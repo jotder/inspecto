@@ -134,6 +134,7 @@ Per-jar signing (P3h, opt-in): `package.ps1 -SignJars -JarKeystore <p12> -JarAli
 `inspecto*.jar` with `jarsigner` BEFORE the SBOM step (so the per-module hashes cover the signed bytes), then
 `tools/check-jar-signatures.mjs <bundle>` asserts every one verifies and all share one signer certificate. The store password comes
 only from `$env:INSPECTO_JARSIGN_STOREPASS`. Without the switch the bundle is unchanged. `*.p12|*.pfx|*.jks|*.keystore` are git-ignored.
+`release.yml` enables it only when the repository secrets `JARSIGN_KEYSTORE_B64`, `INSPECTO_JARSIGN_STOREPASS` and `JARSIGN_ALIAS` exist (optional variable `JARSIGN_TSA_URL`); otherwise its command lines are unchanged. `tools/check-release-signing.mjs` guards that wiring.
 
 ### What the bundle contains — and what it deliberately does not
 

@@ -31,6 +31,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      # Per-jar signing (MODULE-REORG-1 P3h) is OPT-IN: it activates only when ALL three secrets exist. `secrets` is not
+      # readable in an `if:`, so the decision is taken here once and every signing step tests this env value.
+      HAS_JARSIGN: ${{ secrets.JARSIGN_KEYSTORE_B64 != '' && secrets.INSPECTO_JARSIGN_STOREPASS != '' && secrets.JARSIGN_ALIAS != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -150,6 +154,24 @@ jobs:
       - name: Populate the DuckDB extension cache (both platforms)
         run: node tools/fetch-duckdb-extensions.mjs --out "$RUNNER_TEMP/duckdb-extensions"
 
+      # Per-jar signing (P3h). Secrets: JARSIGN_KEYSTORE_B64 (base64 PKCS12), INSPECTO_JARSIGN_STOREPASS, JARSIGN_ALIAS (no
+      # spaces); optional repository variable JARSIGN_TSA_URL. With any of them missing HAS_JARSIGN is false, both steps
+      # are skipped and SIGN_ARGS stays unset, so the package.ps1 command lines below expand exactly as before.
+      - name: Decode jar-signing keystore
+        if: ${{ env.HAS_JARSIGN == 'true' }}
+        env:
+          JARSIGN_KEYSTORE_B64: ${{ secrets.JARSIGN_KEYSTORE_B64 }}
+          JARSIGN_ALIAS: ${{ secrets.JARSIGN_ALIAS }}
+          JARSIGN_TSA_URL: ${{ vars.JARSIGN_TSA_URL }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$JARSIGN_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/jarsign.p12"
+          chmod 600 "$RUNNER_TEMP/jarsign.p12"
+          args="-SignJars -JarKeystore $RUNNER_TEMP/jarsign.p12 -JarAlias $JARSIGN_ALIAS -JarKeystoreType PKCS12"
+          if [ -n "$JARSIGN_TSA_URL" ]; then args="$args -TsaUrl $JARSIGN_TSA_URL"; fi
+          echo "SIGN_ARGS=$args" >> "$GITHUB_ENV"
+
       # Every edition, signed, each WITH an embedded trimmed runtime (OPS-07, 2026-09-14).
       # These steps used to pass -NoRuntime "because the jlink runtime needs the GraalVM jmods cache this
       # runner does not carry", so no published bundle ever contained a runtime. That cause was wrong: the
@@ -163,7 +185,8 @@ jobs:
       - name: Package + SBOM + sign — Personal
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Personal ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions"
+          INSPECTO_JARSIGN_STOREPASS: ${{ secrets.INSPECTO_JARSIGN_STOREPASS }}
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Personal ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
       # Examples smoke (EXAMPLES-STEPS-1): run one bundled example through the bundle's OWN runner against the
       # packaged jar, so a runner that stops declaring -Dassist.safety.roots ("no allowed roots configured")
       # fails the release instead of shipping. hello-csv is the minimum pipeline: CSV -> Parquet, 4 typed columns.
@@ -217,7 +240,8 @@ jobs:
       - name: Package + SBOM + sign — Professional
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Professional ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions"
+          INSPECTO_JARSIGN_STOREPASS: ${{ secrets.INSPECTO_JARSIGN_STOREPASS }}
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Professional ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
       - name: Collect Professional artifacts
         run: |
           set -euo pipefail
@@ -234,7 +258,8 @@ jobs:
       - name: Package + SBOM + sign — Enterprise
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Enterprise ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions"
+          INSPECTO_JARSIGN_STOREPASS: ${{ secrets.INSPECTO_JARSIGN_STOREPASS }}
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Enterprise ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
       - name: Collect Enterprise artifacts
         run: |
           set -euo pipefail
@@ -290,6 +315,23 @@ jobs:
           for zip in *.zip; do
             gpg --batch --verify "$zip.asc" "$zip"
           done
+
+      # Per-jar signatures, checked the way a customer would: unzip each published zip and require every first-party jar
+      # to verify under jarsigner with ONE signer certificate. Skipped entirely unless signing was enabled.
+      - name: Verify jar signatures
+        if: ${{ env.HAS_JARSIGN == 'true' }}
+        run: |
+          set -euo pipefail
+          for z in release/*.zip; do
+            d=$(mktemp -d)
+            unzip -q "$z" -d "$d"
+            node tools/check-jar-signatures.mjs "$d/inspecto-deploy"
+            rm -rf "$d"
+          done
+
+      - name: Remove jar-signing keystore
+        if: ${{ always() && env.HAS_JARSIGN == 'true' }}
+        run: rm -f "$RUNNER_TEMP/jarsign.p12"
 
       - name: Publish the GitHub release
         if: github.event_name == 'push'

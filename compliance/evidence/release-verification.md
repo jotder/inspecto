@@ -107,6 +107,11 @@ must be the one the publisher announces and **identical across all jars**. `node
 per-module SBOMs (`sbom/<jar>.sbom.cdx.json`) record the SHA-256 of the SIGNED jar bytes. A signature without a trusted timestamp
 stops validating when the certificate expires; production releases are timestamped (`-TsaUrl`).
 
+How a customer verifies a jar-signed release: unzip, run `keytool -printcert -jarfile inspecto.jar` and compare the SHA-256
+fingerprint with the one stated in the release notes (published by the operator with the release; this document does not carry one),
+then `jarsigner -verify` on each jar or `node tools/check-jar-signatures.mjs <unzipped bundle> --expect-fingerprint <sha256>`. The
+release pipeline signs jars only when the repository holds the jar-signing secrets, and runs the same check on every published zip.
+
 ## 5. SBOM — what each bundle attests it contains (G1)
 
 **Generated per packaged bundle since 2026-09-02 (COMPLY-1).** `package.ps1` runs `tools/sbom.mjs`

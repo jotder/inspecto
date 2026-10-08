@@ -333,6 +333,11 @@ jobs:
       - name: Guard — the OpenAPI document is the merge of the module fragments
         run: node tools/check-openapi-fragments.mjs && node --test tools/check-openapi-fragments.test.mjs
 
+      # Per-jar signing wiring in release.yml (MODULE-REORG-1 P3h): opt-in on secrets, byte-identical command lines when unset,
+      # no secret inside a run: block, keystore removed in an always() step. Text-level; no build, ~0.1s.
+      - name: Guard — release.yml per-jar signing is opt-in and leak-free
+        run: node tools/check-release-signing.mjs && node --test tools/check-release-signing.test.mjs
+
   test:
     runs-on: ubuntu-latest
     # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is

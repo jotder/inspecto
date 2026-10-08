@@ -724,6 +724,15 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   `-TsaUrl`: without a timestamp a signature stops validating when the certificate expires), and the `release.yml` wiring: decode a
   `JARSIGN_KEYSTORE_B64` secret to a runner temp file and add `-SignJars -JarKeystore ... -JarAlias ... -TsaUrl ...` to the
   `package.ps1` calls. `release.yml` is deliberately NOT edited (no secret exists yet to validate against).
+- **release.yml wiring as built (2026-10-09).** Opt-in and a NO-OP unless the operator adds the secrets. Job env `HAS_JARSIGN` is true
+  only when `JARSIGN_KEYSTORE_B64`, `INSPECTO_JARSIGN_STOREPASS` and `JARSIGN_ALIAS` (no spaces) are ALL set (`secrets` is unreadable in
+  `if:`, hence the env indirection). Steps: *Decode jar-signing keystore* (guarded; secret via `env:`, `$RUNNER_TEMP/jarsign.p12`, chmod
+  600, writes `SIGN_ARGS` to `$GITHUB_ENV`, adds `-TsaUrl` when the optional variable `JARSIGN_TSA_URL` is set); each of the three
+  `package.ps1` calls now ends in unquoted `$SIGN_ARGS` and gets `INSPECTO_JARSIGN_STOREPASS` via `env:`; *Verify jar signatures* unzips
+  every published zip and runs `check-jar-signatures.mjs`; *Remove jar-signing keystore* (`always()`, `rm -f`). **No-op guarantee:**
+  unset, `SIGN_ARGS` is not defined, unquoted `$SIGN_ARGS` word-splits to nothing so the argv is identical, the empty StorePass env
+  is read only under `-SignJars`, and the decode/verify/cleanup steps are skipped. Guard: `tools/check-release-signing.mjs` (+ test, in
+  ci.yml's guards job). **Enable:** add the three secrets and optionally the variable `JARSIGN_TSA_URL`. Not run on a real runner.
 
 ### P3a as built (2026-10-07 — the build-id stamp and its boot check; the jar split is NOT done)
 - **Stamp:** manifest attribute `Inspecto-Build-Id` on every module jar, set ONCE in the parent pom: `maven-jar-plugin`
