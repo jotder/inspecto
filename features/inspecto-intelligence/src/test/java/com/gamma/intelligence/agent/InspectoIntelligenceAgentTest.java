@@ -288,4 +288,38 @@ class InspectoIntelligenceAgentTest {
                 null, List.of(), new RunId("run-4"));
         assertNull(InspectoIntelligenceAgent.toResult(unknownKind).artifact());
     }
+
+    /**
+     * MODULE-REORG-P7 ALERT residue retirement: the {@code alert_triage} state-watch reads the stored Alerts and acks
+     * through the Alert service, so it works with NO operational-object module (this classpath has none; the scan read
+     * ALERT objects before and so always answered empty here).
+     */
+    @Test
+    void alertTriageScansStoredAlertsAndAcksThroughTheAlertServiceWithoutOps() throws Exception {
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
+        assertTrue(svc.objects().isEmpty(), "no operational-object module on this classpath");
+        InspectoIntelligenceAgent agent = new InspectoIntelligenceAgent(StubLlmGateway.builder().defaultReplyText("ok").build());
+        agent.init(svc);
+        try {
+            assertTrue(agent.scanRemediableState().isEmpty(), "no open Alert, no finding");
+
+            svc.eventLog().emit(com.gamma.audit.Event.builder(com.gamma.audit.EventType.SEQUENCE_GAP).pipeline("triage_src")
+                    .message("gap").attr("expected", "f1.csv").build());
+            var findings = agent.scanRemediableState();
+            assertEquals(1, findings.size());
+            var f = findings.get(0);
+            assertEquals("alert_triage", f.actionClass());
+            assertEquals("triage_src", f.subject().get("pipeline"));
+            assertEquals("sequence_gap", f.subject().get("rule"));
+
+            String detail = agent.remediate("alert_triage", f.subject());
+            assertTrue(detail.contains(f.dedupeKey()), detail);
+            assertTrue(agent.scanRemediableState().isEmpty(), "acknowledged: no longer OPEN, so no longer a finding");
+            assertEquals("ACKNOWLEDGED", svc.alertService().orElseThrow().recent(10).get(0).get("state"));
+            assertThrows(java.util.NoSuchElementException.class,
+                    () -> agent.remediate("alert_triage", Map.of("alertId", "ALERT-NOPE")), "an unknown id fails the action");
+        } finally {
+            agent.close();
+        }
+    }
 }

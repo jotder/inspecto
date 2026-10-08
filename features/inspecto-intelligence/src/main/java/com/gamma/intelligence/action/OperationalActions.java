@@ -23,8 +23,8 @@ import java.util.Optional;
  *   <li>{@code job_run} — trigger a job on demand: {@code POST /jobs/{name}/trigger}.</li>
  *   <li>{@code pipeline_rerun} — replay a committed batch of a pipeline (the RCA remediation verb):
  *       {@code POST /runs/{pipeline}/reprocess} with {@code {batchId}}.</li>
- *   <li>{@code alert_ack} — acknowledge an operational alert (an Alert-Center object,
- *       {@code OPEN→ACKNOWLEDGED}): {@code POST /objects/{id}/ack}.</li>
+ *   <li>{@code alert_ack} — acknowledge a stored Alert
+ *       ({@code OPEN→ACKNOWLEDGED}): {@code POST /alerts/{id}/ack}.</li>
  *   <li>{@code schedule_apply} — change a job's cron schedule: {@code POST /jobs/{name}/reschedule}
  *       with {@code {cron}} (requires a write root, like every config-persisting route).</li>
  * </ul>
@@ -62,7 +62,7 @@ public final class OperationalActions {
         result.put("job", job);
         // The control plane echoes runId/status (v1 202) or {status:"triggered"} (root); surface both.
         if (r.body().get("runId") != null) result.put("runId", r.body().get("runId"));
-        if (r.body().get("status") != null) result.put("status", r.body().get("status"));
+        if (r.body().get("state") != null) result.put("status", r.body().get("state"));
         result.put("actor", "agent:" + session);
         return ok(result);
     }
@@ -87,14 +87,14 @@ public final class OperationalActions {
         return ok(result);
     }
 
-    /** {@code alert_ack}: acknowledge an operational alert object ({@code POST /objects/{id}/ack}). */
+    /** {@code alert_ack}: acknowledge a stored Alert ({@code POST /alerts/{id}/ack}; Alerts left the object store in P7). */
     public static ToolResult alertAck(ControlPlaneClient client, ToolCall call, String session) {
         String id = str(call, "id");
         if (id == null || id.isBlank()) return error("id is required");
 
         // Actor rides X-Agent-Session (→ actor=agent:<session>); no body needed.
         ControlPlaneClient.Response r = client.exchange("POST",
-                "/objects/" + id + "/ack", null, null, session);
+                "/alerts/" + id + "/ack", null, null, session);
         if (r.status() < 0) return error(r.raw());
         if (!r.ok()) return error("alert_ack failed: status " + r.status() + " — " + r.raw());
 

@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * End-to-end tests for the P3 operational act tools ({@link OperationalActions}) driving the loopback
  * {@link ControlPlaneClient} against a stub control plane. They assert the exact wire contract the
  * "no private backdoor" guarantee rests on — the governed route each verb rides
- * ({@code /jobs/{name}/trigger}, {@code /runs/{pipeline}/reprocess}, {@code /objects/{id}/ack},
+ * ({@code /jobs/{name}/trigger}, {@code /runs/{pipeline}/reprocess}, {@code /alerts/{id}/ack},
  * {@code /jobs/{name}/reschedule}), the request body, and the {@code X-Agent-Session} attribution
  * header on every write — plus the non-2xx and absent-control-plane failure paths. (The real
  * {@code actor=agent} audit on those routes is proven separately in the core module.)
@@ -114,7 +114,7 @@ class OperationalActionsTest {
     }
 
     @Test
-    void alertAckPostsToTheObjectAckRoute() {
+    void alertAckPostsToTheAlertAckRoute() {
         ToolResult r = OperationalActions.alertAck(new ControlPlaneClient(),
                 call("alert_ack", Map.of("id", "alert-9001"), "sess-4"), "sess-4");
         assertTrue(r.ok(), () -> "expected ok, got: " + r.error());
@@ -125,7 +125,7 @@ class OperationalActionsTest {
 
         Recorded post = requests.get(0);
         assertEquals("POST", post.method());
-        assertEquals("/api/v1/objects/alert-9001/ack", post.path());
+        assertEquals("/api/v1/alerts/alert-9001/ack", post.path());
         assertEquals("sess-4", post.agentSession());
     }
 

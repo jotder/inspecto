@@ -1403,12 +1403,12 @@ final class InspectoTools {
     }
 
     /**
-     * AGT-5 P3 {@code alert_ack} (act, L2): acknowledge an operational alert (an Alert-Center object,
-     * {@code OPEN→ACKNOWLEDGED}) via {@code POST /objects/{id}/ack}. Mutating: same gate + audit path.
+     * AGT-5 P3 {@code alert_ack} (act, L2): acknowledge a stored Alert
+     * ({@code OPEN→ACKNOWLEDGED}) via {@code POST /alerts/{id}/ack}. Mutating: same gate + audit path.
      */
     private static Tool alertAck(ControlPlaneClient controlPlane) {
         ToolSpec spec = new ToolSpec(OperationalActions.TOOL_ALERT_ACK,
-                "Acknowledge an operational alert (Alert-Center object: OPEN→ACKNOWLEDGED) via the "
+                "Acknowledge a stored Alert (OPEN→ACKNOWLEDGED) via the "
                         + "governed control plane. Gated: dry-run → human approval → audited ack. Args: id.",
                 "{\"type\":\"object\",\"properties\":{"
                         + "\"id\":{\"type\":\"string\"}},"

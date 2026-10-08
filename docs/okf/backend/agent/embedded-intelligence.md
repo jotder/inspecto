@@ -145,8 +145,8 @@ governed from an operator inbox UI. Five slices shipped (`a30049a`, `b5069c1`, `
   the **same** governed control-plane route a UI caller hits (no backdoor), attributed via
   `X-Agent-Session`: `job_run` (`POST /jobs/{name}/trigger`, `Capability.TRIGGER_JOB`),
   `pipeline_rerun` (replay a committed batch — the RCA remediation verb — `POST /runs/{pipeline}/reprocess`
-  with `{batchId}`, `RUN_PIPELINE`), `alert_ack` (acknowledge an Alert-Center object,
-  `POST /objects/{id}/ack`, `WRITE_DATASTORE`), `schedule_apply` (change a job's cron,
+  with `{batchId}`, `RUN_PIPELINE`), `alert_ack` (acknowledge a stored Alert,
+  `POST /alerts/{id}/ack`, `WRITE_DATASTORE`), `schedule_apply` (change a job's cron,
   `POST /jobs/{name}/reschedule` with `{cron}`, write-root-gated server-side, `EDIT_CONFIG`). Belt is
   now **18** (14 read/draft + 4 component/operational act tools were 2, now the two families total 6
   mutating). The approval previewer in `start()` now dispatches by tool family — operational tools get a

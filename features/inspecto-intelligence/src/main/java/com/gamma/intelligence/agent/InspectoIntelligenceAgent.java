@@ -202,7 +202,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             opsMonitor = new OpsMonitor(autonomy, autonomyLog, this::remediate);
             opsMonitor.attach(service.eventLog());
             // P4 polish: an optional periodic state-watch (poll) complements the event path. When
-            // -Dintelligence.opsmonitor.statewatch.seconds>0, it scans open ALERT objects and — only if
+            // -Dintelligence.opsmonitor.statewatch.seconds>0, it scans open stored Alerts and — only if
             // the operator set alert_triage to AUTO within budget — acks them via the audited alert_ack.
             long watchSeconds = Long.getLong("intelligence.opsmonitor.statewatch.seconds", 0L);
             if (watchSeconds > 0) opsMonitor.attachStateWatch(this::scanRemediableState, watchSeconds);
@@ -578,7 +578,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
      * {@code agent:ops-monitor}. Returns a human detail on success; throws on a non-2xx / unreachable
      * control plane so {@link OpsMonitor} records the action as FAILED.
      */
-    private String remediate(String actionClass, Map<String, Object> subject) throws Exception {
+    String remediate(String actionClass, Map<String, Object> subject) throws Exception {
         ControlPlaneClient client = new ControlPlaneClient();
         return switch (actionClass) {
             case OpsMonitor.ACTION_BATCH_RERUN -> {
@@ -592,10 +592,9 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             }
             case OpsMonitor.ACTION_ALERT_TRIAGE -> {
                 String alertId = String.valueOf(subject.get("alertId"));
-                ToolCall call = new ToolCall(OperationalActions.TOOL_ALERT_ACK,
-                        Map.of("id", alertId), new RunId(OpsMonitor.ACTOR_SESSION));
-                ToolResult r = OperationalActions.alertAck(client, call, OpsMonitor.ACTOR_SESSION);
-                if (!r.ok()) throw new IllegalStateException(r.error() == null ? "alert_ack failed" : r.error());
+                // The Alert service's own acknowledge (what POST /alerts/{id}/ack calls), attributed to the agent.
+                var alerts = service.alertService().orElseThrow(() -> new IllegalStateException("no Alert engine"));
+                alerts.acknowledge(alertId, "agent:" + OpsMonitor.ACTOR_SESSION);
                 yield "acknowledged alert " + alertId;
             }
             default -> throw new IllegalArgumentException("no remediator for action class '" + actionClass + "'");
@@ -604,29 +603,24 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
 
     /**
      * The {@code ops_monitor} state-watch scanner (P4 polish): the current remediable state, read
-     * in-process (never mutating). Today it surfaces open {@code ALERT} operational objects as
-     * {@code alert_triage} findings (each object carries its own id + pipeline, so no Signal-id gap);
+     * in-process (never mutating). Today it surfaces open stored Alerts as
+     * {@code alert_triage} findings (each Alert carries its own id + pipeline, so no Signal-id gap);
      * the policy engine decides whether any actually get acked. Generalizes to more finding kinds later.
      */
-    private List<OpsMonitor.Finding> scanRemediableState() {
+    List<OpsMonitor.Finding> scanRemediableState() {
         if (service == null) return List.of();
         List<OpsMonitor.Finding> findings = new java.util.ArrayList<>();
         try {
-            // ⚠ Through the ObjectAccess seam since EDG-01 cell 7 — operational objects are the optional
-            // inspecto-ops module, so on a bundle without it this scan yields nothing and the agent's
-            // other monitors are unaffected. ⛔ Not an error: an absent optional module is a deployment
-            // state, and reporting "scan failed" would teach an operator something is broken.
-            var objects = service.objects().orElse(null);
-            if (objects == null) return List.of();
-            for (Map<String, Object> obj : objects.findByStatus(com.gamma.workflow.ObjectType.ALERT, "OPEN")) {
+            // MODULE-REORG-P7 (2026-10-08): Alerts are stored in the Alert store, which exists on EVERY edition, so
+            // this scan no longer depends on the optional inspecto-ops module (it read ALERT objects before).
+            var alerts = service.alertService().orElse(null);
+            if (alerts == null) return List.of();
+            for (var row : alerts.openAlerts()) {
                 Map<String, Object> subject = new HashMap<>();
-                String alertId = String.valueOf(obj.get("id"));
-                subject.put("alertId", alertId);
-                subject.put("pipeline", obj.get("correlationId"));
-                @SuppressWarnings("unchecked")
-                Map<String, String> attrs = (Map<String, String>) obj.get("attributes");
-                if (attrs != null) subject.put("rule", attrs.get("rule"));
-                findings.add(new OpsMonitor.Finding(OpsMonitor.ACTION_ALERT_TRIAGE, alertId, subject));
+                subject.put("alertId", row.id());
+                subject.put("pipeline", row.scope());
+                subject.put("rule", row.attributes().get("rule"));
+                findings.add(new OpsMonitor.Finding(OpsMonitor.ACTION_ALERT_TRIAGE, row.id(), subject));
             }
         } catch (RuntimeException e) {
             log.warn("ops_monitor state-watch scan failed: {}", e.getMessage());

@@ -80,7 +80,7 @@ class RunbookActionsTest {
         assertEquals(2, v.get("total"));
 
         assertEquals(2, requests.size(), "both steps hit the control plane");
-        assertEquals("/api/v1/objects/alert-1/ack", requests.get(0).path(), "step 1 acks the alert first");
+        assertEquals("/api/v1/alerts/alert-1/ack", requests.get(0).path(), "step 1 acks the alert first");
         assertEquals("/api/v1/runs/orders_etl/reprocess", requests.get(1).path(), "step 2 replays the batch");
         assertTrue(requests.stream().allMatch(rq -> "sess-1".equals(rq.agentSession())),
                 "every step carries X-Agent-Session");
@@ -162,7 +162,7 @@ class RunbookActionsTest {
         assertEquals(1, v.get("haltedAtStep"));
 
         assertEquals(1, requests.size(), "the reprocess step must NOT run after ack failed");
-        assertEquals("/api/v1/objects/alert-2/ack", requests.get(0).path());
+        assertEquals("/api/v1/alerts/alert-2/ack", requests.get(0).path());
         List<Map<String, Object>> steps = (List<Map<String, Object>>) v.get("steps");
         assertEquals(1, steps.size());
         assertEquals(false, steps.get(0).get("ok"));
