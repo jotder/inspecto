@@ -26,9 +26,6 @@ public final class AlertMigration {
 
     private static final Logger log = LoggerFactory.getLogger(AlertMigration.class);
 
-    /** {@code EventObjectBridge.GAP_RULE} / {@code IMBALANCE_RULE} — spelled here because the bridge is in the optional module. */
-    private static final java.util.Set<String> BRIDGE_RULES = java.util.Set.of("sequence_gap", "conservation_imbalance");
-
     private AlertMigration() {}
 
     /** Adopt the still-active ALERT objects of {@code objects} into {@code store}; the number copied (0 when skipped). */
@@ -42,8 +39,13 @@ public final class AlertMigration {
                 @SuppressWarnings("unchecked")
                 Map<String, String> attrs = o.get("attributes") instanceof Map<?, ?> m
                         ? new LinkedHashMap<>((Map<String, String>) m) : Map.of();
-                // The Event bridge's gap / imbalance ALERTs are not Alert Rule firings and stay objects (slice 2 report).
-                if (BRIDGE_RULES.contains(attrs.get("rule"))) continue;
+                // The Event bridge's gap / imbalance ALERTs (now raised into the store by EventAlertBridge) are adopted
+                // too, with the de-duplication key the bridge stamps, so a re-reported gap is not cloned.
+                String rule = attrs.get("rule");
+                if (EventAlertBridge.GAP_RULE.equals(rule) && attrs.get("expected") != null)
+                    attrs.put(AlertService.EVENT_KEY, EventAlertBridge.gapKey(attrs.get("expected")));
+                else if (EventAlertBridge.IMBALANCE_RULE.equals(rule) && attrs.get("node") != null)
+                    attrs.put(AlertService.EVENT_KEY, EventAlertBridge.imbalanceKey(attrs.get("node")));
                 store.insert(new AlertStore.Row(String.valueOf(o.get("id")), str(o.get("title")), str(o.get("description")),
                         str(o.get("severity")), str(o.get("correlationId")), attrs, str(o.get("status")),
                         o.get("createdAt") instanceof Number n ? n.longValue() : System.currentTimeMillis(), 0L, null, null, null));

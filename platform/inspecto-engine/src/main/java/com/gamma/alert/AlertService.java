@@ -356,6 +356,38 @@ public final class AlertService {
         }).toList();
     }
 
+    /** Every stored Alert still {@code OPEN} (not yet acknowledged), newest first; empty when the store cannot be read. */
+    public List<AlertStore.Row> openAlerts() {
+        try {
+            return records.openAlertRows();
+        } catch (RuntimeException e) {
+            log.warn("could not read the open Alerts from the Alert store: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** The attribute that de-duplicates an Alert raised from a domain Event ({@link #raiseFromEvent}). */
+    static final String EVENT_KEY = "eventKey";
+
+    /**
+     * Record an Alert that is NOT an Alert Rule firing but the consequence of a domain Event (a sequence gap, a
+     * conservation imbalance: {@link EventAlertBridge}). It joins the {@code GET /alerts} ring and the Alert store,
+     * de-duplicated while a non-terminal Alert with the same {@code dedupeKey} exists in {@code scope}. No Incident,
+     * no {@code ALERT_FIRED} event (the source Event is the record) and no cooldown.
+     *
+     * @return the new Alert record's id, or empty when an active one already carries {@code dedupeKey}
+     */
+    public synchronized java.util.Optional<String> raiseFromEvent(Alert alert, String title, String scope,
+                                                                  String dedupeKey, Map<String, String> attributes) {
+        String sc = scope == null ? "" : scope;
+        if (records.activeAlertIndex(sc, EVENT_KEY).containsKey(dedupeKey)) return java.util.Optional.empty();
+        Map<String, String> attrs = new LinkedHashMap<>(attributes);
+        attrs.put(EVENT_KEY, dedupeKey);
+        fired.addFirst(alert);
+        while (fired.size() > capacity) fired.removeLast();
+        return java.util.Optional.of(records.openAlert(alert, title, alert.message(), alert.severity(), sc, attrs));
+    }
+
     /**
      * Acknowledge the stored Alert {@code alertId} as {@code actor} ({@code OPEN → ACKNOWLEDGED}).
      *

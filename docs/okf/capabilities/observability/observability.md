@@ -806,7 +806,7 @@ pages for *what is*.
   `EventCoreTest`, `EventLogAndAppenderTest`, `ParquetEventStoreTest`, `MetricRegistryTest`, `AuditAttrsTest`;
   `inspecto-observability` — `ControlApiEventsTest`, `ControlApiEventsPageTest`; `inspecto-observability` —
   `MetricsExpositionTest`; `inspecto-backup` — `BackupTaskTest`, `BackupPathContainmentTest`;
-  `inspecto-ops` — `IncidentPurgeTaskTest`, `EventObjectBridgeTest`; `inspecto-engine` —
+  `inspecto-ops` — `IncidentPurgeTaskTest`; `inspecto-engine` — `EventAlertBridgeTest`,
   `MaintenanceLibraryTest`, `NoBackupTaskShipsInThePersonalBuildTest`, `JobServiceTest`,
   `JobServiceOrphanAuditTest`, `PipelineJobRunnerTest`, `ConservationCheckTest`, `ConsignmentProvenanceTest`,
   `DbJobRunStoreTest`, `ConcurrencyBrokerTest`, `EnrichmentAuditReaderTest`. UI: 21 vitest specs under

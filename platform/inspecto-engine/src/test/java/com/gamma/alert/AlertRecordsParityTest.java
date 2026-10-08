@@ -408,17 +408,19 @@ class AlertRecordsParityTest {
         String keep = ops.open(ObjectType.ALERT, "Failed batches on P", "msg", "warning", "P", Map.of("rule", "r-failed"));
         String done = ops.open(ObjectType.ALERT, "old", "msg", "warning", "P", Map.of("rule", "r-old"));
         ops.close(done);                                                       // RESOLVED: history, not state
-        ops.open(ObjectType.ALERT, "gap", "msg", "high", "P", Map.of("rule", "sequence_gap"));   // the Event bridge's
+        ops.open(ObjectType.ALERT, "gap", "msg", "high", "P", Map.of("rule", "sequence_gap", "expected", "f1"));   // the Event bridge's
         ops.open(ObjectType.INCIDENT, "inc", "msg", "critical", "P", Map.of("rule", "r-failed")); // not an Alert
 
         AlertStore store = new InMemoryAlertStore();
-        assertEquals(1, AlertMigration.adopt(ops, store), "only the still-active, Alert-Rule-fired ALERT is adopted");
+        assertEquals(2, AlertMigration.adopt(ops, store), "the still-active ALERTs: the Alert Rule's and the Event bridge's gap (not the resolved one, not the INCIDENT)");
+        assertEquals(1, store.activeIndex("P", "eventKey").size(), "the adopted gap carries the bridge's de-duplication key");
+        assertTrue(store.activeIndex("P", "eventKey").containsKey("sequence_gap|f1"));
         assertTrue(store.hasActive("P", "r-failed"), "it carries the de-duplication state");
         assertEquals(keep, store.activeIndex("P", "rule").get("r-failed"), "under its OWN id, so existing Incident links still resolve");
         assertEquals(4, ops.opened.size(), "the object rows are untouched - nothing deleted, nothing added");
 
         assertEquals(0, AlertMigration.adopt(ops, store), "idempotent: a non-empty store is never touched again");
-        assertEquals(1, store.size());
+        assertEquals(2, store.size());
         // ... and a rule that was adopted does not re-fire after the upgrade
         assertEquals(0, AlertMigration.adopt(null, store));
     }
@@ -438,6 +440,7 @@ class AlertRecordsParityTest {
         @Override public boolean acknowledgeAlert(String id, String actor) { calls++; return inner.acknowledgeAlert(id, actor); }
         @Override public Optional<AlertStore.Row> findAlert(String id) { calls++; return inner.findAlert(id); }
         @Override public List<AlertStore.Row> recentAlertRows(int limit) { calls++; return inner.recentAlertRows(limit); }
+        @Override public List<AlertStore.Row> openAlertRows() { calls++; return inner.openAlertRows(); }
         @Override public boolean reopenIncident(String id, String actor) { calls++; return inner.reopenIncident(id, actor); }
         @Override public void linkEscalation(String i, String a, String actor) { calls++; inner.linkEscalation(i, a, actor); }
         @Override public List<Alert> recentFired(int limit) { calls++; return inner.recentFired(limit); }

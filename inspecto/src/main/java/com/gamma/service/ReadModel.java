@@ -106,6 +106,9 @@ public interface ReadModel {
     /** The operational-object seam, or empty when the optional inspecto-ops module is absent. */
     java.util.Optional<com.gamma.objects.ObjectAccess> objects();
 
+    /** The Alert engine (every edition; its stored Alerts survive a restart) - what a triage reads and acknowledges through. */
+    Optional<com.gamma.alert.AlertService> alertService();
+
     /** The job service, or empty when this deployment runs no jobs. */
     Optional<JobService> jobService();
 

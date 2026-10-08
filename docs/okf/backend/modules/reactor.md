@@ -72,7 +72,7 @@ per-file copy is a regression:
   (`ExpectationEvaluator.literal`, `SqlViews`' pinned `'`→`''`).
 
 Deliberately left as local copies, each verified different: `PipelineJobRunner.safe` (no null-guard,
-where `fileSafe(null)` yields `"_"`), `EventObjectBridge.putIfPresent` (`Map<String,String>` AND
+where `fileSafe(null)` yields `"_"`), `EventAlertBridge.putIfPresent` (`Map<String,String>` AND
 excludes blanks), `RowShaper.str` (a `PipelineNode` accessor, not a map lookup).
 
 ## Version management (M1)

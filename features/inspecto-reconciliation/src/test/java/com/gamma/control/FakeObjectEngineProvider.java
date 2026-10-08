@@ -178,11 +178,6 @@ public final class FakeObjectEngineProvider implements ObjectEngineProvider {
                     .map(FakeObjects::flatten).toList();
         }
 
-        @Override
-        public Optional<java.util.function.Consumer<com.gamma.audit.Event>> eventSubscriber() {
-            return Optional.empty();
-        }
-
         private static Map<String, Object> flatten(Fake o) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("kind", o.kind().name().toLowerCase(java.util.Locale.ROOT));

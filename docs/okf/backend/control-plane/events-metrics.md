@@ -391,7 +391,7 @@ timestamp: 2026-07-16T00:00:00Z
   delivery-status webhooks, digest batching.
 * **Conservation imbalance now notifies** (2026-07-23) — `NotificationRules.defaults()` gained a rule
   for `FLOW_CONSERVATION_IMBALANCE` (category `ops`, `minLevel=WARN` so both `LOSS`/ERROR and
-  `AMPLIFICATION`/WARN reach the feed, matching that `EventObjectBridge` opens an ALERT object for both
+  `AMPLIFICATION`/WARN reach the feed, matching that `EventAlertBridge` raises an Alert for both
   kinds). Closes the gap `docs/ops/provenance-conservation-verification.md` flagged (OPS-5 product Q).
 * **Authorable notification rules** (2026-07-24) — an operator can now add/override notification rules
   at runtime, not just channels. `NotificationRule` gained an `id` + `enabled` flag and

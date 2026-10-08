@@ -48,6 +48,10 @@ final class StoredAlertRecords implements AlertRecords {
 
     @Override public List<AlertStore.Row> recentAlertRows(int limit) { return store.recentRows(limit); }
 
+    @Override public List<AlertStore.Row> openAlertRows() {
+        return store.allActive().stream().filter(r -> AlertStore.WORKFLOW.initialState().equals(r.state())).toList();
+    }
+
     @Override public boolean reopenIncident(String incidentId, String actor) {
         return objects.map(o -> o.transition(incidentId, "reopen", actor)).orElse(false);
     }

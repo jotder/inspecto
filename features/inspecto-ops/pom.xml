@@ -31,8 +31,9 @@
         WHAT PERSONAL LOSES, DELIBERATELY (operator decision 2026-09-08). Two EDITIONS rows were amended in
         the same change rather than left to contradict the build:
           * OPS-01 no longer lists `objects` among the operational stores Personal carries.
-          * SP-CTL-02's gap watchdog still raises the EVENT on Personal but no longer promotes it to an
-            ALERT object — the promotion is EventObjectBridge, which lives here.
+          * SP-CTL-02's gap watchdog raised the EVENT on Personal but no longer promoted it to an
+            ALERT object (EventObjectBridge lived here). Since 2026-10-08 the bridge is EventAlertBridge in the
+            core and raises a stored Alert on every edition, so that row is whole on Personal again.
         Event RECORDING is untouched in every edition; only the promotion and the managed objects are gated.
 
         NOT IN THIS MODULE: /alerts and /alerts/rules. That is AlertsService over config-authored alert

@@ -1,6 +1,5 @@
 package com.gamma.ops;
 
-import com.gamma.audit.Event;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.workflow.ObjectType;
 import com.gamma.objects.TagAssignment;
@@ -9,7 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
  * The domain's implementation of the core {@link ObjectAccess} seam (EDG-01 cell 7, 2026-09-08).
@@ -181,18 +179,5 @@ public final class ObjectServiceAccess implements ObjectAccess {
     public List<Map<String, Object>> findByStatus(ObjectType kind, String status) {
         return service.query(ObjectQuery.builder().objectType(kind).status(status).build())
                 .stream().map(ObjectServiceAccess::flatten).toList();
-    }
-
-    /**
-     * The gap / conservation-imbalance → ALERT promotion, which core registers on its {@code EventLog}
-     * instead of constructing {@code new EventObjectBridge(...)} itself.
-     *
-     * <p>⛔ Absent this module there is simply no subscriber, so the events are still recorded and nothing
-     * promotes them — which is exactly the amended EDITIONS {@code SP-CTL-02} contract for Personal.
-     */
-    @Override
-    public Optional<Consumer<Event>> eventSubscriber() {
-        EventObjectBridge bridge = new EventObjectBridge(service);
-        return Optional.of(bridge::onEvent);
     }
 }

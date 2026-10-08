@@ -13,9 +13,9 @@ here.
   must equal records that left. A violation emits `EventType.FLOW_CONSERVATION_IMBALANCE` with
   `node`/`recordsIn`/`recordsOut`/`kind` (`LOSS` or `AMPLIFICATION`) attributes, correlated to the
   run's `batchId`.
-- Downstream consequences already wired: the event is promoted to a managed **ALERT object** by
-  `EventObjectBridge` (de-duplicated per `(pipeline, node)`), so an imbalance surfaces in the
-  Alerts/Incidents view; and the run's per-node counts drive the Lineage/Sankey overlay served by
+- Downstream consequences already wired: the event is raised as a stored **Alert** by
+  `EventAlertBridge` (de-duplicated per `(pipeline, node)`), so an imbalance surfaces in the
+  Alerts view; and the run's per-node counts drive the Lineage/Sankey overlay served by
   `JobRoutes` — `GET /provenance` and `GET /provenance/batches` (not `LineageRoutes`, which is the
   separate file→store→flow ingest-lineage endpoint).
   - A conservation imbalance now also raises an operator **notification** (product Q resolved

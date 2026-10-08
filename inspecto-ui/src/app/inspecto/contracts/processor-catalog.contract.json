@@ -901,7 +901,7 @@
     "icon" : "heroicons_outline:bell-alert",
     "status" : "delivered",
     "nodeType" : "gap",
-    "note" : "same detector; a gap raises the `SEQUENCE_GAP` event in EVERY edition, but promoting it to a managed ALERT object is `EventObjectBridge`, which ships in the optional `inspecto-ops` module — so Personal is partial (EDG-01 cell 7, operator-approved 2026-09-08)",
+    "note" : "same detector; a gap raises the `SEQUENCE_GAP` event in EVERY edition, and `EventAlertBridge` raises it as a stored Alert on every edition, Personal included (P7 ALERT residue retirement 2026-10-08; it was an ALERT object only where the optional `inspecto-ops` module was present)",
     "addable" : true
   }, {
     "id" : "control.audit.stamp",

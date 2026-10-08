@@ -42,7 +42,9 @@ const ENTERPRISE_ONLY = new Set(['quality.pii.mask', 'quality.compliance.redact'
 // hand-edited into the generated table — so `--check` went RED on master, and regenerating SILENTLY REVERTED
 // an approved product decision back to ✅. A generator that cannot express a decision the board must state
 // turns the guard into pressure to undo the decision. Add the row here instead of hand-editing the table.
-const PARTIAL_ON_PERSONAL = new Set(['control.gap.detector']);
+// EMPTY since 2026-10-08 (P7 ALERT residue retirement): `EventAlertBridge` moved into the core and raises the gap as a
+// stored Alert on every edition, so `SP-CTL-02` is no longer degraded on Personal. The mechanism stays for the next row.
+const PARTIAL_ON_PERSONAL = new Set([]);
 
 const GLYPH = { delivered: '✅', partial: '🟡', planned: '🔲' };
 

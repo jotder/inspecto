@@ -47,7 +47,7 @@ the real ControlApi.
   `RELATED_TO` (`ObjectRoutes.createObject`). The create dialog collects them via a required "Linked
   entities" multi-select + relationship select (`object-create.dialog`; a case defaults to `CONTAINS`, an
   incident to `RELATED_TO`). **Unaffected:** the
-  auto-creation paths (`AlertService`/`DecisionRoutes`/`ExpectationRoutes`/`ReconRunJob`/`EventObjectBridge`)
+  auto-creation paths (`AlertService`/`DecisionRoutes`/`ExpectationRoutes`/`ReconRunJob`; `AlertService` and the Event bridge write the Alert store since 2026-10-08)
   open objects directly via `ObjectService.open`, bypassing the route. **Bootstrap consequence:** the first
   object in an empty space must come from an auto-creation path — there is nothing to link to yet, so the
   dialog shows a "no existing objects to link to" hint and blocks manual creation until one exists.

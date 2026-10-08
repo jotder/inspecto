@@ -238,8 +238,8 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   `AlertService` evaluates on every terminal `ConsignmentEvent` over the ledger window, with a per-rule cooldown; on
   breach emits `ALERT_FIRED` and (if `ObjectService` wired) opens a managed `ALERT` object (dup-suppressed).
 - **Objects (`com.gamma.ops`):** managed Cases/Issues/Alerts with a workflow lifecycle, comments, attachments,
-  RCA, and correlation links/graph. `EventObjectBridge` promotes `SEQUENCE_GAP` events → `ALERT` objects
-  independently of alert rules. Correlation id is the join key between the object engine and the event timeline.
+  RCA, and correlation links/graph. `EventAlertBridge` (core) raises `SEQUENCE_GAP` events as stored Alerts
+  independently of alert rules (it promoted `ALERT` objects until 2026-10-08). Correlation id is the join key between the object engine and the event timeline.
 - **Events:** `ALERT_FIRED`, `OBJECT_OPENED`, `OBJECT_ACTIVITY`, `OBJECT_SLA_BREACH`, `OBJECT_LINKED`,
   `OBJECT_NOTE`.
 - **State:** event ring or Parquet (`inspecto-events/`); objects/links/notes in-mem or DuckDB
@@ -278,7 +278,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 | `FILE_FETCH_FAILED` | fetch/integrity failed | file | CollectorProcessor |
 | `FILE_CHANGED` | known path, changed content | file | CollectorProcessor |
 | `FILE_ARCHIVED` | source post-action done | file, action | CollectorProcessor |
-| `SEQUENCE_GAP` | expected file missing | expected, sequence, unit | CollectorProcessor → also `EventObjectBridge` → ALERT object |
+| `SEQUENCE_GAP` | expected file missing | expected, sequence, unit | CollectorProcessor → also `EventAlertBridge` → stored Alert |
 | `SOURCE_CIRCUIT_OPEN` | breaker tripped | source | CollectorProcessor |
 | `STORE_DELETE_CONFLICT` | delete races active flow | store, activeProducers, activeConsumers | CollectorService |
 | `ALERT_FIRED` | alert-rule breach | rule, metric, value, severity | AlertService |
@@ -566,7 +566,7 @@ marker and *will* re-pick the file.
 inputs: `GET /pipelines/{n}/quarantine` (reason subdir tells you field_mismatch vs unreadable vs corrupt_download).
 
 **Sequence gap / missing file.** `SEQUENCE_GAP` event (attrs expected/sequence/unit), `inspecto_sequence_gaps_total`;
-also auto-promoted to an `ALERT` object via `EventObjectBridge` (find it in `/objects?type=ALERT`).
+also raised as a stored Alert via `EventAlertBridge` (find it in `GET /alerts`; it was an `ALERT` object until 2026-10-08).
 
 **Collector circuit open.** `SOURCE_CIRCUIT_OPEN` event (attr source) after repeated discover failures; the collector is
 skipped until the breaker half-opens. Check connectivity (`POST /connections/{id}/test`), then it self-recovers.

@@ -2,12 +2,10 @@ package com.gamma.objects;
 
 import com.gamma.workflow.ObjectType;
 import com.gamma.api.PublicApi;
-import com.gamma.audit.Event;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
  * The core's seam onto <b>operational objects</b> — Alerts → Incidents → Cases → Tasks and their notes,
@@ -145,19 +143,6 @@ public interface ObjectAccess {
     default long countByStatus(ObjectType kind, String status) {
         return findByStatus(kind, status).size();
     }
-
-    /**
-     * The module's {@code EventLog} subscriber, which promotes qualifying events (a sequence gap, a
-     * conservation imbalance) into managed ALERT objects — or empty when it has none to contribute.
-     *
-     * <p>⚠ This exists because {@code CollectorService} used to construct
-     * {@code new com.gamma.ops.EventObjectBridge(objects)} unconditionally, <b>by fully-qualified name with
-     * no import</b> — a coupling an import census cannot see (the trap that broke cell 4's build). Core now
-     * asks for a subscriber and registers whatever it gets, so a bundle without the module simply has no
-     * promotion step. ⛔ The events themselves are still recorded either way: gating the promotion must
-     * never gate the event, which is what EDITIONS {@code SP-CTL-02} keeps promising Personal.
-     */
-    Optional<Consumer<Event>> eventSubscriber();
 
     /**
      * Link {@code fromId} (an object) to a <b>subject that is not an operational object</b> — {@code subjectKind} +

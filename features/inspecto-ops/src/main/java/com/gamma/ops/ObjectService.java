@@ -99,7 +99,7 @@ public final class ObjectService {
     /**
      * Attribute key holding WHEN THE UNDERLYING CONDITION OCCURRED (epoch ms) — the numerator MTTD needs
      * and nothing recorded until 2026-09-15 (`INCIDENT-KPI-MTTD-1`). Stamped at promotion by whoever has the
-     * occurrence time in hand: {@code EventObjectBridge} copies the triggering {@code Event.ts()}. ⚠ It is
+     * occurrence time in hand: a producer such as the retired Event bridge copies the triggering {@code Event.ts()}. ⚠ It is
      * the event's OWN time, not the earliest Signal at the causation root — that fuller anchor needs an
      * event-store read on the analytics path, which is a seam nobody has built and this row refuses to
      * fake. An object without the stamp is simply excluded from the MTTD mean, never counted as zero.

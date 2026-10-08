@@ -61,6 +61,9 @@ public interface AlertRecords {
     /** One stored Alert by id, in any state. */
     Optional<AlertStore.Row> findAlert(String alertId);
 
+    /** Every Alert still in state {@code OPEN} (not yet acknowledged), newest first: what an automated triage reads. */
+    List<AlertStore.Row> openAlertRows();
+
     /** The most recent stored Alerts that carry a fired {@link Alert}, newest first (any state). */
     List<AlertStore.Row> recentAlertRows(int limit);
 

@@ -168,8 +168,8 @@ core at all.
    (`CopyOnWriteArrayList` subscribers). *Writers:* `AlertService`, `control.AuditTrail`,
    `ExpectationRoutes`, `EventStoreAppender` (SLF4J bridge), `inspector.AcquisitionTelemetry`,
    `ReportJob`, `ObjectService`, `PipelineJobRunner`, `CollectorService`. *Subscribers* (wired only in
-   `CollectorService.java:347,384`): `ops.EventObjectBridge` — promotes `SEQUENCE_GAP` /
-   `FLOW_CONSERVATION_IMBALANCE` events into managed ALERT objects — and the notification
+   `CollectorService.java:347,384`): `alert.EventAlertBridge` — raises `SEQUENCE_GAP` /
+   `FLOW_CONSERVATION_IMBALANCE` events as stored Alerts — and the notification
    subscriber.
 2. **`etl.ConsignmentEventBus`** — the consignment-commit fan-out (`Consumer<ConsignmentEvent>`), subscribed by
    `JobService`, `EnrichmentService`, `MetricsService`, `CollectorService.onUpstreamCommit` (event
@@ -206,7 +206,7 @@ core at all.
 - *Strategy* — `ConsignmentIngestStrategy` (Csv vs StreamingPlugin), `OutputFormat` (enum-as-strategy),
   `TransformCompiler` function registry, `RouteModule` (shape only — see below).
 - *SPI Registry* — the 8 ServiceLoader seams (§4).
-- *Bridge/anti-corruption* — `ops.EventObjectBridge` (events → managed objects).
+- *Bridge/anti-corruption* — `alert.EventAlertBridge` (events → stored Alerts).
 - *Ring buffer* — `InMemoryEventStore` (bounded, drop-oldest).
 
 **Misapplied / missing (improvement-plan items):**

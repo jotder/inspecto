@@ -1281,7 +1281,7 @@ file to `archive/archive/…`).
 | Processor | Id | Maps to |
 |---|---|---|
 | File sequence & gap integrity analyzer | `control.file.sequence_analyzer` | `gap` — Collector `gap_detection: {sequence}` → the gap node + SEQUENCE_GAP events |
-| Sequence-gap & data-loss watchdog | `control.gap.detector` | `gap` — same detector; gaps raise ALERT objects via the EventObjectBridge |
+| Sequence-gap & data-loss watchdog | `control.gap.detector` | `gap` — same detector; gaps raise stored Alerts via the EventAlertBridge |
 | Audit metadata & lineage stamper | `control.audit.stamp` | `sink.persistent` — `filename_column` + the per-file/batch/lineage ledgers + `__batch_id` provenance |
 | Throttle & rate limiter | `control.throttle` | `acquisition` — Collector `fetch.rate_limit` + intake caps + the concurrency broker |
 | Circuit breaker & fallback switch | `control.circuitbreaker` | `acquisition` — Collector `circuit_breaker` + `retry` |

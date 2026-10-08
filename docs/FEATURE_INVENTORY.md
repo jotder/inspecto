@@ -177,7 +177,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 | Alert Rule (`alert-rule` component, `registry/alert-rules/<name>.toon`) | `{ name, metric: error_rate, comparator: gt, threshold: 0.05, window: 1h, severity: WARNING, onPipeline: events }` | `ADVANCED_GUIDE §5.5` · `AlertRule` |
 | Alert metrics | `error_rate`, `failed_batches`, `rejected_files`, `duration_ms` | `AlertService` |
 | Alert batch window | `window: 20b` (last 20 batches) | `AlertRuleTest` |
-| Gap → ALERT object (auto) | via `EventObjectBridge` when objects backend on | `ADVANCED_GUIDE §5.5` |
+| Gap → stored Alert (auto) | via `EventAlertBridge`, every edition | `ADVANCED_GUIDE §5.5` |
 | Durable events (Parquet) | `-Devents.backend=parquet -Devents.dir=inspecto-events` | `ADVANCED_GUIDE §9` |
 | DB-backed objects | `-Dobjects.backend=db` | `ADVANCED_GUIDE §9` |
 | DB-backed job runs | `-Djobs.backend=duckdb` | `ADVANCED_GUIDE §9` |

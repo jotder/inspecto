@@ -106,10 +106,9 @@ build**. Cell 7 amended its two named neighbours and not these; the same class o
 
 **One standing note no status token can carry:** ⛔ **`/alerts*` is not in the gated set.** `AlertService`
 lives in `inspecto-engine`, `AlertRoutes` in core, and the fired-alert feed is a bounded in-memory ring, so
-every edition evaluates rules and serves `GET /alerts`. What Personal loses is the **object** half: no
-`ALERT` object is opened (`ObjectAccess` is empty), no Incident is promoted (`IncidentAccess` returns empty),
-and `EventObjectBridge` is absent — which is exactly why `SP-CTL-02` is 🟡 on Personal (the gap *event*
-fires, the ALERT *object* does not). **Working a fired Alert (2026-10-07):** rule-fired Alerts live in the Alert-owned
+every edition evaluates rules and serves `GET /alerts`. What Personal loses is the **Incident** half: no
+Incident is promoted (`IncidentAccess` returns empty). A sequence gap or a conservation imbalance is a stored Alert on
+every edition (`EventAlertBridge`, 2026-10-08), so `SP-CTL-02` is ✅ on Personal too. **Working a fired Alert (2026-10-07):** rule-fired Alerts live in the Alert-owned
 store, not as objects, so an operator works one with `POST /alerts/{id}/ack` and `POST /alerts/{id}/resolve` (core
 `AlertRoutes`, `canWorkIncidents`, every edition) — the `id` and lifecycle `state` ride each `GET /alerts` entry; an unknown
 id is 404, a move illegal from the Alert's state (a second ack, anything after RESOLVED) is 422.
@@ -123,7 +122,7 @@ id is 404, a move illegal from the Alert's state (a second ack, anything after R
 | Alert Rules, evaluation, fired-alert feed, `ALERT_FIRED` | `inspecto-engine` `com.gamma.alert` + core `AlertRoutes` | ✅ |
 | `ObjectType` | `inspecto-workflow` `com.gamma.workflow` (Base leaf module, MODULE-REORG-1 P7 slice 1) | present |
 | Promotion seam (`IncidentAccess`), `ObjectAccess` SPI, `AnnotationKinds`, `FindingsSpec`, `RcaTemplate` | `inspecto-engine` `com.gamma.objects` (core vocabulary) | present, inert |
-| The objects domain: `ObjectService`, workflows, queues, escalation, notes, tags, Case Rules, `EventObjectBridge`, the three ops Job Types | **`inspecto-ops`** (`com.gamma.ops`, `com.gamma.opsapi`, `com.gamma.opsjob`) | ❌ 49 routes `503` |
+| The objects domain: `ObjectService`, workflows, queues, escalation, notes, tags, Case Rules, the three ops Job Types | **`inspecto-ops`** (`com.gamma.ops`, `com.gamma.opsapi`, `com.gamma.opsjob`) | ❌ 49 routes `503` |
 | Notification feed, rules, preferences, receipts, suppression, `mail.send` | `inspecto-engine` `com.gamma.notify` + core routes | ✅ (no transport) |
 | Delivery transports `SmtpEmailChannel`, `WebhookChannel` | **`inspecto-notify-channels`** | ❌ zero channels |
 | Diagnosis | `inspecto-agent` `com.gamma.agent.diagnose` + core `com.gamma.assist` | ✅ |
@@ -277,7 +276,7 @@ degrades to "no object".
 | **Reconciliation breach** | `ReconRunJob` (`jobs.md`) | same pattern, at **run** granularity — ONE aggregate Incident per reconciliation (scope = the reconciliation id), carrying only break counts |
 | **A single reconciliation Break** | `POST /recon/promote` (`ReconRoutes`) | 🆕 **2026-09-11 (`BREAK-INCIDENT-1`)** — an operator promotes ONE Break from the board; deduped on `(reconciliation, type, key, column)` with a composite **`breakId`** attribute as the dedupe attribute, carrying the break type, column and run id as evidence alongside it. ⚠ **Widened 2026-09-15 (`BREAK-DEDUPE-GRAIN-1`)** from `key` alone — one key breaking on two columns used to collapse into ONE Incident and the second promote was silently suppressed. 🔴 The attribute is a composite because the READ half indexes a SINGLE attribute (`activeAttributeIndex`), so a three-attribute dedupe would leave the offer unable to express the grain; its parts are escaped (`\` then `|`) because a recon `key` routinely contains `|`. It is one contract with the SPA's `breakId()`, which renders the byte-identical string. ⚠ It **coexists** with the row above rather than replacing it: the Job says *"this reconciliation is breaching"*, a promotion says *"**this** Break is being worked"*. 🔴 The backlog row that asked for it claimed the tree's only promotion was Alert→Incident — `ReconRunJob` had been opening Incidents since it shipped, so the gap was **granularity, not mechanism** |
 | **— and reading it back** | `GET /recon/promoted?reconciliation=<id>` (`ReconRoutes`) | 🆕 **2026-09-13 (`BREAK-INCIDENT-RESOLVE-1`)** — `breakId → incidentId` (the `(type, key, column)` identity, keyed by `breakKey` until 2026-09-15) for the Breaks whose Incident is still **ACTIVE**, so a reload no longer forgets what was promoted and a Break can be followed to the Incident working it. 🔴 **The active-only rule is the point**: `promote` suppresses a duplicate only while the Incident is non-terminal, so an ARCHIVED one means the Break is promotable again — both halves read `ObjectAccess.activeAttributeIndex`, which is why this is a server route and not the SPA filtering `GET /objects` by attribute. A client matching on mere existence would report an available action as unavailable. ⚠ Bounded at 1000 entries with a `truncated` flag and the TRUE `total` |
-| **Ledger bridges** | `EventObjectBridge` (`inspecto-ops`) | `SEQUENCE_GAP` and `PIPELINE_CONSERVATION_IMBALANCE` (+ its legacy name) → an **ALERT object**, not an Incident |
+| **Ledger bridges** | `EventAlertBridge` (`inspecto-engine`, `com.gamma.alert`; was `ops.EventObjectBridge` until 2026-10-08) | `SEQUENCE_GAP` and `PIPELINE_CONSERVATION_IMBALANCE` (+ its legacy name) → a stored **Alert** (`GET /alerts`, `POST /alerts/{id}/ack`) on every edition, not an Incident and no longer an ALERT object |
 
 Operator-created objects take the other door: `POST /objects` with **title + at least one link** (§3.4).
 The auto-creation paths bypass the route and call `ObjectService.open` directly — which is why the first
@@ -316,11 +315,11 @@ Three rules, each pinned by `ObjectServiceTest`:
 ✅ **MTTD is built on a NARROWER anchor than first proposed** (`INCIDENT-KPI-MTTD-1`, 2026-09-15). The proposed
 anchor — the earliest Signal at the Incident's `causationId` root — needs an event-store read on the analytics
 path, a seam `ObjectService` does not have, and this row refused to fake it. What IS recorded without any new
-seam is the triggering event's OWN time: `EventObjectBridge.promoteGap`/`promoteImbalance` stamp
+seam is the triggering event's OWN time: the Event bridge (`ops.EventObjectBridge` until 2026-10-08, now `EventAlertBridge`, which keeps `occurredAt` on the stored Alert) stamped
 `ObjectService.ATTR_OCCURRED_AT` (`occurredAt`, epoch ms) from `Event.ts()` at promotion, and `analytics()` adds
 `mttd = {count, avgMs, definition}` = `occurredAt → createdAt` over objects that carry the stamp. Same honesty
 rule as MTTR: `count` is the denominator, unstamped objects (hand-opened, Alert-Rule-opened) are EXCLUDED, so a
-deployment with no bridge-promoted objects reports count 0 — a true statement. The Case-analytics dialog shows an
+deployment with no stamped objects reports count 0 — a true statement (since 2026-10-08 nothing writes an ALERT object, so `analytics(ALERT)` reads only legacy rows). The Case-analytics dialog shows an
 MTTD tile with the server's own definition. ⚠ Still absent: **MTTA** — nothing stamps an acknowledged-at
 (`ack()` records no timestamp), so it needs its own seam before it could exist.
 
@@ -715,7 +714,7 @@ pane has an `okf/frontend` feature page (`features/index.md` says "not yet docum
 `@PublicApi(since = "4.0.0")` on: `ObjectType`, `ObjectAccess`, `IncidentAccess`, `AnnotationKinds`,
 `FindingsSpec`, `RcaTemplate`, `TagAssignment`, `IdScheme` (core vocabulary, `inspecto-engine`);
 `ObjectService`, `ObjectStore`, `DbObjectStore`, `InMemoryObjectStore`, `ObjectQuery`, `OperationalObject`,
-`EscalationPolicy` (`inspecto-ops`). **Not** marked: `AlertRule`, `EventObjectBridge`, `OpsEngineProvider`.
+`EscalationPolicy` (`inspecto-ops`). **Not** marked: `AlertRule`, `EventAlertBridge`, `OpsEngineProvider`.
 ⚠ The `@PublicApi` marker records *intent*, not exposure — nothing after 3.x has shipped
 (`api-stability.md`). Making the dependent-cascade store methods **abstract** in MNT-14 was a MAJOR widening
 of an unreleased surface, and was chosen anyway because a default would orphan rows.
@@ -945,7 +944,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `ObjectServiceQueueTest` · `ControlApiQueueRoutesTest` | `QueueRouter` routing, assign / watch / watchers routes |
 | `ObjectServiceCaseGroupTest` · `ControlApiCaseGroupTest` | Contents, merge (`MERGED_INTO`), split (`SPLIT_FROM`) |
 | `ObjectServiceCaseRuleTest` · `ControlApiCaseRuleTest` · `CaseRuleEvalJobTest` | Case Rules: threshold + window, open-or-attach idempotence, the Job Type |
-| `EventObjectBridgeTest` | `SEQUENCE_GAP` / conservation → ALERT object |
+| `EventAlertBridgeTest` (`inspecto-engine`) · `ControlApiAlertFromEventTest` | `SEQUENCE_GAP` / conservation → a stored Alert, listed on `GET /alerts`, no ops module |
 | `IncidentAccessTest` | the narrowed seam, dry-run opens nothing |
 | `AlertServicePersistenceTest` | fired alerts persisted as objects when the module is present |
 | `ControlApiFindingsSpecTest` | `GET /findings/{type}`, the `422` value gate, frontend-only keys refused |
@@ -1008,8 +1007,8 @@ destinations**, and — by decision — no scheduled `incident_purge`.
 
 ### 8.6 Guards
 
-`render-processor-board --check` pins `SP-CTL-02`'s Personal cell 🟡 through the `PARTIAL_ON_PERSONAL`
-override in `ProcessorCatalog.java` (the gap event fires everywhere; the ALERT object does not) — the
+`render-processor-board --check` used to pin `SP-CTL-02`'s Personal cell 🟡 through the `PARTIAL_ON_PERSONAL`
+override (the gap event fired everywhere; the ALERT object did not; the set is EMPTY since 2026-10-08, the bridge is core) — the
 generator could not express that until 2026-09-08 and its "just regenerate" advice would have flipped an
 operator-approved decision back to ✅. `NoChannelShipsInThePersonalBuildTest` and the cell-7 Personal
 baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guards in test clothing.

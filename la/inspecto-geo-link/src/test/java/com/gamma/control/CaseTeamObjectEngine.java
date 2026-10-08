@@ -1,6 +1,5 @@
 package com.gamma.control;
 
-import com.gamma.audit.Event;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.workflow.ObjectType;
 import com.gamma.service.ObjectEngineProvider;
@@ -11,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
 /**
  * LA-24 test stand-in for the optional {@code inspecto-ops} module — which this module must never depend on.
@@ -53,7 +51,6 @@ public final class CaseTeamObjectEngine implements ObjectEngineProvider {
             public List<String> tagsOf(String k, String i) { return List.of(); }
             public List<String> targetIdsForTag(String t, String k) { return List.of(); }
             public List<Map<String, Object>> findByStatus(ObjectType kind, String status) { return List.of(); }
-            public Optional<Consumer<Event>> eventSubscriber() { return Optional.empty(); }
         };
         return new ObjectEngine() {
             public ObjectAccess access() { return access; }

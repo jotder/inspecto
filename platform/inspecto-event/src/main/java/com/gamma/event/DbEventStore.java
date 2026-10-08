@@ -35,7 +35,7 @@ import com.gamma.audit.EventType;
  *
  * <p>⚠ <b>D6 does NOT make SSE cross-pod</b>, contrary to a reading of the plan's §5.5. {@code
  * /signals/stream} subscribes to {@code EventLog}'s <b>in-heap</b> subscriber list and never consults a
- * store, and {@code EventObjectBridge} promotes {@code SEQUENCE_GAP} from that same in-heap stream — so a
+ * store, and {@code EventAlertBridge} raises an Alert for {@code SEQUENCE_GAP} from that same in-heap stream — so a
  * gap observed on pod B still never becomes an ALERT if the bridge runs on pod A. This store closes the
  * <em>query</em> half only. ⛔ Do not record D6 as closing the live-tail half.
  *

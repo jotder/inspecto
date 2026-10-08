@@ -25,7 +25,7 @@ Inspecto (repo `inspecto`) — Java 27 build / Maven `release=27`, multi-module 
   `GapDetector`, `ConnectionRegistry`/`ConnectionProfile`/`SecretResolver`, `IntegrityChecker`,
   `CircuitBreaker`, `RateLimiter`, `retry/RetryPolicy`, `PostAction`.
 - **`ops/`** — Operational Intelligence: mutable object store (`ObjectService`, DuckDB), workflow engine,
-  `link/` (OBJECT_LINK graph), `note/` (comments/attachments), `rca/` (RCA templates), `EventObjectBridge`.
+  `link/` (OBJECT_LINK graph), `note/` (comments/attachments), `rca/` (RCA templates). (`EventObjectBridge` moved to `alert/EventAlertBridge` 2026-10-08.)
 - **`event/`** (`EventLog`/`EventType`) · **`alert/`** (`AlertRule`/`AlertService`) · **`metrics/`**
   (`MetricRegistry`, Prometheus) · **`catalog/`** (metadata graph) · **`config/`** (Smart Config) ·
   **`sql/`** (sandboxed SQL) · **`service/`** (`CollectorService` host, `ControlApi` REST, `JobService`).

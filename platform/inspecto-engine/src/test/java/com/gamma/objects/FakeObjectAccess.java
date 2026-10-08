@@ -1,7 +1,6 @@
 package com.gamma.objects;
 
 import com.gamma.workflow.ObjectType;
-import com.gamma.audit.Event;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -9,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 /**
  * An in-memory {@link ObjectAccess} for core's own tests (EDG-01 cell 7, 2026-09-08).
@@ -189,11 +187,5 @@ public final class FakeObjectAccess implements ObjectAccess {
         m.put("assignee", null);
         m.put("attributes", o.attributes());
         return m;
-    }
-
-    /** No promotion subscriber: the fake is the seam, not the module's event bridge. */
-    @Override
-    public Optional<Consumer<Event>> eventSubscriber() {
-        return Optional.empty();
     }
 }

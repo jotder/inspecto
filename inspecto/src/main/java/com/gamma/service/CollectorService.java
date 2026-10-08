@@ -521,14 +521,6 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
         if (this.jobs != null) this.jobs.objects(this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access).orElse(null));
 
-        // Phase D2: promote selected domain events to managed objects (SEQUENCE_GAP → ALERT) via an EventLog
-        // subscriber. ⚠ Now ASKED FOR rather than constructed: core used to do
-        // `new com.gamma.ops.EventObjectBridge(objects)::onEvent` by fully-qualified name with no import —
-        // a coupling an import census cannot see. De-registered in close() so repeated service instances
-        // don't accumulate listeners. ⛔ Absent the module there is no promotion, which is exactly the
-        // amended EDITIONS SP-CTL-02 contract: a gap still raises the EVENT on Personal.
-        this.eventObjectBridge = this.objectEngine.flatMap(e -> e.access().eventSubscriber()).orElse(null);
-        if (this.eventObjectBridge != null) this.eventLog.addSubscriber(this.eventObjectBridge);
         // Alert engine (v4.1, B5): deterministic, lean-core, event-driven. Always present (like the
         // object store above) so the authoring routes (POST/PUT/DELETE /alerts/rules) can arm rules at
         // runtime even when no Alert Rule was loaded at boot — empty until a rule is added. Subscribed
@@ -546,6 +538,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         alertObjects.ifPresent(o -> com.gamma.alert.AlertMigration.adopt(o, this.alertStore));
         this.alerting = new com.gamma.alert.AlertService(alertRules, configSource, this.status,
                 com.gamma.alert.AlertRecords.of(this.alertStore, alertObjects), com.gamma.alert.AlertRecords.incidentsOf(alertObjects));
+        // Phase D2, retired into the Alert store (MODULE-REORG-P7, 2026-10-08): a SEQUENCE_GAP / conservation-imbalance
+        // Event becomes a stored Alert on EVERY edition (it was an ALERT object only where the ops module was present).
+        // De-registered in close() so repeated service instances don't accumulate listeners.
+        this.eventAlertBridge = new com.gamma.alert.EventAlertBridge(this.alerting)::onEvent;
+        this.eventLog.addSubscriber(this.eventAlertBridge);
         // BI-5: measure rules evaluate a Dataset measure via the headless BI evaluator. Both roots
         // resolve lazily and PER SPACE (MEASURE-PROBE-SPACE-ROOT-1): the registry is this Space's config
         // root (the default Space alone falls back to -Dassist.write.root), and the data root follows the
@@ -811,11 +808,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /** The Space's Alert records (slice 2) — closed with the service. */
     private final com.gamma.alert.AlertStore alertStore;
 
-    /** The EventLog→ObjectService bridge (Phase D2); held so {@link #close()} can de-register it. */
-    private final java.util.function.Consumer<com.gamma.audit.Event> eventObjectBridge;
+    /** The EventLog→Alert bridge (Phase D2); held so {@link #close()} can de-register it. */
+    private final java.util.function.Consumer<com.gamma.audit.Event> eventAlertBridge;
 
     /** In-app notification feed (Phase B2) and its event→feed engine; the subscriber is held so
-     *  {@link #close()} can de-register it (mirrors {@link #eventObjectBridge}). */
+     *  {@link #close()} can de-register it (mirrors {@link #eventAlertBridge}). */
     private final com.gamma.notify.NotificationStore notifications;
     /** Per-reader read marks over {@link #notifications} (operator 2026-09-25) — in memory, like the feed. */
     private final com.gamma.notify.NotificationReadState notificationReadState = new com.gamma.notify.NotificationReadState();
@@ -843,6 +840,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     }
 
     /** The alert engine (always present; empty until a rule is armed) — backs {@code /alerts}. */
+    @Override
     public java.util.Optional<com.gamma.alert.AlertService> alertService() {
         return java.util.Optional.ofNullable(alerting);
     }
@@ -2160,7 +2158,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         pipelineScheduler.closeStreamLanes();          // the continuous lanes are timers too (ASSURE-PUSH-INGEST-1)
         triggerWorkers.close();                        // drain in-flight cycle + event-triggered runs (T13)
         enrichment.close();   // drain in-flight recomputes first
-        this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge
+        this.eventLog.removeSubscriber(eventAlertBridge);   // de-register the D2 gap→Alert bridge
         this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
         this.eventLog.removeSubscriber(pendingAlertRuleSubscriber);   // de-register the deferred Alert Rule seed
         this.eventLog.removeSubscriber(securityTriggers);   // de-register the security trigger evaluator

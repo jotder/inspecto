@@ -734,7 +734,7 @@ public final class PipelineJobRunner implements Job {
     /**
      * T22 — evaluate the §11.4 conservation invariant over this run's per-edge counts and emit a
      * {@link EventType#PIPELINE_CONSERVATION_IMBALANCE} event for each non-amplifying node where records were
-     * lost or unexpectedly amplified. The {@link com.gamma.ops.EventObjectBridge} promotes it to a managed ALERT.
+     * lost or unexpectedly amplified. The {@link com.gamma.alert.EventAlertBridge} raises it as a stored Alert.
      * Never throws — observability must not break the run that just succeeded.
      *
      * <p>Package-visible (not private) so a test can drive the emit bridge with crafted imbalanced counts:
