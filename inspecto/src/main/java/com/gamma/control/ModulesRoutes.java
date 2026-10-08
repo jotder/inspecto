@@ -17,7 +17,8 @@ import java.util.Set;
 /**
  * The installed-module topology (MODULE-REORG-1 P2a):
  * <pre>
- *   GET /modules   {hostBuildId, modules:[{id,title,buildId,buildRole,offeringRole,bindingTime,state,reasons,enabledInSpace,provides,requires}], diagnostics:[...]}
+ *   GET /modules   {hostBuildId, modules:[{id,title,buildId,buildRole,offeringRole,bindingTime,state,reasons,enabledInSpace,provides,requires}], diagnostics:[...],
+ *                   inert:{modulesToon:[id], configKinds:[{module,kind,files}], jobs:[{name,type,module}]}}
  * </pre>
  *
  * <p>Built from the manifests ({@code META-INF/inspecto/module.toon}) on the LIVE class path and resolved by
@@ -34,7 +35,76 @@ final class ModulesRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/modules", (e, m) -> ETags.respond(e, build(loaded(), api.disabledFeatures(), known())));
+        api.get("/modules", (e, m) -> {
+            Map<String, Object> out = build(loaded(), api.disabledFeatures(), known());
+            out.put("inert", inertReferences(api, KnownModules.absent(known(), loaded().manifests())));
+            return ETags.respond(e, out);
+        });
+    }
+
+    /**
+     * What THIS Space holds that an installed module does not account for (P4e, plan section 2.5: config naming an
+     * absent capability loads inert and says so). Read-only; nothing is rewritten.
+     * <ul>
+     *   <li>{@code modulesToon} - ids {@code modules.toon} stores that no installed module declares;</li>
+     *   <li>{@code configKinds} - registry kinds a known-but-not-installed module owns ({@code provides.configKinds}) of
+     *       which the Space holds files: {@code {module, kind, files}};</li>
+     *   <li>{@code jobs} - Jobs of a Job Type a known-but-not-installed module declares: {@code {name, type, module}}.</li>
+     * </ul>
+     */
+    private static Map<String, Object> inertReferences(ApiContext api, List<ModuleManifest> absent) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        List<String> toon = new ArrayList<>();
+        List<Object> kinds = new ArrayList<>();
+        List<Object> jobs = new ArrayList<>();
+        out.put("modulesToon", toon);
+        out.put("configKinds", kinds);
+        out.put("jobs", jobs);
+        java.nio.file.Path root;
+        try {
+            root = api.writeRoot();
+        } catch (RuntimeException noSpace) {
+            return out;
+        }
+        if (root == null) return out;
+        Set<String> installed = api.registeredFeatures();
+        for (String id : ModuleSettings.disabled(root)) if (!installed.contains(id)) toon.add(id);
+        for (ModuleManifest m : absent)
+            for (String kind : m.provides().configKinds()) {
+                int files = com.gamma.pipeline.ComponentRegistry.dirForType(kind)
+                        .map(dir -> countFiles(root.resolve("registry").resolve(dir))).orElse(0);
+                if (files > 0) {
+                    Map<String, Object> o = new LinkedHashMap<>();
+                    o.put("module", m.id());
+                    o.put("kind", kind);
+                    o.put("files", files);
+                    kinds.add(o);
+                }
+            }
+        try {
+            HostContext.of(api).service().jobService().ifPresent(js -> {
+                for (com.gamma.job.JobService.JobView v : js.jobs())
+                    if (!v.hosted() && v.missingModule() != null) {
+                        Map<String, Object> o = new LinkedHashMap<>();
+                        o.put("name", v.name());
+                        o.put("type", v.type());
+                        o.put("module", v.missingModule());
+                        jobs.add(o);
+                    }
+            });
+        } catch (RuntimeException noService) {
+            // no Collector service on this context (a route-only test double): nothing to list
+        }
+        return out;
+    }
+
+    private static int countFiles(java.nio.file.Path dir) {
+        if (!java.nio.file.Files.isDirectory(dir)) return 0;
+        try (var s = java.nio.file.Files.list(dir)) {
+            return (int) s.filter(java.nio.file.Files::isRegularFile).count();
+        } catch (java.io.IOException unreadable) {
+            return 0;
+        }
     }
 
     private ModuleManifests.Loaded loaded() {

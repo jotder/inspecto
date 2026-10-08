@@ -96,6 +96,25 @@ class ModuleRemovalJobTest {
     }
 
     @Test
+    void aJobOfATypeAKnownAbsentModuleDeclaresNamesThatModule(@TempDir Path root) throws Exception {
+        // P4e: recon.run is declared by the reconciliation manifest (provides.jobTypes), which this class path does not install
+        spaceWithGhostJob(root);
+        Files.writeString(root.resolve("acme/config/jobs/recon_job.toon"),
+                "job:\n  name: nightly-recon\n  type: recon.run\n  enabled: true\n  cron: \"0 3 * * *\"\n");
+        try (Ctx c = open(root)) {
+            JsonNode recon = find(V1Body.of(send(c.port, "GET", BASE + "/jobs", null).body()), "nightly-recon");
+            assertFalse(recon.get("hosted").asBoolean(), recon.toString());
+            assertEquals("reconciliation", recon.get("missingModule").asText(), recon.toString());
+            assertTrue(recon.get("reason").asText().contains("'reconciliation' module"), recon.toString());
+            JsonNode ghost = find(V1Body.of(send(c.port, "GET", BASE + "/jobs", null).body()), "ghost");
+            assertTrue(ghost.get("missingModule").isNull(), "a type no known module declares names no module: " + ghost);
+            HttpResponse<String> r = send(c.port, "POST", BASE + "/jobs/nightly-recon/trigger", null);
+            assertEquals(503, r.statusCode(), r.body());
+            assertTrue(r.body().contains("'reconciliation'"), r.body());
+        }
+    }
+
+    @Test
     void aTriggerNamesTheMissingTypeInsteadOfPretendingTheJobDoesNotExist(@TempDir Path root) throws Exception {
         spaceWithGhostJob(root);
         try (Ctx c = open(root)) {

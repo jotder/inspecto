@@ -133,6 +133,8 @@ public final class JobService implements AutoCloseable {
     private volatile DeletionFence.Guard deletionGuard;
     /** Job Type id -> why a Job of it may not run in this Space now, or null (P4e). */
     private volatile java.util.function.Function<String, String> typeGate = type -> null;
+    /** Job Type id -> the known-but-absent module that declares it, or null (P4e). */
+    private volatile java.util.function.Function<String, String> unhostedTypeModule = type -> null;
     /** The space this service's jobs belong to; each job run executes under this MDC so the per-space EventLog /
      *  metric label / acquisition routing resolves correctly. Defaults to the default space (single-space identical). */
     private volatile String spaceId = EventLog.DEFAULT_SPACE_ID;
@@ -332,10 +334,12 @@ public final class JobService implements AutoCloseable {
      *  itself ({@link #upsertSystemJob}) — listed like any other so it is never a hidden thread, but
      *  owned by the platform, not by an author. {@code hosted} is false for a Job whose Job Type nothing registers
      *  here (an optional module or Job Pack that is not installed): its config is kept, it can never fire, so
-     *  {@code nextFire} is empty and {@code reason} says why (MODULE-REORG-P4-1); {@code reason} is null when hosted. */
+     *  {@code nextFire} is empty and {@code reason} says why (MODULE-REORG-P4-1); {@code reason} is null when hosted.
+     *  {@code missingModule} names the module that declares the type ({@code provides.jobTypes}) when that module is
+     *  known but not installed (P4e); null when hosted or when no known module declares it. */
     public record JobView(String name, String type, String cron, String onPipeline, String onSignal,
                           boolean enabled, String lastStatus, String lastRunTime, String nextFire,
-                          boolean system, boolean hosted, String reason) {}
+                          boolean system, boolean hosted, String reason, String missingModule) {}
 
     public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir) {
@@ -1804,6 +1808,23 @@ public final class JobService implements AutoCloseable {
         this.typeGate = gate == null ? type -> null : gate;
     }
 
+    /**
+     * Names the module behind a Job Type nothing registers here (P4e): {@code lookup} answers the id of the module whose
+     * {@code provides.jobTypes} declares {@code type} when that module is KNOWN but not installed, else {@code null}.
+     * Only wording and the {@code missingModule} field of {@link JobView} depend on it. Default: no module is named.
+     */
+    public void unhostedTypeModule(java.util.function.Function<String, String> lookup) {
+        this.unhostedTypeModule = lookup == null ? type -> null : lookup;
+    }
+
+    private static String unhostedReason(String type, String module) {
+        return module == null
+                ? "job type '" + type + "' is not registered here: no installed module or Job Pack provides it, so this "
+                        + "job cannot run (its config is kept and works once one is installed)"
+                : "job type '" + type + "' is provided by the '" + module + "' module, which is not installed here, so this "
+                        + "job cannot run (its config is kept and works once the module is installed)";
+    }
+
     /** Why a Job of {@code type} may not run in this Space now (see {@link #jobTypeGate}), if it may not. */
     public Optional<String> jobTypeDisabledReason(String type) {
         return Optional.ofNullable(typeGate.apply(type));
@@ -1907,6 +1928,7 @@ public final class JobService implements AutoCloseable {
             JobRun last = ledger.lastRun(c.name());
             String nextFire = "";
             boolean hosted = registry.has(c.type());
+            String missing = hosted ? null : unhostedTypeModule.apply(c.type());
             if (hosted && c.enabled() && c.hasCron()) {
                 CronExpression expr = crons.getOrDefault(c.name(), c.cronExpression());
                 nextFire = expr.next(now).format(TS);
@@ -1915,8 +1937,8 @@ public final class JobService implements AutoCloseable {
                     last == null ? "" : last.status(),
                     last == null ? "" : last.endTime(),
                     nextFire, systemJobs.contains(c.name()), hosted,
-                    hosted ? null : "job type '" + c.type() + "' is not registered here: no installed module or Job Pack "
-                            + "provides it, so this job cannot run (its config is kept and works once one is installed)"));
+                    hosted ? null : unhostedReason(c.type(), missing),
+                    hosted ? null : missing));
         }
         return out;
     }

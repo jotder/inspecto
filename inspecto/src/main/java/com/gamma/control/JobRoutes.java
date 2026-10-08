@@ -321,8 +321,9 @@ final class JobRoutes implements RouteModule {
         Optional<JobConfig> cfg = jobs(api).jobConfig(name);
         if (cfg.isPresent() && jobs(api).jobTypeView(cfg.get().type()).isEmpty())
             return new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "job '" + name + "' is configured but its type '"
-                    + cfg.get().type() + "' is not registered here — the module that provides it is not installed; "
-                    + "the config is kept unchanged");
+                    + cfg.get().type() + "' is not registered here — the module that provides it"
+                    + java.util.Optional.ofNullable(JobModuleGate.absentModuleOf(cfg.get().type())).map(id -> " ('" + id + "')").orElse("")
+                    + " is not installed; the config is kept unchanged");
         return new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'");
     }
 

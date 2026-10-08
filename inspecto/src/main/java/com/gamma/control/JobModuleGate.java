@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.module.ModuleManifest;
+import com.gamma.module.KnownModules;
 import com.gamma.module.ModuleManifests;
 
 import java.nio.file.Path;
@@ -62,5 +63,28 @@ public final class JobModuleGate {
     /** The gate for the Space whose config root is {@code configRoot}: reads {@code modules.toon} at every call. */
     public static Function<String, String> forSpace(Path configRoot) {
         return type -> reason(type, ModuleSettings.disabled(configRoot));
+    }
+
+    private static volatile Map<String, ModuleManifest> absentOwnerByType;
+
+    /** Test seam for {@link #absentModuleOf}; {@code null} restores the real table. */
+    static void absentOwnersForTest(Map<String, ModuleManifest> owners) {
+        absentOwnerByType = owners;
+    }
+
+    /**
+     * The id of the module that declares {@code jobType} when that module is known (a manifest of the source tree) but
+     * not installed on this class path; {@code null} otherwise. Names the missing module on an unhosted Job.
+     */
+    public static String absentModuleOf(String jobType) {
+        if (jobType == null) return null;
+        Map<String, ModuleManifest> o = absentOwnerByType;
+        if (o == null) {
+            ClassLoader cl = JobModuleGate.class.getClassLoader();
+            absentOwnerByType = o = ownersOf(KnownModules.absent(KnownModules.load(cl).manifests(),
+                    ModuleManifests.load(cl).manifests()));
+        }
+        ModuleManifest m = o.get(jobType.toLowerCase(java.util.Locale.ROOT));
+        return m == null ? null : m.id();
     }
 }
