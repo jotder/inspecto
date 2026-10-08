@@ -1199,6 +1199,37 @@ Decision (operator away, recorded, rational): retire the enum value in the same 
 
 **Not done / deliberately deferred.** Deleting `AlertMigration` and `LegacyAlertObjects` (one release after this ships); retention of resolved Alert rows; the dead `/objects/{id}/ack` route; an unfiltered "all objects" SPA list (there is none today, so the badge has no list row to sit on).
 
+### P7 Alert retention as built (2026-10-09 - `alert_purge`, retention of resolved Alert rows)
+
+**Problem.** The Alert-owned store (`AlertStore`: `DbAlertStore` / `InMemoryAlertStore`, the `ALERTS` family) never deleted a
+row, so resolved Alerts grew without bound on every edition, Personal included.
+
+**Design (decided).** A **base built-in** maintenance task `alert_purge`: a `case` in `MaintenanceJob`'s switch beside
+`event_prune` / `notification_prune`, implemented by `AlertPurgeTask`, NOT a `MaintenanceTaskProvider`. Alerts are BASE (P4f: no
+`ModuleGate`), a provider would add a ServiceLoader site and a module manifest entry for something that exists on every edition,
+and the provider TCK (`MaintenanceTaskProviderContract`) therefore does not apply; the built-in switch is pinned by
+`MaintenanceTaskContractTest` (the `BUILT_IN_TASKS` list moved 22 -> 23 ids). Reaches the engine through `JobService.alertService()`
+(attached by `CollectorService` like `notificationService`).
+
+- Port: `AlertStore.purgeResolvedBefore(Instant cutoff, boolean dryRun)` returns `Purge(purged, keptResolved, keptActive, fired)`;
+  `AlertRecords.purgeResolvedAlerts`; `AlertService.purgeResolved` also removes the purged `fired` entries from the live ring.
+  Db: three counts + `DELETE ... WHERE state = 'RESOLVED' AND closed_at > 0 AND closed_at < ?` (bound parameter, portable to
+  PostgreSQL); in-memory: the same predicate.
+- Rules: age = the Alert's own `closedAt`, strictly before `now - retention_days`; `closedAt == cutoff` and `closedAt <= 0` kept;
+  `OPEN` / `ACKNOWLEDGED` NEVER deleted (de-duplication state); `retention_days` absent = 90, blank/0/negative/non-numeric REFUSED;
+  dry run (the framework MNT-1 flag) counts and deletes nothing; no Alert engine attached = the task FAILS (the `incident_purge`
+  lesson: a retention control must not report a silent success).
+- Incident link: purge by age only. `incident_id` is a text reference into another store and nothing reads an Alert row back through
+  an Incident (the `ESCALATED_FROM` edge has no node behind it), so a dangling link is tolerated; tested.
+- Audit: a real purge that deleted rows emits `AUDIT` action `alerts.purged` (no `*_PURGED` event type exists; `event_prune`'s
+  `AUDIT` + `action` pattern is the sibling).
+- **No default schedule**, no shipped Job instance (there is none for `incident_purge` / `event_prune` either, so no example pattern to
+  mirror). To enable: a maintenance Job `task: alert_purge`, `retention_days: 90` (documented in `okf/capabilities/incidents/incidents.md` §3.7).
+- Deliberately not done: a `dryRun` task *param* (the framework dry run is the one mechanism); a per-run `max_count` cap; an
+  administrator-only gate (`JobRoutes.ADMINISTER_ONLY_TASKS` is for audit-trail and restore tasks).
+- Tests: `AlertRetentionPinTest` (written first: nothing deleted today), `AlertPurgeStoreTest` (both stores + reopened DuckDB file),
+  `AlertPurgeTaskTest`, `MaintenanceTaskContractTest`. RED proved with a mutant (`<=` boundary, `days < -1`): 4 failures.
+
 ### P7 contracts: access module as built (2026-10-07, `9dc9df34c` — the auth contract sheds policy and state)
 
 New Base module **`platform/inspecto-access`** (id `access`, `platform`/`base`, package **`com.gamma.access`**). Moved out of

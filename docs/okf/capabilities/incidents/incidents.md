@@ -632,6 +632,23 @@ removed" — the append-only ledger keeps the Incident's `OBJECT_ACTIVITY`, incl
 ⛔ **Nothing schedules `incident_purge`, and nothing should**: a shipped default that hard-deletes business
 records is indefensible; the operator opts in with a Job.
 
+**Alert retention — `alert_purge` (2026-10-09, MODULE-REORG-P7-INCIDENTS).** The Alert-owned store
+(`AlertStore`, the `ALERTS` family) never deleted anything, so resolved Alert rows grew without bound on every
+edition. `alert_purge` is a **base** built-in task of the `maintenance` Job Type (`AlertPurgeTask`,
+`inspecto-engine`; Alerts carry no module gate, so it is a case of `MaintenanceJob`'s switch like `event_prune`,
+not a `MaintenanceTaskProvider`). **Schedule it** with a maintenance Job: `task: alert_purge`,
+`retention_days: 90` (cron as you like; run a dry run first). **Defaults:** `retention_days` absent = 90; present
+but blank / `0` / negative / non-numeric is **refused** (a mistyped window must never read as "delete everything");
+**nothing ships scheduled** — no default Job, so existing installs lose nothing until an operator opts in. **What is
+purged:** `RESOLVED` rows whose own `closedAt` is strictly before `now - retention_days`. **What is never purged:**
+`OPEN` and `ACKNOWLEDGED` Alerts (they carry the de-duplication state — a deleted active row would let its rule fire
+again), a resolved row closed exactly at the cutoff or inside the window, and a resolved row with no close time. Age
+only: an Alert's `incident_id` is a text reference into another store and nothing reads an Alert row back through an
+Incident (the Incident's `ESCALATED_FROM` edge has no node behind it), so a purged Alert leaves a harmless dangling
+reference. A purge also drops the purged Alerts from the live `GET /alerts` history, and a real purge that deleted
+rows writes one `AUDIT` row `alerts.purged` (`alerts_removed`, `purge_before`, `retention_days`). Without an Alert
+engine attached the task **fails** rather than reporting a silent success.
+
 ### 3.8 Notifications
 
 Shipped 2026-06-29 as an **in-process MVP**, deliberately without a broker: `NotificationService` is an
@@ -967,6 +984,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `MeasureAlertTest` | `inspecto-engine` | scalar Measure rules: fire, cooldown, the heal edge (all-clear once, cooldown reset so a relapse fires at once), unknown never heals |
 | `ScalarMeasureAlertObjectsTest` | `inspecto-ops` | the real workflow for a no-`by` Measure rule: heal resolves the Alert never the Incident, relapse links / re-opens, restart seeding, retire on a Dataset change |
 | `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: a heal never resolves the Incident, even with a complete postmortem; a relapse after an operator's resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
+| `AlertPurgeStoreTest` · `AlertPurgeTaskTest` · `AlertRetentionPinTest` | `inspecto-engine` | `alert_purge`: old resolved deleted, recent / exact-boundary / no-close-time kept, `OPEN` and `ACKNOWLEDGED` never touched, dry run counts only, window 0/blank refused, DuckDB file reopened shows no resurrected row, the live history drops purged entries, the AUDIT row |
 | `NotificationServiceTest` | `inspecto-engine` | subscriber hand-off, rate limiter, preferences gating |
 | `ControlApiNotificationsTest` · `ControlApiNotificationChannelsTest` · `ControlApiNotificationRulesTest` · `ControlApiNotificationStreamTest` | `inspecto` | feed routes, channel CRUD (`422` on a bad EMAIL target), rules, the SSE stream |
 | `ControlApiCollectorNotifyTest` | `inspecto` | the ACQ push-notify seam that feeds the ledger |
