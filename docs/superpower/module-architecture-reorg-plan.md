@@ -1326,6 +1326,8 @@ A verifier packaging a pristine export of `5359ca938` failed the series. Finding
 
 **Follow-up 2026-10-08 (flake root cause, `082960f19`).** `/bi/query` with a `LIMIT` and no `orderBy` returned an arbitrary subset of the groups and `statistics.truncated` was always false; fixed in `BI-QUERY-TRUNCATION-1` (deterministic ORDER BY of the grouping keys; one-past-the-cap probe). Not a reorg item; recorded here because the verifier found it. The remaining silent cuts (Risk Score evidence, `materialize`, `report`) were closed the same day under the same id.
 
+**Round-2 verifier notes, not fixed (2026-10-08).** (a) `MaterializeTask` checks the over-cap row count after the COPY already wrote up to `MAX_ROWS + 1` rows: wasteful at the ceiling, correct (the prior snapshot is untouched). (b) The `ModuleSettings` cache keys on (mtime, size), so a same-size rewrite in the same filesystem tick reads stale; pre-existing, fail-open documented. (c) The `TRANSITIONS` map is unbounded by Spaces x ids; negligible. Fixed in this round: `/bi/query` echoes the SQL for the caller's cap (not the cap+1 probe); `ReportJob` uses the spec's clamped limit as the executor cap and names it in the truncation note; `MaterializeTask` clamps its cap to at least 1.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |
