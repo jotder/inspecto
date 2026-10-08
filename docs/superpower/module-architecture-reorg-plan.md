@@ -1324,6 +1324,8 @@ A verifier packaging a pristine export of `5359ca938` failed the series. Finding
 
 **Proof.** `package.ps1 -NoUi` exit 0 with the boot smoke for Personal, Professional, Enterprise `-DemoAuth` and Preview. Personal: `modules.list` == the 16 staged jars, 16 per-module SBOMs, `edition=Personal`; `serve.bat` answered /health 200 and `/api/v1/bootstrap` showed ops, cases, actionRequests, scoring and reconciliation all false.
 
+**Follow-up 2026-10-08 (flake root cause, `082960f19`).** `/bi/query` with a `LIMIT` and no `orderBy` returned an arbitrary subset of the groups and `statistics.truncated` was always false; fixed in `BI-QUERY-TRUNCATION-1` (deterministic ORDER BY of the grouping keys; one-past-the-cap probe). Not a reorg item; recorded here because the verifier found it.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |

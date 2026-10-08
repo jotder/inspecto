@@ -102,6 +102,26 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   `/db/table` / `/db/query`. ⚠ A dashboard drill-through (`filtered()` in the dashboard editor) still
   reads the raw store through `/db/query`, so a cross-filter ON a calculated column cannot resolve there.
 
+## Row cap on `/bi/query`: ordered and honestly flagged (`BI-QUERY-TRUNCATION-1`, shipped 2026-10-08)
+
+`MeasureCompiler.compile` always ends in a `LIMIT` (the route default is 500). Two defects made that cap lie:
+
+* **Arbitrary subset.** A grouped spec with a `LIMIT` and no `orderBy` returned whichever groups DuckDB
+  produced first (it promises no order), so a 532-group Dataset lost a planted offender on some runs. Now such
+  a spec is ordered by its `groupBy` keys ascending (a scalar has nothing to order). An explicit `orderBy`
+  is untouched, and `limit = Integer.MAX_VALUE` is the "no cap" sentinel (`RowShaper`, `DatasetMeasureProbe`)
+  and stays unsorted. Materialize and report outputs were unordered before, so ordering them is a
+  compatible narrowing, not a change of content.
+* **`statistics.truncated` was always `false`.** The compiled statement carries its own `LIMIT n`, and
+  `QueryExecutor` wraps it in `LIMIT n+1` to detect a cut, so it could never see row n+1. `/bi/query` and
+  the share-link query now compile with `Spec.withLimit(limit + 1)` and let the executor trim, so the flag is
+  exact (the risk-score evaluator already used this pattern). The echoed `sql` therefore shows `LIMIT n+1`.
+  No response shape changed: `statistics.truncated` was already on the wire and the Widget host already shows
+  *Showing the first N rows - the result was cut* when it is true.
+
+Residual (the backlog row): the Risk Score evidence read and the Materialize / Report jobs still cut at their
+cap without saying so.
+
 ## Time grain on `/bi/query` (shipped 2026-08-14)
 
 A widget's time bucket is part of the query, not a client-side afterthought:

@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **56<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 39<!--count:backlog-p3--> × P3** —
+> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 40<!--count:backlog-p3--> × P3** —
+> ⬆ **56 → 57 (P3 39 → 40) on 2026-10-08**: filed P3 `BI-QUERY-TRUNCATION-1` — the residual of the `/bi/query` ordering and exact-truncation fix: Risk Score evidence, `materialize` and `report` Jobs still cut at their cap silently.
 > ⬇ **57 → 56 (P3 40 → 39) on 2026-10-08**: closed P3 `MODULE-REORG-P1-FAMILY` — `OperationalDb.Family` is a contribution point: 12 core families stay in the enum, `inspecto-ops` contributes `OBJECTS`/`LINKS`/`NOTES`/`TAGS` through `StoreFamilyProvider` (`provides.storeFamilies` in its manifest); persisted file names and Postgres schemas unchanged (golden parity table); `check-family-count` reads the core enum + the manifests. Also shrank `MODULE-REORG-P4-3`: part (a) is done. As-built in `superpower/module-architecture-reorg-plan.md` §6 *P1 families as built*.
 > ⬇ **58 → 57 (P3 41 → 40) on 2026-10-08**: closed P3 `MODULE-REORG-P7-CONTRACTS` — `com.gamma.control` no longer spans modules (entity-store -> `com.gamma.entitystore`, http-spi -> `com.gamma.spi.http`, auth-spi -> `com.gamma.spi.auth`; `RequestAttrs` moved with auth-spi, it cannot go up to http-spi: a cycle). `AuditChain` stays split by design (static format and verifier in audit-spi, writer in `inspecto-event`). As-built in `superpower/module-architecture-reorg-plan.md` §6 *P7 contracts: com.gamma.control split as built*.
 > ⬇ **59 → 58 (P3 42 → 41) on 2026-10-07**: closed P3 `MODULE-REORG-P4-2` — every writer that rebuilds a config from a typed `toMap()` now keeps `x-` keys and refuses any other unmodelled key 422 `ERR_UNKNOWN_CONFIG_KEY` (Alert Rule, Expectation, Notification Rule, Channel, then Tag, Tag Rule, Case Rule, Saved View); KPI, Job, Investigation Measure and Value Measure were already right and are now pinned. As-built in `superpower/module-architecture-reorg-plan.md` §6 *P4d as built*.
@@ -157,10 +158,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 56<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 57<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -367,6 +368,8 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 
 
+
+- **P3** · **Queries / BI** — `BI-QUERY-TRUNCATION-1` residual: `/bi/query` and the share-link query are now ordered and report `statistics.truncated` exactly; three consumers still cut at a cap without saying so — the Risk Score evidence read (`RiskScoreEvaluator`, request limit equals the spec limit so `ev.truncated()` is always false), the `materialize` Job (default 1,000,000) and the `report` Job (default 10,000), which deliver a silently truncated file. Fix shape: probe one row past the cap and WARN or refuse like the indicator read does. → `okf/backend/control-plane/queries.md`
 
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 
