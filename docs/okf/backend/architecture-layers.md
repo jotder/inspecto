@@ -19,7 +19,7 @@ timestamp: 2026-07-16T00:00:00Z
 > by the code (`PipelineNodeType` has implementors; `RouteModule` is wired as a registry).
 >
 > For current structure read [architecture](architecture.md); for the reasoning behind the split read
-> [reactor.md](modules/reactor.md) (whose own module list is also stale — see architecture.md).
+> [reactor.md](modules/reactor.md) (whose own module table is marked history). The current module map is [modules/index.md](modules/index.md) and the classification [module-taxonomy.md](module-taxonomy.md).
 > **Still sound and unique to this page:** §5's two-event-buses distinction and §7's DuckDB
 > open-per-use / `SqlSandbox` boundary. *(Assessed 2026-09-08; this page is a retirement candidate —
 > `docs/archived-documents/plans-archive/docs-consolidation-plan.md` §5.8.1 group 7.)* *(Moved from the retired root-level `architecture-layers.md` (docs consolidation, 2026-07-16).)*

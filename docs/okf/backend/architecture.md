@@ -56,10 +56,7 @@ Inspecto is deliberately **framework-free**: no Spring, no web framework, no IoC
 
 Since the WS-D reactor split the code spans several Maven modules — **23 today: 14 default + 9
 profile-scoped** (rebuild the list from `pom.xml`, which is the only current source).
-🔴 **The map this file used to call authoritative is stale**: [reactor.md](./modules/reactor.md) is headed
-*"Reactor shape (2026-07-22)"* and mentions `inspecto-ops`, `inspecto-events`, `inspecto-metrics`,
-`inspecto-exchange` and `inspecto-geo-link` **zero times** — all five were created by the EDG-01 edition
-extractions after it was written. Read it for the *reasoning* behind the split, not for the module list. The **core / composition root** [`inspecto/`](./modules/engine.md)
+🔴 **The map this file used to call authoritative was stale and has been rebuilt (2026-10-08):** the current map is [modules/index.md](./modules/index.md) with the classification in [module-taxonomy.md](./module-taxonomy.md); [reactor.md](./modules/reactor.md) keeps its 2026-07-22 table as marked history. Read reactor.md for the *reasoning* behind the split, not for the module list. The **core / composition root** [`inspecto/`](./modules/engine.md)
 holds `control/` (HTTP API), `service/` (spaces + host), `assist/spi/`, `report/`, `exchange/`,
 `expectation/`, `intelligence/`, `model/` and ships the fat JAR. The **engine** was extracted below it:
 `etl/` (ingest/transform/output) → `inspecto-etl`; `event/` + `metrics/` → `inspecto-event` (its audit core — `Event`/`EventLog`/`EventType` + `MetricRegistry` — in `inspecto-audit-spi`, D-1 step 2); `acquire/`

@@ -9,19 +9,18 @@ timestamp: 2026-07-22T00:00:00Z
 
 # Maven reactor & modularization (as-built)
 
-> 🔴 **THE MODULE LIST BELOW IS STALE — do not read it as the current reactor.** §1 is headed *"Reactor
-> shape (2026-07-22 …)"* and mentions `inspecto-ops`, `inspecto-observability`, `inspecto-observability`,
-> `inspecto-exchange`, `inspecto-geo-link`, `inspecto-backup`, `inspecto-notify-channels`,
-> `inspecto-policy` and `inspecto-intelligence` **zero times** — nine modules, all created after it was
-> written (the EDG-01 edition extractions, through 2026-09-08).
->
-> **The reactor is 23 modules in the default (Personal) build, 31 with `-Pedition-standard`, 32 with
-> `-Pedition-enterprise`.** ⚠ *(Corrected 2026-09-09: this read “23 today: 14 default + 9
-> profile-scoped”, which adds up by coincidence. 14 is the count of `<modules>` ENTRIES, one of which is
-> the `providers/asn-parser/asn-decoders` aggregator contributing itself + 8 children; with the root POM that
-> makes 23 built modules, and the 9 profile-scoped ones then take the total to 32.)* `pom.xml` is the only current
-> source — rebuild the list from it, never from this page. ⚠ `backend/architecture.md` used to call this
-> page "the authoritative map"; that deference has been corrected.
+> 🔴 **THE REACTOR TABLE IN §1 BELOW IS HISTORY (2026-07-22) — do not read it as the current reactor.** It predates
+> the edition extractions (EDG-01, through 2026-09-08) and the module reorganisation (MODULE-REORG-1, 2026-10). The
+> current map is [index.md](index.md) (grouped by directory: `spi/ platform/ features/ la/ providers/`, with `inspecto`
+> at the root) and [module-taxonomy.md](../module-taxonomy.md) (build role, offering role and binding time per module,
+> and the Offerings). Both were rebuilt 2026-10-08 from root `pom.xml` and every `module.toon`; `pom.xml` and the
+> manifests remain the only current source — rebuild the list from them, never from this page. Modules the §1 table
+> lacks, all built since: `inspecto-oidc`, `-secrets`, `-geo-country`, `-observability`, `-connectors-kafka`,
+> `-telecom-asn1`, `-workflow`, `-access`, `-reconciliation`, `-scoring`, `-case-management`, `-ops`, `-exchange`,
+> `-geo-link` and the `la-*` set, `-backup`, `-notify-channels`, `-policy`, `-entity-list`, `-entity-store`, the three
+> `spi/` contracts (`-audit-spi`, `-auth-spi`, `-http-spi`) and `-action-requests`. The old `inspecto-security`,
+> `-metrics` and `-events` modules no longer exist: security split into oidc / secrets / geo-country (D-MR6), and
+> metrics / events into `inspecto-observability`.
 >
 > **Still sound and unique to this page:** the *reasoning* behind the split, the shared-helper homes in
 > `inspecto-util` (as-built 2026-08-27), version management (M1), and the rules for extracting a further
@@ -33,7 +32,7 @@ How the reactor is shaped, why, and the rules for extracting further modules. Di
 `../../../archived-documents/plans-archive/`) — that plan's findings sections hold the full evidence
 base and the per-item history.
 
-## Reactor shape (2026-07-22, +WS-D increments 2–4: fp-etl, fp-event, fp-acquire)
+## Reactor shape (HISTORY, 2026-07-22, +WS-D increments 2–4: fp-etl, fp-event, fp-acquire; current map: [index.md](index.md))
 
 Build order (root `pom.xml`, parent `inspecto-parent`):
 

@@ -1,25 +1,69 @@
 # Modules
 
-The backend Maven modules. Directory names were renamed 2026-06-12; the artifactIds were not (dir ≠
-artifactId). The core stays lean — network, hosted-AI, and auth dependencies are isolated in their own
-modules. Reactor shape, version management, and the module-extraction playbook:
-[reactor.md](reactor.md).
+The backend Maven modules. Directory names were renamed 2026-06-12 and regrouped into `spi/ platform/ features/
+la/ providers/` on 2026-10-07 (D-MR2, directories only — the artifactIds were not changed, so dir ≠ artifactId; name a
+module to Maven by artifactId, `-pl :inspecto-engine`). The product module `inspecto/` stays at the root. The core
+stays lean — network, hosted-AI, and auth dependencies are isolated in their own modules. The classification of every
+module (build role · offering role · binding time) and the Offerings that compose them:
+[module-taxonomy.md](../module-taxonomy.md). Reactor shape, version management, and the module-extraction playbook:
+[reactor.md](reactor.md). Source of truth for the list: root `pom.xml` plus each module's
+`META-INF/inspecto/module.toon` — never this page.
 
 # Modules
 
-* [Reactor & modularization](reactor.md) - build order, parent `dependencyManagement`, extraction rules (S5 + WS-D, 2026-07-21).
+* [Reactor & modularization](reactor.md) - build order (history), parent `dependencyManagement`, extraction rules (S5 + WS-D, 2026-07-21).
+* [Module taxonomy](../module-taxonomy.md) - the manifest, the three axes, Offerings, the Installed/Enabled/Permitted gates.
 * [Java review coverage](review-coverage.md) - what has been read line-by-line, what has not, and the defect classes that keep recurring (2026-08-18).
-* `platform/inspecto-api/` — dependency-free leaf: the `@PublicApi` annotation (`inspecto-api`).
-* `platform/inspecto-util/` — leaf (w.r.t. `com.gamma`): DuckDB access + CSV/file/tar helpers (`inspecto-util`).
-* `platform/inspecto-config/` — config spec/codec/safety (`inspecto-config`); depends on fp-api + fp-util (its TOON decode is util's `ToonHelper.decode`).
-* `platform/inspecto-sql/` — sandboxed DuckDB SQL: `SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews` (`inspecto-sql`); depends on fp-api/config/util.
-* `platform/inspecto-etl/` — `com.gamma.etl`: ingest/transform/output core — `PipelineConfig`, ingesters, batch planning, quarantine, partitioned Parquet (`inspecto-etl`).
-* `platform/inspecto-event/` — `com.gamma.event` + `metrics`: the Operational-Intelligence event store + metric registry; owns `logback.xml` (`inspecto-event`).
-* `platform/inspecto-acquire/` — `com.gamma.acquire`: connectors, connection profiles/registry/workbench, fingerprint ledger, stability gate, retry/circuit-breaker (`inspecto-acquire`).
-* `platform/inspecto-engine/` — the engine cluster: `signal`/`query`/`pipeline`/`inspector`/`ingester`/`ops`/`job`/`enrich`/`alert`/`notify`/`catalog`; holds the fat-jar entry points (`inspecto-engine`).
-* [Core](engine.md) - `inspecto/` — the composition root: control plane + application packages, ships `inspecto.jar`. The engine was extracted to sibling modules `inspecto-engine`/`-etl`/`-event`/`-acquire` in WS-D (see [reactor.md](reactor.md)).
+
+## Root
+
+* [Core](engine.md) - `inspecto/` — manifest id `processor`: the composition root (control plane + application packages); ships `inspecto.jar`. The engine was extracted to sibling modules in WS-D (see [reactor.md](reactor.md)).
+
+## `spi/` — contracts (buildRole contract, always present)
+
+* `spi/inspecto-audit-spi/` — the audit contract (`audit-spi`).
+* `spi/inspecto-auth-spi/` — the authentication and capability contract (`auth-spi`).
+* `spi/inspecto-http-spi/` — the `RouteModule` contract (`http-spi`).
+
+## `platform/` — foundations and platform modules (offeringRole base, always present)
+
+* `platform/inspecto-api/` — dependency-free leaf: the `@PublicApi` annotation (`api`).
+* `platform/inspecto-util/` — leaf (w.r.t. `com.gamma`): DuckDB access, CSV/file/tar helpers, TOON helpers, the module-manifest activator (`util`).
+* `platform/inspecto-config/` — config spec/codec/safety (`config`); its TOON decode is util's `ToonHelper.decode`.
+* `platform/inspecto-sql/` — sandboxed DuckDB SQL: `SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews` (`sql`).
+* `platform/inspecto-etl/` — `com.gamma.etl`: ingest/transform/output core, step registry, quarantine, partitioned Parquet (`etl`).
+* `platform/inspecto-event/` — `com.gamma.event` + `metrics`: the Operational-Intelligence event store + metric registry; owns `logback.xml` (`event`).
+* `platform/inspecto-workflow/` — Workflow and SLA models (`workflow`).
+* `platform/inspecto-access/` — access policy: roles, grants, row scope, audit trail (`access`).
+* `platform/inspecto-acquire/` — `com.gamma.acquire`: Collectors, connection profiles/registry/workbench, fingerprint ledger, stability gate, retry/circuit-breaker (`acquire`).
+* `platform/inspecto-entity-store/` — the entity store (`entity-store`).
+* `platform/inspecto-engine/` — the engine cluster: `signal`/`query`/`pipeline`/`inspector`/`ingester`/`ops`/`job`/`enrich`/`alert`/`notify`/`catalog`/`decision` (`engine`).
+
+## `features/` — optional modules (offeringRole optional)
+
+* [Agent](agent.md) - `features/inspecto-agent/` — optional AI assist skills (`agent`).
+* `features/inspecto-intelligence/` — AI assist and intelligence (`intelligence`).
+* `features/inspecto-backup/` — backup/backup_verify/restore tasks (`backup`).
+* `features/inspecto-entity-list/` — Entity Lists + the shared entity fact log (`entity-list`; requires `entity-store`).
+* `features/inspecto-exchange/` — cross-Space publication and ingestion contracts (`exchange`; feature `exchange`).
+* `features/inspecto-observability/` — the Prometheus exposition and the `/events*` feed (`observability`; feature `events`).
+* `features/inspecto-ops/` — operational objects and Incidents; owns the OBJECTS/LINKS/NOTES/TAGS store families (`ops`; feature `ops`).
+* `features/inspecto-case-management/` — Case Management (`case-management`; feature `cases`; requires `ops`).
+* `features/inspecto-reconciliation/` — Reconciliation (`reconciliation`; feature `reconciliation`).
+* `features/inspecto-scoring/` — Scoring (`scoring`; feature `scoring`; requires `entity-list`).
+* `features/inspecto-action-requests/` — Action Requests (`action-requests`; feature `actionRequests`; requires `notify-channels`); page: [action-requests](../control-plane/action-requests.md).
+
+## `la/` — link analysis (optional)
+
+* `la/inspecto-la-graph/` — graph algorithms (`la-graph`). `la/inspecto-la-core/` — core and ports (`la-core`). `la/inspecto-la-storage/` — storage (`la-storage`). `la/inspecto-la-api/` — link-analysis and geo routes (`la-api`; feature `geoLink`). `la/inspecto-geo-link/` — geo and link adapters over platform data (`geo-link`). `la/inspecto-la-store-pg/` — the PostgreSQL store (`la-store-pg`, Enterprise provider).
+
+## `providers/` — implementations chosen by deployment profile (offeringRole provider)
+
 * [Connectors](connectors.md) - `providers/inspecto-connectors/` — SFTP/FTP/FTPS/DB connectors (all network deps).
-* [Agent](agent.md) - `features/inspecto-agent/` — optional AI assist skills (vendored kernel layer + eoiagent model transport).
+* `providers/inspecto-connectors-kafka/` — the premium Kafka stream connector (`connectors-kafka`).
 * [Agent (hosted)](agent-hosted.md) - `providers/inspecto-agent-hosted/` — hosted model providers (omitted from air-gapped builds).
-* [Security](security.md) - `providers/inspecto-oidc/` — Standard-only OIDC auth (`inspecto-oidc`),
-  reactor-gated behind the `edition-standard` Maven profile — see also [auth & security](../editions/auth-security.md).
+* [Security](security.md) - `providers/inspecto-oidc/` — OIDC auth (`oidc`); split by D-MR6 into `providers/inspecto-secrets/` (file-keystore secrets) and `providers/inspecto-geo-country/` (MaxMind resolver). Professional and up — see also [auth & security](../editions/auth-security.md).
+* `providers/inspecto-policy/` — attribute-based access policy (`policy`, Enterprise).
+* `providers/inspecto-notify-channels/` — webhook + SMTP notification transports (`notify-channels`).
+* `providers/inspecto-telecom-asn1/` — the telecom ASN.1 decoder (`telecom-asn1`) over `providers/asn-parser/` (nested reactor, moves as a unit).
+* `providers/inspecto-demo-auth/` — the demo authenticator; no edition bundles it, only `package.ps1 -DemoAuth`.
