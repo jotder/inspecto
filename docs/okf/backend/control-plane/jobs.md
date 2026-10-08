@@ -1031,3 +1031,5 @@ could never fire. `JobView` now carries `hosted` and `reason`; an unhosted job h
 Pack provides it"), and the Jobs pane badges it "Not installed". The reason is generic when no known module declares the type; since P4e manifests declare
 `provides.jobTypes`, so a type a known-but-absent module declares gets `missingModule` and a reason naming the module. The detail read
 (`GET /jobs/{name}`) stays the raw config on purpose. Pinned by `ModuleRemovalJobTest` and `jobs.component.spec.ts`.
+
+⚠ **A `maintenance` Job whose task belongs to a switched-off module is `SKIPPED` too (P4f, 2026-10-08).** `provides.maintenanceTasks` declares the owner (ops: `incident_purge`); `JobService.jobTaskGate` is consulted next to the Job Type gate, so every fire is recorded `SKIPPED` ("switched off in this Space"), a manual trigger or replay answers 404 `MODULE_DISABLED`, and it resumes on re-enable. Pinned by `JobTaskGateTest` and `OpsBackgroundManifestTest`.

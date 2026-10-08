@@ -82,7 +82,10 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
   jobs}` lists what the Space holds for an absent module, and an unhosted Job names it (`missingModule`). A module switched off in a
   Space (`modules.toon`) also stops its Jobs there: the fire is recorded `SKIPPED` ("switched off in this Space"), a manual trigger
   or replay answers 404 `MODULE_DISABLED`, the config is untouched and it resumes when re-enabled (`JobModuleGate`, `ModuleDisabledJobTest`).
-  Not stopped: maintenance tasks, the SLA sweep and other non-Job background work (see the plan, *P4e as built*).
+  Periodic work is paused the same way (P4f): a module declares `provides.background` (ops: `sla-sweep`) and
+  `provides.maintenanceTasks` (ops: `incident_purge`), and the owning tick asks the shared `ModuleGate` first - skipped for that
+  Space, logged once per transition, resumed on re-enable; `GET /modules` lists the paused ids as `backgroundPaused`. A Run already
+  started is not interrupted, and a module with no feature id (`backup`, `intelligence`) cannot be switched off (plan, *P4f as built*).
 
 ## Seams (current)
 - Route modules: the built-ins are an explicit ordered list in `ControlApi`; optional modules are discovered by
