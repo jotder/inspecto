@@ -101,6 +101,9 @@ public final class RiskScoreJobType implements JobTypeProvider {
                     "dataset", model.scoresDataset(), "entities", run.scored().size(), "high", high));
             ctx.log().info("scored entities", "model", modelId, "entities", run.scored().size(), "high", high,
                     "modelVersion", version, "evidenceTruncated", run.evidenceTruncated());
+            if (run.evidenceTruncated())
+                ctx.log().warn("evidence read hit its cap - entities past it carry no evidence (their scores are unaffected)",
+                        "model", modelId, "cap", RiskScoreEvaluator.MAX_EVIDENCE_ROWS);
             return JobResult.ok("risk.score: " + run.scored().size() + " entit(ies) scored, " + high
                     + " high → dataset '" + model.scoresDataset() + "'", (System.nanoTime() - t0) / 1_000_000L);
         }

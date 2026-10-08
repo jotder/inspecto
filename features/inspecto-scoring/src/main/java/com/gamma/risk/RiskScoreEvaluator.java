@@ -122,7 +122,8 @@ public final class RiskScoreEvaluator {
     /** A preview's outcome: the scored entity, and whether any factor named it. */
     public record Preview(RiskScorer.Scored scored, boolean found) {}
 
-    private static Run evaluate(RiskScoreModel model, Function<String, String> relationSql, EvidenceMasker masker,
+    /** Package-visible so a test can drive a small evidence cap without 20,000 rows. */
+    static Run evaluate(RiskScoreModel model, Function<String, String> relationSql, EvidenceMasker masker,
                                 int maxEntities, int maxEvidenceRows, SqlSandboxPolicy policy)
             throws SQLException, IOException {
         Map<String, Map<String, Double>> values = new TreeMap<>();              // entity → factor → value
@@ -149,8 +150,10 @@ public final class RiskScoreEvaluator {
                 if (v instanceof Number n) perEntity.put(f.id(), n.doubleValue());
             }
             if (!f.evidence().isEmpty()) {
+                // One row past the cap, for the same reason as the indicator read: the compiled statement carries its
+                // own LIMIT, so asking for exactly the cap could never come back truncated (BI-QUERY-TRUNCATION-1).
                 QueryExecutor.Result ev = run(model, f, "evidence", new QueryExecutor.Request(f.dataset(), relation,
-                        MeasureCompiler.compile(f.evidenceSpec(maxEvidenceRows)), maxEvidenceRows, 0,
+                        MeasureCompiler.compile(f.evidenceSpec(maxEvidenceRows + 1)), maxEvidenceRows, 0,
                         List.of(), List.of()), policy);
                 evidenceTruncated |= ev.truncated();
                 for (Map<String, Object> row : ev.rows()) {

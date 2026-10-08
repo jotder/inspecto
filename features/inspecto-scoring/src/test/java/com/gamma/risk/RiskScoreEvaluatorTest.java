@@ -139,4 +139,25 @@ class RiskScoreEvaluatorTest {
         assertNull(e.getCause(), "the cause (which carries the DuckDB message) is not attached");
         assertTrue(e.getMessage().contains("factor 'spend'"), e.getMessage());
     }
+
+    /** BI-QUERY-TRUNCATION-1: the evidence read asked for exactly its cap, so it could never report a cut. */
+    @Test
+    void evidenceReadPastItsCapIsFlaggedAndAnExactFitIsNot(@TempDir Path data) throws Exception {
+        DuckDbUtil.loadDriver();
+        Path dir = Files.createDirectories(data.resolve("notes"));
+        String file = dir.resolve("data.parquet").toString().replace('\\', '/');
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES ('m1','a'),('m2','b'),('m3','c'),('m4','d')) AS v(msisdn, tag)) TO '"
+                    + file + "' (FORMAT PARQUET)");
+        }
+        RiskScoreModel m = RiskScoreModel.fromMap("ev", Map.of("entityType", "subscriber", "highThreshold", 50,
+                "factors", List.of(Map.of("id", "n", "dataset", "notes", "key", "msisdn", "measure", "count",
+                        "weight", 10, "evidence", List.of("tag")))));
+        java.util.function.Function<String, String> rel = id -> DatasetRelation.relationSql(Map.of("physicalRef", id), data, null);
+        var cut = RiskScoreEvaluator.evaluate(m, rel, NO_MASK, 100, 3, com.gamma.sql.SqlSandboxPolicy.defaultPolicy());
+        assertTrue(cut.evidenceTruncated(), "4 evidence rows, cap 3");
+        assertEquals(4, cut.scored().size(), "scores are never refused over evidence");
+        assertFalse(RiskScoreEvaluator.evaluate(m, rel, NO_MASK, 100, 4, com.gamma.sql.SqlSandboxPolicy.defaultPolicy())
+                .evidenceTruncated(), "exactly the cap is not a cut");
+    }
 }
