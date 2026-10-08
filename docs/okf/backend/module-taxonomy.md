@@ -9,7 +9,7 @@ timestamp: 2026-10-08T00:00:00Z
 
 # Module taxonomy
 
-> 🟡 **Status (2026-10-07): in flight; every phase P0..P7 has a shipped slice, none is finished** (phase table and remaining work: the plan header; open items are `MODULE-REORG-*` rows in `docs/BACKLOG.md`). Vocabulary is in `docs/GLOSSARY.md` §15.
+> 🟢 **Status (2026-10-09): every phase P0..P7 has shipped its slices; five rows of deliberate residue remain** (the plan header lists them; each is a `MODULE-REORG-*` row in `docs/BACKLOG.md`: release signing is operator-owned, in-flight cancellation has no work item, the Alert-migration deletion and Workflow & SLA slice 2 wait on a release / a second governed source, Decision Kernel step 7 and the RBAC capability contribution are declined, one EDITIONS re-confirmation). Vocabulary is in `docs/GLOSSARY.md` §15.
 > Built: the per-module manifest (`META-INF/inspecto/module.toon`, every module), the activator
 > (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
 > disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).
