@@ -1,4 +1,4 @@
-<div #studioRoot class="flex h-full min-h-0 min-w-0 flex-auto flex-col p-4">
+<div #studioRoot class="flex h-[calc(100dvh-var(--shell-chrome-height,7.5rem))] min-h-0 min-w-0 flex-auto flex-col p-4 max-md:h-auto">
     <!-- ── compact header (the canvas gets the space) ── -->
     <inspecto-page-header
         compact
@@ -672,7 +672,7 @@
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
-            class="relative flex min-h-[28rem] min-w-0 flex-auto overflow-hidden rounded-lg border max-md:!h-auto max-md:flex-col"
+            class="relative flex min-h-0 min-w-0 flex-auto overflow-hidden max-md:min-h-[28rem] rounded-lg border max-md:!h-auto max-md:flex-col"
         >
             <!-- left dock — Query (+ Filter); collapses to an icon rail -->
             <aside

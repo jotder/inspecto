@@ -78,7 +78,7 @@ your saved views. The steps below are the same thing done by hand.
 * **Tool rail** (far left, full canvas height): search, filter, layout, save this analysis, Attach to Case, the
   algorithms and Investigation shortcuts, saved views, display options, Undo / Redo, Fit, Show as list, Full screen
   and one **Export** menu (PNG, JSON, SVG, GraphML). The rail scrolls when the window is short; on a narrow screen it
-  wraps back into a row above the stacked panels. The canvas fills all the height below the title row.
+  wraps back into a row above the stacked panels. The page never scrolls on a wide window: the Link Analysis page is exactly as tall as the window below the application header and above the footer (measured 1440x900: canvas 462 px wide with both panels open, 974 px with **Hide the side panels**), and the panels scroll inside themselves. On a narrow screen (under 960 px) the panels stack and the page scrolls.
 * **Docks** are resizable (drag or arrow keys) and collapse to a rail (*Hide the query panel*, *Hide the
   toolbox*); **Hide the side panels** gives the canvas the whole width.
 * **Canvas:** drag to pan, scroll to zoom, drag a node to move it, click a node for its details, click a branch

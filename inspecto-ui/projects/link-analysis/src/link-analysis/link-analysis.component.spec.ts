@@ -1489,6 +1489,32 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         expect(wrapper.classList).toContain('max-md:min-h-[480px]'); // stacked layout keeps the old canvas height
     });
 
+    it('bounds the page to the viewport at md+ (no page scroll): root height, row min-h-0, strip shrink-0; stacked keeps page scroll', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const root = el.firstElementChild as HTMLElement;
+        expect(root.classList).toContain('h-[calc(100dvh-var(--shell-chrome-height,7.5rem))]'); // header 4rem + footer 3.5rem
+        expect(root.classList).toContain('max-md:h-auto');
+        expect(root.classList).not.toContain('h-full');
+        const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+        for (const c of ['min-h-0', 'flex-auto', 'overflow-hidden', 'max-md:min-h-[28rem]']) {
+            expect(workspace.classList).toContain(c);
+        }
+        for (const dock of ['Query', 'Toolbox']) {
+            const aside = el.querySelector(`aside[aria-label="${dock}"]`)!;
+            expect(aside.classList).toContain('overflow-hidden');
+            expect(aside.querySelector('.overflow-y-auto')).toBeTruthy(); // the dock body scrolls inside
+        }
+        expect(el.querySelector('nav[data-testid="la-tool-rail"]')!.classList).toContain('overflow-y-auto');
+        const strip = Array.from(el.querySelectorAll<HTMLElement>('div.shrink-0.rounded-lg.border')).find((d) =>
+            d.textContent?.includes('Data'),
+        );
+        expect(strip).toBeTruthy();
+    });
+
     it('the starter cards are a11y-clean', async () => {
         const { fixture } = create({ views: [OTHER, MONEY] });
         fixture.detectChanges();
