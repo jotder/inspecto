@@ -9,6 +9,8 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Link Analysis
 
+> **Backend structure** (modules, store backends, index layout, gate order, host wiring): [`okf/backend/modules/link-analysis.md`](../../backend/modules/link-analysis.md).
+
 > **Edition (2026-09-07, EDG-01 cell 3b).** Link analysis's backend routes live in the optional `inspecto-geo-link` module —
 > Standard and Enterprise only (EDITIONS `CP-09`). `SessionService.geoLinkEnabled` mirrors `/bootstrap`
 > `features.geoLink`; when false the nav entry and the Menu-Builder widget offer are **hidden**, and a deep link

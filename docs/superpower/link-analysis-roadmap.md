@@ -19,7 +19,7 @@
 | Separation, option D (D-0…D-6) | built | `LA-APP-REAL-SIGNIN-1`, I1 trust, `LA-INDEX-SCALE-MEASURE-1` (§1) |
 | D-7 parallel analyst sandboxes (Drafts) | built D7-1…D7-7 | team Drafts, Draft SPA surface, linear rebase (§1) |
 | Embed view | deferred | `LA-EMBED-VIEW-1` (§1) |
-| Data preparation (CDR → fast index) | **plan; spikes SP1, SP2 (indicative), SP4, SP5 measured 2026-10-06; WP3 index builder still unbuilt** | LDP-D1…D11 open, WP0…WP10 (§2) |
+| Data preparation (CDR → fast index) | **plan; spikes SP1, SP2 (indicative), SP4, SP5 measured 2026-10-06; the generic D-3 index and its daily build exist, WP3's CDR-specific remainder (frozen schemas/manifests, index-backed traversal beyond the step 5-7 reads) is unbuilt** | LDP-D1…D11 open, WP0…WP10 (§2) |
 | Daily ingestion (CSV / Hive / database to the index) | **ingest chain built and accepted (T1-T9)** | `LA-DAILY-INGEST-1` T1…T9, decisions D-ING1…D-ING6 answered (D-ING5 file-first), T1/T2/T3/T4/T6/T7/T9 done, T5/T8 built; open: follow-ups in the BACKLOG row |
 | Investigation store | S0–S7 closed | demand-gated items (§2) |
 | Entity model LA-17 | slice 1 + slice 2 built | SPA member browsing, `excludeBy` range/CIDR (§3) |
@@ -124,7 +124,7 @@ Drawn from: `docs/archived-documents/plans-archive/la-data-preparation-plan.md` 
 
 Inputs: telecom RA/FM on CDR, domain-neutral design (I-01); ~10^9 CDRs/day, split by record type unknown (I-02); daily freshness (I-03); 4 hops with filters, above ~10K result nodes the analyst adds filters (I-04); 1-3 analysts (I-05); "who was with X" co-location drives Geo (I-06); free to pull full data from Hive and lay out own Parquet (I-10); Domain Profiles separate from core, several active, shipped only by us (I-11).
 
-Critical path: D-1 (modules) and D-4 (Graph Run) are done; **D-3 (the index) is unstarted and unscheduled = WP3 is the critical path**. D-4 ceilings (500,000 nodes / 5,000,000 edges) leave 10^8-10^9 to an index-backed engine; nothing built proves D21. Sequence: Wave 0 spikes SP1/SP2 + LDP-D1 -> WP3 builder -> WP4 (supernode, lists, gate) / WP6 (presence) -> WP7 UI -> WP8 acceptance run.
+Critical path: D-1 (modules), D-4 (Graph Run) and D-3 Path A (the generic index, steps 1-8: full / append / compact builds, `recursive-paths`, neighbours, `expand` and Graph Run read from it; `index.enabled` default false) are done, and the daily `la.index.build` Job exists (`LA-DAILY-INGEST-1` T5). *(Corrected 2026-10-09: this line said D-3 was unstarted; it was carried over from the 2026-10-02 plan.)* **WP3 is still the critical path, narrowed to what the CDR target needs beyond the generic index:** frozen index schemas and manifests (M05, M09, incl. the SP1 sorted-within-bucket question), a per-day coverage manifest on the index, and index-backed hop-ladder traversal at CDR scale (10^9 unproven, `LA-INDEX-SCALE-MEASURE-1`). D-4 ceilings (500,000 nodes / 5,000,000 edges) leave 10^8-10^9 to an index-backed engine; nothing built proves D21. Sequence: Wave 0 spikes SP1/SP2 + LDP-D1 -> WP3 builder -> WP4 (supernode, lists, gate) / WP6 (presence) -> WP7 UI -> WP8 acceptance run.
 
 ### Ranked priority list (rule: retire largest unknown, unblock most, Must before Should, no-decision before gated; size S<=2d, M~1wk, L 2-3wk, XL>1mo)
 
@@ -147,7 +147,7 @@ Critical path: D-1 (modules) and D-4 (Graph Run) are done; **D-3 (the index) is 
 | 15 | M08 build-time as-of identity (SCD2 Reference) | Must | S-M | LDP-D8 (soft) | 1 |
 | 16 | M05 + M09 freeze index schemas and manifests | Must | M | LDP-D1, SP1, SP2 | 2 |
 | 17 | M19 coverage and quality gates in the build | Must | M | - | 2 |
-| 18 | WP3 builder: daily incremental index job (D-3 content), CRITICAL PATH | Must | L | SP1, SP2, LDP-D1 | 2 |
+| 18 | WP3: CDR index on top of the built D-3 index (schemas/manifests frozen, coverage manifest, scale); daily incremental job already built (T5), CRITICAL PATH | Must | L | SP1, SP2, LDP-D1 | 2 |
 | 19 | M06, M07 supernode policy, SQL-prunable lists, barrier | Must | M-L | LDP-D3, D4 | 2 |
 | 20 | M11 result gate | Must | M | LDP-D2 | 2 |
 | 21 | M10 presence index + server-side co-location | Must | L | SP6 | 2 |
@@ -177,7 +177,7 @@ Start-now (no decision): #1-9, M11 server gate, M03.
 | WP0 | Requirements closure + hygiene: facts brief F-01..F-16, doc fixes, GLOSSARY terms (Working Set, Dossier, Snapshot, Draft, Purpose, Masking mode, Value Measure), cross-check M20/M14 vs RFP gap G-20 if present | not started (Wave 0) | - |
 | WP1 | Spikes SP1-SP7; each appends a numbered result block and updates the decision it feeds (= signed D-2) | not started (Wave 0) | - |
 | WP2 | Platform data prep (M01-M04, M08, M20 part): writer layout (hash bucket, sort, row group, file size on the one `copyOpts` seam in `PartitionWriter`, via `SafetyPolicy`); deterministic partition replace + durable ledger; E.164 normalisation; node-dictionary enrichment on distinct numbers only; acquisition per LDP-D6 | not started (Waves 0-1) | SP1, SP5, LDP-D6; none on LA |
-| WP3 | The index `la-storage` (D-3 content; M05, M06, M08, M09, M19): schemas + manifests, daily build as one builder class (Pipeline node type via bridge + `la-app` job), per-day coverage manifest written last, index-backed `GraphInput` loads a subgraph | not started, CRITICAL PATH (Wave 2) | SP1, SP2, LDP-D1, WP2 |
+| WP3 | The index `la-storage` (D-3 content; M05, M06, M08, M09, M19): schemas + manifests, daily build as one builder class (Pipeline node type via bridge + `la-app` job), per-day coverage manifest written last, index-backed `GraphInput` loads a subgraph | partly built (2026-10-09 correction): generic D-3 index, append/compact builds, daily `la.index.build` Job and index-backed `GraphInput` for neighbourhood / ego / seeds-only degree exist; CDR schema/manifest freeze, per-day coverage manifest on the index and 10^9 proof are not; CRITICAL PATH (Wave 2) | SP1, SP2, LDP-D1, WP2 |
 | WP4 | Traversal + result control (M06, M07, M11): hop ladder over index, supernode policy, derived `list_member`, barrier as `expand` field, gate; new routes clear the four gates | not started (Wave 2) | WP3, LDP-D2/D3/D4 |
 | WP5 | Domain Profile seam + telecom profile (M18, S08, W04): extract telecom assumptions, derived guard, toy 2nd profile, FX one-page sketch | not started (Wave 3) | LDP-D7 |
 | WP6 | Geo presence (M10, S09): presence tables in two sort orders, cell Reference, server-side "where was X"/"who was with X", hot-cell cap | not started (Wave 2) | SP6, WP3 |

@@ -13,6 +13,7 @@ module (build role · offering role · binding time) and the Offerings that comp
 
 * [Reactor & modularization](reactor.md) - build order (history), parent `dependencyManagement`, extraction rules (S5 + WS-D, 2026-07-21).
 * [Module taxonomy](../module-taxonomy.md) - the manifest, the three axes, Offerings, the Installed/Enabled/Permitted gates.
+* [Link Analysis backend architecture](link-analysis.md) - the `la/` modules + entity store: dependency direction, Investigation store port (FS / Postgres), Drafts, masking, link index, Graph Run, `/inv` gate order, host wiring, editions (2026-10-09).
 * [Java review coverage](review-coverage.md) - what has been read line-by-line, what has not, and the defect classes that keep recurring (2026-08-18).
 
 ## Root
