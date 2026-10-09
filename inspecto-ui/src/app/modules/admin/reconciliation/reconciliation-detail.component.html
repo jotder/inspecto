@@ -55,6 +55,17 @@
             </ng-container>
         </inspecto-page-header>
 
+        <!-- RECON-PERF-1: these Breaks are of ONE day; the legend explains the row tint (operator, 2026-10-09) -->
+        <inspecto-recon-toolbar
+            class="mt-4 block"
+            [availableDays]="availableDays()"
+            [day]="day()"
+            [showFilter]="false"
+            [showSample]="false"
+            [bands]="r.bands"
+            (dayChange)="setDay($event)"
+        />
+
         <!-- Execution & Health Status Banner -->
         <div
             class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-card p-4 shadow-sm dark:border-gray-700"
@@ -176,6 +187,7 @@
                             sourceName="recon-only-in-a"
                             exportName="recon-only-in-a"
                             stateKey="recon-only-in-a"
+                            [rowClass]="breakRowClass"
                             [rows]="missingA()"
                             [columns]="missingColumns()"
                             [rowActions]="rowActions"
@@ -196,6 +208,7 @@
                             sourceName="recon-only-in-b"
                             exportName="recon-only-in-b"
                             stateKey="recon-only-in-b"
+                            [rowClass]="breakRowClass"
                             [rows]="missingB()"
                             [columns]="missingColumns()"
                             [rowActions]="rowActions"
@@ -213,6 +226,7 @@
                             sourceName="recon-value-breaks"
                             exportName="recon-value-breaks"
                             stateKey="recon-value-breaks"
+                            [rowClass]="breakRowClass"
                             [rows]="valueBreaks()"
                             [columns]="valueColumns()"
                             [rowActions]="rowActions"
@@ -232,6 +246,7 @@
                             sourceName="recon-duplicate-keys"
                             exportName="recon-duplicate-keys"
                             stateKey="recon-duplicate-keys"
+                            [rowClass]="breakRowClass"
                             [rows]="duplicates()"
                             [columns]="duplicateColumns()"
                             [rowActions]="duplicateActions"

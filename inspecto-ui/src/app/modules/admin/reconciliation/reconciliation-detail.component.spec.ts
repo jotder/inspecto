@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { EMPTY, of, throwError } from 'rxjs';
+import { statusRowClasses } from 'app/inspecto/components/status-badge.component';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -65,6 +66,7 @@ const ROWS = {
 async function create(
     opts: {
         path?: string;
+        day?: string;
         /** The server-RECORDED lifecycle (`GET /recon/{id}/state`, R2-03). */
         breaks?: ReconBreak[];
         lastRunAt?: string | null;
@@ -109,6 +111,9 @@ async function create(
     const promoted =
         opts.promoted ?? vi.fn(() => of({ reconciliation: current.id, promoted: {}, total: 0, truncated: false }));
     const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+    // The day picker's list: one row of the Board's (server-cached) run for the URL's day.
+    const page = vi.fn(() => of({ day: '2026-09-26', availableDays: ['2026-09-26', '2026-09-25'] }));
+    const navigate = vi.fn();
     TestBed.configureTestingModule({
         imports: [ReconciliationDetailComponent],
         providers: [
@@ -118,16 +123,19 @@ async function create(
                 useValue: {
                     snapshot: {
                         paramMap: convertToParamMap({ id: current.id }),
-                        queryParamMap: convertToParamMap(opts.path ? { path: opts.path } : {}),
+                        queryParamMap: convertToParamMap({
+                            ...(opts.path ? { path: opts.path } : {}),
+                            ...(opts.day ? { day: opts.day } : {}),
+                        }),
                     },
                 },
             },
             {
                 provide: Router,
-                useValue: { navigate: vi.fn(), createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
+                useValue: { navigate, createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
             },
             { provide: ReconciliationsService, useValue: { get: () => of(current), save } },
-            { provide: ReconExecService, useValue: { breaks, rows: opts.rows ?? vi.fn(async () => ROWS) } },
+            { provide: ReconExecService, useValue: { breaks, page, rows: opts.rows ?? vi.fn(async () => ROWS) } },
             { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: ToastrService, useValue: toastr },
             { provide: ReconApiService, useValue: { promote, promoted, state, setBreakStatus } },
@@ -143,7 +151,19 @@ async function create(
     fixture.detectChanges(); // ngOnInit — load + compute
     await fixture.whenStable();
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, save, breaks, promote, promoted, toastr, setBreakStatus, dialog };
+    return {
+        fixture,
+        c: fixture.componentInstance,
+        save,
+        breaks,
+        page,
+        navigate,
+        promote,
+        promoted,
+        toastr,
+        setBreakStatus,
+        dialog,
+    };
 }
 
 describe('ReconciliationDetailComponent (Breaks page)', () => {
@@ -252,9 +272,40 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         expect(text).toContain('Matched, different');
     });
 
+    it('reads ONE day: the URL day goes to the Breaks request, and the picker lists the days with data', async () => {
+        const { c, breaks, page, fixture } = await create({ day: '2026-09-25' });
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-25');
+        expect(page).toHaveBeenCalledWith(expect.anything(), { day: '2026-09-25', offset: 0, limit: 1, filter: 'all' });
+        expect(c.availableDays()).toEqual(['2026-09-26', '2026-09-25']);
+        const legend = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Band legend"]');
+        expect(legend?.textContent).toContain('Breach > 2%');
+    });
+
+    it('no URL day shows the latest day; another day rewrites the URL and recomputes', async () => {
+        const { c, breaks, navigate } = await create();
+        expect(c.day()).toBe('2026-09-26');
+        c.setDay('2026-09-25');
+        expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { day: '2026-09-25' } }));
+        await vi.waitFor(() =>
+            expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-25'),
+        );
+    });
+
+    it('tints each Break row by its band and names the band in the key cell — no status-colour column', async () => {
+        const { c } = await create();
+        const vb = c.valueBreaks()[0]; // 118 vs 114: −3.4 % → breach
+        expect(c.breakRowClass(vb)).toContain(statusRowClasses('error'));
+        expect(c.breakRowClass(vb)).toContain('border-l-4');
+        expect(c.breakRowClass(c.missingA()[0])).toContain(statusRowClasses('error'));
+        const key = c.valueColumns()[0];
+        expect(key.headerName).toBe('Key');
+        const html = (key.cellRenderer as (p: unknown) => string)({ value: vb.key, data: vb });
+        expect(html).toContain('<span class="sr-only">Breach: </span>EU · data');
+    });
+
     it('scopes to the Board dimension path from ?path=', async () => {
         const { c, breaks } = await create({ path: 'region:EU' });
-        expect(breaks).toHaveBeenCalledWith(expect.anything(), { region: 'EU' }, null, 'b');
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), { region: 'EU' }, null, 'b', '2026-09-26');
         expect(c.missingA()).toHaveLength(0);
         expect(c.valueBreaks()).toHaveLength(1);
     });
@@ -432,7 +483,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
         c.setSide('c');
         await vi.waitFor(() => expect(c.computing()).toBe(false));
-        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), c.path(), null, 'c');
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), c.path(), null, 'c', '2026-09-26');
         expect(c.valueBreaks()[0]).toMatchObject({ pair: 'AC', status: 'open', firstSeenAt: acSeen });
         expect(c.valueBreaks()[0].note).toBeUndefined();
         expect(c.ageText(c.valueBreaks()[0])).toBe('5d');
@@ -827,7 +878,7 @@ describe('Duplicate keys — cardinality Breaks on the Breaks page', () => {
         c.select(c.duplicates()[0] as unknown as Record<string, unknown>);
         await vi.waitFor(() => expect(c.breakRows()).not.toBeNull());
         fixture.detectChanges();
-        expect(rows).toHaveBeenCalledWith(expect.anything(), { msisdn: 'm9' }, 'b');
+        expect(rows).toHaveBeenCalledWith(expect.anything(), { msisdn: 'm9' }, 'b', '2026-09-26');
         expect(el(fixture).querySelector('[data-testid="break-rows"]')?.textContent).toContain('2 on');
         expect(el(fixture).querySelector('[data-testid="selected-break"]')?.textContent).toContain('duplicate key');
     });

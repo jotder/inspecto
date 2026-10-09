@@ -171,6 +171,9 @@ export class DataTableComponent {
     readonly loading = input(false);
     /** Rows per page. Always offered in the page-size selector (see {@link pageSizeOptions}). */
     readonly pageSize = input(10);
+    /** Extra classes per row (e.g. a band tint) — the caller owns the meaning and its non-colour cue. */
+    readonly rowClass = input<((row: unknown) => string | undefined) | undefined>(undefined);
+    readonly rowClassFn = (p: { data?: unknown }): string | undefined => this.rowClass()?.(p.data);
     /**
      * A FIXED grid height (e.g. `'15rem'`) — only for hosts whose layout needs a stable box (a docked
      * bottom panel under a map/graph). Omitted ⇒ the grid sizes to its rows (`domLayout: 'autoHeight'`):

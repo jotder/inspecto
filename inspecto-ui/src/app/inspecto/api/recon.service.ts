@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ReconBreakSets, ReconRunResult } from 'app/inspecto/reconciliation/recon-board';
+import { ReconBreakSets, ReconRunQuery, ReconRunResult } from 'app/inspecto/reconciliation/recon-board';
 import { ReconBreak, ReconState } from 'app/inspecto/reconciliation/reconciliation-types';
 import { apiUrl, toParams } from './api-base';
 
@@ -111,8 +111,17 @@ export class ReconApiService {
         return this.http.post<ReconColumnsResult>(apiUrl('/recon/columns'), { datasets });
     }
 
-    run(config: ReconServerConfig, limit?: number): Observable<ReconRunResult> {
-        return this.http.post<ReconRunResult>(apiUrl('/recon/run'), { config, ...(limit ? { limit } : {}) });
+    /**
+     * ONE day's page of the Board (RECON-PERF-1): the grain rows of `query.day` (absent = the latest day) cut by
+     * `filter` / `offset` / `limit`, plus the whole day's totals and summary.
+     */
+    run(config: ReconServerConfig, query?: ReconRunQuery): Observable<ReconRunResult> {
+        return this.http.post<ReconRunResult>(apiUrl('/recon/run'), {
+            config,
+            ...(query?.day ? { day: query.day } : {}),
+            ...(query ? { limit: query.limit, offset: query.offset, filter: query.filter } : {}),
+            ...(query?.sample ? { sample: query.sample } : {}),
+        });
     }
 
     /**
@@ -124,9 +133,11 @@ export class ReconApiService {
         key: Record<string, string>,
         side?: string | null,
         limit?: number,
+        day?: string | null,
     ): Observable<ReconRowsResult> {
         return this.http.post<ReconRowsResult>(apiUrl('/recon/rows'), {
             config,
+            ...(day ? { day } : {}),
             key,
             ...(side ? { side } : {}),
             ...(limit ? { limit } : {}),
@@ -140,9 +151,11 @@ export class ReconApiService {
         side?: string | null,
         limit?: number,
         offset?: number,
+        day?: string | null,
     ): Observable<ReconBreakSets> {
         return this.http.post<ReconBreakSets>(apiUrl('/recon/breaks'), {
             config,
+            ...(day ? { day } : {}),
             ...(path ? { path } : {}),
             ...(type ? { type } : {}),
             ...(side ? { side } : {}),
@@ -201,8 +214,12 @@ export class ReconApiService {
      * Record a run of the SAVED Reconciliation (`canOperateRuns`): the server computes every Break itself —
      * no page limit — merges the lifecycle and stamps the run. Returns the new state.
      */
-    record(reconciliation: string): Observable<ReconState> {
-        return this.http.post<ReconState>(apiUrl(`/recon/${encodeURIComponent(reconciliation)}/record`), {});
+    /** Record a run of ONE day (absent = the latest); the answer names the day it recorded. */
+    record(reconciliation: string, day?: string | null): Observable<ReconState & { day?: string }> {
+        return this.http.post<ReconState & { day?: string }>(
+            apiUrl(`/recon/${encodeURIComponent(reconciliation)}/record`),
+            day ? { day } : {},
+        );
     }
 
     /**

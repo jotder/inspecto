@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
-import { CompareColumn, Reconciliation, ReconciliationConfig } from './reconciliation-types';
+import { CompareColumn, Reconciliation, ReconBands, ReconciliationConfig } from './reconciliation-types';
 
 /**
  * Reconciliation store — persists {@link Reconciliation}s through the component registry as the
@@ -62,8 +62,19 @@ function toContent(r: Reconciliation): Record<string, unknown> {
         ...(r.thirdDataset ? { thirdDataset: r.thirdDataset } : {}),
         keyColumns: r.keyColumns,
         compareColumns: r.compareColumns,
-        ...(r.bands ? { bands: r.bands } : {}),
+        // The saved spelling is the server's `{okBelow, warnAbove}` (validated 0 <= ok <= warn <= 100 → 422,
+        // operator 2026-10-09); the SPA keeps its own `{warnPct, breachPct}` names internally.
+        ...(r.bands ? { bands: { okBelow: r.bands.warnPct, warnAbove: r.bands.breachPct } } : {}),
     };
+}
+
+/** The saved `{okBelow, warnAbove}` as the SPA's {@link ReconBands}; anything else reads as unset (defaults apply). */
+export function bandsFromContent(v: unknown): ReconBands | undefined {
+    if (typeof v !== 'object' || v === null) return undefined;
+    const b = v as Record<string, unknown>;
+    return typeof b['okBelow'] === 'number' && typeof b['warnAbove'] === 'number'
+        ? { warnPct: b['okBelow'], breachPct: b['warnAbove'] }
+        : undefined;
 }
 
 function fromContent(name: string, content: Record<string, unknown>): Reconciliation {
@@ -85,7 +96,7 @@ function fromContent(name: string, content: Record<string, unknown>): Reconcilia
         thirdDataset: c.thirdDataset ?? list[2] ?? undefined,
         keyColumns: (c.keyColumns as string[]) ?? [],
         compareColumns: (c.compareColumns as CompareColumn[]) ?? [],
-        bands: c.bands,
+        bands: bandsFromContent(content['bands']),
         raw: content,
     };
 }

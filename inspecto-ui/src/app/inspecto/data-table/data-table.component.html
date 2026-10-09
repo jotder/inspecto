@@ -172,6 +172,7 @@
         [suppressHorizontalScroll]="suppressHScroll()"
         [theme]="gridTheme.theme()"
         [rowData]="displayRows()"
+        [getRowClass]="rowClassFn"
         [columnDefs]="gridColumns()"
         [defaultColDef]="defaultColDef()"
         [quickFilterText]="search()"

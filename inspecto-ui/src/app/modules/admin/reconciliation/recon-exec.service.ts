@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { ReconApiService, ReconServerConfig } from 'app/inspecto/api';
 import { ReconRowsResult } from 'app/inspecto/api/recon.service';
-import { Reconciliation, ReconBreakSets, ReconRunResult, SideKey } from 'app/inspecto/reconciliation';
+import { Reconciliation, ReconBreakSets, ReconRunQuery, ReconRunResult, SideKey } from 'app/inspecto/reconciliation';
 
 /**
  * Reconciliation execution seam — the recon analogue of `DatasetResultService`. The comparison executes
@@ -13,9 +13,9 @@ import { Reconciliation, ReconBreakSets, ReconRunResult, SideKey } from 'app/ins
 export class ReconExecService {
     private api = inject(ReconApiService);
 
-    /** Run the Board aggregate comparison. */
-    async run(recon: Reconciliation): Promise<ReconRunResult> {
-        return firstValueFrom(this.api.run(serverConfig(recon)));
+    /** One day's page of the Board comparison — an Observable so a newer request can cancel it (switchMap). */
+    page(recon: Reconciliation, query: ReconRunQuery): Observable<ReconRunResult> {
+        return this.api.run(serverConfig(recon), query);
     }
 
     /**
@@ -23,8 +23,13 @@ export class ReconExecService {
      * dimension path. {@code side} picks the compared side ('b' default, or 'c' on a 3-way recon).
      */
     /** The raw rows behind one key, both sides (RECON-CARDINALITY-2). */
-    async rows(recon: Reconciliation, key: Record<string, string>, side: SideKey = 'b'): Promise<ReconRowsResult> {
-        return firstValueFrom(this.api.rows(serverConfig(recon), key, side));
+    async rows(
+        recon: Reconciliation,
+        key: Record<string, string>,
+        side: SideKey = 'b',
+        day?: string | null,
+    ): Promise<ReconRowsResult> {
+        return firstValueFrom(this.api.rows(serverConfig(recon), key, side, undefined, day));
     }
 
     async breaks(
@@ -32,8 +37,9 @@ export class ReconExecService {
         path?: Record<string, string> | null,
         type?: 'missing_left' | 'missing_right' | 'value_break' | null,
         side: SideKey = 'b',
+        day?: string | null,
     ): Promise<ReconBreakSets> {
-        return firstValueFrom(this.api.breaks(serverConfig(recon), path, type, side));
+        return firstValueFrom(this.api.breaks(serverConfig(recon), path, type, side, undefined, undefined, day));
     }
 }
 

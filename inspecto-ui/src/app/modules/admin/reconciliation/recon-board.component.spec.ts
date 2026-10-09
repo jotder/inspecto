@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, convertToParamMap } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { EMPTY, Observable, of, throwError } from 'rxjs';
+import { BehaviorSubject, EMPTY, Observable, Subject, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { LensService, ReconApiService } from 'app/inspecto/api';
@@ -12,10 +12,11 @@ import {
     aggregateRecon,
     Reconciliation,
     ReconciliationsService,
+    ReconRunQuery,
     ReconRunResult,
     ReconState,
 } from 'app/inspecto/reconciliation';
-import { ReconBoardComponent } from './recon-board.component';
+import { queryFromParams, ReconBoardComponent } from './recon-board.component';
 import { ReconExecService } from './recon-exec.service';
 import { DatasetsService } from '../studio/datasets/datasets.service';
 import { Dataset } from '../studio/datasets/dataset-types';
@@ -61,7 +62,12 @@ const RIGHT = [
     { region: 'EU', product: 'voice', amount: 100 },
     { region: 'EU', product: 'data', amount: 114 },
 ];
-const RESULT = aggregateRecon(RECON, LEFT, RIGHT);
+const RESULT: ReconRunResult = {
+    ...aggregateRecon(RECON, LEFT, RIGHT),
+    day: '2026-09-26',
+    availableDays: ['2026-09-26', '2026-09-25'],
+    page: { offset: 0, limit: 50, total: 3 },
+};
 
 async function create(
     opts: {
@@ -69,21 +75,32 @@ async function create(
         result?: ReconRunResult;
         datasets?: Partial<Dataset>[];
         record?: () => Observable<ReconState>;
+        state?: () => Observable<ReconState>;
         canOperateRuns?: boolean;
         canAuthor?: boolean;
+        params?: Record<string, string>;
+        page?: (q: ReconRunQuery) => Observable<ReconRunResult>;
+        settle?: boolean;
     } = {},
 ) {
     const recon: Reconciliation = { ...RECON, ...opts.patch };
-    const navigate = vi.fn();
+    const navigate = vi.fn(async (..._args: unknown[]) => true);
     const save = vi.fn((r: Reconciliation) => of(r));
-    const record = vi.fn(opts.record ?? (() => of(RECORDED)));
-    const state = vi.fn(() => of({ ...RECORDED, runs: 3 }));
+    const record = vi.fn(opts.record ?? (() => of({ ...RECORDED, day: '2026-09-26' })));
+    const state = vi.fn(opts.state ?? (() => of({ ...RECORDED, runs: 3 })));
     const toastr = { success: vi.fn(), error: vi.fn() };
+    const params = new BehaviorSubject<ParamMap>(convertToParamMap(opts.params ?? {}));
+    const page = vi.fn((_r: Reconciliation, q: ReconRunQuery) =>
+        opts.page ? opts.page(q) : of(opts.result ?? RESULT),
+    );
     TestBed.configureTestingModule({
         imports: [ReconBoardComponent],
         providers: [
             provideNoopAnimations(),
-            { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: RECON.id }) } } },
+            {
+                provide: ActivatedRoute,
+                useValue: { snapshot: { paramMap: convertToParamMap({ id: RECON.id }) }, queryParamMap: params },
+            },
             {
                 provide: Router,
                 useValue: { navigate, createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
@@ -97,7 +114,7 @@ async function create(
                     canAuthorWorkbench: () => opts.canAuthor ?? true,
                 },
             },
-            { provide: ReconExecService, useValue: { run: vi.fn(async () => opts.result ?? RESULT) } },
+            { provide: ReconExecService, useValue: { page } },
             { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
             { provide: ToastrService, useValue: toastr },
@@ -105,53 +122,63 @@ async function create(
         ],
     });
     const fixture = TestBed.createComponent(ReconBoardComponent);
-    fixture.detectChanges(); // ngOnInit — load + auto-run
+    fixture.detectChanges(); // ngOnInit — load + the first page of the URL's day
     const c = fixture.componentInstance;
-    // Zoneless CD: run()'s promise chain is pure microtasks, which whenStable() (pending-task
-    // based) cannot see — it may resolve before the result lands. Poll for it instead, then
-    // commit the rendered board.
-    await vi.waitFor(() => expect(c.result()).not.toBeNull());
+    if (opts.settle !== false) await vi.waitFor(() => expect(c.result()).not.toBeNull());
     fixture.detectChanges();
-    return { fixture, c, navigate, save, record, state, toastr };
+    const el = fixture.nativeElement as HTMLElement;
+    return { fixture, c, el, navigate, save, record, state, toastr, params, page };
 }
 
 describe('ReconBoardComponent', () => {
-    it('loads, auto-runs, and renders the summary + TOTAL strip + board tree', async () => {
-        const { fixture, c } = await create();
-        expect(c.result()).not.toBeNull();
-        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    it('loads the latest day and renders the summary, the TOTAL strip and the band-tinted rows', async () => {
+        const { c, el, page } = await create();
+        expect(page).toHaveBeenCalledWith(expect.objectContaining({ id: RECON.id }), {
+            day: null,
+            filter: 'all',
+            limit: 50,
+            offset: 0,
+            sample: null,
+        });
+        const text = el.textContent ?? '';
         expect(text).toContain('Mediation vs Billing');
+        expect(text).toContain('2026-09-26');
         expect(text).toContain('2 matched');
         expect(text).toContain('only in A: 1');
         expect(text).toContain('value breaks: 1');
         expect(text).toContain('Total');
-
-        // the tree folds region → product, worst-severity first (MEA is structural: only in A)
-        expect(c.treeNodes().map((n) => n.label)).toEqual(['MEA', 'EU']);
-        expect(c.treeColumns().map((col) => col.field)).toEqual([
-            'a_amount',
-            'b_amount',
-            'pct_b_amount',
-            'a___records',
-            'b___records',
-            'pct_b___records',
-        ]);
+        expect(c.result()).not.toBeNull();
+        const rows = Array.from(el.querySelectorAll('inspecto-recon-grain-table tbody tr'));
+        expect(rows.map((r) => r.getAttribute('data-band'))).toEqual(['breach', 'ok', 'structural']);
+        expect(rows[2].querySelector('.sr-only')?.textContent).toContain('Missing on a side');
+        const heads = Array.from(el.querySelectorAll('inspecto-recon-grain-table thead th')).map((h) =>
+            h.textContent?.trim(),
+        );
+        expect(heads.slice(0, 2)).toEqual(['Region', 'Product']);
+        expect(heads).not.toContain('Status');
+        expect(el.querySelector('mat-paginator')).not.toBeNull();
     });
 
     /**
      * R2-03: a run is RECORDED server-side (`canOperateRuns`), never saved through the authoring PUT — an
      * operations-only user got a 403 there and no run was ever recorded.
      */
-    it('records the run server-side and never saves the config', async () => {
-        const { fixture, c, save, record } = await create();
+    it('opening the Board READS the lifecycle and never records (operator, 2026-10-09)', async () => {
+        const { c, record, state, save, el } = await create();
         await vi.waitFor(() => expect(c.state()).not.toBeNull());
-        fixture.detectChanges();
-        expect(record).toHaveBeenCalledWith('med_vs_bill');
+        expect(record).not.toHaveBeenCalled();
+        expect(state).toHaveBeenCalledWith('med_vs_bill');
         expect(save).not.toHaveBeenCalled();
-        expect(c.state()?.runs).toBe(4);
-        // the aging strip reads the RECORDED lifecycle: one open Break, 100 days old (the resolved one is settled)
         expect(c.ageBuckets()).toEqual([{ bucket: '90+', count: 1 }]);
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('90+ days');
+        expect(el.querySelector('[data-testid="record-run"]')?.textContent).toContain('Record run');
+    });
+
+    it('"Record run" records the SELECTED day server-side and shows the recorded lifecycle', async () => {
+        const { c, record, toastr } = await create({ params: { day: '2026-09-25' } });
+        c.record();
+        expect(record).toHaveBeenCalledWith('med_vs_bill', '2026-09-25');
+        expect(c.state()?.runs).toBe(4);
+        expect(toastr.success).toHaveBeenCalled();
     });
 
     it('counts the open Breaks of BOTH pairs of a 3-way Reconciliation in the aging strip', async () => {
@@ -165,7 +192,7 @@ describe('ReconBoardComponent', () => {
                 { pair: 'AC', key: 'EU · data', type: 'value_break', column: 'amount', status: 'resolved' },
             ],
         };
-        const { c } = await create({ patch: { thirdDataset: 'crm_daily' }, record: () => of(threeWay) });
+        const { c } = await create({ patch: { thirdDataset: 'crm_daily' }, state: () => of(threeWay) });
         await vi.waitFor(() => expect(c.state()).toEqual(threeWay));
         expect(c.ageBuckets()).toEqual([
             { bucket: '0-30', count: 1 },
@@ -194,7 +221,7 @@ describe('ReconBoardComponent', () => {
                 { key: 'EU · data', type: 'value_break', column: 'amount', status: 'resolved', recurrences: 1 },
             ],
         };
-        const { fixture, c } = await create({ record: () => of(lifecycle) });
+        const { fixture, c } = await create({ state: () => of(lifecycle) });
         await vi.waitFor(() => expect(c.state()).toEqual(lifecycle));
         fixture.detectChanges();
         expect(c.ageBuckets()).toEqual([
@@ -209,25 +236,96 @@ describe('ReconBoardComponent', () => {
     });
 
     it('toasts a run it could not record and keeps the last recorded lifecycle', async () => {
-        const { c, toastr, state } = await create({
+        const { c, toastr } = await create({
             record: () => throwError(() => ({ status: 403, error: { error: { message: 'requires canOperateRuns' } } })),
         });
         await vi.waitFor(() => expect(c.state()).not.toBeNull());
+        c.record();
         expect(toastr.error).toHaveBeenCalled();
-        expect(state).toHaveBeenCalledWith('med_vs_bill');
         expect(c.state()?.runs).toBe(3);
         expect(c.result()).not.toBeNull(); // the Board itself still renders
     });
 
-    // A manager (no canOperateRuns) opens a Board: the comparison and the recorded lifecycle show, nothing is recorded,
-    // and no refusal toast greets them on every open.
-    it('a viewer who may not operate runs reads the recorded lifecycle without recording or toasting', async () => {
-        const { c, record, state, toastr } = await create({ canOperateRuns: false });
-        await vi.waitFor(() => expect(c.state()).not.toBeNull());
+    it('a viewer who may not operate runs gets no Record button', async () => {
+        const { c, el, record } = await create({ canOperateRuns: false });
+        expect(el.querySelector('[data-testid="record-run"]')).toBeNull();
+        c.record();
         expect(record).not.toHaveBeenCalled();
-        expect(state).toHaveBeenCalledWith('med_vs_bill');
-        expect(toastr.error).not.toHaveBeenCalled();
-        expect(c.result()).not.toBeNull();
+    });
+
+    it('shows the spinner — never the empty state — while the day is compared', async () => {
+        const { el, c } = await create({ page: () => new Subject<ReconRunResult>(), settle: false });
+        expect(c.running()).toBe(true);
+        expect(el.querySelector('[data-testid="board-loading"]')?.textContent).toContain(
+            'Comparing mediation_daily and billing_daily for the latest day…',
+        );
+        expect(el.querySelector('inspecto-empty-state')).toBeNull();
+        await expectNoA11yViolations(el);
+    });
+
+    it('the URL drives the request, and a newer view cancels the one in flight', async () => {
+        const inflight: Subject<ReconRunResult>[] = [];
+        const { params, page } = await create({
+            settle: false,
+            page: () => {
+                const s = new Subject<ReconRunResult>();
+                inflight.push(s);
+                return s;
+            },
+            params: { day: '2026-09-26', filter: 'breaks', offset: '50', limit: '25', sample: '4000' },
+        });
+        expect(page.mock.calls[0][1]).toEqual({
+            day: '2026-09-26',
+            filter: 'breaks',
+            offset: 50,
+            limit: 25,
+            sample: 4000,
+        });
+        params.next(convertToParamMap({ day: '2026-09-25' }));
+        expect(inflight[0].observed).toBe(false);
+        expect(page.mock.calls[1][1]).toEqual({ day: '2026-09-25', filter: 'all', offset: 0, limit: 50, sample: null });
+    });
+
+    it('moving the view rewrites the URL only — date, page and filter are never saved', async () => {
+        const { c, navigate, save } = await create();
+        c.setView({ day: '2026-09-25', offset: 0 });
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({
+                queryParams: { day: '2026-09-25', filter: null, offset: null, limit: null, sample: null },
+                replaceUrl: true,
+            }),
+        );
+        c.setView({ filter: 'value_break', offset: 100, limit: 100 });
+        expect(navigate.mock.calls[1][1]).toEqual(
+            expect.objectContaining({
+                queryParams: { day: null, filter: 'value_break', offset: 100, limit: 100, sample: null },
+            }),
+        );
+        expect(save).not.toHaveBeenCalled();
+    });
+
+    it('reads a hostile or stale URL as the defaults', () => {
+        expect(
+            queryFromParams(
+                convertToParamMap({ day: "2026-09-26' OR 1", filter: 'nope', limit: '5000', offset: '-3' }),
+            ),
+        ).toEqual({ day: null, filter: 'all', limit: 50, offset: 0, sample: null });
+    });
+
+    it('the band editor is hidden from, and refuses, a user who may not author', async () => {
+        const viewer = await create({ canAuthor: false });
+        expect(viewer.el.querySelector('button[aria-label="Edit tolerance bands"]')).toBeNull();
+        viewer.c.saveBands({ warnPct: 2, breachPct: 5 });
+        expect(viewer.save).not.toHaveBeenCalled();
+    });
+
+    it('an author edits the bands, saved through the component save', async () => {
+        const author = await create();
+        expect(author.el.querySelector('button[aria-label="Edit tolerance bands"]')).not.toBeNull();
+        author.c.saveBands({ warnPct: 2, breachPct: 5 });
+        expect(author.save).toHaveBeenCalledWith(expect.objectContaining({ bands: { warnPct: 2, breachPct: 5 } }));
+        expect(author.c.bands()).toEqual({ warnPct: 2, breachPct: 5 });
     });
 
     // R3-05: the pencil opened an editor whose save the server refuses (the component PUT needs canAuthorWorkbench).
@@ -244,18 +342,11 @@ describe('ReconBoardComponent', () => {
         expect((fixture.nativeElement as HTMLElement).querySelector('button[aria-label="Edit"]')).not.toBeNull();
     });
 
-    it('the details action navigates to the Breaks page with the encoded path', async () => {
+    it("a row's action opens the Breaks page for that key on the same day", async () => {
         const { c, navigate } = await create();
-        c.rowActions[0].onClick!({
-            __id: 'x',
-            __depth: 0,
-            __hasChildren: false,
-            __expanded: false,
-            __label: 'EU',
-            __path: 'region:EU',
-        });
+        c.viewKey({ region: 'EU', product: 'data' });
         expect(navigate).toHaveBeenCalledWith(['/reconciliation', RECON.id, 'breaks'], {
-            queryParams: { path: 'region:EU' },
+            queryParams: { path: 'region:EU|product:data', day: '2026-09-26' },
         });
     });
 
@@ -320,7 +411,10 @@ describe('ReconBoardComponent — readable side and column names (R2-16)', () =>
         { id: 'mediation_daily', name: 'mediation_daily', description: 'Mediation daily extract' },
         { id: 'billing_daily', name: 'Billing daily' },
     ];
-    const heads = (c: ReconBoardComponent) => c.treeColumns().map((col) => col.headerName);
+    const heads = (el: HTMLElement) =>
+        Array.from(el.querySelectorAll('inspecto-recon-grain-table thead th'))
+            .map((h) => h.textContent?.trim())
+            .slice(2, -1);
     const BANDS = ' · tree Region › Product · bands ok < 1% · warn 1–2% · breach > 2%';
 
     it('names the sides by their Dataset and humanises the columns', async () => {
@@ -329,7 +423,7 @@ describe('ReconBoardComponent — readable side and column names (R2-16)', () =>
         expect((fixture.nativeElement as HTMLElement).textContent).toContain(
             'A: Mediation daily extract ⇄ B: Billing daily',
         );
-        expect(heads(c)).toEqual([
+        expect(heads(fixture.nativeElement)).toEqual([
             'Mediation daily extract · Amount',
             'Billing daily · Amount',
             'Δ% Amount',
@@ -338,14 +432,18 @@ describe('ReconBoardComponent — readable side and column names (R2-16)', () =>
             'Δ% Records',
         ]);
         // the builder's ids stay one hover away
-        expect(c.treeColumns()[0].headerTooltip).toBe('A = mediation_daily · amount');
+        expect(
+            (fixture.nativeElement as HTMLElement)
+                .querySelectorAll('inspecto-recon-grain-table thead th')[2]
+                .getAttribute('title'),
+        ).toBe('A · amount');
         expect(c.keyColumnsLabel()).toBe('Region › Product');
     });
 
     it('falls back to the Dataset id when the Dataset is not found', async () => {
-        const { c } = await create();
+        const { c, el } = await create();
         expect(c.subtitle()).toBe('A: mediation_daily ⇄ B: billing_daily' + BANDS);
-        expect(heads(c)).toEqual([
+        expect(heads(el)).toEqual([
             'mediation_daily · Amount',
             'billing_daily · Amount',
             'Δ% Amount',

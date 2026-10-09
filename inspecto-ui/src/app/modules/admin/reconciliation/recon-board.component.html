@@ -15,13 +15,30 @@
                         <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
                     </button>
                 }
-                <button mat-flat-button color="primary" (click)="run()" [disabled]="running() || loading()">
-                    @if (running()) {
-                        <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
-                    }
-                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
-                    <span class="ml-1">Run</span>
+                <button
+                    mat-icon-button
+                    (click)="run()"
+                    [disabled]="running() || loading()"
+                    matTooltip="Refresh"
+                    aria-label="Refresh"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
+                @if (canRecord()) {
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        (click)="record()"
+                        [disabled]="recording() || running() || !result()"
+                        data-testid="record-run"
+                    >
+                        @if (recording()) {
+                            <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
+                        }
+                        <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
+                        <span class="ml-1">Record run</span>
+                    </button>
+                }
             </ng-container>
         </inspecto-page-header>
 
@@ -55,9 +72,41 @@
             </div>
         }
 
-        @if (result(); as res) {
-            <!-- Summary chips -->
+        <!-- RECON-PERF-1: one day at a time; day / filter / page / sample are URL view state, bands the only save -->
+        <inspecto-recon-toolbar
+            class="mt-4 block"
+            [availableDays]="result()?.availableDays ?? []"
+            [day]="result()?.day ?? query().day"
+            [filter]="query().filter"
+            [sample]="query().sample"
+            [threeWay]="!!r.thirdDataset"
+            [bands]="r.bands"
+            [canEditBands]="canAuthor()"
+            [saving]="savingBands()"
+            (dayChange)="setView({ day: $event, offset: 0 })"
+            (filterChange)="setView({ filter: $event, offset: 0 })"
+            (sampleChange)="setView({ sample: $event, offset: 0 })"
+            (bandsSave)="saveBands($event)"
+        />
+
+        @if (running()) {
+            <div
+                class="text-secondary mt-8 flex items-center justify-center gap-3 text-sm"
+                role="status"
+                data-testid="board-loading"
+            >
+                <mat-progress-spinner diameter="24" mode="indeterminate" aria-hidden="true" />
+                <span>{{ comparing() }}</span>
+            </div>
+        } @else if (pages.error(); as message) {
+            <inspecto-alert class="mt-4 block" variant="error" title="The comparison failed">
+                {{ message }}
+                <button mat-button type="button" (click)="pages.retry()">Retry</button>
+            </inspecto-alert>
+        } @else if (result(); as res) {
+            <!-- Summary chips (the whole day, whatever the page) -->
             <div class="text-secondary mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <span>{{ res.day }}</span>
                 <span>{{ res.summary.groups }} groups</span>
                 <span>{{ res.summary.matchedKeys }} matched</span>
                 <span>only in A: {{ res.summary.byType.missing_right }}</span>
@@ -66,10 +115,10 @@
                 @for (d of duplicateCounts(); track d.label) {
                     <span data-testid="board-duplicates">{{ d.label }}: {{ d.count }}</span>
                 }
-                @if (res.statistics.truncated) {
-                    <span class="text-amber-600 dark:text-amber-400"
-                        >! truncated — add a filter or drop a dimension</span
-                    >
+                @if (res.sample?.sampled) {
+                    <inspecto-chip variant="outline" tone="warning" data-testid="board-sampled">
+                        Sampled: {{ res.sample?.keys }} of {{ res.sample?.totalKeys }} keys
+                    </inspecto-chip>
                 }
                 <button mat-button (click)="viewBreaks()">
                     <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
@@ -94,41 +143,24 @@
                 }
             </div>
 
-            <!-- Board tree -->
-            <div class="mt-4">
-                <div class="mb-2 flex flex-wrap items-center justify-end gap-2">
-                    <mat-slide-toggle [checked]="breachesOnly()" (change)="breachesOnly.set($event.checked)">
-                        Expand breaches
-                    </mat-slide-toggle>
-                    <button mat-icon-button (click)="expandAll()" matTooltip="Expand all" aria-label="Expand all">
-                        <mat-icon svgIcon="heroicons_outline:chevron-double-down"></mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="collapseAll()" matTooltip="Collapse all" aria-label="Collapse all">
-                        <mat-icon svgIcon="heroicons_outline:chevron-double-up"></mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="exportCsv()" matTooltip="Export CSV" aria-label="Export CSV">
-                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-                    </button>
-                </div>
-                <inspecto-tree-table
-                    [treeHeader]="keyColumnsLabel() || 'Dimension'"
-                    exportName="reconciliation-board"
-                    [nodes]="treeNodes()"
-                    [columns]="treeColumns()"
-                    [rowActions]="rowActions"
-                    [groupDefaultExpanded]="breachesOnly() ? 0 : 1"
-                    [loading]="running()"
-                    noRowsTitle="No key groups"
-                    noRowsHint="Both datasets returned no rows for this configuration."
-                />
-            </div>
-        } @else if (!running() && !loading()) {
-            <div class="mt-8">
-                <inspecto-empty-state
-                    icon="heroicons_outline:play"
-                    title="Not run yet"
-                    message="Run the reconciliation to compute the Board."
-                />
+            <!-- One page of the day's grain rows, band-tinted (operator, 2026-10-09) -->
+            <div class="bg-card mt-4 rounded-2xl p-2 shadow">
+                @if (res.rows.length) {
+                    <inspecto-recon-grain-table
+                        [result]="res"
+                        [bands]="r.bands"
+                        [sideLabels]="sideLabels()"
+                        [openable]="true"
+                        (pageChange)="setView($event)"
+                        (keyOpen)="viewKey($event)"
+                    />
+                } @else {
+                    <inspecto-empty-state
+                        icon="heroicons_outline:scale"
+                        title="No rows"
+                        message="No key matches this filter on this day."
+                    />
+                }
             </div>
         }
     } @else if (!loading()) {

@@ -19,6 +19,9 @@ import { InspectoRowAction } from 'app/inspecto/grid';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import {
     ageBucketLabel,
+    bandKeyCell,
+    bandRowClass,
+    breakBand,
     breakAgeDays,
     breakId,
     breakImpacts,
@@ -35,6 +38,7 @@ import {
     reconCardinality,
     reconciliationTitle,
     ReconState,
+    ReconToolbarComponent,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
 import { ReconAssignData, ReconAssignDialog } from './recon-assign.dialog';
@@ -70,6 +74,7 @@ import { humanizeColumn } from 'app/inspecto/viz/column-label';
         InspectoEmptyStateComponent,
         InspectoAlertComponent,
         StatusBadgeComponent,
+        ReconToolbarComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './reconciliation-detail.component.html',
@@ -137,6 +142,15 @@ export class ReconciliationDetailComponent implements OnInit {
 
     /** The compared side of the anchor-relative pair — 'b' always, 'c' when the recon is 3-way. */
     readonly side = signal<'b' | 'c'>('b');
+    /** The ONE day these Breaks are of (RECON-PERF-1) — the URL's `day`, else the latest day present. */
+    readonly day = signal<string | null>(null);
+    /** The days that hold data (from the Board's cached run), for the day picker. */
+    readonly availableDays = signal<string[]>([]);
+
+    /** A Break row's band, tinting its row (operator, 2026-10-09) — the key cell carries the glyph and the name. */
+    readonly breakRowClass = (row: unknown): string | undefined =>
+        row ? bandRowClass(breakBand(row as ReconBreak, this.recon()?.bands)) : undefined;
+    private readonly keyCell = bandKeyCell((row) => breakBand(row as ReconBreak, this.recon()?.bands));
     readonly threeWay = computed(() => !!this.recon()?.thirdDataset);
     /** Dataset id → readable label, read once on open (R2-16); empty until then, so sides show their ids. */
     readonly datasetNames = signal<Record<string, string>>({});
@@ -329,7 +343,7 @@ export class ReconciliationDetailComponent implements OnInit {
 
     /** Key + impact + status (+ actions) — the shape of the two missing-side tables. */
     readonly missingColumns = computed<ColDef<ReconBreak>[]>(() => [
-        { field: 'key', headerName: 'Key', flex: 1 },
+        { field: 'key', headerName: 'Key', flex: 1, cellRenderer: this.keyCell },
         ...this.impactColumn(),
         ...this.lifecycleColumns,
         {
@@ -362,7 +376,7 @@ export class ReconciliationDetailComponent implements OnInit {
     };
 
     readonly duplicateColumns = computed<ColDef<ReconBreak>[]>(() => [
-        { field: 'key', headerName: 'Key', flex: 1 },
+        { field: 'key', headerName: 'Key', flex: 1, cellRenderer: this.keyCell },
         {
             colId: 'duplicatedSide',
             headerName: 'Repeated on',
@@ -390,7 +404,7 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly valueColumns = computed<ColDef<ReconBreak>[]>(() => {
         const r = this.recon();
         return [
-            { field: 'key', headerName: 'Key', flex: 1 },
+            { field: 'key', headerName: 'Key', flex: 1, cellRenderer: this.keyCell },
             {
                 // UIE-10: the field-level diff, `field: A → B`, named by the two Datasets it compares.
                 colId: 'fieldDiff',
@@ -607,7 +621,7 @@ export class ReconciliationDetailComponent implements OnInit {
         for (const k of r.keyColumns) key[k] = String(b.keyValues[k] ?? '');
         this.breakRowsLoading.set(true);
         try {
-            this.breakRows.set({ label: b.key, result: await this.exec.rows(r, key, this.side()) });
+            this.breakRows.set({ label: b.key, result: await this.exec.rows(r, key, this.side(), this.day()) });
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Could not load the rows behind this break'));
         } finally {
@@ -622,6 +636,7 @@ export class ReconciliationDetailComponent implements OnInit {
     ngOnInit(): void {
         const id = this.route.snapshot.paramMap.get('id') ?? '';
         this.path.set(decodePath(this.route.snapshot.queryParamMap.get('path')));
+        this.day.set(this.route.snapshot.queryParamMap.get('day'));
         // Labels only: a failed read leaves the sides named by their ids.
         this.datasetsApi
             .list()
@@ -670,6 +685,30 @@ export class ReconciliationDetailComponent implements OnInit {
         });
     }
 
+    /** The day picker's list and the effective day — one row of the (server-cached) Board run for this day. */
+    private loadDays(r: Reconciliation): void {
+        this.exec.page(r, { day: this.day(), offset: 0, limit: 1, filter: 'all' }).subscribe({
+            next: (res) => {
+                this.availableDays.set(res.availableDays ?? []);
+                if (!this.day() && res.day) this.day.set(res.day);
+            },
+            error: () => undefined,
+        });
+    }
+
+    /** Move to another day: the URL keeps it (view state, never saved) and the Breaks recompute. */
+    setDay(day: string): void {
+        if (this.computing() || day === this.day()) return;
+        this.day.set(day);
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { day },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+        });
+        void this.compute();
+    }
+
     /** Switch the compared side (3-way) and recompute. */
     setSide(side: 'b' | 'c'): void {
         // Defense in depth behind the template's [disabled]: `compute()` early-returns while one is in
@@ -686,7 +725,8 @@ export class ReconciliationDetailComponent implements OnInit {
         this.computing.set(true);
         const side = this.side();
         try {
-            const sets = await this.exec.breaks(r, this.path(), null, side);
+            this.loadDays(r);
+            const sets = await this.exec.breaks(r, this.path(), null, side, this.day());
             // Tagged with the pair they were computed on — the recorded state holds both pairs of a 3-way.
             const pair = side === 'c' ? 'AC' : 'AB';
             this.liveBreaks.set(breaksFromSets(r, sets).map((b) => ({ ...b, pair })));

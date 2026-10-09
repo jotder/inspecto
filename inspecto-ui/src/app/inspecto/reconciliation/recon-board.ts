@@ -1,6 +1,11 @@
-import { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { TreeNode } from 'app/inspecto/tree-table';
 import { humanizeColumn } from 'app/inspecto/viz/column-label';
+import {
+    escapeHtml,
+    StatusTone,
+    statusEdgeClasses,
+    statusIconClasses,
+    statusRowClasses,
+} from 'app/inspecto/components/status-badge.component';
 import {
     CompareColumn,
     DEFAULT_BANDS,
@@ -69,7 +74,46 @@ export interface ReconRunResult {
     rows: ReconGrainRow[];
     totals: { a: Record<string, number | null>; b: Record<string, number | null>; c?: Record<string, number | null> };
     summary: ReconRunSummary;
-    statistics: { rowCount: number; elapsedMs: number; truncated: boolean };
+    statistics: { rowCount: number; elapsedMs: number; truncated: boolean; cached?: boolean };
+    /** The ONE day compared (RECON-PERF-1, operator 2026-10-09) — the requested day, or the latest present. */
+    day?: string;
+    /** Every day present across the sides, newest first (capped server-side). */
+    availableDays?: string[];
+    /** The grain-row filter this page was cut with. */
+    filter?: ReconFilter;
+    /** Set when only a deterministic sample of the day's keys was compared; `null` = every key. */
+    sample?: { sampled: boolean; size: number; keys: number; totalKeys: number } | null;
+    /** This page of `rows`; `total` = every row the filter matches on the day. Totals/summary are the whole day's. */
+    page?: { offset: number; limit: number; total: number };
+}
+
+/** The Board grain-row filters `/recon/run` accepts (`missing_c` only on a 3-way Reconciliation). */
+export const RECON_FILTERS = ['all', 'breaks', 'missing_a', 'missing_b', 'missing_c', 'value_break'] as const;
+export type ReconFilter = (typeof RECON_FILTERS)[number];
+
+/** How each filter reads in the toolbar. */
+export const RECON_FILTER_LABELS: Record<ReconFilter, string> = {
+    all: 'All keys',
+    breaks: 'Breaks only',
+    missing_a: 'Missing on A',
+    missing_b: 'Missing on B',
+    missing_c: 'Missing on C',
+    value_break: 'Value breaks',
+};
+
+/** The page sizes the Board offers; the server refuses more than 200. */
+export const RECON_PAGE_SIZES = [25, 50, 100, 200] as const;
+export const RECON_DEFAULT_PAGE_SIZE = 50;
+
+/** One `/recon/run` request's view state — never persisted (operator, 2026-10-09). */
+export interface ReconRunQuery {
+    /** ISO day; absent = the latest day present. */
+    day?: string | null;
+    offset: number;
+    limit: number;
+    filter: ReconFilter;
+    /** Compare at most this many keys (deterministic); absent = every key. */
+    sample?: number | null;
 }
 
 /** The non-anchor side keys present in a result (['b'] for 2-way, ['b','c'] for 3-way). */
@@ -453,12 +497,6 @@ export function bandFor(pct: number | null | undefined, bands: ReconBands = DEFA
     return 'ok';
 }
 
-/** Severity rank for sibling ordering (worst first). */
-function severityRank(band: ReconBand, pct: number | null): number {
-    const base = band === 'structural' ? 3 : band === 'breach' ? 2 : band === 'warn' ? 1 : 0;
-    return base * 1_000_000 + Math.min(Math.abs(pct ?? 0), 999_999);
-}
-
 /** Encode a Board dimension path (`region=EU`, `product=data`) as a stable node id / query param. */
 export function encodePath(path: Record<string, unknown>, keyColumns: string[]): string {
     return keyColumns
@@ -476,121 +514,6 @@ export function decodePath(encoded: string | null | undefined): Record<string, s
         if (i > 0) out[seg.slice(0, i)] = decodeURIComponent(seg.slice(i + 1));
     }
     return Object.keys(out).length ? out : null;
-}
-
-/**
- * Fold grain rows into the Board's dimension tree (key-column order = hierarchy). Every node carries
- * per-measure `a_<m>` / `b_<m>` / `pct_<m>` values plus `__structural` ('a' | 'b' when the whole node is
- * one-sided) and `__path` (the encoded dimension path for drill). Parent measures are the SUM of their
- * children (missing side contributes 0 while present anywhere below — COALESCE semantics), and parent Δ%
- * is recomputed from those rolled-up sums. Siblings sort worst-severity-first.
- */
-export function buildBoardTree(result: ReconRunResult, bands: ReconBands = DEFAULT_BANDS): TreeNode[] {
-    return buildLevel(result.rows, result, bands, 0, {});
-}
-
-function buildLevel(
-    rows: ReconGrainRow[],
-    result: ReconRunResult,
-    bands: ReconBands,
-    depth: number,
-    parentPath: Record<string, unknown>,
-): TreeNode[] {
-    const dim = result.keyColumns[depth];
-    const sides = comparedSides(result);
-    const byValue = new Map<string, ReconGrainRow[]>();
-    for (const r of rows) {
-        const v = String(r.key[dim] ?? '');
-        byValue.set(v, [...(byValue.get(v) ?? []), r]);
-    }
-    const nodes: { node: TreeNode; rank: number }[] = [];
-    for (const [value, group] of byValue) {
-        const path = { ...parentPath, [dim]: group[0].key[dim] };
-        const id = encodePath(path, result.keyColumns);
-        const inA = group.some((r) => r.inA);
-        const present: Record<SideKey, boolean> = {
-            a: inA,
-            b: group.some((r) => r.inB),
-            c: group.some((r) => !!r.inC),
-        };
-        const values: Record<string, unknown> = { __path: id, __anchorMissing: !inA };
-        let worst = 0;
-        for (const m of result.measures) values[`a_${m}`] = rollup(group, 'a', m, inA);
-        for (const s of sides) {
-            // Per-side structural: anchor present but this side absent below the node (or vice-versa).
-            const structural = inA !== present[s];
-            values[`__miss_${s}`] = structural ? (inA ? 'a' : s) : null;
-            for (const m of result.measures) {
-                const a = values[`a_${m}`] as number | null;
-                const v = rollup(group, s, m, present[s]);
-                const pct = structural ? null : deltaPct(a, v);
-                values[`${s}_${m}`] = v;
-                values[`pct_${s}_${m}`] = pct;
-                worst = Math.max(worst, severityRank(structural ? 'structural' : bandFor(pct, bands), pct));
-            }
-        }
-        const leaf = depth === result.keyColumns.length - 1;
-        nodes.push({
-            rank: worst,
-            node: {
-                id,
-                label: value === '' ? '(blank)' : value,
-                values,
-                children: leaf ? undefined : buildLevel(group, result, bands, depth + 1, path),
-            },
-        });
-    }
-    nodes.sort((x, y) => y.rank - x.rank || x.node.label.localeCompare(y.node.label));
-    return nodes.map((n) => n.node);
-}
-
-/** Sum a measure across grain rows for one side; `null` when the side is absent below this node. */
-function rollup(group: ReconGrainRow[], side: SideKey, measure: string, present: boolean): number | null {
-    if (!present) return null;
-    let sum = 0;
-    let any = false;
-    for (const r of group) {
-        const sideMeasures = side === 'a' ? r.a : side === 'b' ? r.b : r.c;
-        const v = sideMeasures?.[measure];
-        if (v !== null && v !== undefined) {
-            sum += v;
-            any = true;
-        }
-    }
-    return any ? sum : null;
-}
-
-/** Copy of `nodes` with `expanded: true` on every ancestor of a warn/breach/structural node. */
-export function markBreachesExpanded(nodes: TreeNode[], bands: ReconBands = DEFAULT_BANDS): TreeNode[] {
-    const mark = (n: TreeNode): { node: TreeNode; hot: boolean } => {
-        const children = (n.children ?? []).map(mark);
-        const selfHot = nodeBand(n, bands) !== 'ok';
-        const hot = selfHot || children.some((c) => c.hot);
-        return {
-            hot,
-            node: {
-                ...n,
-                expanded: children.some((c) => c.hot) || undefined,
-                children: n.children ? children.map((c) => c.node) : undefined,
-            },
-        };
-    };
-    return nodes.map((n) => mark(n).node);
-}
-
-/** A node's worst band across its measures and sides. */
-export function nodeBand(n: TreeNode, bands: ReconBands = DEFAULT_BANDS): ReconBand {
-    const v = n.values ?? {};
-    for (const key of Object.keys(v)) if (key.startsWith('__miss_') && v[key]) return 'structural';
-    if (v['__anchorMissing']) return 'structural';
-    let worst: ReconBand = 'ok';
-    for (const key of Object.keys(v)) {
-        if (!key.startsWith('pct_')) continue;
-        const band = bandFor(v[key] as number | null, bands);
-        if (band === 'breach') return 'breach';
-        if (band === 'warn') worst = 'warn';
-    }
-    return worst;
 }
 
 // ── cell renderers (text tones only — the token guard forbids status-tinted fills) ───
@@ -613,27 +536,61 @@ export function bandGlyph(band: ReconBand): string {
     return BAND_GLYPH[band];
 }
 
+/** A band as a reader says it — the row's tooltip and its visually-hidden name (operator, 2026-10-09). */
+export const BAND_LABEL: Record<ReconBand, string> = {
+    ok: 'Within tolerance',
+    warn: 'Warning',
+    breach: 'Breach',
+    structural: 'Missing on a side',
+};
+
+/** The shape icon per band — the non-colour cue beside the row tint (WCAG 1.4.1). */
+export const BAND_ICON: Record<ReconBand, string> = {
+    ok: 'heroicons_outline:check-circle',
+    warn: 'heroicons_outline:exclamation-triangle',
+    breach: 'heroicons_outline:x-circle',
+    structural: 'heroicons_outline:minus-circle',
+};
+
+/** The design-system status tone a band is tinted with (a missing side reads as a breach). */
+export function bandStatusTone(band: ReconBand): StatusTone {
+    return band === 'ok' ? 'success' : band === 'warn' ? 'warning' : 'error';
+}
+
+const BAND_RANK: Record<ReconBand, number> = { ok: 0, warn: 1, breach: 2, structural: 3 };
+
 /**
- * String cell-renderer for a Board Δ% column of one compared {@code side}: severity glyph + signed
- * percentage, text-tone only (glyph + text carry the meaning — never color alone). A one-sided node
- * renders "only in A/<side>"; a zero-anchor "new" value renders the breach glyph with "new".
+ * One grain row's band: `structural` when the key is missing on any side, else the WORST band of its Δ% over every
+ * measure and compared side (the same `bandFor` the TOTAL strip uses).
  */
-export function bandCell(side: SideKey = 'b', bands: ReconBands = DEFAULT_BANDS): (p: ICellRendererParams) => string {
-    const label = side.toUpperCase();
-    return (p) => {
-        const data = p.data as Record<string, unknown> | undefined;
-        const miss = data?.[`__miss_${side}`] as string | null | undefined;
-        if (miss) {
-            const which = miss === 'a' ? 'A' : label;
-            return `<span class="${BAND_TONE.structural}">${BAND_GLYPH.structural} only in ${which}</span>`;
+export function rowBand(row: ReconGrainRow, result: ReconRunResult, bands: ReconBands = DEFAULT_BANDS): ReconBand {
+    const sides = comparedSides(result);
+    if (!row.inA || !row.inB || (sides.includes('c') && row.inC === false)) return 'structural';
+    let worst: ReconBand = 'ok';
+    for (const m of result.measures)
+        for (const s of sides) {
+            const band = bandFor(deltaPct(row.a?.[m], row[s]?.[m]), bands);
+            if (BAND_RANK[band] > BAND_RANK[worst]) worst = band;
         }
-        const pct = p.value as number | null | undefined;
-        if (pct === null || pct === undefined)
-            return `<span class="${BAND_TONE.breach}">${BAND_GLYPH.breach} new</span>`;
-        const band = bandFor(pct, bands);
-        const text = `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
-        return `<span class="${BAND_TONE[band]}">${BAND_GLYPH[band]} ${text}</span>`;
-    };
+    return worst;
+}
+
+/** The legend entries for a band set: each band's name and its threshold, worst last. */
+export function bandLegend(bands: ReconBands = DEFAULT_BANDS): { band: ReconBand; label: string; range: string }[] {
+    return [
+        { band: 'ok', label: BAND_LABEL.ok, range: `< ${bands.warnPct}%` },
+        { band: 'warn', label: BAND_LABEL.warn, range: `${bands.warnPct}–${bands.breachPct}%` },
+        { band: 'breach', label: BAND_LABEL.breach, range: `> ${bands.breachPct}%` },
+        { band: 'structural', label: BAND_LABEL.structural, range: 'key on some sides only' },
+    ];
+}
+
+/** A signed Δ% as text (`+1.5%`), `new` for a zero anchor, `—` for a missing side — words carry no colour names. */
+export function fmtPct(a: number | null | undefined, b: number | null | undefined): string {
+    if (a === null || a === undefined || b === null || b === undefined) return '—';
+    const pct = deltaPct(a, b);
+    if (pct === null) return 'new';
+    return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
 /** Compact numeric formatter for the Board's measure value columns (`—` for a missing side). */
@@ -643,8 +600,6 @@ export function fmtMeasure(v: unknown): string {
     if (Number.isNaN(n)) return String(v);
     return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
-
-const measureCell = (p: { value: unknown }): string => fmtMeasure(p.value);
 
 /** How a Board side is named in its column headers (R2-16): a readable label, and the Dataset id for the tooltip. */
 export interface BoardSide {
@@ -657,56 +612,43 @@ export function measureLabel(measure: string): string {
     return measure === RECON_RECORDS ? 'Records' : humanizeColumn(measure);
 }
 
-/**
- * The Board's aligned value columns for a run result: per measure, the anchor value, then per compared
- * side its value + a banded Δ% column. Δ% headers name the side only when there is more than one
- * (3-way). {@code includeValues:false} yields the compact Δ%-only set for the dashboard widget tile.
- * {@code sides} names each side by its Dataset (default: the side letter); the letter, Dataset id and raw
- * column name ride in each header's tooltip.
- */
-export function boardColumns(
-    result: ReconRunResult,
+/** The in-flight message: "Comparing HLR, CRM and CBS for 2026-09-26…" (no day yet ⇒ "for the latest day…"). */
+export function comparingMessage(labels: string[], day?: string | null): string {
+    const names =
+        labels.length > 1 ? `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}` : (labels[0] ?? '');
+    return `Comparing ${names} for ${day ? day : 'the latest day'}…`;
+}
+
+/** A recorded/live Break's band: a value break by its Δ% (anchor-relative), every other Break type as `structural`. */
+export function breakBand(
+    b: { type: string; leftValue?: unknown; rightValue?: unknown },
     bands: ReconBands = DEFAULT_BANDS,
-    opts: { includeValues?: boolean; sides?: Partial<Record<SideKey, BoardSide>> } = {},
-): ColDef[] {
-    const sides = comparedSides(result);
-    const multi = sides.length > 1;
-    const values = opts.includeValues ?? false;
-    const label = (s: SideKey) => opts.sides?.[s]?.label || s.toUpperCase();
-    // The builder's view — side letter, Dataset id and raw column — stays one hover away (R2-16).
-    const code = (s: SideKey) => {
-        const id = opts.sides?.[s]?.id;
-        return id ? `${s.toUpperCase()} = ${id}` : s.toUpperCase();
+): ReconBand {
+    if (b.type !== 'value_break') return 'structural';
+    const a = typeof b.leftValue === 'number' ? b.leftValue : null;
+    const v = typeof b.rightValue === 'number' ? b.rightValue : null;
+    return bandFor(deltaPct(a, v), bands);
+}
+
+/** The row tint + left edge for a band (the table row's classes; the icon and name are the non-colour cue). */
+export function bandRowClass(band: ReconBand): string {
+    const tone = bandStatusTone(band);
+    return `${statusRowClasses(tone)} ${statusEdgeClasses(tone)}`;
+}
+
+/**
+ * An ag-Grid key-cell renderer that carries a Break's band without a status column (operator, 2026-10-09): the band's
+ * shape glyph (tooltip = the band name, hidden from assistive tech) and the band name as visually-hidden text,
+ * before the key itself. Pairs with {@link bandRowClass} on the row.
+ */
+export function bandKeyCell(bandOf: (row: unknown) => ReconBand): (p: { value?: unknown; data?: unknown }) => string {
+    return (p) => {
+        const band = bandOf(p.data);
+        const label = BAND_LABEL[band];
+        const tone = statusIconClasses(bandStatusTone(band));
+        return (
+            `<span class="${tone} mr-1" aria-hidden="true" title="${label}">${bandGlyph(band)}</span>` +
+            `<span class="sr-only">${label}: </span>${escapeHtml(String(p.value ?? ''))}`
+        );
     };
-    const cols: ColDef[] = [];
-    for (const m of result.measures) {
-        const measure = measureLabel(m);
-        const raw = m === RECON_RECORDS ? 'record count' : m;
-        if (values)
-            cols.push({
-                field: `a_${m}`,
-                headerName: `${label('a')} · ${measure}`,
-                headerTooltip: `${code('a')} · ${raw}`,
-                width: 120,
-                valueFormatter: measureCell,
-            });
-        for (const s of sides) {
-            if (values)
-                cols.push({
-                    field: `${s}_${m}`,
-                    headerName: `${label(s)} · ${measure}`,
-                    headerTooltip: `${code(s)} · ${raw}`,
-                    width: 120,
-                    valueFormatter: measureCell,
-                });
-            cols.push({
-                field: `pct_${s}_${m}`,
-                headerName: multi ? `Δ% ${label(s)} · ${measure}` : `Δ% ${measure}`,
-                headerTooltip: `Δ% of ${code(s)} vs ${code('a')} · ${raw}`,
-                width: values ? 120 : 130,
-                cellRenderer: bandCell(s, bands),
-            });
-        }
-    }
-    return cols;
 }

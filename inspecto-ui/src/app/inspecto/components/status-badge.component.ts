@@ -151,6 +151,52 @@ export function statusBadgeClasses(value: string | null | undefined): string {
     return TONE_CLASSES[statusTone(value)];
 }
 
+/**
+ * A table ROW tinted by tone (operator, 2026-10-09 — the Reconciliation tables): a light wash of the tone behind the
+ * row's own ink, so body text keeps its normal contrast (the 50 / 950 steps sit under slate-800 / slate-100 text at
+ * well over 4.5:1). Never the only cue — pair it with {@link statusEdgeClasses} and a shape icon + text.
+ */
+const TONE_ROW_CLASSES: Record<StatusTone, string> = {
+    error: 'bg-red-50 dark:bg-red-950',
+    warning: 'bg-amber-50 dark:bg-amber-950',
+    info: 'bg-blue-50 dark:bg-blue-950',
+    success: 'bg-green-50 dark:bg-green-950',
+    neutral: '',
+};
+
+/** The thin coloured left edge that marks a tinted row's tone (a second, non-fill cue). */
+const TONE_EDGE_CLASSES: Record<StatusTone, string> = {
+    error: 'border-l-4 border-red-600 dark:border-red-400',
+    warning: 'border-l-4 border-amber-500 dark:border-amber-400',
+    info: 'border-l-4 border-blue-600 dark:border-blue-400',
+    success: 'border-l-4 border-green-600 dark:border-green-400',
+    neutral: 'border-l-4 border-transparent',
+};
+
+/** The row wash for a tone — see {@link TONE_ROW_CLASSES}. */
+export function statusRowClasses(tone: StatusTone): string {
+    return TONE_ROW_CLASSES[tone];
+}
+
+/** The left-edge marker for a tone — see {@link TONE_EDGE_CLASSES}. */
+export function statusEdgeClasses(tone: StatusTone): string {
+    return TONE_EDGE_CLASSES[tone];
+}
+
+/** The text tone of a status icon (the swatch of a legend, the band icon in a row). */
+const TONE_ICON_CLASSES: Record<StatusTone, string> = {
+    error: 'text-red-700 dark:text-red-300',
+    warning: 'text-amber-700 dark:text-amber-300',
+    info: 'text-blue-700 dark:text-blue-300',
+    success: 'text-green-700 dark:text-green-300',
+    neutral: 'text-secondary',
+};
+
+/** The icon tone for a status tone. */
+export function statusIconClasses(tone: StatusTone): string {
+    return TONE_ICON_CLASSES[tone];
+}
+
 /** The scheme-specific half of a tone's classes (no `dark:` prefix) — for side-by-side specimens. */
 export function statusToneSchemeClasses(tone: StatusTone, scheme: 'light' | 'dark'): string {
     return TONE_SCHEME_CLASSES[tone][scheme];

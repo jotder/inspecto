@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { ICellRendererParams } from 'ag-grid-community';
 import { CompareColumn } from './reconciliation-types';
 import {
+    BAND_ICON,
+    BAND_LABEL,
+    bandKeyCell,
+    bandLegend,
+    bandRowClass,
+    bandStatusTone,
+    breakBand,
+    comparingMessage,
+    fmtPct,
+    rowBand,
     aggregateRecon,
-    bandCell,
     bandFor,
-    boardColumns,
-    buildBoardTree,
     comparedSides,
     decodePath,
     deltaPct,
     encodePath,
-    markBreachesExpanded,
     measureLabel,
     RECON_RECORDS,
     reconBreakSets,
@@ -155,17 +160,6 @@ describe('aggregateRecon 3-way (anchor model, backend parity)', () => {
         expect(c.value_break!.rows[0].key['product']).toBe('voice');
         expect(c.value_break!.rows[0].b!['amount']).toBe(195); // compared side rides the 'b' role slot
     });
-
-    it('the Board tree adds c columns and per-side structural marks', () => {
-        const nodes = buildBoardTree(aggregateRecon(CONFIG, LEFT, RIGHT, THIRD));
-        const eu = nodes.find((n) => n.label === 'EU')!;
-        const voice = eu.children!.find((n) => n.label === 'voice')!;
-        expect(voice.values!['c_amount']).toBe(195);
-        expect(voice.values!['pct_c_amount']).toBeCloseTo(-2.5);
-        const latam = nodes.find((n) => n.label === 'LATAM')!;
-        expect(latam.values!['__miss_c']).toBe('c'); // present only in C
-        expect(latam.values!['__anchorMissing']).toBe(true); // no anchor row under this node
-    });
 });
 
 describe('reconBreakSets', () => {
@@ -186,38 +180,6 @@ describe('reconBreakSets', () => {
     });
 });
 
-describe('buildBoardTree', () => {
-    it('rolls parents up from SUMS (never averaged child Δ%s) and marks one-sided nodes structural', () => {
-        const nodes = buildBoardTree(run());
-        const eu = nodes.find((n) => n.label === 'EU')!;
-        expect(eu.values!['a_amount']).toBe(318); // 200 + 118
-        expect(eu.values!['b_amount']).toBe(314); // 200 + 114
-        // Δ% from rolled sums: (314-318)/318·100 = −1.258… — NOT the child average (0 + −3.39)/2.
-        expect(eu.values!['pct_b_amount']).toBeCloseTo(-1.2579, 3);
-        expect(eu.values!['__miss_b']).toBeNull();
-
-        // children sorted worst-severity first: BOTH breach — voice on the implicit record count
-        // (2 vs 1 rows = −50%) outranks data (amount −3.39%) by |Δ%| within the breach band.
-        expect(eu.children!.map((c) => c.label)).toEqual(['voice', 'data']);
-        expect(eu.children![0].values!['pct_b___records']).toBeCloseTo(-50);
-
-        const mea = nodes.find((n) => n.label === 'MEA')!;
-        expect(mea.values!['__miss_b']).toBe('a');
-        expect(mea.values!['b_amount']).toBeNull();
-
-        // drill path ids encode the dimension path in key-column order
-        expect(eu.children![1].id).toBe('region:EU|product:data');
-    });
-
-    it('markBreachesExpanded expands exactly the ancestors of hot nodes', () => {
-        const marked = markBreachesExpanded(buildBoardTree(run()));
-        const eu = marked.find((n) => n.label === 'EU')!;
-        const us = marked.find((n) => n.label === 'US')!;
-        expect(eu.expanded).toBe(true); // contains the EU/data breach
-        expect(us.expanded).toBeUndefined(); // all-ok subtree stays collapsed
-    });
-});
-
 describe('bands + cells + paths', () => {
     it('bandFor honors the locked defaults (<1 ok · 1–2 warn · >2 breach; null = structural)', () => {
         expect(bandFor(0.99)).toBe('ok');
@@ -233,20 +195,6 @@ describe('bands + cells + paths', () => {
         expect(deltaPct(0, 0)).toBe(0);
         expect(deltaPct(0, 5)).toBeNull();
         expect(deltaPct(null, 5)).toBeNull();
-    });
-
-    it('bandCell renders glyph + text (never color alone) and names the one-sided dataset', () => {
-        const cell = bandCell();
-        const p = (value: unknown, data?: Record<string, unknown>): ICellRendererParams =>
-            ({ value, data }) as unknown as ICellRendererParams;
-        expect(cell(p(0.3))).toContain('✓ +0.3%');
-        expect(cell(p(-1.6))).toContain('! -1.6%');
-        expect(cell(p(3.4))).toContain('✕ +3.4%');
-        expect(cell(p(null, { __miss_b: 'a' }))).toContain('⊘ only in A');
-        expect(cell(p(null, { __miss_b: 'b' }))).toContain('⊘ only in B');
-        expect(cell(p(null, {}))).toContain('✕ new');
-        // the 'c' renderer names side C on a one-sided node
-        expect(bandCell('c')(p(null, { __miss_c: 'c' }))).toContain('⊘ only in C');
     });
 
     it('encodePath/decodePath round-trip values with reserved characters', () => {
@@ -533,73 +481,65 @@ describe('duplicate keys — cardinality and the impact of the extra copies', ()
     });
 });
 
-describe('boardColumns — readable headers (R2-16)', () => {
-    const TELCO = {
-        keyColumns: ['offer_id'],
-        compareColumns: [{ column: 'monthly_fee_sar', toleranceType: 'exact', tolerance: 0 } as CompareColumn],
-    };
-    const result = aggregateRecon(
-        TELCO,
-        [{ offer_id: 'o1', monthly_fee_sar: 149 }],
-        [{ offer_id: 'o1', monthly_fee_sar: 99 }],
-    );
-    const heads = (cols: ReturnType<typeof boardColumns>) => cols.map((c) => c.headerName);
-
-    it('names each side by its Dataset label and humanises the measure, the ids riding in the tooltip', () => {
-        const cols = boardColumns(result, undefined, {
-            includeValues: true,
-            sides: {
-                a: { id: 'crm_subscribers', label: 'CRM subscriber extract' },
-                b: { id: 'cbs_subscribers', label: 'CBS subscriber extract' },
-            },
-        });
-        expect(heads(cols)).toEqual([
-            'CRM subscriber extract · Monthly fee (SAR)',
-            'CBS subscriber extract · Monthly fee (SAR)',
-            'Δ% Monthly fee (SAR)',
-            'CRM subscriber extract · Records',
-            'CBS subscriber extract · Records',
-            'Δ% Records',
-        ]);
-        expect(cols.map((c) => c.headerTooltip)).toEqual([
-            'A = crm_subscribers · monthly_fee_sar',
-            'B = cbs_subscribers · monthly_fee_sar',
-            'Δ% of B = cbs_subscribers vs A = crm_subscribers · monthly_fee_sar',
-            'A = crm_subscribers · record count',
-            'B = cbs_subscribers · record count',
-            'Δ% of B = cbs_subscribers vs A = crm_subscribers · record count',
-        ]);
-    });
-
-    it('falls back to the side letter when no side is named (the dashboard widget tile)', () => {
-        expect(heads(boardColumns(result, undefined, { includeValues: true }))).toEqual([
-            'A · Monthly fee (SAR)',
-            'B · Monthly fee (SAR)',
-            'Δ% Monthly fee (SAR)',
-            'A · Records',
-            'B · Records',
-            'Δ% Records',
-        ]);
-        expect(heads(boardColumns(result))).toEqual(['Δ% Monthly fee (SAR)', 'Δ% Records']);
-    });
-
-    it('names the side on a 3-way Δ% header', () => {
-        const three = aggregateRecon(
-            TELCO,
-            [{ offer_id: 'o1', monthly_fee_sar: 149 }],
-            [{ offer_id: 'o1', monthly_fee_sar: 99 }],
-            [{ offer_id: 'o1', monthly_fee_sar: 149 }],
-        );
-        expect(heads(boardColumns(three, undefined, { sides: { c: { id: 'gl', label: 'General ledger' } } }))).toEqual([
-            'Δ% B · Monthly fee (SAR)',
-            'Δ% General ledger · Monthly fee (SAR)',
-            'Δ% B · Records',
-            'Δ% General ledger · Records',
-        ]);
-    });
-
+describe('measureLabel', () => {
     it('reads the implicit COUNT(*) as Records', () => {
         expect(measureLabel(RECON_RECORDS)).toBe('Records');
         expect(measureLabel('monthly_fee_sar')).toBe('Monthly fee (SAR)');
+    });
+});
+
+describe('row bands, legend and the in-flight message (RECON-PERF-1, operator 2026-10-09)', () => {
+    const r = run();
+    const row = (region: string, product: string) =>
+        r.rows.find((g) => g.key['region'] === region && g.key['product'] === product)!;
+
+    it('bands a grain row by its WORST Δ% and a key missing on a side as structural', () => {
+        expect(rowBand(row('EU', 'data'), r)).toBe('breach'); // amount −3.39 %
+        expect(rowBand(row('MEA', 'voice'), r)).toBe('structural'); // only in A
+        expect(rowBand(row('US', 'voice'), r)).toBe('ok');
+        // wider bands move the same row down a band — the saved bands are what decide
+        expect(rowBand(row('EU', 'data'), r, { warnPct: 3, breachPct: 5 })).toBe('warn');
+    });
+
+    it('maps every band to a design-system tone, a shape icon and a name — no colour words', () => {
+        expect(bandStatusTone('ok')).toBe('success');
+        expect(bandStatusTone('warn')).toBe('warning');
+        expect(bandStatusTone('breach')).toBe('error');
+        expect(bandStatusTone('structural')).toBe('error');
+        for (const b of ['ok', 'warn', 'breach', 'structural'] as const) {
+            expect(BAND_ICON[b]).toMatch(/^heroicons_outline:/);
+            expect(BAND_LABEL[b]).not.toMatch(/red|green|amber/i);
+            expect(bandRowClass(b)).toContain('border-l-4');
+        }
+    });
+
+    it('the legend states each band with its threshold', () => {
+        expect(bandLegend({ warnPct: 1, breachPct: 2 }).map((l) => `${l.label} ${l.range}`)).toEqual([
+            'Within tolerance < 1%',
+            'Warning 1–2%',
+            'Breach > 2%',
+            'Missing on a side key on some sides only',
+        ]);
+    });
+
+    it('formats a Δ% as text and a Break by its own band', () => {
+        expect(fmtPct(100, 101.5)).toBe('+1.5%');
+        expect(fmtPct(0, 5)).toBe('new');
+        expect(fmtPct(null, 5)).toBe('—');
+        expect(breakBand({ type: 'value_break', leftValue: 100, rightValue: 101.5 })).toBe('warn');
+        expect(breakBand({ type: 'missing_left' })).toBe('structural');
+    });
+
+    it('the key cell carries the band glyph (hidden) and the band name for assistive tech', () => {
+        const html = bandKeyCell(() => 'breach')({ value: 'm<1>', data: {} });
+        expect(html).toContain('aria-hidden="true" title="Breach"');
+        expect(html).toContain('<span class="sr-only">Breach: </span>m&lt;1&gt;');
+    });
+
+    it('names the sides and the day it is comparing', () => {
+        expect(comparingMessage(['HLR', 'CRM', 'CBS'], '2026-09-26')).toBe(
+            'Comparing HLR, CRM and CBS for 2026-09-26…',
+        );
+        expect(comparingMessage(['A', 'B'])).toBe('Comparing A and B for the latest day…');
     });
 });

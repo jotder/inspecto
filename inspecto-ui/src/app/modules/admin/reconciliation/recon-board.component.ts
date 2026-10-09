@@ -1,38 +1,42 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ColDef } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, LensService, ReconApiService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { InspectoRowAction } from 'app/inspecto/grid';
-import { FlatTreeRow, TreeNode, TreeTableComponent } from 'app/inspecto/tree-table';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
     ageBucketLabel,
     bandFor,
     bandGlyph,
     bandTone,
     BoardSide,
-    boardColumns,
-    buildBoardTree,
     comparedSides,
+    comparingMessage,
+    encodePath,
     datasetLabels,
     DEFAULT_BANDS,
     deltaPct,
     fmtMeasure,
     lifecycleCounts,
-    markBreachesExpanded,
     measureLabel,
     openAgeBuckets,
     Reconciliation,
     ReconciliationsService,
-    ReconRunResult,
+    RECON_DEFAULT_PAGE_SIZE,
+    RECON_FILTERS,
+    RECON_PAGE_SIZES,
+    ReconBands,
+    ReconFilter,
+    ReconGrainTableComponent,
+    ReconRunQuery,
     ReconState,
+    ReconToolbarComponent,
     reconciliationTitle,
     SideKey,
 } from 'app/inspecto/reconciliation';
@@ -40,6 +44,7 @@ import { humanizeColumn } from 'app/inspecto/viz/column-label';
 import { DatasetsService } from '../studio/datasets/datasets.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { ReconExecService } from './recon-exec.service';
+import { ReconPageLoader } from './recon-page.loader';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -54,10 +59,12 @@ interface TotalLine {
 }
 
 /**
- * Reconciliation Board (`/reconciliation/:id`) — the aggregate comparison tree: key columns in selection
- * order form the hierarchy; each compare column shows both sides + a banded Δ% vs the anchor (A).
- * Runs on open via {@link ReconExecService} (server DuckDB, or the offline mirror under mock Studio);
- * the details action drills to the Breaks page carrying the encoded dimension path.
+ * Reconciliation Board (`/reconciliation/:id`) — ONE DAY of the comparison at a time (RECON-PERF-1, operator
+ * 2026-10-09): the toolbar's day / filter / sample and the table's page live in the URL query params (view state, never
+ * saved); each change requests one server page through {@link ReconPageLoader}, which cancels the request in flight.
+ * The rows are band-tinted (no status column); totals and the Break summary are the whole day's. Opening the Board
+ * never records — "Record run" (canOperateRuns, the server's gate) records the selected day. The bands are the one
+ * saved setting (author only). A row's action drills to the Breaks page for that key and day.
  * Design: `docs/superpower/reconciliation-board-design.md` §4.
  */
 @Component({
@@ -68,10 +75,11 @@ interface TotalLine {
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,
-        MatSlideToggleModule,
         MatTooltipModule,
-        TreeTableComponent,
+        InspectoAlertComponent,
         InspectoEmptyStateComponent,
+        ReconGrainTableComponent,
+        ReconToolbarComponent,
         ChipComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,15 +96,20 @@ export class ReconBoardComponent implements OnInit {
     private lens = inject(LensService);
     private datasetsApi = inject(DatasetsService);
 
-    private tree = viewChild(TreeTableComponent);
+    private destroyRef = inject(DestroyRef);
 
     readonly recon = signal<Reconciliation | null>(null);
-    readonly result = signal<ReconRunResult | null>(null);
+    /** ONE day's page (RECON-PERF-1) — every date / page / filter / sample change cancels the request in flight. */
+    readonly pages = new ReconPageLoader(this.exec, this.destroyRef);
+    readonly result = this.pages.result;
+    readonly running = this.pages.loading;
+    /** The view state, read from the URL query params (`day`, `filter`, `offset`, `limit`, `sample`) — never saved. */
+    readonly query = signal<ReconRunQuery>({ offset: 0, limit: RECON_DEFAULT_PAGE_SIZE, filter: 'all' });
     /** The server-recorded run + Break lifecycle (R2-03) — what the aging strip reads. */
     readonly state = signal<ReconState | null>(null);
     readonly loading = signal(true);
-    readonly running = signal(false);
-    readonly breachesOnly = signal(false);
+    readonly recording = signal(false);
+    readonly savingBands = signal(false);
     /** Dataset id → readable label, read once on open (R2-16); empty until then, so sides show their ids. */
     readonly datasetNames = signal<Record<string, string>>({});
 
@@ -166,16 +179,17 @@ export class ReconBoardComponent implements OnInit {
     /** Unresolved Breaks someone owns, and those that came back after auto-closing (ASSURE-BREAK-LIFECYCLE-1). */
     readonly lifecycle = computed(() => lifecycleCounts(this.state()?.breaks ?? []));
 
-    readonly treeNodes = computed<TreeNode[]>(() => {
-        const r = this.result();
-        if (!r) return [];
-        const nodes = buildBoardTree(r, this.bands());
-        return this.breachesOnly() ? markBreachesExpanded(nodes, this.bands()) : nodes;
+    /** "Comparing HLR, CRM and CBS for 2026-09-26…" — what the spinner says while the backend works. */
+    readonly comparing = computed(() => {
+        const s = this.sides();
+        const labels = (['a', 'b', 'c'] as const).map((k) => s[k]?.label).filter((l): l is string => !!l);
+        return comparingMessage(labels, this.query().day ?? this.result()?.day);
     });
 
-    readonly treeColumns = computed<ColDef[]>(() => {
-        const r = this.result();
-        return r ? boardColumns(r, this.bands(), { includeValues: true, sides: this.sides() }) : [];
+    /** Side letter → readable label, for the grain table's headers. */
+    readonly sideLabels = computed(() => {
+        const s = this.sides();
+        return { a: s.a?.label, b: s.b?.label, ...(s.c ? { c: s.c.label } : {}) };
     });
 
     readonly totalLines = computed<TotalLine[]>(() => {
@@ -203,14 +217,6 @@ export class ReconBoardComponent implements OnInit {
         return lines;
     });
 
-    readonly rowActions: InspectoRowAction<FlatTreeRow>[] = [
-        {
-            icon: 'heroicons_outline:magnifying-glass',
-            hint: 'View breaks under this path',
-            onClick: (row) => this.viewBreaks(String(row['__path'] ?? '')),
-        },
-    ];
-
     ngOnInit(): void {
         const id = this.route.snapshot.paramMap.get('id') ?? '';
         // Labels only: a failed read leaves the sides named by their ids.
@@ -221,7 +227,12 @@ export class ReconBoardComponent implements OnInit {
             next: (r) => {
                 this.recon.set(r);
                 this.loading.set(false);
-                void this.run();
+                // Opening a Board READS the recorded lifecycle; it never records (operator, 2026-10-09).
+                this.loadState(r.id);
+                this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((q) => {
+                    this.query.set(queryFromParams(q));
+                    this.pages.load(r, this.query());
+                });
             },
             error: (e) => {
                 this.loading.set(false);
@@ -230,36 +241,72 @@ export class ReconBoardComponent implements OnInit {
         });
     }
 
-    /**
-     * Run the aggregate comparison, then RECORD the run (R2-03): the server computes every Break of the saved
-     * Reconciliation itself, merges the locked lifecycle (re-matched keys auto-close, resolutions and
-     * first-seen stamps carry forward) and stamps the run — gated `canOperateRuns`, so an operations-only
-     * user records it too. A failed record is toasted and the Board keeps the last RECORDED lifecycle. A viewer
-     * who may not operate runs (a manager, a developer) sees the comparison and the recorded lifecycle but records
-     * nothing — so opening a Board does not toast a refusal they cannot act on.
-     */
-    async run(): Promise<void> {
+    /** Move the view (day / page / filter / sample) by rewriting the URL; the param subscription re-requests. */
+    setView(patch: Partial<ReconRunQuery>): void {
+        const next = { ...this.query(), ...patch };
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            replaceUrl: true,
+            queryParams: {
+                day: next.day || null,
+                filter: next.filter === 'all' ? null : next.filter,
+                offset: next.offset || null,
+                limit: next.limit === RECON_DEFAULT_PAGE_SIZE ? null : next.limit,
+                sample: next.sample || null,
+            },
+            queryParamsHandling: 'merge',
+        });
+    }
+
+    /** Re-run the current view (the Refresh button). */
+    run(): void {
         const r = this.recon();
-        if (!r || this.running()) return;
-        this.running.set(true);
-        try {
-            this.result.set(await this.exec.run(r));
-        } catch (e) {
-            this.result.set(null);
-            this.toastr.error(apiErrorMessage(e, 'Reconciliation run failed'));
-            return;
-        } finally {
-            this.running.set(false);
-        }
-        if (!this.lens.canOperateRuns()) {
-            this.stateApi.state(r.id).subscribe({ next: (s) => this.state.set(s), error: () => undefined });
-            return;
-        }
-        this.stateApi.record(r.id).subscribe({
-            next: (s) => this.state.set(s),
+        if (r) this.pages.load(r, this.query());
+    }
+
+    private loadState(id: string): void {
+        this.stateApi.state(id).subscribe({ next: (s) => this.state.set(s), error: () => undefined });
+    }
+
+    /** Recording is the operate act the server gates (`canOperateRuns`); the button shows only to who holds it. */
+    readonly canRecord = computed(() => this.lens.canOperateRuns());
+
+    /**
+     * RECORD a run of the selected day (R2-03 + RECON-PERF-1): the server computes every Break of that day, merges the
+     * lifecycle (re-matched keys auto-close, resolutions and first-seen stamps carry forward) and stamps the run. An
+     * explicit act — opening the Board no longer records (operator, 2026-10-09).
+     */
+    record(): void {
+        const r = this.recon();
+        if (!r || !this.canRecord() || this.recording()) return;
+        this.recording.set(true);
+        this.stateApi.record(r.id, this.query().day ?? this.result()?.day ?? null).subscribe({
+            next: (s) => {
+                this.recording.set(false);
+                this.state.set(s);
+                this.toastr.success(`Recorded the run for ${s.day ?? 'the latest day'}`);
+            },
             error: (e) => {
+                this.recording.set(false);
                 this.toastr.error(apiErrorMessage(e, 'This run was not recorded'));
-                this.stateApi.state(r.id).subscribe({ next: (s) => this.state.set(s), error: () => undefined });
+            },
+        });
+    }
+
+    /** Save the tolerance bands — the ONE persisted change here, through the author-gated component save. */
+    saveBands(bands: ReconBands): void {
+        const r = this.recon();
+        if (!r || !this.canAuthor()) return;
+        const updated: Reconciliation = { ...r, bands };
+        this.savingBands.set(true);
+        this.reconApi.save(updated).subscribe({
+            next: () => {
+                this.savingBands.set(false);
+                this.recon.set(updated);
+            },
+            error: (e) => {
+                this.savingBands.set(false);
+                this.toastr.error(apiErrorMessage(e, 'Could not save the bands'));
             },
         });
     }
@@ -288,7 +335,7 @@ export class ReconBoardComponent implements OnInit {
                 this.reconApi.save(updated).subscribe({
                     next: () => {
                         this.recon.set(updated);
-                        void this.run();
+                        this.run();
                     },
                     error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not save the reconciliation')),
                 });
@@ -298,18 +345,32 @@ export class ReconBoardComponent implements OnInit {
     viewBreaks(path?: string): void {
         const r = this.recon();
         if (!r) return;
-        void this.router.navigate(['/reconciliation', r.id, 'breaks'], path ? { queryParams: { path } } : {});
+        const day = this.query().day ?? this.result()?.day;
+        const queryParams = { ...(path ? { path } : {}), ...(day ? { day } : {}) };
+        void this.router.navigate(
+            ['/reconciliation', r.id, 'breaks'],
+            Object.keys(queryParams).length ? { queryParams } : {},
+        );
     }
 
-    expandAll(): void {
-        this.tree()?.expandAll();
+    /** A grain row's "view breaks" action: the Breaks page scoped to that key on this day. */
+    viewKey(key: Record<string, string>): void {
+        this.viewBreaks(encodePath(key, this.recon()?.keyColumns ?? Object.keys(key)));
     }
+}
 
-    collapseAll(): void {
-        this.tree()?.collapseAll();
-    }
-
-    exportCsv(): void {
-        this.tree()?.exportCsv();
-    }
+/** The Board's view state from its URL — anything unknown or out of range falls back to the default. */
+export function queryFromParams(q: { get(name: string): string | null }): ReconRunQuery {
+    const filter = q.get('filter') as ReconFilter | null;
+    const limit = Number(q.get('limit'));
+    const offset = Number(q.get('offset'));
+    const sample = Number(q.get('sample'));
+    const day = q.get('day');
+    return {
+        day: day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null,
+        filter: filter && (RECON_FILTERS as readonly string[]).includes(filter) ? filter : 'all',
+        limit: (RECON_PAGE_SIZES as readonly number[]).includes(limit) ? limit : RECON_DEFAULT_PAGE_SIZE,
+        offset: Number.isInteger(offset) && offset > 0 ? offset : 0,
+        sample: Number.isInteger(sample) && sample > 0 ? sample : null,
+    };
 }
