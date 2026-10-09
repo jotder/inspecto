@@ -546,6 +546,15 @@ findings are merged into the active Incident's attributes (`ObjectAccess.saveAtt
 `OBJECT_ACTIVITY` `findings-updated` event by actor `system`); identical findings are suppressed; the title and
 message are not rewritten. Dry-run / pack-harness stand-ins keep the open-only default. Three or more consecutive days with nothing registered emit `kpi.completeness.unknown_streak`
 at WARN (`unknownStreakDays` in the payload) and open **no** Incident. The 28 / 7 / 0.3 defaults are confirmed.
+**§8-D completeness tile — DESIGN, not built (2026-10-09).** The viz seam (`viz/viz-registry.ts` `registerViz`,
+`VizPlugin` in `viz/viz-types.ts`, `render: {kind:'component', componentKey}` as in `progress-list.plugin.ts`) registers
+a type cleanly, but every plugin is Dataset-driven (`buildQuery` → `dataset-result.service`), and a Widget binds a
+`datasetId` checked by `ComponentIntegrity`. A Signal-reading tile therefore does not fit cleanly. Proposed shape:
+a `completeness-status` component plugin that reads `GET /signals?type=kpi.completeness.evaluated&limit=N`
+(`SignalRoutes`, no new route) through `EventsService.signals()`, keeps the latest Signal per `pipeline` payload key,
+and renders OK / BREACH / UNKNOWN with the shared `status-badge`. UNKNOWN is shown as unknown, never as OK. A failed
+fetch shows an error state, never sample data. Open before building: either let a Widget carry no Dataset, or put the
+Signals behind a Dataset (e.g. a registered Signal view).
 **Editor field (operator, 2026-10-09).** The gap node carries a `NodeAttributes.GAP` spec — `file_template`
 and `seq_scope` only (`sequence` keeps its grammar in the dialog's free-form section). The node lowers to
 `collector.gap_detection` (`PipelineEditable.gapSection`); `NodeConfigNameContractTest.gapTemplateAttributesReachTheEngine`
