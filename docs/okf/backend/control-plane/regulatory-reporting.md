@@ -110,7 +110,23 @@ jailed, fail closed on an unreadable document, signed with the Space's Pending C
 skipped by Space export (`BundleExporter`) and by backup (`BackupTask.secret`): operational and confidential; the
 delivered file and the audit chain are the durable trail.
 
+## The SPA pane (`/regulatory-reports`)
+`inspecto-ui/src/app/modules/admin/regulatory-reports/` over `RegulatoryReportsService` (`inspecto/api/regulatory-reports.service.ts`);
+nav item *Operations ▸ Regulatory Reports*, shown only when `/bootstrap` reports `features.regulatoryReporting` (the module
+registered its routes). The Action Requests inbox pattern: a list with **Waiting** (draft, pending and failed — what a
+person still has to act on, filtered client-side from the capped list), **Submitted** (`?status=submitted`, the submission
+log) and **All**; selecting a row opens its detail — template, subject link, format, drop folder, file name, SHA-256,
+who sent it for approval / approved / declined, the submission, and the exact content in a scrollable `<pre>`. Warnings
+in place: `sourceChanged` ("decline it and draft again"), `approverCheck: none-eligible`, an `invalid` record.
+Actions by capability (the server decides): **New report** and **Send for approval** with `canWorkIncidents`; **Approve
+and submit** / **Decline** on a pending report and **Retry the submission** on a failed one with `canApproveChanges`;
+the server's refusal (four-eyes, a moved status, integrity) is shown in place, never only toasted. **New report** is a
+dirty-guarded dialog (`regulatory-report-draft.dialog.ts`): the Report Template and the Case / Incident through
+`<inspecto-option-picker>` (subjects from `GET /objects?type=`), one textarea per `input.*` key the template reads —
+required and max length derived from its fields (`requiredInputs`, `inputMaxLength`), labelled as words (`inputLabel`) —
+and the server's render refusal shown in the dialog, which stays open. Picker errors appear only after a submit attempt.
+
 ## Deliberately not built (see `docs/BACKLOG.md` `REGULATORY-REPORTING-1`)
-Template authoring routes and the SPA pane; regulator acknowledgement ingest (`rejected`, receipts); live regulator
+Template authoring routes; regulator acknowledgement ingest (`rejected`, receipts); live regulator
 delivery (SFTP / HTTPS through a Connection); nested repeating groups; sealing / signing the delivered file; a
 dedicated filing capability (RBAC capability contribution is declined, P1-D3).

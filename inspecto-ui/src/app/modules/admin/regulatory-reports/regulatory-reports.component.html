@@ -1,0 +1,190 @@
+<div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
+    <inspecto-page-header
+        title="Regulatory Reports"
+        subtitle="Regulator-format reports filed from Cases and Incidents. Draft one, read the content, send it for approval; a different person approves it, which submits it."
+        [inset]="false"
+    >
+        <ng-container actions>
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
+                <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
+            </button>
+            @if (canDraft()) {
+                <button mat-flat-button color="primary" (click)="newReport()">New report</button>
+            }
+        </ng-container>
+    </inspecto-page-header>
+
+    @if (templateProblems().length) {
+        <inspecto-alert class="mt-4" variant="warning" title="Some Report Templates do not load">
+            <ul class="m-0 pl-4">
+                @for (p of templateProblems(); track p.id) {
+                    <li>
+                        <span class="font-mono">{{ p.id }}</span> ({{ p.origin }}): {{ p.problems.join('; ') }}
+                    </li>
+                }
+            </ul>
+        </inspecto-alert>
+    }
+
+    <mat-button-toggle-group
+        class="mt-4 self-start"
+        aria-label="Which regulatory reports to list"
+        [value]="filter()"
+        (change)="setFilter($event.value)"
+    >
+        <mat-button-toggle value="waiting">Waiting</mat-button-toggle>
+        <mat-button-toggle value="submitted">Submitted</mat-button-toggle>
+        <mat-button-toggle value="all">All</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (error()) {
+        <inspecto-alert class="mt-4" variant="error" title="Could not load the regulatory reports">{{
+            error()
+        }}</inspecto-alert>
+    } @else {
+        <div class="mt-4">
+            <inspecto-data-table
+                stateKey="regulatory-reports"
+                exportName="regulatory-reports"
+                [rows]="reports()"
+                [columns]="columnDefs"
+                [loading]="loading()"
+                (rowClick)="open($event)"
+                [noRowsTitle]="filter() === 'submitted' ? 'Nothing submitted yet' : 'No regulatory reports waiting'"
+                noRowsHint="Draft one from a Case or Incident with New report; it waits here until a different person approves it."
+            />
+        </div>
+    }
+
+    @if (selected(); as r) {
+        <section class="bg-card mt-6 rounded-2xl p-6 shadow" aria-labelledby="rr-title">
+            <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                    <h2 id="rr-title" class="text-lg font-semibold">{{ r.templateTitle }}</h2>
+                    <p class="text-secondary text-sm">
+                        Drafted by {{ r.author }} on {{ r.createdAt | date: 'medium' }} from
+                        <a class="text-primary underline" [routerLink]="link(r)">{{
+                            r.subjectTitle ?? r.caseId ?? r.incidentId
+                        }}</a>
+                        @if (r.status === 'draft' || r.status === 'pending') {
+                            · expires {{ r.expiresAt | date: 'medium' }}
+                        }
+                        · a different person must approve
+                    </p>
+                </div>
+                <inspecto-status-badge [value]="r.status" />
+                <button mat-icon-button (click)="close()" aria-label="Close the regulatory report">
+                    <mat-icon [svgIcon]="'heroicons_outline:x-mark'"></mat-icon>
+                </button>
+            </div>
+
+            @if (r.status === 'invalid') {
+                <inspecto-alert class="mt-4" variant="error" title="Integrity check failed">
+                    This record was not written by this server, or was edited since. It can be neither approved nor
+                    submitted.
+                </inspecto-alert>
+            }
+            @if (r.sourceChanged) {
+                <inspecto-alert class="mt-4" variant="warning" title="The source changed since this was drafted">
+                    The {{ r.caseId ? 'Case' : 'Incident' }} was edited after the content below was rendered. The
+                    content is never re-rendered: decline it and draft again to file the current state.
+                    @if (r.sourceError) {
+                        <span class="mt-1 block">{{ r.sourceError }}</span>
+                    }
+                </inspecto-alert>
+            }
+            @if (r.approverCheck === 'none-eligible') {
+                <inspecto-alert class="mt-4" variant="warning" title="No one can approve this">
+                    No one holding the approval capability in this Space is outside the report's makers. It stays
+                    pending until it expires unless a role is granted.
+                </inspecto-alert>
+            }
+
+            <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                <dt class="text-secondary">Format</dt>
+                <dd class="m-0">{{ r.format.toUpperCase() }} ({{ r.mediaType }})</dd>
+                <dt class="text-secondary">Drop folder</dt>
+                <dd class="m-0 font-mono break-all">{{ r.delivery.dir }}</dd>
+                <dt class="text-secondary">File name</dt>
+                <dd class="m-0 font-mono">{{ r.delivery.fileName }}</dd>
+                <dt class="text-secondary">SHA-256</dt>
+                <dd class="m-0 font-mono break-all">{{ r.contentSha256 }}</dd>
+                @if (r.requestedBy) {
+                    <dt class="text-secondary">Sent for approval by</dt>
+                    <dd class="m-0">{{ r.requestedBy }} on {{ r.requestedAt | date: 'medium' }}</dd>
+                }
+                @if (r.approver) {
+                    <dt class="text-secondary">Approved by</dt>
+                    <dd class="m-0">{{ r.approver }} on {{ r.approvedAt | date: 'medium' }}</dd>
+                }
+                @if (r.decidedBy) {
+                    <dt class="text-secondary">Declined by</dt>
+                    <dd class="m-0">{{ r.decidedBy }}</dd>
+                }
+                @if (r.submission; as s) {
+                    <dt class="text-secondary">Submitted</dt>
+                    <dd class="m-0">
+                        {{ s.at | date: 'medium' }} to <span class="font-mono break-all">{{ s.file }}</span>
+                        @if (s.alreadyPresent) {
+                            (the identical file was already there)
+                        }
+                    </dd>
+                }
+                @if (r.lastError) {
+                    <dt class="text-secondary">Last error</dt>
+                    <dd class="m-0">{{ r.lastError }}</dd>
+                }
+            </dl>
+            @if (r.reason) {
+                <p class="mt-3 text-sm"><span class="font-semibold">Reason:</span> {{ r.reason }}</p>
+            }
+            @if (r.decisionReason) {
+                <p class="mt-1 text-sm"><span class="font-semibold">Decision reason:</span> {{ r.decisionReason }}</p>
+            }
+
+            <h3 class="mt-4 text-sm font-semibold">Content that is submitted</h3>
+            <pre
+                class="bg-default mt-1 max-h-96 overflow-auto rounded p-3 text-xs whitespace-pre-wrap"
+                tabindex="0"
+                aria-label="Rendered report content"
+                >{{ r.content }}</pre
+            >
+
+            @if (actError()) {
+                <inspecto-alert class="mt-4" variant="error" title="Not done">{{ actError() }}</inspecto-alert>
+            }
+
+            @if (canRequestApproval() || canDecide()) {
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-label>Reason (optional)</mat-label>
+                        <input matInput [formControl]="reason" maxlength="500" />
+                        @if (reason.hasError('maxlength')) {
+                            <mat-error>At most 500 characters.</mat-error>
+                        }
+                    </mat-form-field>
+                    @if (canRequestApproval()) {
+                        <button mat-flat-button color="primary" [disabled]="acting()" (click)="requestApproval()">
+                            Send for approval
+                        </button>
+                    }
+                    @if (canDecide()) {
+                        <button mat-stroked-button color="warn" [disabled]="acting()" (click)="decline()">
+                            Decline
+                        </button>
+                        <button mat-flat-button color="primary" [disabled]="acting()" (click)="approve()">
+                            Approve and submit
+                        </button>
+                    }
+                </div>
+            }
+            @if (canRetry()) {
+                <div class="mt-4 flex justify-end">
+                    <button mat-flat-button color="primary" [disabled]="acting()" (click)="retry()">
+                        Retry the submission
+                    </button>
+                </div>
+            }
+        </section>
+    }
+</div>
