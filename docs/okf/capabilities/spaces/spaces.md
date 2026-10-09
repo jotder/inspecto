@@ -388,7 +388,7 @@ Golden result: 2 detections (the planted −400 day, 2026-06-04; the planted +15
 false positives against 4 planted look-alikes; forecast RMSE 10.3 against the noise-free signal (σ = 20),
 MAPE 1.7 %. Variant corpora (the test rewrites the corpus under the view's own model SQL): a ±level shift from
 day 100 → exactly 1 regime change (day 102), then silence; a ±8/day ramp → exactly 1 drift detection within 21
-days (measured 19 / 13); bad margin input → 2 data-quality Alerts, `new` and `insufficient` groups silent. The
+days (measured 19 / 13); a second corpus (series scaled x7 + 3000; a different noise realization) → only the planted spike, so the sigma-relative constants are not corpus-specific (`theConstantsHoldOnASecondSyntheticCorpus`; real customer series and a live-server drive are still untested); bad margin input → 2 data-quality Alerts, `new` and `insufficient` groups silent. The
 forecast Dataset's description is kept under 60 characters so Alert text names it (`DatasetMeasureProbe.label`). Runbooks: `config/runbooks/business-assurance-runbooks.md`.
 
 **Product gaps the pack recorded** (both decided 2026-10-04): the forecast is NOT a Measure function — the
