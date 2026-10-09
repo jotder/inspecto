@@ -111,6 +111,17 @@ class ControlApiRunRoutesTest {
             JsonNode registered = json(ok);
             assertTrue(registered.get("registered").asBoolean());
             assertEquals("second_etl", registered.get("id").asText());
+
+            // the listing never serves the host's absolute layout (found driving the Enterprise demo, 2026-10-09)
+            HttpResponse<String> list = send(c.port, "GET", "/runs", null, "Authorization", "Bearer author");
+            assertEquals(200, list.statusCode(), list.body());
+            JsonNode rows = json(list);
+            assertTrue(rows.size() >= 2, list.body());
+            for (JsonNode row : rows) {
+                String served = row.get("configPath").asText();
+                assertFalse(Path.of(served).isAbsolute() || served.startsWith("/") || served.contains(":"),
+                        "GET /runs leaks an absolute path: " + served);
+            }
         } finally {
             System.clearProperty("assist.write.root");
         }

@@ -1719,10 +1719,24 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     public List<PipelineView> pipelines() {
         List<PipelineView> out = new ArrayList<>();
         for (ConfigRegistry.Entry e : configRegistry.all()) {
-            out.add(new PipelineView(e.id(), e.path().toString(),
+            out.add(new PipelineView(e.id(), listedPath(e.path()),
                     paused.contains(e.id()), status.committedBatches(e.config()).size()));
         }
         return out;
+    }
+
+    /**
+     * The config path a listing serves: relative to this Space's config root (the form {@code POST /runs}
+     * accepts back), never the host's absolute layout. An entry outside that root serves its file name only.
+     */
+    private String listedPath(java.nio.file.Path path) {
+        java.nio.file.Path abs = path.toAbsolutePath().normalize();
+        java.nio.file.Path base = root.config();
+        if (base != null) {
+            java.nio.file.Path b = base.toAbsolutePath().normalize();
+            if (abs.startsWith(b)) return b.relativize(abs).toString().replace('\\', '/');
+        }
+        return abs.getFileName().toString();
     }
 
     /**
