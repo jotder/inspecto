@@ -218,6 +218,11 @@ final class JobAuthority {
             } catch (RuntimeException noSpace) {
                 root = null;
             }
+            String ownerRefusal = indexBuildOwnerRefusal(cfg, root);
+            if (ownerRefusal != null) {
+                audit(cfg, ownerRefusal);
+                return Optional.of(ownerRefusal);
+            }
             if (!JobRoutes.requiresAdminister(cfg, root)) return Optional.empty();
             String refusal = refusal(cfg, root);
             if (refusal != null) audit(cfg, refusal);
@@ -247,6 +252,26 @@ final class JobAuthority {
             return new com.gamma.job.PostgresPublishJobType.Author(by == null || by.isBlank() ? null : by,
                     Set.copyOf(roles), Set.copyOf(capabilitiesNow(roles, root)), false);
         };
+    }
+
+    /**
+     * Why an {@code la.index.build} {@code cfg} may not run now, or null. Its {@code owner} is the authority the build
+     * runs under; the save path stamps it from the saver ({@link #stamp}), so a stamped Job has {@code owner == updatedBy}.
+     * Anything else - a Job saved before the stamp, a template changed later, a file edited on disk - runs only if the
+     * recorded last editor's roles STILL grant {@code canConfigureAccess} (the right to name another owner). FAIL CLOSED.
+     */
+    static String indexBuildOwnerRefusal(JobConfig cfg, Path root) {
+        if (!LA_INDEX_BUILD.equals(String.valueOf(cfg.type()).trim().toLowerCase(Locale.ROOT))) return null;
+        String owner = cfg.params().get(LA_OWNER);
+        String by = cfg.params().get(JobConfig.UPDATED_BY);
+        if (owner != null && by != null && !by.isBlank() && owner.trim().equals(by.trim())) return null;
+        List<String> roles = new ArrayList<>();
+        for (String r : cfg.opt(JobConfig.UPDATED_BY_ROLES, "").split(","))
+            if (!r.isBlank()) roles.add(r.trim().toLowerCase(Locale.ROOT));
+        if (capabilitiesNow(roles, root).contains(Roles.CAN_CONFIGURE_ACCESS)) return null;
+        return "run refused: la.index.build Job '" + cfg.name() + "' names owner '" + owner + "' but its last editor '"
+                + (by == null || by.isBlank() ? "(none recorded)" : by) + "' does not hold canConfigureAccess - re-save it "
+                + "as the intended owner";
     }
 
     /** Why an administrator-only {@code cfg} may not run now, or null when its last editor still may. */
