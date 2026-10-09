@@ -37,6 +37,9 @@ abstract class InvestigationStoreContract {
     /** A new, empty store (a fresh directory, a throwaway schema). */
     abstract InvestigationStore fresh() throws Exception;
 
+    /** A new, empty store whose per-set size limit ({@link WorkingSetSizeLimit}) is {@code bytes}. */
+    abstract InvestigationStore freshWithSetLimit(long bytes) throws Exception;
+
     private static InvestigationStore.Scope main(String id) {
         return InvestigationStore.Scope.main(id);
     }
@@ -614,6 +617,104 @@ abstract class InvestigationStoreContract {
         assertEquals("{\"reset\":3}", s.draftSet("r", d, 3).orElseThrow());
         assertTrue(s.draftSet("r", d, 4).isEmpty(), "the old set is gone");
         assertEquals(InvestigationStore.DraftState.OPEN, s.draftState("r", d));
+    }
+
+    // ── the per-set size limit (D-IS2; operator 2026-10-10): at the limit passes, one byte over is refused 413 and writes nothing ──
+
+    private static final long LIMIT = 1024;
+
+    /** {@code bytes} UTF-8 bytes of valid JSON-ish text; {@code multibyte} spends two bytes per char ("é"), so chars != bytes. */
+    private static String setOf(long bytes, boolean multibyte) {
+        StringBuilder b = new StringBuilder();
+        if (multibyte) {
+            b.append("\u00e9".repeat((int) (bytes / 2)));
+            if (bytes % 2 == 1) b.append('x');
+        } else {
+            b.append("x".repeat((int) bytes));
+        }
+        String s = b.toString();
+        assertEquals(bytes, s.getBytes(StandardCharsets.UTF_8).length);
+        return s;
+    }
+
+    private static void assertTooLarge(org.junit.jupiter.api.function.Executable write) {
+        com.gamma.spi.auth.ApiException e = assertThrows(com.gamma.spi.auth.ApiException.class, write);
+        assertEquals(413, e.status);
+        assertEquals(com.gamma.spi.auth.ErrorCodes.PAYLOAD_TOO_LARGE, e.errorCode);
+        assertTrue(e.getMessage().contains(String.valueOf(LIMIT)), "the message states the limit: " + e.getMessage());
+        assertTrue(e.getMessage().contains("max_set_bytes"), "the message says how to raise it: " + e.getMessage());
+    }
+
+    @Test
+    void appendAcceptsASetExactlyAtTheLimitAndRefusesOneByteOverCountingBytesNotChars() throws Exception {
+        InvestigationStore s = freshWithSetLimit(LIMIT);
+        s.create("a", "{}");
+        for (boolean multibyte : new boolean[] {false, true}) {
+            int step = multibyte ? 2 : 1;
+            String over = setOf(LIMIT + 1, multibyte), atLimit = setOf(LIMIT, multibyte);
+            assertTooLarge(() -> s.append(main("a"), step - 1, step, line(step), over));
+            assertEquals(step - 1, s.version(main("a")), "a refused set writes no log line");
+            assertTrue(s.set("a", step).isEmpty(), "a refused set is never stored, not even cut");
+            s.append(main("a"), step - 1, step, line(step), atLimit);
+            assertEquals(atLimit, s.set("a", step).orElseThrow(), "exactly at the limit is stored verbatim");
+        }
+        assertEquals(2, s.version(main("a")));
+        assertTrue(setOf(LIMIT, true).length() < LIMIT, "the multibyte case really has fewer chars than bytes");
+    }
+
+    @Test
+    void aDraftAppendIsHeldToTheSameLimit() throws Exception {
+        InvestigationStore s = freshWithSetLimit(LIMIT);
+        String d = promotable(s, "a", 1, 0);
+        var sc = draft("a", d);
+        assertTooLarge(() -> s.append(sc, 0, 2, "{\"own\":2}", setOf(LIMIT + 1, false)));
+        assertEquals(0, s.version(sc));
+        assertTrue(s.draftSet("a", d, 2).isEmpty());
+        s.append(sc, 0, 2, "{\"own\":2}", setOf(LIMIT, false));
+        assertEquals(1, s.version(sc));
+    }
+
+    @Test
+    void createForkRefusesAnyOverLimitSetAndCreatesNothing() throws Exception {
+        InvestigationStore s = freshWithSetLimit(LIMIT);
+        assertTooLarge(() -> s.createFork("f", "{}", List.of(line(1), line(2)), List.of(setOf(LIMIT, false), setOf(LIMIT + 1, false))));
+        assertTrue(s.header("f").isEmpty(), "not even the header of a refused fork exists");
+        assertEquals(List.of(), s.ids());
+        assertTrue(s.createFork("f", "{}", List.of(line(1), line(2)), List.of(setOf(LIMIT, false), setOf(LIMIT, true))));
+        assertEquals(2, s.version(main("f")));
+    }
+
+    @Test
+    void promoteRefusesAnOverLimitResealedSetButNeverReChecksTheDraftsOwnSealedOne() throws Exception {
+        InvestigationStore s = freshWithSetLimit(LIMIT);
+        String d = promotable(s, "p", 1, 2);
+        List<String> main = s.log(main("p")), own = s.log(draft("p", d));
+        String mh = DraftStore.prefixHash(main, 1), oh = DraftStore.prefixHash(own, own.size());
+        List<String> lines = List.of("{\"step\":2}", "{\"step\":3}");
+        List<String> over = new ArrayList<>();
+        over.add(null);
+        over.add(setOf(LIMIT + 1, false));
+        assertTooLarge(() -> s.promoteDraft("p", d, 1, mh, oh, lines, over, "{}"));
+        assertEquals(1, s.version(main("p")), "a refused promote left the main log as it was");
+        assertEquals(InvestigationStore.DraftState.OPEN, s.draftState("p", d), "and the Draft open");
+        List<String> ok = new ArrayList<>();
+        ok.add(null);
+        ok.add(setOf(LIMIT, false));
+        s.promoteDraft("p", d, 1, mh, oh, lines, ok, "{\"promoted\":true}");
+        assertEquals(3, s.version(main("p")));
+    }
+
+    @Test
+    void replaceDraftRefusesAnOverLimitSetAndLeavesTheDraftAsItWas() throws Exception {
+        InvestigationStore s = freshWithSetLimit(LIMIT);
+        String d = promotable(s, "r", 2, 2);
+        List<String> main = s.log(main("r")), own = s.log(draft("r", d));
+        String mh = DraftStore.prefixHash(main, 2), oh = DraftStore.prefixHash(own, own.size());
+        assertTooLarge(() -> s.replaceDraft("r", d, 2, mh, oh, "{\"new\":1}", List.of("{\"step\":3}"), List.of(setOf(LIMIT + 1, false)), List.of(3)));
+        assertEquals(own, s.log(draft("r", d)), "a refused swap changed nothing");
+        assertEquals(draftHeader(d, "ann", 2), s.draftHeader("r", d).orElseThrow());
+        s.replaceDraft("r", d, 2, mh, oh, "{\"new\":1}", List.of("{\"step\":3}"), List.of(setOf(LIMIT, false)), List.of(3));
+        assertEquals(setOf(LIMIT, false), s.draftSet("r", d, 3).orElseThrow());
     }
 
     @Test

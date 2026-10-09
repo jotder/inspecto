@@ -474,7 +474,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 * **Settings ▸ Link Analysis** (2026-09-30, `settings/link-analysis-settings.component`): the four-eyes thresholds
   (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and
   `seedByDistinctCap` only when the server reports that key. ⚠ `PUT /settings/link-analysis` REPLACES the
-  document, so the save sends every other stated key back as read (node caps, masking mode, Entity Types).
+  document, so the save sends every other stated key back as read (node caps, masking mode, Entity Types, `maxSetBytes`). `maxSetBytes` (`max_set_bytes`, 2026-10-10) is the per-set size limit of a sealed Working Set, default 64 MiB (`maxSetBytesInForce`), 1 KiB..1 GiB; a step over it is refused `413` naming the limit; there is no SPA field for it yet.
   Since 2026-10-01 the document also holds `graphRun` (`graph_run` in `link-analysis.toon`; LA separation D-4 step 6):
   `{maxNodes, maxEdges, timeoutMs}` = the DEFAULT budget of a server graph run that states none (clamped to the
   server's hard ceilings and echoed by `GET /inv/graph/algorithms`), `{threads, queue}` = the Space's graph-run workers

@@ -30,14 +30,14 @@ public final class PgInvestigationStoreProvider implements InvestigationStorePro
     }
 
     @Override
-    public InvestigationStore open(String spaceId, Connection connection) throws IOException {
+    public InvestigationStore open(String spaceId, Connection connection, java.util.function.LongSupplier maxSetBytes) throws IOException {
         String schema = schemaFor(spaceId);
         String key = connection.url() + "\n" + connection.user() + "\n" + schema;
         InvestigationStore known = STORES.get(key);
         if (known != null) return known;
         ConnectionSource pool = pool(connection);
         try {
-            InvestigationStore opened = new PgInvestigationStore(pool, schema);
+            InvestigationStore opened = new PgInvestigationStore(pool, schema, maxSetBytes);
             InvestigationStore raced = STORES.putIfAbsent(key, opened);
             return raced != null ? raced : opened;
         } catch (ApiException unreachable) {

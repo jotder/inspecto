@@ -184,6 +184,10 @@ public final class LinkEventTypes {
      *  {@code investigationId}, {@code principal}, {@code value} (the breaching-entity COUNT, never an id). */
     public static final String LINK_STANDING_DETECTION_SWEPT = "LINK_STANDING_DETECTION_SWEPT";
 
+    /** A write of a Working Set was REFUSED because the set was over the Space's {@code max_set_bytes}. {@code investigationId},
+     *  {@code step}, {@code limitBytes}; never the set or an entity id. Emitted by the store seam, so every route that seals a set audits it. */
+    public static final String LINK_WORKING_SET_TOO_LARGE = "LINK_WORKING_SET_TOO_LARGE";
+
     /** A standing-detection sweep REFUSED to read: nothing was evaluated. {@code rule}, {@code investigationId},
      *  {@code principal}, and the stable reason {@code code}. */
     public static final String LINK_STANDING_DETECTION_REFUSED = "LINK_STANDING_DETECTION_REFUSED";

@@ -80,6 +80,15 @@ class PgInvestigationStoreContractTest extends InvestigationStoreContract {
         return new PgInvestigationStore(pool(url), schema);
     }
 
+    @Override
+    InvestigationStore freshWithSetLimit(long bytes) throws Exception {
+        String url = url();
+        assumeTrue(url != null, "no Postgres: set INSPECTO_TEST_PG_URL (jdbc:postgresql://host:5432/db?user=..&password=..) to run this");
+        String schema = "la_t_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        schemas.add(schema);
+        return new PgInvestigationStore(pool(url), schema, () -> bytes);
+    }
+
     @Test
     void firstStartOfOneSpaceOnManyPodsAtOnceBootstrapsTheSchemaOnceAndAllSucceed() throws Exception {
         String url = url();

@@ -60,8 +60,11 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     private final FsInvestigationLayout snapshots;
 
+    private final java.util.function.LongSupplier maxSetBytes;
+
     public FsInvestigationStore(Path writeRoot) {
         this.snapshots = new FsInvestigationLayout(writeRoot);
+        this.maxSetBytes = WorkingSetSizeLimit.forRoot(writeRoot);
     }
 
     /** TRANSITIONAL (Draft vertical): one Investigation's directory. Not part of the port. */
@@ -109,6 +112,7 @@ public final class FsInvestigationStore implements InvestigationStore {
     @Override
     public boolean createFork(String id, String headerJson, List<String> lines, List<String> sets) throws IOException {
         contained(id);
+        WorkingSetSizeLimit.enforceAll(maxSetBytes, id, 1, sets);
         synchronized (monitor(investigationsRoot())) {
             return snapshots.createFork(id, headerJson, lines, sets);
         }
@@ -151,6 +155,7 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     @Override
     public void append(Scope scope, long expectedVersion, int step, String lineJson, String setJson) throws IOException {
+        WorkingSetSizeLimit.enforce(maxSetBytes, scope.investigationId(), step, setJson);
         Path inv = investigationDir(scope.investigationId());
         Path dir = scope.isDraft() ? draftDir(scope) : inv;
         synchronized (monitor(inv)) {
@@ -441,6 +446,7 @@ public final class FsInvestigationStore implements InvestigationStore {
     @Override
     public void promoteDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash,
                              String expectedDraftLogHash, List<String> lines, List<String> sets, String markerJson) throws IOException {
+        WorkingSetSizeLimit.enforceAll(maxSetBytes, investigationId, (int) expectedMainVersion + 1, sets);
         Path invDir = investigationDir(investigationId);
         Path draftDir = draftDirOf(investigationId, draftId);
         synchronized (monitor(invDir)) {   // the main log, THEN the Draft: the one order everywhere
@@ -505,6 +511,7 @@ public final class FsInvestigationStore implements InvestigationStore {
     public void replaceDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash,
                              String expectedDraftLogHash, String headerJson, List<String> lines, List<String> sets,
                              List<Integer> setSteps) throws IOException {
+        for (int i = 0; i < sets.size(); i++) WorkingSetSizeLimit.enforce(maxSetBytes, investigationId, setSteps.get(i), sets.get(i));
         Path invDir = investigationDir(investigationId);
         Path draftDir = draftDirOf(investigationId, draftId);
         synchronized (monitor(invDir)) {

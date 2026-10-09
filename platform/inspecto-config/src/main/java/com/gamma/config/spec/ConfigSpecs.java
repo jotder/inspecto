@@ -1286,6 +1286,10 @@ public final class ConfigSpecs {
                         "Distinct values per bound column a seedBy (LA-17) may scan to find an Entity List's "
                                 + "members in the Dataset; above it the seed is refused, never sampled; "
                                 + "absent = 20000."),
+                FieldSpec.of("max_set_bytes", "Maximum Working Set size (bytes)", FieldType.INT,
+                        "The most sealed Working Set text one step may store (UTF-8 bytes, 1024..1073741824); a set above "
+                                + "it is refused with 413 PAYLOAD_TOO_LARGE, never truncated, on both the filesystem and the "
+                                + "database Investigation store; absent = 67108864 (64 MiB)."),
                 FieldSpec.of("graph_run", "Graph run service", FieldType.MAP,
                         "The server-side graph-run service (D-4): {max_nodes, max_edges, timeout_ms} is the DEFAULT "
                                 + "budget of a run that states none (clamped to the server's hard ceilings, echoed by "

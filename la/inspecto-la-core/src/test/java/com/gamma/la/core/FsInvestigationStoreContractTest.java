@@ -25,6 +25,12 @@ class FsInvestigationStoreContractTest extends InvestigationStoreContract {
         return new FsInvestigationStore(root);
     }
 
+    @Override
+    InvestigationStore freshWithSetLimit(long bytes) throws Exception {
+        Files.writeString(root.resolve(com.gamma.entitystore.LinkAnalysisSettings.FILE), "max_set_bytes: " + bytes + "\n", StandardCharsets.UTF_8);
+        return new FsInvestigationStore(root);
+    }
+
     private Path invDir(String id) {
         return root.resolve("audit").resolve("snapshots").resolve("investigations").resolve(id);
     }
