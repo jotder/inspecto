@@ -20,6 +20,13 @@ export function randomState(): string {
     return base64Url(bytes.buffer);
 }
 
+/** An opaque random value for the OIDC `nonce` parameter: binds the returned ID token to this sign-in (replay defense). */
+export function randomNonce(): string {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return base64Url(bytes.buffer);
+}
+
 /** The S256 code challenge for a verifier: base64url(SHA-256(verifier)) (RFC 7636 §4.2). */
 export async function challengeFromVerifier(verifier: string): Promise<string> {
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));

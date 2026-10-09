@@ -67,6 +67,7 @@ interface Bootstrap {
 
 const VERIFIER_KEY = 'inspecto.pkce.verifier';
 const STATE_KEY = 'inspecto.pkce.state';
+const NONCE_KEY = 'inspecto.pkce.nonce';
 /**
  * Set while this browser holds a session the refresh cookie can resume. The cookie is httpOnly, so the
  * SPA cannot see it; without this hint every first load of a signed-out browser POSTed /auth/refresh
@@ -164,6 +165,12 @@ export class SessionService {
 
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
+    /**
+     * False when OIDC is on but the deployment supplied no `authorizeUrl` / `clientId` (neither `/bootstrap` `auth`
+     * nor `environment.oidc`) - {@link beginLogin} then cannot redirect anywhere real, so the sign-in page shows an
+     * error instead of a button that appears dead. Always true for the mock/demo relay, which never redirects.
+     */
+    readonly oidcConfigured = signal(true);
     /** The in-flight post-sign-in bootstrap re-read ({@link completeLogin} does not wait for it). */
     private sessionLoad: Promise<void> = Promise.resolve();
 
@@ -249,6 +256,7 @@ export class SessionService {
             endSessionUrl: boot.auth?.endSessionUrl ?? this.environment.oidc?.endSessionUrl ?? '',
             mock: boot.auth?.mock ?? this.environment.oidc?.mock ?? false,
         };
+        this.oidcConfigured.set(this.oidc.mock || (!!this.oidc.authorizeUrl && !!this.oidc.clientId));
         this.demoUsers.set(boot.auth?.demoUsers ?? []);
         // A returning user still holds the httpOnly refresh cookie — mint an access token from it. A 401
         // just means "not signed in yet"; the guard will route to sign-in.
@@ -283,11 +291,16 @@ export class SessionService {
 
     /** Start the Authorization-Code + PKCE redirect (or, in mock mode, grant a code locally offline). */
     async beginLogin(demoUserId?: string): Promise<void> {
-        const { randomVerifier, randomState, challengeFromVerifier } = await import('./pkce');
+        // No authorize endpoint / client id configured: do not redirect (it would land on this very origin with an
+        // empty client_id and show nothing) - the sign-in page renders the error from `oidcConfigured`.
+        if (!this.oidcConfigured()) return;
+        const { randomVerifier, randomState, randomNonce, challengeFromVerifier } = await import('./pkce');
         const verifier = randomVerifier();
         const state = randomState();
+        const nonce = randomNonce();
         sessionStorage.setItem(VERIFIER_KEY, verifier);
         sessionStorage.setItem(STATE_KEY, state);
+        sessionStorage.setItem(NONCE_KEY, nonce);
 
         if (this.oidc?.mock) {
             // Offline demo: no real IAM to redirect to — grant a fake code and jump straight to the callback.
@@ -303,6 +316,7 @@ export class SessionService {
             redirect_uri: this.redirectUri(),
             scope: this.oidc?.scopes ?? 'openid profile',
             state,
+            nonce,
             code_challenge: challenge,
             code_challenge_method: 'S256',
         });
@@ -319,6 +333,8 @@ export class SessionService {
         sessionStorage.removeItem(STATE_KEY);
         const verifier = sessionStorage.getItem(VERIFIER_KEY);
         sessionStorage.removeItem(VERIFIER_KEY);
+        const nonce = sessionStorage.getItem(NONCE_KEY);
+        sessionStorage.removeItem(NONCE_KEY);
         if (!state || state !== expected || !verifier) return of(false); // CSRF / stale round-trip
 
         return this.http
@@ -326,6 +342,8 @@ export class SessionService {
                 code,
                 codeVerifier: verifier,
                 redirectUri: this.redirectUri(),
+                // The backend checks it against the ID token's `nonce` claim; omitted only for the mock/demo relay.
+                ...(nonce ? { nonce } : {}),
             })
             .pipe(
                 tap((r) => {

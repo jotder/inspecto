@@ -88,6 +88,12 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                             This workspace is secured. Continue with your organisation's single sign-on.
                         }
                     </p>
+                    @if (!configured()) {
+                        <inspecto-alert class="mt-4 block text-left" variant="error" title="Single sign-on isn't set up">
+                            This workspace can't start sign-in because single sign-on hasn't been configured yet. Ask
+                            your administrator to finish setting it up.
+                        </inspecto-alert>
+                    }
                     @if (failed()) {
                         <inspecto-alert class="mt-4 block text-left" variant="error" title="Sign-in failed">
                             We couldn't complete sign-in. Please try again.
@@ -120,7 +126,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                             mat-flat-button
                             color="primary"
                             class="mt-6 w-full"
-                            [disabled]="busy()"
+                            [disabled]="busy() || !configured()"
                             (click)="signIn()"
                         >
                             @if (busy()) {
@@ -159,6 +165,9 @@ export class SignInComponent implements OnInit {
     /** R2-17: demo sign-in is on — the page must not claim security or SSO, nor pitch builder copy. */
     readonly demo = computed(() => this.demoUsers().length > 0);
 
+    /** False when OIDC is on but no authorize URL / client id was supplied - sign-in cannot start (shows an error). */
+    readonly configured = computed(() => this.session.oidcConfigured());
+
     ngOnInit(): void {
         // Already signed in (or Personal/offline where login is never required) → straight into the app.
         if (!this.session.loginRequired()) {
@@ -170,6 +179,7 @@ export class SignInComponent implements OnInit {
     }
 
     async signIn(demoUserId?: string): Promise<void> {
+        if (!this.configured()) return;
         this.busy.set(true);
         await this.session.beginLogin(demoUserId);
     }

@@ -20,11 +20,12 @@ const FAILED_KEY = 'inspecto.signInFailed';
  * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
-function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[] } = {}) {
+function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; configured?: boolean } = {}) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => opts.loginRequired ?? true,
         beginLogin: vi.fn(),
+        oidcConfigured: signal(opts.configured ?? true),
         version: signal<string | null>(null),
         branding: signal({ logoDataUrl: null, caption: null, footerText: null }),
         demoUsers: signal<DemoUser[]>(opts.demoUsers ?? []),
@@ -168,5 +169,25 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
             expect(el.textContent).not.toContain('Demo sign-in');
             await expectNoA11yViolations(el);
         });
+    });
+
+    // Real-IAM finding 2026-10-09: with no authorize URL / client id the button redirected to the SPA's own
+    // origin and showed nothing. Now the page says so, plainly, and the button cannot start a redirect.
+    it('shows a clear error and disables sign-in when single sign-on is not configured', async () => {
+        const { el, session, fixture } = create({ configured: false });
+        const alert = el.querySelector('inspecto-alert');
+        expect(alert?.textContent).toContain("Single sign-on isn't set up");
+        expect(alert?.textContent).toContain('Ask your administrator');
+        expect(alert?.querySelector('[role="alert"]')).toBeTruthy();
+        const button = el.querySelector('button') as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        button.click();
+        await fixture.whenStable();
+        expect(session.beginLogin).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
+    it('shows no configuration error when single sign-on is configured', () => {
+        expect(create().el.textContent).not.toContain("Single sign-on isn't set up");
     });
 });

@@ -15,6 +15,7 @@ function create(
     const session = {
         loginRequired: () => true,
         beginLogin: vi.fn(),
+        oidcConfigured: signal(true),
         version: signal<string | null>(version),
         demoUsers: signal([]),
         branding: signal({

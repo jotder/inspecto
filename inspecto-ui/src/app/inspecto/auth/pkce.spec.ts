@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { challengeFromVerifier, randomState, randomVerifier } from './pkce';
+import { challengeFromVerifier, randomNonce, randomState, randomVerifier } from './pkce';
 
 describe('pkce (W6d OIDC)', () => {
     it('randomVerifier is base64url in the RFC 7636 length range and unique', () => {
@@ -26,5 +26,10 @@ describe('pkce (W6d OIDC)', () => {
     it('randomState is base64url and unique', () => {
         expect(randomState()).toMatch(/^[A-Za-z0-9_-]+$/);
         expect(randomState()).not.toEqual(randomState());
+    });
+
+    it('randomNonce is base64url, 128-bit, and unique per call', () => {
+        expect(randomNonce()).toMatch(/^[A-Za-z0-9_-]{22}$/);
+        expect(randomNonce()).not.toEqual(randomNonce());
     });
 });

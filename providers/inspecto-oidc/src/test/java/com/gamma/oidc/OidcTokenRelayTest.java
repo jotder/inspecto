@@ -127,4 +127,58 @@ class OidcTokenRelayTest {
         assertTrue(t.isPresent());
         assertNull(t.get().refreshExpiresInSeconds(), "absent refresh_expires_in must stay null (session cookie)");
     }
+
+    // -- OIDC nonce: the ID token's nonce claim must equal the one the SPA sent --
+
+    private static String idToken(String nonceClaim) {
+        var claims = new com.nimbusds.jwt.JWTClaimsSet.Builder().subject("u1");
+        if (nonceClaim != null) claims.claim("nonce", nonceClaim);
+        return new com.nimbusds.jwt.PlainJWT(claims.build()).serialize();
+    }
+
+    private void iamReturnsIdToken(String idToken) {
+        respondBody = "{\"access_token\":\"at-1\",\"expires_in\":300,\"refresh_token\":\"rt-1\""
+                + (idToken == null ? "" : ",\"id_token\":\"" + idToken + "\"") + "}";
+    }
+
+    @Test
+    void matchingNonceIsAccepted() {
+        iamReturnsIdToken(idToken("n-1"));
+        assertTrue(relay(null).exchangeCode("c", "v", "r", "n-1").isPresent());
+    }
+
+    @Test
+    void mismatchedAbsentOrMissingIdTokenNonceIsRefusedWhenOneWasSent() {
+        iamReturnsIdToken(idToken("someone-elses"));
+        assertTrue(relay(null).exchangeCode("c", "v", "r", "n-1").isEmpty(), "mismatch");
+        iamReturnsIdToken(idToken(null));
+        assertTrue(relay(null).exchangeCode("c", "v", "r", "n-1").isEmpty(), "claim absent");
+        iamReturnsIdToken(null);
+        assertTrue(relay(null).exchangeCode("c", "v", "r", "n-1").isEmpty(), "no id_token at all");
+        iamReturnsIdToken("not-a-jwt");
+        assertTrue(relay(null).exchangeCode("c", "v", "r", "n-1").isEmpty(), "malformed id_token");
+    }
+
+    @Test
+    void noNonceSentMeansNoNonceCheck() {
+        iamReturnsIdToken(null);
+        assertTrue(relay(null).exchangeCode("c", "v", "r", null).isPresent());
+    }
+
+    @Test
+    void bootstrapAuthPublishesOnlyPublicClientConfigAndOnlyWhenConfigured() {
+        try {
+            assertTrue(relay("s3cret").bootstrapAuth().isEmpty(), "unconfigured publishes nothing");
+            System.setProperty("auth.oidc.authorizeUrl", "https://idp/authorize");
+            System.setProperty("auth.oidc.endSessionUrl", "https://idp/logout");
+            Map<String, Object> m = relay("s3cret").bootstrapAuth();
+            assertEquals("https://idp/authorize", m.get("authorizeUrl"));
+            assertEquals("inspecto-spa", m.get("clientId"));
+            assertEquals("https://idp/logout", m.get("endSessionUrl"));
+            assertFalse(m.toString().contains("s3cret"));
+        } finally {
+            System.clearProperty("auth.oidc.authorizeUrl");
+            System.clearProperty("auth.oidc.endSessionUrl");
+        }
+    }
 }

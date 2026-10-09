@@ -258,6 +258,56 @@ describe('SessionService (W6d edition switch)', () => {
         assign.mockRestore();
     });
 
+    // OIDC nonce: the authorize request carries a fresh random nonce, kept beside state/verifier, and the
+    // exchange hands it to the backend, which checks it against the ID token.
+    it('beginLogin sends a per-sign-in random nonce, stores it, and completeLogin forwards it once', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({ authorizeUrl: 'https://idp/authorize', clientId: 'spa-1' });
+
+        await svc.beginLogin();
+        const first = new URL(assign.mock.calls[0][0] as string).searchParams.get('nonce') ?? '';
+        expect(first).toMatch(/^[A-Za-z0-9_-]{16,}$/);
+        expect(sessionStorage.getItem('inspecto.pkce.nonce')).toBe(first);
+
+        await svc.beginLogin();
+        expect(new URL(assign.mock.calls[1][0] as string).searchParams.get('nonce')).not.toBe(first);
+
+        const state = sessionStorage.getItem('inspecto.pkce.state') ?? '';
+        const nonce = sessionStorage.getItem('inspecto.pkce.nonce');
+        svc.completeLogin('c', state).subscribe();
+        const req = httpMock.expectOne(`${base}/auth/exchange`);
+        expect(req.request.body.nonce).toBe(nonce);
+        expect(sessionStorage.getItem('inspecto.pkce.nonce')).toBeNull(); // one-shot: a replayed callback has none
+        req.flush({ accessToken: 'at' });
+        await tick();
+        httpMock.expectOne(`${base}/bootstrap`).flush({});
+        assign.mockRestore();
+    });
+
+    it('a refused exchange (nonce mismatch, 401) leaves the user signed out', async () => {
+        sessionStorage.setItem('inspecto.pkce.state', 's1');
+        sessionStorage.setItem('inspecto.pkce.verifier', 'v1');
+        sessionStorage.setItem('inspecto.pkce.nonce', 'n1');
+        let ok = true;
+        svc.completeLogin('c', 's1').subscribe((r) => (ok = r));
+        httpMock.expectOne(`${base}/auth/exchange`).flush({ error: 'x' }, { status: 401, statusText: 'x' });
+        await tick();
+        expect(ok).toBe(false);
+        expect(svc.authenticated()).toBe(false);
+    });
+
+    it('beginLogin with no authorizeUrl/clientId does NOT redirect and reports OIDC as not configured', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({});
+        expect(svc.oidcConfigured()).toBe(false);
+
+        await svc.beginLogin();
+
+        expect(assign).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem('inspecto.pkce.verifier')).toBeNull();
+        assign.mockRestore();
+    });
+
     it('beginLogin in offline mock mode grants a fake code in-app and never leaves the SPA', async () => {
         const assign = spyOnRedirect();
         await signedInWith({ authorizeUrl: 'https://idp/authorize', clientId: 'spa-1', mock: true });
