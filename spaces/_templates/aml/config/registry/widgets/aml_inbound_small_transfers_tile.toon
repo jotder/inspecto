@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Small transfers received (smurfing candidates)
+  kpi:
+    kpiId: aml_inbound_small_transfers

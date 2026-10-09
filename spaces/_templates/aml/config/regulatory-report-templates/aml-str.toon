@@ -1,0 +1,26 @@
+id: aml-str
+title: AML suspicious transaction report (illustrative)
+description: "The shape of an STR for this pack's typologies (subject account, the Incidents that raised it, evidence, typology and narrative). It follows no real regulator's schema; replace the fields and delivery directory with your regulator's."
+format: xml
+rootElement: suspiciousTransactionReport
+delivery:
+  kind: file-drop
+  dir: regulatory-submissions/aml-str
+fields[17]{name,source,required,maxLength}:
+  schema,"const:inspecto-aml-str/1",true,0
+  reportId,report.id,true,64
+  preparedAt,report.createdAt,true,0
+  preparedBy,report.author,true,256
+  reportingEntity,input.reportingEntity,true,256
+  subjectId,subject.id,true,128
+  subjectTitle,subject.title,true,400
+  severity,subject.severity,false,32
+  amountSuspected,subject.impact.suspected,false,64
+  currency,subject.impact.currency,false,8
+  incident/id,incidents.id,false,128
+  incident/title,incidents.title,false,400
+  evidence/name,evidence.name,false,256
+  evidence/uri,evidence.uri,false,2048
+  typology,input.typology,true,64
+  narrative,input.narrative,true,20000
+  activityPeriod,input.activityPeriod,false,128

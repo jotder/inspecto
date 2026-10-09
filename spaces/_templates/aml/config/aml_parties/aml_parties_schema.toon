@@ -1,0 +1,28 @@
+raw:
+  name: AML_PARTIES
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    snapshot_date,"0",DATE,"Party-register snapshot day","","INTERNAL"
+    party_id,"1",VARCHAR,"Customer or counterparty identifier","","CONFIDENTIAL"
+    full_name,"2",VARCHAR,"Registered name","","CONFIDENTIAL"
+    national_id,"3",VARCHAR,"National or registration identifier","","CONFIDENTIAL"
+    country,"4",VARCHAR,"Country of residence or registration","","INTERNAL"
+mapping:
+  canonicalName: aml_parties
+  rawName: AML_PARTIES
+  fields[5]:
+    - name: snapshot_date
+      from: snapshot_date
+      fn: keep
+    - name: party_id
+      from: party_id
+      fn: keep
+    - name: full_name
+      from: full_name
+      fn: keep
+    - name: national_id
+      from: national_id
+      fn: keep
+    - name: country
+      from: country
+      fn: keep

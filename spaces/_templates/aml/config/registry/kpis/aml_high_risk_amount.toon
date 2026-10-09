@@ -1,0 +1,8 @@
+name: aml_high_risk_amount
+title: Wired to high-risk jurisdictions
+dataset: aml_high_risk_traffic
+measure: sum(high_risk_amount)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

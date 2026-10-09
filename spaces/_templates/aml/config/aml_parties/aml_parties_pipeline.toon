@@ -1,0 +1,35 @@
+name: aml_parties
+active: true
+
+dirs:
+  poll:       data/inbox/aml_parties
+  database:   data/aml_parties/database
+  backup:     data/aml_parties/backup
+  temp:       data/aml_parties/temp
+  errors:     data/aml_parties/errors
+  quarantine: data/aml_parties/quarantine
+  markers:    data/aml_parties/markers
+  status_dir: data/aml_parties/status
+  log_dir:    data/aml_parties/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: aml_parties_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "AML_PARTIES_{yyyyMMdd}"

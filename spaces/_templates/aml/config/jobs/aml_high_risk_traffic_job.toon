@@ -1,0 +1,14 @@
+job:
+  name: aml_high_risk_traffic
+  type: sql.template
+  description: "Watch-list traffic - cross-border wires to a configured high-risk jurisdiction list, per sending account"
+  sql: "WITH cur AS (SELECT account_id, CAST($window_start AS DATE) AS window_date, count(*) AS high_risk_wires, sum(amount) AS high_risk_amount, count(DISTINCT country) AS countries FROM aml_txn WHERE txn_type = 'WIRE' AND country IN (SELECT unnest(string_split($high_risk_countries, ','))) AND txn_ts >= CAST($window_start AS TIMESTAMP) - to_days(CAST($lookback_days AS INTEGER)) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY account_id) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM aml_high_risk_traffic WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: aml_txn,aml_high_risk_traffic
+  sink_dataset: aml_high_risk_traffic
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  high_risk_countries: "XA,XB"
+  lookback_days: "6"
+  enabled: true

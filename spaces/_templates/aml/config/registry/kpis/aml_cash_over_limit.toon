@@ -1,0 +1,8 @@
+name: aml_cash_over_limit
+title: Cash deposited by accounts over the limit
+dataset: aml_threshold
+measure: sum(cash_total)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

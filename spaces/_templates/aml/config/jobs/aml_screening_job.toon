@@ -1,0 +1,12 @@
+job:
+  name: aml_screening
+  type: screening.run
+  description: "Screens every party in the register against the aml_sanctions and aml_pep Entity Lists; raises a Screening Hit per new match. Create the two Entity Lists first, then enable."
+  cron: "0 5 * * *"
+  dataset: aml_parties
+  keyField: party_id
+  nameField: full_name
+  idField: national_id
+  lists: "aml_sanctions,aml_pep"
+  threshold: "0.85"
+  enabled: false

@@ -1,0 +1,15 @@
+name: aml_account_transfers
+description: "Account-to-account money movement from the aml_txn feed (payer to payee; cash has no payee). Open it, seed with an account an Alert named, then run Cycles, Shortest path or a money pattern pack. To watch structuring over the whole Dataset create an Investigation over aml_txn and bind a structuring value Measure Alert Rule (runbook)."
+sourceId: entity-projection
+layout: dagre
+profile: finance
+query:
+  projection:
+    datasetId: aml_txn
+    sourceCol: account_id
+    targetCol: counterparty_id
+    linkKindCol: txn_type
+    attrCols[2]: txn_ts,amount
+view:
+  legend: true
+  workingSet: true

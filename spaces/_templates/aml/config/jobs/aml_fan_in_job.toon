@@ -1,0 +1,14 @@
+job:
+  name: aml_fan_in
+  type: sql.template
+  description: "Smurfing - many distinct accounts each sending a small transfer into one account over the look-back window"
+  sql: "WITH cur AS (SELECT counterparty_id AS account_id, CAST($window_start AS DATE) AS window_date, count(DISTINCT account_id) AS payers, count(*) AS inbound_transfers, sum(amount) AS inbound_total FROM aml_txn WHERE txn_type IN ('TRANSFER', 'WIRE') AND counterparty_id IS NOT NULL AND amount <= CAST($small_transfer_max AS DECIMAL(18,2)) AND txn_ts >= CAST($window_start AS TIMESTAMP) - to_days(CAST($lookback_days AS INTEGER)) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY counterparty_id) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM aml_fan_in WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: aml_txn,aml_fan_in
+  sink_dataset: aml_fan_in
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  small_transfer_max: "1000"
+  lookback_days: "6"
+  enabled: true

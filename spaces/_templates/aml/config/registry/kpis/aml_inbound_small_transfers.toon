@@ -1,0 +1,8 @@
+name: aml_inbound_small_transfers
+title: Small transfers received (smurfing candidates)
+dataset: aml_fan_in
+measure: sum(inbound_total)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

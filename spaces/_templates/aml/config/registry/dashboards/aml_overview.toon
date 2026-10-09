@@ -1,0 +1,9 @@
+name: aml_overview
+tiles[7]{widgetId,span}:
+  aml_cash_over_limit_tile,1
+  aml_inbound_small_transfers_tile,1
+  aml_high_risk_amount_tile,1
+  aml_structuring_by_account,2
+  aml_threshold_by_account,2
+  aml_fan_in_by_account,2
+  aml_high_risk_by_account,2

@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: aml_fan_in
+controls:
+  x[1]{field}:
+    account_id
+  y[1]{field,agg}:
+    payers,sum
+options:
+  title: Distinct small-transfer payers by account

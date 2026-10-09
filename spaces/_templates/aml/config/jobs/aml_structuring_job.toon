@@ -1,0 +1,15 @@
+job:
+  name: aml_structuring
+  type: sql.template
+  description: "Structuring - repeated cash deposits just under the reporting limit by one account over the look-back window"
+  sql: "WITH cur AS (SELECT account_id, CAST($window_start AS DATE) AS window_date, count(*) AS near_limit_deposits, count(DISTINCT CAST(txn_ts AS DATE)) AS active_days, sum(amount) AS near_limit_amount FROM aml_txn WHERE txn_type = 'CASH_DEPOSIT' AND amount < CAST($reporting_limit AS DECIMAL(18,2)) AND amount >= CAST($reporting_limit AS DECIMAL(18,2)) * (1 - CAST($near_limit_band AS DECIMAL(9,6))) AND txn_ts >= CAST($window_start AS TIMESTAMP) - to_days(CAST($lookback_days AS INTEGER)) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY account_id) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM aml_structuring WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: aml_txn,aml_structuring
+  sink_dataset: aml_structuring
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  reporting_limit: "10000"
+  near_limit_band: "0.10"
+  lookback_days: "6"
+  enabled: true
