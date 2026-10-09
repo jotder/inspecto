@@ -86,10 +86,14 @@ public final class SqlGuard {
             "range", "generate_series", "unnest", "repeat", "repeat_row", "json_each", "json_tree",
             "pg_timezone_names", "icu_calendar_names");
 
-    /** Keyword verbs that have no place in a read-only SELECT (matched as whole words, anywhere). */
+    /**
+     * Keyword verbs that have no place in a read-only SELECT (matched as whole words, anywhere). {@code replace}
+     * followed by {@code (} is the string function {@code replace(s, from, to)} (or the {@code * REPLACE (…)}
+     * star modifier), not a statement — {@code CREATE OR REPLACE} is still refused by {@code create}.
+     */
     private static final Pattern BLOCKED_KEYWORDS = Pattern.compile(
             "\\b(attach|detach|install|load|pragma|set|reset|export|import|copy|call|checkpoint"
-                    + "|create|insert|update|delete|drop|alter|merge|truncate|replace|grant|revoke"
+                    + "|create|insert|update|delete|drop|alter|merge|truncate|replace(?!\\s*\\()|grant|revoke"
                     + "|vacuum|analyze|prepare|execute)\\b",
             Pattern.CASE_INSENSITIVE);
 

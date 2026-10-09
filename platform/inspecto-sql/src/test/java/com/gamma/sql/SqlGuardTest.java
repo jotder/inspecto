@@ -40,6 +40,16 @@ class SqlGuardTest {
     }
 
     @Test
+    void replaceStringFunctionPassesButCreateOrReplaceIsRejected() {
+        assertTrue(SqlGuard.isReadOnly("SELECT TRY_CAST(REPLACE(attendance, ',', '') AS INTEGER) AS a FROM input"),
+                "replace(s, from, to) is a string function, not a statement");
+        assertTrue(SqlGuard.isReadOnly("SELECT * REPLACE (upper(team) AS team) FROM input"),
+                "the * REPLACE (...) star modifier is read-only");
+        assertTrue(rejects("CREATE OR REPLACE TABLE t AS SELECT 1"), "CREATE OR REPLACE is still a write");
+        assertTrue(rejects("SELECT 1 REPLACE"), "a bare REPLACE keyword is still refused");
+    }
+
+    @Test
     void trailingSemicolonIsTolerated() {
         assertTrue(SqlGuard.isReadOnly("SELECT 1 AS x;"), "one trailing ';' is fine");
     }
