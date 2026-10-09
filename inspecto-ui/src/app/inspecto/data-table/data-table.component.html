@@ -92,7 +92,7 @@
         @if (sqlOpen()) {
             @defer (when sqlOpen()) {
                 <inspecto-sql-editor
-                    [sql]="generatedSql()"
+                    [sql]="currentSql()"
                     [sourceName]="sourceName()"
                     [running]="running()"
                     [error]="proError()"

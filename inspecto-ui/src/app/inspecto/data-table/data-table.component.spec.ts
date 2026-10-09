@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DataTableComponent, DataTableTier, headerWordFloor } from './data-table.component';
+import { SqlEditorComponent } from './sql/sql-editor.component';
 
 async function create(tier: DataTableTier = 'standard') {
     TestBed.configureTestingModule({
@@ -190,6 +191,24 @@ describe('DataTableComponent', () => {
         });
         f.detectChanges();
         expect(c.chosen()).toEqual(['id']);
+    });
+
+    it("a seeded sqlOverride is what the SQL editor shows, not the builder's generated SELECT", async () => {
+        // A Dataset saved with hand-written SQL reopened showing `SELECT * FROM …` — a re-save wiped its SQL.
+        const f = await create('pro');
+        const SQL = 'SELECT name, count(*) AS n FROM "data" GROUP BY name';
+        f.componentRef.setInput('initialModel', {
+            projection: '*',
+            where: { kind: 'group', op: 'AND', items: [] },
+            sqlOverride: SQL,
+        });
+        f.detectChanges();
+        f.componentInstance.toggleSql();
+        f.detectChanges();
+        await f.whenStable();
+        f.detectChanges();
+        const editor = f.debugElement.query(By.directive(SqlEditorComponent));
+        expect((editor.componentInstance as SqlEditorComponent).sql()).toBe(SQL);
     });
 
     it('queryModelChange emits the current model + SQL whenever the projection/filter changes', async () => {
