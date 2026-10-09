@@ -107,11 +107,6 @@ public final class EngineDatasetProvider implements DatasetProvider {
     }
 
     @Override
-    public String predicate(Object filter) {
-        return ConditionSql.predicate(filter);
-    }
-
-    @Override
     public BoundFilter predicateBound(Object filter) {
         ConditionSql.Bound b = ConditionSql.predicateBound(filter);
         return new BoundFilter(b.sql(), b.params().stream().map(String::valueOf).toList());

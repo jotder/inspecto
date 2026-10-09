@@ -136,7 +136,7 @@ class ControlApiLaPortsBridgeTest {
 
             Map<String, Object> filter = Map.of("kind", "group", "op", "and", "children", List.of(
                     Map.of("kind", "cond", "field", "channel", "op", "eq", "value", "voice")));
-            assertEquals(ConditionSql.predicate(filter), p.predicate(filter));
+            assertEquals(ConditionSql.predicateBound(filter).sql(), p.predicateBound(filter).sql());
         }
     }
 

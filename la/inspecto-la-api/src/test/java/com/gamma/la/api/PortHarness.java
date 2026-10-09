@@ -72,7 +72,6 @@ final class PortHarness {
             throw new UnsupportedOperationException("not needed by these tests");
         }
 
-        @Override public String predicate(Object filter) { return "TRUE"; }
 
         @Override public BoundFilter predicateBound(Object filter) { return BoundFilter.TRUE; }
     }
