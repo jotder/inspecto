@@ -174,6 +174,9 @@ export class OptionPickerDialog {
                 <button
                     type="button"
                     class="hover:bg-hover -my-0.5 flex min-w-0 items-center gap-1 rounded px-2 py-1 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    [class.border]="outlined()"
+                    [attr.data-outlined]="outlined() ? '' : null"
+                    [style.border-color]="outlined() ? 'var(--gamma-border)' : null"
                     style="max-width: 70%"
                     [disabled]="disabled()"
                     [attr.aria-labelledby]="labelId"
@@ -209,6 +212,8 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
     /** Visually hide the label (it stays the trigger's accessible name) — for a host that renders the
      *  label itself, e.g. the schema-form's flat property rows. */
     readonly hideLabel = input(false);
+    /** Draw the trigger as a bordered control, so a first-time user reads it as something to open (default: the compact property row). */
+    readonly outlined = input(false);
 
     private dialog = inject(MatDialog);
 

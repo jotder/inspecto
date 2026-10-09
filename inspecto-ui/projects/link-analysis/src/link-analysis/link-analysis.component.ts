@@ -1,5 +1,6 @@
 import {
     ChangeDetectionStrategy,
+    ChangeDetectorRef,
     Component,
     ElementRef,
     OnInit,
@@ -46,7 +47,8 @@ import { InvService, MultiProjectionMappingSummary } from '@inspecto/link-analys
 import { OfferShareDialog, OfferShareResult } from '@inspecto/core/components/offer-share.dialog';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
-import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
+import { LinkAnalysisStarterCardsComponent } from './link-analysis-starter-cards.component';
+import { QueuedSeed, pickFollowTheMoney } from './la-starter';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { G6GraphData, EntityProjection, GraphSourceId, GraphSourceQuery, toGraphml } from '@inspecto/core/graph';
@@ -241,7 +243,7 @@ const SERVER_PATH_LIMIT = 100;
         MatSliderModule,
         MatTooltipModule,
         InspectoAlertComponent,
-        InspectoEmptyStateComponent,
+        LinkAnalysisStarterCardsComponent,
         InspectoSkeletonComponent,
         GraphViewComponent,
         DataTableComponent,
@@ -335,6 +337,7 @@ export class LinkAnalysisComponent implements OnInit {
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
+    @ViewChild('viewsTrigger') private viewsTrigger?: MatMenuTrigger;
 
     // ── workspace layout: [query dock] │ canvas │ [toolbox dock], Data as a bottom strip ──
     /** Full query form vs its collapsed selected-values summary (auto-collapses after a run). */
@@ -354,6 +357,7 @@ export class LinkAnalysisComponent implements OnInit {
     readonly listMode = signal(false);
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
     readonly investigation = inject(InvestigationSessionStore);
+    private readonly cdr = inject(ChangeDetectorRef);
     private readonly graphRuns = inject(GraphRunsService);
     /** Canvas overlays — each minimises to a pill so the graph gets the space. */
     readonly legendOpen = signal(true);
@@ -972,6 +976,47 @@ export class LinkAnalysisComponent implements OnInit {
         const node = g.nodes.find((n) => n.data.objectRef?.id === pivot.id && n.data.objectRef?.type === pivot.type);
         if (node) this.focusNode(node.id);
         else this.toastr.info('That record is not in this graph.', 'Not found');
+    }
+
+    /** The ready-made "follow the money" saved view of this Space, or null - the starter card is then hidden. */
+    readonly followView = computed(() => pickFollowTheMoney(this.views(), this.datasets()));
+
+    /** Starter card "Follow the money": load the ready-made view, which draws its graph. */
+    loadFollowTheMoney(): void {
+        const v = this.followView();
+        if (v) void this.loadView(v);
+    }
+
+    /** Starter card "Explore a Dataset": show the Query panel and open its guided Dataset picker. */
+    exploreDataset(): void {
+        this.queryDockOpen.set(true);
+        this.queryOpen.set(true);
+        this.sourceId.set('entity-projection');
+        this.cdr.detectChanges(); // the panel mounts with the dock - the picker must exist before it is opened
+        this.queryPanel?.startExplore();
+    }
+
+    /** Starter card "Open a saved view": the same menu as the rail's saved-views button. */
+    openSavedViews(): void {
+        this.viewsTrigger?.openMenu();
+    }
+
+    /** A ranking row was picked: highlight, select and centre that node on the canvas. */
+    onNodePick(id: string): void {
+        this.focusNode(id);
+        const picked = this.canvasData()?.nodes.find((n) => n.id === id);
+        if (picked && this.investigation.active()) this.investigation.selected.set(picked);
+        this.graphView?.centerOn([id]);
+    }
+
+    /** "Start an Investigation from the top results": queue the ranked nodes and show the Investigation tab. */
+    queueSeedsAndOpen(seeds: QueuedSeed[]): void {
+        if (!seeds.length) {
+            this.toastr.info('None of the top results can seed an Investigation.', 'Nothing to queue');
+            return;
+        }
+        this.investigation.queueSeeds(seeds);
+        this.openInvestigation();
     }
 
     /** Re-fetch the saved views (after an import brought some in). */

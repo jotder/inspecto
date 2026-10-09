@@ -233,6 +233,19 @@ export class LinkAnalysisInvestigationComponent {
             this.timeColumnZone.reset('');
             this.title.reset('');
             this.purpose.reset('');
+            // Pressing Start is the analyst's confirmation: the queued top results become the first seed step.
+            await this.seedQueued();
+        }
+    }
+
+    /** Apply the queued ranked nodes as ONE seed step on the open Investigation, then empty the queue. */
+    async seedQueued(): Promise<void> {
+        const queued = this.store.queuedSeeds();
+        if (!queued.length || !this.store.active()) return;
+        const entityType = this.store.activeRef()?.entityType;
+        const ids = [...new Set(queued.flatMap((s) => s.ids))];
+        if (await this.store.apply({ op: 'seed', ids, ...(entityType ? { entityType } : {}) })) {
+            this.store.clearQueuedSeeds();
         }
     }
 

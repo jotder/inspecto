@@ -7,6 +7,7 @@
     >
         <inspecto-option-picker
             class="w-56"
+            [outlined]="true"
             label="Graph source"
             [options]="sourceOptions()"
             [ngModel]="sourceId()"
@@ -17,25 +18,37 @@
         @switch (sourceId()) {
             @case ('entity-projection') {
                 <inspecto-option-picker
+                    #datasetPicker
                     class="w-56"
+                    [outlined]="true"
                     label="Dataset"
                     formControlName="datasetId"
                     [options]="datasetOptions()"
+                    help="Datasets that look like links (from/to columns) are listed first."
                 ></inspecto-option-picker>
                 <inspecto-option-picker
                     class="w-56"
+                    [outlined]="true"
                     label="Source entity column"
                     formControlName="sourceCol"
                     [options]="columnOptions()"
                 ></inspecto-option-picker>
                 <inspecto-option-picker
                     class="w-56"
+                    [outlined]="true"
                     label="Target entity column"
                     formControlName="targetCol"
                     [options]="columnOptions()"
                 ></inspecto-option-picker>
+                @if (prefilled(); as p) {
+                    <p class="text-secondary w-full text-xs" role="status" data-testid="prefilled-note">
+                        Filled in for you: {{ p.source }} to {{ p.target }}. Change either column if the link runs
+                        another way.
+                    </p>
+                }
                 <inspecto-option-picker
                     class="w-56"
+                    [outlined]="true"
                     label="Link type column (optional)"
                     formControlName="linkKindCol"
                     [options]="optionalColumnOptions()"
@@ -282,6 +295,10 @@
                 }"
                 [outputs]="aiAssistOutputs"
             />
+            <p class="text-secondary w-full text-xs" data-testid="derive-mapping-help">
+                Derive mapping asks the assistant to draft the columns, and needs permission to author configuration.
+                Without it, use the columns filled in above.
+            </p>
         }
 
         <button mat-flat-button color="primary" type="submit" [disabled]="loading()" class="self-center">

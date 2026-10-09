@@ -189,6 +189,17 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
         expect(graph.draw).toHaveBeenCalledTimes(1);
     });
 
+    it('centerOn pans the viewport to the nodes without animation, and tolerates an id the graph lacks', async () => {
+        const { comp, graph } = harness(graphOf(['a', 'b']));
+        const focusElement = vi.fn(() => Promise.reject(new Error('no such element')));
+        (graph as unknown as { focusElement: unknown }).focusElement = focusElement;
+        (comp as unknown as GraphViewComponent).centerOn(['a']);
+        expect(focusElement).toHaveBeenCalledWith(['a'], false);
+        (comp as unknown as GraphViewComponent).centerOn([]);
+        expect(focusElement).toHaveBeenCalledTimes(1);
+        await Promise.resolve(); // the rejection is swallowed, never unhandled
+    });
+
     it('an emphasis change repaints in place', () => {
         const { comp, graph, create } = harness(graphOf(['a', 'b']));
         comp.emphasis = { nodeIds: ['a'] };

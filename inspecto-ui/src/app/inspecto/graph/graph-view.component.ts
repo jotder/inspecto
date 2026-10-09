@@ -510,6 +510,16 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
 
     /**
+     * Pan the viewport so these nodes sit in its centre (a ranking row was picked). A no-op until a graph is
+     * drawn; an id the drawn graph does not hold (a node folded into a super-node) is ignored, never an error.
+     */
+    centerOn(ids: string[]): void {
+        const g = this.graph;
+        if (!g || !ids.length) return;
+        void g.focusElement(ids, false).catch(() => undefined);
+    }
+
+    /**
      * The edges whose label the density rule reveals for a hovered/clicked element: the edge itself, or
      * every edge touching a node. Empty when the rule is not hiding labels.
      */

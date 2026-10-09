@@ -1,5 +1,6 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,6 +8,7 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { GraphSourceId } from '@inspecto/core/graph';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
+import { InspectoOptionPickerComponent } from '@inspecto/core/components/option-picker.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 
 function make(sourceId: GraphSourceId = 'entity-projection', extraProviders: unknown[] = []) {
@@ -319,5 +321,149 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         fixture.detectChanges();
         expect(el.querySelector('[aria-label="Filter for edge mapping 1"]')).not.toBeNull();
         await expectNoA11yViolations(el);
+    });
+});
+
+describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-10)', () => {
+    const DATASETS = [
+        {
+            id: 'maintenance_backups',
+            name: 'maintenance_backups',
+            sourceName: 'mb',
+            columns: [
+                { name: 'file', type: 'string' },
+                { name: 'size', type: 'number' },
+            ],
+        },
+        {
+            id: 'mule_transfers_dataset',
+            name: 'mule_transfers_dataset',
+            sourceName: 'mt',
+            description: 'Account-to-account transfers. Synthetic.',
+            columns: [
+                { name: 'TXN_ID', type: 'string' },
+                { name: 'PAYER_ACCOUNT', type: 'string' },
+                { name: 'PAYEE_ACCOUNT', type: 'string' },
+                { name: 'AMOUNT', type: 'number' },
+            ],
+        },
+    ] as never[];
+
+    function withDatasets(extraProviders: unknown[] = []) {
+        const m = make('entity-projection', extraProviders);
+        m.fixture.componentRef.setInput('datasets', DATASETS);
+        m.fixture.detectChanges();
+        return m;
+    }
+
+    const settle = async (fixture: { whenStable(): Promise<unknown>; detectChanges(): void }) => {
+        await fixture.whenStable();
+        fixture.detectChanges();
+    };
+
+    it('lists the link-shaped Dataset first, each with a reason and a column preview', () => {
+        const { c } = withDatasets();
+        const options = c.datasetOptions();
+        expect(options.map((o) => o.value)).toEqual(['mule_transfers_dataset', 'maintenance_backups']);
+        expect(options[0].hint).toContain('PAYER_ACCOUNT and PAYEE_ACCOUNT look like the two ends of a link');
+        expect(options[0].hint).toContain('Columns: TXN_ID, PAYER_ACCOUNT, PAYEE_ACCOUNT, AMOUNT');
+        expect(options[1].hint).toContain('No obvious from/to column pair');
+    });
+
+    it('picking a Dataset pre-fills Source and Target (editable), so the query is ready to run', async () => {
+        const { c, fixture } = withDatasets();
+        c.queryForm.patchValue({ datasetId: 'mule_transfers_dataset' });
+        await settle(fixture);
+        expect(c.queryForm.getRawValue()).toMatchObject({ sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT' });
+        const note = fixture.nativeElement.querySelector('[data-testid="prefilled-note"]') as HTMLElement;
+        expect(note.textContent).toContain('PAYER_ACCOUNT to PAYEE_ACCOUNT');
+        expect(c.buildQuery()).toMatchObject({
+            projection: { sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT' },
+        });
+
+        // the analyst changes one end: it is theirs now, and the note goes
+        c.queryForm.patchValue({ targetCol: 'TXN_ID' });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="prefilled-note"]')).toBeNull();
+    });
+
+    it('never overwrites a mapping that is already there (a loaded saved view)', async () => {
+        const { c, fixture } = withDatasets();
+        c.queryForm.patchValue({ datasetId: 'mule_transfers_dataset', sourceCol: 'TXN_ID', targetCol: 'AMOUNT' });
+        await settle(fixture);
+        expect(c.queryForm.getRawValue()).toMatchObject({ sourceCol: 'TXN_ID', targetCol: 'AMOUNT' });
+        expect(c.prefilled()).toBeNull();
+    });
+
+    it('a Dataset with no obvious pair is left blank for the analyst to choose', async () => {
+        const { c, fixture } = withDatasets();
+        c.queryForm.patchValue({ datasetId: 'maintenance_backups' });
+        await settle(fixture);
+        expect(c.queryForm.getRawValue()).toMatchObject({ sourceCol: '', targetCol: '' });
+    });
+
+    it('the pickers are outlined, and Derive mapping is explained in plain words', () => {
+        const { fixture } = withDatasets();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelectorAll('button[data-outlined]').length).toBeGreaterThanOrEqual(5);
+        const help = el.querySelector('[data-testid="derive-mapping-help"]') as HTMLElement;
+        expect(help.textContent).toContain('needs permission to author configuration');
+        expect(help.textContent).toContain('use the columns filled in above');
+    });
+
+    it('Explore a Dataset opens the Dataset picker, and the pick that follows runs the query', async () => {
+        const { c, fixture } = withDatasets();
+        const picker = fixture.debugElement
+            .queryAll(By.directive(InspectoOptionPickerComponent))
+            .map((d) => d.componentInstance as InspectoOptionPickerComponent)
+            .find((p) => p.label() === 'Dataset') as InspectoOptionPickerComponent;
+        const open = vi.spyOn(picker, 'open').mockImplementation(() => undefined);
+        const runs: unknown[] = [];
+        c.run.subscribe(() => runs.push(1));
+        c.startExplore();
+        expect(open).toHaveBeenCalledTimes(1);
+        c.queryForm.patchValue({ datasetId: 'mule_transfers_dataset' });
+        await settle(fixture);
+        expect(runs).toHaveLength(1);
+
+        // a later plain pick does not run by itself
+        c.queryForm.patchValue({ datasetId: 'maintenance_backups', sourceCol: '', targetCol: '' });
+        await settle(fixture);
+        expect(runs).toHaveLength(1);
+    });
+
+    it('Explore does not run a query it cannot map (no suggestion = the analyst chooses columns first)', async () => {
+        const { c, fixture } = withDatasets();
+        const runs: unknown[] = [];
+        c.run.subscribe(() => runs.push(1));
+        c.startExplore();
+        c.queryForm.patchValue({ datasetId: 'maintenance_backups' });
+        await settle(fixture);
+        expect(runs).toHaveLength(0);
+    });
+
+    it('ranks a Dataset that declares no columns by the columns probed off its store', async () => {
+        const columns = vi.fn(() =>
+            Promise.resolve([
+                { name: 'caller', type: 'string' },
+                { name: 'callee', type: 'string' },
+            ]),
+        );
+        const { c, fixture } = make('entity-projection', [{ provide: DatasetRowsService, useValue: { columns } }]);
+        fixture.componentRef.setInput('datasets', [
+            { id: 'a_plain', name: 'a_plain', sourceName: 'p', columns: [{ name: 'x', type: 'number' }] },
+            { id: 'cdr', name: 'cdr', sourceName: 'cdr_store', columns: [] },
+        ]);
+        fixture.detectChanges();
+        await settle(fixture);
+        expect(columns).toHaveBeenCalledTimes(1);
+        expect(c.datasetOptions().map((o) => o.value)).toEqual(['cdr', 'a_plain']);
+    });
+
+    it('is a11y-clean with the guidance showing', async () => {
+        const { c, fixture } = withDatasets();
+        c.queryForm.patchValue({ datasetId: 'mule_transfers_dataset' });
+        await settle(fixture);
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

@@ -4,6 +4,7 @@ import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
@@ -1368,5 +1369,129 @@ describe('LinkAnalysisComponent', () => {
             await fixture.componentInstance.sealTemporal();
             expect(apply).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe('LinkAnalysisComponent - starter cards and result actions (operator 2026-10-10)', () => {
+    const MONEY: LinkAnalysisView = {
+        id: 'mule_layering_ring',
+        name: 'mule_layering_ring',
+        description: 'Money-mule layering ring. Planted inside ordinary transfers.',
+        sourceId: 'entity-projection',
+        query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
+    };
+    const OTHER: LinkAnalysisView = {
+        id: 'roaming',
+        name: 'roaming',
+        description: 'Roaming footprint',
+        sourceId: 'entity-projection',
+        query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
+    };
+    const card = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null;
+
+    it('replaces the empty canvas with starter cards; the Explore card is always there', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain('No graph yet');
+        expect(card(el, 'starter-explore')).toBeTruthy();
+        // nothing saved in this Space: the cards that need a saved view are hidden, not dead
+        expect(card(el, 'starter-follow')).toBeNull();
+        expect(card(el, 'starter-views')).toBeNull();
+    });
+
+    it('Follow the money loads the ready-made saved view and puts its graph on screen in one click', async () => {
+        const { fixture, queried } = create({ views: [OTHER, MONEY] });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(card(el, 'starter-follow')?.textContent).toContain('mule_layering_ring');
+        card(el, 'starter-follow')!.click();
+        await fixture.whenStable();
+        expect(queried).toEqual([MONEY.query]);
+        expect(fixture.componentInstance.graph()).not.toBeNull();
+    });
+
+    it('the follow-the-money card is hidden when the saved views are not money-themed', () => {
+        const { fixture } = create({ views: [OTHER] });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(card(el, 'starter-follow')).toBeNull();
+        expect(card(el, 'starter-views')?.textContent).toContain('1 saved view');
+    });
+
+    it('Open a saved view opens the same menu as the rail button', () => {
+        const { fixture } = create({ views: [OTHER] });
+        fixture.detectChanges();
+        const open = vi.spyOn(MatMenuTrigger.prototype, 'openMenu').mockImplementation(() => undefined);
+        card(fixture.nativeElement, 'starter-views')!.click();
+        expect(open).toHaveBeenCalledTimes(1);
+        open.mockRestore();
+    });
+
+    it('Explore a Dataset shows the Query panel and hands over to its guided picker', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.queryDockOpen.set(false);
+        const panel = fixture.debugElement.query(By.directive(LinkAnalysisQueryPanelComponent))
+            ?.componentInstance as LinkAnalysisQueryPanelComponent;
+        const explore = vi
+            .spyOn(LinkAnalysisQueryPanelComponent.prototype, 'startExplore')
+            .mockImplementation(() => undefined);
+        fixture.detectChanges();
+        card(fixture.nativeElement, 'starter-explore')!.click();
+        expect(c.queryDockOpen()).toBe(true);
+        expect(explore).toHaveBeenCalledTimes(1);
+        explore.mockRestore();
+        expect(panel === undefined || panel instanceof LinkAnalysisQueryPanelComponent).toBe(true);
+    });
+
+    it('a picked ranking row highlights the node and centres the canvas on it', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const centerOn = vi.fn();
+        (c as unknown as { graphView: unknown }).graphView = { centerOn };
+        c.onNodePick('b');
+        expect(c.emphasis()).toEqual({ nodeIds: ['b'], edgeIds: [] });
+        expect(centerOn).toHaveBeenCalledWith(['b']);
+    });
+
+    it('"Start an Investigation from the top results" queues the seeds and opens the Investigation tab - creating nothing', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.toolboxTab.set('analysis');
+        c.queueSeedsAndOpen([{ id: 'a', label: 'A', ids: ['a'] }]);
+        expect(c.investigation.queuedSeeds()).toEqual([{ id: 'a', label: 'A', ids: ['a'] }]);
+        expect(c.toolboxTab()).toBe('investigation');
+        expect(c.investigation.active()).toBe(false); // the analyst confirms title/purpose first
+    });
+
+    it('queues nothing when no top result can seed (all masked)', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.queueSeedsAndOpen([]);
+        expect(c.investigation.queuedSeeds()).toEqual([]);
+    });
+
+    /**
+     * Measured in the real shell 2026-10-10: the fill-mode graph view is `flex-auto`, which does nothing in a block
+     * parent, so G6 kept its 480px default inside a 1012px zone. Its wrapper must be a flex column.
+     */
+    it('the canvas wrapper is a flex column, so the fill-mode graph view grows into the zone', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const wrapper = (fixture.nativeElement as HTMLElement).querySelector('inspecto-graph-view')!
+            .parentElement as HTMLElement;
+        expect(wrapper.classList).toContain('flex');
+        expect(wrapper.classList).toContain('flex-col');
+        expect(wrapper.classList).toContain('max-md:min-h-[480px]'); // stacked layout keeps the old canvas height
+    });
+
+    it('the starter cards are a11y-clean', async () => {
+        const { fixture } = create({ views: [OTHER, MONEY] });
+        fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

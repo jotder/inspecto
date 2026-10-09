@@ -40,6 +40,12 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 
 ## 2. Quick start (five minutes)
 
+**Fastest start:** the first screen offers three starter cards. **Follow the money (example)** opens a ready-made
+saved view of your Space and draws it at once (shown only when your Space has one). **Explore a Dataset** opens the
+Dataset picker — the Datasets that look like links are listed first, each with a one-line reason — and when you
+pick one its from and to columns are filled in for you and the graph is drawn. **Open a saved view** opens
+your saved views. The steps below are the same thing done by hand.
+
 1. Open *Studio → Link Analysis*. Choose a **Domain profile** (for example *Financial crime — transactions* or
    *Telecom — call detail records*): it pre-selects the most useful tools.
 2. In the **Query** panel pick the graph type **Entity/Link (from a Dataset)**, then the **Dataset**, the
@@ -96,6 +102,11 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 ### 4.2 Map the columns
 
 * **Source entity column → Target entity column** define a link (who → whom). <!-- vocab-allow: exact on-screen label -->
+  When you pick a Dataset these are **filled in for you** if two columns look like the two ends of a link (payer /
+  payee, sender / receiver, caller / callee, src / dst, from / to, …); a note says so and you can change either one.
+  The Dataset picker lists such Datasets first and says why under each name. **Derive mapping** is a different,
+  optional helper: it asks the assistant to draft the columns and needs permission to author configuration, so it
+  stays greyed out for an analyst — the filled-in columns work without it.
 * **Link type column** (optional) gives each link a kind (wire, card, cash_out, SMS, …). Kinds get colours and can be
   filtered.
 * **Attribute columns** (optional) carry amounts, times or anything else onto the links; they feed the timeline,
@@ -181,6 +192,12 @@ loaded (cap 2 000 nodes; the heavier scores are capped lower and say so).
 | **Flow & backbone** | Maximum throughput and minimum cut between two nodes; the spanning backbone. | <!-- vocab-allow: exact on-screen label -->
 | **Suspicion score** | An explainable 0–100 composite with a per-node breakdown; the top decile is highlighted. |
 | **Pattern match** | Find a shape (see §7). |
+
+**What to do with a ranking.** In *Centrality*, *Suspicion score* and *Similarity & prediction*, click a row to
+select that node and centre the canvas on it. Under the table, **Start an Investigation from the top results**
+carries the top five nodes to the **Investigation** tab as *queued seed entities*; nothing is created. You fill in the
+title and purpose and press **Start Investigation with 5 queued seeds** — only then is the Investigation created
+and the queued entities seeded as its first step. You can remove one from the queue or clear it first.
 
 ---
 

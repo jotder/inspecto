@@ -108,6 +108,23 @@ describe('InspectoOptionPickerComponent', () => {
         expect(row.querySelector('[id$="-label"]')).toBeTruthy();
     });
 
+    /** Operator 2026-10-10: a first-time user read the borderless row as plain text. `outlined` is the opt-in outline. */
+    it('draws a bordered trigger only when `outlined` is on', () => {
+        TestBed.configureTestingModule({
+            imports: [InspectoOptionPickerComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const f = TestBed.createComponent(InspectoOptionPickerComponent);
+        f.componentRef.setInput('label', 'Dataset');
+        f.detectChanges();
+        const btn = f.nativeElement.querySelector('button') as HTMLButtonElement;
+        expect(btn.classList.contains('border')).toBe(false);
+        f.componentRef.setInput('outlined', true);
+        f.detectChanges();
+        expect(btn.classList.contains('border')).toBe(true);
+        expect(btn.hasAttribute('data-outlined')).toBe(true);
+    });
+
     it('writes the picked value back through the form control', () => {
         const { fixture, open } = create('json');
         picked = 'fixedwidth';

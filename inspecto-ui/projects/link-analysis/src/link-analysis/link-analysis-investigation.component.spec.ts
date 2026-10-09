@@ -481,3 +481,68 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         expect(section.textContent).not.toContain('zero rows');
     });
 });
+
+describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 2026-10-10)', { timeout: 20_000 }, () => {
+    const SEEDS = [
+        { id: 'a', label: 'A', ids: ['acct-a'] },
+        { id: 'b', label: 'B', ids: ['acct-b', 'ACCT B'] },
+    ];
+
+    it('shows the queue and creates NOTHING until the analyst presses Start', async () => {
+        const { fixture, store, el, inv, button } = create();
+        store.queueSeeds(SEEDS);
+        fixture.detectChanges();
+        const queued = el.querySelector('[data-testid="queued-seeds"]') as HTMLElement;
+        expect(queued.textContent).toContain('Queued seed entities (2)');
+        expect(queued.textContent).toContain('Nothing is created until then');
+        expect(button('Start Investigation').textContent).toContain('with 2 queued seeds');
+        expect(inv.createInvestigation).not.toHaveBeenCalled();
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
+    it('Start creates the Investigation, then seeds every queued raw id in ONE step and empties the queue', async () => {
+        const { fixture, store, el, inv, button } = create();
+        store.queueSeeds(SEEDS);
+        fixture.detectChanges();
+        const purpose = el.querySelector('input[required]') as HTMLInputElement;
+        purpose.value = 'warrant 7';
+        purpose.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        button('Start Investigation').click();
+        await fixture.whenStable();
+        expect(inv.createInvestigation).toHaveBeenCalledTimes(1);
+        expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(1);
+        expect(inv.appendInvestigationOp).toHaveBeenCalledWith('inv-1', {
+            op: 'seed',
+            ids: ['acct-a', 'acct-b', 'ACCT B'],
+        });
+        expect(store.queuedSeeds()).toEqual([]);
+    });
+
+    it('a queued entity can be removed or the queue cleared before Start', () => {
+        const { fixture, store, el, button } = create();
+        store.queueSeeds(SEEDS);
+        fixture.detectChanges();
+        (el.querySelector('[aria-label="Remove A from the queued seeds"]') as HTMLButtonElement).click();
+        expect(store.queuedSeeds().map((s) => s.id)).toEqual(['b']);
+        fixture.detectChanges();
+        button('Clear the queue').click();
+        expect(store.queuedSeeds()).toEqual([]);
+    });
+
+    it('on an open Investigation the queue waits for an explicit Seed press', async () => {
+        const { fixture, store, inv, button } = create();
+        await openInv(store);
+        store.queueSeeds(SEEDS);
+        fixture.detectChanges();
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+        button('Seed the queued entities').click();
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).toHaveBeenCalledWith('inv-1', {
+            op: 'seed',
+            ids: ['acct-a', 'acct-b', 'ACCT B'],
+        });
+        expect(store.queuedSeeds()).toEqual([]);
+    });
+});
