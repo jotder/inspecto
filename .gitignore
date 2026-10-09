@@ -135,6 +135,7 @@ inspecto-consignment-outputs.db.wal
 /features/inspecto-case-management/target/
 /features/inspecto-action-requests/target/
 /features/inspecto-regulatory-reporting/target/
+/features/inspecto-screening/target/
 /providers/inspecto-oidc/target/
 /providers/inspecto-secrets/target/
 /providers/inspecto-geo-country/target/

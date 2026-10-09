@@ -73,6 +73,7 @@ const MODULES = [
     { artifactId: 'inspecto-case-management', dir: 'features/inspecto-case-management', bundleFile: 'inspecto-case-management.jar', from: 'professional' },  // MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, from-entities, caserule.evaluate; requires ops; NOT Personal)
     { artifactId: 'inspecto-action-requests', dir: 'features/inspecto-action-requests', bundleFile: 'inspecto-action-requests.jar', from: 'professional' },  // MODULE-REORG-P7: the Action Requests add-on (/action-requests* + invoke-api; reaches subjects through LinkedSubjectProvider; NOT Personal)
     { artifactId: 'inspecto-regulatory-reporting', dir: 'features/inspecto-regulatory-reporting', bundleFile: 'inspecto-regulatory-reporting.jar', from: 'professional' },  // REGULATORY-REPORTING-1: the Regulatory Reporting add-on (/regulatory-reports*; requires ops; NOT Personal)
+    { artifactId: 'inspecto-screening', dir: 'features/inspecto-screening', bundleFile: 'inspecto-screening.jar', from: 'professional' },  // SCREENING-1: the Screening add-on (/screening* + screening.run; requires entity-list; NOT Personal)
     // PKG-5 (2026-09-12): the assist agent ships Professional and above, as an OPTIONAL component. NB it is
     // a DEFAULT-reactor module, unlike the gated ones around it — package.ps1 lists it in $modules only so
     // that pass builds its shaded `sidecar` artifact. The staged file is the sidecar, never the thin jar.

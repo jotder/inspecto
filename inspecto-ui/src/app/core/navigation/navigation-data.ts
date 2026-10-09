@@ -131,6 +131,14 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 link: '/regulatory-reports',
             },
             {
+                id: 'screening',
+                navFeature: 'screening',
+                title: 'Screening Hits',
+                type: 'basic',
+                icon: 'heroicons_outline:magnifying-glass-circle',
+                link: '/screening',
+            },
+            {
                 id: 'autonomy',
                 navFeature: 'ops',
                 title: 'Autonomy',

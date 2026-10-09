@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-screening</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Screening add-on (optional)</name>
+    <description>
+        OPTIONAL control-plane module (SCREENING-1, 2026-10-09): fuzzy name / identifier matching of subjects against
+        Entity Lists (sanctions, PEP, deny lists) with Match Scores, the screening.run Job Type over a Dataset, and the
+        review of the Screening Hits it raises (POST /screening/check, GET /screening/hits, GET /screening/hits/{id},
+        POST /screening/hits/{id}/decide). Package com.gamma.screening. Domain-neutral.
+
+        Reads the Entity List fact log through inspecto-entity-store; lists are authored by inspecto-entity-list, so
+        the manifest requires entity-list. THIN like inspecto-scoring: nothing beyond what the core supplies, no shade.
+        Built only under the edition-professional / -enterprise / -preview profiles; absent on Personal (its routes
+        answer 503 from the manifest's absentMessage).
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/ApiException/WriteGates, PendingChanges (the record MAC), the Job SPI,
+             DatasetRelation, QueryExecutor, EvidenceMasker. Compile scope, as inspecto-scoring does. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- The Entity List fact log, registry fold and mask tokens. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- The routes that author the lists, so the HTTP tests can create them. Test scope only: at run time the
+             manifest's requires.modules: entity-list carries the edge. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-list</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Platform test kit (FakeApiContext + RouteModuleContract + ModuleRoutesParity) and the Job Type TCK. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -18,6 +18,7 @@ describe('NavigationService — optional-module nav entries', () => {
         opsEnabled = true,
         casesEnabled = opsEnabled,
         actionRequestsEnabled = opsEnabled,
+        screeningEnabled = true,
     ) {
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({
@@ -34,6 +35,7 @@ describe('NavigationService — optional-module nav entries', () => {
                             ops: opsEnabled,
                             cases: casesEnabled,
                             actionRequests: actionRequestsEnabled,
+                            screening: screeningEnabled,
                         }),
                     },
                 },
@@ -154,6 +156,17 @@ describe('NavigationService — optional-module nav entries', () => {
         const off = await firstValueFrom(mount(true, true, true, true, false).get());
         expect(findById(off.default as never, 'action-requests'), 'action-requests should be hidden').toBeUndefined();
         for (const id of ['incidents', 'cases', 'approvals', 'pending-changes']) {
+            expect(findById(off.default as never, id), id + ' should be present').toBeDefined();
+        }
+    });
+
+    /** SCREENING-1: the Screening Hits entry follows the optional `inspecto-screening` module (feature `screening`). */
+    it('shows Screening Hits only when the screening module registered its routes', async () => {
+        const on = await firstValueFrom(mount(true, true, true, true, true, true).get());
+        expect(findById(on.default as never, 'screening'), 'screening should be present').toBeDefined();
+        const off = await firstValueFrom(mount(true, true, true, true, true, false).get());
+        expect(findById(off.default as never, 'screening'), 'screening should be hidden').toBeUndefined();
+        for (const id of ['incidents', 'action-requests', 'approvals']) {
             expect(findById(off.default as never, id), id + ' should be present').toBeDefined();
         }
     });

@@ -114,6 +114,9 @@ public final class BundleExporter {
                     // Regulatory Reports carry a filing's confidential content, signed with that same key
                     // (REGULATORY-REPORTING-1): operational records, never exported config.
                     if (entry.startsWith("regulatory-reports/")) continue;
+                    // Screening Hits hold screened names and review decisions, signed with that same key (SCREENING-1):
+                    // operational records, never exported config.
+                    if (entry.startsWith("screening-hits/")) continue;
                     entries.put(entry, exportableBytes(f));
                     artifacts.add(artifact(entry, kindOf(f)));
                 }

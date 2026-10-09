@@ -81,6 +81,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `reconciliation` - Reconciliation | features | optional | — | — | ✅ | ✅ | ✅ |
 | `regulatory-reporting` - Regulatory Reporting | features | optional | `ops` | — | ✅ | ✅ | ✅ |
 | `scoring` - Scoring | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
+| `screening` - Screening | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
 | `geo-link` - Geo and link adapters over platform data | la | optional | `la-api`, `la-core` | — | ✅ | ✅ | ✅ |
 | `la-api` - Link analysis and geo routes | la | optional | `la-core`, `la-storage` | — | ✅ | ✅ | ✅ |
 | `la-core` - Link analysis core and ports | la | optional | `la-graph` | — | ✅ | ✅ | ✅ |
@@ -115,6 +116,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | reconciliation | `reconciliation` | — | built | built | built |
 | regulatoryReporting | `regulatory-reporting` | — | built | built | built |
 | scoringLists | `entity-list`, `scoring` | — | built | built | built |
+| screening | `screening` | — | built | built | built |
 | telecomIndustryPack | `telecom-asn1` | — | built | built | built |
 | workflowSla | planned in `engine` | — | planned | planned | planned |
 
@@ -131,10 +133,10 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 
 | | Personal | Professional | Enterprise | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 16 | 38 | 41 | 41 |
+| First-party jars (processor + connectors + optional + core thin) | 16 | 39 | 42 | 42 |
 | of which core thin jars | 14 | 14 | 14 | 14 |
-| Optional modules beyond Personal | 0 | 22 | 25 | 25 |
-| Total on the classpath (+ third-party sidecars) | 16 | 39 | 42 | 42 |
+| Optional modules beyond Personal | 0 | 23 | 26 | 26 |
+| Total on the classpath (+ third-party sidecars) | 16 | 40 | 43 | 43 |
 <!-- offerings-matrix:end -->
 
 ## Preview — not a customer-facing tier

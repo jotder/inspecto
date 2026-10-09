@@ -11831,6 +11831,144 @@
         },
         "x-generated" : true
       }
+    },
+    "/screening/check" : {
+      "post" : {
+        "tags" : [ "screening" ],
+        "summary" : "Screen subjects against Entity Lists (Match Scores; persists nothing)",
+        "operationId" : "postScreeningCheck",
+        "description" : "SCREENING-1. Read-shaped (CapabilityManifest exemption): scores each subject's name (folded, look-alike letters mapped, token-set Jaro-Winkler) and identifier (exact under the list's sealed normaliser, prefix/range/CIDR) against the named Entity Lists; returns matches at or above the threshold, best first. A POST so names never ride in a URL. A retired list matches nothing; an expired entry never matches; a masked list's entry is its mask token.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "description" : "{subjects[1..1000]: [{key?, name?, identifier?}], lists[1..20]: [listId], threshold? (0.5..1, default 0.85), maxMatches? (1..20, default 5)}"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {threshold, results[{key, name, identifier, matches[{listId, purpose, entry, method (name|identifier), score}]}]}"
+          },
+          "422" : {
+            "description" : "Malformed body, or an unknown Entity List."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/screening/hits" : {
+      "get" : {
+        "tags" : [ "screening" ],
+        "summary" : "List Screening Hits, newest first",
+        "operationId" : "getScreeningHits",
+        "description" : "SCREENING-1. Hits raised by screening.run Jobs. Optional query 'state' = open|escalated|confirmed|dismissed. A record that fails its integrity check is listed with integrity: invalid.",
+        "parameters" : [ {
+          "name" : "state",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "open", "escalated", "confirmed", "dismissed" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {hits[{id, state, version, listId, purpose, entry, method, score, threshold, subjectKey, subjectName, subjectIdentifier, source, raisedAt, raisedBy, decidedBy?, decidedAt?, reason?, history[]}]}"
+          },
+          "422" : {
+            "description" : "Unknown state."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/screening/hits/{hitId}" : {
+      "get" : {
+        "tags" : [ "screening" ],
+        "summary" : "One Screening Hit",
+        "operationId" : "getScreeningHit",
+        "description" : "SCREENING-1.",
+        "parameters" : [ {
+          "name" : "hitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^sh-[0-9]{14}-[0-9a-f]{6}$"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = the hit."
+          },
+          "404" : {
+            "description" : "No such hit."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/screening/hits/{hitId}/decide" : {
+      "post" : {
+        "tags" : [ "screening" ],
+        "summary" : "Decide a Screening Hit (confirm, dismiss or escalate)",
+        "operationId" : "postScreeningHitDecide",
+        "description" : "SCREENING-1. Gated on canWorkIncidents. open -> confirmed|dismissed|escalated; escalated -> confirmed|dismissed; confirmed and dismissed are final. The body names the hit's current version (optimistic concurrency) and a reason; the transition is appended to the hit's history and audited (never the screened name).",
+        "parameters" : [ {
+          "name" : "hitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^sh-[0-9]{14}-[0-9a-f]{6}$"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "description" : "{decision: confirm|dismiss|escalate, reason (1..500), version (the hit's current version)}"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = the decided hit."
+          },
+          "403" : {
+            "description" : "The caller lacks canWorkIncidents."
+          },
+          "404" : {
+            "description" : "No such hit."
+          },
+          "409" : {
+            "description" : "Stale version, a final state, a transition not allowed, or a record that failed its integrity check."
+          },
+          "422" : {
+            "description" : "Malformed body."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
     }
   },
   "components" : {

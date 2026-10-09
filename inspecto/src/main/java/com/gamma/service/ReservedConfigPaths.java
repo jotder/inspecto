@@ -17,7 +17,8 @@ import java.util.Set;
  *       {@code registry/access-profiles/}, {@code canConfigureAccess}), {@code approval.toon} and
  *       {@code pending-changes/} (reserved for the maker-checker policy and its records), {@code action-requests/}
  *       (the signed Action Request records, `ASSURE-ACTION-REQUESTS-1`), {@code regulatory-reports/} (the signed
- *       Regulatory Report records, `REGULATORY-REPORTING-1`) and {@code egress.toon} (their egress
+ *       Regulatory Report records, `REGULATORY-REPORTING-1`), {@code screening-hits/} (the signed
+ *       Screening Hit records and their decisions, `SCREENING-1`) and {@code egress.toon} (their egress
  *       allowlist — an import that widened it would be an SSRF door), {@code agent/} (the
  *       assist agent's autonomy {@code policy.json}, {@code approvals.jsonl} and run logs), and the Data
  *       Exchange {@code offers.toon} / {@code grants.toon};</li>
@@ -51,7 +52,7 @@ public final class ReservedConfigPaths {
 
     /** Reserved directories (a prefix of the config-relative path). */
     static final List<String> DIRS = List.of(
-            "pending-changes/", "action-requests/", "regulatory-reports/", "publication-approvals/", "recon-state/", ".history/", "audit/", "agent/", "expectation-baselines/",
+            "pending-changes/", "action-requests/", "regulatory-reports/", "screening-hits/", "publication-approvals/", "recon-state/", ".history/", "audit/", "agent/", "expectation-baselines/",
             "registry/access-catalog/", "registry/access-profiles/");
 
     /** Component kinds no bundle may carry — the access config, gated {@code canConfigureAccess} on its own routes. */

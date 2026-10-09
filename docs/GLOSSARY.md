@@ -1005,6 +1005,26 @@ a reason; the chain is re-verified on every read. Built kinds: `list.created` ·
 2026-09-27: `/inv/entity-identities*`). Planned: **asserted** identity facts by a named mapping Dataset and **resolved** ones derived deterministically from them — never by similarity (`D-M1`) — each
 withdrawn by a later `retract` fact, never edited.
 
+**Screening** *(added 2026-10-09, `SCREENING-1`; ✅ built: the optional `inspecto-screening` module, add-on `screening`)* — Comparing
+subjects (a name and/or an identifier) against **Entity Lists** of any purpose (sanctions, PEP, deny lists) and reporting a
+**Match Score** per candidate entry. Domain-neutral. Two entry points: an on-demand check (`POST /screening/check`, persists
+nothing) and a **Screening Run**. ⛔ Not *Identity resolution*: a match, even a confirmed one, never writes an **Identity Fact**
+(`D-M1`: identities are never asserted by similarity). ⛔ Not *filtering* or *matching* as a feature name.
+
+**Match Score** — How alike a subject is to one Entity List entry, 0..1 (4 decimals): 1.0 for an identifier match (exact
+under the list's sealed normaliser, or inside a prefix / range / CIDR entry); for a name, the fold-and-token-set score of
+`NameMatcher`. A match counts when its score reaches the **threshold** (default 0.85). ⛔ Not *confidence* (Model Escalation
+Ladder) and not a **Risk Score** (a weighted 0..100 sum over factors).
+
+**Screening Run** — One run of a Job whose Job Type is `screening.run`: every row of a Dataset screened against named Entity
+Lists, each new match raised as a **Screening Hit**. Refuses to screen a subset (more rows than `maxRows` fails the run).
+
+**Screening Hit** — One match at or above the threshold, raised by a Screening Run and awaiting or carrying a reviewer's
+decision: `open` → `confirmed` · `dismissed` · `escalated`; `escalated` → `confirmed` · `dismissed`. Never raised twice for
+the same list, entry and subject. Stored as a signed record under `screening-hits/`. ⛔ Not an **Alert** or an **Incident**
+(it does not ride the Alert → Incident chain), and the set of open hits is ⛔ not a *review queue* (queues stay deleted, D-P4):
+say *open Screening Hits*.
+
 ### Geo (Geo Map Analysis) *(added 2026-07-05; as built: [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md))*
 
 **Geo Map Analysis Studio** — The Builder-lens Studio pane (`/studio/geo-map`, Phase 1) for geographic

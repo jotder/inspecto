@@ -53,6 +53,7 @@ module (build role · offering role · binding time) and the Offerings that comp
 * `features/inspecto-scoring/` — Scoring (`scoring`; feature `scoring`; requires `entity-list`).
 * `features/inspecto-action-requests/` — Action Requests (`action-requests`; feature `actionRequests`; requires `notify-channels`); page: [action-requests](../control-plane/action-requests.md).
 * `features/inspecto-regulatory-reporting/` — Regulatory Reporting (`regulatory-reporting`; feature `regulatoryReporting`; requires `ops`); page: [regulatory-reporting](../control-plane/regulatory-reporting.md).
+* `features/inspecto-screening/` — Screening (`screening`; feature `screening`; requires `entity-list`); page: [screening](../control-plane/screening.md).
 
 ## `la/` — link analysis (optional)
 

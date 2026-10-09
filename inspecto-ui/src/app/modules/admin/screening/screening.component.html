@@ -1,0 +1,139 @@
+<div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
+    <inspecto-page-header
+        title="Screening Hits"
+        subtitle="Names and identifiers that matched an Entity List (sanctions, PEP, deny lists). Dismiss a false positive, confirm a true match, or escalate it."
+        [inset]="false"
+    >
+        <ng-container actions>
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
+                <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
+
+    @if (unavailable()) {
+        <inspecto-alert class="mt-4" variant="info" title="Screening is not available on this deployment">
+            The Screening add-on is not installed or is switched off for this Space.
+        </inspecto-alert>
+    } @else {
+        <mat-button-toggle-group
+            class="mt-4 self-start"
+            aria-label="Which Screening Hits to list"
+            [value]="filter()"
+            (change)="setFilter($event.value)"
+        >
+            <mat-button-toggle value="open">Open</mat-button-toggle>
+            <mat-button-toggle value="escalated">Escalated</mat-button-toggle>
+            <mat-button-toggle value="all">All</mat-button-toggle>
+        </mat-button-toggle-group>
+
+        @if (error()) {
+            <inspecto-alert class="mt-4" variant="error" title="Could not load the Screening Hits">{{
+                error()
+            }}</inspecto-alert>
+        } @else {
+            <div class="mt-4">
+                <inspecto-data-table
+                    stateKey="screening-hits"
+                    exportName="screening-hits"
+                    [rows]="hits()"
+                    [columns]="columnDefs"
+                    [loading]="loading()"
+                    (rowClick)="open($event)"
+                    noRowsTitle="No Screening Hits here"
+                    noRowsHint="A Screening Job raises a hit when a name or identifier in its Dataset matches an Entity List entry."
+                />
+            </div>
+        }
+    }
+
+    @if (selected(); as h) {
+        <section class="bg-card mt-6 rounded-2xl p-6 shadow" aria-labelledby="sh-title">
+            <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                    <h2 id="sh-title" class="text-lg font-semibold break-all">
+                        {{ h.subjectName ?? h.subjectIdentifier ?? h.subjectKey }}
+                    </h2>
+                    <p class="text-secondary text-sm">
+                        Matched <span class="font-mono">{{ h.entry }}</span> on Entity List {{ h.listId }} ({{
+                            h.purpose
+                        }}) · raised {{ h.raisedAt | date: 'medium' }} by {{ h.raisedBy }}
+                    </p>
+                </div>
+                <inspecto-status-badge [value]="hitTone(h.state)" [label]="h.state" />
+                <button mat-icon-button (click)="close()" aria-label="Close the Screening Hit">
+                    <mat-icon [svgIcon]="'heroicons_outline:x-mark'"></mat-icon>
+                </button>
+            </div>
+
+            @if (h.integrity === 'invalid') {
+                <inspecto-alert class="mt-4" variant="error" title="Integrity check failed">
+                    This record was not written by this server, or was edited since. It cannot be decided.
+                </inspecto-alert>
+            }
+
+            <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                <dt class="text-secondary">Match Score</dt>
+                <dd class="m-0 tabular-nums">
+                    {{ scorePercent(h.score) }} ({{ h.method }} match, threshold {{ scorePercent(h.threshold) }})
+                </dd>
+                <dt class="text-secondary">Subject key</dt>
+                <dd class="m-0 font-mono break-all">{{ h.subjectKey }}</dd>
+                @if (h.subjectIdentifier) {
+                    <dt class="text-secondary">Identifier</dt>
+                    <dd class="m-0 font-mono break-all">{{ h.subjectIdentifier }}</dd>
+                }
+                @if (h.source; as s) {
+                    <dt class="text-secondary">Raised by the run</dt>
+                    <dd class="m-0">{{ s.job }} · {{ s.runId }} · Dataset {{ s.dataset }}</dd>
+                }
+                @if (h.decidedBy) {
+                    <dt class="text-secondary">Last decided by</dt>
+                    <dd class="m-0">{{ h.decidedBy }} on {{ h.decidedAt | date: 'medium' }}</dd>
+                }
+            </dl>
+
+            <h3 class="mt-4 text-sm font-semibold">History</h3>
+            <ul class="m-0 list-none p-0 text-sm">
+                @for (step of h.history; track step.at + step.state) {
+                    <li>
+                        {{ step.at | date: 'medium' }} · {{ step.state }} · {{ step.by }}
+                        @if (step.reason) {
+                            — {{ step.reason }}
+                        }
+                    </li>
+                }
+            </ul>
+
+            @if (decideError()) {
+                <inspecto-alert class="mt-4" variant="error" title="Not decided">{{ decideError() }}</inspecto-alert>
+            }
+
+            @if (decisions().length) {
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-label>Reason</mat-label>
+                        <input matInput [formControl]="reason" maxlength="500" required />
+                        @if (reason.hasError('required')) {
+                            <mat-error>A reason is required.</mat-error>
+                        }
+                        @if (reason.hasError('maxlength')) {
+                            <mat-error>At most 500 characters.</mat-error>
+                        }
+                    </mat-form-field>
+                    @for (d of decisions(); track d) {
+                        @if (d === 'confirm') {
+                            <button mat-flat-button color="warn" [disabled]="deciding()" (click)="decide(d)">
+                                {{ label(d) }}
+                            </button>
+                        } @else {
+                            <button mat-stroked-button [disabled]="deciding()" (click)="decide(d)">
+                                {{ label(d) }}
+                            </button>
+                        }
+                    }
+                </div>
+            }
+        </section>
+    }
+</div>

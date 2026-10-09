@@ -345,6 +345,7 @@ $scoringJarSrc = $null
 $caseMgmtJarSrc = $null
 $actionReqJarSrc = $null
 $regReportJarSrc = $null
+$screeningJarSrc = $null
 if ($Edition -eq 'Standard') { $Edition = 'Professional' }
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
@@ -533,6 +534,14 @@ if ($Edition -ne 'Personal') {
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $scoringJarSrc -or -not (Test-Path $scoringJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $scoringTargetDir\inspecto-scoring-*.jar."
+    }
+    # SCREENING-1: the Screening add-on (/screening* + screening.run). THIN like inspecto-scoring; Professional and above.
+    $screeningTargetDir = Join-Path $sandboxRoot 'features\inspecto-screening\target'
+    $screeningJarSrc = Get-ChildItem -Path $screeningTargetDir -Filter 'inspecto-screening-*.jar' -ErrorAction SilentlyContinue |
+                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                       Select-Object -First 1 -ExpandProperty FullName
+    if (-not $screeningJarSrc -or -not (Test-Path $screeningJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $screeningTargetDir\inspecto-screening-*.jar."
     }
     # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Professional and above.
     $caseMgmtTargetDir = Join-Path $sandboxRoot 'features\inspecto-case-management\target'
@@ -934,6 +943,24 @@ if ($scoringJarSrc) {
         }
         Write-Host "  verified: RouteModule, JobTypeProvider and ComponentKindValidator registrations present in the Scoring module" -ForegroundColor DarkGray
     } finally { $scZip.Dispose() }
+}
+if ($screeningJarSrc) {
+    Copy-Item $screeningJarSrc "$bundleDir\inspecto-screening.jar"
+    Write-Host "Bundled Screening module -> inspecto-screening.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - /screening* would 503 and screening.run
+    # would be an unknown Job Type on a bundle supposed to have them.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $srZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-screening.jar")
+    try {
+        foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.screening.ScreeningRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.screening.ScreeningJobType'))) {
+            $srEntry = $srZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
+            if (-not $srEntry) { throw "inspecto-screening.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
+            $srReader = New-Object System.IO.StreamReader($srEntry.Open())
+            try { $srBody = $srReader.ReadToEnd() } finally { $srReader.Dispose() }
+            if ($srBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-screening.jar's $($svc[0]) service file does not list $($svc[1]) - it lists only: $srBody" }
+        }
+        Write-Host "  verified: RouteModule and JobTypeProvider registrations present in the Screening module" -ForegroundColor DarkGray
+    } finally { $srZip.Dispose() }
 }
 if ($caseMgmtJarSrc) {
     Copy-Item $caseMgmtJarSrc "$bundleDir\inspecto-case-management.jar"
