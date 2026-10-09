@@ -61,7 +61,8 @@ public final class AccessPolicyStore {
 
     /** The parse is keyed on the attribute-claim allowlist too: whether {@code subject.<claim>} is a
      *  known reference depends on {@code roles.toon}, so a roles edit re-validates this doc. */
-    private record Cached(long mtime, long size, Set<String> claims, Doc doc) {}
+    /** Keyed on the file's exact text: an (mtime, size) stamp missed a same-size rewrite inside one mtime tick. */
+    private record Cached(String text, Set<String> claims, Doc doc) {}
 
     private static final ConcurrentHashMap<Path, Cached> CACHE = new ConcurrentHashMap<>();
 
@@ -73,21 +74,20 @@ public final class AccessPolicyStore {
         return load(RequestAttrs.attr(ex, Roles.ATTR_CONFIG_ROOT) instanceof Path p ? p : null);
     }
 
-    /** The authored doc at {@code configRoot} (mtime/size-cached — an on-disk edit or an
+    /** The authored doc at {@code configRoot} (cached by the file's text — an on-disk edit or an
      *  {@code AccessRoutes} PUT is picked up on the next read, no restart). */
     public static Doc load(Path configRoot) {
         if (configRoot == null) return Doc.ABSENT;
         Path file = configRoot.resolve(FILE);
         if (!Files.exists(file)) return Doc.ABSENT;
         try {
-            long mtime = Files.getLastModifiedTime(file).toMillis();
-            long size = Files.size(file);
+            String text = Files.readString(file, java.nio.charset.StandardCharsets.UTF_8);
             Set<String> claims = Set.copyOf(Roles.load(configRoot).attributeClaims());
             Cached hit = CACHE.get(file);
-            if (hit != null && hit.mtime() == mtime && hit.size() == size && hit.claims().equals(claims))
+            if (hit != null && hit.text().equals(text) && hit.claims().equals(claims))
                 return hit.doc();
             Doc parsed = parseFile(file, claims);
-            CACHE.put(file, new Cached(mtime, size, claims, parsed));
+            CACHE.put(file, new Cached(text, claims, parsed));
             return parsed;
         } catch (IOException e) {
             LOG.warn("access-policies: cannot stat {} — marking unreadable (deny loudly): {}", file, e.toString());

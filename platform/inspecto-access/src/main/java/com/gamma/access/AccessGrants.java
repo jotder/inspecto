@@ -48,7 +48,8 @@ public final class AccessGrants {
 
     private static final Logger LOG = LoggerFactory.getLogger(AccessGrants.class);
 
-    private record CachedToon(long mtime, long size, Map<String, Object> content) {}
+    /** Keyed on the file's exact text: an (mtime, size) stamp missed a same-size rewrite inside one mtime tick. */
+    private record CachedToon(String text, Map<String, Object> content) {}
 
     private static final ConcurrentHashMap<Path, CachedToon> CACHE = new ConcurrentHashMap<>();
 
@@ -133,22 +134,21 @@ public final class AccessGrants {
         return new ProfileGrants(grants instanceof Map<?, ?> g ? g : Map.of(), false);
     }
 
-    /** mtime/size-cached TOON read: {@code null} = file absent; empty map = exists but unreadable. */
+    /** Text-cached TOON read: {@code null} = file absent; empty map = exists but unreadable. */
     private static Map<String, Object> read(Path file) {
         if (!Files.exists(file)) return null;
         try {
-            long mtime = Files.getLastModifiedTime(file).toMillis();
-            long size = Files.size(file);
+            String text = Files.readString(file, java.nio.charset.StandardCharsets.UTF_8);
             CachedToon hit = CACHE.get(file);
-            if (hit != null && hit.mtime() == mtime && hit.size() == size) return hit.content();
+            if (hit != null && hit.text().equals(text)) return hit.content();
             Map<String, Object> parsed;
             try {
-                parsed = ToonHelper.load(file.toString());
+                parsed = ToonHelper.decode(text);
             } catch (Exception e) {
                 LOG.warn("access: {} failed to parse: {}", file, e.toString());
                 parsed = Map.of();
             }
-            CACHE.put(file, new CachedToon(mtime, size, parsed));
+            CACHE.put(file, new CachedToon(text, parsed));
             return parsed;
         } catch (Exception e) {
             LOG.warn("access: cannot stat {}: {}", file, e.toString());

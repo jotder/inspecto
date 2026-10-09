@@ -101,7 +101,7 @@ server-side authorization system, all behind the existing SPIs (core stays auth-
 - **Data-driven roles (R1).** Role→capability/data-scope grants are authorable: `com.gamma.access.Roles` (`platform/inspecto-access`)
   holds the seed table + doc grammar; `ControlApi` stamps the bound space's config root
   (`Roles.ATTR_CONFIG_ROOT`) pre-auth and `Roles.effective(ex)` overlays a per-space `roles.toon` **per role
-  name** (authored `[]` revokes; unnamed seed roles keep defaults), mtime-cached so edits apply next request,
+  name** (authored `[]` revokes; unnamed seed roles keep defaults), cached by the file's text so edits apply next request,
   no restart. `RoleMapper` lost its hardcoded switch and resolves through the table. **Fail-closed:** an
   existing-but-unreadable `roles.toon` suspends all role grants. `GET/PUT /access/roles` author it (PUT gated
   `canConfigureAccess`); Settings ▸ Access ▸ **Roles** tab (R5) edits it with source badges + the
@@ -142,7 +142,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   via `DottedPath`; grammar `== != in contains and or not ( )` + literals + dotted refs; strict-Boolean
   truthiness, type-mismatch-is-false, offset-bearing parse errors. Core `AccessPolicies` mirrors `Roles`:
   per-space `access-policies.toon` (`{name, effect: allow|deny, target:{actions?,resourceKinds?}, when?}`),
-  mtime-cached, one validate grammar shared by the file parser and `GET/PUT /access/policies` (`when`
+  cached by the file's text, one validate grammar shared by the file parser and `GET/PUT /access/policies` (`when`
   parse-gates 422). Unreadable doc ⇒ the engine DENIES loudly, never "no policies".
 - **Enforcement (A3).** `AccessDecider` SPI (core) is consulted at two PEPs: the route-level **authorize
   stage** in `ControlApi.routeDispatch` (after authenticate; DENY → 403; skips public paths + subject-less
