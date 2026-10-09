@@ -45,8 +45,8 @@ class ReconRunJobTest {
         seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0),('EU','data',118.0),('MEA','voice',10.0)");
         seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
-        store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
+        store.write("dataset", "a_ds", Map.of("dateField", "event_date", "physicalRef", "orders_a"));
+        store.write("dataset", "b_ds", Map.of("dateField", "event_date", "physicalRef", "orders_b"));
         store.write("reconciliation", "orders_recon", Map.of(
                 "datasets", List.of("a_ds", "b_ds"),
                 "keyColumns", List.of("region", "product"),
@@ -78,8 +78,8 @@ class ReconRunJobTest {
         seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0),('EU','data',118.0),('MEA','voice',10.0)");
         seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
-        store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
+        store.write("dataset", "a_ds", Map.of("dateField", "event_date", "physicalRef", "orders_a"));
+        store.write("dataset", "b_ds", Map.of("dateField", "event_date", "physicalRef", "orders_b"));
         store.write("reconciliation", "orders_recon", Map.of(
                 "datasets", List.of("a_ds", "b_ds"),
                 "keyColumns", List.of("region", "product"),
@@ -113,8 +113,8 @@ class ReconRunJobTest {
         seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0),('EU','data',118.0),('MEA','voice',10.0)");
         seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
-        store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
+        store.write("dataset", "a_ds", Map.of("dateField", "event_date", "physicalRef", "orders_a"));
+        store.write("dataset", "b_ds", Map.of("dateField", "event_date", "physicalRef", "orders_b"));
         store.write("reconciliation", "orders_recon", Map.of(
                 "datasets", List.of("a_ds", "b_ds"),
                 "keyColumns", List.of("region", "product"),
@@ -153,7 +153,7 @@ class ReconRunJobTest {
         seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0)");
         seedStore(dataDir, "orders_c", "VALUES ('EU','voice',100.0)");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        for (String s : List.of("a", "b", "c")) store.write("dataset", s + "_ds", Map.of("physicalRef", "orders_" + s));
+        for (String s : List.of("a", "b", "c")) store.write("dataset", s + "_ds", Map.of("dateField", "event_date", "physicalRef", "orders_" + s));
         store.write("reconciliation", "three_recon", Map.of(
                 "datasets", List.of("a_ds", "b_ds", "c_ds"),
                 "keyColumns", List.of("region", "product"),
@@ -178,7 +178,7 @@ class ReconRunJobTest {
         seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0),('MEA','voice',10.0),('APAC','sms',5.0)");
         seedStore(dataDir, "orders_c", "VALUES ('EU','voice',100.0)");   // MEA + APAC lost only at C
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        for (String s : List.of("a", "b", "c")) store.write("dataset", s + "_ds", Map.of("physicalRef", "orders_" + s));
+        for (String s : List.of("a", "b", "c")) store.write("dataset", s + "_ds", Map.of("dateField", "event_date", "physicalRef", "orders_" + s));
         store.write("reconciliation", "three_recon", Map.of(
                 "datasets", List.of("a_ds", "b_ds", "c_ds"),
                 "keyColumns", List.of("region", "product"),
@@ -228,7 +228,7 @@ class ReconRunJobTest {
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("recon_job_seed_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM (" + values + ") t(region, product, amount)) TO '"
+            st.execute("COPY (SELECT *, DATE '2026-09-26' AS event_date FROM (" + values + ") t(region, product, amount)) TO '"
                     + parquet + "' (FORMAT PARQUET)");
         } finally {
             DuckDbUtil.deleteTempDb(db);

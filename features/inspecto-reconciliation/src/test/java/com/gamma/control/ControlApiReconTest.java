@@ -85,12 +85,12 @@ class ControlApiReconTest {
         seedStore(dataDir, "subs_c", "msisdn, active_flag", "VALUES ('m1',1),('m2',1),('m4',1)");
 
         ComponentStore store = new ComponentStore(config.resolve("registry"));
-        store.write("dataset", "subs_a_ds", Map.of("physicalRef", "subs_a"));
-        store.write("dataset", "subs_b_ds", Map.of("physicalRef", "subs_b"));
-        store.write("dataset", "subs_c_ds", Map.of("physicalRef", "subs_c"));
-        store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
-        store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
-        store.write("dataset", "c_ds", Map.of("physicalRef", "orders_c"));
+        store.write("dataset", "subs_a_ds", Map.of("dateField", "event_date", "physicalRef", "subs_a"));
+        store.write("dataset", "subs_b_ds", Map.of("dateField", "event_date", "physicalRef", "subs_b"));
+        store.write("dataset", "subs_c_ds", Map.of("dateField", "event_date", "physicalRef", "subs_c"));
+        store.write("dataset", "a_ds", Map.of("dateField", "event_date", "physicalRef", "orders_a"));
+        store.write("dataset", "b_ds", Map.of("dateField", "event_date", "physicalRef", "orders_b"));
+        store.write("dataset", "c_ds", Map.of("dateField", "event_date", "physicalRef", "orders_c"));
         store.write("reconciliation", "orders_recon", reconConfig());
     }
 
@@ -112,7 +112,7 @@ class ControlApiReconTest {
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("recon_seed_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM (" + values + ") t(" + columns + ")) TO '"
+            st.execute("COPY (SELECT *, DATE '2026-09-26' AS event_date FROM (" + values + ") t(" + columns + ")) TO '"
                     + parquet + "' (FORMAT PARQUET)");
         } finally {
             DuckDbUtil.deleteTempDb(db);
@@ -326,8 +326,8 @@ class ControlApiReconTest {
             assertEquals(200, r.statusCode(), r.body());
             JsonNode d = data(r);
             assertEquals(2, d.get("datasets").size());
-            // both stores share region/product/amount plus the hive-partition column dt → four auto-matches
-            assertEquals(4, d.get("matches").size(), d.get("matches").toString());
+            // both stores share region/product/amount/event_date plus the hive-partition column dt → five auto-matches
+            assertEquals(5, d.get("matches").size(), d.get("matches").toString());
             JsonNode amount = null;
             for (JsonNode m : d.get("matches")) if ("amount".equals(m.get("name").asText())) amount = m;
             assertNotNull(amount);

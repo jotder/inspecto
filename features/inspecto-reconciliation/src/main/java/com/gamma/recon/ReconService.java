@@ -199,49 +199,182 @@ public final class ReconService {
     private static final String[] VIEWS = {"__recon_a", "__recon_b", "__recon_c"};
     private static final String[] WIRE_SIDES = {"a", "b", "c"};
 
+    /** Grain-row classification bits ({@code __cls}): which sides lack the key, and which Breaks it carries. */
+    public static final int CLS_MISSING_A = 1, CLS_MISSING_B = 2, CLS_MISSING_C = 4, CLS_VALUE = 8, CLS_CARDINALITY = 16;
+
+    /** The Board grain-row filters ({@code filter} on {@code /recon/run}), in wire order. */
+    public static final List<String> FILTERS = List.of("all", "breaks", "missing_a", "missing_b", "missing_c", "value_break");
+
+    /**
+     * The {@code __cls} mask a grain-row {@code filter} selects; {@code 0} = every row. ONE definition, read by the
+     * cached (in-memory) page AND the SQL page, so the two cannot disagree. {@code missing_c} on a 2-way spec, or an
+     * unknown word, throws (→ 422).
+     */
+    public static int filterMask(String filter, int sides) {
+        String f = filter == null ? "all" : filter;
+        return switch (f) {
+            case "all" -> 0;
+            case "breaks" -> CLS_MISSING_A | CLS_MISSING_B | (sides > 2 ? CLS_MISSING_C : 0) | CLS_VALUE | CLS_CARDINALITY;
+            case "missing_a" -> CLS_MISSING_A;
+            case "missing_b" -> CLS_MISSING_B;
+            case "missing_c" -> {
+                if (sides < 3) throw new IllegalArgumentException("filter missing_c needs a 3-way reconciliation");
+                yield CLS_MISSING_C;
+            }
+            case "value_break" -> CLS_VALUE;
+            default -> throw new IllegalArgumentException("filter must be one of " + FILTERS + ", got '" + f + "'");
+        };
+    }
+
+    /**
+     * One day's comparison, computed ONCE and paged many times (RECON-PERF-1, operator 2026-10-09): the grain
+     * {@code rows} (shaped as {@link RunResult} rows, ordered by key, with {@code cls} the parallel classification
+     * bits), the exact {@code totals} and {@code summary}, and the {@code sample} block when keys were sampled.
+     * {@code rows} is {@code null} when the day has more key groups than the row cap — the caller then pages in
+     * SQL ({@link #dayRun}'s page) and must not cache the rows.
+     */
+    public record DayResult(List<Map<String, Object>> rows, int[] cls, long groups, Map<String, Object> totals,
+                            Map<String, Object> summary, Map<String, Object> sample, long elapsedMs) {
+
+        /** The {@code [offset, offset+limit)} slice of the rows matching {@code mask}, and how many match in all. */
+        public Page page(int mask, int offset, int limit) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            int total = 0;
+            for (int i = 0; i < rows.size(); i++) {
+                if (mask != 0 && (cls[i] & mask) == 0) continue;
+                if (total >= offset && out.size() < limit) out.add(rows.get(i));
+                total++;
+            }
+            return new Page(out, total);
+        }
+    }
+
+    /** One page of grain rows and the TRUE number of rows the filter matches. */
+    public record Page(List<Map<String, Object>> rows, int total) {}
+
+    /** {@link #dayRun}'s result: the day (rows possibly {@code null}) and the requested page. */
+    public record DayPage(DayResult day, Page page) {}
+
+    /**
+     * The Board's grain rows + exact totals + Break summary over whatever relation the spec's sides carry — now
+     * {@link #dayRun} (one pass), first {@code limit} rows.
+     */
     public static RunResult run(Spec spec, int limit) throws SQLException, IOException {
+        DayPage dp = dayRun(spec, 0, 0, 0, limit, limit);
+        boolean truncated = dp.day().groups() > limit;
+        return new RunResult(dp.page().rows(), dp.day().totals(), dp.day().summary(), truncated, dp.day().elapsedMs());
+    }
+
+    /**
+     * The whole comparison in ONE pass over the sides (RECON-PERF-1): the grain FULL OUTER JOIN chain is
+     * materialised once as {@code __grain} (each row classified by {@code __cls}), and the totals, every pair's
+     * Break summary and the group count are then one aggregate over that table — replacing the former seven scans
+     * (grain + 3 totals + 2 pair summaries + groups). Per-side totals sum the per-key groups, which partition each
+     * side's rows, so they equal the old ungrouped totals exactly (counts COALESCE to 0 on an empty side, as before).
+     *
+     * @param sample   {@code > 0} compares only that many keys, chosen deterministically ({@code ORDER BY hash(keys)}
+     *                 over the union of every side's keys); {@code 0} = all keys
+     * @param mask     the page's {@link #filterMask}
+     * @param rowCap   the most grain rows held in memory; a day with more groups returns {@code rows == null}
+     */
+    public static DayPage dayRun(Spec spec, int sample, int mask, int offset, int limit, int rowCap)
+            throws SQLException, IOException {
         long t0 = System.nanoTime();
         int n = spec.sides().size();
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
             Connection conn = registerSides(sandbox, spec);
-
-            List<Map<String, Object>> grain = select(conn, grainSql(spec, limit));
-            boolean truncated = grain.size() > limit;
-            if (truncated) grain = grain.subList(0, limit);
-
-            List<Map<String, Object>> rows = new ArrayList<>(grain.size());
-            for (Map<String, Object> r : grain) rows.add(shapeRow(spec, r));
+            Map<String, Object> sampleInfo = sample > 0 ? applySample(conn, spec, sample) : null;
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE TEMP TABLE __grain AS " + grainTableSql(spec));
+            }
+            Map<String, Object> agg = select(conn, grainSummarySql(spec)).get(0);
+            long groups = ((Number) agg.get("groups")).longValue();
 
             Map<String, Object> totals = new LinkedHashMap<>();
-            for (int i = 0; i < n; i++)
-                totals.put(WIRE_SIDES[i], measuresOf(spec, select(conn, totalsSql(spec, i)).get(0), null));
-
-            // Anchor-relative pair summaries (design §6): one per non-anchor side. The legacy top-level
-            // fields mirror the first pair (A↔B) so 2-way consumers are unchanged.
+            for (int s = 0; s < n; s++) totals.put(WIRE_SIDES[s], measuresOf(spec, agg, "t" + s + "_"));
             List<Map<String, Object>> pairs = new ArrayList<>();
             for (int other = 1; other < n; other++) {
-                Map<String, Object> s = select(conn, pairSummarySql(spec, other)).get(0);
+                String p = "p" + other + "_";
                 Map<String, Object> byType = new LinkedHashMap<>();
-                byType.put("missing_left", s.get("missing_left"));
-                byType.put("missing_right", s.get("missing_right"));
-                byType.put("value_break", s.get("value_break"));
+                byType.put("missing_left", agg.get(p + "missing_left"));
+                byType.put("missing_right", agg.get(p + "missing_right"));
+                byType.put("value_break", agg.get(p + "value_break"));
                 if (spec.cardinality() != Cardinality.MANY_TO_MANY)
-                    byType.put("cardinality_break", s.get("cardinality_break"));
+                    byType.put("cardinality_break", agg.get(p + "cardinality_break"));
                 Map<String, Object> pair = new LinkedHashMap<>();
                 pair.put("side", WIRE_SIDES[other]);
-                pair.put("matchedKeys", s.get("matched"));
+                pair.put("matchedKeys", agg.get(p + "matched"));
                 pair.put("byType", byType);
                 pairs.add(pair);
             }
-            Map<String, Object> groupsRow = select(conn, groupsSql(spec)).get(0);
             Map<String, Object> summary = new LinkedHashMap<>();
-            summary.put("groups", groupsRow.get("groups"));
+            summary.put("groups", groups);
             summary.put("matchedKeys", pairs.get(0).get("matchedKeys"));
             summary.put("byType", pairs.get(0).get("byType"));
             summary.put("pairs", pairs);
 
-            return new RunResult(rows, totals, summary, truncated, (System.nanoTime() - t0) / 1_000_000);
+            String order = " ORDER BY " + orderByKeys(spec, "");
+            if (groups <= rowCap) {
+                List<Map<String, Object>> raw = select(conn, "SELECT * FROM __grain" + order);
+                List<Map<String, Object>> rows = new ArrayList<>(raw.size());
+                int[] cls = new int[raw.size()];
+                for (int i = 0; i < raw.size(); i++) {
+                    rows.add(shapeRow(spec, raw.get(i)));
+                    cls[i] = ((Number) raw.get(i).get("__cls")).intValue();
+                }
+                DayResult day = new DayResult(List.copyOf(rows), cls, groups, totals, summary, sampleInfo,
+                        (System.nanoTime() - t0) / 1_000_000);
+                return new DayPage(day, day.page(mask, offset, limit));
+            }
+            String where = mask == 0 ? "" : " WHERE (\"__cls\" & " + mask + ") <> 0";
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Map<String, Object> r : select(conn, "SELECT * FROM __grain" + where + order
+                    + " LIMIT " + Math.max(0, limit) + " OFFSET " + Math.max(0, offset)))
+                rows.add(shapeRow(spec, r));
+            int total = ((Number) select(conn, "SELECT COUNT(*) AS c FROM __grain" + where).get(0).get("c")).intValue();
+            DayResult day = new DayResult(null, null, groups, totals, summary, sampleInfo, (System.nanoTime() - t0) / 1_000_000);
+            return new DayPage(day, new Page(rows, total));
         }
+    }
+
+    /**
+     * Restrict every side to {@code size} keys chosen deterministically: the union of every side's (filtered) keys,
+     * as text, {@code ORDER BY hash(keys), keys LIMIT size}. Each side's view is re-registered as a semi-join on that
+     * set (NULL-safe, like every key comparison here). Returns {@code {sampled:true, size, keys, totalKeys}}.
+     */
+    private static Map<String, Object> applySample(Connection conn, Spec spec, int size) throws SQLException {
+        int n = spec.sides().size();
+        List<String> ks = IntStream.range(0, spec.keyColumns().size()).mapToObj(i -> q("k" + i)).toList();
+        List<String> unions = new ArrayList<>();
+        for (int s = 0; s < n; s++) {
+            List<String> cols = new ArrayList<>();
+            for (int i = 0; i < spec.keyColumns().size(); i++)
+                cols.add("CAST(" + q(spec.physical(s, spec.keyColumns().get(i))) + " AS VARCHAR) AS " + q("k" + i));
+            unions.add("SELECT " + String.join(", ", cols) + " FROM " + VIEWS[s] + whereFilter(spec, s));
+        }
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE TEMP TABLE __allkeys AS " + String.join(" UNION ", unions));
+            st.execute("CREATE TEMP TABLE __sample AS SELECT * FROM __allkeys ORDER BY hash(" + String.join(", ", ks)
+                    + "), " + String.join(", ", ks) + " LIMIT " + size);
+        }
+        long total = ((Number) select(conn, "SELECT COUNT(*) AS c FROM __allkeys").get(0).get("c")).longValue();
+        long kept = ((Number) select(conn, "SELECT COUNT(*) AS c FROM __sample").get(0).get("c")).longValue();
+        for (int s = 0; s < n; s++) {
+            List<String> on = new ArrayList<>();
+            for (int i = 0; i < spec.keyColumns().size(); i++)
+                on.add("__k." + q("k" + i) + " IS NOT DISTINCT FROM CAST(__r." + q(spec.physical(s, spec.keyColumns().get(i)))
+                        + " AS VARCHAR)");
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE OR REPLACE VIEW " + VIEWS[s] + " AS SELECT * FROM (" + spec.sides().get(s).relationSql()
+                        + ") AS __r WHERE EXISTS (SELECT 1 FROM __sample AS __k WHERE " + String.join(" AND ", on) + ")");
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("sampled", true);
+        out.put("size", size);
+        out.put("keys", kept);
+        out.put("totalKeys", total);
+        return out;
     }
 
     /**
@@ -469,8 +602,13 @@ public final class ReconService {
         return filter == null ? "" : " WHERE (" + ExpressionGuard.check(filter) + ")";
     }
 
-    /** The Board grain query: FULL OUTER JOIN chain of the grouped sides on NULL-safe key equality. */
-    static String grainSql(Spec spec, int limit) {
+    /**
+     * The grain table body: the FULL OUTER JOIN chain of the grouped sides on NULL-safe key equality (unified keys
+     * {@code k<i>}, per-side measures {@code s<s>_m<i>} and presence counts {@code s<s>_mr}), each row classified by
+     * {@code __cls} ({@link #CLS_MISSING_A} … {@link #CLS_CARDINALITY}). Each grouped side holds a key once, so a key
+     * occupies exactly one chain row and every anchor-relative pair can be read off the chain.
+     */
+    static String grainTableSql(Spec spec) {
         int n = spec.sides().size();
         StringBuilder sb = new StringBuilder(with(spec)).append("SELECT ");
         for (int i = 0; i < spec.keyColumns().size(); i++)
@@ -478,12 +616,66 @@ public final class ReconService {
         for (int s = 0; s < n; s++) {
             for (int i = 0; i < spec.measures().size(); i++)
                 sb.append("__s").append(s).append('.').append(q("m" + i)).append(" AS ").append(q("s" + s + "_m" + i)).append(", ");
-            sb.append("__s").append(s).append('.').append(q("mr")).append(" AS ").append(q("s" + s + "_mr"))
-              .append(s < n - 1 ? ", " : "");
+            sb.append("__s").append(s).append('.').append(q("mr")).append(" AS ").append(q("s" + s + "_mr")).append(", ");
         }
-        sb.append(" FROM ").append(joinChain(spec, n))
-          .append(" ORDER BY ").append(orderByKeys(spec, "")).append(" LIMIT ").append(Math.max(0, limit) + 1);
+        List<String> cls = new ArrayList<>();
+        int[] missingBits = {CLS_MISSING_A, CLS_MISSING_B, CLS_MISSING_C};
+        for (int s = 0; s < n; s++)
+            cls.add("(CASE WHEN __s" + s + ".\"mr\" IS NULL THEN " + missingBits[s] + " ELSE 0 END)");
+        List<String> value = new ArrayList<>();
+        List<String> card = new ArrayList<>();
+        for (int other = 1; other < n; other++) {
+            String o = "__s" + other;
+            String both = "__s0.\"mr\" IS NOT NULL AND " + o + ".\"mr\" IS NOT NULL";
+            for (int i = 0; i < spec.measures().size(); i++)
+                value.add("(" + both + " AND NOT " + within("__s0." + q("m" + i), o + "." + q("m" + i), spec.measures().get(i)) + ")");
+            if (spec.cardinality() != Cardinality.MANY_TO_MANY)
+                card.add("(" + both + " AND (" + cardinalityViolation(spec, o) + "))");
+        }
+        if (!value.isEmpty()) cls.add("(CASE WHEN " + String.join(" OR ", value) + " THEN " + CLS_VALUE + " ELSE 0 END)");
+        if (!card.isEmpty()) cls.add("(CASE WHEN " + String.join(" OR ", card) + " THEN " + CLS_CARDINALITY + " ELSE 0 END)");
+        sb.append(String.join(" + ", cls)).append(" AS \"__cls\"");
+        sb.append(" FROM ").append(joinChain(spec, n));
         return sb.toString();
+    }
+
+    /**
+     * ONE aggregate over {@code __grain}: {@code groups}, per-side totals {@code t<s>_m<i>} / {@code t<s>_mr}, and per
+     * compared side the pair counts {@code p<other>_missing_right|missing_left|matched|value_break} (+
+     * {@code cardinality_break} when asserted). value_break counts (key × column), cardinality counts keys — exactly
+     * as the per-pair summaries it replaces.
+     */
+    static String grainSummarySql(Spec spec) {
+        int n = spec.sides().size();
+        StringBuilder sb = new StringBuilder("SELECT COUNT(*) AS \"groups\"");
+        for (int s = 0; s < n; s++) {
+            for (int i = 0; i < spec.measures().size(); i++) {
+                String col = q("s" + s + "_m" + i);
+                sb.append(", ").append("count".equals(spec.measures().get(i).agg()) ? "COALESCE(SUM(" + col + "), 0)" : "SUM(" + col + ")")
+                  .append(" AS ").append(q("t" + s + "_m" + i));
+            }
+            sb.append(", COALESCE(SUM(").append(q("s" + s + "_mr")).append("), 0) AS ").append(q("t" + s + "_mr"));
+        }
+        for (int other = 1; other < n; other++) {
+            String a = q("s0_mr"), o = q("s" + other + "_mr"), p = "p" + other + "_";
+            sb.append(", COUNT(*) FILTER (WHERE ").append(a).append(" IS NOT NULL AND ").append(o).append(" IS NULL) AS ").append(q(p + "missing_right"))
+              .append(", COUNT(*) FILTER (WHERE ").append(o).append(" IS NOT NULL AND ").append(a).append(" IS NULL) AS ").append(q(p + "missing_left"))
+              .append(", COUNT(*) FILTER (WHERE ").append(a).append(" IS NOT NULL AND ").append(o).append(" IS NOT NULL) AS ").append(q(p + "matched"));
+            if (spec.measures().isEmpty()) {
+                sb.append(", 0 AS ").append(q(p + "value_break"));
+            } else {
+                final int oth = other;
+                List<String> terms = IntStream.range(0, spec.measures().size())
+                        .mapToObj(i -> "COALESCE(SUM(CASE WHEN " + a + " IS NOT NULL AND " + o + " IS NOT NULL AND NOT "
+                                + within(q("s0_m" + i), q("s" + oth + "_m" + i), spec.measures().get(i)) + " THEN 1 ELSE 0 END), 0)")
+                        .toList();
+                sb.append(", (").append(String.join(" + ", terms)).append(") AS ").append(q(p + "value_break"));
+            }
+            if (spec.cardinality() != Cardinality.MANY_TO_MANY)
+                sb.append(", COUNT(*) FILTER (WHERE ").append(a).append(" IS NOT NULL AND ").append(o).append(" IS NOT NULL AND (")
+                  .append(cardinalityViolationCols(spec, a, o)).append(")) AS ").append(q(p + "cardinality_break"));
+        }
+        return sb.append(" FROM __grain").toString();
     }
 
     /** `COALESCE(__s0."ki", …, __s{n-1}."ki")` — the unified key column across all joined sides. */
@@ -502,49 +694,6 @@ public final class ReconService {
                 terms.add(coalesceKey(spec, i, s) + " IS NOT DISTINCT FROM __s" + s + "." + q("k" + i));
             sb.append(" FULL OUTER JOIN __s").append(s).append(" ON ").append(String.join(" AND ", terms));
         }
-        return sb.toString();
-    }
-
-    /** Exact distinct key-group count across ALL sides (immune to the grain LIMIT). */
-    static String groupsSql(Spec spec) {
-        return with(spec) + "SELECT COUNT(*) AS \"groups\" FROM " + joinChain(spec, spec.sides().size());
-    }
-
-    /** One side's exact totals (no GROUP BY — immune to grain truncation). */
-    static String totalsSql(Spec spec, int side) {
-        StringBuilder sb = new StringBuilder("SELECT ");
-        for (int i = 0; i < spec.measures().size(); i++)
-            sb.append(aggExpr(spec, side, i)).append(", ");
-        sb.append("COUNT(*) AS ").append(q("mr")).append(" FROM ").append(VIEWS[side]).append(whereFilter(spec, side));
-        return sb.toString();
-    }
-
-    /** One-pass exact Break summary for the anchor↔{@code other} pair (value_break counts (key × column) entries). */
-    static String pairSummarySql(Spec spec, int other) {
-        String o = "__s" + other;
-        StringBuilder sb = new StringBuilder(with(spec))
-                .append("SELECT ")
-                .append("COUNT(*) FILTER (WHERE __s0.\"mr\" IS NOT NULL AND ").append(o).append(".\"mr\" IS NULL) AS \"missing_right\", ")
-                .append("COUNT(*) FILTER (WHERE ").append(o).append(".\"mr\" IS NOT NULL AND __s0.\"mr\" IS NULL) AS \"missing_left\", ")
-                .append("COUNT(*) FILTER (WHERE __s0.\"mr\" IS NOT NULL AND ").append(o).append(".\"mr\" IS NOT NULL) AS \"matched\", ");
-        if (spec.measures().isEmpty()) {
-            sb.append("0 AS \"value_break\"");
-        } else {
-            List<String> terms = IntStream.range(0, spec.measures().size())
-                    .mapToObj(i -> "COALESCE(SUM(CASE WHEN __s0.\"mr\" IS NOT NULL AND " + o + ".\"mr\" IS NOT NULL AND NOT "
-                            + within("__s0." + q("m" + i), o + "." + q("m" + i), spec.measures().get(i))
-                            + " THEN 1 ELSE 0 END), 0)")
-                    .toList();
-            sb.append('(').append(String.join(" + ", terms)).append(") AS \"value_break\"");
-        }
-        // ⚠ Only when an assertion is declared — the column is absent otherwise, so a reconciliation that
-        // predates this option gets the same summary row it always got. Counts KEYS, unlike value_break,
-        // which counts (key × column): a key has one cardinality, not one per compare column.
-        if (spec.cardinality() != Cardinality.MANY_TO_MANY)
-            sb.append(", COUNT(*) FILTER (WHERE __s0.\"mr\" IS NOT NULL AND ").append(o)
-              .append(".\"mr\" IS NOT NULL AND (").append(cardinalityViolation(spec, o))
-              .append(")) AS \"cardinality_break\"");
-        sb.append(" FROM __s0 FULL OUTER JOIN ").append(o).append(" ON ").append(keyJoin(spec, 0, other));
         return sb.toString();
     }
 
@@ -607,12 +756,17 @@ public final class ReconService {
     /**
      * The predicate that makes a matched key violate the declared {@link Cardinality}.
      *
-     * <p>⚠ Shared by {@link #cardinalityBreaksSql} and {@link #pairSummarySql} deliberately: a summary
+     * <p>⚠ Shared by {@link #cardinalityBreaksSql} and {@link #grainSummarySql} (and {@link #grainTableSql}) deliberately: a summary
      * that counted a different thing from the break list it summarises is worse than no summary.
      */
     private static String cardinalityViolation(Spec spec, String o) {
-        String anchorMany = "__s0." + q("mr") + " > 1";
-        String otherMany = o + "." + q("mr") + " > 1";
+        return cardinalityViolationCols(spec, "__s0." + q("mr"), o + "." + q("mr"));
+    }
+
+    /** {@link #cardinalityViolation} over explicit anchor / compared row-count expressions (the grain table's columns). */
+    private static String cardinalityViolationCols(Spec spec, String anchorMr, String otherMr) {
+        String anchorMany = anchorMr + " > 1";
+        String otherMany = otherMr + " > 1";
         return switch (spec.cardinality()) {
             case ONE_TO_ONE -> anchorMany + " OR " + otherMany;
             case ONE_TO_MANY -> anchorMany;     // the anchor side must contribute exactly one row

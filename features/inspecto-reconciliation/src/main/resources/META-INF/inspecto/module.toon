@@ -7,6 +7,6 @@ absentMessage: "Reconciliation is not installed in this bundle - it is provided 
 provides:
   features[1]: reconciliation
   configKinds[1]: reconciliation
-  contracts[2]: JobTypeProvider,ComponentDeleteHook
+  contracts[3]: JobTypeProvider,ComponentDeleteHook,ComponentKindValidator
   jobTypes[1]: recon.run
   routes[10]: "POST /recon/columns","POST /recon/run","POST /recon/breaks","POST /recon/rows","POST /recon/promote","GET /recon/promoted","GET /recon/state","GET /recon/([^/]+)/state","POST /recon/([^/]+)/record","POST /recon/([^/]+)/breaks/status"

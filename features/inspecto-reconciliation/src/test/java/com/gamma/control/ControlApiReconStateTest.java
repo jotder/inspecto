@@ -89,14 +89,14 @@ class ControlApiReconStateTest {
         seed(dataDir, "wide3_a", "SELECT range AS id, 1.0 AS amount FROM range(30001)");
 
         ComponentStore store = new ComponentStore(config.resolve("registry"));
-        store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
-        store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
-        store.write("dataset", "wa_ds", Map.of("physicalRef", "wide_a"));
-        store.write("dataset", "wb_ds", Map.of("physicalRef", "wide_b"));
-        store.write("dataset", "hlr_ds", Map.of("physicalRef", "hlr"));
-        store.write("dataset", "crm_ds", Map.of("physicalRef", "crm"));
-        store.write("dataset", "cbs_ds", Map.of("physicalRef", "cbs"));
-        store.write("dataset", "w3_ds", Map.of("physicalRef", "wide3_a"));
+        store.write("dataset", "a_ds", Map.of("dateField", "event_date", "physicalRef", "orders_a"));
+        store.write("dataset", "b_ds", Map.of("dateField", "event_date", "physicalRef", "orders_b"));
+        store.write("dataset", "wa_ds", Map.of("dateField", "event_date", "physicalRef", "wide_a"));
+        store.write("dataset", "wb_ds", Map.of("dateField", "event_date", "physicalRef", "wide_b"));
+        store.write("dataset", "hlr_ds", Map.of("dateField", "event_date", "physicalRef", "hlr"));
+        store.write("dataset", "crm_ds", Map.of("dateField", "event_date", "physicalRef", "crm"));
+        store.write("dataset", "cbs_ds", Map.of("dateField", "event_date", "physicalRef", "cbs"));
+        store.write("dataset", "w3_ds", Map.of("dateField", "event_date", "physicalRef", "wide3_a"));
         store.write("reconciliation", "sim_recon", Map.of(
                 "datasets", List.of("hlr_ds", "crm_ds", "cbs_ds"),
                 "keyColumns", List.of("msisdn"),
@@ -137,6 +137,8 @@ class ControlApiReconStateTest {
             String runAt = s.get("lastRunAt").asText();
             assertEquals("orders_recon", s.get("reconciliation").asText());
             assertEquals(1, s.get("runs").asInt());
+            assertEquals("2026-09-26", s.get("day").asText(), "a record names the day it recorded (the latest present)");
+            ((com.fasterxml.jackson.databind.node.ObjectNode) s).remove("day");
             assertEquals(Map.of("MEA · voice", "missing_right", "APAC · sms", "missing_left", "EU · data", "value_break"),
                     byKey(s, "type"));
             for (JsonNode b : s.get("breaks")) {
@@ -739,7 +741,7 @@ class ControlApiReconStateTest {
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("recon_state_seed_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
-            st.execute("COPY (" + select + ") TO '" + parquet + "' (FORMAT PARQUET)");
+            st.execute("COPY (SELECT *, DATE '2026-09-26' AS event_date FROM (" + select + ")) TO '" + parquet + "' (FORMAT PARQUET)");
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }

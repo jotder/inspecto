@@ -23,6 +23,7 @@ public final class ReconConfigLoader {
 
     /** Build a spec from {@code config}, resolving each dataset id to its trusted relation SQL via {@code relationSqlFor}. */
     public static ReconService.Spec buildSpec(Map<String, Object> config, Function<String, String> relationSqlFor) {
+        bands(config);   // a corrupt saved band is refused here too, not only at authoring time
         List<String> datasets = strings(config.get("datasets"));
         if (datasets.isEmpty()) {   // v1 config compatibility: leftDataset/rightDataset[/thirdDataset]
             String left = Values.blankToNull(config.get("leftDataset"));
@@ -65,6 +66,30 @@ public final class ReconConfigLoader {
         // impact.column may name a non-compared column: it is then carried on each Break, never compared.
         return ReconService.Spec.of(sides, strings(config.get("keyColumns")), measures, includeRecordCount,
                 cardinality).withImpact(Values.blankToNull(mapOf(config.get("impact")).get("column")));
+    }
+
+    /**
+     * The Reconciliation's saved tolerance bands {@code bands: {okBelow, warnAbove}} (percent of the compared keys
+     * breaking; RECON-PERF-1, operator 2026-10-09), or {@code null} when none are saved (the UI then uses its
+     * {@code DEFAULT_BANDS}). Validated fail-closed: both numbers, {@code 0 <= okBelow <= warnAbove <= 100}, else
+     * {@link IllegalArgumentException} (→ 422 at authoring and at run time).
+     */
+    public static Map<String, Object> bands(Map<String, Object> config) {
+        Object raw = config == null ? null : config.get("bands");
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?> m))
+            throw new IllegalArgumentException("bands must be an object {okBelow, warnAbove} (percent)");
+        Object ok = m.get("okBelow"), warn = m.get("warnAbove");
+        if (!(ok instanceof Number o) || !(warn instanceof Number w))
+            throw new IllegalArgumentException("bands needs numeric okBelow and warnAbove (percent), got " + raw);
+        double okv = o.doubleValue(), warnv = w.doubleValue();
+        if (!(okv >= 0 && okv <= warnv && warnv <= 100))
+            throw new IllegalArgumentException("bands must satisfy 0 <= okBelow <= warnAbove <= 100, got okBelow="
+                    + okv + ", warnAbove=" + warnv);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("okBelow", okv);
+        out.put("warnAbove", warnv);
+        return out;
     }
 
     // ── config-map parsing helpers ────────────────────────────────────────────────

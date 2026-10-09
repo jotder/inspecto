@@ -45,9 +45,6 @@ import java.util.function.Supplier;
  */
 public final class ReconRunJob implements Job {
 
-    /** Board grain-row cap (MAX_LIMIT parity with ReconRoutes); the Break summary is exact regardless. */
-    private static final int GRAIN_LIMIT = 5_000;
-
     private final JobConfig cfg;
     private final String dataDir;
     /** Live view of this space's {@link ObjectAccess} (wired post-construction on the JobService); its value
@@ -90,15 +87,17 @@ public final class ReconRunJob implements Job {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown reconciliation '" + reconId + "'"));
 
-        ReconService.Spec spec = ReconConfigLoader.buildSpec(config, dsId -> {
-            Map<String, Object> ds = store.get("dataset", dsId)
-                    .map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + dsId + "'"));
-            return DatasetRelation.relationSql(ds, dataRoot, views);
-        });
+        java.util.function.Function<String, Map<String, Object>> datasetFor = dsId -> store.get("dataset", dsId)
+                .map(ComponentRegistry.Component::content)
+                .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + dsId + "'"));
+        // ONE day, like the Board (RECON-PERF-1, operator 2026-10-09): the Job's `day` parameter, else the latest
+        // day present on any side.
+        ReconDay.Scoped scoped = ReconDay.resolve(config, datasetFor,
+                dsId -> DatasetRelation.relationSql(datasetFor.apply(dsId), dataRoot, views), dataRoot, cfg.opt("day", null));
+        ReconService.Spec spec = scoped.spec();
 
-        ReconService.RunResult r = ReconService.run(spec, GRAIN_LIMIT);
-        Map<String, Object> byType = r.summary().get("byType") instanceof Map<?, ?> bt ? cast(bt) : Map.of();
+        Map<String, Object> summary = ReconService.dayRun(spec, 0, 0, 0, 0, 0).day().summary();
+        Map<String, Object> byType = summary.get("byType") instanceof Map<?, ?> bt ? cast(bt) : Map.of();
         // The counts cover EVERY pair (A<->B and, on a 3-way Reconciliation, A<->C): the same Breaks the run
         // records. The run summary's byType is the A<->B pair alone, so it is only the fallback when the Breaks
         // cannot be computed (the run is then also not recorded, and says so).
@@ -117,17 +116,18 @@ public final class ReconRunJob implements Job {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("reconciliation", reconId);
+        payload.put("day", scoped.day());
         payload.put("missingLeft", missingLeft);
         payload.put("missingRight", missingRight);
         payload.put("valueBreak", valueBreak);
         payload.put("breaks", breaks);
-        payload.put("matchedKeys", r.summary().get("matchedKeys"));
+        payload.put("matchedKeys", summary.get("matchedKeys"));
         ctx.signals().emit("recon.run.completed", breaks > 0 ? Severity.WARN : Severity.INFO, payload);
         ctx.log().info("reconciliation complete", "reconciliation", reconId, "breaks", breaks);
         if (breaks > 0) openIncident(ctx, reconId, missingLeft, missingRight, valueBreak, breaks);
         String notRecorded = fresh == null ? computeError : recordRun(ctx, writeRoot, reconId, fresh);
 
-        return JobResult.ok("recon.run '" + reconId + "': " + breaks + " break(s) ("
+        return JobResult.ok("recon.run '" + reconId + "' " + scoped.day() + ": " + breaks + " break(s) ("
                 + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)"
                 + (notRecorded == null ? "" : " — run not recorded: " + notRecorded),
                 (System.nanoTime() - t0) / 1_000_000L);

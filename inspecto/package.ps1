@@ -916,14 +916,14 @@ if ($reconJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $rcZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-reconciliation.jar")
     try {
-        foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.recon.ReconRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.recon.ReconRunJobType'), @('com.gamma.spi.http.ComponentDeleteHook', 'com.gamma.recon.ReconComponentDeleteHook'))) {
+        foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.recon.ReconRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.recon.ReconRunJobType'), @('com.gamma.spi.http.ComponentDeleteHook', 'com.gamma.recon.ReconComponentDeleteHook'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.recon.ReconKindValidator'))) {
             $rcEntry = $rcZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
             if (-not $rcEntry) { throw "inspecto-reconciliation.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
             $rcReader = New-Object System.IO.StreamReader($rcEntry.Open())
             try { $rcBody = $rcReader.ReadToEnd() } finally { $rcReader.Dispose() }
             if ($rcBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-reconciliation.jar's $($svc[0]) service file does not list $($svc[1]) - it lists only: $rcBody" }
         }
-        Write-Host "  verified: RouteModule, JobTypeProvider and ComponentDeleteHook registrations present in the Reconciliation module" -ForegroundColor DarkGray
+        Write-Host "  verified: RouteModule, JobTypeProvider, ComponentDeleteHook and ComponentKindValidator registrations present in the Reconciliation module" -ForegroundColor DarkGray
     } finally { $rcZip.Dispose() }
 }
 if ($scoringJarSrc) {

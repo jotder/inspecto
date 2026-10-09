@@ -49,7 +49,13 @@ import static com.gamma.util.Values.intOr;
  */
 public final class ReconRoutes implements RouteModule {
 
-    private static final int GRAIN_LIMIT = 5_000;      // Board grain-row cap (MAX_LIMIT parity)
+    /** Board page size when none is asked for, and the largest one accepted (RECON-PERF-1, operator 2026-10-09). */
+    private static final int DEFAULT_PAGE = 50;
+    private static final int MAX_PAGE = 200;
+    /** Most keys a {@code sample} may compare per day. */
+    private static final int MAX_SAMPLE = 100_000;
+    /** Most grain rows of one day held in the result cache; a bigger day is paged in SQL on every request. */
+    private static final int ROW_CAP = 200_000;
     private static final int DEFAULT_BREAKS_LIMIT = 200;
     private static final int MAX_LIMIT = 5_000;
 
@@ -76,7 +82,7 @@ public final class ReconRoutes implements RouteModule {
         api.get("/recon/state", (e, m) -> states(api));
         api.get("/recon/([^/]+)/state", (e, m) -> state(api, ApiContext.name(m)));
         api.post("/recon/([^/]+)/record", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> record(api, ApiContext.name(m))));
+                (e, m) -> record(api, ApiContext.name(m), api.body(e))));
         api.post("/recon/([^/]+)/breaks/status", ApiContext.withCapability("canOperateRuns",
                 (e, m) -> breakStatus(api, ApiContext.name(m), api.body(e))));
     }
@@ -100,32 +106,69 @@ public final class ReconRoutes implements RouteModule {
         }
     }
 
-    // ── POST /recon/run {id | config, limit?} ───────────────────────────────────────
+    // ── POST /recon/run {id | config, day?, limit?, offset?, filter?, sample?} ─────
 
+    /**
+     * One DAY of the Board (RECON-PERF-1, operator 2026-10-09): {@code day} (ISO; absent ⇒ the latest day present),
+     * a page of grain rows ({@code limit} 1..200, default 50; {@code offset}; {@code filter} =
+     * all|breaks|missing_a|missing_b|missing_c|value_break) and the day's exact {@code totals} / {@code summary},
+     * which never depend on the page. {@code sample} (1..100000) compares only that many keys, chosen
+     * deterministically, and the response says so ({@code sample.sampled}). The day's comparison is computed once
+     * and cached ({@link ReconDay.Cache}); a further page or filter of the same day reads the cache.
+     */
     private Object run(ApiContext api, Map<String, Object> body) {
-        ReconService.Spec spec = spec(api, body);
-        int limit = clamp(intOr(body.get("limit"), GRAIN_LIMIT));
-        ReconService.RunResult r;
+        ReconDay.Scoped scoped = scoped(api, body);
+        ReconService.Spec spec = scoped.spec();
+        int limit = intOr(body.get("limit"), DEFAULT_PAGE);
+        if (limit < 1 || limit > MAX_PAGE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be 1.." + MAX_PAGE + ", got " + limit);
+        int offset = intOr(body.get("offset"), 0);
+        if (offset < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "offset must be >= 0, got " + offset);
+        int sample = intOr(body.get("sample"), 0);
+        if (sample < 0 || sample > MAX_SAMPLE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "sample must be 1.." + MAX_SAMPLE + " keys, got " + sample);
+        String filter = orDefault(ApiContext.str(body, "filter"), "all");
+        int mask;
         try {
-            r = ReconService.run(spec, limit);
+            mask = ReconService.filterMask(filter, spec.sides().size());
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
-        } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
-        } catch (IOException e) {
-            throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
+        }
+        String cacheKey = scoped.fingerprint() == null ? null : "grain|" + scoped.fingerprint() + "|" + scoped.day() + "|" + sample;
+        ReconService.DayResult day = cacheKey == null ? null : ReconDay.Cache.get(cacheKey);
+        boolean cached = day != null;
+        ReconService.Page page;
+        long t0 = System.nanoTime();
+        if (cached) {
+            page = day.page(mask, offset, limit);
+        } else {
+            ReconService.DayPage dp = compute(() -> ReconService.dayRun(spec, sample, mask, offset, limit, ROW_CAP));
+            day = dp.day();
+            page = dp.page();
+            if (cacheKey != null && day.rows() != null) ReconDay.Cache.put(cacheKey, day);
         }
         Map<String, Object> statistics = new LinkedHashMap<>();
-        statistics.put("rowCount", r.rows().size());
-        statistics.put("elapsedMs", r.elapsedMs());
-        statistics.put("truncated", r.truncated());
+        statistics.put("rowCount", page.rows().size());
+        statistics.put("elapsedMs", (System.nanoTime() - t0) / 1_000_000);
+        statistics.put("truncated", offset + page.rows().size() < page.total());
+        statistics.put("cached", cached);
+
+        Map<String, Object> pageInfo = new LinkedHashMap<>();
+        pageInfo.put("offset", offset);
+        pageInfo.put("limit", limit);
+        pageInfo.put("total", page.total());
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("keyColumns", spec.keyColumns());
         data.put("measures", measureNames(spec));
-        data.put("rows", r.rows());
-        data.put("totals", r.totals());
-        data.put("summary", r.summary());
+        data.put("day", scoped.day());
+        data.put("availableDays", scoped.availableDays());
+        data.put("filter", filter);
+        data.put("sample", day.sample());
+        data.put("rows", page.rows());
+        data.put("page", pageInfo);
+        data.put("totals", day.totals());
+        data.put("summary", day.summary());
         data.put("statistics", statistics);
         return data;
     }
@@ -133,7 +176,7 @@ public final class ReconRoutes implements RouteModule {
     // ── POST /recon/breaks {id | config, path?, type?, limit?, offset?} ─────────────
 
     private Object breaks(ApiContext api, Map<String, Object> body) {
-        ReconService.Spec spec = spec(api, body);
+        ReconService.Spec spec = scoped(api, body).spec();
         int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
         int offset = Math.max(0, intOr(body.get("offset"), 0));
         String type = ApiContext.str(body, "type");
@@ -171,7 +214,7 @@ public final class ReconRoutes implements RouteModule {
      * its siblings — nothing is persisted, so nothing here needs a capability.
      */
     private Object rows(ApiContext api, Map<String, Object> body) {
-        ReconService.Spec spec = spec(api, body);
+        ReconService.Spec spec = scoped(api, body).spec();
         Map<String, String> key = pathOf(body.get("key"));
         if (key == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'key' — every key column and its value");
         int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
@@ -453,10 +496,15 @@ public final class ReconRoutes implements RouteModule {
      * <p>Gates, in order: 503 no write root · 422 unsafe id · 404 unknown reconciliation / dataset · 422
      * unusable config · 403 jail · 422 too many Breaks / failing comparison · 503 sandbox or state unreadable.
      */
-    private Object record(ApiContext api, String rawId) {
+    private Object record(ApiContext api, String rawId, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         String id = WriteGates.safeName(rawId, "reconciliation id");
-        ReconService.Spec spec = spec(api, Map.of("id", id));
+        Map<String, Object> req = new LinkedHashMap<>();
+        req.put("id", id);
+        String requestedDay = body == null ? null : ApiContext.str(body, "day");
+        if (requestedDay != null) req.put("day", requestedDay);
+        ReconDay.Scoped scoped = scoped(api, req);
+        ReconService.Spec spec = scoped.spec();
         ReconStateStore store = new ReconStateStore(writeRoot);
         readState(store, id);   // jail + readability BEFORE the comparison runs, not after
         List<ReconBreaks.Break> fresh;
@@ -471,7 +519,9 @@ public final class ReconRoutes implements RouteModule {
         }
         try {
             String runAt = ReconStateStore.now();
-            return store.record(id, fresh, runAt).toWire(Instant.parse(runAt));
+            Map<String, Object> out = new LinkedHashMap<>(store.record(id, fresh, runAt).toWire(Instant.parse(runAt)));
+            out.put("day", scoped.day());
+            return out;
         } catch (SecurityException jail) {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
         } catch (IOException e) {
@@ -559,8 +609,12 @@ public final class ReconRoutes implements RouteModule {
 
     // ── spec assembly ───────────────────────────────────────────────────────────────
 
-    /** Resolve the request's reconciliation config ({@code config} inline, or saved {@code id}) to a validated spec. */
-    private ReconService.Spec spec(ApiContext api, Map<String, Object> body) {
+    /**
+     * Resolve the request's reconciliation config ({@code config} inline, or saved {@code id}) to a validated spec
+     * scoped to ONE day ({@code day}, or the latest present — {@link ReconDay}). 404 unknown reconciliation / dataset ·
+     * 422 unusable config, bad day, or a Dataset with no temporal column · 503 sandbox unavailable.
+     */
+    private ReconDay.Scoped scoped(ApiContext api, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
 
@@ -575,10 +629,26 @@ public final class ReconRoutes implements RouteModule {
         }
         // Shared spec assembly (identical to the scheduled recon.run Job); relation-SQL resolution stays
         // here so an unknown/unusable dataset keeps its route gate (404/422 via relationSql).
+        String day = ApiContext.str(body, "day");
+        return compute(() -> ReconDay.resolve(config,
+                dsId -> component(store, "dataset", dsId)
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown dataset '" + dsId + "'")),
+                dsId -> relationSql(api, store, writeRoot, dsId), api.dataRoot(), day));
+    }
+
+    /** A comparison step, its failures mapped as every recon compute route maps them. */
+    @FunctionalInterface
+    private interface Compute<T> { T get() throws SQLException, IOException; }
+
+    private static <T> T compute(Compute<T> c) {
         try {
-            return ReconConfigLoader.buildSpec(config, dsId -> relationSql(api, store, writeRoot, dsId));
+            return c.get();
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+        } catch (SQLException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+        } catch (IOException e) {
+            throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
     }
 
