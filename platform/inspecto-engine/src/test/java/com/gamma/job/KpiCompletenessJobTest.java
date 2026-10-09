@@ -242,6 +242,51 @@ class KpiCompletenessJobTest {
         assertEquals("2026-08-08", KpiCompletenessJob.defaultRecordDay(" ", ops, clock));
     }
 
+    /** Rows of the kpi_completeness store, as "pipeline|day|status|rows". */
+    static List<String> storeRows(Path dataRoot) throws Exception {
+        List<String> out = new java.util.ArrayList<>();
+        Path f = dataRoot.resolve(KpiCompletenessOutput.DIR).resolve(KpiCompletenessOutput.FILE);
+        try (java.sql.Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             java.sql.ResultSet rs = c.createStatement().executeQuery("SELECT pipeline, CAST(record_day AS VARCHAR), "
+                     + "status, rows FROM read_parquet('" + f.toString().replace(java.io.File.separatorChar, '/') + "') ORDER BY 1, 2")) {
+            while (rs.next()) out.add(rs.getString(1) + "|" + rs.getString(2) + "|" + rs.getString(3) + "|" + rs.getObject(4));
+        }
+        return out;
+    }
+
+    @Test
+    void theJobUpsertsOneRowPerPipelineDayIntoTheKpiCompletenessStore(@TempDir Path dataRoot) throws Exception {
+        String prev = System.getProperty("data.dir");
+        System.setProperty("data.dir", dataRoot.toString());
+        try {
+            db.record(List.of(out("cdr", "2026-08-04", "/w/a.parquet", 70)));
+            job(params("pipeline", "cdr", "record_day", "2026-08-04")).run(new CapturingJobContext());
+            assertEquals(List.of("cdr|2026-08-04|NO_BASELINE|70"), storeRows(dataRoot));
+            assertTrue(Files.isRegularFile(dataRoot.resolve(KpiCompletenessOutput.DIR).resolve(KpiCompletenessOutput.OWNER_MARKER)));
+
+            // A same-day re-run with more data UPSERTS: still one row, carrying the new count — never a duplicate.
+            db.record(List.of(out("cdr", "2026-08-04", "/w/b.parquet", 30)));
+            job(params("pipeline", "cdr", "record_day", "2026-08-04")).run(new CapturingJobContext());
+            assertEquals(List.of("cdr|2026-08-04|NO_BASELINE|100"), storeRows(dataRoot));
+
+            // negative probe: another day is another row, so the upsert key is the Pipeline-day, not the Pipeline.
+            job(params("pipeline", "cdr", "record_day", "2026-08-05")).run(new CapturingJobContext());
+            assertEquals(2, storeRows(dataRoot).size());
+        } finally {
+            if (prev == null) System.clearProperty("data.dir"); else System.setProperty("data.dir", prev);
+        }
+    }
+
+    @Test
+    void aForeignKpiCompletenessDirectoryIsRefusedUntouched(@TempDir Path dataRoot) throws Exception {
+        Path foreign = Files.createDirectories(dataRoot.resolve(KpiCompletenessOutput.DIR));
+        Files.writeString(foreign.resolve("other.parquet"), "not ours");
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> KpiCompletenessOutput.upsert(dataRoot,
+                Map.of("pipeline", "cdr", "recordDay", "2026-08-04", "status", "OK"), java.time.Instant.now()));
+        assertTrue(e.getMessage().contains("refuses to write"), e.getMessage());
+        assertFalse(Files.exists(foreign.resolve(KpiCompletenessOutput.FILE)));
+    }
+
     /** A {@link CapturingJobContext} that also grants {@link IncidentAccess}. */
     private static final class ServicesContext implements JobContext {
         final CapturingJobContext inner = new CapturingJobContext();

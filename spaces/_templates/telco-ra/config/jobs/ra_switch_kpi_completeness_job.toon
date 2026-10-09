@@ -1,0 +1,7 @@
+job:
+  name: ra_switch_kpi_completeness
+  type: kpi.completeness
+  pipeline: switch_xdr
+  check_files: "false"
+  cron: "15 6 * * *"
+  enabled: false

@@ -546,15 +546,18 @@ findings are merged into the active Incident's attributes (`ObjectAccess.saveAtt
 `OBJECT_ACTIVITY` `findings-updated` event by actor `system`); identical findings are suppressed; the title and
 message are not rewritten. Dry-run / pack-harness stand-ins keep the open-only default. Three or more consecutive days with nothing registered emit `kpi.completeness.unknown_streak`
 at WARN (`unknownStreakDays` in the payload) and open **no** Incident. The 28 / 7 / 0.3 defaults are confirmed.
-**§8-D completeness tile — DESIGN, not built (2026-10-09).** The viz seam (`viz/viz-registry.ts` `registerViz`,
-`VizPlugin` in `viz/viz-types.ts`, `render: {kind:'component', componentKey}` as in `progress-list.plugin.ts`) registers
-a type cleanly, but every plugin is Dataset-driven (`buildQuery` → `dataset-result.service`), and a Widget binds a
-`datasetId` checked by `ComponentIntegrity`. A Signal-reading tile therefore does not fit cleanly. Proposed shape:
-a `completeness-status` component plugin that reads `GET /signals?type=kpi.completeness.evaluated&limit=N`
-(`SignalRoutes`, no new route) through `EventsService.signals()`, keeps the latest Signal per `pipeline` payload key,
-and renders OK / BREACH / UNKNOWN with the shared `status-badge`. UNKNOWN is shown as unknown, never as OK. A failed
-fetch shows an error state, never sample data. Open before building: either let a Widget carry no Dataset, or put the
-Signals behind a Dataset (e.g. a registered Signal view).
+**§8-D completeness tile — Signals behind a Dataset (operator, 2026-10-09).** Each run also upserts its
+Pipeline-day row (`pipeline`, `record_day`, `status`, `rows`, `baseline_rows`, `deviation`, `missing_files`,
+`unknown_streak_days`, `evaluated_at`) into `<dataRoot>/kpi_completeness/kpi_completeness.parquet`
+(`KpiCompletenessOutput`): read, drop the Pipeline-day, add, `COPY` to a temp file, atomic move — a same-day
+re-run replaces its row. Ownership follows the Risk Score output pattern: the directory is created with a
+`.kpi-completeness-output` marker, and an existing directory without it is refused untouched. No data root (a bare
+test or CLI run) leaves the run signal-only with a warning. The `telco-ra` template ships the `kpi_completeness_dataset`
+(`physicalRef: kpi_completeness`), an ordinary table Widget `ra_completeness_status` (Pipeline × day × status, rows,
+newest day first) on `ra_overview`, and a `ra_switch_kpi_completeness` Job over `switch_xdr` that ships **disabled**
+(it refuses unless the consignment-output store is durable). Pinned by `KpiCompletenessJobTest` and
+`KpiCompletenessWidgetTest` (template created through `POST /spaces`, tile rendered through `POST /bi/query`).
+⚠ The table shows every stored day, newest first; it does not filter to the latest day.
 **Editor field (operator, 2026-10-09).** The gap node carries a `NodeAttributes.GAP` spec — `file_template`
 and `seq_scope` only (`sequence` keeps its grammar in the dialog's free-form section). The node lowers to
 `collector.gap_detection` (`PipelineEditable.gapSection`); `NodeConfigNameContractTest.gapTemplateAttributesReachTheEngine`

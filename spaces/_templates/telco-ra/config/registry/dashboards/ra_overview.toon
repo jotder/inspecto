@@ -1,5 +1,5 @@
 name: ra_overview
-tiles[7]{widgetId,span}:
+tiles[8]{widgetId,span}:
   ra_leakage_found,1
   ra_leakage_items,1
   ra_leakage_confirmed,1
@@ -7,3 +7,4 @@ tiles[7]{widgetId,span}:
   ra_xdr_lost,1
   ra_data_quality_items,1
   ra_leakage_by_control,2
+  ra_completeness_status,2

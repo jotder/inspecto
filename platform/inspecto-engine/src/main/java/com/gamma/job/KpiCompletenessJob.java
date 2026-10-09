@@ -135,6 +135,7 @@ final class KpiCompletenessJob implements Job {
         int streak = unknownStreak(series, recordDay);
         payload.put("unknownStreakDays", streak);
         ctx.signals().emit(SignalType.KPI_COMPLETENESS_EVALUATED, breach || fileGaps ? Severity.WARN : Severity.INFO, payload);
+        writeOutput(ctx, payload);
         // §7-h (operator, 2026-10-06): 3+ consecutive days with nothing registered is a WARN, never an Incident.
         if (streak >= STREAK_DAYS)
             ctx.signals().emit(SignalType.KPI_COMPLETENESS_UNKNOWN_STREAK, Severity.WARN, payload);
@@ -162,6 +163,23 @@ final class KpiCompletenessJob implements Job {
     static String defaultRecordDay(String sourceTimezone, java.time.ZoneId opsZone, java.time.Clock clock) {
         java.time.ZoneId zone = sourceTimezone == null || sourceTimezone.isBlank() ? opsZone : java.time.ZoneOffset.UTC;
         return LocalDate.now(clock.withZone(zone)).minusDays(1).toString();
+    }
+
+    /**
+     * Upsert the Pipeline-day row into the {@code kpi_completeness} store the Dataset reads (operator, 2026-10-09).
+     * No data root (a bare test or CLI run) leaves the run signal-only, with a warning; a refused directory throws.
+     */
+    private static void writeOutput(JobContext ctx, Map<String, Object> payload) {
+        java.nio.file.Path root = com.gamma.pipeline.SpaceConfigRoot.currentDataRoot();
+        if (root == null) {
+            ctx.log().warn("kpi_completeness row not written: no data root for this space", "pipeline", payload.get("pipeline"));
+            return;
+        }
+        try {
+            KpiCompletenessOutput.upsert(root, payload, java.time.Instant.now());
+        } catch (java.io.IOException | java.sql.SQLException e) {
+            throw new IllegalStateException(TYPE + " could not write the kpi_completeness row: " + e.getMessage(), e);
+        }
     }
 
     /** Consecutive days ending at {@code recordDay} with no registered output, within the fetched series. */

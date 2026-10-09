@@ -1,0 +1,14 @@
+vizType: table
+datasetId: kpi_completeness_dataset
+controls:
+  x[3]{field}:
+    pipeline
+    record_day
+    status
+  y[1]{field,agg}:
+    rows,sum
+options:
+  title: Completeness by Pipeline-day
+  tableSort:
+    field: record_day
+    dir: desc
