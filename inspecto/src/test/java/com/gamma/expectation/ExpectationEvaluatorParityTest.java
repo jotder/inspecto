@@ -109,4 +109,14 @@ class ExpectationEvaluatorParityTest {
         m.put("pattern", "^a");
         assertEquals("regex", Expectation.fromMap(m).kind());   // the same body with a plain pattern is accepted
     }
+
+    /** DECISION-RULE-SQL-GUARD-1: the operand is a bound parameter, never statement text. */
+    @Test
+    void theOperandIsBoundNotRendered() {
+        Map<String, Object> m = new LinkedHashMap<>(Map.of("name", "e", "target", "t", "column", "code",
+                "kind", "regex", "pattern", "^O'B"));
+        com.gamma.query.ConditionSql.Bound b = ExpectationEvaluator.countSql(Expectation.fromMap(m), data);
+        org.junit.jupiter.api.Assertions.assertFalse(b.sql().contains("O'"), b.sql());
+        assertEquals(java.util.List.of("^O'B"), b.params());
+    }
 }
