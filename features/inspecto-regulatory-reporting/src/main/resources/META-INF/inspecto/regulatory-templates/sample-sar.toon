@@ -1,0 +1,28 @@
+id: sample-sar
+title: Sample suspicious activity report
+description: "Illustrative only - the shape of a SAR / STR (header, subject, repeating incidents and evidence, narrative). It follows no real regulator's schema; a pack ships those."
+format: xml
+rootElement: suspiciousActivityReport
+delivery:
+  kind: file-drop
+  dir: regulatory-submissions/sample-sar
+fields[19]{name,source,required,maxLength}:
+  schema,"const:inspecto-sample-sar/1",true,0
+  reportId,report.id,true,64
+  preparedAt,report.createdAt,true,0
+  preparedBy,report.author,true,256
+  reportingEntity,input.reportingEntity,true,256
+  subjectId,subject.id,true,128
+  subjectType,subject.objectType,true,32
+  subjectTitle,subject.title,true,400
+  severity,subject.severity,false,32
+  amountSuspected,subject.impact.suspected,false,64
+  currency,subject.impact.currency,false,8
+  incident/id,incidents.id,false,128
+  incident/title,incidents.title,false,400
+  incident/status,incidents.status,false,64
+  evidence/name,evidence.name,false,256
+  evidence/uri,evidence.uri,false,2048
+  evidence/contentType,evidence.contentType,false,128
+  narrative,input.narrative,true,20000
+  activityPeriod,input.activityPeriod,false,128

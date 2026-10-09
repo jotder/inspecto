@@ -1,0 +1,11 @@
+id: regulatory-reporting
+title: Regulatory Reporting
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+absentMessage: "Regulatory Reporting is not installed in this bundle - regulator-format reports assembled from Cases and Incidents, approved four-eyes and submitted to a file drop, are provided by the optional inspecto-regulatory-reporting module (Professional edition and above)."
+provides:
+  features[1]: regulatoryReporting
+  routes[8]: "GET /regulatory-reports/templates","GET /regulatory-reports","GET /regulatory-reports/([^/]+)","POST /regulatory-reports","POST /regulatory-reports/([^/]+)/request-approval","POST /regulatory-reports/([^/]+)/approve","POST /regulatory-reports/([^/]+)/decline","POST /regulatory-reports/([^/]+)/retry"
+requires:
+  modules[1]: ops

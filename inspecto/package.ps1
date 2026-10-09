@@ -344,6 +344,7 @@ $reconJarSrc = $null
 $scoringJarSrc = $null
 $caseMgmtJarSrc = $null
 $actionReqJarSrc = $null
+$regReportJarSrc = $null
 if ($Edition -eq 'Standard') { $Edition = 'Professional' }
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
@@ -548,6 +549,14 @@ if ($Edition -ne 'Personal') {
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $actionReqJarSrc -or -not (Test-Path $actionReqJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $actionReqTargetDir\inspecto-action-requests-*.jar."
+    }
+    # REGULATORY-REPORTING-1: the Regulatory Reporting add-on (regulator-format reports, four-eyes, file drop). THIN; requires ops; Professional and above.
+    $regReportTargetDir = Join-Path $sandboxRoot 'features\inspecto-regulatory-reporting\target'
+    $regReportJarSrc = Get-ChildItem -Path $regReportTargetDir -Filter 'inspecto-regulatory-reporting-*.jar' -ErrorAction SilentlyContinue |
+                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                       Select-Object -First 1 -ExpandProperty FullName
+    if (-not $regReportJarSrc -or -not (Test-Path $regReportJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $regReportTargetDir\inspecto-regulatory-reporting-*.jar."
     }
     if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') {
         $policyTargetDir = Join-Path $sandboxRoot 'providers\inspecto-policy\target'
@@ -961,6 +970,21 @@ if ($actionReqJarSrc) {
         }
         Write-Host "  verified: RouteModule and ConsequenceProvider registrations present in the Action Requests module" -ForegroundColor DarkGray
     } finally { $arZip.Dispose() }
+}
+if ($regReportJarSrc) {
+    Copy-Item $regReportJarSrc "$bundleDir\inspecto-regulatory-reporting.jar"
+    Write-Host "Bundled Regulatory Reporting module -> inspecto-regulatory-reporting.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - /regulatory-reports* would 503 on a bundle supposed to have them.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $rrZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-regulatory-reporting.jar")
+    try {
+        $rrEntry = $rrZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $rrEntry) { throw "inspecto-regulatory-reporting.jar has no META-INF/services/com.gamma.spi.http.RouteModule - RegulatoryReportRoutes would never be discovered." }
+        $rrReader = New-Object System.IO.StreamReader($rrEntry.Open())
+        try { $rrBody = $rrReader.ReadToEnd() } finally { $rrReader.Dispose() }
+        if ($rrBody -notmatch [regex]::Escape('com.gamma.regreporting.RegulatoryReportRoutes')) { throw "inspecto-regulatory-reporting.jar's RouteModule service file does not list RegulatoryReportRoutes - it lists only: $rrBody" }
+        Write-Host "  verified: RouteModule registration present in the Regulatory Reporting module" -ForegroundColor DarkGray
+    } finally { $rrZip.Dispose() }
 }
 if ($agentJarSrc) {
     Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"

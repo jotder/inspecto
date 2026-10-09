@@ -11681,6 +11681,156 @@
         },
         "x-generated" : true
       }
+    },
+    "/regulatory-reports" : {
+      "get" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "GET /regulatory-reports (generated skeleton)",
+        "operationId" : "getRegulatoryReports",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "post" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "POST /regulatory-reports (generated skeleton)",
+        "operationId" : "postRegulatoryReports",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/regulatory-reports/templates" : {
+      "get" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "GET /regulatory-reports/templates (generated skeleton)",
+        "operationId" : "getRegulatoryReportsTemplates",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/regulatory-reports/{regulatoryreportId}" : {
+      "get" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "GET /regulatory-reports/{regulatoryreportId} (generated skeleton)",
+        "operationId" : "getRegulatoryReportsByRegulatoryreportId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "regulatoryreportId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/regulatory-reports/{regulatoryreportId}/approve" : {
+      "post" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "POST /regulatory-reports/{regulatoryreportId}/approve (generated skeleton)",
+        "operationId" : "postRegulatoryReportsByRegulatoryreportIdApprove",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "regulatoryreportId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/regulatory-reports/{regulatoryreportId}/decline" : {
+      "post" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "POST /regulatory-reports/{regulatoryreportId}/decline (generated skeleton)",
+        "operationId" : "postRegulatoryReportsByRegulatoryreportIdDecline",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "regulatoryreportId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/regulatory-reports/{regulatoryreportId}/request-approval" : {
+      "post" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "POST /regulatory-reports/{regulatoryreportId}/request-approval (generated skeleton)",
+        "operationId" : "postRegulatoryReportsByRegulatoryreportIdRequestApproval",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "regulatoryreportId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/regulatory-reports/{regulatoryreportId}/retry" : {
+      "post" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "POST /regulatory-reports/{regulatoryreportId}/retry (generated skeleton)",
+        "operationId" : "postRegulatoryReportsByRegulatoryreportIdRetry",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "regulatoryreportId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

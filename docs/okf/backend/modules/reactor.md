@@ -18,7 +18,7 @@ timestamp: 2026-07-22T00:00:00Z
 > lacks, all built since: `inspecto-oidc`, `-secrets`, `-geo-country`, `-observability`, `-connectors-kafka`,
 > `-telecom-asn1`, `-workflow`, `-access`, `-reconciliation`, `-scoring`, `-case-management`, `-ops`, `-exchange`,
 > `-geo-link` and the `la-*` set, `-backup`, `-notify-channels`, `-policy`, `-entity-list`, `-entity-store`, the three
-> `spi/` contracts (`-audit-spi`, `-auth-spi`, `-http-spi`) and `-action-requests`. The old `inspecto-security`,
+> `spi/` contracts (`-audit-spi`, `-auth-spi`, `-http-spi`), `-action-requests` and `-regulatory-reporting`. The old `inspecto-security`,
 > `-metrics` and `-events` modules no longer exist: security split into oidc / secrets / geo-country (D-MR6), and
 > metrics / events into `inspecto-observability`.
 >

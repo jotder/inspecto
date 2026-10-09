@@ -111,6 +111,9 @@ public final class BundleExporter {
                     // Action Requests carry rendered payloads and target response excerpts, and are signed with
                     // that same key (ASSURE-ACTION-REQUESTS-1): operational records, never exported config.
                     if (entry.startsWith("action-requests/")) continue;
+                    // Regulatory Reports carry a filing's confidential content, signed with that same key
+                    // (REGULATORY-REPORTING-1): operational records, never exported config.
+                    if (entry.startsWith("regulatory-reports/")) continue;
                     entries.put(entry, exportableBytes(f));
                     artifacts.add(artifact(entry, kindOf(f)));
                 }

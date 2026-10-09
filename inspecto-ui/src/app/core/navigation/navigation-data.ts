@@ -123,6 +123,14 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 link: '/action-requests',
             },
             {
+                id: 'regulatory-reports',
+                navFeature: 'regulatoryReporting',
+                title: 'Regulatory Reports',
+                type: 'basic',
+                icon: 'heroicons_outline:scale',
+                link: '/regulatory-reports',
+            },
+            {
                 id: 'autonomy',
                 navFeature: 'ops',
                 title: 'Autonomy',

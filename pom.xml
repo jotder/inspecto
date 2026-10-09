@@ -141,6 +141,8 @@
                 <module>features/inspecto-case-management</module>
                 <!-- MODULE-REORG-P7: Action Requests (four-eyes approved outbound calls, invoke-api); reaches Incidents/Cases through LinkedSubjectProvider. -->
                 <module>features/inspecto-action-requests</module>
+                <!-- REGULATORY-REPORTING-1: Regulatory Reporting (regulator-format reports from Cases/Incidents, four-eyes, file drop); requires ops. -->
+                <module>features/inspecto-regulatory-reporting</module>
             </modules>
         </profile>
         <profile>
@@ -170,6 +172,8 @@
                 <module>features/inspecto-case-management</module>
                 <!-- MODULE-REORG-P7: Action Requests (four-eyes approved outbound calls, invoke-api); reaches Incidents/Cases through LinkedSubjectProvider. -->
                 <module>features/inspecto-action-requests</module>
+                <!-- REGULATORY-REPORTING-1: Regulatory Reporting (regulator-format reports from Cases/Incidents, four-eyes, file drop); requires ops. -->
+                <module>features/inspecto-regulatory-reporting</module>
             </modules>
         </profile>
         <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
@@ -212,6 +216,8 @@
                 <module>features/inspecto-case-management</module>
                 <!-- MODULE-REORG-P7: Action Requests (four-eyes approved outbound calls, invoke-api); reaches Incidents/Cases through LinkedSubjectProvider. -->
                 <module>features/inspecto-action-requests</module>
+                <!-- REGULATORY-REPORTING-1: Regulatory Reporting (regulator-format reports from Cases/Incidents, four-eyes, file drop); requires ops. -->
+                <module>features/inspecto-regulatory-reporting</module>
             </modules>
         </profile>
         <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -247,6 +253,8 @@
                 <module>features/inspecto-case-management</module>
                 <!-- MODULE-REORG-P7: Action Requests (four-eyes approved outbound calls, invoke-api); reaches Incidents/Cases through LinkedSubjectProvider. -->
                 <module>features/inspecto-action-requests</module>
+                <!-- REGULATORY-REPORTING-1: Regulatory Reporting (regulator-format reports from Cases/Incidents, four-eyes, file drop); requires ops. -->
+                <module>features/inspecto-regulatory-reporting</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —
