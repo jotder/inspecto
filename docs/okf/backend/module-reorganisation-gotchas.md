@@ -38,7 +38,7 @@ Context: [module-taxonomy.md](module-taxonomy.md), [decisions](module-reorganisa
 - **`OptionalSpi` is fail-soft; a base provider must fail closed.** An absent or unloadable optional module contributes nothing silently; anything that must exist belongs in a base provider. A module's features are collected only after `register()` succeeded.
 - **Shaded jars collapse same-named resources** (every `module.toon` shared one path); the `---` separator in manifests tolerates a merge. A thin jar keeps its own.
 - **TOON has no comment syntax**: a `#` line in a manifest or Offering corrupts it.
-- **The per-Space `modules.toon` cache** keys on (mtime, size): a same-size rewrite inside one filesystem tick reads stale (a flaky test, fixed in `cee0153eb`, was exactly this).
+- **File caches must key on content, never (mtime, size).** A same-size rewrite inside one filesystem mtime tick reads as unchanged (Linux CI: nanosecond mtimes vs a millisecond stamp). Fixed 2026-10-09 in the per-Space `modules.toon` cache, `GovernanceRegistry`, `ConfigRegistry`, the Safety Policy files and the three access caches (`f2110d781`, `5c251b73a` and the follow-up). Left on size + mtime on purpose: the Link Analysis `DraftCheckpoints` (its logs are append-only, so a change always grows the file, and the entry count is checked too) and `DraftIndex` (a display-only header list).
 - **A rebuild-from-modeled-state write drops every key it does not model**: never write a typed record back without carrying the unmodelled keys (`x-` kept, anything else refused 422).
 - **A disabled module's in-flight Run is not interrupted**, and `backup` / `intelligence` have no feature id so they cannot be switched off.
 

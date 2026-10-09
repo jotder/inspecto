@@ -42,8 +42,9 @@ final class ModuleSettings {
 
     private ModuleSettings() {}
 
-    /** One parsed file, cached by its stamp so the dispatch path does not re-parse it on every request. */
-    private record Cached(long modified, long size, Set<String> disabled) {}
+    /** One parsed file, cached by its exact text so the dispatch path does not re-parse it on every request
+     *  (an (mtime, size) stamp missed a same-size rewrite inside one mtime tick and kept a disabled module on). */
+    private record Cached(String text, Set<String> disabled) {}
 
     private static final Map<Path, Cached> CACHE = new ConcurrentHashMap<>();
 
@@ -56,12 +57,11 @@ final class ModuleSettings {
                 CACHE.remove(f);
                 return Set.of();
             }
-            long modified = Files.getLastModifiedTime(f).toMillis();
-            long size = Files.size(f);
+            String text = Files.readString(f, java.nio.charset.StandardCharsets.UTF_8);
             Cached c = CACHE.get(f);
-            if (c != null && c.modified == modified && c.size == size) return c.disabled;
-            Set<String> ids = strings(ToonHelper.load(f.toString()).get(KEY));
-            CACHE.put(f, new Cached(modified, size, ids));
+            if (c != null && c.text.equals(text)) return c.disabled;
+            Set<String> ids = strings(ToonHelper.decode(text).get(KEY));
+            CACHE.put(f, new Cached(text, ids));
             return ids;
         } catch (RuntimeException | IOException unreadable) {
             org.slf4j.LoggerFactory.getLogger(ModuleSettings.class)

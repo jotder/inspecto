@@ -45,8 +45,9 @@ final class GovernanceRegistry {
         static final Snapshot EMPTY = new Snapshot(Map.of(), Map.of(), List.of());
     }
 
-    /** One file's stamp and the last version of it that validated ({@code null} = never valid). */
-    private record Entry(long mtime, long size, Object lastValid) {}
+    /** One file's exact text and the last version of it that validated ({@code null} = never valid). Keyed on the
+     *  text: an (mtime, size) stamp missed a same-size rewrite inside one mtime tick and kept the old SLA / rule. */
+    private record Entry(String text, Object lastValid) {}
 
     private final Path registryRoot;
     private final Map<Path, Entry> files = new HashMap<>();
@@ -95,23 +96,22 @@ final class GovernanceRegistry {
         for (Path f : list) {
             seen.add(f);
             String id = f.getFileName().toString().replaceFirst("\\.toon$", "");
-            long mtime, size;
+            String text;
             try {
-                mtime = Files.getLastModifiedTime(f).toMillis();
-                size = Files.size(f);
+                text = Files.readString(f, java.nio.charset.StandardCharsets.UTF_8);
             } catch (IOException e) {
                 continue;
             }
             Entry e = files.get(f);
-            if (e == null || e.mtime() != mtime || e.size() != size) {
+            if (e == null || !e.text().equals(text)) {
                 Object valid = e == null ? null : e.lastValid();
                 try {
-                    valid = parse.apply(id, ToonHelper.load(f.toString()));
+                    valid = parse.apply(id, ToonHelper.decode(text));
                 } catch (Exception bad) {
                     log.warn("Invalid governance file {} — {}: {}", f,
                             valid == null ? "not served" : "its last valid version stays in force", bad.getMessage());
                 }
-                e = new Entry(mtime, size, valid);
+                e = new Entry(text, valid);
                 files.put(f, e);
                 changed = true;
             }
