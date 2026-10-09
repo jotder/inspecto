@@ -17,6 +17,7 @@ import com.gamma.util.OperationsZone;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
+import com.gamma.signal.SignalType;
 import com.gamma.signal.Signals;
 import com.gamma.util.LockingRunner;
 import org.slf4j.Logger;
@@ -1052,7 +1053,7 @@ public final class JobService implements AutoCloseable {
      *  {@code on_signal: pipeline.commit}. The existing {@code on_pipeline} path (via {@link #onConsignmentEvent})
      *  is unchanged — the two coexist (no double-fire; different config keys). */
     private void mirrorPipelineCommit(ConsignmentEvent be) {
-        emitSignal("pipeline.commit", "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
+        emitSignal(SignalType.PIPELINE_COMMIT, "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
                 be.batchId(), null, Ref.of("pipeline", be.pipeline()), commitPayload(be));
     }
 
@@ -1087,7 +1088,7 @@ public final class JobService implements AutoCloseable {
     /** A→B→A loop protection: the chain is too deep — don't fire; emit a {@code job.chain.cut} WARN (§8.4). */
     private void refuseSignal(String name, Signal sig) {
         recordSkipped(name, "signal:" + sig.type(), "burst bound: " + maxPendingSignalRuns + " Runs already queued");
-        emitSignal("job.signal.refused", Severity.WARN, sig.correlationId(), sig.signalId(), Ref.of("job", name),
+        emitSignal(SignalType.JOB_SIGNAL_REFUSED, Severity.WARN, sig.correlationId(), sig.signalId(), Ref.of("job", name),
                 Map.of("job", name, "refusedSignalId", String.valueOf(sig.signalId()),
                         "refusedType", String.valueOf(sig.type()), "maxPending", maxPendingSignalRuns));
     }
@@ -1095,7 +1096,7 @@ public final class JobService implements AutoCloseable {
     private void cutChain(String name, Signal sig, int depth) {
         log.warn("[JOB] signal chain cut at depth {} (max {}) — not firing '{}' on '{}'",
                 depth, maxChainDepth, name, sig.type());
-        emitSignal("job.chain.cut", Severity.WARN, sig.correlationId(), sig.signalId(), Ref.of("job", name),
+        emitSignal(SignalType.JOB_CHAIN_CUT, Severity.WARN, sig.correlationId(), sig.signalId(), Ref.of("job", name),
                 Map.of("job", name, "signalType", sig.type(), "chainDepth", depth, "maxChainDepth", maxChainDepth));
     }
 
@@ -1526,7 +1527,7 @@ public final class JobService implements AutoCloseable {
         if (unavailableJobs.contains(name)) {
             String reason = "job type '" + job.type() + "' unavailable: owning Job Pack was unloaded";
             ctx.log().error("run rejected: " + reason, null);
-            ctx.signals().emit("job.run.rejected", Severity.WARN,
+            ctx.signals().emit(SignalType.JOB_RUN_REJECTED, Severity.WARN,
                     Map.of("job", name, "run", runId, "reason", reason));
             if (pipelineId != null) runningPipelines.remove(pipelineId);
             record(new JobRun(runId, name, job.type(), trigger, start,
@@ -1545,7 +1546,7 @@ public final class JobService implements AutoCloseable {
             }
             if (refused != null) {
                 ctx.log().error("run refused: " + refused, null);
-                ctx.signals().emit("job.run.rejected", Severity.WARN,
+                ctx.signals().emit(SignalType.JOB_RUN_REJECTED, Severity.WARN,
                         Map.of("job", name, "run", runId, "reason", refused));
                 if (pipelineId != null) runningPipelines.remove(pipelineId);
                 record(new JobRun(runId, name, job.type(), trigger, start,
@@ -1575,7 +1576,7 @@ public final class JobService implements AutoCloseable {
                 reasons.add("unknown expression(s): " + String.join(", ", pr.unknownExpression()));
             String reason = String.join("; ", reasons);
             ctx.log().error("run rejected: " + reason, null);
-            ctx.signals().emit("job.run.rejected", Severity.WARN,
+            ctx.signals().emit(SignalType.JOB_RUN_REJECTED, Severity.WARN,
                     Map.of("job", name, "run", runId, "missing", pr.missingRequired(),
                             "invalidType", pr.invalidType(),
                             "unknownExpression", pr.unknownExpression()));
@@ -1622,14 +1623,14 @@ public final class JobService implements AutoCloseable {
             deadline = JobDeadline.resolve(registry.deadline(job.type()), cfg);
         } catch (IllegalArgumentException bad) {
             ctx.log().error("run rejected: " + bad.getMessage(), null);
-            ctx.signals().emit("job.run.rejected", Severity.WARN,
+            ctx.signals().emit(SignalType.JOB_RUN_REJECTED, Severity.WARN,
                     Map.of("job", name, "run", runId, "reason", bad.getMessage()));
             if (pipelineId != null) runningPipelines.remove(pipelineId);
             record(new JobRun(runId, name, job.type(), trigger, start,
                     LocalDateTime.now().format(TS), "REJECTED", 0L, bad.getMessage()));
             return;
         }
-        ctx.signals().emit("job.run.started", Severity.INFO,
+        ctx.signals().emit(SignalType.JOB_RUN_STARTED, Severity.INFO,
                 Map.of("job", name, "run", runId, "trigger", trigger));
         JobResult res;
         boolean threw = false;
@@ -1678,10 +1679,10 @@ public final class JobService implements AutoCloseable {
         ctx.log().info("run completed", "status", res.status(), "durationMs", res.durationMs());
         // One terminal lifecycle signal: job.run.failed on a thrown exception, else job.run.completed.
         if (threw)
-            ctx.signals().emit("job.run.failed", Severity.CRITICAL,
+            ctx.signals().emit(SignalType.JOB_RUN_FAILED, Severity.CRITICAL,
                     Map.of("job", name, "run", runId, "outcome", res.status(), "message", String.valueOf(res.message())));
         else
-            ctx.signals().emit("job.run.completed", res.success() ? Severity.INFO : Severity.WARN,
+            ctx.signals().emit(SignalType.JOB_RUN_COMPLETED, res.success() ? Severity.INFO : Severity.WARN,
                     Map.of("job", name, "run", runId, "outcome", res.status(), "durationMs", res.durationMs()));
         JobRun run = new JobRun(runId, name, job.type(), trigger, start,
                 LocalDateTime.now().format(TS), res.status(), res.durationMs(), res.message());
@@ -2285,7 +2286,7 @@ public final class JobService implements AutoCloseable {
         reportedOrphans = Set.copyOf(findings);
         List<String> fresh = findings.stream().filter(f -> !previous.contains(f)).toList();
         if (!fresh.isEmpty())
-            emitSignal("maintenance.scheduler.findings", Severity.WARN, null, null,
+            emitSignal(SignalType.MAINTENANCE_SCHEDULER_FINDINGS, Severity.WARN, null, null,
                     Ref.of("job", "orphan_audit"),
                     Map.of("count", fresh.size(), "findings", fresh));
         return fresh;
@@ -2311,7 +2312,7 @@ public final class JobService implements AutoCloseable {
         List<String> fresh = findings.stream().filter(f -> !previous.contains(f)).toList();
         if (!fresh.isEmpty()) {
             for (String f : fresh) log.warn("[JOB] {}", f);
-            emitSignal("maintenance.scheduler.findings", Severity.WARN, null, null,
+            emitSignal(SignalType.MAINTENANCE_SCHEDULER_FINDINGS, Severity.WARN, null, null,
                     Ref.of("job", "shared_pipeline_audit"),
                     Map.of("count", fresh.size(), "findings", fresh));
         }

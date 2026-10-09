@@ -8,6 +8,6 @@ public final class ScoringSignals {
 
     private ScoringSignals() {}
 
-    /** Signal type {@code risk.score.produced}. */
-    public static final String RISK_SCORE_PRODUCED = "risk.score.produced";
+    /** Signal type {@code risk.score.produced} — a cross-module contract, so it aliases the core constant. */
+    public static final String RISK_SCORE_PRODUCED = com.gamma.signal.SignalType.RISK_SCORE_PRODUCED;
 }

@@ -831,7 +831,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private void onRiskScoreProduced(com.gamma.audit.Event e) {
         if (!com.gamma.audit.EventType.SIGNAL.equals(e.type())) return;
         com.gamma.signal.Signal sig = com.gamma.signal.Signal.fromEvent(e);
-        if (!"risk.score.produced".equals(sig.type()) || !(sig.payload().get("model") instanceof String model)) return;
+        if (!com.gamma.signal.SignalType.RISK_SCORE_PRODUCED.equals(sig.type()) || !(sig.payload().get("model") instanceof String model)) return;
         java.nio.file.Path writeRoot = root.config();
         if (writeRoot == null) {
             String wr = System.getProperty("assist.write.root");

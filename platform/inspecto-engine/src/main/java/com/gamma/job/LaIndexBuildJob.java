@@ -2,6 +2,7 @@ package com.gamma.job;
 
 import com.gamma.linkindex.LinkIndexAccess;
 import com.gamma.signal.Severity;
+import com.gamma.signal.SignalType;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -77,7 +78,7 @@ final class LaIndexBuildJob implements Job {
         payload.put("edges", o.edges());
         payload.put("nodes", o.nodes());
         payload.put("deltas", o.deltas());
-        ctx.signals().emit("la.index.build.completed", o.ok() ? Severity.INFO : Severity.WARN, payload);
+        ctx.signals().emit(SignalType.LA_INDEX_BUILD_COMPLETED, o.ok() ? Severity.INFO : Severity.WARN, payload);
         ctx.log().info("link index build", "result", o.result(), "mode", o.mode(), "code", o.code());
 
         long ms = (System.nanoTime() - t0) / 1_000_000L;

@@ -29,6 +29,9 @@ class SignalTypeTest {
         assertEquals("job.run.rejected", SignalType.JOB_RUN_REJECTED);
         assertEquals("job.chain.cut", SignalType.JOB_CHAIN_CUT);
         assertEquals("pipeline.commit", SignalType.PIPELINE_COMMIT);
+        assertEquals("job.signal.refused", SignalType.JOB_SIGNAL_REFUSED);
+        assertEquals("la.index.build.completed", SignalType.LA_INDEX_BUILD_COMPLETED);
+        assertEquals("risk.score.produced", SignalType.RISK_SCORE_PRODUCED);
         assertEquals("maintenance.filerepo.findings", SignalType.MAINTENANCE_FILEREPO_FINDINGS);
         assertEquals("maintenance.metadata.findings", SignalType.MAINTENANCE_METADATA_FINDINGS);
         assertEquals("maintenance.storage.threshold", SignalType.MAINTENANCE_STORAGE_THRESHOLD);

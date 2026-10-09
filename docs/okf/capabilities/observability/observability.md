@@ -571,7 +571,7 @@ proves the round trip.
 `com.gamma.signal.SignalType`; each optional module keeps its own in a constants class beside its jobs
 (`ReconSignals`, `BackupSignals`, `ScreeningSignals`, `ScoringSignals`, `CaseSignals`, `OpsSignals`), so core
 never names module vocabulary. Every value is pinned byte-for-byte by `SignalTypeTest` / `<Module>SignalsTest`.
-⚠ Still literal: `JobService`, `LaIndexBuildJob`, and `CollectorService`'s `risk.score.produced` match.
+No dotted literal is left at an emit site (2026-10-10): `JobService` and `LaIndexBuildJob` (Link Analysis is core, so `LA_INDEX_BUILD_COMPLETED` sits in `SignalType` beside `LA_DETECT_COMPLETED`) use `SignalType`. `risk.score.produced` is a cross-module contract — scoring emits it, core's `CollectorService` matches it — so it lives in core `SignalType.RISK_SCORE_PRODUCED` and `ScoringSignals.RISK_SCORE_PRODUCED` aliases it; they cannot drift. ⚠ The `JobTypeDescriptor` emitted-signal lists in `JobService` stay literal: they are catalog declarations, not emit sites.
 Design archived: `archived-documents/plans-archive/completeness-kpi-k4-design.md`.
 
 **The two deviation bases (operator, 2026-08-30 — ⛔ do not re-ask):**

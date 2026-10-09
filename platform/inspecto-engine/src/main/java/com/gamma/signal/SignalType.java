@@ -91,4 +91,17 @@ public final class SignalType {
 
     /** Signal type {@code maintenance.scheduler.findings}. */
     public static final String MAINTENANCE_SCHEDULER_FINDINGS = "maintenance.scheduler.findings";
+
+    /** Signal type {@code job.signal.refused}. */
+    public static final String JOB_SIGNAL_REFUSED = "job.signal.refused";
+
+    /** Signal type {@code la.index.build.completed} (Link Analysis is core, like {@link #LA_DETECT_COMPLETED}). */
+    public static final String LA_INDEX_BUILD_COMPLETED = "la.index.build.completed";
+
+    /**
+     * Signal type {@code risk.score.produced} — a CROSS-MODULE contract: the scoring module emits it and core
+     * ({@code CollectorService}) matches it, so it lives here; {@code ScoringSignals.RISK_SCORE_PRODUCED}
+     * references this constant so the two cannot drift.
+     */
+    public static final String RISK_SCORE_PRODUCED = "risk.score.produced";
 }
