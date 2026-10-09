@@ -144,7 +144,7 @@ final class SqlTemplateJob implements Job {
 
         swapIn(outDir, tmp, snapshot);
         ctx.artifacts().dataset("output", sink, meta, rows, Instant.now());
-        ctx.signals().emit("job.dataset.produced", Severity.INFO, Map.of("dataset", sink, "rows", rows));
+        ctx.signals().emit(com.gamma.signal.SignalType.JOB_DATASET_PRODUCED, Severity.INFO, Map.of("dataset", sink, "rows", rows));
         ctx.log().info("wrote derived dataset", "sink", sink, "rows", rows, "sources", sources);
         return JobResult.ok("sql.template: " + rows + " row(s) → dataset '" + sink + "'",
                 (System.nanoTime() - t0) / 1_000_000L);

@@ -546,6 +546,11 @@ findings are merged into the active Incident's attributes (`ObjectAccess.saveAtt
 `OBJECT_ACTIVITY` `findings-updated` event by actor `system`); identical findings are suppressed; the title and
 message are not rewritten. Dry-run / pack-harness stand-ins keep the open-only default. Three or more consecutive days with nothing registered emit `kpi.completeness.unknown_streak`
 at WARN (`unknownStreakDays` in the payload) and open **no** Incident. The 28 / 7 / 0.3 defaults are confirmed.
+**Signal-type constants (§8-C, operator, 2026-10-09).** Core dotted Signal types live in
+`com.gamma.signal.SignalType`; each optional module keeps its own in a constants class beside its jobs
+(`ReconSignals`, `BackupSignals`, `ScreeningSignals`, `ScoringSignals`, `CaseSignals`, `OpsSignals`), so core
+never names module vocabulary. Every value is pinned byte-for-byte by `SignalTypeTest` / `<Module>SignalsTest`.
+⚠ Still literal: `JobService`, `LaIndexBuildJob`, and `CollectorService`'s `risk.score.produced` match.
 Design archived: `archived-documents/plans-archive/completeness-kpi-k4-design.md`.
 
 **The two deviation bases (operator, 2026-08-30 — ⛔ do not re-ask):**

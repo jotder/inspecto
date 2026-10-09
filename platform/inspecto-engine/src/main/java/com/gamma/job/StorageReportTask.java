@@ -83,7 +83,7 @@ final class StorageReportTask {
             for (Map.Entry<Path, Long> f : files.subList(0, Math.min(top, files.size())))
                 ctx.log().info("largest consumer", "path", f.getKey().toString(), "bytes", f.getValue());
             if (breached)
-                ctx.signals().emit("maintenance.storage.threshold", Severity.WARN,
+                ctx.signals().emit(com.gamma.signal.SignalType.MAINTENANCE_STORAGE_THRESHOLD, Severity.WARN,
                         Map.of("dir", dir.toString(), "totalBytes", totalBytes, "warnBytes", warnBytes));
             // Persist this run's per-axis sample so the series accumulates queryably for storage_trend —
             // real runs only (a dry-run preview must never add a data point to the trend).

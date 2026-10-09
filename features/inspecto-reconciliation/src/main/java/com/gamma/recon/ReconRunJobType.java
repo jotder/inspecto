@@ -29,7 +29,7 @@ public final class ReconRunJobType implements JobTypeProvider {
                 List.of(ParameterDecl.required("reconciliation", ParamType.STRING, "Saved reconciliation component id"),
                         ParameterDecl.optional("day", ParamType.DATE, null,
                                 "The day to reconcile (yyyy-mm-dd); absent = the latest day present on any side")),
-                List.of("recon.run.completed"), List.of(), List.of("objects"));
+                List.of(ReconSignals.RECON_RUN_COMPLETED), List.of(), List.of("objects"));
     }
 
     @Override

@@ -51,7 +51,7 @@ public final class ScreeningJobType implements JobTypeProvider {
             List.of(ParameterDecl.required("dataset", ParamType.STRING, "Dataset to screen"),
                     ParameterDecl.required("keyField", ParamType.STRING, "Column that identifies the subject"),
                     ParameterDecl.required("lists", ParamType.STRING, "Entity List ids, comma separated")),
-            List.of("screening.hits.raised"),
+            List.of(ScreeningSignals.SCREENING_HITS_RAISED),
             List.of());
 
     private final String dataDir;
@@ -142,7 +142,7 @@ public final class ScreeningJobType implements JobTypeProvider {
             attrs.put("raised", raised);
             ScreeningHits.audit(actor, "job", "screening.run.hits", ID + " " + cfg.name() + ": " + raised
                     + " new hit(s) from " + matched + " match(es) over " + screened + " subject(s)", attrs);
-            ctx.signals().emit("screening.hits.raised", Severity.INFO, Map.of("dataset", p.dataset(),
+            ctx.signals().emit(ScreeningSignals.SCREENING_HITS_RAISED, Severity.INFO, Map.of("dataset", p.dataset(),
                     "screened", screened, "matched", matched, "raised", raised));
             ctx.log().info("screened subjects", "dataset", p.dataset(), "screened", screened, "matched", matched,
                     "raised", raised);

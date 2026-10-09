@@ -113,7 +113,7 @@ public final class SignalIngress implements AutoCloseable {
     static boolean elevated(Signal s) {
         return s.severity().ordinal() >= Severity.ERROR.ordinal()
                 || Signals.matchesType(s.type(), "pipeline.batch.failed")
-                || Signals.matchesType(s.type(), "job.run.failed");
+                || Signals.matchesType(s.type(), com.gamma.signal.SignalType.JOB_RUN_FAILED);
     }
 
     /** The most recent elevated signals, newest first, at most {@code limit}. */

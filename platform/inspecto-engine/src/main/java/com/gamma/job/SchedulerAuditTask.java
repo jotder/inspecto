@@ -70,8 +70,8 @@ final class SchedulerAuditTask {
         Map<String, String> outputStores = host.pipelineOutputStores();   // null = host never wired them — skip, don't guess
         if (outputStores != null) findings.addAll(orphanOutputStoreFindings(all, outputStores));
         findings.addAll(sharedPipelineFindings(all));   // JOB-PIPELINE-PARAM-UNIQUE-1: why a job skips
-        Set<String> emitted = new LinkedHashSet<>(List.of("job.run.started", "job.run.completed",
-                "job.run.failed", "job.run.rejected", "job.chain.cut", "pipeline.commit"));
+        Set<String> emitted = new LinkedHashSet<>(List.of(com.gamma.signal.SignalType.JOB_RUN_STARTED, com.gamma.signal.SignalType.JOB_RUN_COMPLETED,
+                com.gamma.signal.SignalType.JOB_RUN_FAILED, com.gamma.signal.SignalType.JOB_RUN_REJECTED, com.gamma.signal.SignalType.JOB_CHAIN_CUT, com.gamma.signal.SignalType.PIPELINE_COMMIT));
         for (JobTypeDescriptor d : host.jobTypes()) emitted.addAll(d.emits());
         for (JobConfig c : all) {
             if (!c.enabled() || !c.hasSignal()) continue;
@@ -83,7 +83,7 @@ final class SchedulerAuditTask {
         if (ctx != null) {
             for (String f : findings) ctx.log().warn(f);
             if (!findings.isEmpty())
-                ctx.signals().emit("maintenance.scheduler.findings", Severity.WARN,
+                ctx.signals().emit(com.gamma.signal.SignalType.MAINTENANCE_SCHEDULER_FINDINGS, Severity.WARN,
                         Map.of("count", findings.size(), "findings", findings));
         }
         return JobResult.ok("scheduler_audit: " + findings.size() + " finding(s) across " + all.size()

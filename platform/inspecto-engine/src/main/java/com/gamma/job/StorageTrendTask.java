@@ -87,7 +87,7 @@ final class StorageTrendTask {
                         + (etaDays <= warnDays ? " (within warn_days=" + warnDays + ")" : "");
 
         if (ctx != null && breach)
-            ctx.signals().emit("maintenance.storage.trend", Severity.WARN, Map.of(
+            ctx.signals().emit(com.gamma.signal.SignalType.MAINTENANCE_STORAGE_TREND, Severity.WARN, Map.of(
                     "currentBytes", latestTotal, "bytesPerDay", Math.round(totalPerDay),
                     "etaDays", etaDays, "warnBytes", warnBytes,
                     "topAxis", axisTrends.isEmpty() ? "-" : axisTrends.get(0).axis()));

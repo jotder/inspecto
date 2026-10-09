@@ -22,7 +22,7 @@ final class SqlTemplateJobType implements JobTypeProvider {
                             .description("SQL SELECT template; its $name tokens are the runtime parameters").build(),
                     ParameterDecl.required("sink_dataset", ParamType.STRING, "Output Dataset (store dir under the data root)"),
                     ParameterDecl.optional("sources", ParamType.STRING, null, "CSV of source store names to register as views")),
-            List.of("job.dataset.produced"),
+            List.of(com.gamma.signal.SignalType.JOB_DATASET_PRODUCED),
             List.of(ArtifactDecl.dataset("output")));
 
     private final String dataDir;

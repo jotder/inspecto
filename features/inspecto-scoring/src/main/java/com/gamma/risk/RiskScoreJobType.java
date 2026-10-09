@@ -37,7 +37,7 @@ public final class RiskScoreJobType implements JobTypeProvider {
             "Scores every entity a saved Risk Score model names (Σ weight × indicator, 0–100, with its factors) "
                     + "and writes the scores Dataset.",
             List.of(ParameterDecl.required("model", ParamType.STRING, "Saved risk-score component id")),
-            List.of("risk.score.produced"),
+            List.of(ScoringSignals.RISK_SCORE_PRODUCED),
             List.of(ArtifactDecl.dataset("scores")));
 
     private final String dataDir;
@@ -97,7 +97,7 @@ public final class RiskScoreJobType implements JobTypeProvider {
             if (model.watchList() != null)
                 ctx.log().info("fed watch list", "model", modelId, "list", model.watchList().list(), "written", fed);
             ctx.artifacts().dataset("scores", model.scoresDataset(), META, run.scored().size(), now);
-            ctx.signals().emit("risk.score.produced", Severity.INFO, Map.of("model", modelId,
+            ctx.signals().emit(ScoringSignals.RISK_SCORE_PRODUCED, Severity.INFO, Map.of("model", modelId,
                     "dataset", model.scoresDataset(), "entities", run.scored().size(), "high", high));
             ctx.log().info("scored entities", "model", modelId, "entities", run.scored().size(), "high", high,
                     "modelVersion", version, "evidenceTruncated", run.evidenceTruncated());

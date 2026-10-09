@@ -157,7 +157,7 @@ final class BackupTask {
         if (ctx != null) {
             ctx.artifacts().file("backup", zip, zipBytes);
             ctx.artifacts().file("backup_manifest", sidecar, Files.size(sidecar));
-            ctx.signals().emit("maintenance.backup.completed", Severity.INFO, Map.of(
+            ctx.signals().emit(BackupSignals.BACKUP_COMPLETED, Severity.INFO, Map.of(
                     "archive", zip.toString(), "archiveSha256", zipSha,
                     "fileCount", files.size(), "totalBytes", totalBytes));
         }
@@ -213,7 +213,7 @@ final class BackupTask {
         if (ctx != null) {
             for (String f : findings) ctx.log().error(f, null);
             if (!findings.isEmpty()) {
-                ctx.signals().emit("maintenance.backup.verify_failed", Severity.CRITICAL,
+                ctx.signals().emit(BackupSignals.BACKUP_VERIFY_FAILED, Severity.CRITICAL,
                         Map.of("backupDir", backupDir.toString(), "count", findings.size(), "findings", findings));
             }
         }
@@ -333,7 +333,7 @@ final class BackupTask {
                     + " failed the post-extraction hash check (first: " + mismatches.get(0) + ")", ms);
         }
         if (ctx != null) {
-            ctx.signals().emit("maintenance.restore.completed", Severity.INFO, Map.of(
+            ctx.signals().emit(BackupSignals.RESTORE_COMPLETED, Severity.INFO, Map.of(
                     "archive", zip.toString(), "target", target.toString(), "fileCount", restored));
         }
         return JobResult.ok("restore: " + restored + " file(s), " + totalBytes + " byte(s) from "

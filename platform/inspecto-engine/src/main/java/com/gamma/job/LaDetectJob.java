@@ -60,7 +60,7 @@ final class LaDetectJob implements Job {
         payload.put("job", cfg.name());
         payload.put("fired", fired.size());
         payload.put("rules", names);
-        ctx.signals().emit("la.detect.completed", fired.isEmpty() ? Severity.INFO : Severity.WARN, payload);
+        ctx.signals().emit(com.gamma.signal.SignalType.LA_DETECT_COMPLETED, fired.isEmpty() ? Severity.INFO : Severity.WARN, payload);
         ctx.log().info("investigation alert rules evaluated", "fired", fired.size(), "rules", names);
         String msg = fired.isEmpty()
                 ? "la.detect: no Investigation rule breached"

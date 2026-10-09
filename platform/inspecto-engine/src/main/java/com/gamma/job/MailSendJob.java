@@ -70,7 +70,7 @@ final class MailSendJob implements Job {
         // are the operator's contact data, not diagnostics.
         ctx.log().info(sent ? "mail sent" : "no email channel configured — nothing sent",
                 "recipients", to.size() + cc.size(), "subject", subject);
-        ctx.signals().emit("mail.sent", Severity.INFO,
+        ctx.signals().emit(com.gamma.signal.SignalType.MAIL_SENT, Severity.INFO,
                 Map.of("job", cfg.name(), "run", ctx.runId(), "recipients", to.size() + cc.size(), "sent", sent));
 
         long ms = (System.nanoTime() - t0) / 1_000_000L;

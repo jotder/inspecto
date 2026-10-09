@@ -249,7 +249,7 @@ final class ReportJob implements Job {
                 .action("report.attach.refused").actionCategory("security")
                 .attr("job", cfg.name()).attr("fingerprint", fp));
         if (ctx != null)
-            ctx.signals().emit("report.attach.refused", com.gamma.signal.Severity.WARN,
+            ctx.signals().emit(com.gamma.signal.SignalType.REPORT_ATTACH_REFUSED, com.gamma.signal.Severity.WARN,
                     Map.of("job", cfg.name(), "reason", why, "fingerprint", fp));
         throw new IllegalStateException("report '" + cfg.name() + "': " + why);
     }

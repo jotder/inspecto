@@ -151,7 +151,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                         ParameterDecl.optional(P_TIMEOUT, ParamType.INTEGER, "300", "Connect and statement timeout, seconds"),
                         ParameterDecl.optional(P_RETRIES, ParamType.INTEGER, "2",
                                 "Retries of the whole transaction on a transient (connection/serialization) failure")),
-                List.of("publish.postgres.completed"), List.of());
+                List.of(com.gamma.signal.SignalType.PUBLISH_POSTGRES_COMPLETED), List.of());
     }
 
     @Override
@@ -202,7 +202,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             try {
                 String msg = publish(ctx, p, rows);
                 audit("success", schema, rows, null);
-                ctx.signals().emit("publish.postgres.completed", Severity.INFO, Map.of("job", cfg.name(),
+                ctx.signals().emit(com.gamma.signal.SignalType.PUBLISH_POSTGRES_COMPLETED, Severity.INFO, Map.of("job", cfg.name(),
                         "schema", String.valueOf(schema), "tables", String.join(",", rows.keySet()),
                         "rows", rows.values().stream().mapToLong(Long::longValue).sum()));
                 return JobResult.ok(msg, ms(t0));
@@ -226,7 +226,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
 
         private JobResult refuse(JobContext ctx, String why, long t0) {
             audit("refused", cfg.params().get(P_SCHEMA), Map.of(), why);
-            ctx.signals().emit("publish.postgres.refused", Severity.WARN, Map.of("job", cfg.name(), "reason", why));
+            ctx.signals().emit(com.gamma.signal.SignalType.PUBLISH_POSTGRES_REFUSED, Severity.WARN, Map.of("job", cfg.name(), "reason", why));
             ctx.log().error("publish.postgres refused: " + why, null, "job", cfg.name());
             return JobResult.failed(TYPE_ID + " refused: " + why, ms(t0));
         }

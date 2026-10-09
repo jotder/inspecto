@@ -69,7 +69,7 @@ final class SampleHelloJob implements Job {
                     .isPresent();
         }
 
-        ctx.signals().emit("sample.hello.completed", Severity.INFO,
+        ctx.signals().emit(com.gamma.signal.SignalType.SAMPLE_HELLO_COMPLETED, Severity.INFO,
                 Map.of("job", cfg.name(), "run", ctx.runId(), "notified", emitted));
         return JobResult.ok(title + (emitted ? " (notification emitted)" : " (no notification emitted)"),
                 (System.nanoTime() - t0) / 1_000_000L);

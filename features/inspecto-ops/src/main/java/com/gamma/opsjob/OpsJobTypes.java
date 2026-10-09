@@ -61,7 +61,7 @@ public final class OpsJobTypes {
                                     "CSV of INCIDENT | CASE | TASK (default: all three)"),
                             ParameterDecl.optional("retention_days", ParamType.INTEGER, "0",
                                     "Forget samples older than N days (0 = keep forever)")),
-                    List.of("objects.analytics.completed"), List.of(), OBJECTS);
+                    List.of(OpsSignals.OBJECTS_ANALYTICS_COMPLETED), List.of(), OBJECTS);
         }
 
         /** ⚠ No supplier and no data root: both are resolved from the {@code JobContext} at run time. */

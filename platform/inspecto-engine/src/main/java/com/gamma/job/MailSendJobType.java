@@ -34,7 +34,7 @@ final class MailSendJobType implements JobTypeProvider {
                     ParameterDecl.of("body", ParamType.TEXT).label("Body")
                             .tier(ParameterDecl.Tier.REQUIRED).group("Message")
                             .description("Message body").build()),
-            List.of("mail.sent"),
+            List.of(com.gamma.signal.SignalType.MAIL_SENT),
             List.of(),
             List.of("mail"));
 

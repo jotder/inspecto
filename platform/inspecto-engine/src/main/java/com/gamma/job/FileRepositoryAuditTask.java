@@ -73,7 +73,7 @@ final class FileRepositoryAuditTask {
         if (ctx != null) {
             for (String f : findings) ctx.log().warn(f);
             if (!findings.isEmpty())
-                ctx.signals().emit("maintenance.filerepo.findings", Severity.WARN,
+                ctx.signals().emit(com.gamma.signal.SignalType.MAINTENANCE_FILEREPO_FINDINGS, Severity.WARN,
                         Map.of("count", findings.size(), "findings", findings));
         }
         return JobResult.ok("file_repository_audit: " + findings.size() + " finding(s) under " + dataRoot

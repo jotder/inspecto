@@ -72,7 +72,7 @@ public final class CaseRuleEvalJob implements Job {
         payload.put("grouped", e.grouped());
         payload.put("opened", e.opened());
         if (e.caseId() != null) payload.put("caseId", e.caseId());
-        ctx.signals().emit("caserule.evaluate.completed", Severity.INFO, payload);
+        ctx.signals().emit(CaseSignals.CASERULE_EVALUATE_COMPLETED, Severity.INFO, payload);
         ctx.log().info("case rule evaluated", "rule", ruleName, "matched", e.matched(),
                 "grouped", e.grouped(), "case", e.caseId());
 

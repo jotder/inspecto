@@ -83,7 +83,7 @@ final class AlertEvaluateJob implements Job {
         if (freshnessOnly) payload.put("scope", "freshness");
         // WARN when something breached, so the Run itself is visible in the feed — the Alert/Incident
         // objects are opened by the Alert engine, not here.
-        ctx.signals().emit("alert.evaluate.completed",
+        ctx.signals().emit(com.gamma.signal.SignalType.ALERT_EVALUATE_COMPLETED,
                 fired.isEmpty() ? Severity.INFO : Severity.WARN, payload);
         ctx.log().info("alert rules evaluated", "fired", fired.size(), "rules", names);
 

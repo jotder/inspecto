@@ -125,7 +125,7 @@ public final class ReconRunJob implements Job {
         payload.put("valueBreak", valueBreak);
         payload.put("breaks", breaks);
         payload.put("matchedKeys", summary.get("matchedKeys"));
-        ctx.signals().emit("recon.run.completed", breaks > 0 ? Severity.WARN : Severity.INFO, payload);
+        ctx.signals().emit(ReconSignals.RECON_RUN_COMPLETED, breaks > 0 ? Severity.WARN : Severity.INFO, payload);
         ctx.log().info("reconciliation complete", "reconciliation", reconId, "breaks", breaks);
         if (breaks > 0) openIncident(ctx, reconId, missingLeft, missingRight, valueBreak, breaks);
         String notRecorded = fresh == null ? computeError : recordRun(ctx, writeRoot, reconId, fresh, scoped.day());

@@ -21,7 +21,7 @@ public final class CaseRuleEvaluate implements JobTypeProvider {
         return new JobTypeDescriptor("caserule.evaluate", "Case Rule Evaluation",
                 "Evaluates a saved Case Rule, grouping matching Incidents into a Case; emits a completion signal.",
                 List.of(ParameterDecl.required("rule", ParamType.STRING, "Saved case rule name")),
-                List.of("caserule.evaluate.completed"), List.of(), OpsJobTypes.OBJECTS);
+                List.of(CaseSignals.CASERULE_EVALUATE_COMPLETED), List.of(), OpsJobTypes.OBJECTS);
     }
 
     /** No supplier: the job resolves its Space's engine from the {@code JobContext} at run time. */

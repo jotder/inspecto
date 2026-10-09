@@ -156,7 +156,7 @@ public final class ObjectsAnalyticsJob implements Job {
             Map<String, Object> failure = new LinkedHashMap<>();
             failure.put("rows", rows.size());
             failure.put("error", e.getMessage());
-            ctx.signals().emit("objects.analytics.completed", Severity.WARN, failure);
+            ctx.signals().emit(OpsSignals.OBJECTS_ANALYTICS_COMPLETED, Severity.WARN, failure);
             log.warn("objects.analytics write failed: {}", e.getMessage());
             throw e;   // the write IS the work — never report a silent no-op success
         }
@@ -169,7 +169,7 @@ public final class ObjectsAnalyticsJob implements Job {
         payload.put("types", types.stream().map(Enum::name).toList());
         payload.put("durationMs", ms);
         if (purged > 0) payload.put("purged", purged);
-        ctx.signals().emit("objects.analytics.completed", Severity.INFO, payload);
+        ctx.signals().emit(OpsSignals.OBJECTS_ANALYTICS_COMPLETED, Severity.INFO, payload);
         ctx.log().info("object analytics sampled", "dataset", CATALOG, "rows", rows.size(),
                 "types", types.size(), "purged", purged);
         ctx.artifacts().dataset(LEDGER, LEDGER, null, ledger.size(), now);

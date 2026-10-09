@@ -390,7 +390,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             loaded.put(name, pack);
             rejectedRows.remove(name);
             log.info("[PACKS] loaded {} v{} ({}): {}", pack.id(), pack.version(), name, ids);
-            signals.emit("job.pack.loaded", Severity.INFO, packPayload(pack));
+            signals.emit(com.gamma.signal.SignalType.JOB_PACK_LOADED, Severity.INFO, packPayload(pack));
             return true;
             // 🔴 LinkageError is NOT optional here. The five ServiceLoader loops above run over an
             // OPERATOR-SUPPLIED pack loader, and a pack that is present but UNLOADABLE — a class compiled
@@ -417,7 +417,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             row.put("state", "rejected");
             row.put("cause", cause);
             rejectedRows.put(name, row);
-            signals.emit("job.pack.rejected", Severity.WARN, Map.of("file", name, "hash", hash, "cause", cause));
+            signals.emit(com.gamma.signal.SignalType.JOB_PACK_REJECTED, Severity.WARN, Map.of("file", name, "hash", hash, "cause", cause));
             return false;
         }
     }
@@ -466,7 +466,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         if (registry.platform() != null) registry.platform().deregister(name);
         log.info("[PACKS] unloaded {} ({}): {}{}", pack.id(), name, removed,
                 removedTokens.isEmpty() ? "" : " + tokens " + removedTokens);
-        signals.emit("job.pack.unloaded", Severity.INFO, packPayload(pack));
+        signals.emit(com.gamma.signal.SignalType.JOB_PACK_UNLOADED, Severity.INFO, packPayload(pack));
         if (unloadListener != null) unloadListener.onUnload(name);
         closeOrDefer(name, pack);
     }
