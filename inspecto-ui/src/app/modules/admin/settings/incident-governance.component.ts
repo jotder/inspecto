@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { FormArray, FormBuilder, FormGroup, FormGroupDirective, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -325,7 +325,12 @@ import {
                                 Editing Escalation Rule <span class="font-mono">{{ e.name }}</span>
                             </p>
                         }
-                        <form [formGroup]="rule" class="flex flex-wrap items-start gap-3" (ngSubmit)="addRule()">
+                        <form
+                            #ruleForm="ngForm"
+                            [formGroup]="rule"
+                            class="flex flex-wrap items-start gap-3"
+                            (ngSubmit)="addRule()"
+                        >
                             <mat-form-field class="w-48">
                                 <mat-label>Rule id</mat-label>
                                 <input matInput formControlName="id" />
@@ -450,6 +455,7 @@ export class IncidentGovernanceComponent implements OnInit {
     readonly rules = signal<ComponentDef[]>([]);
     /** The stored rule the form is editing (null = the form adds a new rule). */
     readonly editing = signal<ComponentDef | null>(null);
+    @ViewChild('ruleForm') private ruleForm?: FormGroupDirective;
     /** The match context an Escalation Rule's `when` is evaluated over (server `escalationContext`). */
     readonly contextColumns = ESCALATION_CONTEXT_COLUMNS;
     /** The new rule's `when` tree; the condition-group editor mutates it in place. */
@@ -651,8 +657,9 @@ export class IncidentGovernanceComponent implements OnInit {
             return;
         }
         const draft: EscalationRuleDraft = { ...this.rule.getRawValue(), objectType: this.type, when: this.whenGroup };
-        this.report(this.components.create('escalation-rule', escalationRuleContent(draft)), 'Escalation Rule');
-        this.resetWhen();
+        this.report(this.components.create('escalation-rule', escalationRuleContent(draft)), 'Escalation Rule', () =>
+            this.cancelEdit(),
+        );
     }
 
     /** Load a stored rule into the form; its id is fixed while editing (a rename is delete + add). */
@@ -678,10 +685,12 @@ export class IncidentGovernanceComponent implements OnInit {
         }
     }
 
+    /** Leave edit mode (if in it) and clear the form, its submitted state included so no error shows on it. */
     cancelEdit(): void {
         this.editing.set(null);
         this.rule.controls.id.enable();
-        this.rule.reset();
+        if (this.ruleForm) this.ruleForm.resetForm();
+        else this.rule.reset();
         this.resetWhen();
     }
 

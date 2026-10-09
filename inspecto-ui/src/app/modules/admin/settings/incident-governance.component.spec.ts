@@ -299,6 +299,24 @@ describe('IncidentGovernanceComponent', () => {
             expect(el.textContent).toContain('changed since you opened it');
         });
 
+        it('a saved edit leaves a clean blank form: no required-id error from the submit that saved it', () => {
+            const { fixture, el, button } = editing();
+            button('Save Escalation Rule')!.click();
+            fixture.detectChanges();
+            expect(button('Add Escalation Rule')).toBeTruthy();
+            expect(el.querySelector('mat-error')).toBeNull();
+        });
+
+        it('a created rule clears the add form without flagging the blank id', () => {
+            const { c, fixture, el, button, components } = setup();
+            c.rule.patchValue({ id: 'second' });
+            button('Add Escalation Rule')!.click();
+            fixture.detectChanges();
+            expect(components.create).toHaveBeenCalled();
+            expect(c.rule.getRawValue().id).toBe('');
+            expect(el.querySelector('mat-error')).toBeNull();
+        });
+
         it('cancel returns the form to adding a new rule', () => {
             const { c, fixture, button } = editing();
             button('Cancel')!.click();
