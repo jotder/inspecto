@@ -26,9 +26,13 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   (ISO); absent = the **latest** day present on any side. Each side's relation is filtered to that day of its
   Dataset's temporal column — `columns[].role: temporal` (`DatasetRelation.temporalColumn`), else `dateField`. A DATE
   column is compared bare, a TIMESTAMP as a half-open range (so Parquet row-group statistics can skip), anything else
-  through `TRY_CAST(… AS DATE)`. ⛔ **Decision: a Dataset with no temporal column is a 422 naming the fix**, not the
-  whole relation with `dayScoped:false` (operator, 2026-10-09 — fail-closed: an unscoped side would compare 30 days of
-  one system against one day of another and report every key as a Break). `availableDays` = the distinct days across
+  through `TRY_CAST(… AS DATE)`. ⛔ **Decision (operator, 2026-10-09, revised the same day):** when SOME sides declare a
+  day column and another does not, that side is a **422 naming the fix** (an unscoped side would compare 30 days of one
+  system against one day of another and report every key as a Break); when **NO** side declares one, the whole
+  relations are compared and the answer says **`dayScoped: false`** (`day` null, `availableDays` empty; a `day` then is
+  a 422). The first cut refused every undated Reconciliation; the full gate showed the committed telco-ra and
+  mobile-money templates are whole-period Reconciliations (rated-vs-billed compares a month's invoices), so the
+  all-undated case became the explicit unscoped answer instead. `availableDays` = the distinct days across
   the sides, newest first, capped 366. A `day` that is not an ISO date is a 422 and is the only form that reaches SQL.
 * **One pass** (`ReconService.dayRun`): the grain FULL OUTER JOIN chain is materialised once as `__grain`, each row
   classified by `__cls` bits (missing on A/B/C, value break, cardinality break); totals, every pair's summary and the

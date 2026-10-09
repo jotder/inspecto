@@ -106,7 +106,11 @@
         } @else if (result(); as res) {
             <!-- Summary chips (the whole day, whatever the page) -->
             <div class="text-secondary mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <span>{{ res.day }}</span>
+                @if (res.dayScoped === false) {
+                    <span data-testid="board-unscoped">Whole period — no Dataset declares a day column</span>
+                } @else {
+                    <span>{{ res.day }}</span>
+                }
                 <span>{{ res.summary.groups }} groups</span>
                 <span>{{ res.summary.matchedKeys }} matched</span>
                 <span>only in A: {{ res.summary.byType.missing_right }}</span>

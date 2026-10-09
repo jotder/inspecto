@@ -162,6 +162,7 @@ public final class ReconRoutes implements RouteModule {
         data.put("keyColumns", spec.keyColumns());
         data.put("measures", measureNames(spec));
         data.put("day", scoped.day());
+        data.put("dayScoped", scoped.dayScoped());
         data.put("availableDays", scoped.availableDays());
         data.put("filter", filter);
         data.put("sample", day.sample());

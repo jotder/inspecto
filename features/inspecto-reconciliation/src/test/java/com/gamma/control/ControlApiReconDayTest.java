@@ -79,6 +79,9 @@ class ControlApiReconDayTest {
         store.write("dataset", "crm_ds", Map.of("physicalRef", "crm", "dateField", "event_date"));
         store.write("dataset", "cbs_ds", Map.of("physicalRef", "cbs", "dateField", "event_date"));
         store.write("dataset", "undated_ds", Map.of("physicalRef", "undated"));
+        store.write("dataset", "undated2_ds", Map.of("physicalRef", "crm"));
+        store.write("reconciliation", "whole_period", Map.of(
+                "datasets", List.of("undated_ds", "undated2_ds"), "keyColumns", List.of("msisdn")));
         store.write("reconciliation", "ra_c01", Map.of(
                 "datasets", List.of("hlr_ds", "crm_ds", "cbs_ds"),
                 "keyColumns", List.of("msisdn"),
@@ -168,6 +171,21 @@ class ControlApiReconDayTest {
             HttpResponse<String> r = post(c.port, "/spaces/s1/recon/run", "{\"id\":\"undated_recon\"}");
             assertEquals(422, r.statusCode(), r.body());
             assertTrue(r.body().contains("undated_ds") && r.body().contains("role: temporal"), r.body());
+        }
+    }
+
+    @Test
+    void noSideWithADayColumnComparesTheWholeRelationsAndSaysSo(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            JsonNode r = run(c, "{\"id\":\"whole_period\"}");
+            assertFalse(r.get("dayScoped").asBoolean());
+            assertTrue(r.get("day").isNull());
+            assertEquals(0, r.get("availableDays").size());
+            assertEquals(11, r.get("totals").get("b").get("__records").asInt(), "every day of CRM (D1 6 + D2 5): unscoped");
+            HttpResponse<String> withDay = post(c.port, "/spaces/s1/recon/run", "{\"id\":\"whole_period\",\"day\":\"" + D2 + "\"}");
+            assertEquals(422, withDay.statusCode(), "a day cannot be read where no side has one: " + withDay.body());
+            // and the dated reconciliations say they are day-scoped
+            assertTrue(run(c, "{\"id\":\"two_way\"}").get("dayScoped").asBoolean());
         }
     }
 

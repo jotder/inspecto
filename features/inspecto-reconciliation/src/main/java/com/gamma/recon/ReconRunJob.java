@@ -116,7 +116,7 @@ public final class ReconRunJob implements Job {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("reconciliation", reconId);
-        payload.put("day", scoped.day());
+        if (scoped.day() != null) payload.put("day", scoped.day());   // a Signal payload holds no nulls
         payload.put("missingLeft", missingLeft);
         payload.put("missingRight", missingRight);
         payload.put("valueBreak", valueBreak);
@@ -127,7 +127,7 @@ public final class ReconRunJob implements Job {
         if (breaks > 0) openIncident(ctx, reconId, missingLeft, missingRight, valueBreak, breaks);
         String notRecorded = fresh == null ? computeError : recordRun(ctx, writeRoot, reconId, fresh, scoped.day());
 
-        return JobResult.ok("recon.run '" + reconId + "' " + scoped.day() + ": " + breaks + " break(s) ("
+        return JobResult.ok("recon.run '" + reconId + "'" + (scoped.day() == null ? "" : " " + scoped.day()) + ": " + breaks + " break(s) ("
                 + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)"
                 + (notRecorded == null ? "" : " — run not recorded: " + notRecorded),
                 (System.nanoTime() - t0) / 1_000_000L);

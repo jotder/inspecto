@@ -31,10 +31,12 @@ import java.util.regex.Pattern;
 /**
  * A Reconciliation is read ONE DAY at a time (RECON-PERF-1, operator 2026-10-09). Every side's relation is filtered
  * to one calendar day of its Dataset's <b>temporal column</b> — the {@code columns[]} entry carrying
- * {@code role: temporal} ({@link DatasetRelation#temporalColumn}), else the Dataset's {@code dateField}. A Dataset
- * with neither is REFUSED (→ 422 naming the fix) rather than compared whole: the fail-closed choice of the two the
- * operator offered (operator, 2026-10-09), because a silently unscoped side would compare 30 days of one system
- * against one day of another and report every key as a Break.
+ * {@code role: temporal} ({@link DatasetRelation#temporalColumn}), else the Dataset's {@code dateField}. When SOME
+ * sides declare one and others do not, the undated side is REFUSED (→ 422 naming the fix): an unscoped side would
+ * compare 30 days of one system against one day of another and report every key as a Break. When NO side declares
+ * one, the whole relations are compared and the answer says {@code dayScoped:false} — a monthly or whole-period
+ * Reconciliation has no day to scope to (operator, 2026-10-09; revised the same day from "always 422" when the full
+ * gate showed the committed telco-ra and mobile-money templates are whole-period Reconciliations).
  *
  * <p>No requested day ⇒ the LATEST day present on any side. {@code availableDays} is the distinct days across the
  * sides, newest first, capped at {@link #MAX_DAYS}. Also holds the small per-(reconciliation, day) result cache
@@ -56,7 +58,10 @@ public final class ReconDay {
      * when they cannot be enumerated (a view-backed or virtual Dataset, or a store over the file cap), and then
      * nothing derived from them is cached.
      */
-    public record Scoped(ReconService.Spec spec, String day, List<String> availableDays, String fingerprint) {}
+    public record Scoped(ReconService.Spec spec, String day, List<String> availableDays, String fingerprint) {
+        /** False when NO side declares a day column: the whole relations are compared ({@code day} is null). */
+        public boolean dayScoped() { return day != null; }
+    }
 
     /**
      * Resolve the reconciliation {@code config} to a spec scoped to {@code requestedDay} (ISO {@code yyyy-mm-dd}, or
@@ -77,9 +82,22 @@ public final class ReconDay {
         for (ReconService.Side side : base.sides()) {
             Map<String, Object> ds = datasetFor.apply(side.datasetId());
             datasets.add(ds);
-            columns.add(temporalColumn(side.datasetId(), ds));
+            columns.add(temporalColumnOrNull(side.datasetId(), ds));
         }
         String fingerprint = fingerprint(base, datasets, dataRoot);
+        // NO side declares a day column: compare the whole relations, explicitly unscoped (`dayScoped:false`) — a
+        // monthly or whole-period Reconciliation (the telco-ra rated-vs-billed one compares a month's invoices) has no
+        // day to scope to. Only a MIXED set is refused: one dated side against an undated one would compare one day of
+        // one system with every day of the other and report every key as a Break (operator, 2026-10-09).
+        long dated = columns.stream().filter(java.util.Objects::nonNull).count();
+        if (dated == 0) {
+            if (day != null)
+                throw new IllegalArgumentException("no reconciled Dataset declares a temporal column, so there is no day to "
+                        + "read - mark each Dataset's event-date column 'role: temporal' (or set its dateField), or omit 'day'");
+            return new Scoped(base, null, List.of(), fingerprint);
+        }
+        for (int i = 0; i < columns.size(); i++)
+            if (columns.get(i) == null) temporalColumn(base.sides().get(i).datasetId(), datasets.get(i));   // throws the named fix
 
         List<String> available = fingerprint == null ? null : Cache.get("days|" + fingerprint);
         List<String> dayExprs = new ArrayList<>();
@@ -122,6 +140,20 @@ public final class ReconDay {
         return new Scoped(scoped, day, available, fingerprint);
     }
 
+    /** {@link #temporalColumn}, or {@code null} when the Dataset declares none (a bad declaration still throws). */
+    static String temporalColumnOrNull(String datasetId, Map<String, Object> ds) {
+        try {
+            return temporalColumn(datasetId, ds);
+        } catch (NoTemporalColumn none) {
+            return null;
+        }
+    }
+
+    /** The Dataset declares no day column — refused when another side of the same Reconciliation does. */
+    static final class NoTemporalColumn extends IllegalArgumentException {
+        NoTemporalColumn(String message) { super(message); }
+    }
+
     /** The Dataset's day column: {@code role: temporal}, else {@code dateField}; neither ⇒ 422 naming the fix. */
     static String temporalColumn(String datasetId, Map<String, Object> ds) {
         Optional<String> col = DatasetRelation.temporalColumn(ds);
@@ -133,9 +165,9 @@ public final class ReconDay {
                         + dateField + "'");
             return dateField;
         }
-        throw new IllegalArgumentException("dataset '" + datasetId + "' has no temporal column - a Reconciliation is "
-                + "read one day at a time, so mark the Dataset's event-date column 'role: temporal' in its columns "
-                + "(or set its dateField)");
+        throw new NoTemporalColumn("dataset '" + datasetId + "' has no temporal column while another reconciled Dataset "
+                + "has one - a Reconciliation is read one day at a time, so mark the Dataset's event-date column "
+                + "'role: temporal' in its columns (or set its dateField)");
     }
 
     /** {@code yyyy-mm-dd} or 422 — the only form that ever reaches SQL, as a {@code DATE '…'} literal. */

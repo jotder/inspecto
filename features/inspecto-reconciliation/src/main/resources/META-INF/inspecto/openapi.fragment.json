@@ -95,7 +95,7 @@
                             }
                           },
                           "day" : {
-                            "type" : "string",
+                            "type" : [ "string", "null" ],
                             "format" : "date"
                           },
                           "availableDays" : {
@@ -168,6 +168,10 @@
                                 "type" : "boolean"
                               }
                             }
+                          },
+                          "dayScoped" : {
+                            "type" : "boolean",
+                            "description" : "False when NO reconciled Dataset declares a day column: the whole relations were compared and `day` is null. A mix of dated and undated sides is a 422."
                           }
                         }
                       }
