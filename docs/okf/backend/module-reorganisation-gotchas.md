@@ -46,6 +46,7 @@ Context: [module-taxonomy.md](module-taxonomy.md), [decisions](module-reorganisa
 - **`-Dtest=A+B` runs ZERO tests and reports SUCCESS**: use commas, and count `Tests run`.
 - **Run gates from a path NOT under `.claude/` or `%TEMP%`** (a safety test goes falsely red).
 - **A full UI `ng test` overlapping a Maven gate flakes timing tests.** Run them one at a time; one Maven agent at a time.
+- **A lane worktree under `.claude/worktrees/` scans the MAIN checkout** (2026-10-09): `ReactorModules.root()` takes the outermost ancestor pom, so the repo-wide scanner tests (`CapabilityManifestTest`, `ConfigWriteFunnelTest`, `ImportLoaderInventoryTest`) judge the shared checkout, not the lane: a new route is a false red, a new writer site a false green. Rule: run them from a sibling worktree of the checkout; fix tracked as `REACTOR-ROOT-WORKTREE-1`.
 - **Tests with no Subject make `withCapability` a no-op**: they pass against an UNGATED route. Give the test a real Subject.
 - **A negative test needs a probe that would otherwise succeed**; mutate the whole feature, not one clause.
 - **What the TCKs cannot drive:** connector `create`, workbench and egress/SSRF behaviour; `JobTypeProvider.create` and running a Job; the existence of each `requires:` Platform Service (registered only in the processor); positive `Authenticator`/`TokenRelay` paths; a live-model description. Those stay in each module's own tests.

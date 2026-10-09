@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** —
+> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 18<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** —
 > ⬇ **52 → 51 (P3 35 → 34) on 2026-10-09**: closed `MODULE-REORG-P7-KERNEL` — Kernel steps 1, 3–6 and the Escalation Rule edit UI shipped; the five unregistered Consequences were declined (no consumer; §6 *Control plane & Jobs*, operator signed off); step 7 stays declined.
 > ⬇ **53 → 52 (P3 36 → 35) on 2026-10-09**: closed `DRYRUN-SILENT-CAST-1` — values a declared type nulls (row KEPT, run still SUCCESS, counted as `cast_failures`) are now shown: a warning on run detail's Batches tab, a `castFailures` count + warning on *Run to here*, and a per-map-Step warning on the dry-run (the same `DataTransformer.countCastFailures` a real ingest uses, via a `CsvSettings` overload).
 > ⬇ **58 → 53 (P3 41 → 36) on 2026-10-09**: closed four of the six UI-test findings — `BOOTSTRAP-EDITION-ENTERPRISE-1` (`/bootstrap` reports `enterprise` when an `AccessDecider` is installed), `DECISION-RULES-ACTIONS-PIN-1` (Actions column pinned), `INCIDENT-COMMANDER-TWO-FIELDS-1` (the postmortem Incident Commander defaults to the assignee the header calls Commander), `DRYRUN-SAMPLE-SEED-1` (a sample missing a column the Steps read is named in plain words; the captured-sample button already seeds real rows); withdrew `INCIDENT-CREATE-NEEDS-ENTITY-1` as filed in error (the dialog already explains where the first linked object comes from — recorded decision `CASE-FIRST-OBJECT-DEAD-END-1`). `DRYRUN-SILENT-CAST-1` stays open with its cause verified.
@@ -164,11 +164,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 34<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 34<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -238,6 +238,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 
 | Area | Row | The call |
 |---|---|---|
+| 4 | `SCREENING-1` | (a) approve the `ConfigWriteFunnelTest` inventory entry `Screener#load` (a READ of the Identity Fact log, landed marked *pending operator approval*: guard-inventory entries are operator calls) or name another seam; (b) whether `confirmed` needs a second person (today one holder of `canWorkIncidents` decides) |
 | 3.12 | Link Analysis | none — every `D-S*` / `D-E*` / `D-U*` call is answered (plan retired 2026-10-01); the option-D calls live in `archived-documents/plans-archive/la-separation-feasibility-plan.md` |
 | 3.5 | cross-Space consequence | none — all 12 answered (D2 2026-09-25; D1, D3–D12 2026-09-28, recommendations accepted); D10 named the consequence and lifted the ON HOLD |
 | 3.5 | `D8-SES-SNS-1` | none — every call answered (D1–D14; D12 operator-supplied GeoIP, country only); the row CLOSED 2026-09-29 when the `maxmind-db` resolver binding landed; the live SES checks are P3 `SES-SNS-LIVE-CHECKS-1` |
@@ -456,7 +457,7 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 - **P2** · `MODULE-REORG-1` — **reorganise the ~40 Maven modules for itemized distribution; all decisions taken (D-MR1…D-MR12, operator 2026-10-06); every phase P0..P7 has shipped its slices; the plan is ARCHIVED 2026-10-09 (provenance only) and its durable content lives in the OKF concepts `module-taxonomy`, `module-reorganisation-decisions` and `module-reorganisation-gotchas`.** Three axes per module (build role, offering role, binding time), Offerings composed of a tier + domain-neutral add-ons + function packs + industry packs, the Installed / Enabled per Space / Permitted gates, a TOON manifest per module with an activator, thin per-module jars, removal semantics, a platform test kit and TCKs, one Decision Kernel for the nine rule kinds. **State 2026-10-09: all phases shipped.** What remains is the four rows `MODULE-REORG-P3-THIN-JARS` (operator-owned release signing), `-P4-3` (no work item until a switchable module owns a long-lived subscription), `-P7-INCIDENTS` (an `AlertMigration` deletion dated to a release, Workflow & SLA slice 2 gated on a second governed source) and `-P7-KERNEL` (step 7 and the RBAC capability contribution are DECLINED; small leftovers). Closed 2026-10-09: `-P4-1`, `-P5-TCKS`, `-REVIEW-1`, `-D-MR2`. → `okf/backend/module-reorganisation-decisions.md`
 - **P2** · `PACK-AML-1` — **AML function pack** (competitive gap, 2026-10-07): typology Space Templates (smurfing, structuring, thresholds, watch-list traffic) over Scoring & Lists and Link Analysis; needs `SCREENING-1` and `REGULATORY-REPORTING-1`. → `okf/backend/module-reorganisation-decisions.md`
-- **P2** · `SCREENING-1` — **Screening add-on: backend + review pane SHIPPED 2026-10-09** (optional module `inspecto-screening`, add-on `screening`: `POST /screening/check`, the `screening.run` Job Type, signed Screening Hits with `GET /screening/hits[/{id}]` and `POST /screening/hits/{id}/decide`). SPA pane `/screening` (Operations ▸ Screening Hits) shipped the same day. Open: (1) four-eyes on `confirmed`; (2) phonetic / transliteration keys beyond look-alike folding (blocking never compares a name whose every token starts with a different letter, e.g. Gaddafi / Qadhafi); (3) a dedupe index (a Run lists every hit document); (4) a Space-level threshold default; (5) `check` raising hits on demand; (6) an on-demand check form in the SPA. → `okf/backend/control-plane/screening.md`
+- **P2** · `SCREENING-1` — **Screening add-on: backend + review pane SHIPPED 2026-10-09** (optional module `inspecto-screening`, add-on `screening`: `POST /screening/check`, the `screening.run` Job Type, signed Screening Hits with `GET /screening/hits[/{id}]` and `POST /screening/hits/{id}/decide`). SPA pane `/screening` (Operations ▸ Screening Hits) shipped the same day. Operator calls (§1): approve the `Screener#load` funnel-inventory entry; four-eyes on `confirmed`. Open: (1) four-eyes on `confirmed`; (2) phonetic / transliteration keys beyond look-alike folding (blocking never compares a name whose every token starts with a different letter, e.g. Gaddafi / Qadhafi); (3) a dedupe index (a Run lists every hit document); (4) a Space-level threshold default; (5) `check` raising hits on demand; (6) an on-demand check form in the SPA. → `okf/backend/control-plane/screening.md`
 - **P2** · `REGULATORY-REPORTING-1` — **Regulatory Reporting add-on**: regulator-format reports (e.g. SAR / STR) assembled from Incidents, Cases and evidence, maker-checker before submission, a submission log. → `okf/backend/module-reorganisation-decisions.md`
 - **P2** · `PACK-MOBILE-MONEY-1` — **Mobile Money industry pack**: wallet / agent / bank / partner reconciliation, commission and fee checks, agent fraud, KYC and provisioning checks, as Space Templates over Reconciliation and Scoring & Lists. → `okf/backend/module-reorganisation-decisions.md`
 - **P3** · `ANOMALY-DETECTION-1` — **Anomaly Detection add-on**: explainable behavioural anomaly scoring per entity, beyond Expectation baselines and forecast bands. → `okf/backend/module-reorganisation-decisions.md`
@@ -471,6 +472,8 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 
 #### Test infrastructure
+
+- **P2** · `REACTOR-ROOT-WORKTREE-1` — **from a lane worktree under `.claude/worktrees/` the repo-wide scanner tests read the MAIN checkout** (found 2026-10-09, `SCREENING-1`). `ReactorModules.root()` takes the OUTERMOST ancestor pom with `<modules>`, which from `.claude/worktrees/<lane>` is the shared checkout, so `CapabilityManifestTest` / `ConfigWriteFunnelTest` / `ImportLoaderInventoryTest` and every other `mainJavaTrees()` scan judge master's tree: a lane's new route is a false red, a lane's new writer site a false GREEN (the screening lane's `new EntityFactLog(` passed in place and failed from a sibling worktree). Fix: stop at the nearest root that is a git work-tree top (`git rev-parse --show-toplevel`) or at the first pom whose directory holds `.git`; prove it by a test that runs from a nested worktree. Until then verify scanner tests from a sibling worktree (`C:\sandbox\<name>`). → `okf/backend/module-reorganisation-gotchas.md`
 
 
 #### Developer tooling
