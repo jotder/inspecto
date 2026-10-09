@@ -4,6 +4,7 @@ import com.gamma.la.api.IndexedRead.Fitted;
 import com.gamma.la.api.IndexedRead.Outcome;
 import com.gamma.la.api.IndexedRead.Reason;
 import com.gamma.la.api.IndexedRead.Selection;
+import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.storage.IndexReader;
 import com.gamma.la.storage.IndexReader.LinkTime;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -33,12 +34,12 @@ final class IndexedTemporal {
             if (!rq.timeCol().equalsIgnoreCase(m.timeColumn())) return Fitted.no(Reason.column_not_indexed);
             if (!utc) return Fitted.no(Reason.time_zone_not_servable);
             if (rq.filter() == null) return Fitted.ok(null);
-            String sql = IndexedRead.renderFilter(rq.filter(), m, true);
-            return sql == null ? Fitted.no(Reason.filter_not_indexed) : Fitted.ok(sql);
+            DatasetProvider.BoundFilter f = IndexedRead.renderFilter(rq.filter(), m, true);
+            return f == null ? Fitted.no(Reason.filter_not_indexed) : Fitted.ok(f);
         });
         if (!sel.usable()) return sel.flat();
         try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), policy)) {
-            List<LinkTime> rows = reader.scanLinkTimes(sel.filterSql(), rq.maxRows() + 1);
+            List<LinkTime> rows = reader.scanLinkTimes(sel.filterSql(), sel.filterBinds(), rq.maxRows() + 1);
             boolean truncated = rows.size() > rq.maxRows();
             return sel.served(new Result(truncated ? rows.subList(0, rq.maxRows()) : rows, truncated));
         } catch (SQLException | IOException | RuntimeException unreadable) {

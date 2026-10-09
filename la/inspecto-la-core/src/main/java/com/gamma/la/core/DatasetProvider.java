@@ -147,14 +147,8 @@ public interface DatasetProvider {
             throws SQLException, IOException;
 
     /**
-     * Render a condition-tree {@code filter} as a SQL predicate (every literal quote-escaped).
-     *
-     * @throws IllegalArgumentException when the root is not a group
-     */
-    String predicate(Object filter);
-
-    /**
-     * {@link #predicate} with every operand value a bound parameter instead of a literal: {@code sql} holds one
+     * Render a condition-tree {@code filter} as a SQL predicate with every operand value a bound parameter, never a
+     * literal: {@code sql} holds one
      * {@code ?} per entry of {@code binds}, in text order, so the caller appends them to {@code Request.binds} at the
      * position the predicate occupies in its statement. No filter value reaches the statement text.
      *

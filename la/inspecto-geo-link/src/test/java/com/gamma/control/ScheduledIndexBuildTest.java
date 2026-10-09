@@ -83,7 +83,7 @@ class ScheduledIndexBuildTest {
 
     private static LinkIndexAccess.Request request(boolean allowFull, String owner) {
         return new LinkIndexAccess.Request("xdr_index", "xdr_daily", "who", "other", "kind", null, null, null, List.of(),
-                owner, allowFull, 60_000L);
+                owner, allowFull, 60_000L, -1L);
     }
 
     private Outcome run(Ctx c, boolean allowFull, String owner) {
@@ -204,7 +204,7 @@ class ScheduledIndexBuildTest {
             var slow = new java.util.concurrent.atomic.AtomicReference<Outcome>();
             Thread t = new Thread(() -> slow.set(new ScheduledLinkIndexBuilder().build(c.root, c.api.dataRoot(),
                     new LinkIndexAccess.Request("xdr_index", "xdr_daily", "who", "other", "kind", null, null, null, List.of(),
-                            "analyst-1", true, 1_500L))));
+                            "analyst-1", true, 1_500L, -1L))));
             t.start();
             Thread.sleep(500);                                                    // the first build is live (blocked in the builder)
             Outcome dup = run(c, true, "analyst-1");
@@ -271,12 +271,90 @@ class ScheduledIndexBuildTest {
         }
     }
 
+    private static void liveBuilder(java.util.concurrent.atomic.AtomicBoolean release, java.util.concurrent.atomic.AtomicInteger builds) {
+        com.gamma.la.api.IndexRoutes.forTest(req -> {
+            builds.incrementAndGet();
+            try {
+                while (!release.get()) {
+                    if (req.options().cancel().isCancelled()) throw new com.gamma.la.storage.IndexBuilder.CancelledException();
+                    Thread.sleep(5);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            return new com.gamma.la.storage.IndexBuilder.Result(1, req.store().directory(), null, 3, 3, 0, 3, 16, Map.of(), 5);
+        });
+    }
+
+    private Outcome runWithWait(Ctx c, long waitMs) {
+        return new ScheduledLinkIndexBuilder().build(c.root, c.api.dataRoot(), new LinkIndexAccess.Request(
+                "xdr_index", "xdr_daily", "who", "other", "kind", null, null, null, List.of(), "analyst-1", true,
+                60_000L, waitMs));
+    }
+
+    /** wait_seconds: a long budget outlasts an in-flight build that the default six-wait bound gives up on. */
+    @Test
+    void aWaitBudgetOutlastsALiveBuildThatTheDefaultBoundGivesUpOn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        com.gamma.la.api.ScheduledIndexBuild.backoffForTest(20);                  // default: 20+40+...+640 ms = ~1.3 s, then gives up
+        java.util.concurrent.atomic.AtomicBoolean release = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicInteger builds = new java.util.concurrent.atomic.AtomicInteger();
+        liveBuilder(release, builds);
+        try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of()))) {
+            land(c.dir.resolve("day0.parquet"), 0);
+            Thread first = new Thread(() -> run(c, true, "analyst-1"));
+            first.start();
+            for (int i = 0; i < 2_000 && builds.get() == 0; i++) Thread.sleep(5);   // the first build is live
+            assertEquals(1, builds.get());
+
+            Outcome dflt = runWithWait(c, -1L);                                    // unset: today's behaviour
+            assertEquals("BUILD_IN_PROGRESS", dflt.code(), "the default bound gives up before the live build ends");
+            assertTrue(dflt.message().contains("after 6 waits"), dflt.message());
+
+            new Thread(() -> {
+                try {
+                    Thread.sleep(3_000);                                           // well past the default's ~1.3 s
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                release.set(true);
+            }).start();
+            Outcome patient = runWithWait(c, 30_000L);
+            first.join(20_000);
+            assertEquals("BUILT", patient.result(), patient.message());   // outlasted the live build, then built once
+        } finally {
+            release.set(true);
+        }
+    }
+
+    /** wait_seconds = 0 never waits: the in-flight build is the answer at once. */
+    @Test
+    void aZeroWaitBudgetNeverWaits(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        com.gamma.la.api.ScheduledIndexBuild.backoffForTest(20);
+        java.util.concurrent.atomic.AtomicBoolean release = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicInteger builds = new java.util.concurrent.atomic.AtomicInteger();
+        liveBuilder(release, builds);
+        try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of()))) {
+            land(c.dir.resolve("day0.parquet"), 0);
+            Thread first = new Thread(() -> run(c, true, "analyst-1"));
+            first.start();
+            for (int i = 0; i < 2_000 && builds.get() == 0; i++) Thread.sleep(5);
+            Outcome none = runWithWait(c, 0L);
+            assertEquals("BUILD_IN_PROGRESS", none.code());
+            assertFalse(none.message().contains("waits"), "no wait happened: " + none.message());
+            release.set(true);
+            first.join(20_000);
+        } finally {
+            release.set(true);
+        }
+    }
+
     @Test
     void anUnknownColumnIsAMappingRefusalAndNothingIsBuilt(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of()))) {
             land(c.dir.resolve("day0.parquet"), 0);
             Outcome o = new ScheduledLinkIndexBuilder().build(c.root, c.api.dataRoot(), new LinkIndexAccess.Request(
-                    "xdr_index", "xdr_daily", "who", "nope", null, null, null, null, List.of(), "analyst-1", true, 60_000L));
+                    "xdr_index", "xdr_daily", "who", "nope", null, null, null, null, List.of(), "analyst-1", true, 60_000L, -1L));
             assertEquals("MAPPING_INVALID", o.code());
         }
     }

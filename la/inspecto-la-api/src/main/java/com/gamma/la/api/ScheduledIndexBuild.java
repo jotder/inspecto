@@ -68,7 +68,7 @@ public final class ScheduledIndexBuild {
     /** What to build. {@code owner} is the user id the principal stands in for. */
     public record Request(String job, String dataset, String sourceCol, String targetCol, String kindCol, String timeCol,
                          String timeColZone, String weightCol, List<String> attrCols, String owner, boolean allowFull,
-                         long timeoutMs) { }
+                         long timeoutMs, long waitMs) { }
 
     /** Aggregate-only answer: {@code result} is BUILT | UP_TO_DATE | REFUSED | FAILED | RUNNING. */
     public record Outcome(String result, String mode, String code, String message, long edges, long nodes, int deltas) { }
@@ -89,20 +89,25 @@ public final class ScheduledIndexBuild {
      * times, with a doubling backoff, and never past {@code timeoutMs} from the start. Every attempt is audited; a waited-on
      * attempt carries {@code waiting=true} and its attempt number. The re-plan may find the index already covers the
      * Dataset (the in-flight build took the new files), which is {@code UP_TO_DATE}.
+     *
+     * <p><b>Wait budget.</b> {@code waitMs < 0} (the Job's {@code wait_seconds} unset) keeps the {@link #MAX_WAITS} bound
+     * above. {@code waitMs >= 0} replaces it with a TIME budget: keep waiting (same backoff, the last sleep trimmed to the
+     * budget) until {@code waitMs} has elapsed since the start, still never past {@code timeoutMs}; {@code 0} never waits.
      */
     public static Outcome run(Path writeRoot, Path dataRoot, Request r) {
         long start = System.currentTimeMillis(), backoff = firstBackoffMs;
         for (int waits = 0; ; waits++) {
             Outcome o = attempt(writeRoot, dataRoot, r);
-            boolean wait = BUILD_IN_PROGRESS.equals(o.code()) && waits < MAX_WAITS
-                    && System.currentTimeMillis() - start + backoff < r.timeoutMs();
+            long elapsed = System.currentTimeMillis() - start;
+            boolean budgeted = r.waitMs() < 0 ? waits < MAX_WAITS : elapsed < r.waitMs();
+            boolean wait = BUILD_IN_PROGRESS.equals(o.code()) && budgeted && elapsed + backoff < r.timeoutMs();
             if (!wait && BUILD_IN_PROGRESS.equals(o.code()) && waits > 0)
                 o = new Outcome(o.result(), o.mode(), o.code(), o.message() + " (still in progress after " + waits + " waits)",
                         o.edges(), o.nodes(), o.deltas());
             audit(r, o, wait, waits + 1);
             if (!wait) return o;
             try {
-                Thread.sleep(backoff);
+                Thread.sleep(r.waitMs() < 0 ? backoff : Math.max(1L, Math.min(backoff, r.waitMs() - elapsed)));
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return o;

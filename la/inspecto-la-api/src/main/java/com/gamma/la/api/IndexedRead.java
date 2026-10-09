@@ -1,6 +1,7 @@
 package com.gamma.la.api;
 
 import com.gamma.entitystore.LinkAnalysisSettings;
+import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.storage.BucketFunction;
@@ -90,19 +91,19 @@ final class IndexedRead {
         }
     }
 
-    /** A route's verdict on one candidate index: {@code failure} null = it fits, with {@code filterSql} the rendered request filter (or null). */
-    record Fitted(Reason failure, String filterSql) {
-        static Fitted ok(String filterSql) {
-            return new Fitted(null, filterSql);
+    /** A route's verdict on one candidate index: {@code failure} null = it fits, with {@code filterSql} the request filter bound over the index columns (or null). */
+    record Fitted(Reason failure, String filterSql, List<String> filterBinds) {
+        static Fitted ok(DatasetProvider.BoundFilter filter) {
+            return filter == null ? new Fitted(null, null, List.of()) : new Fitted(null, filter.sql(), filter.binds());
         }
 
         static Fitted no(Reason failure) {
-            return new Fitted(failure, null);
+            return new Fitted(failure, null, List.of());
         }
     }
 
     /** The index chosen and its staleness verdict; {@code declined} (non-null) means the flat path answers. */
-    record Selection(Outcome<?> declined, Path dir, IndexManifest manifest, String filterSql, long version, boolean stale,
+    record Selection(Outcome<?> declined, Path dir, IndexManifest manifest, String filterSql, List<String> filterBinds, long version, boolean stale,
                      String staleReason, List<String> staleCodes, boolean fingerprintKnown) {
         boolean usable() {
             return declined == null;
@@ -121,7 +122,7 @@ final class IndexedRead {
     private IndexedRead() { }
 
     private static Selection declined(Outcome<?> o) {
-        return new Selection(o, null, null, null, 0, false, null, List.of(), true);
+        return new Selection(o, null, null, null, List.of(), 0, false, null, List.of(), true);
     }
 
     /**
@@ -166,6 +167,7 @@ final class IndexedRead {
         Candidate chosen = null;
         Reason firstFailure = null;
         String filterSql = null;
+        List<String> filterBinds = List.of();
         for (Candidate c : published) {
             IndexMapping m = c.manifest().mapping();
             if (!m.srcColumn().equalsIgnoreCase(sourceCol) || !m.dstColumn().equalsIgnoreCase(targetCol)) {
@@ -176,6 +178,7 @@ final class IndexedRead {
             if (f.failure() == null) {
                 chosen = c;
                 filterSql = f.filterSql();
+                filterBinds = f.filterBinds();
                 break;
             }
             if (firstFailure == null || firstFailure == Reason.mapping_not_indexed) firstFailure = f.failure();
@@ -211,18 +214,18 @@ final class IndexedRead {
             }
         }
         String staleReason = reasonText.isEmpty() ? null : String.join("; ", reasonText);
-        return new Selection(null, chosen.dir(), manifest, filterSql, manifest.version(), staleReason != null, staleReason,
+        return new Selection(null, chosen.dir(), manifest, filterSql, filterBinds, manifest.version(), staleReason != null, staleReason,
                 st.reasons(), st.fingerprintKnown());
     }
 
     // ── the filter: the request's condition tree rewritten onto the index's column names ─────────────────────────
 
-    /** The rendered predicate over the index columns, or null when a leaf names a column the index cannot answer exactly. */
-    static String renderFilter(Object filter, IndexMapping m, boolean utc) {
+    /** The bound predicate over the index columns, or null when a leaf names a column the index cannot answer exactly. */
+    static DatasetProvider.BoundFilter renderFilter(Object filter, IndexMapping m, boolean utc) {
         Object rewritten = rewrite(filter, m, utc);
         if (rewritten == null) return null;
         try {
-            return DatasetProviders.require().predicate(rewritten);
+            return DatasetProviders.require().predicateBound(rewritten);
         } catch (IllegalArgumentException notAGroup) {
             return null;                                                                     // the flat path answers that with its 422
         }

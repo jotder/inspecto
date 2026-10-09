@@ -27,7 +27,7 @@ public interface LinkIndexAccess {
     /** What a build was configured to do. {@code owner} is the user id the principal stands in for. */
     record Request(String job, String dataset, String sourceCol, String targetCol, String kindCol, String timeCol,
                    String timeColZone, String weightCol, List<String> attrCols, String owner, boolean allowFull,
-                   long timeoutMs) {
+                   long timeoutMs, long waitMs) {
         public Request {
             attrCols = attrCols == null ? List.of() : List.copyOf(attrCols);
         }

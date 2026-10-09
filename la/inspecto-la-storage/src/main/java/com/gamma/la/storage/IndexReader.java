@@ -136,6 +136,11 @@ public final class IndexReader implements AutoCloseable {
      * {@code perKeyLimit} rows per side. Keys with no edge are absent from the map.
      */
     public Map<String, List<Edge>> edges(List<String> keys, List<Side> sides, String filterSql, int perKeyLimit) throws SQLException {
+        return edges(keys, sides, filterSql, List.of(), perKeyLimit);
+    }
+
+    /** As above; {@code filterBinds} are the filter's positional values, repeated in every per-key, per-side arm (the filter text is). */
+    public Map<String, List<Edge>> edges(List<String> keys, List<Side> sides, String filterSql, List<String> filterBinds, int perKeyLimit) throws SQLException {
         if (perKeyLimit < 1) throw new IllegalArgumentException("perKeyLimit must be >= 1");
         Map<String, List<Edge>> out = new LinkedHashMap<>();
         if (keys.isEmpty() || sides.isEmpty()) return out;
@@ -152,6 +157,7 @@ public final class IndexReader implements AutoCloseable {
                 if (filterSql != null) sql.append(" AND (").append(filterSql).append(')');
                 sql.append(" LIMIT ").append(perKeyLimit).append(')');
                 binds.add(key);
+                if (filterSql != null) binds.addAll(filterBinds);
             }
         }
         try (PreparedStatement ps = sandbox.preparedStatement(sql.toString())) {
@@ -183,6 +189,11 @@ public final class IndexReader implements AutoCloseable {
      * keeps only edges whose kind is in the list (bound); {@code filterSql} is an already-rendered predicate or null.
      */
     public List<Folded> fold(String key, Side side, List<String> extraCols, List<String> kinds, String filterSql) throws SQLException {
+        return fold(key, side, extraCols, kinds, filterSql, List.of());
+    }
+
+    /** As above; {@code filterBinds} are the filter's positional values, bound after the key and the kinds. */
+    public List<Folded> fold(String key, Side side, List<String> extraCols, List<String> kinds, String filterSql, List<String> filterBinds) throws SQLException {
         for (String c : extraCols)
             if (!c.matches("kind|a\\d{1,3}")) throw new IllegalArgumentException("not an index column: " + c);
         if (kinds != null && kinds.isEmpty()) throw new IllegalArgumentException("kinds must not be empty");
@@ -198,7 +209,10 @@ public final class IndexReader implements AutoCloseable {
             sql.append(" AND kind IN (").append(String.join(",", java.util.Collections.nCopies(kinds.size(), "?"))).append(')');
             binds.addAll(kinds);
         }
-        if (filterSql != null) sql.append(" AND (").append(filterSql).append(')');
+        if (filterSql != null) {
+            sql.append(" AND (").append(filterSql).append(')');
+            binds.addAll(filterBinds);
+        }
         sql.append(" GROUP BY ").append(sel);
         List<Folded> out = new ArrayList<>();
         try (PreparedStatement ps = sandbox.preparedStatement(sql.toString())) {
@@ -224,14 +238,22 @@ public final class IndexReader implements AutoCloseable {
      * already-rendered predicate over the index columns or null.
      */
     public List<LinkTime> scanLinkTimes(String filterSql, int maxRows) throws SQLException {
+        return scanLinkTimes(filterSql, List.of(), maxRows);
+    }
+
+    /** As above; {@code filterBinds} are the filter's positional values. */
+    public List<LinkTime> scanLinkTimes(String filterSql, List<String> filterBinds, int maxRows) throws SQLException {
         String sql = "SELECT src, dst, epoch_ms(ts) AS ms FROM e_out" + (filterSql == null ? "" : " WHERE (" + filterSql + ")")
                 + " ORDER BY src, dst, ts LIMIT " + maxRows;
         List<LinkTime> out = new ArrayList<>();
-        try (PreparedStatement ps = sandbox.preparedStatement(sql); ResultSet rs = ps.executeQuery()) {
+        try (PreparedStatement ps = sandbox.preparedStatement(sql)) {
+            if (filterSql != null) for (int i = 0; i < filterBinds.size(); i++) ps.setString(i + 1, filterBinds.get(i));
+            try (ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 long ms = rs.getLong(3);
                 Long time = rs.wasNull() ? null : ms;                     // wasNull() speaks of the LAST column read: ask before the next getString
                 out.add(new LinkTime(rs.getString(1), rs.getString(2), time));
+            }
             }
         }
         return out;

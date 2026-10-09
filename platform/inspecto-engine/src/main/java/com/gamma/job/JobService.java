@@ -703,7 +703,13 @@ public final class JobService implements AutoCloseable {
                                         + "expensive; unset = such a run is refused, never started.")
                                 .defaultValue("false").build(),
                         ParameterDecl.of("timeout_seconds", ParamType.INTEGER).label("Wait at most (s)")
-                                .defaultValue("3600").build()),
+                                .defaultValue("3600").build(),
+                        ParameterDecl.of("wait_seconds", ParamType.INTEGER).label("Wait for a running build (s)")
+                                .description("How long to wait for another build of the same index that is already "
+                                        + "running before giving up (BUILD_IN_PROGRESS). Unset = the built-in bound "
+                                        + "(six waits, about two minutes); 0 = never wait; capped by 'Wait at most'. "
+                                        + "Set this above a full build's duration when the index is large.")
+                                .min(0).build()),
                 List.of("la.index.build.completed"), List.of(), List.of("link-index")),
                 c -> new LaIndexBuildJob(c)));
         // space.comparison (space-comparison design, decided 2026-09-24): compare the storage growth of two or
