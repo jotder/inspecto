@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 35<!--count:backlog-p3--> × P3** —
+> ⬇ **53 → 51 (P3 37 → 35) on 2026-10-10**: closed P3 `ERR-4XX-PATH-ECHO-1` (no absolute server paths in any 4xx echoing a DuckDB/SQL/IO message) and P3 `KPI-DEFAULT-COMPARE-1` (a new KPI Widget starts with no prior-period compare); integration branch integ14.
 > ⬇ **53 → 52 (P3 37 → 36) on 2026-10-10**: closed P3 `MEASURE-SQL-BIND-1` — `MeasureCompiler.compile` returns `Compiled(sql, params)`: every flat `filters` value and `when` operand is a bound parameter (`ConditionSql.predicateBound` for `when`); BI query (incl. the bound-query `WITH`), shared Dashboards, KPIs, Risk Scores, Screening, Alert Rule Measure probes and the `report` Job run it as a prepared statement; `materialize` and `transform.summarize` carry no values and refuse one (`unboundSql()`); the BI response still echoes the literal rendering (`render`). Results unchanged (`MeasureCompilerBindTest` runs both forms over five column types); as-built in `okf/backend/module-reorganisation-decisions.md`.
 > ⬇ **54 → 53 (P2 17 → 16) on 2026-10-10**: closed P2 `PACK-AML-1` — the `aml` Space Template: two synthetic feeds, four per-account typology Jobs (structuring, threshold crossing, smurfing fan-in, watch-list traffic) with Alert Rules, an account Risk Score + pending Alert Rule, a disabled-until-Entity-Lists `screening.run` Job, a Link Analysis view + four money pattern packs, an illustrative STR Report Template, golden-tested. Cut (cannot ship in a template): Entity Lists, Investigation Templates and the value-Measure Alert Rule (runtime state). As-built in `okf/capabilities/spaces/spaces.md` §3.5.4.
 > ⬇ **55 → 54 (P3 38 → 37) on 2026-10-09**: closed P3 `TELCO-FRAUD-CONTENT-GAPS-1` — the `telco-fraud` Space Template gained recharge fraud, data-charging bypass and internal fraud (three Jobs, per-entity Alert Rules, sink seeds, dashboard Widgets, runbook sections; golden 13 rules / 54 Alerts, mutation-checked). As-built in OKF spaces §3.5; cuts (KPIs, volume column, staff register) recorded there.
@@ -173,10 +174,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 35<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 35<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
