@@ -1,0 +1,13 @@
+name: mobile_money_overview
+tiles[11]{widgetId,span}:
+  mm_commission_variance_tile,1
+  mm_fee_overcharged_tile,1
+  mm_dormant_outflow_tile,1
+  mm_kyc_excess_tile,1
+  mm_commission_by_agent,2
+  mm_fee_by_wallet,2
+  mm_agent_split_by_agent,2
+  mm_round_trip_by_agent,2
+  mm_dormant_by_wallet,2
+  mm_kyc_limit_by_wallet,2
+  mm_provisioning_by_wallet,2

@@ -1,0 +1,15 @@
+job:
+  name: mm_kyc_limit
+  type: sql.template
+  description: "KYC tier-limit breach - daily outflow over the wallet's KYC tier limit (a wallet missing from the register is held to tier 1)"
+  sql: "WITH cur AS (SELECT wallet_id, window_date, kyc_tier, outflow, tier_limit, greatest(outflow - tier_limit, 0) AS excess, CASE WHEN outflow > tier_limit THEN 1 ELSE 0 END AS breach FROM (SELECT wallet_id, window_date, kyc_tier, outflow, CASE kyc_tier WHEN 3 THEN CAST($tier3_daily_limit AS DECIMAL(18,2)) WHEN 2 THEN CAST($tier2_daily_limit AS DECIMAL(18,2)) ELSE CAST($tier1_daily_limit AS DECIMAL(18,2)) END AS tier_limit FROM (SELECT t.wallet_id, CAST($window_start AS DATE) AS window_date, coalesce(max(w.kyc_tier), 1) AS kyc_tier, sum(t.amount) AS outflow FROM wallet_txn t LEFT JOIN wallets w ON w.wallet_id = t.wallet_id AND w.snapshot_date = CAST($window_start AS DATE) WHERE t.txn_type IN ('CASH_OUT', 'P2P', 'BILL_PAY', 'BANK_OUT') AND t.txn_ts >= CAST($window_start AS TIMESTAMP) AND t.txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY t.wallet_id) a) b) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM mm_kyc_limit WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: wallet_txn,wallets,mm_kyc_limit
+  sink_dataset: mm_kyc_limit
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  tier1_daily_limit: "300"
+  tier2_daily_limit: "2000"
+  tier3_daily_limit: "10000"
+  enabled: true

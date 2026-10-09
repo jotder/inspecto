@@ -1,0 +1,24 @@
+entityType: agent
+highThreshold: 60
+factors[3]:
+  - id: split
+    label: "Most near-limit cash-ins into one wallet"
+    dataset: mm_agent_split
+    key: agent_id
+    measure: "max(max_split_count)"
+    weight: 10
+    cap: 50
+  - id: round_trip
+    label: "Wallets whose cash-in was cashed out again at the agent"
+    dataset: mm_round_trip
+    key: agent_id
+    measure: "max(round_trip_wallets)"
+    weight: 15
+    cap: 60
+  - id: commission
+    label: "Commission variance (USD)"
+    dataset: mm_commission
+    key: agent_id
+    measure: "max(commission_variance)"
+    weight: 1
+    cap: 30

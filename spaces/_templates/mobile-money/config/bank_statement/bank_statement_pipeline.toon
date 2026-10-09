@@ -1,0 +1,35 @@
+name: bank_statement
+active: true
+
+dirs:
+  poll:       data/inbox/bank_statement
+  database:   data/bank_statement/database
+  backup:     data/bank_statement/backup
+  temp:       data/bank_statement/temp
+  errors:     data/bank_statement/errors
+  quarantine: data/bank_statement/quarantine
+  markers:    data/bank_statement/markers
+  status_dir: data/bank_statement/status
+  log_dir:    data/bank_statement/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: bank_statement_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "BANK_STATEMENT_{yyyyMMdd}"

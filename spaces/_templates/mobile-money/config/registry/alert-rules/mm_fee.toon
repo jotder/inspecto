@@ -1,0 +1,9 @@
+name: mm_fee
+dataset: mm_fee
+measure: max(overcharged)
+by[1]: wallet_id
+comparator: gt
+threshold: 1
+stormCap: 500
+severity: WARNING
+description: "Fee mis-charge (customer overcharged)"

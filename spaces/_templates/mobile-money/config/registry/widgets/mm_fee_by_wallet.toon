@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: mm_fee
+controls:
+  x[1]{field}:
+    wallet_id
+  y[1]{field,agg}:
+    overcharged,sum
+options:
+  title: Fees overcharged by wallet

@@ -1,0 +1,8 @@
+name: mm_kyc_excess
+title: Outflow over KYC limits
+dataset: mm_kyc_limit
+measure: sum(excess)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

@@ -1,0 +1,20 @@
+raw:
+  name: CORE_SUBSCRIBERS
+  format: CSV
+  fields[3]{name,selector,type,description,unit,classification}:
+    snapshot_date,"0",DATE,"Core snapshot day","","INTERNAL"
+    msisdn,"1",VARCHAR,"Subscriber line","","CONFIDENTIAL"
+    status,"2",VARCHAR,"ACTIVE, SUSPENDED or TERMINATED","","INTERNAL"
+mapping:
+  canonicalName: core_subscribers
+  rawName: CORE_SUBSCRIBERS
+  fields[3]:
+    - name: snapshot_date
+      from: snapshot_date
+      fn: keep
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: status
+      from: status
+      fn: keep

@@ -1,0 +1,13 @@
+job:
+  name: mm_dormant
+  type: sql.template
+  description: "Dormant-wallet reactivation - outflow from a wallet idle for dormant_days before the window"
+  sql: "WITH cur AS (SELECT t.wallet_id, CAST($window_start AS DATE) AS window_date, max(w.last_activity_date) AS last_activity_date, count(*) AS outflow_txns, sum(t.amount) AS outflow FROM wallet_txn t JOIN wallets w ON w.wallet_id = t.wallet_id AND w.snapshot_date = CAST($window_start AS DATE) WHERE w.last_activity_date < CAST($window_start AS DATE) - to_days(CAST($dormant_days AS INTEGER)) AND t.txn_type IN ('CASH_OUT', 'P2P', 'BILL_PAY', 'BANK_OUT') AND t.txn_ts >= CAST($window_start AS TIMESTAMP) AND t.txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY t.wallet_id) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM mm_dormant WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: wallet_txn,wallets,mm_dormant
+  sink_dataset: mm_dormant
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  dormant_days: "180"
+  enabled: true

@@ -1,0 +1,35 @@
+name: partner_settlement
+active: true
+
+dirs:
+  poll:       data/inbox/partner_settlement
+  database:   data/partner_settlement/database
+  backup:     data/partner_settlement/backup
+  temp:       data/partner_settlement/temp
+  errors:     data/partner_settlement/errors
+  quarantine: data/partner_settlement/quarantine
+  markers:    data/partner_settlement/markers
+  status_dir: data/partner_settlement/status
+  log_dir:    data/partner_settlement/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: partner_settlement_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "PARTNER_SETTLEMENT_{yyyyMMdd}"

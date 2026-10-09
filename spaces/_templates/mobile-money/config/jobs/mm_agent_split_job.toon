@@ -1,0 +1,14 @@
+job:
+  name: mm_agent_split
+  type: sql.template
+  description: "Agent split transactions - cash-ins just under the reporting limit, most into one wallet at one agent"
+  sql: "WITH cur AS (SELECT agent_id, CAST($window_start AS DATE) AS window_date, max(near_limit_txns) AS max_split_count, count(*) AS split_wallets, sum(near_limit_amount) AS near_limit_amount FROM (SELECT agent_id, wallet_id, count(*) AS near_limit_txns, sum(amount) AS near_limit_amount FROM wallet_txn WHERE txn_type = 'CASH_IN' AND agent_id IS NOT NULL AND amount < CAST($reporting_limit AS DECIMAL(18,2)) AND amount >= CAST($reporting_limit AS DECIMAL(18,2)) * (1 - CAST($near_limit_band AS DECIMAL(9,6))) AND txn_ts >= CAST($window_start AS TIMESTAMP) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY agent_id, wallet_id) t GROUP BY agent_id) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM mm_agent_split WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: wallet_txn,mm_agent_split
+  sink_dataset: mm_agent_split
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  reporting_limit: "1000"
+  near_limit_band: "0.10"
+  enabled: true

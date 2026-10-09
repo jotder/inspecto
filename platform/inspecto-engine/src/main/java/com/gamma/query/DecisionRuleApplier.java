@@ -10,6 +10,7 @@ import com.gamma.pipeline.DecisionRules;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
@@ -67,6 +69,12 @@ import java.util.Map;
  *
  * <p><b>Routing is not a failure:</b> a rule that errors (e.g. its {@code when} references a column
  * the schema no longer maps) is logged and skipped — it never fails the batch/run.
+ *
+ * <p><b>Statement text carries no rule value</b> ({@code DECISION-RULE-SQL-GUARD-1}): every write
+ * statement here ({@code UPDATE} / {@code CREATE TABLE AS} / {@code DELETE} / {@code COPY}) is a
+ * {@link PreparedStatement} over {@link ConditionSql#predicateBound}, so operand values and the tag value
+ * are bound parameters; field and table names are quoted identifiers ({@link SqlIdent#q}); the
+ * quarantine {@code COPY} copies a staging table and its path is built from {@link #fsName} segments.
  */
 public final class DecisionRuleApplier {
 
@@ -198,8 +206,14 @@ public final class DecisionRuleApplier {
                                   Map<String, Object> rule, String ruleName,
                                   String quarantineRoot, String baseName, RouteSink routeSink,
                                   List<PartitionOutput> outputs, List<LineageRow> lineage) throws Exception {
-        String pred = ConditionSql.predicate(rule.get("when"));
-        long matched = count(conn, "SELECT COUNT(*) FROM \"" + table + "\" WHERE " + pred);
+        ConditionSql.Bound pred = ConditionSql.predicateBound(rule.get("when"));
+        String t = SqlIdent.q(table);
+        long matched;
+        try (PreparedStatement ps = prepare(conn, "SELECT COUNT(*) FROM " + t + " WHERE " + pred.sql(), List.of(), pred);
+             ResultSet rs = ps.executeQuery()) {
+            rs.next();
+            matched = rs.getLong(1);
+        }
         if (matched == 0) return;
 
         List<Map<String, Object>> consequences = (List<Map<String, Object>>) (List<?>)
@@ -247,8 +261,8 @@ public final class DecisionRuleApplier {
         }
         if (applied.isEmpty()) return;
         if (remove) {
-            try (Statement st = conn.createStatement()) {
-                st.execute("DELETE FROM \"" + table + "\" WHERE " + pred);
+            try (PreparedStatement ps = prepare(conn, "DELETE FROM " + t + " WHERE " + pred.sql(), List.of(), pred)) {
+                ps.execute();
             }
         }
         log.info("[DECISION] [{}] rule '{}' matched {} row(s): {}",
@@ -258,39 +272,56 @@ public final class DecisionRuleApplier {
 
     // ── consequences ─────────────────────────────────────────────────────────────
 
-    private static void tag(Connection conn, String table, String pred, String tagValue) throws Exception {
-        String v = "'" + tagValue.replace("'", "''") + "'";
+    private static void tag(Connection conn, String table, ConditionSql.Bound pred, String tagValue) throws Exception {
+        String t = SqlIdent.q(table);
         try (Statement st = conn.createStatement()) {
-            st.execute("ALTER TABLE \"" + table + "\" ADD COLUMN IF NOT EXISTS __tags VARCHAR");
-            st.execute("UPDATE \"" + table + "\" SET __tags = CASE WHEN __tags IS NULL OR __tags = '' THEN " + v
-                    + " ELSE __tags || ',' || " + v + " END WHERE " + pred);
+            st.execute("ALTER TABLE " + t + " ADD COLUMN IF NOT EXISTS __tags VARCHAR");
+        }
+        try (PreparedStatement ps = prepare(conn, "UPDATE " + t + " SET __tags = CASE WHEN __tags IS NULL OR __tags = '' "
+                + "THEN CAST(? AS VARCHAR) ELSE __tags || ',' || CAST(? AS VARCHAR) END WHERE " + pred.sql(),
+                List.of(tagValue, tagValue), pred)) {
+            ps.execute();
         }
     }
 
-    private static Result route(Connection conn, String table, String pred, String dest,
+    private static Result route(Connection conn, String table, ConditionSql.Bound pred, String dest,
                                 RouteSink routeSink) throws Exception {
         String routed = "__dr_routed";
-        try (Statement st = conn.createStatement()) {
-            st.execute("DROP TABLE IF EXISTS \"" + routed + "\"");
-            st.execute("CREATE TABLE \"" + routed + "\" AS SELECT * FROM \"" + table + "\" WHERE " + pred);
-        }
+        stage(conn, routed, table, pred);
         try {
             return routeSink.write(conn, routed, dest);
         } finally {
-            try (Statement st = conn.createStatement()) {
-                st.execute("DROP TABLE IF EXISTS \"" + routed + "\"");
-            }
+            drop(conn, routed);
         }
     }
 
-    private static void quarantine(Connection conn, String table, String pred, String quarantineRoot,
+    private static void quarantine(Connection conn, String table, ConditionSql.Bound pred, String quarantineRoot,
                                    String ruleName, String baseName) throws Exception {
         Path dir = Paths.get(quarantineRoot, "records", fsName(ruleName));
         Files.createDirectories(dir);
         String file = dir.resolve(fsName(baseName) + "_records.parquet").toString().replace('\\', '/');
+        // COPY stays parameter-free: the bound predicate selects into a staging table first
+        String staged = "__dr_quarantined";
+        stage(conn, staged, table, pred);
         try (Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM \"" + table + "\" WHERE " + pred + ") TO '"
-                    + file.replace("'", "''") + "' (FORMAT PARQUET)");
+            st.execute("COPY " + SqlIdent.q(staged) + " TO " + SqlIdent.sqlStr(file) + " (FORMAT PARQUET)");
+        } finally {
+            drop(conn, staged);
+        }
+    }
+
+    /** {@code staged} := the rows of {@code table} matching {@code pred} (replacing any leftover). */
+    private static void stage(Connection conn, String staged, String table, ConditionSql.Bound pred) throws Exception {
+        drop(conn, staged);
+        try (PreparedStatement ps = prepare(conn, "CREATE TABLE " + SqlIdent.q(staged) + " AS SELECT * FROM "
+                + SqlIdent.q(table) + " WHERE " + pred.sql(), List.of(), pred)) {
+            ps.execute();
+        }
+    }
+
+    private static void drop(Connection conn, String table) throws Exception {
+        try (Statement st = conn.createStatement()) {
+            st.execute("DROP TABLE IF EXISTS " + SqlIdent.q(table));
         }
     }
 
@@ -316,10 +347,18 @@ public final class DecisionRuleApplier {
         return s == null ? "" : s.trim().replaceAll("[^A-Za-z0-9._-]", "_").replaceAll("^\\.+", "_");
     }
 
-    private static long count(Connection conn, String sql) throws Exception {
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-            rs.next();
-            return rs.getLong(1);
+    /** {@code sql} prepared with {@code leading} bound first, then the predicate's own parameters. */
+    private static PreparedStatement prepare(Connection conn, String sql, List<Object> leading,
+                                             ConditionSql.Bound pred) throws Exception {
+        PreparedStatement ps = conn.prepareStatement(sql);
+        try {
+            int i = 1;
+            for (Object v : leading) ps.setObject(i++, v);
+            for (Object v : pred.params()) ps.setObject(i++, v);
+            return ps;
+        } catch (Exception e) {
+            ps.close();
+            throw e;
         }
     }
 }
