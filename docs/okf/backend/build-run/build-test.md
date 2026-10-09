@@ -24,11 +24,12 @@ Adoptium had published no 27 build as of 2026-09-17. ⚠ The GraalVM cache still
 See the `build-verify` skill for exact local paths.)
 
 ## When GitHub CI runs (operator, 2026-10-09)
-- **Every push / PR:** only `ci.yml`'s no-build `guards` job (~1 min) and the seconds-long `launchers-windows` guard,
-  plus `branch-policy.yml`.
-- **Full build** (`ci.yml` `test`: the Maven reactor with Postgres; `ui.yml`: the SPA lint/test/build) runs **nightly**
-  (01:30 / 01:45 UTC), **on demand** (GitHub -> Actions -> CI or UI -> *Run workflow*, or `gh workflow run CI --ref master`
-  / `gh workflow run UI --ref master`), on a pull request, and (`ci.yml`) on a `v*` release tag.
+- **A branch push runs only `branch-policy.yml`** (~10 s: commit-subject lint, retired-line refusal). The no-build
+  guards were taken off push too (operator, same day): run them locally before pushing.
+- **All of `ci.yml`** (the `guards` job, the Maven reactor + Postgres `test` job, `launchers-windows`) and **`ui.yml`**
+  (the SPA lint/test/build) run **nightly** (01:30 / 01:45 UTC), **on demand** (GitHub -> Actions -> CI or UI ->
+  *Run workflow*, or `gh workflow run CI --ref master` / `gh workflow run UI --ref master`), on a pull request, and
+  (`ci.yml`) on a `v*` release tag.
 - **Why:** parallel lanes pushed several times an hour and each push paid ~15-20 min of reactor. Commits now stay LOCAL
   until a batch of features passes its local tests (unit tests per change; the full local gate before the batch push),
   and the nightly run is the backstop. ⚠ A broken push is therefore found by the next nightly or an ad-hoc run, not at

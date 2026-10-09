@@ -1,15 +1,15 @@
 name: CI
 
-# WHEN IT RUNS (operator, 2026-10-09: "full build nightly only, ad-hoc any time"):
-#   - every push / PR: ONLY the fast no-build `guards` job (and the seconds-long Windows launcher guard);
-#   - the full `test` job (Maven reactor + Postgres): nightly, on demand, on a pull request and on a release tag.
+# WHEN IT RUNS (operator, 2026-10-09: "full build nightly only, ad-hoc any time"; then "off no-build guards"):
+#   NOT on a branch push. Every job (guards, test, launchers-windows) runs nightly, on demand, on a pull request
+#   and on a `v*` release tag. Run the same guards locally before pushing (.githooks/pre-push runs the secret and
+#   vocabulary guards; the rest are `node tools/check-*.mjs`).
 # Run it now: GitHub -> Actions -> CI -> "Run workflow", or `gh workflow run CI --ref master`.
 # Why: lanes pushed several times an hour and each push paid ~15-20 min of reactor; commits now stay local
 # until a batch of features passes its local tests, and the nightly run is the backstop.
 
 on:
   push:
-    branches: [master, main, 3.x]
     tags: ['v*']
   pull_request:
     branches: [master, main, 3.x]
@@ -346,8 +346,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    # Not on a plain branch push (see the header): nightly, on demand, on a PR and on a release tag.
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is
     # installed separately or pointed at — which left `PostgresStateStoreTest` reporting 11 SKIPPED and the
     # only proof that the JDBC stores run on real Postgres (chiefly `percentile_cont`, the one piece of
