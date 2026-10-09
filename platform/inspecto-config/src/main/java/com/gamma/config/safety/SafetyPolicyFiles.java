@@ -45,6 +45,8 @@ public final class SafetyPolicyFiles {
     private record Entry(Stamp stamp, Loaded loaded, SafetyPolicyUnreadableException failure) {}
 
     private static final Map<Path, Entry> CACHE = new ConcurrentHashMap<>();
+    /** Coarsest common mtime granularity (FAT 2 s) — a stamp younger than this is not trusted. */
+    private static final long RACY_MS = 2_000;
 
     /**
      * The effective policy of {@code spaceId}: the server tier (the file in {@code serverDir}, or none when
@@ -102,7 +104,10 @@ public final class SafetyPolicyFiles {
             throw new SafetyPolicyUnreadableException(file.toString(), "cannot stat: " + e, e);
         }
         Entry cached = CACHE.get(file);
-        if (cached != null && cached.stamp().equals(stamp)) {
+        // A file modified within RACY_MS may be rewritten again inside the same mtime tick at the same
+        // size (filesystems keep mtime to 1-2 s), so an equal stamp proves nothing yet: re-parse it.
+        boolean racy = System.currentTimeMillis() - stamp.mtime() < RACY_MS;
+        if (cached != null && !racy && cached.stamp().equals(stamp)) {
             if (cached.failure() != null) throw cached.failure();
             return cached.loaded();
         }
