@@ -4,6 +4,7 @@ import com.gamma.util.SqlIdent;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,7 +27,9 @@ import static com.gamma.util.Values.strOrEmpty;
  * case-sensitive {@code VARCHAR} comparison.
  *
  * <p>All identifiers and literals are quote-escaped here — the tree is authored config, and nothing
- * from it may reach the statement unescaped.
+ * from it may reach the statement unescaped. A caller that builds a WRITE statement from the predicate
+ * uses {@link #predicateBound} instead, where operand values never reach the statement text at all
+ * ({@code DECISION-RULE-SQL-GUARD-1}).
  */
 public final class ConditionSql {
 
@@ -45,8 +48,24 @@ public final class ConditionSql {
      */
     public static String predicate(Object when) {
         ConditionTree.requireGroupRoot(when);
-        String g = group(when);
+        String g = group(when, null);
         return g == null ? "TRUE" : g;
+    }
+
+    /** A predicate whose operand values are JDBC parameters: one {@code ?} in {@code sql} per entry of {@code params}, in order. */
+    public record Bound(String sql, List<Object> params) {
+    }
+
+    /**
+     * {@link #predicate} with every operand value (string, number, regex, date) bound as a JDBC parameter
+     * instead of rendered as a literal, so no rule value ever reaches the statement text — only quoted
+     * identifiers and fixed SQL do. Same semantics, same refusals.
+     */
+    public static Bound predicateBound(Object when) {
+        ConditionTree.requireGroupRoot(when);
+        List<Object> params = new ArrayList<>();
+        String g = group(when, params);
+        return new Bound(g == null ? "TRUE" : g, List.copyOf(params));
     }
 
     /**
@@ -59,13 +78,16 @@ public final class ConditionSql {
      */
     public static String predicateStrict(Object when) {
         ConditionTree.validateStrict(when);
-        return group(when);
+        return group(when, null);
     }
 
     // ── tree walk (mirrors ConditionTree.matchGroup) ─────────────────────────────
 
-    /** Render a group, or {@code null} when it contributes no constraint. */
-    private static String group(Object node) {
+    /**
+     * Render a group, or {@code null} when it contributes no constraint. {@code p} collects bound operand
+     * values ({@link #predicateBound}); {@code null} renders them as escaped literals.
+     */
+    private static String group(Object node, List<Object> p) {
         if (!(node instanceof Map<?, ?> g)) return null;
         Object rawItems = g.get("items");
         if (rawItems == null) rawItems = g.get("conditions");
@@ -77,7 +99,7 @@ public final class ConditionSql {
         int rendered = 0;
         for (Object it : items) {
             if (!(it instanceof Map<?, ?> m)) continue;
-            String part = isGroup(m) ? group(m) : isComplete(m) ? condition(m) : null;
+            String part = isGroup(m) ? group(m, p) : isComplete(m) ? condition(m, p) : null;
             if (part != null) {
                 sql.add(part);
                 rendered++;
@@ -102,7 +124,7 @@ public final class ConditionSql {
 
     // ── one leaf ─────────────────────────────────────────────────────────────────
 
-    private static String condition(Map<?, ?> c) {
+    private static String condition(Map<?, ?> c, List<Object> p) {
         String f = ident(strOrEmpty(c.get("field")));
         String operator = strOrEmpty(c.get("operator"));
         String value = strOrEmpty(c.get("value"));
@@ -114,25 +136,25 @@ public final class ConditionSql {
             // ConditionTree treats null and '' alike for the null checks
             case "isNull" -> "(" + f + " IS NULL OR CAST(" + f + " AS VARCHAR) = '')";
             case "isNotNull" -> "(" + f + " IS NOT NULL AND CAST(" + f + " AS VARCHAR) <> '')";
-            case "contains" -> like(f, value, true, true);
-            case "startsWith" -> like(f, value, false, true);
-            case "endsWith" -> like(f, value, true, false);
-            case "matches" -> "regexp_matches(CAST(" + f + " AS VARCHAR), " + lit(value) + (ic ? ", 'i')" : ")");
-            case "in" -> in(f, value, ic);
-            case "between" -> "(" + typed(f, ">=", value, false) + " AND " + typed(f, "<=", value2, false) + ")";
-            case "=", "!=" -> typed(f, operator, value, ic);
-            case "<", "<=", ">", ">=" -> typed(f, operator, value, false);
+            case "contains" -> like(f, value, true, true, p);
+            case "startsWith" -> like(f, value, false, true, p);
+            case "endsWith" -> like(f, value, true, false, p);
+            case "matches" -> "regexp_matches(CAST(" + f + " AS VARCHAR), " + lit(value, p) + (ic ? ", 'i')" : ")");
+            case "in" -> in(f, value, ic, p);
+            case "between" -> "(" + typed(f, ">=", value, false, p) + " AND " + typed(f, "<=", value2, false, p) + ")";
+            case "=", "!=" -> typed(f, operator, value, ic, p);
+            case "<", "<=", ">", ">=" -> typed(f, operator, value, false, p);
             default -> "FALSE";
         };
     }
 
-    private static String in(String f, String csv, boolean ic) {
+    private static String in(String f, String csv, boolean ic, List<Object> p) {
         StringJoiner sql = new StringJoiner(" OR ", "(", ")");
         int n = 0;
         for (String x : csv.split(",")) {
             String xt = x.trim();
             if (!xt.isEmpty()) {
-                sql.add(typed(f, "=", xt, ic));
+                sql.add(typed(f, "=", xt, ic, p));
                 n++;
             }
         }
@@ -141,27 +163,35 @@ public final class ConditionSql {
 
     /** Case-insensitive substring match; {@code %}/{@code _}/{@code \} in the operand are escaped
      *  before the wildcard ends are added. */
-    private static String like(String f, String value, boolean pre, boolean post) {
+    private static String like(String f, String value, boolean pre, boolean post, List<Object> p) {
         String v = value.toLowerCase(Locale.ROOT)
                 .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-        String p = (pre ? "%" : "") + v + (post ? "%" : "");
-        return "LOWER(CAST(" + f + " AS VARCHAR)) LIKE " + lit(p) + " ESCAPE '\\'";
+        String pattern = (pre ? "%" : "") + v + (post ? "%" : "");
+        return "LOWER(CAST(" + f + " AS VARCHAR)) LIKE " + lit(pattern, p) + " ESCAPE '\\'";
     }
 
     /** Operand-driven typed comparison (see class doc). */
-    private static String typed(String f, String op, String v, boolean ic) {
+    private static String typed(String f, String op, String v, boolean ic, List<Object> p) {
         String sqlOp = "!=".equals(op) ? "<>" : op;
-        if (isNumeric(v))
-            return "TRY_CAST(" + f + " AS DOUBLE) " + sqlOp + " " + Double.parseDouble(v);
+        if (isNumeric(v)) {
+            double d = Double.parseDouble(v);
+            if (p != null) {
+                p.add(d);
+                return "TRY_CAST(" + f + " AS DOUBLE) " + sqlOp + " CAST(? AS DOUBLE)";
+            }
+            // NaN / Infinity print as bare words DuckDB reads as column names; quote them as DOUBLE literals
+            return "TRY_CAST(" + f + " AS DOUBLE) " + sqlOp + " "
+                    + (Double.isFinite(d) ? String.valueOf(d) : "'" + d + "'::DOUBLE");
+        }
         if ("true".equalsIgnoreCase(v) || "false".equalsIgnoreCase(v)) {
             // ConditionTree: a cell is true when Boolean true or the string 'true'; false orders below true
             String cell = "(CASE WHEN LOWER(CAST(" + f + " AS VARCHAR)) = 'true' THEN 1 ELSE 0 END)";
             return cell + " " + sqlOp + " " + ("true".equalsIgnoreCase(v) ? 1 : 0);
         }
         if (isDateLike(v))
-            return "TRY_CAST(CAST(" + f + " AS VARCHAR) AS TIMESTAMP) " + sqlOp + " TRY_CAST(" + lit(v) + " AS TIMESTAMP)";
-        if (ic) return "LOWER(CAST(" + f + " AS VARCHAR)) " + sqlOp + " " + lit(v.toLowerCase(Locale.ROOT));
-        return "CAST(" + f + " AS VARCHAR) " + sqlOp + " " + lit(v);
+            return "TRY_CAST(CAST(" + f + " AS VARCHAR) AS TIMESTAMP) " + sqlOp + " TRY_CAST(" + lit(v, p) + " AS TIMESTAMP)";
+        if (ic) return "LOWER(CAST(" + f + " AS VARCHAR)) " + sqlOp + " " + lit(v.toLowerCase(Locale.ROOT), p);
+        return "CAST(" + f + " AS VARCHAR) " + sqlOp + " " + lit(v, p);
     }
 
     /**
@@ -236,7 +266,10 @@ public final class ConditionSql {
         return SqlIdent.q(name);
     }
 
-    private static String lit(String v) {
-        return "'" + v.replace("'", "''") + "'";
+    /** A string operand: bound as a {@code VARCHAR} parameter when {@code p} collects them, else an escaped literal. */
+    private static String lit(String v, List<Object> p) {
+        if (p == null) return "'" + v.replace("'", "''") + "'";
+        p.add(v);
+        return "CAST(? AS VARCHAR)";
     }
 }

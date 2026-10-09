@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **50<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** —
+> **49<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** —
+> ⬇ **50 → 49 (P2 16 → 15) on 2026-10-09**: closed P2 `DECISION-RULE-SQL-GUARD-1` — a break-out probe (quotes, `;`, comments, `$$`, hostile field names, NUL, a quarantine path with `'`) found nothing escaping the old escaping; fixed anyway as defence in depth before the Decision Kernel shares the path: `DecisionRuleApplier` now runs every statement as a `PreparedStatement` over `ConditionSql.predicateBound` (operand and tag values are bound parameters, table names `SqlIdent.q`, the quarantine `COPY` copies a staging table). Also fixed: a `NaN`/`Infinity` operand rendered as a bare word and silently skipped the rule. As-built in `okf/backend/module-reorganisation-decisions.md`.
 > ⬇ **52 → 51 (P3 35 → 34) on 2026-10-09**: closed `MODULE-REORG-P7-KERNEL` — Kernel steps 1, 3–6 and the Escalation Rule edit UI shipped; the five unregistered Consequences were declined (no consumer; §6 *Control plane & Jobs*, operator signed off); step 7 stays declined.
 > ⬇ **53 → 52 (P3 36 → 35) on 2026-10-09**: closed `DRYRUN-SILENT-CAST-1` — values a declared type nulls (row KEPT, run still SUCCESS, counted as `cast_failures`) are now shown: a warning on run detail's Batches tab, a `castFailures` count + warning on *Run to here*, and a per-map-Step warning on the dry-run (the same `DataTransformer.countCastFailures` a real ingest uses, via a `CsvSettings` overload).
 > ⬇ **58 → 53 (P3 41 → 36) on 2026-10-09**: closed four of the six UI-test findings — `BOOTSTRAP-EDITION-ENTERPRISE-1` (`/bootstrap` reports `enterprise` when an `AccessDecider` is installed), `DECISION-RULES-ACTIONS-PIN-1` (Actions column pinned), `INCIDENT-COMMANDER-TWO-FIELDS-1` (the postmortem Incident Commander defaults to the assignee the header calls Commander), `DRYRUN-SAMPLE-SEED-1` (a sample missing a column the Steps read is named in plain words; the captured-sample button already seeds real rows); withdrew `INCIDENT-CREATE-NEEDS-ENTITY-1` as filed in error (the dialog already explains where the first linked object comes from — recorded decision `CASE-FIRST-OBJECT-DEAD-END-1`). `DRYRUN-SILENT-CAST-1` stays open with its cause verified.
@@ -164,11 +165,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 34<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 34<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 50<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 49<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -395,7 +396,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 ### 3.8 Security, Policy, Editions & Compliance
 
-- **P2** · `DECISION-RULE-SQL-GUARD-1` — **Decision Rules build write SQL by string concatenation, guarded by escaping only.** `DecisionRuleApplier` (`inspecto-engine`, ~lines 185-276) renders `ConditionSql` output into `DELETE` / `UPDATE` / `CREATE TABLE AS` / `COPY` statements on the in-flight table with no `SqlGuard` check and no bound parameters. Not shown to be exploitable; found by the Decision Kernel spike (2026-10-06), and must be reviewed before the Decision Kernel makes this the shared SQL path (bind values, check the statement, or confine the writer). → `okf/backend/module-reorganisation-decisions.md`
 
 
 - **P3** · `IMPORT-WHOLE-SPACE-SPLIT-1` — **split a whole-Space export into its kinds' own validated routes on import, if ever asked.** Operator 2026-09-29: importing a whole-Space export into an EXISTING Space is not supported — `POST /spaces/{id}/import` answers a `kind: space` bundle 403 naming the two supported flows (per-data-source import, or a new Space from the zip). Build only on a real request. → `okf/backend/editions/auth-security.md` (import section)
