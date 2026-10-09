@@ -247,6 +247,28 @@ class ControlApiDbBrowserTest {
     }
 
     /**
+     * ERR-4XX-PATH-ECHO-1: the store query runs over the Space's absolute data directory, and DuckDB echoes
+     * that relation in its {@code LINE 1:} context — the 422 must name no absolute server path.
+     */
+    @Test
+    void aQueryFailureNamesNoAbsoluteServerPath(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            // A file that is not Parquet: DuckDB names it by its absolute path in the read error.
+            Path bad = root.resolve("s1").resolve("data").resolve("orders").resolve("dt=2027");
+            Files.createDirectories(bad);
+            Files.writeString(bad.resolve("broken.parquet"), "not parquet");
+            HttpResponse<String> r = postJson(c.port, "/spaces/s1/db/query",
+                    "{\"table\":\"orders\",\"sql\":\"SELECT * FROM \\\"orders\\\"\"}");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.envelope(r.body()).get("error").get("message").asText();
+            assertTrue(message.contains("'data/orders/dt=2027/broken.parquet'"), message);
+            String abs = root.toAbsolutePath().toString();
+            assertFalse(message.contains(abs) || message.contains(abs.replace('\\', '/')), message);
+            assertFalse(message.matches("(?s).*(?:[A-Za-z]:[\\\\/]|/(?:tmp|home|var|Users)/).*"), message);
+        }
+    }
+
+    /**
      * A store named after a registered pipeline browses the pipeline's mapped output ({@code dirs.database}),
      * not the raw pre-mapping {@code backup/} copies colocated under {@code data/<name>} — the whole-tree
      * glob used to lock onto whichever file the directory walk hit first, hiding mapped-only columns.

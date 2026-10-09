@@ -11,7 +11,6 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -144,7 +143,7 @@ final class DatasetRoutes implements RouteModule {
         try {
             r = QueryExecutor.run(new QueryExecutor.Request(id, relationSql, sql, limit, 0, List.of(), List.of()));
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dataset read failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dataset read failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }

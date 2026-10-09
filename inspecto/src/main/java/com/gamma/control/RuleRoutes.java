@@ -13,7 +13,6 @@ import com.gamma.query.Parameters;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.RuleTemplate;
 import com.gamma.sql.SqlGuard;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -115,7 +114,7 @@ final class RuleRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "rule template failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "rule template failed: " + ServerFaults.sqlMessage(sql.getMessage(), api));
         } catch (IOException io) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", io);
         }

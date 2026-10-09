@@ -34,7 +34,6 @@ import com.gamma.service.CollectorService;
 import com.gamma.service.ConfigRegistry;
 import com.gamma.service.SpaceRoot;
 import com.gamma.util.AtomicFiles;
-import com.gamma.util.DuckDbUtil;
 import com.gamma.util.MappingCsv;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
@@ -655,7 +654,7 @@ final class PipelineGraphRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         } catch (Exception e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dry-run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dry-run failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         }
     }
 
@@ -715,7 +714,7 @@ final class PipelineGraphRoutes implements RouteModule {
             if ("FAILED".equals(parsed.status()))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "test run failed: the batch FAILED after "
                         + parsed.totalInputRows() + " row(s) parsed: "
-                        + DuckDbUtil.withoutPendingQueryPreamble(parsed.error()));
+                        + ServerFaults.sqlMessage(parsed.error(), api));
             // 🔴 Seeded with the PARSER's rows, captured before mapping (TESTRUN-SEED-IS-MAPPED-OUTPUT-1,
             // operator decision 2026-09-23) — never the rows the ingest wrote, which are already mapped and
             // made the preview's map re-apply itself to canonical columns. Grouped by SEGMENT (WB-08): a
@@ -751,7 +750,7 @@ final class PipelineGraphRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         } catch (Exception e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "test run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "test run failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } finally {
             PipelineTestRun.deleteScratch(scratch);
         }

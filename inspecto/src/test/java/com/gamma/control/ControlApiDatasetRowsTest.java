@@ -16,6 +16,7 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -187,6 +188,29 @@ class ControlApiDatasetRowsTest {
             JsonNode data = V1Body.of(r.body());
             assertEquals(2, data.get("rows").size());
             assertTrue(data.get("statistics").get("truncated").asBoolean());
+        }
+    }
+
+    /**
+     * ERR-4XX-PATH-ECHO-1: a read failure DuckDB reports by the file's absolute path reaches the author as a
+     * 422 naming only the Space-root-relative path.
+     */
+    @Test
+    void aReadFailureNamesNoAbsoluteServerPath(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            Path broken = root.resolve("feed").resolve("broken.parquet");
+            Files.createDirectories(broken.getParent());
+            Files.writeString(broken, "not parquet");
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("broken_view", "pipeline-x", List.of(),
+                    "SELECT * FROM read_parquet('" + broken.toString().replace('\\', '/') + "')",
+                    "2026-10-10T00:00:00Z"));
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "broken", Map.of("view", "broken_view"));
+            HttpResponse<String> r = get(c.port, "/datasets/broken/rows");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.envelope(r.body()).get("error").get("message").asText();
+            String abs = root.toAbsolutePath().toString();
+            assertFalse(message.contains(abs) || message.contains(abs.replace('\\', '/')), message);
+            assertTrue(message.contains(root.getFileName() + "/feed/broken.parquet"), message);
         }
     }
 

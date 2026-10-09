@@ -14,7 +14,6 @@ import com.gamma.query.Parameters;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -119,8 +118,7 @@ final class BiRoutes implements RouteModule {
             return response(QueryExecutor.run(req), echoSql);
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: "
-                    + ServerFaults.withoutServerPaths(DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()),
-                            api.dataRoot(), writeRoot));
+                    + ServerFaults.sqlMessage(e.getMessage(), api));
         }
     }
 

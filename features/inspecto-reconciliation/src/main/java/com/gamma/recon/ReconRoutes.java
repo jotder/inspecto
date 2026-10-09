@@ -11,7 +11,6 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
-import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -104,7 +103,7 @@ public final class ReconRoutes implements RouteModule {
         try {
             return ReconService.columns(sides);
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "column inventory failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "column inventory failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
@@ -150,7 +149,7 @@ public final class ReconRoutes implements RouteModule {
             page = bigDayPage.page();
         } else {
             int cap = rowCap;
-            ReconService.DayPage dp = compute(() -> ReconService.dayRun(spec, sample, mask, offset, limit, cap));
+            ReconService.DayPage dp = compute(api, () -> ReconService.dayRun(spec, sample, mask, offset, limit, cap));
             day = dp.day();
             page = dp.page();
             if (cacheKey != null) {
@@ -215,7 +214,7 @@ public final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
@@ -268,7 +267,7 @@ public final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
@@ -555,7 +554,7 @@ public final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
@@ -681,7 +680,7 @@ public final class ReconRoutes implements RouteModule {
         // Shared spec assembly (identical to the scheduled recon.run Job); relation-SQL resolution stays
         // here so an unknown/unusable dataset keeps its route gate (404/422 via relationSql).
         String day = ApiContext.str(body, "day");
-        return compute(() -> ReconDay.resolve(config,
+        return compute(api, () -> ReconDay.resolve(config,
                 dsId -> component(store, "dataset", dsId)
                         .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown dataset '" + dsId + "'")),
                 dsId -> relationSql(api, store, writeRoot, dsId), api.dataRoot(), day));
@@ -691,13 +690,13 @@ public final class ReconRoutes implements RouteModule {
     @FunctionalInterface
     private interface Compute<T> { T get() throws SQLException, IOException; }
 
-    private static <T> T compute(Compute<T> c) {
+    private static <T> T compute(ApiContext api, Compute<T> c) {
         try {
             return c.get();
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }

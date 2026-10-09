@@ -70,6 +70,15 @@ public final class ServerFaults {
         return LEFTOVER_PATH.matcher(out).replaceAll("<path>");
     }
 
+    /**
+     * ERR-4XX-PATH-ECHO-1: the one way a 4xx carries a DuckDB / SQL / IO message to the client — the JDBC
+     * pending-query preamble dropped, then {@link #withoutServerPaths} over the Space's data and config roots.
+     */
+    public static String sqlMessage(String message, com.gamma.spi.http.ApiContext api) {
+        return withoutServerPaths(com.gamma.util.DuckDbUtil.withoutPendingQueryPreamble(message),
+                api.dataRoot(), api.writeRoot());
+    }
+
     /** A Windows drive path, or a POSIX absolute path of two or more segments, up to a quote or whitespace. */
     private static final java.util.regex.Pattern LEFTOVER_PATH = java.util.regex.Pattern.compile(
             "(?<![\\w.])(?:[A-Za-z]:[\\\\/]|/(?=[^\\s'\"/]+/))[^\\s'\"]*");

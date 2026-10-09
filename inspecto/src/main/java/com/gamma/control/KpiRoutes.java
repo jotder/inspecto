@@ -12,7 +12,6 @@ import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.KpiDefinition;
 import com.gamma.query.KpiEvaluator;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -83,7 +82,7 @@ final class KpiRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
-                    "kpi evaluation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+                    "kpi evaluation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }

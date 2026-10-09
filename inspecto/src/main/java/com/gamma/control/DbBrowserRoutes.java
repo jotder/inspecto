@@ -12,7 +12,6 @@ import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.BrowsableStore;
-import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -257,7 +256,7 @@ final class DbBrowserRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
@@ -289,7 +288,7 @@ final class DbBrowserRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {          // unknown table for this store
             throw new ApiException(404, ErrorCodes.NOT_FOUND, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         }
     }
 

@@ -27,7 +27,6 @@ import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineReferences;
 import com.gamma.pipeline.exec.ComponentPreview;
 import com.gamma.sql.SqlGuard;
-import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,17 +118,17 @@ final class ComponentRoutes implements RouteModule {
         // component. A pipeline node authors its config inline (AUTHORED-vs-DERIVED), so without this
         // the only testable configs were the registered ones — the gap this closes. Literal paths, so
         // they cannot be reached by a component whose id happens to be "preview".
-        api.post("/components/transform/preview", (e, m) -> previewInlineTransform(api.body(e)));
-        api.post("/components/grammar/preview", (e, m) -> previewInlineGrammar(api.body(e)));
+        api.post("/components/transform/preview", (e, m) -> previewInlineTransform(api, api.body(e)));
+        api.post("/components/grammar/preview", (e, m) -> previewInlineGrammar(api, api.body(e)));
         api.post("/components/sink/preview", (e, m) -> previewInlineSink(api.body(e)));
         // S6b: validate mapping rules WITHOUT writing — the import loop's gate. Un-gated like the
         // /test previews (it reads nothing and writes nothing) and never touches the registry.
         api.post("/components/mapping/validate", (e, m) -> validateMapping(api.body(e)));
         // Live zero-row output column derivation via DuckDB DESCRIBE query over scratch input table.
-        api.post("/components/transform/describe", (e, m) -> describeTransform(api.body(e)));
+        api.post("/components/transform/describe", (e, m) -> describeTransform(api, api.body(e)));
         // AUTHORING-REDESIGN-1 (c): the READ-ONLY parse tree of author SQL. `sql/`, not `transform/` —
         // its first consumer is the Filter Step's predicate, and a predicate is not transform-specific.
-        api.post("/components/sql/ast", (e, m) -> sqlAst(api.body(e)));
+        api.post("/components/sql/ast", (e, m) -> sqlAst(api, api.body(e)));
     }
 
     /**
@@ -146,7 +145,7 @@ final class ComponentRoutes implements RouteModule {
      * {@link #describeTransform}, which binds and must keep its guard — do not "make the two consistent".
      * And no AST→SQL sibling exists or may be added (Q2): the tree is read-only, for good.
      */
-    private Object sqlAst(Map<String, Object> body) {
+    private Object sqlAst(ApiContext api, Map<String, Object> body) {
         if (body == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must not be empty");
         Object rawSql = body.get("sql");
         if (!(rawSql instanceof String sql) || sql.isBlank()) {
@@ -161,7 +160,7 @@ final class ComponentRoutes implements RouteModule {
         try {
             r = SqlAst.parse(sql, fragment);
         } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(500, ErrorCodes.INTERNAL, "the SQL structure could not be read: " + duckDbMessage(e.getMessage()));
+            throw new ApiException(500, ErrorCodes.INTERNAL, "the SQL structure could not be read: " + duckDbMessage(e.getMessage(), api));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", r.ok());
@@ -218,7 +217,7 @@ final class ComponentRoutes implements RouteModule {
      *
      * <p>400 on a missing/invalid body, 422 with the guard's reason or DuckDB's own binder/syntax error.
      */
-    private Object describeTransform(Map<String, Object> body) {
+    private Object describeTransform(ApiContext api, Map<String, Object> body) {
         if (body == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must not be empty");
         Object rawSql = body.get("sql");
         if (!(rawSql instanceof String sql) || sql.isBlank()) {
@@ -256,7 +255,7 @@ final class ComponentRoutes implements RouteModule {
             }
             return Map.of("columns", cols);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, duckDbMessage(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, duckDbMessage(e.getMessage(), api));
         }
     }
 
@@ -268,10 +267,10 @@ final class ComponentRoutes implements RouteModule {
      * the author read in the pane's alert. Everything from the real error onward is kept verbatim: it
      * names the column and lists the candidate bindings, which IS the validation. Only that exact
      * driver text is removed, so a long message keeps its tail. The stripping is the ONE shared seam,
-     * {@link DuckDbUtil#withoutPendingQueryPreamble}, which the Pipeline test run and dry-run use too.
+     * {@link ServerFaults#sqlMessage}, which also drops server paths (ERR-4XX-PATH-ECHO-1).
      */
-    private static String duckDbMessage(String message) {
-        return message == null ? "the SQL could not be described" : DuckDbUtil.withoutPendingQueryPreamble(message);
+    private static String duckDbMessage(String message, ApiContext api) {
+        return message == null ? "the SQL could not be described" : ServerFaults.sqlMessage(message, api);
     }
 
     /** The registry root under the write root, or {@code null} when writes are disabled (no write root). */
@@ -581,7 +580,7 @@ final class ComponentRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "component '" + id + "' is not a transform ('type: transform.*' required)");
 
         PipelineNode node = new PipelineNode(id, type, c.content(), null);
-        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.transform(node, ApiContext.sampleRows(body)));
+        return RouteErrors.mapPreviewErrors(api, () -> ComponentPreview.transform(node, ApiContext.sampleRows(body)));
     }
 
     /**
@@ -591,7 +590,7 @@ final class ComponentRoutes implements RouteModule {
      */
     private Object previewGrammar(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String id, Map<String, Object> body) {
         ComponentRegistry.Component c = requireComponent(api, ex, "grammar", id);
-        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.grammar(c.content(), sampleText(body)));
+        return RouteErrors.mapPreviewErrors(api, () -> ComponentPreview.grammar(c.content(), sampleText(body)));
     }
 
     /**
@@ -622,18 +621,18 @@ final class ComponentRoutes implements RouteModule {
      * it already possesses. Same posture as {@code /components/mapping/validate}. 400 on a missing or
      * non-object {@code config}, 422 on a preview failure, exactly as the by-id arm.
      */
-    private Object previewInlineTransform(Map<String, Object> body) {
+    private Object previewInlineTransform(ApiContext api, Map<String, Object> body) {
         Map<String, Object> config = requireInlineConfig(body);
         String type = ApiContext.str(config, "type");
         if (type == null || !type.startsWith("transform."))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "inline config is not a transform ('type: transform.*' required)");
-        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.transform(
+        return RouteErrors.mapPreviewErrors(api, () -> ComponentPreview.transform(
                 new PipelineNode(INLINE_ID, type, config, null), ApiContext.sampleRows(body)));
     }
 
-    private Object previewInlineGrammar(Map<String, Object> body) {
+    private Object previewInlineGrammar(ApiContext api, Map<String, Object> body) {
         Map<String, Object> config = requireInlineConfig(body);
-        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.grammar(config, sampleText(body)));
+        return RouteErrors.mapPreviewErrors(api, () -> ComponentPreview.grammar(config, sampleText(body)));
     }
 
     private Object previewInlineSink(Map<String, Object> body) {

@@ -18,7 +18,6 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -210,7 +209,7 @@ final class ExpectationRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "expectation evaluation failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "expectation evaluation failed: " + ServerFaults.sqlMessage(sql.getMessage(), api));
         }
 
         Map<String, Object> lastResult = new LinkedHashMap<>();

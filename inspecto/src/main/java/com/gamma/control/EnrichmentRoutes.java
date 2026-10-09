@@ -14,7 +14,6 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.EnrichmentEngine;
 import com.gamma.report.ReportService;
 import com.gamma.service.EnrichmentService;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -161,7 +160,7 @@ final class EnrichmentRoutes implements RouteModule {
         try {
             return EnrichmentEngine.preview(cfg, sampleRows, HostContext.of(api).service().loadedPipelines(), PREVIEW_LIMIT).toMap();
         } catch (Exception compute) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "enrichment preview failed on the sample: " + DuckDbUtil.withoutPendingQueryPreamble(compute.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "enrichment preview failed on the sample: " + ServerFaults.sqlMessage(compute.getMessage(), api));
         }
     }
 

@@ -4,7 +4,6 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
-import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -52,13 +51,13 @@ public final class RouteErrors {
     }
 
     /** Component previews: bad config → 400, an engine parse/SQL failure → 422 ("preview failed"). */
-    public static <T> T mapPreviewErrors(PreviewSupplier<T> body) {
+    public static <T> T mapPreviewErrors(com.gamma.spi.http.ApiContext api, PreviewSupplier<T> body) {
         try {
             return body.get();
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         } catch (SQLException | IOException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "preview failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "preview failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         }
     }
 

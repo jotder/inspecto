@@ -7,7 +7,6 @@ import com.gamma.spi.http.RouteModule;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.exec.ViewQuery;
-import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -72,7 +71,7 @@ final class ViewRoutes implements RouteModule {
         } catch (IllegalStateException e) {
             throw new ApiException(409, ErrorCodes.CONFLICT, e.getMessage());
         } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "view query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "view query failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         }
     }
 
