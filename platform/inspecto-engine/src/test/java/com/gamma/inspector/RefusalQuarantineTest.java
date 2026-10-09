@@ -122,7 +122,10 @@ class RefusalQuarantineTest {
         assertEquals(RefusalQuarantine.CARD_IN_NAME, a.error());
         assertEquals(com.gamma.etl.MemberStatus.QUARANTINED_RESTRICTED, a.status());
         Event audit = seen.stream().filter(e -> e.toString().contains("ingest.refused")).findFirst().orElseThrow();
-        assertFalse(audit.toString().contains("4111"), "the audit event names the code, not the value: " + audit);
+        // The full number and the original name, not a "4111" prefix: the event carries random SHA-256 hex
+        // (audit_hash / audit_prev_hash) that contains any given 4 digits in ~0.2% of runs.
+        assertFalse(audit.toString().contains("4111111111111111"), "the audit event names the code, not the value: " + audit);
+        assertFalse(audit.toString().contains("secret_"), "nor the original file name: " + audit);
     }
 
     @Test

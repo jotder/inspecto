@@ -149,8 +149,14 @@ class DuckLakeRegistrationSiteContractTest {
         return full;
     }
 
-    /** The checkout root — the OUTERMOST ancestor of the working directory whose pom.xml declares the reactor modules. */
+    /**
+     * The checkout root — the nearest ancestor holding {@code .git} (a directory in a plain checkout, a file in a
+     * git worktree), else the OUTERMOST ancestor whose pom.xml declares the reactor modules. Outermost alone picked
+     * the MAIN checkout when the build ran in a worktree under {@code .claude/worktrees/}, prefixing every site.
+     */
     private static Path repoRoot() {
+        for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent())
+            if (Files.exists(dir.resolve(".git")) && Files.isRegularFile(dir.resolve("pom.xml"))) return dir;
         Path found = null;
         for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
             Path pom = dir.resolve("pom.xml");
