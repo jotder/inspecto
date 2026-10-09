@@ -1,0 +1,14 @@
+job:
+  name: fraud_data_bypass
+  type: sql.template
+  description: "Data-charging bypass - seconds of DATA sessions a line used while rated at zero, outside zero-rated APNs"
+  sql: "WITH cur AS (SELECT a_number AS msisdn, CAST($window_start AS DATE) AS window_date, count(*) AS unrated_sessions, CAST(sum(duration_s) AS BIGINT) AS unrated_seconds FROM cdr WHERE service = 'DATA' AND direction = 'MO' AND charge = 0 AND NOT list_contains(string_split($zero_rated_apns, ','), trim(b_number)) AND start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP) GROUP BY a_number HAVING sum(duration_s) >= CAST($min_candidate_seconds AS INTEGER)) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM fraud_data_bypass WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: cdr,fraud_data_bypass
+  sink_dataset: fraud_data_bypass
+  cron: "0 2 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  zero_rated_apns: "zero.operator.apn"
+  min_candidate_seconds: "600"
+  enabled: true

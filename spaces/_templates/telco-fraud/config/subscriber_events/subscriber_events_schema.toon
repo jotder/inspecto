@@ -6,7 +6,7 @@ raw:
     event_ts,"1",TIMESTAMP,"Event time","","INTERNAL"
     event_type,"2",VARCHAR,"ACTIVATION or SIM_SWAP","","INTERNAL"
     msisdn,"3",VARCHAR,"Subscriber number","","CONFIDENTIAL"
-    dealer_id,"4",VARCHAR,"Dealer that performed the activation","","INTERNAL"
+    dealer_id,"4",VARCHAR,"Dealer that performed the activation, or the staff user that performed the SIM swap","","INTERNAL"
     id_doc,"5",VARCHAR,"Identity document presented","","CONFIDENTIAL"
 mapping:
   canonicalName: subscriber_events

@@ -405,7 +405,7 @@ Datasets stays MANUAL until the pack has been driven live; no second Alert Rule 
 **The telecom fraud pack — `spaces/_templates/telco-fraud/`** (`ASSURE-PACK-TELCO-FRAUD-1`, wave 5.1 of
 `superpower/assurance-capability-plan.md`, BUILT 2026-09-30, verified 2026-10-03, not closed). Three feed Pipelines + schemas (`cdr`,
 `subscriber_events`, `payments`; each schema needs a `mapping:` — a `raw:`-only schema fails every file on the
-Consignment path with "a mapping with neither fields[] nor rules[]"); ten detection windows as `sql.template` Jobs
+Consignment path with "a mapping with neither fields[] nor rules[]"); thirteen detection windows as `sql.template` Jobs (ten at the 2026-09-30 build; see *Content gaps closed* below)
 (`config/jobs/fraud_<typology>_job.toon`: IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap,
 subscription / identity, dealer activations, voucher / EVD, payment reversal), each writing one row per candidate
 entity per `window_date` to its sink Dataset `fraud_<typology>`; and one per-entity Alert Rule per typology, `by` =
@@ -421,6 +421,8 @@ stays parked); each run reads and rewrites the whole retained sink, and the iden
 sinks keep every entity, so they grow with the subscriber base — **sizing documented (operator, 2026-10-06)**:
 size by subscriber count x `retention_days`, since each run rewrites the retained sink (pack runbook §
 *Sizing and retention*).
+
+**Content gaps closed 2026-10-09 (`TELCO-FRAUD-CONTENT-GAPS-1`).** Three typologies added to the same template, no new feed and no platform edit: `fraud_recharge` (card-testing / top-up velocity: PAYMENT top-ups under `small_amount` per line, `by` = `msisdn`, `gt 8`), `fraud_data_bypass` (DATA sessions rated at zero outside `zero_rated_apns`, `by` = `msisdn`, `gt 7200` s) and `fraud_internal` (SIM swaps per staff user outside `exempt_staff`, `by` = `staff_id`, `gt 5`), each with its Job, per-entity Alert Rule, sink Dataset + zero-row seed, bar Widget on `telco_fraud_overview` (now 17 tiles) and runbook section. **Seams:** a DATA record reuses the CDR columns (`service = 'DATA'`, `duration_s` = session seconds, `b_number` = the APN) and a staff SIM swap reuses `subscriber_events.dealer_id` as the staff user, so the existing ten Jobs' filters (`VOICE`, `ACTIVATION`, `PAYMENT`) were verified unaffected and the old seeds untouched. **Deliberate cuts:** no KPI for the new typologies, no data-volume (bytes) column, no staff-to-own-line cross-check (needs a staff register Reference Dataset, the same gap as `exempt_doc_prefixes`), no recharge-channel / payer-instrument key (the payments feed carries none). **Gotcha:** the 16-day simulation suffixes every identifier per day, so a recurring exempt or at-threshold key (`zero.operator.apn`, `HELPDESK`, `S111`, the two at-threshold lines) must be added to the golden test's `RECURRING` list. Golden: 13 rules, 54 Alerts; mutation-checked (small_amount 5 to 7 raises the bill-payer, `zero_rated_apns` to `none` raises the zero-rated portal, dropping `charge = 0` raises the charged-data line, `exempt_staff` to `none` raises `HELPDESK`).
 
 Detection semantics worth knowing: dialled numbers are normalised to one E.164-digit format (`+` / `00` stripped,
 national `0…` → `home_cc` + NSN) before a prefix list is matched with `starts_with`, entries of any length; a prefix

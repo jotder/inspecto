@@ -37,7 +37,7 @@ backlog row that would.
 | E | Bypass / SIM-box detection | Y | Y | Y | Y | N | Y | **P** | CDR-based only |
 | F | Signalling detection (SS7 / Diameter / SIP, probes, firewalls) | Y | P | Y | P | P | N | **N** | out of scope (network probes) |
 | G | Test call generation | Y | Y | Y | N | N | Y | **N** | out of scope (hardware / service) |
-| H | Interconnect / wholesale fraud (Wangiri, IRSF, flash calls, CLI) | Y | Y | Y | Y | P | Y | **P** | IRSF / Wangiri from CDRs · `TELCO-FRAUD-CONTENT-GAPS-1` |
+| H | Interconnect / wholesale fraud (Wangiri, IRSF, flash calls, CLI) | Y | Y | Y | Y | P | Y | **P** | IRSF / Wangiri from CDRs; recharge, data-bypass and internal fraud typologies in `telco-fraud` |
 | I | Real-time / pre-call blocking | Y | P | Y | Y | N | N | **N** | `REALTIME-DECISIONING-1` |
 | J | Entity risk scoring | Y | P | Y | Y | N | N | **Y** | Scoring & Lists add-on |
 | K | Watch / deny lists | Y | P | P | Y | N | N | **Y** | Scoring & Lists (Entity Lists) |

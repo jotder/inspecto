@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 37<!--count:backlog-p3--> × P3** —
+> ⬇ **55 → 54 (P3 38 → 37) on 2026-10-09**: closed P3 `TELCO-FRAUD-CONTENT-GAPS-1` — the `telco-fraud` Space Template gained recharge fraud, data-charging bypass and internal fraud (three Jobs, per-entity Alert Rules, sink seeds, dashboard Widgets, runbook sections; golden 13 rules / 54 Alerts, mutation-checked). As-built in OKF spaces §3.5; cuts (KPIs, volume column, staff register) recorded there.
 > ⬆ **52 → 53 (P3 36 → 37) on 2026-10-09**: filed P3 `RECON-PERF-RESIDUALS-1` — what the one-day, server-paged Reconciliation (`RECON-PERF-1`, shipped the same day; as-built in `okf/frontend/features/reconciliation.md`) left open.
 > ⬇ **51 → 50 (P3 36 → 35) on 2026-10-09**: closed P3 `LA-FILTER-SQL-BIND-1` — Link Analysis filters bind their condition-tree values on the flat AND the edge-index reads (positional binds repeated per `UNION ALL` arm through `IndexReader` / `IndexedTraversal`), the literal `DatasetProvider.predicate()` port method is retired (its `EngineDatasetProvider` impl and test stubs with it), and hostile values are proven data on every route incl. the branching legs + probe.
 > ⬇ **52 → 51 (P2 16 → 15) on 2026-10-09**: closed P2 `REACTOR-ROOT-WORKTREE-1` — `ReactorModules.root()` now stops its ancestor walk at the first directory holding `.git` (a work-tree top), so the repo-wide scanner tests run from a lane worktree under `.claude/worktrees/` judge that worktree, not the enclosing checkout; `ReactorModulesRootTest` pins it. As-built in `okf/backend/module-reorganisation-gotchas.md`.
@@ -170,11 +171,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -471,7 +472,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 - **P2** · `SCREENING-1` — **Screening add-on: backend + review pane SHIPPED 2026-10-09** (optional module `inspecto-screening`, add-on `screening`: `POST /screening/check`, the `screening.run` Job Type, signed Screening Hits with `GET /screening/hits[/{id}]` and `POST /screening/hits/{id}/decide`). SPA pane `/screening` (Operations ▸ Screening Hits) shipped the same day. Operator call (§1): four-eyes on `confirmed` (the `Screener#load` entries in `ConfigWriteFunnelTest` and `DecisionRuleWritersTest` were approved 2026-10-09). Open: (1) four-eyes on `confirmed`; (2) phonetic / transliteration keys beyond look-alike folding (blocking never compares a name whose every token starts with a different letter, e.g. Gaddafi / Qadhafi); (3) a dedupe index (a Run lists every hit document); (4) a Space-level threshold default; (5) `check` raising hits on demand; (6) an on-demand check form in the SPA. → `okf/backend/control-plane/screening.md`
 - **P2** · `REGULATORY-REPORTING-1` — **Regulatory Reporting add-on: the MVP shipped 2026-10-09** (optional module `inspecto-regulatory-reporting`: Report Templates rendered to XML / CSV / JSON from a Case or Incident and its evidence, four-eyes approval, file-drop submission, the AUDIT submission log). SPA pane `/regulatory-reports` shipped the same day. Left: template authoring routes (and their pane); regulator acknowledgement ingest (the reserved `rejected` status, receipts); live delivery through a Connection (SFTP / HTTPS); nested repeating groups; sealing / signing the delivered file; a dedicated filing capability if an operator asks (D-RR8). → `okf/backend/control-plane/regulatory-reporting.md`
 - **P3** · `ANOMALY-DETECTION-1` — **Anomaly Detection add-on**: explainable behavioural anomaly scoring per entity, beyond Expectation baselines and forecast bands. → `okf/backend/module-reorganisation-decisions.md`
-- **P3** · `TELCO-FRAUD-CONTENT-GAPS-1` — **telecom fraud content additions** to the `telco-fraud` template: recharge fraud, data-charging bypass, internal fraud. → `okf/backend/module-reorganisation-decisions.md`
 - **P3** · `REALTIME-DECISIONING-1` — **Real-time Decisioning add-on**: an inline allow / block decision on a stream, evaluated by the Decision Kernel; needs its own design (the engine is batch today). → `okf/backend/module-reorganisation-decisions.md`
 - **P3** · `PREDICTIVE-ANALYTICS-1` — **Predictive Analytics add-on** (segmentation, churn, demand forecasting) and, later, the Sales & Marketing BI pack (`PACK-SALES-MARKETING-1`). → `okf/backend/module-reorganisation-decisions.md`
 - **P3** · `MODULE-REORG-P4-3` — **a disabled module's in-flight work and long-lived subscriptions (the only P4 residue).** Everything else shipped (store-family ownership, the bundle kind roster, Job Types and periodic work behind the per-Space gate: plan §6 *P4e as built*, *P4f as built*). Truly open: a Run or dispatch already started when its module is switched off is not interrupted (needs a per-module start/stop lifecycle contract: a decision) and long-lived subscriptions that are themselves switchable work (none exists today). **No work item until a switchable module owns a long-lived subscription or in-flight cancellation is requested.** → `okf/backend/module-reorganisation-decisions.md`

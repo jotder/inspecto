@@ -1,5 +1,5 @@
 name: Telecom fraud
-tagline: "Ten telecom fraud typologies over synthetic CDR, subscriber-event and payment feeds - per-offender Alert Rules"
-description: "A fraud content pack: three feeds (CDR, subscriber events, payments), ten detection windows as sql.template Jobs (IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap, subscription / identity, dealer activations, voucher / EVD, payment reversal), one per-entity Alert Rule per typology keyed on the offender, KPIs, a dashboard and runbooks. Every threshold is configuration. The synthetic golden corpus lands in data/samples - copy it into data/inbox/<feed> to ingest, then run the Jobs."
+tagline: "Thirteen telecom fraud typologies over synthetic CDR, subscriber-event and payment feeds - per-offender Alert Rules"
+description: "A fraud content pack: three feeds (CDR, subscriber events, payments), thirteen detection windows as sql.template Jobs (IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap, subscription / identity, dealer activations, voucher / EVD, payment reversal, recharge fraud, data-charging bypass, internal fraud), one per-entity Alert Rule per typology keyed on the offender, KPIs, a dashboard and runbooks. Every threshold is configuration. The synthetic golden corpus lands in data/samples - copy it into data/inbox/<feed> to ingest, then run the Jobs."
 icon: heroicons_outline:shield-exclamation
-contents[6]: "3 Pipelines + schemas", "10 detection Jobs (sql.template)", "10 per-entity Alert Rules", "KPIs", "Dashboard", "Runbooks"
+contents[6]: "3 Pipelines + schemas", "13 detection Jobs (sql.template)", "13 per-entity Alert Rules", "KPIs", "Dashboard", "Runbooks"

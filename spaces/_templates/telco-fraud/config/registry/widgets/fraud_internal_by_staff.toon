@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: fraud_internal
+controls:
+  x[1]{field}:
+    staff_id
+  y[1]{field,agg}:
+    swaps,max
+options:
+  title: SIM swaps by staff user

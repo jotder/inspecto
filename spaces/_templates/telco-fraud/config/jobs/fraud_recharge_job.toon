@@ -1,0 +1,14 @@
+job:
+  name: fraud_recharge
+  type: sql.template
+  description: "Recharge fraud - small top-ups per subscriber (card testing / top-up velocity)"
+  sql: "WITH cur AS (SELECT msisdn, CAST($window_start AS DATE) AS window_date, count(*) FILTER (WHERE amount < CAST($small_amount AS DOUBLE)) AS small_topups, count(*) AS topups, sum(amount) AS topup_amount FROM payments WHERE txn_type = 'PAYMENT' AND txn_ts >= CAST($window_start AS TIMESTAMP) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY msisdn HAVING count(*) FILTER (WHERE amount < CAST($small_amount AS DOUBLE)) >= CAST($min_candidate_topups AS INTEGER)) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM fraud_recharge WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: payments,fraud_recharge
+  sink_dataset: fraud_recharge
+  cron: "0 2 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  small_amount: "5"
+  min_candidate_topups: "3"
+  enabled: true

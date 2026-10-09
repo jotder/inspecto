@@ -1,0 +1,9 @@
+name: fraud_internal
+dataset: fraud_internal
+measure: max(swaps)
+by[1]: staff_id
+comparator: gt
+threshold: 5
+stormCap: 500
+severity: CRITICAL
+description: "Internal fraud"

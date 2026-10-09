@@ -237,7 +237,53 @@ final class TelcoFraudCorpus {
         for (int i : new int[] {1812, 1813}) reversals(i, 3, 2);
         for (int i : new int[] {1814, 1815}) reversals(i, 20, 0);
         plant("fraud_reversal", homes(1801, 1802, 1803, 1804), homes(1811, 1812, 1813, 1814, 1815));
+        // ---- 11 Recharge fraud (card testing: gt 8 PAYMENT top-ups under small_amount = 5 per line)
+        for (int i : new int[] {1901, 1902, 1903, 1904}) topups(i, 12, 2, "PAYMENT");
+        topups(1905, 9, 2, "PAYMENT");              // JUST above: 9
+        topups(1911, 8, 2, "PAYMENT");              // AT the threshold: 8
+        topups(1912, 3, 2, "PAYMENT");              // a few small top-ups
+        topups(1913, 20, 6, "PAYMENT");             // a heavy bill-payer: many top-ups, none under 5
+        topups(1914, 12, 2, "VOUCHER");             // small VOUCHER redemptions (distinct serials), not card top-ups
+        plant("fraud_recharge", homes(1901, 1902, 1903, 1904, 1905), homes(1911, 1912, 1913, 1914));
+
+        // ---- 12 Data-charging bypass (gt 7200 s of DATA sessions rated at 0 outside zero_rated_apns)
+        for (int i : new int[] {2601, 2602, 2603, 2604}) data(i, 4, 3600, 0, "internet.apn");
+        data(2605, 2, 3600, 0, "internet.apn");
+        data(2605, 1, 1, 0, "internet.apn");                    // JUST above: 7201
+        data(2611, 2, 3600, 0, "internet.apn");                 // AT the threshold: 7200
+        data(2612, 20, 3600, 3.6, "internet.apn");              // 20 h of data, properly charged
+        data(2613, 10, 3600, 0, "zero.operator.apn");           // a zero-rated operator portal
+        data(2614, 1, 3600, 0, "internet.apn");                 // half unrated, half charged
+        data(2614, 1, 3600, 3.6, "internet.apn");
+        data(2615, 6, 100, 0, "internet.apn");                  // a little unrated noise: 600
+        plant("fraud_data_bypass", homes(2601, 2602, 2603, 2604, 2605), homes(2611, 2612, 2613, 2614, 2615));
+
+        // ---- 13 Internal fraud (gt 5 SIM swaps per staff user in a day; exempt_staff HELPDESK)
+        int swapLine = 2701;
+        for (String staff : new String[] {"S101", "S102", "S103"}) swapLine = swaps(staff, 12, swapLine);
+        swapLine = swaps("S104", 6, swapLine);                  // JUST above: 6
+        swapLine = swaps("S111", 5, swapLine);                  // AT the threshold: 5
+        swapLine = swaps("S112", 2, swapLine);
+        swaps("HELPDESK", 40, swapLine);                        // the registered swap desk: many swaps by design
+        plant("fraud_internal", keys("S101", "S102", "S103", "S104"), keys("S111", "S112", "HELPDESK"));
         return this;
+    }
+
+    /** {@code n} top-ups of {@code amount} on line {@code i}; a VOUCHER top-up carries its own distinct serial. */
+    private void topups(int i, int n, double amount, String type) {
+        for (int c = 0; c < n; c++)
+            txn(at(20, c), type, home(i), amount, "VOUCHER".equals(type) ? f("V7%03d%04d", i - 1900, c) : "", "");
+    }
+
+    /** {@code n} one-hour-ish DATA sessions of {@code secs} on line {@code i}, each rated {@code charge}. */
+    private void data(int i, int n, int secs, double charge, String apn) {
+        for (int c = 0; c < n; c++) call(at(21, c), "MO", "DATA", home(i), apn, secs, charge, false, "C800");
+    }
+
+    /** {@code n} SIM swaps by {@code staff} on fresh lines starting at {@code line}; returns the next free line. */
+    private int swaps(String staff, int n, int line) {
+        for (int c = 0; c < n; c++, line++) event(at(11, c), "SIM_SWAP", home(line), staff, "");
+        return line;
     }
 
     /**
