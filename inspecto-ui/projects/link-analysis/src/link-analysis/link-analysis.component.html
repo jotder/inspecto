@@ -68,8 +68,15 @@
             </p>
         }
 
-        <!-- ══ toolbar: graph-only tools · saved views · save · display · canvas tools ══ -->
-        <div class="flex flex-wrap items-center gap-2">
+        <!-- ══ row: [tool rail] │ workspace — the rail is a labelled nav docked on the LEFT edge (canvas height);
+             under the md breakpoint it wraps back into a row above the stacked workspace ══ -->
+        <div class="flex min-h-0 flex-auto gap-2 max-md:flex-col">
+        <nav
+            class="flex shrink-0 flex-col items-center gap-1 overflow-y-auto rounded-lg border py-1 md:w-12 max-md:flex-row max-md:flex-wrap max-md:gap-2 max-md:overflow-visible max-md:border-0 max-md:py-0"
+            style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+            aria-label="Link Analysis tools"
+            data-testid="la-tool-rail"
+        >
             @if (graph()) {
                 <!-- search nodes (icon → popover) -->
                 <button
@@ -211,8 +218,7 @@
                     <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
                 </button>
                 <button
-                    mat-stroked-button
-                    class="!min-h-0 !px-2 !py-1 text-xs"
+                    mat-icon-button
                     (click)="openAttachToCase()"
                     [matTooltip]="
                         latestSnapshot()
@@ -221,13 +227,16 @@
                     "
                     aria-label="Attach to Case"
                 >
-                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:paper-clip"></mat-icon>
-                    Attach to Case
+                    <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
                     @if (snapshots.count(); as n) {
-                        <span class="text-secondary ml-1">· {{ n }}</span>
+                        <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none">{{ n }}</span>
                     }
                 </button>
-                <span class="mx-1 h-5 w-px" style="background: var(--gamma-border)"></span>
+                <span
+                    class="my-1 h-px w-6 max-md:mx-1 max-md:my-0 max-md:h-5 max-md:w-px"
+                    style="background: var(--gamma-border)"
+                    aria-hidden="true"
+                ></span>
                 <!-- graph-algorithms toolbox (opens the right dock's Analysis tab) -->
                 <button
                     mat-icon-button
@@ -271,7 +280,7 @@
                 }
             }
 
-            <span class="flex-auto"></span>
+            <span class="flex-auto max-md:hidden"></span>
 
             <inspecto-la-host-slot
                 [component]="aiExplain"
@@ -630,31 +639,39 @@
                         "
                     ></mat-icon>
                 </button>
-                <button mat-icon-button (click)="exportPng()" matTooltip="Export PNG" aria-label="Export as PNG">
-                    <mat-icon svgIcon="heroicons_outline:photo"></mat-icon>
-                </button>
-                <button mat-icon-button (click)="exportJson()" matTooltip="Export JSON" aria-label="Export as JSON">
-                    <mat-icon svgIcon="heroicons_outline:code-bracket"></mat-icon>
-                </button>
-                <button mat-icon-button (click)="exportSvg()" matTooltip="Export SVG" aria-label="Export as SVG">
-                    <mat-icon svgIcon="heroicons_outline:photo"></mat-icon>
-                </button>
+                <!-- Export group: one rail icon, the four formats as menu items -->
                 <button
                     mat-icon-button
-                    (click)="exportGraphml()"
-                    matTooltip="Export GraphML"
-                    aria-label="Export as GraphML"
+                    [matMenuTriggerFor]="exportMenu"
+                    matTooltip="Export"
+                    aria-label="Export the graph"
                 >
-                    <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                    <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
                 </button>
+                <mat-menu #exportMenu="matMenu">
+                    <button mat-menu-item (click)="exportPng()" aria-label="Export as PNG">
+                        <mat-icon svgIcon="heroicons_outline:photo"></mat-icon>
+                        <span>PNG</span>
+                    </button>
+                    <button mat-menu-item (click)="exportJson()" aria-label="Export as JSON">
+                        <mat-icon svgIcon="heroicons_outline:code-bracket"></mat-icon>
+                        <span>JSON</span>
+                    </button>
+                    <button mat-menu-item (click)="exportSvg()" aria-label="Export as SVG">
+                        <mat-icon svgIcon="heroicons_outline:photo"></mat-icon>
+                        <span>SVG</span>
+                    </button>
+                    <button mat-menu-item (click)="exportGraphml()" aria-label="Export as GraphML">
+                        <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                        <span>GraphML</span>
+                    </button>
+                </mat-menu>
             }
-        </div>
+        </nav>
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
-            class="relative flex min-h-[28rem] overflow-hidden rounded-lg border max-md:!h-auto max-md:flex-col"
-            [class.flex-auto]="fullscreen() !== null"
-            [style.height]="fullscreen() === null ? 'calc(100dvh - 17rem)' : null"
+            class="relative flex min-h-[28rem] min-w-0 flex-auto overflow-hidden rounded-lg border max-md:!h-auto max-md:flex-col"
         >
             <!-- left dock — Query (+ Filter); collapses to an icon rail -->
             <aside
@@ -1198,8 +1215,10 @@
             </aside>
         </div>
 
+        </div>
+
         <!-- ══ Data strip: the displayed graph as rows (links or nodes) ══ -->
-        <div class="rounded-lg border">
+        <div class="shrink-0 rounded-lg border">
             <div class="flex flex-wrap items-center gap-2 px-3 py-1">
                 <span class="text-sm font-medium">Data</span>
                 @if (bottomOpen()) {

@@ -1143,6 +1143,82 @@ describe('LinkAnalysisComponent', () => {
         });
     });
 
+    describe('tool rail (the former top toolbar, docked on the LEFT for canvas height)', () => {
+        const ready = async () => {
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            await runQuery(fixture);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            return { fixture, el, rail: el.querySelector('nav[data-testid="la-tool-rail"]') as HTMLElement };
+        };
+
+        it('is a labelled nav that sits BEFORE the workspace in the same row, so the canvas starts at the title row', async () => {
+            const { el, rail } = await ready();
+            expect(rail.getAttribute('aria-label')).toBe('Link Analysis tools');
+            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            expect(rail.parentElement).toBe(workspace.parentElement); // one row: [rail | workspace]
+            expect(rail.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            expect(rail.classList).toContain('flex-col');
+            expect(rail.classList).toContain('max-md:flex-row'); // stacked layout keeps a wrapped row
+        });
+
+        it('keeps every action reachable by its accessible name', async () => {
+            const { rail } = await ready();
+            const names = Array.from(rail.querySelectorAll('button')).map((b) => b.getAttribute('aria-label') ?? '');
+            for (const name of [
+                'Search nodes',
+                'Filter node types',
+                'Graph layout',
+                'Save this analysis',
+                'Attach to Case',
+                'Open the graph-algorithms toolbox',
+                'Open the Investigation',
+                'Open saved views',
+                'Save the current view',
+                'Undo the last display/filter change',
+                'Redo the last undone display/filter change',
+                'Fit the graph to the screen',
+                'Show as list',
+                'View the graph in full screen',
+                'Export the graph',
+            ]) {
+                expect(
+                    names.some((n) => n.startsWith(name)),
+                    name,
+                ).toBe(true);
+            }
+            expect(names.every((n) => n.length > 0)).toBe(true); // an icon-only button without a name is an axe failure
+        });
+
+        it('groups the four exports behind one Export menu whose items keep their names', async () => {
+            const { fixture, rail } = await ready();
+            expect(rail.querySelector('[aria-label="Export as PNG"]')).toBeNull(); // not loose in the rail
+            (rail.querySelector('button[aria-label="Export the graph"]') as HTMLElement).click();
+            fixture.detectChanges();
+            const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
+            for (const f of ['PNG', 'JSON', 'SVG', 'GraphML']) {
+                expect(panel.querySelector(`[aria-label="Export as ${f}"]`), f).not.toBeNull();
+            }
+        });
+
+        it('Hide the side panels still collapses both docks and the rail stays', async () => {
+            const { fixture, el, rail } = await ready();
+            (el.querySelector('button[aria-label="Hide the side panels"]') as HTMLElement).click();
+            fixture.detectChanges();
+            expect(el.querySelector('inspecto-link-analysis-query-panel')).toBeNull();
+            expect(el.querySelector('button[aria-label="Show the side panels"]')).not.toBeNull();
+            expect(el.querySelector('nav[data-testid="la-tool-rail"]')).toBe(rail);
+        });
+
+        it('the workspace fills the remaining height instead of a fixed calc()', async () => {
+            const { el } = await ready();
+            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            expect(workspace.classList).toContain('flex-auto');
+            expect(workspace.style.height).toBe('');
+        });
+    });
+
     describe('graph as a list (LA-A11Y-AUDIT-1: the canvas text alternative)', () => {
         const ready = async () => {
             const { fixture } = create({ stubGraph: true });
