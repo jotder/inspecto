@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
@@ -23,6 +25,10 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
  * from Settings was not obviously something you then had to activate). Offered only with
  * {@link LensService.canAdminister} — `POST /spaces` refuses anyone else once a Space is hosted, and the
  * switcher only renders when Spaces are hosted.
+ *
+ * A URL carrying `?space=<id>` (a menu screen link into another Space, a shared link) switches to that
+ * Space and reloads at the SAME URL, so the link opens its screen in the right Space. An unknown id is
+ * ignored, so a bad link cannot reload-loop.
  */
 @Component({
     selector: 'inspecto-space-switcher',
@@ -76,9 +82,32 @@ export class SpaceSwitcherComponent implements OnInit {
     protected lens = inject(LensService);
     private router = inject(Router);
     private dialog = inject(MatDialog);
+    private destroyRef = inject(DestroyRef);
 
     ngOnInit(): void {
-        this.spaces.refresh().subscribe();
+        this.spaces.refresh().subscribe(() => {
+            this.followSpaceParam(this.router.url);
+            this.router.events
+                .pipe(
+                    filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+                    takeUntilDestroyed(this.destroyRef),
+                )
+                .subscribe((e) => this.followSpaceParam(e.urlAfterRedirects));
+        });
+    }
+
+    /** Switch to the Space a `?space=<id>` URL names, then reload in place (see the class doc). */
+    protected followSpaceParam(url: string): void {
+        const id = this.router.parseUrl(url).queryParams['space'];
+        if (!id || id === this.spaces.currentSpaceId()) return;
+        if (!this.spaces.availableSpaces().some((s) => s.id === id)) return;
+        this.spaces.selectSpace(id);
+        this.reload();
+    }
+
+    /** A hard reload in place (its own seam so a spec can stub it — jsdom cannot reload). */
+    protected reload(): void {
+        window.location.reload();
     }
 
     /** The active space's display label (its name, falling back to its id). */

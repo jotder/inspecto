@@ -94,4 +94,30 @@ describe('SpaceSwitcherComponent', () => {
         expect(open).toHaveBeenCalled();
         expect(selectSpace).not.toHaveBeenCalled();
     });
+    describe('a ?space=<id> URL', () => {
+        type Seams = { followSpaceParam(url: string): void; reload(): void };
+        function seams(fixture: ReturnType<typeof create>['fixture']) {
+            const c = fixture.componentInstance as unknown as Seams;
+            const reload = vi.spyOn(c, 'reload').mockImplementation(() => undefined);
+            return { c, reload };
+        }
+
+        it('switches to the named Space and reloads in place', () => {
+            const { fixture, selectSpace } = create(true);
+            const { c, reload } = seams(fixture);
+            c.followSpaceParam('/pipelines?space=beta');
+            expect(selectSpace).toHaveBeenCalledWith('beta');
+            expect(reload).toHaveBeenCalled();
+        });
+
+        it('does nothing for the current Space, an unknown Space, or no parameter', () => {
+            const { fixture, selectSpace } = create(true);
+            const { c, reload } = seams(fixture);
+            c.followSpaceParam('/pipelines?space=alpha');
+            c.followSpaceParam('/pipelines?space=nope');
+            c.followSpaceParam('/pipelines');
+            expect(selectSpace).not.toHaveBeenCalled();
+            expect(reload).not.toHaveBeenCalled();
+        });
+    });
 });
