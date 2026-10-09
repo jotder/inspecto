@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> ⬇ **52 → 51 (P2 16 → 15) on 2026-10-09**: closed P2 `REACTOR-ROOT-WORKTREE-1` — `ReactorModules.root()` now stops its ancestor walk at the first directory holding `.git` (a work-tree top), so the repo-wide scanner tests run from a lane worktree under `.claude/worktrees/` judge that worktree, not the enclosing checkout; `ReactorModulesRootTest` pins it. As-built in `okf/backend/module-reorganisation-gotchas.md`.
 > ⬆ **51 → 52 (P2 15 → 16) on 2026-10-09**: filed `REACTOR-ROOT-WORKTREE-1` (a lane worktree under `.claude/worktrees/` makes the repo-wide scanner tests read the main checkout); `SCREENING-1` shipped its backend and review pane and stays open for its residuals and two operator calls. (`PACK-MOBILE-MONEY-1` closed the same day: 51 → 50.)
 > ⬆ **49 → 51 (P3 34 → 36) on 2026-10-09**: filed P3 `MEASURE-SQL-BIND-1` and `LA-FILTER-SQL-BIND-1` — the two remaining `ConditionSql.predicate()` callers big enough to need their own change (BI/Measure SQL, the Link Analysis filter port) after `DECISION-RULE-SQL-GUARD-1` moved the Decision Rule applier and Expectations to bound parameters; the AI `query` tool stays inline by design (its output is saved SQL text).
 > ⬇ **50 → 49 (P2 16 → 15) on 2026-10-09**: closed P2 `DECISION-RULE-SQL-GUARD-1` — a break-out probe (quotes, `;`, comments, `$$`, hostile field names, NUL, a quarantine path with `'`) found nothing escaping the old escaping; fixed anyway as defence in depth before the Decision Kernel shares the path: `DecisionRuleApplier` now runs every statement as a `PreparedStatement` over `ConditionSql.predicateBound` (operand and tag values are bound parameters, table names `SqlIdent.q`, the quarantine `COPY` copies a staging table). Also fixed: a `NaN`/`Infinity` operand rendered as a bare word and silently skipped the rule. As-built in `okf/backend/module-reorganisation-decisions.md`.
@@ -167,11 +168,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -476,7 +477,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 #### Test infrastructure
 
-- **P2** · `REACTOR-ROOT-WORKTREE-1` — **from a lane worktree under `.claude/worktrees/` the repo-wide scanner tests read the MAIN checkout** (found 2026-10-09, `SCREENING-1`). `ReactorModules.root()` takes the OUTERMOST ancestor pom with `<modules>`, which from `.claude/worktrees/<lane>` is the shared checkout, so `CapabilityManifestTest` / `ConfigWriteFunnelTest` / `ImportLoaderInventoryTest` and every other `mainJavaTrees()` scan judge master's tree: a lane's new route is a false red, a lane's new writer site a false GREEN (the screening lane's `new EntityFactLog(` passed in place and failed from a sibling worktree). Fix: stop at the nearest root that is a git work-tree top (`git rev-parse --show-toplevel`) or at the first pom whose directory holds `.git`; prove it by a test that runs from a nested worktree. Until then verify scanner tests from a sibling worktree (`C:\sandbox\<name>`). → `okf/backend/module-reorganisation-gotchas.md`
 
 
 #### Developer tooling

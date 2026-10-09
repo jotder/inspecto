@@ -14,7 +14,9 @@ import java.util.regex.Pattern;
 /**
  * Finds the Maven reactor's module directories from the poms themselves, so a guard that scans "every module"
  * does not depend on WHERE the module directories sit (repo root today, grouped one level down after a regroup).
- * The root is the OUTERMOST ancestor of {@code user.dir} whose {@code pom.xml} declares {@code <modules>}; module
+ * The root is the OUTERMOST ancestor of {@code user.dir} whose {@code pom.xml} declares {@code <modules>}, but the walk
+ * stops at the first directory holding a {@code .git} (a work-tree top), so a lane worktree nested under
+ * {@code .claude/worktrees/} resolves to itself, not the enclosing checkout; module
  * directories are resolved recursively from every {@code <module>} entry in that pom — default list, every profile
  * list, and nested aggregators (e.g. {@code providers/asn-parser/asn-decoders}). Comments are stripped before reading.
  * Copy of the lookup the sibling-enumerating guards used to hand-roll ({@code Files.list("..")}).
@@ -26,14 +28,20 @@ public final class ReactorModules {
 
     private ReactorModules() {}
 
-    /** The reactor root: the outermost ancestor of the working directory with a pom.xml declaring modules. */
+    /** The reactor root: the outermost ancestor of the working directory, up to its git work-tree top, with a pom.xml declaring modules. */
     public static Path root() throws IOException {
+        return root(Path.of(System.getProperty("user.dir")));
+    }
+
+    /** {@link #root()} from an explicit start directory (so a test can prove the nested-worktree behaviour). */
+    static Path root(Path start) throws IOException {
         Path found = null;
-        for (Path d = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize(); d != null; d = d.getParent()) {
+        for (Path d = start.toAbsolutePath().normalize(); d != null; d = d.getParent()) {
             Path pom = d.resolve("pom.xml");
             if (Files.isRegularFile(pom) && !declared(pom).isEmpty()) found = d;
+            if (Files.exists(d.resolve(".git"))) break; // work-tree top (a linked worktree has a .git FILE): never climb into an enclosing checkout
         }
-        if (found == null) throw new IllegalStateException("no reactor root (pom.xml with <modules>) above " + System.getProperty("user.dir"));
+        if (found == null) throw new IllegalStateException("no reactor root (pom.xml with <modules>) above " + start);
         return found;
     }
 
