@@ -70,13 +70,14 @@ public final class ConfigRegistry {
     private static final Pattern FILE_AND_LINE = Pattern.compile("((?:[A-Za-z]:)?[^:\\n]*?\\.toon): (?:line (\\d+): )?");
 
     /**
-     * A cached parse keyed by pipeline file path: the indexed {@link Entry} plus the modification-time
-     * fingerprint of every file that contributed to it (the pipeline {@code .toon} and each referenced
+     * A cached parse keyed by pipeline file path: the indexed {@link Entry} plus the CONTENT
+     * fingerprint (SHA-256 of the bytes — a modification time missed a rewrite inside one mtime tick and kept
+     * running the old config) of every file that contributed to it (the pipeline {@code .toon} and each referenced
      * schema/grammar/segment file). A subsequent {@link #rebuild} reuses this entry verbatim while the
      * fingerprint is unchanged — so a pipeline (and its schemas) is parsed once and re-read only when
      * something on disk actually changes.
      */
-    private record Cached(Entry entry, Map<Path, Long> fingerprint) {}
+    private record Cached(Entry entry, Map<Path, String> fingerprint) {}
 
     /** Snapshot map (id → entry); replaced wholesale on {@link #rebuild} for lock-free reads. */
     private final AtomicReference<Map<String, Entry>> index = new AtomicReference<>(Map.of());
@@ -165,28 +166,31 @@ public final class ConfigRegistry {
         com.gamma.etl.EditionFeatures.requirePipeline(cfg);
         String id = cfg.identity().pipelineName();
         noteSuffixDivergence(p, id);
-        Map<Path, Long> fp = new LinkedHashMap<>();
-        fp.put(p, mtime(p));
-        for (Path ref : cfg.referencedFiles()) fp.put(ref, mtime(ref));
+        Map<Path, String> fp = new LinkedHashMap<>();
+        fp.put(p, contentHash(p));
+        for (Path ref : cfg.referencedFiles()) fp.put(ref, contentHash(ref));
         log.debug("Loaded config {} (id '{}', {} referenced file(s))", p, id, cfg.referencedFiles().size());
         return new Cached(new Entry(id, p, cfg), fp);
     }
 
-    /** Whether every fingerprinted file still has the modification time recorded at the last parse. */
-    private static boolean fingerprintMatches(Map<Path, Long> fingerprint) {
-        for (Map.Entry<Path, Long> e : fingerprint.entrySet()) {
-            if (mtime(e.getKey()) != e.getValue()) return false;
+    /** Whether every fingerprinted file still has the content recorded at the last parse. */
+    private static boolean fingerprintMatches(Map<Path, String> fingerprint) {
+        for (Map.Entry<Path, String> e : fingerprint.entrySet()) {
+            if (!contentHash(e.getKey()).equals(e.getValue())) return false;
         }
         return true;
     }
 
-    /** Last-modified epoch-millis for a file, or {@code -1} when it is missing/unreadable (forces a
-     *  re-parse, which then surfaces the real error through the normal load path). */
-    private static long mtime(Path p) {
+    /** SHA-256 of a file's bytes, or {@code "missing"} when it is missing/unreadable (a file that appears forces a
+     *  re-parse, which then surfaces any real error through the normal load path). */
+    private static String contentHash(Path p) {
         try {
-            return Files.getLastModifiedTime(p).toMillis();
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(p)));
         } catch (IOException e) {
-            return -1L;
+            return "missing";
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is mandatory on every JDK", e);
         }
     }
 

@@ -34,6 +34,7 @@ class SafetyPolicyFilesTest {
     }
 
     private static void write(Path dir, String text) throws IOException {
+        // A plain rewrite, deliberately: the same-size, same-mtime-tick rewrite is the case the cache once missed.
         Files.writeString(dir.resolve(SafetyPolicyFiles.FILE), text);
     }
 
@@ -182,7 +183,12 @@ class SafetyPolicyFilesTest {
         {
             SafetyPolicy.pinnedForRun(() -> {
                 seen[0] = SafetyPolicy.defaultPolicy().maxThreads();
-                try { write(cfg, "caps:\n  max_threads: 1\n"); } catch (IOException e) { throw new RuntimeException(e); }
+                try {   // same size AND the same mtime: a rewrite inside one filesystem mtime tick (Linux CI hit it)
+                    Path f = cfg.resolve(SafetyPolicyFiles.FILE);
+                    java.nio.file.attribute.FileTime tick = Files.getLastModifiedTime(f);
+                    write(cfg, "caps:\n  max_threads: 1\n");
+                    Files.setLastModifiedTime(f, tick);
+                } catch (IOException e) { throw new RuntimeException(e); }
                 seen[1] = SafetyPolicy.defaultPolicy().maxThreads();   // mid-run: still the plan-time snapshot (D8)
                 return null;
             });
@@ -190,25 +196,6 @@ class SafetyPolicyFilesTest {
             assertEquals(4, seen[1]);
             assertEquals(1, SafetyPolicy.defaultPolicy().maxThreads());   // the NEXT run applies the tightened file
         }
-    }
-
-    /**
-     * The cause of the intermittent CI failure of the test above: a same-length edit inside one mtime tick
-     * (coarse on Linux) left (mtime, size) unchanged and the stale policy was served. Pinning the old mtime
-     * makes that deterministic on every OS.
-     */
-    @Test
-    void aSameLengthEditWithAnUnchangedMtimeIsStillSeen() throws IOException {
-        Path base = spaceBase("s1");
-        DiscoveredRoots.register("default", base);
-        Path cfg = base.resolve("config");
-        write(cfg, "caps:\n  max_threads: 4\n");
-        Path file = cfg.resolve(SafetyPolicyFiles.FILE);
-        var mtime = Files.getLastModifiedTime(file);
-        assertEquals(4, SafetyPolicy.defaultPolicy().maxThreads());
-        write(cfg, "caps:\n  max_threads: 1\n");
-        Files.setLastModifiedTime(file, mtime);
-        assertEquals(1, SafetyPolicy.defaultPolicy().maxThreads());
     }
 
     @Test

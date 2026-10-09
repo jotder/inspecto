@@ -252,7 +252,8 @@ public final class Roles {
         static final Doc ABSENT = new Doc(Map.of(), List.of(), false);
     }
 
-    private record Cached(long mtime, long size, Doc doc) {}
+    /** Keyed on the file's exact text: an (mtime, size) stamp missed a same-size rewrite inside one mtime tick. */
+    private record Cached(String text, Doc doc) {}
 
     private static final ConcurrentHashMap<Path, Cached> CACHE = new ConcurrentHashMap<>();
 
@@ -274,19 +275,18 @@ public final class Roles {
         return java.util.Collections.unmodifiableMap(merged);
     }
 
-    /** The authored doc at {@code configRoot} (mtime/size-cached — an on-disk edit or an
+    /** The authored doc at {@code configRoot} (cached by the file's text — an on-disk edit or an
      *  {@code AccessRoutes} PUT is picked up on the next read, no restart). */
     public static Doc load(Path configRoot) {
         if (configRoot == null) return Doc.ABSENT;
         Path file = configRoot.resolve(FILE);
         if (!Files.exists(file)) return Doc.ABSENT;
         try {
-            long mtime = Files.getLastModifiedTime(file).toMillis();
-            long size = Files.size(file);
+            String text = Files.readString(file, java.nio.charset.StandardCharsets.UTF_8);
             Cached hit = CACHE.get(file);
-            if (hit != null && hit.mtime() == mtime && hit.size() == size) return hit.doc();
+            if (hit != null && hit.text().equals(text)) return hit.doc();
             Doc parsed = parseFile(file);
-            CACHE.put(file, new Cached(mtime, size, parsed));
+            CACHE.put(file, new Cached(text, parsed));
             return parsed;
         } catch (IOException e) {
             LOG.warn("roles: cannot stat {} — suspending role grants (fail-closed): {}", file, e.toString());
