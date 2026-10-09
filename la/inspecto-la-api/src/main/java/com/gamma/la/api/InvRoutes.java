@@ -594,7 +594,7 @@ public final class InvRoutes implements RouteModule {
     /** One validated LA-08 mapping, resolved and rendered before any query runs. */
     private record Mapping(boolean node, String dataset, String relationSql, String sql, String kind,
                            String category, List<String> attrs, Map<String, Object> idType,
-                           Map<String, Object> sourceType, Map<String, Object> targetType) {}
+                           Map<String, Object> sourceType, Map<String, Object> targetType, List<String> binds) {}
 
     /**
      * {@code POST /inv/projection/multi} (LA-08, contract §5.2) — node mappings and edge projections over
@@ -638,19 +638,19 @@ public final class InvRoutes implements RouteModule {
             sql.append(" FROM ").append(q(ds)).append(" WHERE ").append(q(idCol)).append(" IS NOT NULL ORDER BY 1, 2");
             Map<String, Map<String, Object>> types = columnTypes(writeRoot, ds, List.of(idCol));
             plan.add(new Mapping(true, ds, relationSql, guarded(sql.toString(), ds), null,
-                    ApiContext.str(m, "category"), attrs, types.get(idCol), null, null));
+                    ApiContext.str(m, "category"), attrs, types.get(idCol), null, null, List.of()));
         }
         for (Map<String, Object> m : edgeSpecs) {
             String ds = datasetOf(m, "edges");
             String relationSql = relationFor(api, ex, writeRoot, ds);
             String srcCol = ident(m, "sourceColumn", true), tgtCol = ident(m, "targetColumn", true);
             List<String> attrs = nameList(m, "attributes", true);
-            String filterSql = "(" + filterSql(body.get("filter"), ds, relationSql) + ") AND ("
-                    + filterSql(m.get("filter"), ds, relationSql) + ")";
-            String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filterSql);
+            DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), ds, relationSql)
+                    .and(filterSql(m.get("filter"), ds, relationSql));
+            String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filter);
             Map<String, Map<String, Object>> types = columnTypes(writeRoot, ds, List.of(srcCol, tgtCol));
             plan.add(new Mapping(false, ds, relationSql, guarded(sql, ds), ApiContext.str(m, "type"), null, attrs,
-                    null, types.get(srcCol), types.get(tgtCol)));
+                    null, types.get(srcCol), types.get(tgtCol), filter.binds()));
         }
         // D-U7, judged on the WHOLE plan before any mapping runs (fail closed, whole call): `limit` applies per
         // mapping, so the call reads up to limit × mappings rows, and one entity can take up to `limit` links from
@@ -664,7 +664,7 @@ public final class InvRoutes implements RouteModule {
             DatasetProvider.Result r;
             try {
                 r = DatasetProviders.require().run(new DatasetProvider.Request(mp.dataset(), mp.relationSql(), mp.sql(),
-                        limit, 0, List.of(), List.of()));
+                        limit, 0, List.of(), List.of(), mp.binds()));
             } catch (SQLException e) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection of dataset '" + mp.dataset() + "' failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
             }
@@ -772,7 +772,7 @@ public final class InvRoutes implements RouteModule {
         // LA-01: the optional condition tree is validated against the relation's REAL columns and
         // rendered BEFORE a single character of the statement is assembled below — an identifier the
         // relation does not have cannot reach SQL, because the render never happens.
-        String filterSql = filterSql(body.get("filter"), datasetId, relationSql);
+        DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), datasetId, relationSql);
         // D-U7: either read returns at most `limit` links, so no entity can have more — rows and fan-out alike.
         refuseIfSensitive(writeRoot, (neighborsOf != null ? "a neighbours read" : "a projection")
                 + " (limit " + limit + ")", limit, limit);
@@ -805,9 +805,15 @@ public final class InvRoutes implements RouteModule {
         String src = q(sourceCol), tgt = q(targetCol);
         String neighborFilter = neighborsOf != null
                 ? " AND (CAST(" + src + " AS VARCHAR) = ? OR CAST(" + tgt + " AS VARCHAR) = ?)" : "";
-        List<String> binds = neighborsOf != null ? List.of(neighborsOf, neighborsOf) : List.of();
+        // The filter's binds follow the neighbour pair: edgeSql puts `extraWhere` ahead of the filter predicate.
+        List<String> binds = new ArrayList<>();
+        if (neighborsOf != null) {
+            binds.add(neighborsOf);
+            binds.add(neighborsOf);
+        }
+        binds.addAll(filter.binds());
         // Server-built from validated identifiers only; one extra row detects truncation.
-        String sql = edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, neighborFilter, filterSql);
+        String sql = edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, neighborFilter, filter);
 
         try {
             DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
@@ -870,10 +876,11 @@ public final class InvRoutes implements RouteModule {
     /**
      * The folded-edge statement: distinct {@code (source, target[, kind][, attr_i...])} with a row count,
      * heaviest first, NULL endpoints excluded. Built from validated identifiers only; {@code extraWhere} is
-     * server-authored (a bound-parameter clause or empty) and {@code filterSql} is the LA-01 render.
+     * server-authored (a bound-parameter clause or empty) and {@code filter} is the LA-01 render, its values bound
+     * (its binds follow {@code extraWhere}'s in the caller's list).
      */
     private static String edgeSql(String datasetId, String sourceCol, String targetCol, String kindCol,
-                                  List<String> attrCols, String extraWhere, String filterSql) {
+                                  List<String> attrCols, String extraWhere, DatasetProvider.BoundFilter filter) {
         String src = q(sourceCol), tgt = q(targetCol);
         String kindSel = kindCol != null ? ", CAST(" + q(kindCol) + " AS VARCHAR) AS kind" : "";
         StringBuilder attrSel = new StringBuilder();
@@ -887,7 +894,7 @@ public final class InvRoutes implements RouteModule {
         return "SELECT CAST(" + src + " AS VARCHAR) AS source, CAST(" + tgt + " AS VARCHAR) AS target"
                 + kindSel + attrSel + ", COUNT(*) AS cnt FROM " + q(datasetId)
                 + " WHERE " + src + " IS NOT NULL AND " + tgt + " IS NOT NULL" + extraWhere
-                + " AND (" + filterSql + ")"
+                + " AND (" + filter.sql() + ")"
                 + " " + groupBy
                 + " ORDER BY cnt DESC, source, target";
     }
@@ -1010,8 +1017,8 @@ public final class InvRoutes implements RouteModule {
             if (col != null && !containsIgnoreCase(columns, col))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
         }
-        String filterSql = "TRUE";
-        if (body.get("filter") != null) filterSql = checkedFilterSql(body.get("filter"), columns, datasetId);
+        DatasetProvider.BoundFilter filter = DatasetProvider.BoundFilter.TRUE;
+        if (body.get("filter") != null) filter = checkedFilterSql(body.get("filter"), columns, datasetId);
         // D-U7: the walk reads at most maxDepth × maxEdgeYield rows, and takes up to maxEdgeYield links per level.
         refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
                 (long) maxDepth * maxEdges, maxEdges);
@@ -1019,12 +1026,12 @@ public final class InvRoutes implements RouteModule {
         String src = q(sourceCol), tgt = q(targetCol);
         String wSel = weightCol != null ? "TRY_CAST(" + q(weightCol) + " AS DOUBLE)" : "CAST(NULL AS DOUBLE)";
         String tsSel = tsCol != null ? "CAST(" + q(tsCol) + " AS TIMESTAMP)" : "CAST(NULL AS TIMESTAMP)";
-        List<String> binds = new ArrayList<>();
+        List<String> binds = new ArrayList<>(filter.binds());          // the filter is the first `?` in the statement
         StringBuilder sql = new StringBuilder("WITH RECURSIVE __e0 AS (SELECT CAST(").append(src)
                 .append(" AS VARCHAR) AS s, CAST(").append(tgt).append(" AS VARCHAR) AS t, ").append(wSel)
                 .append(" AS w, ").append(tsSel).append(" AS ts FROM ").append(q(datasetId))
                 .append(" WHERE ").append(src).append(" IS NOT NULL AND ").append(tgt).append(" IS NOT NULL AND (")
-                .append(filterSql).append(")), __e AS (SELECT s, t, w, ts FROM __e0");
+                .append(filter.sql()).append(")), __e AS (SELECT s, t, w, ts FROM __e0");
         if (direction.equals("UNDIRECTED")) sql.append(" UNION ALL SELECT t, s, w, ts FROM __e0");
         sql.append("), __walk(node, path, depth, weight, first_ts, last_ts) AS MATERIALIZED (")
            .append("SELECT CAST(? AS VARCHAR), list_value(CAST(? AS VARCHAR)), 0, CAST(0 AS DOUBLE),")
@@ -1183,24 +1190,25 @@ public final class InvRoutes implements RouteModule {
      * <p><b>D-S5(a) — field validation is the safeguard.</b> The tree is rendered by the shared
      * {@code ConditionSql} (which quote-escapes every literal, the tested contract for authored config),
      * and every leaf {@code field} is first checked against the relation's <em>actual</em> columns: an
-     * unknown identifier is a 422 naming the field, and the renderer is never reached. A bind-emitting
-     * renderer is a deliberate follow-on, not this item.
+     * unknown identifier is a 422 naming the field, and the renderer is never reached. Values are
+     * bound ({@code predicateBound}) on the flat reads; the edge-index reads still render literals
+     * ({@code LA-FILTER-SQL-BIND-1}).
      *
      * <p>Absent tree, or one that constrains nothing (empty group, only incomplete leaves) → {@code TRUE},
      * a no-op — parity with {@code ConditionSql}/{@code ConditionTree}'s "an empty group matches every row".
      * A root that is not a group (a bare condition, or not an object) is a 422: it used to render as
      * {@code TRUE} and return every row while the analyst believed the data was filtered.
      */
-    private static String filterSql(Object filter, String datasetId, String relationSql) {
-        if (filter == null) return "TRUE";
+    private static DatasetProvider.BoundFilter filterSql(Object filter, String datasetId, String relationSql) {
+        if (filter == null) return DatasetProvider.BoundFilter.TRUE;
         return checkedFilterSql(filter, relationColumns(datasetId, relationSql), datasetId);
     }
 
     /** Field-check then render; {@code ConditionSql}'s refusal of a non-group root becomes a 422. */
-    static String checkedFilterSql(Object filter, List<String> columns, String datasetId) {
+    static DatasetProvider.BoundFilter checkedFilterSql(Object filter, List<String> columns, String datasetId) {
         checkFilterFields(filter, columns, datasetId);
         try {
-            return DatasetProviders.require().predicate(filter);
+            return DatasetProviders.require().predicateBound(filter);
         } catch (IllegalArgumentException notAGroup) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'filter': " + notAGroup.getMessage());
         }
