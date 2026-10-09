@@ -34,13 +34,8 @@ class SafetyPolicyFilesTest {
     }
 
     private static void write(Path dir, String text) throws IOException {
-        Path f = dir.resolve(SafetyPolicyFiles.FILE);
-        // The parsed-file cache is keyed on (mtime ms, size): a same-size rewrite inside one mtime tick would
-        // read as unchanged, so every rewrite is stamped strictly later than the file it replaces.
-        java.nio.file.attribute.FileTime before = Files.exists(f) ? Files.getLastModifiedTime(f) : null;
-        Files.writeString(f, text);
-        if (before != null && Files.getLastModifiedTime(f).compareTo(before) <= 0)
-            Files.setLastModifiedTime(f, java.nio.file.attribute.FileTime.fromMillis(before.toMillis() + 1000));
+        // A plain rewrite, deliberately: the same-size, same-mtime-tick rewrite is the case the cache once missed.
+        Files.writeString(dir.resolve(SafetyPolicyFiles.FILE), text);
     }
 
     private SafetyPolicyTier eff(Path server, Path base, String id) {
@@ -188,7 +183,12 @@ class SafetyPolicyFilesTest {
         {
             SafetyPolicy.pinnedForRun(() -> {
                 seen[0] = SafetyPolicy.defaultPolicy().maxThreads();
-                try { write(cfg, "caps:\n  max_threads: 1\n"); } catch (IOException e) { throw new RuntimeException(e); }
+                try {   // same size AND the same mtime: a rewrite inside one filesystem mtime tick (Linux CI hit it)
+                    Path f = cfg.resolve(SafetyPolicyFiles.FILE);
+                    java.nio.file.attribute.FileTime tick = Files.getLastModifiedTime(f);
+                    write(cfg, "caps:\n  max_threads: 1\n");
+                    Files.setLastModifiedTime(f, tick);
+                } catch (IOException e) { throw new RuntimeException(e); }
                 seen[1] = SafetyPolicy.defaultPolicy().maxThreads();   // mid-run: still the plan-time snapshot (D8)
                 return null;
             });

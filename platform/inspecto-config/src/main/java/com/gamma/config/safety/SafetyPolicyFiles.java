@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -24,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * or {@code mode} in a Space file all throw {@link SafetyPolicyUnreadableException}. The server file may name
  * Spaces whose policy is <em>required</em> ({@code require_spaces}, D7): a named Space with no file is
  * unreadable too, because naming is what makes a deletion detectable. An un-named absent Space file narrows
- * nothing. Parsed files are cached by (mtime, size), the {@code AccessPolicyStore.load} shape.
+ * nothing. Parsed files are cached by their exact text: a policy file is tiny, and an (mtime, size) stamp read a
+ * same-size rewrite inside one mtime tick as unchanged, so a tightened policy could be ignored.
  */
 public final class SafetyPolicyFiles {
 
@@ -41,8 +41,7 @@ public final class SafetyPolicyFiles {
     /** One parsed file: the tier plus (server file only) the Spaces whose policy file is required. */
     public record Loaded(SafetyPolicyTier tier, Set<String> requiredSpaces) {}
 
-    private record Stamp(long mtime, long size) {}
-    private record Entry(Stamp stamp, Loaded loaded, SafetyPolicyUnreadableException failure) {}
+    private record Entry(String text, Loaded loaded, SafetyPolicyUnreadableException failure) {}
 
     private static final Map<Path, Entry> CACHE = new ConcurrentHashMap<>();
 
@@ -93,29 +92,28 @@ public final class SafetyPolicyFiles {
 
     /** Loads one file; {@code null} when it does not exist, throws when it exists and is not a valid policy. */
     static Loaded load(Path file, boolean spaceTier) {
-        Stamp stamp;
+        String text;
         try {
             if (!Files.exists(file)) { CACHE.remove(file); return null; }
-            BasicFileAttributes a = Files.readAttributes(file, BasicFileAttributes.class);
-            stamp = new Stamp(a.lastModifiedTime().toMillis(), a.size());
+            text = Files.readString(file, StandardCharsets.UTF_8);
         } catch (IOException | RuntimeException e) {
-            throw new SafetyPolicyUnreadableException(file.toString(), "cannot stat: " + e, e);
+            throw new SafetyPolicyUnreadableException(file.toString(), "cannot read: " + e, e);
         }
         Entry cached = CACHE.get(file);
-        if (cached != null && cached.stamp().equals(stamp)) {
+        if (cached != null && cached.text().equals(text)) {
             if (cached.failure() != null) throw cached.failure();
             return cached.loaded();
         }
         try {
-            Loaded l = parse(file, Files.readString(file, StandardCharsets.UTF_8), spaceTier);
-            CACHE.put(file, new Entry(stamp, l, null));
+            Loaded l = parse(file, text, spaceTier);
+            CACHE.put(file, new Entry(text, l, null));
             return l;
         } catch (SafetyPolicyUnreadableException e) {
-            CACHE.put(file, new Entry(stamp, null, e));
+            CACHE.put(file, new Entry(text, null, e));
             throw e;
-        } catch (IOException | RuntimeException e) {
+        } catch (RuntimeException e) {
             var ex = new SafetyPolicyUnreadableException(file.toString(), String.valueOf(e.getMessage()), e);
-            CACHE.put(file, new Entry(stamp, null, ex));
+            CACHE.put(file, new Entry(text, null, ex));
             throw ex;
         }
     }
