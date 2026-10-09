@@ -97,4 +97,49 @@ class ReconPerfTest {
                 + " ms, first page best of 3 = " + bestDay + " ms, cached page = " + pageUs + " us, sample 1000 = " + sampled
                 + " ms, record compute = " + recDay + " ms (" + dayBreaks + " breaks)");
     }
+    /**
+     * RECON-PERF-RESIDUALS-1 (1) + (4): the same fixture read through real {@code physicalRef} Datasets. Unpruned =
+     * no data root (what every day read did before: all 30 files opened); pruned = the footer-statistics file pruning.
+     * Breaks: the uncached compute every request paid before, a sampled compute, and the cached read-back.
+     */
+    @Test
+    void dayPruningAndBreaks(@TempDir Path dir) throws Exception {
+        for (String[] s : new String[][]{{"hlr", "1"}, {"crm", "2"}, {"cbs", "3"}}) generate(dir, s[0], Integer.parseInt(s[1]));
+        java.util.Map<String, Object> cfg = java.util.Map.of("datasets", List.of("hlr", "crm", "cbs"), "keyColumns", List.of("msisdn"),
+                "compareColumns", List.of(java.util.Map.of("column", "active_flag")));
+        java.util.function.Function<String, java.util.Map<String, Object>> ds =
+                id -> java.util.Map.of("physicalRef", id, "dateField", "event_date");
+        java.util.function.Function<String, String> relOf = id -> com.gamma.query.DatasetRelation.relationSql(ds.apply(id), dir, null);
+        for (boolean prune : new boolean[]{false, true}) {
+            ReconDay.Cache.clear();
+            ReconDay.Scoped scoped = ReconDay.resolve(cfg, ds, relOf, prune ? dir : null, null);
+            ReconService.dayRun(scoped.spec(), 0, 0, 0, 50, 200_000);   // warm-up
+            long best = Long.MAX_VALUE;
+            for (int i = 0; i < 3; i++) {
+                long t0 = System.nanoTime();
+                ReconService.dayRun(scoped.spec(), 0, 0, 0, 50, 200_000);
+                best = Math.min(best, (System.nanoTime() - t0) / 1_000_000);
+            }
+            long t1 = System.nanoTime();
+            ReconDay.resolve(cfg, ds, relOf, prune ? dir : null, null);
+            long resolveMs = (System.nanoTime() - t1) / 1_000_000;
+            long bBest = Long.MAX_VALUE;
+            for (int i = 0; i < 3; i++) {
+                long t2 = System.nanoTime();
+                ReconService.breaks(scoped.spec(), null, null, 1, 200, 0);
+                bBest = Math.min(bBest, (System.nanoTime() - t2) / 1_000_000);
+            }
+            long t3 = System.nanoTime();
+            ReconService.breaks(scoped.spec(), null, null, 1, 200, 0, 1_000, new java.util.HashMap<>());
+            long sampled = (System.nanoTime() - t3) / 1_000_000;
+            System.out.println("RECON-PERF " + (prune ? "PRUNED  " : "UNPRUNED") + " day " + scoped.day() + ": first page best of 3 = "
+                    + best + " ms, re-resolve (days cached) = " + resolveMs + " ms, breaks compute best of 3 = " + bBest
+                    + " ms, breaks sample 1000 = " + sampled + " ms");
+        }
+        String key = "breaks|probe";
+        ReconDay.Cache.put(key, java.util.Map.of());
+        long t4 = System.nanoTime();
+        ReconDay.Cache.get(key);
+        System.out.println("RECON-PERF cached breaks/rows read-back = " + (System.nanoTime() - t4) / 1_000 + " us");
+    }
 }

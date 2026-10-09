@@ -54,8 +54,12 @@ public final class ReconRoutes implements RouteModule {
     private static final int MAX_PAGE = 200;
     /** Most keys a {@code sample} may compare per day. */
     private static final int MAX_SAMPLE = 100_000;
-    /** Most grain rows of one day held in the result cache; a bigger day is paged in SQL on every request. */
-    private static final int ROW_CAP = 200_000;
+    /**
+     * Most grain rows of one day held in the result cache. A bigger day caches each served PAGE (at most
+     * {@link #MAX_PAGE} rows, with the day's totals/summary) instead — RECON-PERF-RESIDUALS-1 (2): a repeated page
+     * is a cache hit, a new page of a big day still runs the join. Not final only so a test can lower it.
+     */
+    static volatile int rowCap = 200_000;
     private static final int DEFAULT_BREAKS_LIMIT = 200;
     private static final int MAX_LIMIT = 5_000;
 
@@ -124,9 +128,7 @@ public final class ReconRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be 1.." + MAX_PAGE + ", got " + limit);
         int offset = intOr(body.get("offset"), 0);
         if (offset < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "offset must be >= 0, got " + offset);
-        int sample = intOr(body.get("sample"), 0);
-        if (sample < 0 || sample > MAX_SAMPLE)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "sample must be 1.." + MAX_SAMPLE + " keys, got " + sample);
+        int sample = sampleOf(body);
         String filter = orDefault(ApiContext.str(body, "filter"), "all");
         int mask;
         try {
@@ -135,17 +137,26 @@ public final class ReconRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         String cacheKey = scoped.fingerprint() == null ? null : "grain|" + scoped.fingerprint() + "|" + scoped.day() + "|" + sample;
+        String pageKey = cacheKey == null ? null : cacheKey + "|page|" + mask + "|" + offset + "|" + limit;
         ReconService.DayResult day = cacheKey == null ? null : ReconDay.Cache.get(cacheKey);
-        boolean cached = day != null;
+        ReconService.DayPage bigDayPage = day != null || pageKey == null ? null : ReconDay.Cache.get(pageKey);
+        boolean cached = day != null || bigDayPage != null;
         ReconService.Page page;
         long t0 = System.nanoTime();
-        if (cached) {
+        if (day != null) {
             page = day.page(mask, offset, limit);
+        } else if (bigDayPage != null) {
+            day = bigDayPage.day();
+            page = bigDayPage.page();
         } else {
-            ReconService.DayPage dp = compute(() -> ReconService.dayRun(spec, sample, mask, offset, limit, ROW_CAP));
+            int cap = rowCap;
+            ReconService.DayPage dp = compute(() -> ReconService.dayRun(spec, sample, mask, offset, limit, cap));
             day = dp.day();
             page = dp.page();
-            if (cacheKey != null && day.rows() != null) ReconDay.Cache.put(cacheKey, day);
+            if (cacheKey != null) {
+                if (day.rows() != null) ReconDay.Cache.put(cacheKey, day);
+                else ReconDay.Cache.put(pageKey, dp);   // a big day: the page (<= MAX_PAGE rows) + totals, never the rows
+            }
         }
         Map<String, Object> statistics = new LinkedHashMap<>();
         statistics.put("rowCount", page.rows().size());
@@ -174,10 +185,18 @@ public final class ReconRoutes implements RouteModule {
         return data;
     }
 
-    // ── POST /recon/breaks {id | config, path?, type?, limit?, offset?} ─────────────
+    // ── POST /recon/breaks {id | config, day?, path?, type?, side?, limit?, offset?, sample?} ─────
 
+    /**
+     * The paged Break sets of one day. RECON-PERF-RESIDUALS-1 (4): {@code sample} (1..100000) compares the same
+     * deterministic keys {@code /recon/run} samples (the answer then carries {@code sample}), and the answer is held
+     * in {@link ReconDay.Cache} under the input fingerprint + day + every request parameter, so a repeated page or a
+     * Board-to-Breaks round trip reads it back; changed data or config is a new key.
+     */
     private Object breaks(ApiContext api, Map<String, Object> body) {
-        ReconService.Spec spec = scoped(api, body).spec();
+        ReconDay.Scoped scoped = scoped(api, body);
+        ReconService.Spec spec = scoped.spec();
+        int sample = sampleOf(body);
         int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
         int offset = Math.max(0, intOr(body.get("offset"), 0));
         String type = ApiContext.str(body, "type");
@@ -186,9 +205,14 @@ public final class ReconRoutes implements RouteModule {
         int other = "b".equals(side) ? 1 : "c".equals(side) ? 2 : -1;
         if (other < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "side must be b|c, got '" + side + "'");
         Map<String, String> path = pathOf(body.get("path"));
+        String cacheKey = scoped.fingerprint() == null ? null : "breaks|" + scoped.fingerprint() + "|" + scoped.day() + "|"
+                + sample + "|" + other + "|" + type + "|" + (path == null ? null : new java.util.TreeMap<>(path)) + "|" + limit + "|" + offset;
+        Map<String, Object> hit = cacheKey == null ? null : ReconDay.Cache.get(cacheKey);
+        if (hit != null) return hit;
         Map<String, ReconService.BreakSet> sets;
+        Map<String, Object> sampleInfo = new LinkedHashMap<>();
         try {
-            sets = ReconService.breaks(spec, path, type, other, limit, offset);
+            sets = ReconService.breaks(spec, path, type, other, limit, offset, sample, sampleInfo);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
@@ -204,7 +228,17 @@ public final class ReconRoutes implements RouteModule {
             set.put("truncated", e.getValue().truncated());
             data.put(e.getKey(), set);
         }
+        if (!sampleInfo.isEmpty()) data.put("sample", sampleInfo);
+        if (cacheKey != null) ReconDay.Cache.put(cacheKey, data);
         return data;
+    }
+
+    /** {@code sample}: 0 (absent) = every key, else 1..{@link #MAX_SAMPLE}; anything else 422. */
+    private static int sampleOf(Map<String, Object> body) {
+        int sample = intOr(body.get("sample"), 0);
+        if (sample < 0 || sample > MAX_SAMPLE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "sample must be 1.." + MAX_SAMPLE + " keys, got " + sample);
+        return sample;
     }
 
     // ── POST /recon/rows {id | config, key:{col:val…}, side?, limit?} ───────────────
@@ -212,16 +246,23 @@ public final class ReconRoutes implements RouteModule {
     /**
      * The raw rows behind one key on both sides ({@code RECON-CARDINALITY-2}). {@code key} must name every
      * key column; {@code side} picks the compared side as {@code /recon/breaks} does. Stateless compute like
-     * its siblings — nothing is persisted, so nothing here needs a capability.
+     * its siblings — nothing is persisted, so nothing here needs a capability. RECON-PERF-RESIDUALS-1 (4): the answer
+     * is cached like {@code /recon/breaks}; it is never sampled — one key's rows are already the narrowest read, and
+     * a sample would only answer "absent" for a key outside it.
      */
     private Object rows(ApiContext api, Map<String, Object> body) {
-        ReconService.Spec spec = scoped(api, body).spec();
+        ReconDay.Scoped scoped = scoped(api, body);
+        ReconService.Spec spec = scoped.spec();
         Map<String, String> key = pathOf(body.get("key"));
         if (key == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'key' — every key column and its value");
         int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
         String side = orDefault(ApiContext.str(body, "side"), "b");
         int other = "b".equals(side) ? 1 : "c".equals(side) ? 2 : -1;
         if (other < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "side must be b|c, got '" + side + "'");
+        String cacheKey = scoped.fingerprint() == null ? null : "rows|" + scoped.fingerprint() + "|" + scoped.day() + "|"
+                + other + "|" + new java.util.TreeMap<>(key) + "|" + limit;
+        Map<String, Object> hit = cacheKey == null ? null : ReconDay.Cache.get(cacheKey);
+        if (hit != null) return hit;
         Map<String, ReconService.BreakSet> sets;
         try {
             sets = ReconService.rows(spec, other, key, limit);
@@ -241,6 +282,7 @@ public final class ReconRoutes implements RouteModule {
             set.put("truncated", e.getValue().truncated());
             data.put(e.getKey(), set);
         }
+        if (cacheKey != null) ReconDay.Cache.put(cacheKey, data);
         return data;
     }
 

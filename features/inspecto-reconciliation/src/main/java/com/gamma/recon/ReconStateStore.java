@@ -45,6 +45,20 @@ public final class ReconStateStore {
     /** The most Breaks one Reconciliation's state may hold — a run with more is refused, never truncated. */
     public static final int MAX_BREAKS = 50_000;
 
+    /**
+     * Retention across days (RECON-PERF-RESIDUALS-1 (7)): a record keeps the Breaks of the {@value} most recent
+     * recorded days (newest by day, not by wall clock, so a backfill of an old day is judged against the data) and
+     * drops older days whole — whatever their status, an open Break included. Undated Breaks (recorded before
+     * RECON-PERF-1) are never dropped by it.
+     */
+    public static final int RETAIN_DAYS = 90;
+
+    /**
+     * The most Breaks the state FILE holds across days: after {@link #RETAIN_DAYS}, the oldest days are dropped whole
+     * until the file is at most this; the day just recorded and the undated Breaks are never dropped.
+     */
+    public static final int MAX_STATE_BREAKS = 4 * MAX_BREAKS;
+
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Object LOCK = new Object();
 
@@ -116,7 +130,7 @@ public final class ReconStateStore {
             List<ReconBreaks.Break> dated = new ArrayList<>(fresh.size());
             for (ReconBreaks.Break b : fresh) dated.add(b.withDay(day));
             List<ReconBreaks.Break> merged = new ArrayList<>(ReconBreaks.merge(sameDay, dated, runAt));
-            merged.addAll(otherDays);
+            merged.addAll(retained(otherDays, day, merged.size()));
             State next = new State(reconciliationId, runAt, prev.runs() + 1, merged);
             save(next);
             return next;
@@ -175,6 +189,27 @@ public final class ReconStateStore {
     }
 
     // ── internals ─────────────────────────────────────────────────────────────
+
+    /**
+     * The other days' Breaks a record of {@code day} keeps ({@link #RETAIN_DAYS}, then {@link #MAX_STATE_BREAKS}
+     * with {@code kept} Breaks already held for the recorded day): whole days, oldest dropped first; undated kept.
+     */
+    static List<ReconBreaks.Break> retained(List<ReconBreaks.Break> otherDays, String day, int kept) {
+        java.util.TreeMap<String, List<ReconBreaks.Break>> byDay = new java.util.TreeMap<>(java.util.Comparator.reverseOrder());
+        List<ReconBreaks.Break> out = new ArrayList<>();
+        for (ReconBreaks.Break b : otherDays)
+            if (b.day() == null) out.add(b);
+            else byDay.computeIfAbsent(b.day(), d -> new ArrayList<>()).add(b);
+        int total = kept + out.size();
+        int days = day == null ? 0 : 1;   // the recorded day counts towards the window
+        for (Map.Entry<String, List<ReconBreaks.Break>> e : byDay.entrySet()) {
+            if (days >= RETAIN_DAYS || total + e.getValue().size() > MAX_STATE_BREAKS) break;
+            out.addAll(e.getValue());   // otherDays never holds the recorded day itself
+            total += e.getValue().size();
+            days++;
+        }
+        return out;
+    }
 
     /** {@link #setStatus}'s assignee rule: assign sets it, resolve keeps it, re-open clears it. */
     private static String assigneeAfter(String status, String recorded, String requested) {

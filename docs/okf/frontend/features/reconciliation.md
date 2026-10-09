@@ -47,8 +47,29 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
 * **Per-day cache** (`ReconDay.Cache`, 32 entries, LRU, in memory): key = sha-256 of the spec + every side's input-file
   stamps (path, size, mtime from `DatasetRelation.inputFiles`) + day + sample. A changed file or config is a NEW key,
   so stale entries are never read, only aged out; a view-backed/virtual Dataset or a store over 50,000 files is not
-  cached (it still runs). The day's rows are held when the day has ≤ 200,000 key groups; a bigger day pages in SQL on
-  every request (leftover). `statistics.cached` says which.
+  cached (it still runs). The day's rows are held when the day has ≤ 200,000 key groups. ⛔ **Decision
+  (`RECON-PERF-RESIDUALS-1` (2), 2026-10-09): a bigger day caches each served PAGE instead** (≤ 200 rows plus the
+  day's totals/summary, key = the day key + filter + offset + limit) — a repeated page is a hit, a NEW page of a big day
+  still runs the join. Rejected: raising the cap (a 200,000-group day already holds ~100 MB of row maps per entry, and
+  the LRU keeps 32) and a summary-only entry (the join, not the aggregate, is the cost). `statistics.cached` says
+  which. The same cache also holds `days|`, per-file day ranges (`stats|`), the per-day file choice (`prune|`) and the
+  `/recon/breaks` + `/recon/rows` answers — all in the one 32-entry LRU.
+* **File pruning** (`RECON-PERF-RESIDUALS-1` (1), 2026-10-09; `ReconDay.dayFiles`): a day reads ONLY the store's files
+  whose Parquet footer statistics can hold it — each file's min/max of the temporal column (`parquet_metadata`, footers
+  only), cached per input fingerprint; the side then reads `DatasetRelation.relationSqlOverFiles(kept)` and the day
+  predicate still applies, so a file that straddles days stays exact. ⛔ Decision: **statistics, not folder names** —
+  a Hive `year=/month=/day=` store prunes to its day's folder this way WITHOUT turning `hive_partitioning` on (still
+  off by decision: it would surface the segments as columns on every Dataset), and a partition a Pipeline cut from a
+  different column than the temporal one (`PartitionDef.source`) can never drop a row. Not pruned (reads the whole
+  store, as before): a view-backed, virtual or `shared/` Dataset; a text day column (no comparable statistics); a
+  `TIMESTAMP WITH TIME ZONE` column (its statistics are UTC, the day is the session zone); a file with a missing
+  statistic; a store under 2 files; and a day whose kept files expose a different column set (a column added
+  mid-life). Pinned by `ReconDayPruneTest`.
+* **`/recon/breaks` + `/recon/rows` cached and sampled** (`RECON-PERF-RESIDUALS-1` (4)): each answer is cached under
+  the input fingerprint + day + every request parameter. `/recon/breaks` takes `sample` (1..100000) — the SAME
+  deterministic keys `/recon/run` samples (`applySample` now wraps whatever view is registered, so it composes with
+  the impact padding) — and then answers a `sample` block. `/recon/rows` is never sampled (one key is already the
+  narrowest read; a sample would answer "absent" for a key outside it).
 * **Sample** (`sample` 1..100000, not saved): the union of every side's keys as text, `ORDER BY hash(keys), keys
   LIMIT n`; each side becomes a NULL-safe semi-join on it. The answer says `sample{sampled, size, keys, totalKeys}` and
   the Board shows a *Sampled* chip.
@@ -87,8 +108,15 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   laptop): before — whole-store run 284–307 ms, record compute 391–410 ms (2,164 Breaks over all days), up to 4,000 rows
   per answer. After — the merged one-pass whole-store run 131–133 ms; one day: resolve (days list) 93 ms, first page
   125 ms, a further page from the cache 0.4 ms, sample of 1,000 keys 195 ms, record compute 297 ms (267 Breaks), 50 rows
-  per answer. ⚠ The day filter does not prune files when the temporal column is a plain column (all 30 files are still
-  opened); only a hive partition column used as the temporal column would let DuckDB skip them (leftover).
+  per answer. **Residuals (1)/(4)** (`ReconPerfTest.dayPruningAndBreaks`, same fixture through real `physicalRef`
+  Datasets, one run on a loaded laptop — compare the pair, not with the numbers above): first page unpruned 233 ms →
+  pruned 173 ms; `/recon/breaks` compute 495 ms → 124 ms; breaks over a 1,000-key sample 757 ms → 160 ms; a repeated
+  breaks/rows request is now a cache read-back (~10 µs) instead of a recompute.
+* **State retention** (`RECON-PERF-RESIDUALS-1` (7), ⛔ decision 2026-10-09): a record keeps the Breaks of the
+  `ReconStateStore.RETAIN_DAYS` = **90** most recent recorded days (newest by DAY, not wall clock) and drops older days
+  WHOLE, whatever their status — an open Break 91 days back is gone (setting its status later re-appends it
+  identity-only). Then a file cap, `MAX_STATE_BREAKS` = 4 × `MAX_BREAKS` = 200,000: the oldest days go whole until
+  the file fits. The day just recorded and the undated (pre-RECON-PERF-1) Breaks are never dropped.
 * **Open residuals** are tracked as `RECON-PERF-RESIDUALS-1` in [`BACKLOG.md`](../../../BACKLOG.md).
 
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked

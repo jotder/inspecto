@@ -339,8 +339,9 @@ public final class ReconService {
 
     /**
      * Restrict every side to {@code size} keys chosen deterministically: the union of every side's (filtered) keys,
-     * as text, {@code ORDER BY hash(keys), keys LIMIT size}. Each side's view is re-registered as a semi-join on that
-     * set (NULL-safe, like every key comparison here). Returns {@code {sampled:true, size, keys, totalKeys}}.
+     * as text, {@code ORDER BY hash(keys), keys LIMIT size}. Each side's CURRENT view (whatever was registered before,
+     * e.g. {@link #padAbsentImpact}'s) is renamed and re-wrapped as a semi-join on that set (NULL-safe, like every key
+     * comparison here). Returns {@code {sampled:true, size, keys, totalKeys}}.
      */
     private static Map<String, Object> applySample(Connection conn, Spec spec, int size) throws SQLException {
         int n = spec.sides().size();
@@ -365,8 +366,9 @@ public final class ReconService {
                 on.add("__k." + q("k" + i) + " IS NOT DISTINCT FROM CAST(__r." + q(spec.physical(s, spec.keyColumns().get(i)))
                         + " AS VARCHAR)");
             try (Statement st = conn.createStatement()) {
-                st.execute("CREATE OR REPLACE VIEW " + VIEWS[s] + " AS SELECT * FROM (" + spec.sides().get(s).relationSql()
-                        + ") AS __r WHERE EXISTS (SELECT 1 FROM __sample AS __k WHERE " + String.join(" AND ", on) + ")");
+                st.execute("ALTER VIEW " + VIEWS[s] + " RENAME TO " + VIEWS[s] + "_unsampled");
+                st.execute("CREATE VIEW " + VIEWS[s] + " AS SELECT * FROM " + VIEWS[s] + "_unsampled"
+                        + " AS __r WHERE EXISTS (SELECT 1 FROM __sample AS __k WHERE " + String.join(" AND ", on) + ")");
             }
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -386,6 +388,17 @@ public final class ReconService {
      */
     public static Map<String, BreakSet> breaks(Spec spec, Map<String, String> path, String type,
                                                int other, int limit, int offset) throws SQLException, IOException {
+        return breaks(spec, path, type, other, limit, offset, 0, null);
+    }
+
+    /**
+     * {@link #breaks(Spec, Map, String, int, int, int)} over a deterministic {@code sample} of keys ({@code > 0}; the
+     * same keys {@link #dayRun} samples), recording the sample block into {@code sampleOut} when given
+     * (RECON-PERF-RESIDUALS-1 (4)).
+     */
+    public static Map<String, BreakSet> breaks(Spec spec, Map<String, String> path, String type, int other, int limit,
+                                               int offset, int sample, Map<String, Object> sampleOut)
+            throws SQLException, IOException {
         if (path != null)
             for (String dim : path.keySet())
                 if (!spec.keyColumns().contains(dim))
@@ -401,6 +414,10 @@ public final class ReconService {
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
             Connection conn = registerSides(sandbox, spec);
             if (spec.carriedImpact() != null) padAbsentImpact(conn, spec);
+            if (sample > 0) {
+                Map<String, Object> info = applySample(conn, spec, sample);
+                if (sampleOut != null) sampleOut.putAll(info);
+            }
             Map<String, BreakSet> out = new LinkedHashMap<>();
             if (type == null || type.equals("missing_right"))
                 out.put("missing_right", breakSet(conn, spec, missingSql(spec, other, true, path, limit, offset), 'a', limit, false));

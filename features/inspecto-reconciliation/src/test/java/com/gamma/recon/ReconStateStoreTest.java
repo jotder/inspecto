@@ -161,4 +161,50 @@ class ReconStateStoreTest {
         store.delete("orders");
         assertEquals(0, store.read("orders").runs());
     }
+    // ── retention across days (RECON-PERF-RESIDUALS-1 (7)) ─────────────────────────
+
+    @Test
+    void aRecordKeepsTheMostRecentRetainDaysAndDropsOlderDaysWhole(@TempDir Path root) throws Exception {
+        ReconStateStore store = new ReconStateStore(root);
+        java.time.LocalDate d0 = java.time.LocalDate.parse("2026-01-01");
+        int days = ReconStateStore.RETAIN_DAYS + 5;
+        for (int d = 0; d < days; d++)
+            store.record("orders", List.of(open("value_break", "EU", "amount"), open("missing_left", "US", null)),
+                    "2026-07-01T00:00:00Z", d0.plusDays(d).toString());
+        ReconStateStore.State s = store.read("orders");
+        java.util.Set<String> held = new java.util.TreeSet<>();
+        for (ReconBreaks.Break b : s.breaks()) held.add(b.day());
+        assertEquals(ReconStateStore.RETAIN_DAYS, held.size(), "exactly the window of days is held");
+        assertEquals(d0.plusDays(days - ReconStateStore.RETAIN_DAYS).toString(), ((java.util.TreeSet<String>) held).first(),
+                "the OLDEST days went, not the newest");
+        assertEquals(2 * ReconStateStore.RETAIN_DAYS, s.breaks().size(), "whole days: both Breaks of each held day");
+    }
+
+    @Test
+    void retentionNeverDropsTheRecordedDayOrUndatedBreaks(@TempDir Path root) throws Exception {
+        ReconStateStore store = new ReconStateStore(root);
+        store.record("orders", List.of(open("value_break", "LEGACY", "amount")), "2026-07-01T00:00:00Z", null);   // undated
+        java.time.LocalDate d0 = java.time.LocalDate.parse("2026-03-01");
+        for (int d = 0; d < ReconStateStore.RETAIN_DAYS; d++)
+            store.record("orders", List.of(open("value_break", "EU", "amount")), "2026-07-01T00:00:00Z", d0.plusDays(d).toString());
+        // a backfill of a day OLDER than every held one: it is kept, and the oldest other day makes room
+        ReconStateStore.State s = store.record("orders", List.of(open("value_break", "EU", "amount")), "2026-07-02T00:00:00Z", "2025-12-31");
+        List<String> days = s.breaks().stream().map(ReconBreaks.Break::day).toList();
+        assertTrue(days.contains("2025-12-31"), "the recorded day is kept");
+        assertTrue(days.contains(null), "an undated Break is never dropped by retention");
+        assertFalse(days.contains(d0.toString()), "the oldest other day made room");
+        assertTrue(days.contains(d0.plusDays(1).toString()));
+    }
+
+    @Test
+    void theFileCapDropsTheOldestDaysWholeWhenTheWindowStillHoldsTooMany() {
+        List<ReconBreaks.Break> other = new java.util.ArrayList<>();
+        for (String day : List.of("2026-01-01", "2026-01-02", "2026-01-03"))
+            for (String k : List.of("a", "b")) other.add(open("value_break", k, "amount").withDay(day));
+        // the recorded day already holds all but 3 of the cap: only the newest day (2 Breaks) fits, never half a day
+        List<ReconBreaks.Break> kept = ReconStateStore.retained(other, "2026-01-04", ReconStateStore.MAX_STATE_BREAKS - 3);
+        assertEquals(List.of("2026-01-03", "2026-01-03"), kept.stream().map(ReconBreaks.Break::day).toList());
+        // negative probe: with room, every day stays
+        assertEquals(6, ReconStateStore.retained(other, "2026-01-04", 0).size());
+    }
 }

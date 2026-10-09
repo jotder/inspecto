@@ -233,6 +233,12 @@
                   "offset" : {
                     "type" : "integer"
                   },
+                  "sample" : {
+                    "type" : "integer",
+                    "minimum" : 1,
+                    "maximum" : 100000,
+                    "description" : "Compare only this many keys - the same deterministic keys POST /recon/run samples; the answer then carries a `sample` block {sampled, size, keys, totalKeys} (RECON-PERF-RESIDUALS-1)."
+                  },
                   "day" : {
                     "type" : "string",
                     "format" : "date",

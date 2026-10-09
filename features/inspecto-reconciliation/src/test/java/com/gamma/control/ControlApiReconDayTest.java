@@ -283,6 +283,84 @@ class ControlApiReconDayTest {
         }
     }
 
+    // ── RECON-PERF-RESIDUALS-1 (2) + (4) ───────────────────────────────────────────
+
+    @Test
+    void aBigDayCachesEachServedPageNotItsRows(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            com.gamma.recon.ReconDayTestAccess.setRowCap(2);   // D2 has 6 key groups: a "big" day
+            try {
+                String q = "{\"id\":\"ra_c01\",\"day\":\"" + D2 + "\",\"limit\":2,\"offset\":2}";
+                JsonNode first = run(c, q);
+                assertFalse(first.get("statistics").get("cached").asBoolean());
+                JsonNode again = run(c, q);
+                assertTrue(again.get("statistics").get("cached").asBoolean(), "the same page of a big day is a cache hit");
+                assertEquals(keys(first), keys(again));
+                assertEquals(List.of("m3", "m4"), keys(again));
+                assertEquals(first.get("summary"), again.get("summary"));
+                // negative probe: ANOTHER page of the big day is not served from the cache (its rows are not held)
+                JsonNode other = run(c, "{\"id\":\"ra_c01\",\"day\":\"" + D2 + "\",\"limit\":2,\"offset\":4}");
+                assertFalse(other.get("statistics").get("cached").asBoolean());
+                assertEquals(List.of("m5", "m6"), keys(other));
+            } finally {
+                com.gamma.recon.ReconDayTestAccess.setRowCap(200_000);
+            }
+        }
+    }
+
+    @Test
+    void breaksAndRowsAreCachedPerDayAndBreaksCanBeSampled(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String q = "{\"id\":\"two_way\",\"day\":\"" + D2 + "\"}";
+            HttpResponse<String> b1 = post(c.port, "/spaces/s1/recon/breaks", q);
+            assertEquals(200, b1.statusCode(), b1.body());
+            long hits = com.gamma.recon.ReconDayTestAccess.cacheHits("breaks");
+            HttpResponse<String> b2 = post(c.port, "/spaces/s1/recon/breaks", q);
+            assertEquals(V1Body.of(b1.body()), V1Body.of(b2.body()));
+            assertEquals(hits + 1, com.gamma.recon.ReconDayTestAccess.cacheHits("breaks"), "the second answer is read back");
+            assertFalse(V1Body.of(b1.body()).has("sample"), "an unsampled answer carries no sample block");
+            // a different day is a different entry
+            HttpResponse<String> other = post(c.port, "/spaces/s1/recon/breaks", "{\"id\":\"two_way\",\"day\":\"" + D1 + "\"}");
+            assertEquals(0, V1Body.of(other.body()).get("missing_right").get("rowCount").asInt(), other.body());
+
+            // sample: the same keys /recon/run samples; labelled; bounded; 422 out of range
+            JsonNode sampledRun = run(c, "{\"id\":\"two_way\",\"day\":\"" + D2 + "\",\"sample\":2}");
+            HttpResponse<String> sb = post(c.port, "/spaces/s1/recon/breaks", "{\"id\":\"two_way\",\"day\":\"" + D2 + "\",\"sample\":2}");
+            assertEquals(200, sb.statusCode(), sb.body());
+            JsonNode sampled = V1Body.of(sb.body());
+            assertTrue(sampled.get("sample").get("sampled").asBoolean());
+            assertEquals(2, sampled.get("sample").get("keys").asInt());
+            Set<String> sampleKeys = new TreeSet<>(keys(sampledRun));
+            Set<String> breakKeys = new TreeSet<>();
+            for (String set : List.of("missing_left", "missing_right", "value_break"))
+                for (JsonNode r : sampled.get(set).get("rows")) breakKeys.add(r.get("key").get("msisdn").asText());
+            assertTrue(sampleKeys.containsAll(breakKeys), "sampled Breaks lie in the run's sample " + sampleKeys + " " + breakKeys);
+            int full = 0, part = 0;
+            for (String set : List.of("missing_left", "missing_right", "value_break")) {
+                full += V1Body.of(b1.body()).get(set).get("rowCount").asInt();
+                part += sampled.get(set).get("rowCount").asInt();
+            }
+            assertTrue(part < full, "a 2-key sample of 6 keys finds fewer Breaks than all keys: " + part + " vs " + full);
+            assertEquals(422, post(c.port, "/spaces/s1/recon/breaks", "{\"id\":\"two_way\",\"sample\":100001}").statusCode());
+
+            // rows: cached too
+            String rq = "{\"id\":\"two_way\",\"day\":\"" + D2 + "\",\"key\":{\"msisdn\":\"m2\"}}";
+            HttpResponse<String> r1 = post(c.port, "/spaces/s1/recon/rows", rq);
+            assertEquals(200, r1.statusCode(), r1.body());
+            long before = com.gamma.recon.ReconDayTestAccess.cacheHits("rows");
+            HttpResponse<String> r2 = post(c.port, "/spaces/s1/recon/rows", rq);
+            assertEquals(V1Body.of(r1.body()), V1Body.of(r2.body()));
+            assertEquals(before + 1, com.gamma.recon.ReconDayTestAccess.cacheHits("rows"), "the second rows answer is read back");
+
+            // changed data is a new key: m3 appears on CRM D2, so its missing_right Break goes
+            Thread.sleep(1100);
+            seed(c.data(), "crm", "('m1',1,DATE '" + D2 + "'),('m2',0,DATE '" + D2 + "'),('m3',1,DATE '" + D2 + "'),"
+                    + "('m4',1,DATE '" + D2 + "'),('m5',1,DATE '" + D2 + "'),('m6',1,DATE '" + D2 + "')");
+            HttpResponse<String> b3 = post(c.port, "/spaces/s1/recon/breaks", q);
+            assertEquals(0, V1Body.of(b3.body()).get("missing_right").get("rowCount").asInt(), b3.body());
+        }
+    }
+
     // ── breaks + record ────────────────────────────────────────────────────────────
 
     @Test
