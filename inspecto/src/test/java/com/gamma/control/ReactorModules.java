@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 /**
  * Finds the Maven reactor's module directories from the poms themselves, so a guard that scans "every module"
  * does not depend on WHERE the module directories sit (repo root today, grouped one level down after a regroup).
- * The root is the OUTERMOST ancestor of {@code user.dir} whose {@code pom.xml} declares {@code <modules>}; module
+ * The root is the nearest ancestor of {@code user.dir} holding {@code .git} (see {@link #root()}); module
  * directories are resolved recursively from every {@code <module>} entry in that pom — default list, every profile
  * list, and nested aggregators (e.g. {@code providers/asn-parser/asn-decoders}). Comments are stripped before reading.
  * Copy of the lookup the sibling-enumerating guards used to hand-roll ({@code Files.list("..")}).
@@ -26,8 +26,13 @@ public final class ReactorModules {
 
     private ReactorModules() {}
 
-    /** The reactor root: the outermost ancestor of the working directory with a pom.xml declaring modules. */
+    /**
+     * The reactor root: the nearest ancestor holding .git (a directory in a plain checkout, a file in a git worktree) - OUTERMOST alone resolved to the MAIN checkout when the build ran in a worktree under .claude/worktrees/, so the guard scanned another tree; else the outermost ancestor of the working directory with a pom.xml
+     * declaring modules.
+     */
     public static Path root() throws IOException {
+        for (Path d = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize(); d != null; d = d.getParent())
+            if (Files.exists(d.resolve(".git")) && Files.isRegularFile(d.resolve("pom.xml"))) return d;
         Path found = null;
         for (Path d = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize(); d != null; d = d.getParent()) {
             Path pom = d.resolve("pom.xml");
