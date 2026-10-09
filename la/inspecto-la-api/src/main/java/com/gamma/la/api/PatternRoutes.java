@@ -119,7 +119,7 @@ public final class PatternRoutes implements RouteModule {
         for (String col : List.of(sourceCol, targetCol, timeCol))
             if (!InvRoutes.containsIgnoreCase(columns, col))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
-        String filterSql = body.get("filter") == null ? "TRUE" : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
+        DatasetProvider.BoundFilter filter = body.get("filter") == null ? DatasetProvider.BoundFilter.TRUE : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
         InvRoutes.refuseIfSensitive(writeRoot, "a temporal scan (up to " + TEMPORAL_MAX_ROWS + " rows)", TEMPORAL_MAX_ROWS, 0);
 
         // LA-INVESTIGATION-OPS-DEFERRED-1: answered from the edge index when - and only when - it can answer exactly (IndexedTemporal),
@@ -136,11 +136,11 @@ public final class PatternRoutes implements RouteModule {
             } else {
                 String sql = "SELECT CAST(\"" + sourceCol + "\" AS VARCHAR) AS s, CAST(\"" + targetCol + "\" AS VARCHAR) AS t,"
                         + " epoch_ms(TRY_CAST(CAST(\"" + timeCol + "\" AS VARCHAR) AS TIMESTAMP)) AS ts FROM \"" + datasetId + "\""
-                        + " WHERE \"" + sourceCol + "\" IS NOT NULL AND \"" + targetCol + "\" IS NOT NULL AND (" + filterSql + ")"
+                        + " WHERE \"" + sourceCol + "\" IS NOT NULL AND \"" + targetCol + "\" IS NOT NULL AND (" + filter.sql() + ")"
                         + " ORDER BY s, t, ts";
                 SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
                 DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                        datasetId, relationSql, sql, TEMPORAL_MAX_ROWS, 0, List.of(), List.of(), List.of()), policy);
+                        datasetId, relationSql, sql, TEMPORAL_MAX_ROWS, 0, List.of(), List.of(), filter.binds()), policy);
                 for (Map<String, Object> row : r.rows())                       // rows arrive grouped by link, times ascending
                     rows.add(new LinkTime(String.valueOf(row.get("s")), String.valueOf(row.get("t")),
                             row.get("ts") instanceof Number ts ? ts.longValue() : null));
@@ -320,17 +320,17 @@ public final class PatternRoutes implements RouteModule {
             if (col != null && !InvRoutes.containsIgnoreCase(columns, col))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
         }
-        String filterSql = body.get("filter") == null ? "TRUE" : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
+        DatasetProvider.BoundFilter filter = body.get("filter") == null ? DatasetProvider.BoundFilter.TRUE : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
 
         if (PatternQueryCompiler.needsTime(stages) && timeCol == null)
             return refusal(ex, datasetId, "This pattern has a time window or ordering — choose a time column in the Query panel first.");
 
         SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
         try {
-            String refused = probe(datasetId, relationSql, sourceCol, targetCol, kindCol, timeCol, stages, filterSql, policy);
+            String refused = probe(datasetId, relationSql, sourceCol, targetCol, kindCol, timeCol, stages, filter, policy);
             if (refused != null) return refusal(ex, datasetId, refused);
 
-            Compiled c = PatternQueryCompiler.legs(datasetId, sourceCol, targetCol, kindCol, timeCol, stages, filterSql);
+            Compiled c = PatternQueryCompiler.legs(datasetId, sourceCol, targetCol, kindCol, timeCol, stages, filter);
             DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
                     datasetId, relationSql, c.sql(), MAX_LEGS, 0, List.of(), List.of(), c.binds()), policy);
 
@@ -388,10 +388,10 @@ public final class PatternRoutes implements RouteModule {
 
     /** The TS matcher's two threshold refusals, in its words, or null when every thresholded stage has legs. */
     private static String probe(String datasetId, String relationSql, String sourceCol, String targetCol, String kindCol,
-                                String timeCol, List<Stage> stages, String filterSql, SqlSandboxPolicy policy)
+                                String timeCol, List<Stage> stages, DatasetProvider.BoundFilter filter, SqlSandboxPolicy policy)
             throws SQLException, IOException {
         if (PatternQueryCompiler.thresholdAttrs(stages).isEmpty()) return null;
-        Compiled p = PatternQueryCompiler.refusalProbe(datasetId, sourceCol, targetCol, kindCol, timeCol, stages, filterSql);
+        Compiled p = PatternQueryCompiler.refusalProbe(datasetId, sourceCol, targetCol, kindCol, timeCol, stages, filter);
         Map<String, Object> row = DatasetProviders.require().run(new DatasetProvider.Request(
                 datasetId, relationSql, p.sql(), 1, 0, List.of(), List.of(), p.binds()), policy).rows().get(0);
         for (int i = 0; i < stages.size(); i++) {

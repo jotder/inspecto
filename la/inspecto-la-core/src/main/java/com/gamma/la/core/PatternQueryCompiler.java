@@ -108,19 +108,19 @@ public final class PatternQueryCompiler {
 
     /**
      * The shared base relation {@code __r}: one row per Dataset row, endpoints normalised, blank endpoints and
-     * rows failing {@code filterSql} dropped. Columns: {@code s,t} (keys), {@code sl,tl} (trimmed raw labels),
+     * rows failing {@code filter} dropped. Columns: {@code s,t} (keys), {@code sl,tl} (trimmed raw labels),
      * {@code k} (kind), {@code tr} (the time as text) + {@code ts} (epoch ms, NULL when unparseable), and per
      * threshold column {@code r_i} (text) + {@code v_i} (DOUBLE, NULL when not numeric).
      */
     private static String base(String datasetId, String sourceCol, String targetCol, String kindCol, String timeCol,
-                               List<String> attrs, String filterSql) {
+                               List<String> attrs, DatasetProvider.BoundFilter filter) {
         String src = "trim(CAST(" + q(sourceCol) + " AS VARCHAR))", tgt = "trim(CAST(" + q(targetCol) + " AS VARCHAR))";
         StringBuilder sb = new StringBuilder("__r0 AS (SELECT ").append(src).append(" AS sl, ").append(tgt).append(" AS tl, ")
                 .append(kindCol != null ? "CAST(" + q(kindCol) + " AS VARCHAR)" : "'" + DEFAULT_LINK_KIND + "'").append(" AS k, ")
                 .append(timeCol != null ? "CAST(" + q(timeCol) + " AS VARCHAR)" : "CAST(NULL AS VARCHAR)").append(" AS tr");
         for (int i = 0; i < attrs.size(); i++) sb.append(", CAST(").append(q(attrs.get(i))).append(" AS VARCHAR) AS r_").append(i);
         sb.append(" FROM ").append(q(datasetId)).append(" WHERE ").append(q(sourceCol)).append(" IS NOT NULL AND ")
-          .append(q(targetCol)).append(" IS NOT NULL AND (").append(filterSql).append(")), ")
+          .append(q(targetCol)).append(" IS NOT NULL AND (").append(filter.sql()).append(")), ")
           .append("__r AS (SELECT ").append(norm("sl")).append(" AS s, ").append(norm("tl")).append(" AS t, sl, tl, k, tr,")
           .append(" epoch_ms(TRY_CAST(tr AS TIMESTAMP)) AS ts");
         for (int i = 0; i < attrs.size(); i++) sb.append(", r_").append(i).append(", TRY_CAST(trim(r_").append(i).append(") AS DOUBLE) AS v_").append(i);
@@ -155,10 +155,10 @@ public final class PatternQueryCompiler {
      * ({@code valued_i}) and how many pass the band ({@code passing_i}) — the TS matcher's two §2.6 refusals.
      */
     public static Compiled refusalProbe(String datasetId, String sourceCol, String targetCol, String kindCol, String timeCol,
-                                 List<Stage> stages, String filterSql) {
+                                 List<Stage> stages, DatasetProvider.BoundFilter filter) {
         List<String> attrs = thresholdAttrs(stages);
-        List<String> binds = new ArrayList<>();
-        StringBuilder sb = new StringBuilder("WITH ").append(base(datasetId, sourceCol, targetCol, kindCol, timeCol, attrs, filterSql))
+        List<String> binds = new ArrayList<>(filter.binds());       // the filter sits in the base CTE: its `?` come first
+        StringBuilder sb = new StringBuilder("WITH ").append(base(datasetId, sourceCol, targetCol, kindCol, timeCol, attrs, filter))
                 .append(" SELECT 0 AS __probe");
         for (int i = 0; i < stages.size(); i++) {
             Stage st = stages.get(i);
@@ -182,13 +182,13 @@ public final class PatternQueryCompiler {
      * their breadth; stage k keeps only legs out of a node stage k-1 reached (and, ordered, after it did).
      */
     public static Compiled legs(String datasetId, String sourceCol, String targetCol, String kindCol, String timeCol,
-                         List<Stage> stages, String filterSql) {
+                         List<Stage> stages, DatasetProvider.BoundFilter filter) {
         List<String> attrs = thresholdAttrs(stages);
-        List<String> binds = new ArrayList<>();
+        List<String> binds = new ArrayList<>(filter.binds());       // the filter sits in the base CTE: its `?` come first
         StringBuilder rCols = new StringBuilder();
         for (int i = 0; i < attrs.size(); i++) rCols.append(", r_").append(i);
         String legCols = "s, t, k, tr" + rCols;
-        StringBuilder sb = new StringBuilder("WITH ").append(base(datasetId, sourceCol, targetCol, kindCol, timeCol, attrs, filterSql));
+        StringBuilder sb = new StringBuilder("WITH ").append(base(datasetId, sourceCol, targetCol, kindCol, timeCol, attrs, filter));
         for (int i = 0; i < stages.size(); i++) {
             Stage st = stages.get(i);
             // One row per distinct leg — the browser folds identical (source, target, kind, attrs) into ONE edge.

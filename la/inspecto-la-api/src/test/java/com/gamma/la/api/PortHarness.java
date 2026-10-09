@@ -73,6 +73,8 @@ final class PortHarness {
         }
 
         @Override public String predicate(Object filter) { return "TRUE"; }
+
+        @Override public BoundFilter predicateBound(Object filter) { return BoundFilter.TRUE; }
     }
 
     /** A request that has no network behind it (the platform test kit's, kept under this name for the tests). */

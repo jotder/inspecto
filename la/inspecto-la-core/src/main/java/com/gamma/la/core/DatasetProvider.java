@@ -152,4 +152,30 @@ public interface DatasetProvider {
      * @throws IllegalArgumentException when the root is not a group
      */
     String predicate(Object filter);
+
+    /**
+     * {@link #predicate} with every operand value a bound parameter instead of a literal: {@code sql} holds one
+     * {@code ?} per entry of {@code binds}, in text order, so the caller appends them to {@code Request.binds} at the
+     * position the predicate occupies in its statement. No filter value reaches the statement text.
+     *
+     * @throws IllegalArgumentException when the root is not a group
+     */
+    BoundFilter predicateBound(Object filter);
+
+    /** A rendered predicate plus its positional bind values (all strings; the SQL casts each). */
+    record BoundFilter(String sql, List<String> binds) {
+        public BoundFilter {
+            binds = binds == null ? List.of() : List.copyOf(binds);
+        }
+
+        /** No constraint, no binds. */
+        public static final BoundFilter TRUE = new BoundFilter("TRUE", List.of());
+
+        /** {@code (this) AND (other)}, binds in text order. */
+        public BoundFilter and(BoundFilter other) {
+            List<String> all = new java.util.ArrayList<>(binds);
+            all.addAll(other.binds);
+            return new BoundFilter("(" + sql + ") AND (" + other.sql + ")", all);
+        }
+    }
 }
