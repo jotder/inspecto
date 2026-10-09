@@ -69,3 +69,12 @@ export function buildWidget(
         options: extra?.options,
     };
 }
+
+/**
+ * A KPI tile bound to a KPI definition (`options.kpi.kpiId`, ASSURE-KPI-DEFINITIONS-1) and to no Dataset: the KPI
+ * component reads its own value through the definition, so the host runs no query and needs no Dataset (LIVEFIX2 #2 —
+ * the dashboard drew "Dataset for “” not found." for every such tile).
+ */
+export function isKpiBound(w: Pick<WidgetConfig, 'datasetId' | 'options' | 'vizType'>): boolean {
+    return w.vizType === 'kpi' && !w.datasetId && !!w.options?.kpi?.kpiId;
+}

@@ -286,6 +286,30 @@ describe('WidgetHostComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('a KPI tile bound to a KPI definition and NO Dataset renders the KPI without a Dataset (LIVEFIX2 #2)', async () => {
+        const value = vi.fn(() => of(null as never));
+        let datasetFetched = false;
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: { get: () => ((datasetFetched = true), of(DS)) } },
+            { provide: KpisService, useValue: { value } },
+        ]);
+        fixture.componentRef.setInput('widget', {
+            ...WIDGET,
+            datasetId: '',
+            controls: {},
+            options: { kpi: { kpiId: 'leakage_found' } },
+        });
+        fixture.componentRef.setInput('asOf', '2026-10-09');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.kpiBound()).toBe(true);
+        expect(fixture.componentInstance.tileState()).toBe('ready');
+        expect(datasetFetched).toBe(false);
+        expect(value).toHaveBeenCalledWith('leakage_found', '2026-10-09');
+    });
+
     it("evaluates a kpiId-bound KPI at the host Dashboard's asOf day", async () => {
         const value = vi.fn(() => of(null as never));
         const fixture = create([

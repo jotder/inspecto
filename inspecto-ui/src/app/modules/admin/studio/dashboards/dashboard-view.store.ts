@@ -3,7 +3,7 @@ import { getViz } from 'app/inspecto/viz';
 import { Condition, ConditionGroup, emptyGroup } from 'app/inspecto/query';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { DrillEvent } from '../widgets/widget-host.component';
-import { Widget } from '../widgets/widget-types';
+import { Widget, isKpiBound as kpiBound } from '../widgets/widget-types';
 import { WidgetsService } from '../widgets/widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
@@ -124,6 +124,10 @@ export class DashboardViewStore {
     /** View-bound widget (geo-map / link-analysis) — no dataset; the cross-filter/drill don't apply. */
     isViewBound(widget: Widget): boolean {
         return !!getViz(widget.vizType)?.meta.viewKind;
+    }
+    /** KPI tile bound to a KPI definition — no Dataset; the cross-filter/drill don't apply, the as-of date does. */
+    isKpiBound(widget: Widget): boolean {
+        return kpiBound(widget);
     }
 
     /** A tile's drill-down click (or a quick-filter pick) — toggle `field = value` in the cross-filter: add

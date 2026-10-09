@@ -226,7 +226,7 @@
                             <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-up-down"></mat-icon>
                         </button>
                         @if (widgetOf(tile); as w) {
-                            @if (!isViewBound(w)) {
+                            @if (!isViewBound(w) && !isKpiBound(w)) {
                                 <button
                                     mat-icon-button
                                     (click)="drillTileIndex.set($index)"
@@ -258,6 +258,11 @@
                         @if (isViewBound(widget)) {
                             <!-- View-bound tile: the saved view is the binding — the cross-filter doesn't apply. -->
                             <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)">
+                                <ng-container tileActions [ngTemplateOutlet]="tileControls" />
+                            </app-dashboard-tile>
+                        } @else if (isKpiBound(widget)) {
+                            <!-- KPI-definition tile: the KPI reads its own value; no Dataset, no cross-filter. -->
+                            <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)" [asOf]="tileAsOf()">
                                 <ng-container tileActions [ngTemplateOutlet]="tileControls" />
                             </app-dashboard-tile>
                         } @else if (datasetOf(tile); as dataset) {

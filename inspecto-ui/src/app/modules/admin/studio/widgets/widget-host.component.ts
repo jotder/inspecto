@@ -28,7 +28,7 @@ import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
-import { Widget } from './widget-types';
+import { Widget, isKpiBound } from './widget-types';
 import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
@@ -124,6 +124,16 @@ export interface DrillEvent extends DrillPair {
                                 [title]="widget.name"
                                 [viewId]="widget.viewId"
                                 [viewBinding]="widget.workingSet"
+                            />
+                        } @else if (kpiBound()) {
+                            <!-- KPI-definition tile (LIVEFIX2 #2): the KPI reads value, comparison and target itself. -->
+                            <inspecto-viz-render
+                                [plugin]="p"
+                                [props]="props()"
+                                [title]="widget.name"
+                                [renderOptions]="widget.options"
+                                [kpiSize]="kpiSize()"
+                                [kpiAsOf]="asOf()"
                             />
                         } @else if (resolvedDataset(); as dataset) {
                             @if (showRevoked()) {
@@ -237,6 +247,11 @@ export class WidgetHostComponent {
     });
     /** View-bound widget (`meta.viewKind`) — renders a saved investigation view; no dataset, no query run. */
     readonly viewBound = computed(() => !!this.plugin()?.meta.viewKind);
+    /** KPI tile bound to a KPI definition and no Dataset — the KPI component reads its own value; no query run. */
+    readonly kpiBound = computed(() => {
+        const w = this.resolvedWidget();
+        return !!w && isKpiBound(w);
+    });
     readonly props = signal<VizProps>({ labels: [], series: [] });
     readonly canExport = computed(() => this.plugin()?.render.kind === 'chartjs');
     /** False once a data run fails — a shared-bound dataset that no longer resolves (revoked/expired grant). */
@@ -280,7 +295,7 @@ export class WidgetHostComponent {
      *  rows. Every failure state (widget/dataset unavailable, revoked, throttled) is `ready` — the body says it. */
     readonly tileState = computed<TileState>(() => {
         if (!this.resolvedWidget()) return this.loadFailed() ? 'ready' : 'loading';
-        if (!this.plugin() || this.viewBound()) return 'ready';
+        if (!this.plugin() || this.viewBound() || this.kpiBound()) return 'ready';
         if (!this.resolvedDataset()) return this.datasetFailed() ? 'ready' : 'loading';
         if (this.throttled() || this.showRevoked() || this.runError()) return 'ready';
         if (!this.resultArrived()) return 'loading';

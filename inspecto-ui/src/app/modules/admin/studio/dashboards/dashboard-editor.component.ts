@@ -310,6 +310,9 @@ export class DashboardEditorComponent implements OnInit {
     isViewBound(widget: Widget): boolean {
         return this.view.isViewBound(widget);
     }
+    isKpiBound(widget: Widget): boolean {
+        return this.view.isKpiBound(widget);
+    }
     /** The filter a tile over `dataset` runs — the cross-filter plus the preview's date range where it applies. */
     tileFilter(dataset: Dataset): ConditionGroup {
         return this.view.filterFor(dataset);
