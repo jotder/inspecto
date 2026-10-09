@@ -855,7 +855,13 @@ final class PipelineGraphRoutes implements RouteModule {
         m.put("files", files);
         m.put("relations", relations);
         m.put("output", out);
-        m.put("warnings", List.copyOf(warnings));
+        // A run that nulled values still succeeds: say so, or the preview reads as clean (-1 = not measured).
+        List<String> all = new ArrayList<>(warnings);
+        if (parsed.castFailures() > 0)
+            all.add(parsed.castFailures() + " value(s) did not match their declared type: each was stored as empty"
+                    + " and its row was kept (a real run counts them as cast_failures).");
+        m.put("castFailures", parsed.castFailures());
+        m.put("warnings", List.copyOf(all));
         return m;
     }
 

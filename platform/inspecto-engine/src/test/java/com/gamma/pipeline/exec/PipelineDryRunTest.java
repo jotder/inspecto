@@ -96,6 +96,26 @@ class PipelineDryRunTest {
     }
 
     /**
+     * A value its declared type cannot hold becomes NULL while the row is KEPT — a real ingest counts it as
+     * {@code cast_failures} and reports SUCCESS, so the dry-run must say so instead of reading as clean
+     * (found driving the Enterprise demo, 2026-10-09). The clean run is the negative probe.
+     */
+    @Test
+    void warnsWhenADeclaredTypeWouldNullASampleValue(@TempDir Path dir) throws Exception {
+        PipelineGraph g = PipelineLift.lift(csv(dir, PipelineConfigBatchTest.miniSchema()).load());
+        Map<String, Object> good = new LinkedHashMap<>(Map.of("ID", "a1", "AMT", "12.50", "EVENT_DATE", "2026-01-15"));
+        Map<String, Object> bad = new LinkedHashMap<>(Map.of("ID", "a2", "AMT", "oops", "EVENT_DATE", "2026-01-15"));
+
+        PipelineDryRun.Result clean = PipelineDryRun.run(g, List.of(good));
+        assertTrue(clean.warnings().stream().noneMatch(w -> w.contains("declared type")), clean.warnings().toString());
+
+        PipelineDryRun.Result r = PipelineDryRun.run(g, List.of(good, bad));
+        assertEquals(2, relCount(node(r, "map"), PipelineRel.DATA), "the row with the bad value is kept");
+        assertTrue(r.warnings().stream().anyMatch(w -> w.startsWith("1 sample value(s) did not match their declared type in 'map'")),
+                "the nulled value is announced: " + r.warnings());
+    }
+
+    /**
      * A {@code transform.map} whose rules live in a {@code mapping} component projects those rules. Nothing
      * resolved {@code use:} references before a run — {@code ComponentRegistry.effectiveConfig} existed but had
      * no production caller — so a referenced mapping was invisible to the executor and the node projected

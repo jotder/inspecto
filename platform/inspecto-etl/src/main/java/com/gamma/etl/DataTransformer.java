@@ -190,11 +190,18 @@ public final class DataTransformer {
      * <p>Best-effort: any SQL failure returns {@code -1} ("not measured") rather than failing a batch
      * that otherwise succeeded. One extra aggregate scan per batch.
      */
-    @SuppressWarnings("unchecked")
     public static long countCastFailures(Connection conn, Map<String, Object> schemaConfig,
                                         PipelineConfig cfg, String sourceTable) {
+        return countCastFailures(conn, schemaConfig, cfg.csv(), sourceTable);
+    }
+
+    /** {@link #countCastFailures(Connection, Map, PipelineConfig, String)} for a caller holding only the
+     *  {@code csv} settings — the graph executor's map node, whose dry-run has no {@link PipelineConfig}. */
+    @SuppressWarnings("unchecked")
+    public static long countCastFailures(Connection conn, Map<String, Object> schemaConfig,
+                                        PipelineConfig.CsvSettings csv, String sourceTable) {
         Map<String, String> fieldTypes = rawFieldTypes(schemaConfig);
-        SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
+        SourceZones zones = SourceZones.of(schemaConfig, csv.sourceTimezone());
         Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
 
         // 🔴 This method reads the mapping DIRECTLY — it does not go through selectFor — so it must
@@ -208,7 +215,7 @@ public final class DataTransformer {
             for (Map<String, Object> field : fieldRows) {
                 List<String> inputs = RecordTransform.auditedSourceColumns(field, fieldTypes);
                 if (inputs.isEmpty()) continue;   // custom / no source / VARCHAR pass-through — see that method
-                String expr = RecordTransform.compile(List.of(field), fieldTypes, fieldFormats, cfg.csv(), zones,
+                String expr = RecordTransform.compile(List.of(field), fieldTypes, fieldFormats, csv, zones,
                         sourceTable, false).get(0).get("expr").toString();
                 if (!targets.isEmpty()) select.append(", ");
                 // every column input non-blank AND the expression NULL — a blank second input is not a

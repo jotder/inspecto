@@ -1109,6 +1109,16 @@ public final class RowShaper {
      * reference. A node with both prefers the schema, the richer of the two.
      */
     @SuppressWarnings("unchecked")
+    /**
+     * Values this map node's declared types would null while keeping the row, over {@code sourceTable} — the
+     * same count a real ingest records as {@code cast_failures}. 0 for a node with no schema or rules;
+     * {@code -1} when it could not be measured.
+     */
+    static long castFailures(java.sql.Connection conn, PipelineNode node, String sourceTable) {
+        Map<String, Object> schema = mappingSchemaOf(node);
+        return schema == null ? 0 : DataTransformer.countCastFailures(conn, schema, csvSettingsOf(node), sourceTable);
+    }
+
     private static Map<String, Object> mappingSchemaOf(PipelineNode node) {
         if (node.cfg("schema") instanceof Map<?, ?> s
                 && s.get("mapping") instanceof Map<?, ?> m

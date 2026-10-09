@@ -147,6 +147,9 @@ public final class PipelineDryRun {
                 ScratchTables.seed(conn, table, ScratchTables.columnsOf(rows), rows);
                 seeds.put(e.getKey(), table);
             }
+            // Before the run: a value a map node's declared type nulls is KEPT as NULL, and a real ingest counts it as
+            // cast_failures while reporting SUCCESS — say so, or the dry-run reads as clean (found 2026-10-09).
+            List<String> castWarnings = castFailureWarnings(conn, g, seedNode, seeds);
             seal(conn, g, references, scratch);
             PipelineExecutor.DryRunResult dr =
                     PipelineExecutor.dryRun(conn, g, seedNode, seeds, references, stopAtNodeId);
@@ -183,6 +186,7 @@ public final class PipelineDryRun {
             }
             List<String> warnings = new ArrayList<>(notExecutedWarnings(g, dr));
             warnings.addAll(warningsFor(nodes, sinks, seedNode));
+            warnings.addAll(castWarnings);
             return new Result(seedNode, nodes, sinks, List.copyOf(warnings));
         } finally {
             DuckDbUtil.deleteTempDb(db);
@@ -348,6 +352,24 @@ public final class PipelineDryRun {
             }
         }
         return rewrote ? new PipelineGraph(g.name(), g.active(), nodes, g.edges()) : g;
+    }
+
+    /** One warning per map node fed straight from the seed whose declared types null sample values. */
+    private static List<String> castFailureWarnings(Connection conn, PipelineGraph g, String seedNode,
+                                                    Map<String, String> seeds) {
+        if (seeds.size() != 1) return List.of();
+        String table = seeds.values().iterator().next();
+        Map<String, PipelineNode> byId = g.byId();
+        List<String> out = new ArrayList<>();
+        for (PipelineEdge e : g.edges()) {
+            PipelineNode n = byId.get(e.to());
+            if (!seedNode.equals(e.from()) || n == null || !BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type())) continue;
+            long nulled = RowShaper.castFailures(conn, n, table);
+            if (nulled > 0)
+                out.add(nulled + " sample value(s) did not match their declared type in '" + n.id()
+                        + "': each would be stored as empty and its row kept (a real run counts them as cast_failures).");
+        }
+        return out;
     }
 
     /** Seed the sample at the parser node (its {@code data} output) if present, else the first entry node. */

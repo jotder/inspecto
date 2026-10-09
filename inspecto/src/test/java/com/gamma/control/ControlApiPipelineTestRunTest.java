@@ -76,6 +76,29 @@ class ControlApiPipelineTestRunTest {
             assertEquals(2, b.get("output").get("rowCount").asInt(),
                     "the output row count is the FULL parse, not the sample");
             assertTrue(b.get("output").get("path").asText().length() > 0);
+            assertEquals(0, b.get("castFailures").asLong(), "two clean rows null nothing");
+            assertTrue(warnings(b).stream().noneMatch(w -> w.contains("declared type")), "no cast warning on clean data");
+        }
+    }
+
+    /**
+     * A value its declared type cannot hold is stored as NULL while the row is KEPT — a real run counts it as
+     * {@code cast_failures} and still reports SUCCESS, so the test run must say so (found 2026-10-09: the
+     * preview read as clean while a value had been blanked).
+     */
+    @Test
+    void countsAndWarnsAboutValuesTheDeclaredTypeNulled(@TempDir Path dir) throws Exception {
+        Path inbox = Files.createDirectories(dir.resolve("inbox"));
+        Files.writeString(inbox.resolve("a.csv"), "ID,AMT,EVENT_DATE\na1,1.0,2020-04-03\na2,oops,2020-04-03\n");
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> r = send(c.port, "POST",
+                    "/pipelines/authored/test_etl/run", "{\"files\":[\"a.csv\"]}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode b = json(r);
+            assertEquals(2, b.get("output").get("rowCount").asInt(), "the row with the bad value is kept");
+            assertEquals(1, b.get("castFailures").asLong(), r.body());
+            assertTrue(warnings(b).stream().anyMatch(w -> w.startsWith("1 value(s) did not match their declared type")),
+                    "the nulled value is announced: " + warnings(b));
         }
     }
 
