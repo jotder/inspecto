@@ -1,6 +1,7 @@
 package com.gamma.expectation;
 
 import com.gamma.config.safety.DataRef;
+import com.gamma.query.ConditionSql;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 
@@ -8,9 +9,10 @@ import static com.gamma.util.SqlBuilder.quoteIdent;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -19,8 +21,8 @@ import java.util.regex.Pattern;
  * <b>unsealed</b> because the count query legitimately reads Parquet by absolute path. Unlike a user
  * query there is no untrusted SQL phase — the <em>entire</em> statement is server-built here from
  * validated inputs (column/ref identifiers pass {@link #SAFE_IDENT}, dataset refs pass
- * {@link DataRef#requireUnder}, non_null / range / regex render through {@code ConditionSql}, which quote-escapes every identifier and literal),
- * so no {@code SqlGuard} pass is needed.
+ * {@link DataRef#requireUnder}, non_null / range / regex render through {@link ConditionSql#predicateBound}, so
+ * their operand values are bound parameters and never statement text), so no {@code SqlGuard} pass is needed.
  */
 public final class ExpectationEvaluator {
 
@@ -45,26 +47,33 @@ public final class ExpectationEvaluator {
      */
     public static Result evaluate(Expectation exp, Path dataRoot) throws SQLException, IOException {
         long now = System.currentTimeMillis();
-        String sql = countSql(exp, dataRoot);
+        ConditionSql.Bound count = countSql(exp, dataRoot);
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy());
-             Statement st = sandbox.statement();
-             ResultSet rs = st.executeQuery(sql)) {
-            long violations = rs.next() ? rs.getLong(1) : 0L;
-            return new Result(violations > 0 ? "FAILED" : "PASSED", violations, now);
+             PreparedStatement ps = sandbox.preparedStatement(count.sql())) {
+            int i = 1;
+            for (Object v : count.params()) ps.setObject(i++, v);
+            try (ResultSet rs = ps.executeQuery()) {
+                long violations = rs.next() ? rs.getLong(1) : 0L;
+                return new Result(violations > 0 ? "FAILED" : "PASSED", violations, now);
+            }
         }
     }
 
-    /** Build the trusted {@code SELECT count(*) … WHERE <violation predicate>} for the expectation's kind. */
-    static String countSql(Expectation exp, Path dataRoot) {
+    /**
+     * Build the trusted {@code SELECT count(*) … WHERE <violation predicate>} for the expectation's kind,
+     * with the predicate's operand values as positional parameters.
+     */
+    static ConditionSql.Bound countSql(Expectation exp, Path dataRoot) {
         String relation = parquetGlob(dataRoot, exp.target());
         // 'condition' names its own field(s) in the tree; every other kind checks exp.column().
-        String predicate = "condition".equals(exp.kind())
-                ? com.gamma.query.ConditionSql.predicate(exp.violationTree())
+        ConditionSql.Bound predicate = "condition".equals(exp.kind())
+                ? ConditionSql.predicateBound(exp.violationTree())
                 : columnPredicate(exp, dataRoot);
-        return "SELECT count(*) FROM " + relation + " AS __t WHERE " + predicate;
+        return new ConditionSql.Bound("SELECT count(*) FROM " + relation + " AS __t WHERE " + predicate.sql(),
+                predicate.params());
     }
 
-    private static String columnPredicate(Expectation exp, Path dataRoot) {
+    private static ConditionSql.Bound columnPredicate(Expectation exp, Path dataRoot) {
         // 'baseline' compares a whole-input PROFILE against accepted history — there is no per-row predicate
         // to count. Refused by name here (before ident() trips on its absent column) so a caller routing it
         // through the violation count gets the real reason, not "unsafe column identifier 'null'".
@@ -73,10 +82,10 @@ public final class ExpectationEvaluator {
                     + "not as a row predicate");
         String col = quoteIdent(ident(exp.column()));
         return switch (exp.kind()) {
-            case "non_null", "range", "regex" -> com.gamma.query.ConditionSql.predicate(exp.violationTree());
-            case "referential" -> col + " IS NOT NULL AND CAST(" + col + " AS VARCHAR) NOT IN (SELECT CAST("
+            case "non_null", "range", "regex" -> ConditionSql.predicateBound(exp.violationTree());
+            case "referential" -> new ConditionSql.Bound(col + " IS NOT NULL AND CAST(" + col + " AS VARCHAR) NOT IN (SELECT CAST("
                     + quoteIdent(ident(exp.refColumn())) + " AS VARCHAR) FROM "
-                    + parquetGlob(dataRoot, exp.refDataset()) + ")";
+                    + parquetGlob(dataRoot, exp.refDataset()) + ")", List.of());
             default -> throw new IllegalArgumentException("unsupported expectation kind '" + exp.kind() + "'");
         };
     }
