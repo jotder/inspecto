@@ -592,12 +592,27 @@ public final class NodeAttributes {
                     .help("A sheet with more rows fails the run instead of being cut short. Blank = "
                             + com.gamma.etl.PipelineConfig.Excel.DEFAULT_MAX_ROWS + "."));
 
+    /**
+     * {@code gap} (→ {@code collector.gap_detection}, lowered by {@code PipelineEditable.gapSection}) — the
+     * completeness KPI's file template (K2, operator 2026-10-06; editor field operator 2026-10-09). Only the two
+     * template keys are specced: {@code sequence} keeps its GapDetector grammar and stays in the dialog's
+     * free-form "Additional config", which the dialog preserves. Validity ({seq} ⇔ seq_scope) is enforced at save
+     * by the {@code ConfigSpecs} rule on {@code collector.gap_detection.*}.
+     */
+    public static final List<NodeAttribute> GAP = List.of(
+            NodeAttribute.of("file_template", "File sequence template", "string", "optional")
+                    .placeholder("CDR_{yyyyMMddHH}_{seq}_*")
+                    .help("A date token and an optional {seq} token, e.g. CDR_{yyyyMMddHH}_{seq}_* or XDR_{yyyyMMdd}.csv (date-only: one file per date bucket). The kpi.completeness job counts missing files against it."),
+            NodeAttribute.of("seq_scope", "Sequence scope", "select", "optional")
+                    .options("PER_BUCKET", "Restarts every time bucket", "CONTINUOUS", "Runs across buckets")
+                    .help("Required when the template holds {seq}, refused when it does not. Never defaulted."));
+
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, SINK_WEBHOOK, SINK_EXCEL))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -623,6 +638,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.SINK_VIEW.type(), OUTPUT);
         m.put(BuiltinNodeType.SINK_WEBHOOK.type(), SINK_WEBHOOK);
         m.put(BuiltinNodeType.SINK_EXCEL.type(), SINK_EXCEL);
+        m.put(BuiltinNodeType.GAP.type(), GAP);
         // NOT Map.copyOf: that returns an UNORDERED map, so the committed contract JSON would come out in a
         // different key order on a different JVM run and the drift test would fail at random.
         return java.util.Collections.unmodifiableMap(m);

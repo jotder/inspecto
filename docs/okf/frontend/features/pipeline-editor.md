@@ -258,7 +258,7 @@ closing D1–D9 (full history: `NodeConfigNameContractTest` docblock and git his
 - **A served empty array ≠ absent**: empty = the server says the type has no schema (honoured, never
   re-enables the client table); absent = catalog not yet answered (`??`).
 - 🔴 **The Step vocabulary feeds a committed contract**:
-  ⚠ **It covers 19<!--count:node-types-with-attributes--> of the 35<!--count:node-types--> built-in node types** — only those that carry an attribute spec. 🔴 That gap is the root of the five-way "node types" count: `BuiltinNodeType` is the roster and this contract is the subset with attributes — two different sets, one noun. Both figures are derived by `tools/check-doc-counts.mjs`.
+  ⚠ **It covers 20<!--count:node-types-with-attributes--> of the 35<!--count:node-types--> built-in node types** — only those that carry an attribute spec. 🔴 That gap is the root of the five-way "node types" count: `BuiltinNodeType` is the roster and this contract is the subset with attributes — two different sets, one noun. Both figures are derived by `tools/check-doc-counts.mjs`.
   `inspecto/contracts/node-attributes.contract.json` (`NodeAttributesContractTest` +
   `node-attributes.spec.ts`), regenerated with `-Dnode.attributes.write=true`. (The second one,
   `step-types.contract.json`, was retired 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`) with `GET /pipelines/step-types`.) ⚠ `inspecto/contracts/`

@@ -314,6 +314,42 @@ class NodeConfigNameContractTest {
     }
 
     /**
+     * The gap node's completeness-KPI template pair (editor field, operator 2026-10-09). Bespoke because the
+     * two keys are PAIRED at parse ({seq} needs seq_scope), so a single-key {@link #contracts()} row could
+     * never load, and because the shared fixture carries no gap node.
+     */
+    @Test
+    void gapTemplateAttributesReachTheEngine(@TempDir Path dir) throws Exception {
+        assertEquals(List.of("file_template", "seq_scope"),
+                NodeAttributes.forType("gap").stream().map(NodeAttribute::key).toList());
+        Path toon = writeFixture(dir);
+        String text = Files.readString(toon);
+        assertTrue(text.contains("  guarantee: BEST_EFFORT\n"), "fixture anchor moved");
+        Files.writeString(toon, text.replace("  guarantee: BEST_EFFORT\n",
+                "  guarantee: BEST_EFFORT\n  gap_detection:\n    file_template: XDR_{yyyyMMdd}.csv\n"));
+        Map<String, Object> raw = decode(toon);
+        PipelineGraph g = liftEditable(toon);
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        boolean sawGap = false;
+        for (PipelineNode n : g.nodes()) {
+            if (!"gap".equals(n.type())) { nodes.add(n); continue; }
+            sawGap = true;
+            Map<String, Object> cfg = new LinkedHashMap<>(n.config());
+            cfg.put("file_template", "CDR_{yyyyMMddHH}_{seq}_*");
+            cfg.put("seq_scope", "PER_BUCKET");
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), cfg, n.use()));
+        }
+        assertTrue(sawGap, "a gap_detection block no longer lifts to a gap node");
+        Path saved = dir.resolve("saved_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, true)));
+        PipelineConfig.GapDetection gd = PipelineConfig.load(saved.toString()).collector().gapDetection();
+        assertEquals("CDR_{yyyyMMddHH}_{seq}_*", gd.fileTemplate());
+        assertEquals("PER_BUCKET", gd.seqScope());
+    }
+
+    /**
      * The declared-but-unreachable case, pinned rather than fixed. {@code transform.route},
      * {@code sink.materialized} and {@code sink.view} have attribute tables, but the flat config has no
      * home for them — {@code PipelineEditable.lower} refuses them with {@code UNSUPPORTED_NODE} and the
