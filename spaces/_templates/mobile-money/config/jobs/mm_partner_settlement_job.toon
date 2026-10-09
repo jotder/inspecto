@@ -1,0 +1,6 @@
+job:
+  name: mm_partner_settlement
+  type: recon.run
+  reconciliation: mm_partner_settlement
+  cron: "0 4 * * *"
+  enabled: true

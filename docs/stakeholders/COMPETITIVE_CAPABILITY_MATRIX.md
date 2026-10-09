@@ -47,7 +47,7 @@ backlog row that would.
 | O | Workflow and SLA | N | P | P | P | P | N | **Y** | Workflow & SLA add-on |
 | P | Business assurance (margin, forecast, KPI drift) | Y | Y | Y | Y | Y | P | **Y** | `business-assurance` Space Template |
 | Q | Partner / settlement / wholesale | P | Y | P | P | Y | P | **P** | partner-statement reconciliation in `telco-ra` |
-| R | Mobile money / fintech assurance | Y | Y | Y | Y | N | Y | **P** | `payment-fraud` (card-centric) · `PACK-MOBILE-MONEY-1` |
+| R | Mobile money / fintech assurance | Y | Y | Y | Y | N | Y | **Y** | `mobile-money` Space Template (wallet / bank / partner Reconciliation, agent fraud, KYC, provisioning) · `payment-fraud` (card-centric) |
 | S | AML typologies, sanctions / PEP screening | Y | N | N/P | P | N | N | **N** | `PACK-AML-1` + `SCREENING-1` |
 | T | Regulatory reporting (SAR / STR) | Y | N | P | N | N | N | **N** | `REGULATORY-REPORTING-1` |
 | U | 5G / IoT / cloud / digital service assurance | Y | P | Y | P | Y | P | **N** | candidate industry pack (cable / IPDR, digital) |
@@ -76,7 +76,6 @@ tool.
 |---|---|---|
 | Agentic investigation (an agent that explains and works an alert) | Mobileum RAID Agentic, Subex AI Agent Squads | to file: `AGENTIC-INVESTIGATION-1` |
 | AML typologies, sanctions / PEP screening, SAR / STR reporting | LATRO (full), Neural (partial) | `PACK-AML-1`, `SCREENING-1`, `REGULATORY-REPORTING-1` |
-| Mobile-money assurance (wallet / agent / bank reconciliation, agent fraud) | LATRO, Subex, Mobileum, Neural, Araxxe | `PACK-MOBILE-MONEY-1` |
 | Explainable ML anomaly detection | all but TEOCO and Araxxe | `ANOMALY-DETECTION-1` |
 | Real-time / pre-call decisioning | LATRO, Mobileum, Neural | `REALTIME-DECISIONING-1` |
 | Partner settlement | Subex, TEOCO | to file: `PACK-PARTNER-SETTLEMENT-1` |

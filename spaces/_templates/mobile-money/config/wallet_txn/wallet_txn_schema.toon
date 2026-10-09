@@ -1,0 +1,44 @@
+raw:
+  name: WALLET_TXN
+  format: CSV
+  fields[9]{name,selector,type,description,unit,classification}:
+    txn_id,"0",VARCHAR,"Wallet-platform transaction identifier","","INTERNAL"
+    txn_ts,"1",TIMESTAMP,"Transaction time","","INTERNAL"
+    txn_type,"2",VARCHAR,"CASH_IN, CASH_OUT, P2P, BILL_PAY, BANK_OUT (wallet to bank) or BANK_IN (bank to wallet)","","INTERNAL"
+    wallet_id,"3",VARCHAR,"The customer wallet the transaction belongs to (the sender for P2P)","","CONFIDENTIAL"
+    agent_id,"4",VARCHAR,"The agent (CASH_IN / CASH_OUT only)","","INTERNAL"
+    partner_id,"5",VARCHAR,"The biller / aggregator (BILL_PAY only)","","INTERNAL"
+    amount,"6","DECIMAL(18,2)","Transaction amount","USD","INTERNAL"
+    fee,"7","DECIMAL(18,2)","Fee charged to the wallet","USD","INTERNAL"
+    commission,"8","DECIMAL(18,2)","Commission credited to the agent","USD","INTERNAL"
+mapping:
+  canonicalName: wallet_txn
+  rawName: WALLET_TXN
+  fields[9]:
+    - name: txn_id
+      from: txn_id
+      fn: keep
+    - name: txn_ts
+      from: txn_ts
+      fn: keep
+    - name: txn_type
+      from: txn_type
+      fn: keep
+    - name: wallet_id
+      from: wallet_id
+      fn: keep
+    - name: agent_id
+      from: agent_id
+      fn: keep
+    - name: partner_id
+      from: partner_id
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: fee
+      from: fee
+      fn: keep
+    - name: commission
+      from: commission
+      fn: keep

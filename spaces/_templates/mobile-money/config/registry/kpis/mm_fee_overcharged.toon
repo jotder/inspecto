@@ -1,0 +1,8 @@
+name: mm_fee_overcharged
+title: Fees overcharged
+dataset: mm_fee
+measure: sum(overcharged)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

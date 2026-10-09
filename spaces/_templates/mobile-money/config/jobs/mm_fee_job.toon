@@ -1,0 +1,14 @@
+job:
+  name: mm_fee
+  type: sql.template
+  description: "Fee mis-charge - fee charged vs greatest(fee_min, amount x fee_rate) on CASH_OUT and P2P"
+  sql: "WITH cur AS (SELECT wallet_id, CAST($window_start AS DATE) AS window_date, count(*) AS charged_txns, sum(greatest(fee - expected_fee, 0)) AS overcharged, sum(greatest(expected_fee - fee, 0)) AS undercharged FROM (SELECT wallet_id, coalesce(fee, 0) AS fee, greatest(CAST($fee_min AS DECIMAL(18,2)), round(amount * CAST($fee_rate AS DECIMAL(9,6)), 2)) AS expected_fee FROM wallet_txn WHERE txn_type IN ('CASH_OUT', 'P2P') AND txn_ts >= CAST($window_start AS TIMESTAMP) AND txn_ts < CAST($window_end AS TIMESTAMP)) t GROUP BY wallet_id HAVING sum(greatest(fee - expected_fee, 0)) > 0 OR sum(greatest(expected_fee - fee, 0)) > 0) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM mm_fee WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: wallet_txn,mm_fee
+  sink_dataset: mm_fee
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  fee_rate: "0.01"
+  fee_min: "0.50"
+  enabled: true

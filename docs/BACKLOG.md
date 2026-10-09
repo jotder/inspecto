@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** —
+> **50<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** —
 > ⬇ **52 → 51 (P3 35 → 34) on 2026-10-09**: closed `MODULE-REORG-P7-KERNEL` — Kernel steps 1, 3–6 and the Escalation Rule edit UI shipped; the five unregistered Consequences were declined (no consumer; §6 *Control plane & Jobs*, operator signed off); step 7 stays declined.
 > ⬇ **53 → 52 (P3 36 → 35) on 2026-10-09**: closed `DRYRUN-SILENT-CAST-1` — values a declared type nulls (row KEPT, run still SUCCESS, counted as `cast_failures`) are now shown: a warning on run detail's Batches tab, a `castFailures` count + warning on *Run to here*, and a per-map-Step warning on the dry-run (the same `DataTransformer.countCastFailures` a real ingest uses, via a `CsvSettings` overload).
 > ⬇ **58 → 53 (P3 41 → 36) on 2026-10-09**: closed four of the six UI-test findings — `BOOTSTRAP-EDITION-ENTERPRISE-1` (`/bootstrap` reports `enterprise` when an `AccessDecider` is installed), `DECISION-RULES-ACTIONS-PIN-1` (Actions column pinned), `INCIDENT-COMMANDER-TWO-FIELDS-1` (the postmortem Incident Commander defaults to the assignee the header calls Commander), `DRYRUN-SAMPLE-SEED-1` (a sample missing a column the Steps read is named in plain words; the captured-sample button already seeds real rows); withdrew `INCIDENT-CREATE-NEEDS-ENTITY-1` as filed in error (the dialog already explains where the first linked object comes from — recorded decision `CASE-FIRST-OBJECT-DEAD-END-1`). `DRYRUN-SILENT-CAST-1` stays open with its cause verified.
@@ -164,11 +164,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 34<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 34<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 50<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -458,7 +458,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 - **P2** · `PACK-AML-1` — **AML function pack** (competitive gap, 2026-10-07): typology Space Templates (smurfing, structuring, thresholds, watch-list traffic) over Scoring & Lists and Link Analysis; needs `SCREENING-1` and `REGULATORY-REPORTING-1`. → `okf/backend/module-reorganisation-decisions.md`
 - **P2** · `SCREENING-1` — **Screening add-on**: fuzzy name / identifier matching of entities against Entity Lists (sanctions, PEP, deny lists) with match scores and a review queue; domain-neutral. → `okf/backend/module-reorganisation-decisions.md`
 - **P2** · `REGULATORY-REPORTING-1` — **Regulatory Reporting add-on**: regulator-format reports (e.g. SAR / STR) assembled from Incidents, Cases and evidence, maker-checker before submission, a submission log. → `okf/backend/module-reorganisation-decisions.md`
-- **P2** · `PACK-MOBILE-MONEY-1` — **Mobile Money industry pack**: wallet / agent / bank / partner reconciliation, commission and fee checks, agent fraud, KYC and provisioning checks, as Space Templates over Reconciliation and Scoring & Lists. → `okf/backend/module-reorganisation-decisions.md`
 - **P3** · `ANOMALY-DETECTION-1` — **Anomaly Detection add-on**: explainable behavioural anomaly scoring per entity, beyond Expectation baselines and forecast bands. → `okf/backend/module-reorganisation-decisions.md`
 - **P3** · `TELCO-FRAUD-CONTENT-GAPS-1` — **telecom fraud content additions** to the `telco-fraud` template: recharge fraud, data-charging bypass, internal fraud. → `okf/backend/module-reorganisation-decisions.md`
 - **P3** · `REALTIME-DECISIONING-1` — **Real-time Decisioning add-on**: an inline allow / block decision on a stream, evaluated by the Decision Kernel; needs its own design (the engine is batch today). → `okf/backend/module-reorganisation-decisions.md`

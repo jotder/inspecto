@@ -1,0 +1,14 @@
+job:
+  name: mm_round_trip
+  type: sql.template
+  description: "Agent round-tripping - a cash-in cashed out again at the SAME agent within round_trip_minutes"
+  sql: "WITH cur AS (SELECT i.agent_id, CAST($window_start AS DATE) AS window_date, count(DISTINCT i.wallet_id) AS round_trip_wallets, count(DISTINCT i.txn_id) AS round_trip_cash_ins FROM wallet_txn i JOIN wallet_txn o ON o.wallet_id = i.wallet_id AND o.agent_id = i.agent_id AND o.txn_type = 'CASH_OUT' AND o.txn_ts > i.txn_ts AND o.txn_ts <= i.txn_ts + to_minutes(CAST($round_trip_minutes AS INTEGER)) AND o.amount >= i.amount * CAST($round_trip_ratio AS DECIMAL(9,6)) WHERE i.txn_type = 'CASH_IN' AND i.agent_id IS NOT NULL AND i.txn_ts >= CAST($window_start AS TIMESTAMP) AND i.txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY i.agent_id) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM mm_round_trip WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: wallet_txn,mm_round_trip
+  sink_dataset: mm_round_trip
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  round_trip_minutes: "60"
+  round_trip_ratio: "0.9"
+  enabled: true

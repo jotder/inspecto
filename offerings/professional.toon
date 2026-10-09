@@ -8,6 +8,7 @@ posture:
   postgresSidecar: bundled
 includes[1]: personal
 modules[21]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,case-management,action-requests,reconciliation,scoring,agent
+contentPacks[1]: mobile-money
 addons:
   linkAnalysis:
     status: built

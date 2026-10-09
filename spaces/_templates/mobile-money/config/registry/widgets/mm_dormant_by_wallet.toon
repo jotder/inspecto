@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: mm_dormant
+controls:
+  x[1]{field}:
+    wallet_id
+  y[1]{field,agg}:
+    outflow,sum
+options:
+  title: Dormant-wallet outflow by wallet

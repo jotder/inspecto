@@ -1,0 +1,28 @@
+raw:
+  name: BANK_STATEMENT
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    stmt_line_id,"0",VARCHAR,"Statement line identifier","","INTERNAL"
+    value_ts,"1",TIMESTAMP,"Value time","","INTERNAL"
+    bank_ref,"2",VARCHAR,"The wallet transaction the line settles (the txn_id the platform sent)","","INTERNAL"
+    direction,"3",VARCHAR,"CR (into the trust account) or DR (out of it)","","INTERNAL"
+    amount,"4","DECIMAL(18,2)","Line amount","USD","INTERNAL"
+mapping:
+  canonicalName: bank_statement
+  rawName: BANK_STATEMENT
+  fields[5]:
+    - name: stmt_line_id
+      from: stmt_line_id
+      fn: keep
+    - name: value_ts
+      from: value_ts
+      fn: keep
+    - name: bank_ref
+      from: bank_ref
+      fn: keep
+    - name: direction
+      from: direction
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep

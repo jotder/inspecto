@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: mm_round_trip
+controls:
+  x[1]{field}:
+    agent_id
+  y[1]{field,agg}:
+    round_trip_wallets,sum
+options:
+  title: Round-trip wallets by agent

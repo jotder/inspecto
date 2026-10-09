@@ -1,0 +1,8 @@
+name: mm_commission_variance
+title: Commission variance
+dataset: mm_commission
+measure: sum(commission_variance)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

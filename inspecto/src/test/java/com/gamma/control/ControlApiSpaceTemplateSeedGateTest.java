@@ -136,6 +136,7 @@ class ControlApiSpaceTemplateSeedGateTest {
             "telco-ra", "telco-ra-runbooks.md",
             "business-assurance", "business-assurance-runbooks.md",
             "telco-fraud", "telco-fraud-runbooks.md",
+            "mobile-money", "mobile-money-runbooks.md",
             "payment-fraud", "payment-fraud-runbooks.md");
 
     private static void seedAlertTemplate(Path root, String alertToon) throws Exception {

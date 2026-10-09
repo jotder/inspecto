@@ -1,0 +1,28 @@
+raw:
+  name: PARTNER_SETTLEMENT
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    line_id,"0",VARCHAR,"Settlement line identifier","","INTERNAL"
+    settle_date,"1",DATE,"Settlement day","","INTERNAL"
+    partner_id,"2",VARCHAR,"The biller / aggregator","","INTERNAL"
+    txn_ref,"3",VARCHAR,"The wallet transaction the partner credits","","INTERNAL"
+    amount,"4","DECIMAL(18,2)","Amount the partner credited","USD","INTERNAL"
+mapping:
+  canonicalName: partner_settlement
+  rawName: PARTNER_SETTLEMENT
+  fields[5]:
+    - name: line_id
+      from: line_id
+      fn: keep
+    - name: settle_date
+      from: settle_date
+      fn: keep
+    - name: partner_id
+      from: partner_id
+      fn: keep
+    - name: txn_ref
+      from: txn_ref
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
