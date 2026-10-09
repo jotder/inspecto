@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **53<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 37<!--count:backlog-p3--> × P3** —
+> ⬆ **52 → 53 (P3 36 → 37) on 2026-10-09**: filed P3 `RECON-PERF-RESIDUALS-1` — what the one-day, server-paged Reconciliation (`RECON-PERF-1`, shipped the same day; as-built in `okf/frontend/features/reconciliation.md`) left open.
 > ⬆ **51 → 52 (P2 15 → 16) on 2026-10-09**: filed `REACTOR-ROOT-WORKTREE-1` (a lane worktree under `.claude/worktrees/` makes the repo-wide scanner tests read the main checkout); `SCREENING-1` shipped its backend and review pane and stays open for its residuals and two operator calls. (`PACK-MOBILE-MONEY-1` closed the same day: 51 → 50.)
 > ⬆ **49 → 51 (P3 34 → 36) on 2026-10-09**: filed P3 `MEASURE-SQL-BIND-1` and `LA-FILTER-SQL-BIND-1` — the two remaining `ConditionSql.predicate()` callers big enough to need their own change (BI/Measure SQL, the Link Analysis filter port) after `DECISION-RULE-SQL-GUARD-1` moved the Decision Rule applier and Expectations to bound parameters; the AI `query` tool stays inline by design (its output is saved SQL text).
 > ⬇ **50 → 49 (P2 16 → 15) on 2026-10-09**: closed P2 `DECISION-RULE-SQL-GUARD-1` — a break-out probe (quotes, `;`, comments, `$$`, hostile field names, NUL, a quarantine path with `'`) found nothing escaping the old escaping; fixed anyway as defence in depth before the Decision Kernel shares the path: `DecisionRuleApplier` now runs every statement as a `PreparedStatement` over `ConditionSql.predicateBound` (operand and tag values are bound parameters, table names `SqlIdent.q`, the quarantine `COPY` copies a staging table). Also fixed: a `NaN`/`Infinity` operand rendered as a bare word and silently skipped the rule. As-built in `okf/backend/module-reorganisation-decisions.md`.
@@ -168,10 +169,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 53<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -383,6 +384,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 - **P3** · `MEASURE-SQL-BIND-1` — **BI / Measure SQL still renders `when` and `filters` values as escaped literals.** `MeasureCompiler.compile` returns one SQL string: the `when` tree goes through `ConditionSql.predicate()` and the flat `filters` (`filterTerm`) inline their own typed literals. Move it to SQL + bound parameters like the Decision Rule applier and Expectations (`ConditionSql.predicateBound`, `DECISION-RULE-SQL-GUARD-1`). Cost: ~12 call sites in four modules (`BiRoutes` incl. the composed `WITH` and the echoed SQL, `ShareRoutes`, `RiskScoreEvaluator`/`RiskScoreModel`, `ReportJob`, `MaterializeTask`, `RowShaper`, `KpiEvaluator`, `DatasetMeasureProbe`). Defence in depth, not a known hole: the path is read-only, sandboxed and `SqlGuard`-checked, and the 2026-10-09 break-out probe found the escaping sound. → `okf/backend/module-reorganisation-decisions.md`
+- **P3** · `RECON-PERF-RESIDUALS-1` — **what the one-day Reconciliation (`RECON-PERF-1`, operator 2026-10-09) left open.** (1) The day filter prunes no files when the temporal column is a plain column — all of a store's day files are still opened (measured: 30 files, first page 125 ms); only a hive partition column used as the temporal column lets DuckDB skip them, and `DatasetRelation` keeps `hive_partitioning` off by decision — needs its own call. (2) A day with more than 200,000 key groups is not cached and re-runs the grain join on every page. (3) Recording day D2 after D1 auto-closes D1's Breaks: the Break lifecycle is per Reconciliation, not per day — a per-day lifecycle is a design decision. (4) `/recon/breaks` and `/recon/rows` are day-scoped but neither sampled nor cached. (5) The live preview of the new Board/widget/Breaks page (tint contrast in both themes, the paginator) was not driven in a browser — only jsdom + axe; drive it on the demo Space. (6) `ReconStateStore` records do not carry the day they were seen on. → `okf/frontend/features/reconciliation.md` (One day at a time)
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,
 `trend-monitor` today. See [`okf/frontend/features/studio.md`](okf/frontend/features/studio.md).

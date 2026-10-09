@@ -3613,15 +3613,173 @@
     "/recon/run" : {
       "post" : {
         "tags" : [ "recon" ],
-        "summary" : "POST /recon/run (generated skeleton)",
+        "summary" : "One day of the Board: a page of grain rows + the day's exact totals and Break summary",
         "operationId" : "postReconRun",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "description" : "Stateless compute over a saved reconciliation (`id`) or an inline draft (`config`), scoped to ONE day (RECON-PERF-1, operator 2026-10-09). The day's comparison is computed once (one grain join; totals, pair summaries and the group count from one aggregate over it) and cached in memory per (spec, day, sample, input-file stamps), so a further page or filter of the same day is a cache read (`statistics.cached`). `totals` and `summary` cover the whole day whatever the page or filter.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "id" : {
+                    "type" : "string",
+                    "description" : "A saved reconciliation component."
+                  },
+                  "config" : {
+                    "type" : "object",
+                    "description" : "An inline reconciliation config."
+                  },
+                  "day" : {
+                    "type" : "string",
+                    "format" : "date",
+                    "description" : "The ONE day to compare (yyyy-mm-dd) of each Dataset's temporal column (columns[].role temporal, else dateField); absent = the latest day present on any side. A Dataset with no temporal column is a 422 (RECON-PERF-1, operator 2026-10-09)."
+                  },
+                  "limit" : {
+                    "type" : "integer",
+                    "minimum" : 1,
+                    "maximum" : 200,
+                    "default" : 50,
+                    "description" : "Page size."
+                  },
+                  "offset" : {
+                    "type" : "integer",
+                    "minimum" : 0,
+                    "default" : 0
+                  },
+                  "filter" : {
+                    "type" : "string",
+                    "enum" : [ "all", "breaks", "missing_a", "missing_b", "missing_c", "value_break" ],
+                    "default" : "all",
+                    "description" : "Which grain rows the page lists; missing_c only on a 3-way reconciliation."
+                  },
+                  "sample" : {
+                    "type" : "integer",
+                    "minimum" : 1,
+                    "maximum" : 100000,
+                    "description" : "Compare at most this many keys, chosen deterministically (hash of the key); reported in `sample`."
+                  }
+                }
+              }
+            }
           }
         },
-        "x-generated" : true
+        "responses" : {
+          "200" : {
+            "description" : "The page and the day.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "properties" : {
+                          "keyColumns" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "string"
+                            }
+                          },
+                          "measures" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "string"
+                            }
+                          },
+                          "day" : {
+                            "type" : "string",
+                            "format" : "date"
+                          },
+                          "availableDays" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "string",
+                              "format" : "date"
+                            },
+                            "description" : "Days present across the sides, newest first, at most 366."
+                          },
+                          "filter" : {
+                            "type" : "string"
+                          },
+                          "sample" : {
+                            "type" : [ "object", "null" ],
+                            "properties" : {
+                              "sampled" : {
+                                "type" : "boolean"
+                              },
+                              "size" : {
+                                "type" : "integer"
+                              },
+                              "keys" : {
+                                "type" : "integer"
+                              },
+                              "totalKeys" : {
+                                "type" : "integer"
+                              }
+                            }
+                          },
+                          "rows" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "object"
+                            }
+                          },
+                          "page" : {
+                            "type" : "object",
+                            "properties" : {
+                              "offset" : {
+                                "type" : "integer"
+                              },
+                              "limit" : {
+                                "type" : "integer"
+                              },
+                              "total" : {
+                                "type" : "integer"
+                              }
+                            }
+                          },
+                          "totals" : {
+                            "type" : "object"
+                          },
+                          "summary" : {
+                            "type" : "object"
+                          },
+                          "statistics" : {
+                            "type" : "object",
+                            "properties" : {
+                              "rowCount" : {
+                                "type" : "integer"
+                              },
+                              "elapsedMs" : {
+                                "type" : "integer"
+                              },
+                              "truncated" : {
+                                "type" : "boolean"
+                              },
+                              "cached" : {
+                                "type" : "boolean"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          }
+        }
       }
     },
     "/recon/breaks" : {
@@ -3666,6 +3824,11 @@
                   },
                   "offset" : {
                     "type" : "integer"
+                  },
+                  "day" : {
+                    "type" : "string",
+                    "format" : "date",
+                    "description" : "The ONE day to compare (yyyy-mm-dd) of each Dataset's temporal column (columns[].role temporal, else dateField); absent = the latest day present on any side. A Dataset with no temporal column is a 422 (RECON-PERF-1, operator 2026-10-09)."
                   }
                 }
               }
@@ -7871,7 +8034,43 @@
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }
         },
-        "x-generated" : true
+        "x-generated" : true,
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "id" : {
+                    "type" : "string"
+                  },
+                  "config" : {
+                    "type" : "object"
+                  },
+                  "key" : {
+                    "type" : "object",
+                    "additionalProperties" : {
+                      "type" : "string"
+                    }
+                  },
+                  "side" : {
+                    "type" : "string",
+                    "enum" : [ "b", "c" ]
+                  },
+                  "limit" : {
+                    "type" : "integer"
+                  },
+                  "day" : {
+                    "type" : "string",
+                    "format" : "date",
+                    "description" : "The ONE day to compare (yyyy-mm-dd) of each Dataset's temporal column (columns[].role temporal, else dateField); absent = the latest day present on any side. A Dataset with no temporal column is a 422 (RECON-PERF-1, operator 2026-10-09)."
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/expectations/breached-count" : {
@@ -9336,7 +9535,7 @@
         "tags" : [ "recon" ],
         "summary" : "POST /recon/{reconId}/record (generated skeleton)",
         "operationId" : "postReconByReconIdRecord",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision. Records ONE day (`day`, else the latest present) and answers the state plus the recorded `day` (RECON-PERF-1).",
         "parameters" : [ {
           "name" : "reconId",
           "in" : "path",
@@ -9350,7 +9549,24 @@
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }
         },
-        "x-generated" : true
+        "x-generated" : true,
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "day" : {
+                    "type" : "string",
+                    "format" : "date",
+                    "description" : "The ONE day to compare (yyyy-mm-dd) of each Dataset's temporal column (columns[].role temporal, else dateField); absent = the latest day present on any side. A Dataset with no temporal column is a 422 (RECON-PERF-1, operator 2026-10-09)."
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/recon/{reconId}/breaks/status" : {

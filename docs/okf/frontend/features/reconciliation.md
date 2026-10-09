@@ -1,9 +1,9 @@
 ---
 type: Feature
 title: Reconciliation
-description: Dataset-vs-Dataset (and 3-way) reconciliation — Board aggregate tree with banded Δ%, Breaks drill with live record sets, usable as a Widget.
+description: Dataset-vs-Dataset (and 3-way) reconciliation read one day at a time — a server-paged, band-tinted Board table with banded Δ%, Breaks drill with live record sets, usable as a Widget.
 resource: inspecto-ui/src/app/modules/admin/reconciliation/
-tags: [feature, reconciliation, breaks, board, tree-table, dat-7]
+tags: [feature, reconciliation, breaks, board, paging, dat-7, recon-perf-1]
 timestamp: 2026-07-16T00:00:00Z
 ---
 
@@ -17,6 +17,65 @@ timestamp: 2026-07-16T00:00:00Z
 > reports `features.reconciliation=false`, and `recon.run` is an unknown Job Type. The `reconciliation` config component kind
 > stays core — authoring is generic component CRUD; deleting the component deletes its run state through the module's
 > `ComponentDeleteHook`. The tests below moved with it (`features/inspecto-reconciliation/src/test`).
+
+**One day at a time** (`RECON-PERF-1`, **operator, 2026-10-09**). The 3-way ra_c01 Board was slow because every
+open compared each side's WHOLE store (no date predicate) in ~7 scans, returned up to 5,000 rows into one tree, showed
+"No saved Reconciliation" while in flight, and recorded up to 50k Breaks on every open. As built:
+
+* **Day scoping** (`ReconDay`): `/recon/run`, `/recon/breaks`, `/recon/rows` and `/recon/{id}/record` take `day`
+  (ISO); absent = the **latest** day present on any side. Each side's relation is filtered to that day of its
+  Dataset's temporal column — `columns[].role: temporal` (`DatasetRelation.temporalColumn`), else `dateField`. A DATE
+  column is compared bare, a TIMESTAMP as a half-open range (so Parquet row-group statistics can skip), anything else
+  through `TRY_CAST(… AS DATE)`. ⛔ **Decision: a Dataset with no temporal column is a 422 naming the fix**, not the
+  whole relation with `dayScoped:false` (operator, 2026-10-09 — fail-closed: an unscoped side would compare 30 days of
+  one system against one day of another and report every key as a Break). `availableDays` = the distinct days across
+  the sides, newest first, capped 366. A `day` that is not an ISO date is a 422 and is the only form that reaches SQL.
+* **One pass** (`ReconService.dayRun`): the grain FULL OUTER JOIN chain is materialised once as `__grain`, each row
+  classified by `__cls` bits (missing on A/B/C, value break, cardinality break); totals, every pair's summary and the
+  group count are ONE aggregate over it. ⚠ That is exact because each grouped side holds a key once, so every
+  anchor-relative pair reads off the chain, and per-side totals sum the per-key groups (counts COALESCE to 0 on an empty
+  side, as the old ungrouped totals did). `run(spec, limit)` now delegates to it, so the long-standing `ReconServiceTest`
+  run cases pin the merge.
+* **Server paging + filter**: `limit` 1..200 (default 50), `offset`, `filter` = `all | breaks | missing_a | missing_b |
+  missing_c | value_break` (`ReconService.filterMask` — one mask read by both the cached and the SQL page; `missing_c`
+  on a 2-way is a 422). Answer: `page{offset, limit, total}`, `day`, `availableDays`, `filter`, `sample`, and the whole
+  day's `totals`/`summary` — never the page's.
+* **Per-day cache** (`ReconDay.Cache`, 32 entries, LRU, in memory): key = sha-256 of the spec + every side's input-file
+  stamps (path, size, mtime from `DatasetRelation.inputFiles`) + day + sample. A changed file or config is a NEW key,
+  so stale entries are never read, only aged out; a view-backed/virtual Dataset or a store over 50,000 files is not
+  cached (it still runs). The day's rows are held when the day has ≤ 200,000 key groups; a bigger day pages in SQL on
+  every request (leftover). `statistics.cached` says which.
+* **Sample** (`sample` 1..100000, not saved): the union of every side's keys as text, `ORDER BY hash(keys), keys
+  LIMIT n`; each side becomes a NULL-safe semi-join on it. The answer says `sample{sampled, size, keys, totalKeys}` and
+  the Board shows a *Sampled* chip.
+* **Bands are saved config**: `bands: {okBelow, warnAbove}` (percent), validated `0 ≤ okBelow ≤ warnAbove ≤ 100` by
+  `ReconKindValidator` (a `ComponentKindValidator`, so the existing `canAuthorWorkbench` component writes 422 a bad
+  band; `ReconConfigLoader.bands` refuses it at run time too). The SPA keeps `{warnPct, breachPct}` internally and maps
+  at the service edge; absent = `DEFAULT_BANDS`.
+* **Record is day-scoped and explicit**: the Board no longer records on open; **Record run** records the selected day.
+  ⚠ Decision: the button is gated `canOperateRuns` — the route's existing server gate — not the author capability the
+  brief named, because an author without operate would only ever get a 403 (operator, 2026-10-09). Recording day D2
+  after D1 auto-closes D1's Breaks (the lifecycle is per Reconciliation, not per day — leftover). `recon.run` takes an
+  optional `day` parameter, else the latest.
+* **SPA**: `<inspecto-recon-toolbar>` (day limited to `availableDays`, filter, sample, band legend with thresholds,
+  author-only band editor) and `<inspecto-recon-grain-table>` (one page, `mat-paginator` 25/50/100/200) replace the
+  all-rows tree on the Board and widget; `ReconPageLoader` runs every request through `switchMap`, so a newer
+  day/page/filter cancels the one in flight. Day/page/filter/sample are URL query params on the Board and Breaks page,
+  component state in the widget — never saved. While a request runs a spinner says *"Comparing HLR, CRM and CBS for
+  2026-09-26…"*; the empty state is never shown in flight; an error offers Retry.
+* **Row tint, no RAG column** (operator, 2026-10-09): rows are tinted by band (ok / warn / breach, and a key missing
+  on a side) with the design-system status tones (`statusRowClasses`/`statusEdgeClasses`/`statusIconClasses` in
+  `status-badge.component.ts`, the sanctioned colour owner), never a status text column. Colour is not the only cue
+  (WCAG 1.4.1): a thin left edge, a shape icon whose tooltip names the band, and the band name as visually-hidden text
+  in the row's first cell. The Breaks page tints its data-table rows through the new `[rowClass]` input and puts the
+  glyph + hidden name in the Key cell (`bandKeyCell`).
+* **Measured** (`ReconPerfTest`, `RECON_PERF=1`; 30 days × 4,000 msisdns × 3 sides, one Parquet file per day, this
+  laptop): before — whole-store run 284–307 ms, record compute 391–410 ms (2,164 Breaks over all days), up to 4,000 rows
+  per answer. After — the merged one-pass whole-store run 131–133 ms; one day: resolve (days list) 93 ms, first page
+  125 ms, a further page from the cache 0.4 ms, sample of 1,000 keys 195 ms, record compute 297 ms (267 Breaks), 50 rows
+  per answer. ⚠ The day filter does not prune files when the temporal column is a plain column (all 30 files are still
+  opened); only a hive partition column used as the temporal column would let DuckDB skip them (leftover).
+* **Open residuals** are tracked as `RECON-PERF-RESIDUALS-1` in [`BACKLOG.md`](../../../BACKLOG.md).
 
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §7): a **Reconciliation** compares **Datasets** on key columns
@@ -154,7 +213,7 @@ resolving a Break was a config write that 403'd too. As built:
     for an identity-only one), `lastSeenAt = firstSeenAt`, `recurrences` 0, no assignee
     (`ReconStateStoreTest.aStateFileWithoutTheCountersLoadsWithDefaults`). Mutation-checked: dropping the
     recurrence increment or the return-to-assignee turns `ReconBreaksTest` red.
-  * **SPA** — the per-Break view is the **Breaks page**, not the Board (the Board is the aggregate tree and
+  * **SPA** — the per-Break view is the **Breaks page**, not the Board (the Board is one day's grain table and
     lists no Breaks). Every Break table there gains *Age* (server `ageDays`), *Seen* (`4 runs · recurred 1×`)
     and *Assignee* columns, and an **Assign** row action (`ReconAssignDialog`, pre-filled with the current
     assignee or the signed-in actor, trimmed, ≤ 200) shown only when `LensService.canOperateRuns()` — the
@@ -163,7 +222,7 @@ resolving a Break was a config write that 403'd too. As built:
     (the live Break is open again until a run records its return). The **Board**'s age strip adds
     *Assigned: N* and *Recurring: N* chips (`lifecycleCounts`, unresolved Breaks only). The status badge
     reads `assigned` as the info tone, like `open`.
-* **SPA** — the Board runs the display comparison, then `ReconApiService.record(id)` (a failure toasts
+* **SPA** — the Board's **Record run** button calls `ReconApiService.record(id, day)` (since RECON-PERF-1 it no longer records on open; a failure toasts
   *"This run was not recorded"* with the server's reason and falls back to `state(id)`); its aging strip reads
   the recorded state. The Breaks page reads `state(id)` and overlays status/note **and `firstSeenAt`** (it
   overlaid no stamp before, so every age read `—`); resolve/re-open calls `setBreakStatus`; Promote sends the
