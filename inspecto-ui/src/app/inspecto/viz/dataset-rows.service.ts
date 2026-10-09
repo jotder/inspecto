@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DbBrowserService, DbResult } from 'app/inspecto/api/db-browser.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
+import { isSharedRef } from 'app/inspecto/api/shared-ref';
 import { ColumnMeta, ColumnType, QueryModel, compileSql, dbColumnType } from 'app/inspecto/query';
 
 /**
@@ -36,7 +37,7 @@ export class DatasetRowsService {
         // issuing `GET /db/table?limit=1` with NO `name`, which 400s and leaves a column picker silently
         // empty with no clue why (BACKLOG MOCK-GONE-1(b)). The seam refuses rather than the caller,
         // because every consumer reaches the store through here.
-        if (!ds.sourceName?.trim())
+        if (!ds.sourceName?.trim() && !readsRelation(ds))
             return Promise.resolve({
                 rows: [],
                 columns: declaredColumns(ds),
@@ -162,16 +163,19 @@ export interface RowSourceRef {
     calculated?: readonly { name: string; expr: string }[];
     /** A virtual Dataset's saved SQL; with {@link id}, the page is read as its server-side relation. */
     sql?: string | null;
+    /** A bound Dataset's `shared/<owner>/<item>` ref — another space's store, resolved only server-side. */
+    physicalRef?: string | null;
 }
 
 /**
  * Read `ds` as its server-side relation rather than its raw store: a SAVED Dataset (it has an id the
  * server can resolve) that carries its virtual `sql` (the server evaluates exactly that text), or one with
- * calculated columns and no embedded Query Core model (that path compiles its own SQL over the store).
+ * calculated columns and no embedded Query Core model (that path compiles its own SQL over the store), or one
+ * bound to another space's share (`shared/<owner>/<item>` — no local store exists to name).
  */
 function readsRelation(ds: RowSourceRef): boolean {
     if (!ds.id) return false;
-    return !!ds.sql?.trim() || (!ds.query && !!ds.calculated?.length);
+    return isSharedRef(ds.physicalRef) || !!ds.sql?.trim() || (!ds.query && !!ds.calculated?.length);
 }
 
 /**

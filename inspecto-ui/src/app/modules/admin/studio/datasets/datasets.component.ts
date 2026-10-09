@@ -218,7 +218,9 @@ export class DatasetsComponent implements OnInit {
             .subscribe((r: BindSharedDatasetResult | undefined) => {
                 if (!r) return;
                 const ref = `shared/${r.owner}/${r.item}`;
-                this.api.save(buildDataset(r.name, 'physical', r.item, { physicalRef: ref })).subscribe({
+                // No sourceName: the item is the OWNER's store, not one in this space — a sourceName here
+                // sent every row read to `/db/table?name=<item>` locally ("no store '<item>'").
+                this.api.save(buildDataset(r.name, 'physical', '', { physicalRef: ref })).subscribe({
                     next: () => {
                         this.toastr.success(`Bound ${r.owner}/${r.item} as local dataset "${r.name}".`);
                         this.load();

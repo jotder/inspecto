@@ -167,6 +167,20 @@ describe('DatasetRowsService — a virtual Dataset authored as SQL (VIRTUAL-DATA
     });
 });
 
+describe('DatasetRowsService — a Dataset bound to another space’s share', () => {
+    it('reads its server relation — the shared item is not a store in this space', async () => {
+        const { svc, table, query, datasetRows } = setup();
+        const res = await svc.rows(
+            { id: 'football-data_team_performance', sourceName: '', physicalRef: 'shared/football-data/team_performance' },
+            50,
+        );
+        expect(datasetRows).toHaveBeenCalledWith('football-data_team_performance', 50);
+        expect(table).not.toHaveBeenCalled();
+        expect(query).not.toHaveBeenCalled();
+        expect(res.error).toBeUndefined();
+    });
+});
+
 describe('DatasetRowsService — a Dataset with no source', () => {
     // MOCK-GONE-1(b): a blank sourceName used to build `GET /db/table?limit=1` with NO `name`.
     it('refuses without a request, and says why instead of rendering an empty grid', async () => {
