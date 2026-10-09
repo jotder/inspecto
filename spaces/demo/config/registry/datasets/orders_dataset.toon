@@ -1,1 +1,2 @@
 physicalRef: orders
+dateField: ORDER_DATE

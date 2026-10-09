@@ -20,5 +20,5 @@ processing:
     reference: data/ref/region_dim.csv
     on[1]: REGION
   summarize:
-    group_by[1]: REGION
+    group_by[2]: REGION,ORDER_DATE
     measures[2]: count, "sum(GROSS)"

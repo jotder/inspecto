@@ -127,10 +127,13 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   `BILL_PERIOD || '-01'`) — monthly, unchanged expectations. mobile-money — `wallet_txn` `dateField: txn_ts`,
   `bank_statement` `dateField: value_ts` (`mm_bank_float` per day); `mm_partner_settlement` compares the new
   `wallet_txn_monthly` with `partner_settlement`, both dated by the month's first day, so a payment settled the next day
-  (the corpus' benign 9913) still matches — ⚠ a payment on the last day of a month settled on the 1st would now be two
-  Breaks. The git-excluded `spaces/telco-assurance` Reconciliations (ra_c01/c02/c15) were already dated.
-  ⚠ The tracked `spaces/demo` `orders_regional_recon` is undated and is now refused (its rollup side has no date) —
-  left open in the BACKLOG row.
+  (the corpus' benign 9913) still matches. ⛔ **Partner settlement stays MONTHLY (operator, 2026-10-09).** Accepted
+  artefact: a payment made on the last day of a month and settled on the 1st of the next shows as TWO Breaks — a
+  `missing_right` in the payment's month and a `missing_left` in the settlement's month. That is expected, not a
+  defect. The git-excluded `spaces/telco-assurance` Reconciliations (ra_c01/c02/c15) were already dated.
+  `spaces/demo` `orders_regional_recon` (operator, 2026-10-09): the `orders_enriched_rollup` pipeline now groups by
+  `REGION, ORDER_DATE`, and `orders_dataset`, `orders_enriched_dataset` and `orders_rollup_dataset` all carry
+  `dateField: ORDER_DATE`, so all three sides are dated.
 * **Open residuals** are tracked as `RECON-PERF-RESIDUALS-1` in [`BACKLOG.md`](../../../BACKLOG.md).
 
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked
