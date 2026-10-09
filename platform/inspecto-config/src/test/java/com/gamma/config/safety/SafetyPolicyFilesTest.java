@@ -34,13 +34,7 @@ class SafetyPolicyFilesTest {
     }
 
     private static void write(Path dir, String text) throws IOException {
-        Path f = dir.resolve(SafetyPolicyFiles.FILE);
-        // The parsed-file cache is keyed on (mtime ms, size): a same-size rewrite inside one mtime tick would
-        // read as unchanged, so every rewrite is stamped strictly later than the file it replaces.
-        java.nio.file.attribute.FileTime before = Files.exists(f) ? Files.getLastModifiedTime(f) : null;
-        Files.writeString(f, text);
-        if (before != null && Files.getLastModifiedTime(f).compareTo(before) <= 0)
-            Files.setLastModifiedTime(f, java.nio.file.attribute.FileTime.fromMillis(before.toMillis() + 1000));
+        Files.writeString(dir.resolve(SafetyPolicyFiles.FILE), text);
     }
 
     private SafetyPolicyTier eff(Path server, Path base, String id) {
@@ -196,6 +190,25 @@ class SafetyPolicyFilesTest {
             assertEquals(4, seen[1]);
             assertEquals(1, SafetyPolicy.defaultPolicy().maxThreads());   // the NEXT run applies the tightened file
         }
+    }
+
+    /**
+     * The cause of the intermittent CI failure of the test above: a same-length edit inside one mtime tick
+     * (coarse on Linux) left (mtime, size) unchanged and the stale policy was served. Pinning the old mtime
+     * makes that deterministic on every OS.
+     */
+    @Test
+    void aSameLengthEditWithAnUnchangedMtimeIsStillSeen() throws IOException {
+        Path base = spaceBase("s1");
+        DiscoveredRoots.register("default", base);
+        Path cfg = base.resolve("config");
+        write(cfg, "caps:\n  max_threads: 4\n");
+        Path file = cfg.resolve(SafetyPolicyFiles.FILE);
+        var mtime = Files.getLastModifiedTime(file);
+        assertEquals(4, SafetyPolicy.defaultPolicy().maxThreads());
+        write(cfg, "caps:\n  max_threads: 1\n");
+        Files.setLastModifiedTime(file, mtime);
+        assertEquals(1, SafetyPolicy.defaultPolicy().maxThreads());
     }
 
     @Test
