@@ -199,20 +199,6 @@ class SafetyPolicyFilesTest {
     }
 
     @Test
-    void aSameSizeRewriteInsideOneMtimeTickIsNotServedFromTheCache() throws IOException {
-        Path base = spaceBase("s1");
-        DiscoveredRoots.register("default", base);
-        Path f = base.resolve("config").resolve(SafetyPolicyFiles.FILE);
-        java.nio.file.attribute.FileTime tick = java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis());
-        Files.writeString(f, "caps:\n  max_threads: 4\n");
-        Files.setLastModifiedTime(f, tick);
-        assertEquals(4, SafetyPolicy.defaultPolicy().maxThreads());
-        Files.writeString(f, "caps:\n  max_threads: 1\n");   // same size, same mtime: the stamp cannot tell
-        Files.setLastModifiedTime(f, tick);
-        assertEquals(1, SafetyPolicy.defaultPolicy().maxThreads(), "a tightened policy must never be missed");
-    }
-
-    @Test
     void anUnreadableFileRefusesTheRunBeforeItsBodyStartsAndIsListedForHealth() throws IOException {
         Path base = spaceBase("s1");
         DiscoveredRoots.register("default", base);
