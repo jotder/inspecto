@@ -453,7 +453,24 @@
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }
         },
-        "x-generated" : true
+        "x-generated" : true,
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "day" : {
+                    "type" : "string",
+                    "format" : "date",
+                    "description" : "The day the Break is of (per-day lifecycle, operator 2026-10-09); absent = an undated Break recorded before it."
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

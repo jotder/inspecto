@@ -54,9 +54,19 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   at the service edge; absent = `DEFAULT_BANDS`.
 * **Record is day-scoped and explicit**: the Board no longer records on open; **Record run** records the selected day.
   ⚠ Decision: the button is gated `canOperateRuns` — the route's existing server gate — not the author capability the
-  brief named, because an author without operate would only ever get a 403 (operator, 2026-10-09). Recording day D2
-  after D1 auto-closes D1's Breaks (the lifecycle is per Reconciliation, not per day — leftover). `recon.run` takes an
-  optional `day` parameter, else the latest.
+  brief named, because an author without operate would only ever get a 403 (operator, 2026-10-09). `recon.run` takes
+  an optional `day` parameter, else the latest, and records that day only.
+* **Per-day Break lifecycle** (operator, 2026-10-09): every recorded Break carries its `day`, and the lifecycle id is
+  `day|pair|type|key|column` (`ReconBreaks.lifecycleId(day, …)`; the SPA's `lifecycleId()` renders the same string).
+  `ReconStateStore.record(id, fresh, runAt, day)` merges ONLY with that day's recorded Breaks — every other day's are
+  carried untouched, never opened, updated or auto-closed. `POST /recon/{id}/breaks/status` takes `day` (ISO, else
+  422). **Migration:** a Break recorded before this has no day; it reads as *undated*, keeps its old id (a dated id
+  starts with a date, an undated one with its pair, so they never collide), and is never auto-closed by a dated
+  record. The Breaks page stamps its live Breaks with the selected day, overlays that day's record, and falls back to
+  an undated record of the same identity. Pinned by `ControlApiReconDayTest.recordingOneDayNeverTouchesAnotherDaysBreaks`
+  (before the change, recording D1 auto-closed every D2 Break) — mutation-checked (merging every day, and an id
+  without the day, both turn it red). ⚠ The state now holds every day's Breaks: `MAX_BREAKS` caps one run, not the
+  file.
 * **SPA**: `<inspecto-recon-toolbar>` (day limited to `availableDays`, filter, sample, band legend with thresholds,
   author-only band editor) and `<inspecto-recon-grain-table>` (one page, `mat-paginator` 25/50/100/200) replace the
   all-rows tree on the Board and widget; `ReconPageLoader` runs every request through `switchMap`, so a newer

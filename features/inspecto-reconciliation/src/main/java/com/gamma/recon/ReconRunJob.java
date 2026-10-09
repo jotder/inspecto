@@ -125,7 +125,7 @@ public final class ReconRunJob implements Job {
         ctx.signals().emit("recon.run.completed", breaks > 0 ? Severity.WARN : Severity.INFO, payload);
         ctx.log().info("reconciliation complete", "reconciliation", reconId, "breaks", breaks);
         if (breaks > 0) openIncident(ctx, reconId, missingLeft, missingRight, valueBreak, breaks);
-        String notRecorded = fresh == null ? computeError : recordRun(ctx, writeRoot, reconId, fresh);
+        String notRecorded = fresh == null ? computeError : recordRun(ctx, writeRoot, reconId, fresh, scoped.day());
 
         return JobResult.ok("recon.run '" + reconId + "' " + scoped.day() + ": " + breaks + " break(s) ("
                 + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)"
@@ -141,9 +141,10 @@ public final class ReconRunJob implements Job {
      * Record this run into the Reconciliation's state (R2-03). Returns {@code null} when recorded, else the
      * reason it was not — best-effort, like {@link #openIncident}, but never silent.
      */
-    private static String recordRun(JobContext ctx, Path writeRoot, String reconId, List<ReconBreaks.Break> fresh) {
+    private static String recordRun(JobContext ctx, Path writeRoot, String reconId, List<ReconBreaks.Break> fresh,
+                                    String day) {
         try {
-            new ReconStateStore(writeRoot).record(reconId, fresh, ReconStateStore.now());
+            new ReconStateStore(writeRoot).record(reconId, fresh, ReconStateStore.now(), day);   // its day only
             return null;
         } catch (Exception e) {
             ctx.log().warn("could not record the reconciliation run", "reconciliation", reconId, "error", e.getMessage());

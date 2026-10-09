@@ -519,7 +519,7 @@ public final class ReconRoutes implements RouteModule {
         }
         try {
             String runAt = ReconStateStore.now();
-            Map<String, Object> out = new LinkedHashMap<>(store.record(id, fresh, runAt).toWire(Instant.parse(runAt)));
+            Map<String, Object> out = new LinkedHashMap<>(store.record(id, fresh, runAt, scoped.day()).toWire(Instant.parse(runAt)));
             out.put("day", scoped.day());
             return out;
         } catch (SecurityException jail) {
@@ -571,6 +571,15 @@ public final class ReconRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "assignee is longer than " + MAX_ASSIGNEE + " characters");
         String note = ApiContext.str(b, "note");
         note = note == null ? null : note.trim();
+        // The day the Break is of (RECON-PERF-1, per-day lifecycle); absent = an undated Break recorded before it.
+        String day = ApiContext.str(b, "day");
+        if (day != null) {
+            try {
+                day = ReconDay.isoDay(day.trim());
+            } catch (IllegalArgumentException bad) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            }
+        }
         if (note != null && note.length() > MAX_NOTE)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "note is longer than " + MAX_NOTE + " characters");
         Map<String, Object> config = component(new ComponentStore(writeRoot.resolve("registry")), "reconciliation", id)
@@ -580,7 +589,7 @@ public final class ReconRoutes implements RouteModule {
                     + "' compares two Datasets — it has no A vs C Breaks");
         ReconBreaks.Break updated;
         try {
-            updated = new ReconStateStore(writeRoot).setStatus(id, pair, type, key, column, status, note, assignee);
+            updated = new ReconStateStore(writeRoot).setStatus(id, day, pair, type, key, column, status, note, assignee);
         } catch (IllegalArgumentException full) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, full.getMessage());
         } catch (SecurityException jail) {

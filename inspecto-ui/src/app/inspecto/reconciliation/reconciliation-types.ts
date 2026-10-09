@@ -56,6 +56,11 @@ export interface ReconBreak {
      * before pairs existed was an A-vs-B one (the server applies the same rule to its state file).
      */
     pair?: ReconPair;
+    /**
+     * The day this Break is of (RECON-PERF-1, per-day lifecycle — operator 2026-10-09): part of its recorded
+     * identity, so the same Break on two days is two records. Absent = an undated Break recorded before it.
+     */
+    day?: string;
     key: string;
     /**
      * The key as the server spelled it — one value per key column — so a follow-up call (the raw rows
@@ -324,7 +329,8 @@ export function pairOf(b: Pick<ReconBreak, 'pair'>): ReconPair {
  * ⚠ The Incident dedupe grain stays {@link breakId} (no pair) — promotions are keyed by that, not this.
  */
 export function lifecycleId(b: ReconBreak): string {
-    return `${escPart(pairOf(b))}|${breakId(b)}`;
+    const undated = `${escPart(pairOf(b))}|${breakId(b)}`;
+    return b.day ? `${escPart(b.day)}|${undated}` : undated;
 }
 
 /** True when `left` and `right` agree within the column's tolerance (non-numeric ⇒ exact string compare). */

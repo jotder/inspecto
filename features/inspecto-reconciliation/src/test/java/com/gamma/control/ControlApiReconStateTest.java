@@ -216,7 +216,7 @@ class ControlApiReconStateTest {
             assertEquals(200, send(c, "POST", "/spaces/s1/recon/orders_recon/record", null).statusCode());
 
             HttpResponse<String> r = send(c, "POST", "/spaces/s1/recon/orders_recon/breaks/status",
-                    "{\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"resolved\",\"note\":\"  FX  \"}");
+                    "{\"day\":\"2026-09-26\",\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"resolved\",\"note\":\"  FX  \"}");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode b = V1Body.of(r.body()).get("break");
             assertEquals("resolved", b.get("status").asText());
@@ -227,13 +227,13 @@ class ControlApiReconStateTest {
             assertEquals(2, afterRun.get("runs").asInt());
 
             JsonNode reopened = V1Body.of(send(c, "POST", "/spaces/s1/recon/orders_recon/breaks/status",
-                    "{\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"open\"}").body()).get("break");
+                    "{\"day\":\"2026-09-26\",\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"open\"}").body()).get("break");
             assertEquals("open", reopened.get("status").asText());
             assertNull(reopened.get("note"), "a re-open without a note clears it");
 
             // a Break no run has recorded yet is appended identity-only
             JsonNode appended = V1Body.of(send(c, "POST", "/spaces/s1/recon/orders_recon/breaks/status",
-                    "{\"type\":\"missing_left\",\"key\":\"NEW · sms\",\"status\":\"resolved\"}").body()).get("break");
+                    "{\"day\":\"2026-09-26\",\"type\":\"missing_left\",\"key\":\"NEW · sms\",\"status\":\"resolved\"}").body()).get("break");
             assertEquals("resolved", appended.get("status").asText());
             JsonNode state = V1Body.of(send(c, "GET", "/spaces/s1/recon/orders_recon/state", null).body());
             assertNotNull(find(state, "NEW · sms"));
@@ -304,7 +304,7 @@ class ControlApiReconStateTest {
             writeState(c, "orders_recon", 1, List.of(rec("missing_left", "LATAM · voice", null, "open", null)));
             String url = "/spaces/s1/recon/orders_recon/breaks/status";
             HttpResponse<String> r = send(c, "POST", url,
-                    "{\"type\":\"missing_left\",\"key\":\"LATAM · voice\",\"status\":\"assigned\",\"assignee\":\" dana \"}");
+                    "{\"day\":\"2026-09-26\",\"type\":\"missing_left\",\"key\":\"LATAM · voice\",\"status\":\"assigned\",\"assignee\":\" dana \"}");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode b = V1Body.of(r.body()).get("break");
             assertEquals("assigned", b.get("status").asText());
@@ -312,7 +312,7 @@ class ControlApiReconStateTest {
             assertTrue(b.has("ageDays"), "an assigned Break is unresolved, so it ages");
 
             assertEquals(200, send(c, "POST", url,
-                    "{\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"assigned\",\"assignee\":\"lee\"}").statusCode());
+                    "{\"day\":\"2026-09-26\",\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"assigned\",\"assignee\":\"lee\"}").statusCode());
             JsonNode s = V1Body.of(send(c, "POST", "/spaces/s1/recon/orders_recon/record", null).body());
             JsonNode kept = find(s, "EU · data");
             assertEquals("assigned", kept.get("status").asText(), "an assignment persists across a run");
@@ -344,7 +344,7 @@ class ControlApiReconStateTest {
         try (Ctx c = open(root)) {
             Authenticators.forTest(SEED_ROLES);
             String url = "/spaces/s1/recon/orders_recon/breaks/status";
-            String assign = "{\"type\":\"missing_left\",\"key\":\"APAC · sms\",\"status\":\"assigned\",\"assignee\":\"dana\"}";
+            String assign = "{\"day\":\"2026-09-26\",\"type\":\"missing_left\",\"key\":\"APAC · sms\",\"status\":\"assigned\",\"assignee\":\"dana\"}";
             assertEquals(401, send(c, "POST", url, assign).statusCode(), "no credential");
             assertEquals(403, send(c, "POST", url, assign, "Authorization", "Bearer developer").statusCode());
             assertFalse(Files.exists(c.config.resolve("recon-state").resolve("orders_recon.json")), "a refusal writes nothing");
@@ -465,7 +465,7 @@ class ControlApiReconStateTest {
         try (Ctx c = open(root)) {
             assertEquals(200, send(c, "POST", "/spaces/s1/recon/sim_recon/record", null).statusCode());
             HttpResponse<String> r = send(c, "POST", "/spaces/s1/recon/sim_recon/breaks/status",
-                    "{\"pair\":\"AC\",\"type\":\"value_break\",\"key\":\"m2\",\"column\":\"active_flag\",\"status\":\"resolved\",\"note\":\"CBS lags\"}");
+                    "{\"day\":\"2026-09-26\",\"pair\":\"AC\",\"type\":\"value_break\",\"key\":\"m2\",\"column\":\"active_flag\",\"status\":\"resolved\",\"note\":\"CBS lags\"}");
             assertEquals(200, r.statusCode(), r.body());
             assertEquals("AC", V1Body.of(r.body()).get("break").get("pair").asText());
 
@@ -607,7 +607,7 @@ class ControlApiReconStateTest {
             assertTrue(Roles.SEED.get("operations").capabilities().contains(Roles.CAN_OPERATE_RUNS));
             assertFalse(Roles.SEED.get("operations").capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH));
             assertFalse(Roles.SEED.get("developer").capabilities().contains(Roles.CAN_OPERATE_RUNS));
-            String status = "{\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"resolved\"}";
+            String status = "{\"day\":\"2026-09-26\",\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"resolved\"}";
 
             assertEquals(401, send(c, "POST", "/spaces/s1/recon/orders_recon/record", null).statusCode(), "no credential");
             HttpResponse<String> denied = send(c, "POST", "/spaces/s1/recon/orders_recon/record", null,
@@ -671,6 +671,9 @@ class ControlApiReconStateTest {
 
     // ── helpers ─────────────────────────────────────────────────────────────────
 
+    /** Every seeded store row is of this day, so a record (no day ⇒ the latest) records it. */
+    private static final String DAY = "2026-09-26";
+
     private static Map<String, Object> rec(String type, String key, String column, String status, String note) {
         Map<String, Object> b = new LinkedHashMap<>();
         b.put("key", key);
@@ -679,6 +682,7 @@ class ControlApiReconStateTest {
         b.put("status", status);
         if (note != null) b.put("note", note);
         b.put("firstSeenAt", OLD);
+        b.put("day", DAY);   // the fixture's one day (per-day lifecycle, operator 2026-10-09)
         return b;
     }
 

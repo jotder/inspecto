@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -269,7 +270,8 @@ export class ReconciliationDetailComponent implements OnInit {
         const live = this.liveBreaks() ?? [];
         const persisted = this.persistedById();
         return live.map((b) => {
-            const p = persisted.get(lifecycleId(b));
+            // the Break's own day first; an undated record (written before the per-day lifecycle) still overlays
+            const p = persisted.get(lifecycleId(b)) ?? persisted.get(lifecycleId({ ...b, day: undefined }));
             if (!p) return b;
             const aged: ReconBreak = {
                 ...b,
@@ -686,14 +688,16 @@ export class ReconciliationDetailComponent implements OnInit {
     }
 
     /** The day picker's list and the effective day — one row of the (server-cached) Board run for this day. */
-    private loadDays(r: Reconciliation): void {
-        this.exec.page(r, { day: this.day(), offset: 0, limit: 1, filter: 'all' }).subscribe({
-            next: (res) => {
-                this.availableDays.set(res.availableDays ?? []);
-                if (!this.day() && res.day) this.day.set(res.day);
-            },
-            error: () => undefined,
-        });
+    private async loadDays(r: Reconciliation): Promise<void> {
+        try {
+            const res = await firstValueFrom(
+                this.exec.page(r, { day: this.day(), offset: 0, limit: 1, filter: 'all' }),
+            );
+            this.availableDays.set(res.availableDays ?? []);
+            if (!this.day() && res.day) this.day.set(res.day);
+        } catch {
+            // the picker stays empty; the Breaks still compute (for the latest day, server-side)
+        }
     }
 
     /** Move to another day: the URL keeps it (view state, never saved) and the Breaks recompute. */
@@ -725,11 +729,14 @@ export class ReconciliationDetailComponent implements OnInit {
         this.computing.set(true);
         const side = this.side();
         try {
-            this.loadDays(r);
+            // The Breaks are of ONE day and carry it (per-day lifecycle), so learn the latest day before computing.
+            if (this.day()) void this.loadDays(r);
+            else await this.loadDays(r);
             const sets = await this.exec.breaks(r, this.path(), null, side, this.day());
             // Tagged with the pair they were computed on — the recorded state holds both pairs of a 3-way.
             const pair = side === 'c' ? 'AC' : 'AB';
-            this.liveBreaks.set(breaksFromSets(r, sets).map((b) => ({ ...b, pair })));
+            const day = this.day() ?? undefined;
+            this.liveBreaks.set(breaksFromSets(r, sets).map((b) => ({ ...b, pair, ...(day ? { day } : {}) })));
             this.impacts.set(breakImpacts(r, sets));
             this.dupImpacts.set(duplicateImpacts(r, sets));
             this.lastEvaluated.set(new Date());

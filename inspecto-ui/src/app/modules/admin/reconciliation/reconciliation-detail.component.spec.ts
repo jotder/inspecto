@@ -303,6 +303,34 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         expect(html).toContain('<span class="sr-only">Breach: </span>EU · data');
     });
 
+    it('per-day lifecycle: live Breaks carry the day, overlay only that day, and an undated record still overlays', async () => {
+        const { c, setBreakStatus } = await create({
+            breaks: [
+                // another day's resolution must NOT overlay today's Break
+                {
+                    day: '2026-09-25',
+                    pair: 'AB',
+                    key: 'EU · data',
+                    type: 'value_break',
+                    column: 'amount',
+                    status: 'resolved',
+                },
+                // an undated record (before the per-day lifecycle) keeps working
+                { pair: 'AB', key: 'MEA · voice', type: 'missing_right', status: 'resolved' },
+            ],
+        });
+        const vb = c.valueBreaks()[0];
+        expect(vb.day).toBe('2026-09-26');
+        expect(vb.status).toBe('open');
+        expect(c.missingA()[0].status).toBe('resolved');
+        await c.toggleResolve(vb);
+        expect(setBreakStatus).toHaveBeenCalledWith(
+            'med_vs_bill',
+            expect.objectContaining({ day: '2026-09-26' }),
+            'resolved',
+        );
+    });
+
     it('scopes to the Board dimension path from ?path=', async () => {
         const { c, breaks } = await create({ path: 'region:EU' });
         expect(breaks).toHaveBeenCalledWith(expect.anything(), { region: 'EU' }, null, 'b', '2026-09-26');
@@ -464,6 +492,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
                     firstSeenAt: abSeen,
                 },
                 {
+                    day: '2026-09-26',
                     pair: 'AC',
                     key: 'EU · data',
                     type: 'value_break',

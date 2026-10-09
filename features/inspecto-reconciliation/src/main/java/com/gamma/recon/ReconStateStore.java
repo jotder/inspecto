@@ -97,10 +97,27 @@ public final class ReconStateStore {
      * {@code lastRunAt = runAt}, count the run, write atomically. Returns the new state.
      */
     public State record(String reconciliationId, List<ReconBreaks.Break> fresh, String runAt) throws IOException {
+        return record(reconciliationId, fresh, runAt, null);
+    }
+
+    /**
+     * Record a run of ONE day (operator, 2026-10-09): {@code fresh} is stamped with {@code day} and merged ONLY with
+     * the recorded Breaks of that same day — another day's Breaks, and the undated ones recorded before
+     * RECON-PERF-1, are carried untouched (never opened, updated or auto-closed by it). {@code day == null} records
+     * undated, merging with the undated Breaks alone.
+     */
+    public State record(String reconciliationId, List<ReconBreaks.Break> fresh, String runAt, String day) throws IOException {
         synchronized (LOCK) {
             State prev = load(reconciliationId);
-            State next = new State(reconciliationId, runAt, prev.runs() + 1,
-                    ReconBreaks.merge(prev.breaks(), fresh, runAt));
+            List<ReconBreaks.Break> sameDay = new ArrayList<>();
+            List<ReconBreaks.Break> otherDays = new ArrayList<>();
+            for (ReconBreaks.Break b : prev.breaks())
+                (java.util.Objects.equals(b.day(), day) ? sameDay : otherDays).add(b);
+            List<ReconBreaks.Break> dated = new ArrayList<>(fresh.size());
+            for (ReconBreaks.Break b : fresh) dated.add(b.withDay(day));
+            List<ReconBreaks.Break> merged = new ArrayList<>(ReconBreaks.merge(sameDay, dated, runAt));
+            merged.addAll(otherDays);
+            State next = new State(reconciliationId, runAt, prev.runs() + 1, merged);
             save(next);
             return next;
         }
@@ -119,9 +136,15 @@ public final class ReconStateStore {
      */
     public ReconBreaks.Break setStatus(String reconciliationId, String pair, String type, String key, String column,
                                        String status, String note, String assignee) throws IOException {
+        return setStatus(reconciliationId, null, pair, type, key, column, status, note, assignee);
+    }
+
+    /** {@link #setStatus(String, String, String, String, String, String, String, String)} on ONE day's Break ({@code day == null} = undated). */
+    public ReconBreaks.Break setStatus(String reconciliationId, String day, String pair, String type, String key, String column,
+                                       String status, String note, String assignee) throws IOException {
         synchronized (LOCK) {
             State prev = load(reconciliationId);
-            String id = ReconBreaks.lifecycleId(pair, type, key, column);
+            String id = ReconBreaks.lifecycleId(day, pair, type, key, column);
             List<ReconBreaks.Break> breaks = new ArrayList<>(prev.breaks().size() + 1);
             ReconBreaks.Break updated = null;
             for (ReconBreaks.Break b : prev.breaks()) {
@@ -136,7 +159,7 @@ public final class ReconStateStore {
                     throw new IllegalArgumentException("reconciliation '" + reconciliationId + "' already records "
                             + MAX_BREAKS + " Breaks — record a run before changing a Break it has not seen");
                 updated = ReconBreaks.Break.identityOnly(pair, type, key, column, status, note,
-                        assigneeAfter(status, null, assignee));
+                        assigneeAfter(status, null, assignee)).withDay(day);
                 breaks.add(updated);
             }
             save(new State(reconciliationId, prev.lastRunAt(), prev.runs(), breaks));

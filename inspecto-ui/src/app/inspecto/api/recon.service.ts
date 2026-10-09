@@ -229,7 +229,7 @@ export class ReconApiService {
      */
     setBreakStatus(
         reconciliation: string,
-        b: Pick<ReconBreak, 'pair' | 'type' | 'key' | 'column'>,
+        b: Pick<ReconBreak, 'pair' | 'type' | 'key' | 'column' | 'day'>,
         status: 'resolved' | 'open' | 'assigned',
         note?: string | null,
         assignee?: string | null,
@@ -238,6 +238,7 @@ export class ReconApiService {
             apiUrl(`/recon/${encodeURIComponent(reconciliation)}/breaks/status`),
             {
                 pair: b.pair ?? 'AB',
+                ...(b.day ? { day: b.day } : {}),
                 type: b.type,
                 key: b.key,
                 ...(b.column ? { column: b.column } : {}),

@@ -105,13 +105,13 @@ public final class ReconBreaks {
     public record Break(String pair, String key, Map<String, Object> keyValues, String type, String column,
                         Object leftValue, Object rightValue, Double diff, String status, String note,
                         String firstSeenAt, String lastSeenAt, int occurrences, int recurrences, String assignee,
-                        int absentRuns) {
+                        int absentRuns, String day) {
 
         /** A fresh, {@code open} Break carrying no note and no stamp. */
         static Break fresh(String key, Map<String, Object> keyValues, String type, String column,
                            Object leftValue, Object rightValue, Double diff) {
             return new Break(PAIR_AB, key, keyValues, type, column, leftValue, rightValue, diff, OPEN, null, null,
-                    null, 0, 0, null, 0);
+                    null, 0, 0, null, 0, null);
         }
 
         /**
@@ -120,46 +120,52 @@ public final class ReconBreaks {
          */
         public static Break identityOnly(String pair, String type, String key, String column, String status, String note,
                                          String assignee) {
-            return new Break(pair, key, null, type, column, null, null, null, status, note, null, null, 0, 0, assignee, 0);
+            return new Break(pair, key, null, type, column, null, null, null, status, note, null, null, 0, 0, assignee, 0, null);
         }
 
-        /** {@link ReconBreaks#lifecycleId} of this Break — pair included. */
+        /** {@link ReconBreaks#lifecycleId} of this Break — pair and (when dated) day included. */
         public String id() {
-            return lifecycleId(pair, type, key, column);
+            return lifecycleId(day, pair, type, key, column);
+        }
+
+        /** This Break as seen on {@code newDay} (ISO; {@code null} = undated, the pre-RECON-PERF-1 shape). */
+        public Break withDay(String newDay) {
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt,
+                    lastSeenAt, occurrences, recurrences, assignee, absentRuns, newDay);
         }
 
         /** This Break on {@code newPair}. */
         public Break withPair(String newPair) {
             return new Break(newPair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt,
-                    lastSeenAt, occurrences, recurrences, assignee, absentRuns);
+                    lastSeenAt, occurrences, recurrences, assignee, absentRuns, day);
         }
 
         /** This Break with a new status and note; the assignee is kept (see {@link #withAssignee}). */
         public Break withStatus(String newStatus, String newNote) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, newStatus, newNote, firstSeenAt,
-                    lastSeenAt, occurrences, recurrences, assignee, absentRuns);
+                    lastSeenAt, occurrences, recurrences, assignee, absentRuns, day);
         }
 
         public Break withAssignee(String newAssignee) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt,
-                    lastSeenAt, occurrences, recurrences, newAssignee, absentRuns);
+                    lastSeenAt, occurrences, recurrences, newAssignee, absentRuns, day);
         }
 
         Break withFirstSeenAt(String stamp) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, stamp,
-                    lastSeenAt, occurrences, recurrences, assignee, absentRuns);
+                    lastSeenAt, occurrences, recurrences, assignee, absentRuns, day);
         }
 
         /** This Break as seen on the run at {@code runAt}: first/last sighting and the two counters; present, so never absent. */
         Break sighted(String first, String runAt, int occurrenceCount, int recurrenceCount) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, first,
-                    runAt, occurrenceCount, recurrenceCount, assignee, 0);
+                    runAt, occurrenceCount, recurrenceCount, assignee, 0, day);
         }
 
         /** This Break {@code auto_closed} after {@code runs} consecutive recorded runs without it. */
         Break absentFor(int runs) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, AUTO_CLOSED, note, firstSeenAt,
-                    lastSeenAt, occurrences, recurrences, assignee, runs);
+                    lastSeenAt, occurrences, recurrences, assignee, runs, day);
         }
 
         /**
@@ -196,6 +202,7 @@ public final class ReconBreaks {
             m.put("recurrences", recurrences);
             if (assignee != null) m.put("assignee", assignee);
             if (absentRuns > 0) m.put("absentRuns", absentRuns);
+            if (day != null) m.put("day", day);
             return m;
         }
 
@@ -236,7 +243,7 @@ public final class ReconBreaks {
             return new Break(pair, key, kv instanceof Map<?, ?> km ? new LinkedHashMap<>((Map<String, Object>) km) : null,
                     type, str(m.get("column")), m.get("leftValue"), m.get("rightValue"),
                     diff instanceof Number n ? n.doubleValue() : null, status, str(m.get("note")),
-                    first, last, occurrences, recurrences, str(m.get("assignee")), absentRuns);
+                    first, last, occurrences, recurrences, str(m.get("assignee")), absentRuns, str(m.get("day")));
         }
 
         private static String str(Object v) {
@@ -268,6 +275,18 @@ public final class ReconBreaks {
      */
     public static String lifecycleId(String pair, String type, String key, String column) {
         return esc(pair) + '|' + identity(type, key, column);
+    }
+
+    /**
+     * The PER-DAY lifecycle identity (operator, 2026-10-09): {@code day|pair|type|key|column}, so the same Break on
+     * two days is two records that open, age and auto-close independently. An undated Break ({@code day == null},
+     * recorded before RECON-PERF-1) keeps its old {@link #lifecycleId(String, String, String, String)} — a dated id
+     * starts with a date and an undated one with its pair, so the two can never collide. The SPA renders the
+     * byte-identical value.
+     */
+    public static String lifecycleId(String day, String pair, String type, String key, String column) {
+        String undated = lifecycleId(pair, type, key, column);
+        return day == null ? undated : esc(day) + '|' + undated;
     }
 
     private static String esc(String part) {

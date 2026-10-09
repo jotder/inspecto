@@ -293,6 +293,46 @@ class ControlApiReconDayTest {
         }
     }
 
+    // ── per-day Break lifecycle (operator, 2026-10-09) ──────────────────────────────
+
+    @Test
+    void recordingOneDayNeverTouchesAnotherDaysBreaks(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            // an UNDATED Break, as a state file written before the per-day lifecycle holds it
+            new com.gamma.recon.ReconStateStore(root.resolve("s1").resolve("config")).record("two_way",
+                    List.of(com.gamma.recon.ReconBreaks.Break.identityOnly("AB", "missing_left", "legacy", null, "open", null, null)),
+                    "2026-09-01T00:00:00Z");
+
+            HttpResponse<String> d2 = post(c.port, "/spaces/s1/recon/two_way/record", "{\"day\":\"" + D2 + "\"}");
+            assertEquals(200, d2.statusCode(), d2.body());
+            // D1 compares clean: before the per-day lifecycle this run AUTO-CLOSED every D2 Break (the negative probe)
+            HttpResponse<String> d1 = post(c.port, "/spaces/s1/recon/two_way/record", "{\"day\":\"" + D1 + "\"}");
+            assertEquals(200, d1.statusCode(), d1.body());
+            Map<String, String> byKey = new java.util.TreeMap<>();
+            for (JsonNode b : V1Body.of(d1.body()).get("breaks"))
+                byKey.put(b.path("day").asText("undated") + ":" + b.get("key").asText(), b.get("status").asText());
+            assertEquals(Map.of(D2 + ":m2", "open", D2 + ":m3", "open", D2 + ":m6", "open", "undated:legacy", "open"), byKey,
+                    "D2's Breaks and the undated one stay open after recording D1");
+
+            // the same key on two days is two records: resolving D2's m3 leaves D1's m3 alone
+            assertEquals(200, post(c.port, "/spaces/s1/recon/two_way/breaks/status",
+                    "{\"day\":\"" + D1 + "\",\"type\":\"missing_right\",\"key\":\"m3\",\"status\":\"open\",\"note\":\"d1\"}").statusCode());
+            HttpResponse<String> st = post(c.port, "/spaces/s1/recon/two_way/breaks/status",
+                    "{\"day\":\"" + D2 + "\",\"type\":\"missing_right\",\"key\":\"m3\",\"status\":\"resolved\"}");
+            assertEquals(200, st.statusCode(), st.body());
+            assertEquals(D2, V1Body.of(st.body()).get("break").get("day").asText());
+            JsonNode state = V1Body.of(client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                    + "/api/v1/spaces/s1/recon/two_way/state")).GET().build(), BodyHandlers.ofString()).body());
+            Map<String, String> m3 = new java.util.TreeMap<>();
+            for (JsonNode b : state.get("breaks"))
+                if ("m3".equals(b.get("key").asText())) m3.put(b.path("day").asText(), b.get("status").asText());
+            assertEquals(Map.of(D1, "open", D2, "resolved"), m3);
+            HttpResponse<String> bad = post(c.port, "/spaces/s1/recon/two_way/breaks/status",
+                    "{\"day\":\"tomorrow\",\"type\":\"missing_right\",\"key\":\"m3\",\"status\":\"resolved\"}");
+            assertEquals(422, bad.statusCode(), bad.body());
+        }
+    }
+
     // ── bands ──────────────────────────────────────────────────────────────────────
 
     @Test
