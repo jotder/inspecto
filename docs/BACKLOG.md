@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **53<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 35<!--count:backlog-p3--> × P3** —
+> ⬇ **53 → 52 (P3 36 → 35) on 2026-10-09**: closed `DRYRUN-SILENT-CAST-1` — values a declared type nulls (row KEPT, run still SUCCESS, counted as `cast_failures`) are now shown: a warning on run detail's Batches tab, a `castFailures` count + warning on *Run to here*, and a per-map-Step warning on the dry-run (the same `DataTransformer.countCastFailures` a real ingest uses, via a `CsvSettings` overload).
 > ⬇ **58 → 53 (P3 41 → 36) on 2026-10-09**: closed four of the six UI-test findings — `BOOTSTRAP-EDITION-ENTERPRISE-1` (`/bootstrap` reports `enterprise` when an `AccessDecider` is installed), `DECISION-RULES-ACTIONS-PIN-1` (Actions column pinned), `INCIDENT-COMMANDER-TWO-FIELDS-1` (the postmortem Incident Commander defaults to the assignee the header calls Commander), `DRYRUN-SAMPLE-SEED-1` (a sample missing a column the Steps read is named in plain words; the captured-sample button already seeds real rows); withdrew `INCIDENT-CREATE-NEEDS-ENTITY-1` as filed in error (the dialog already explains where the first linked object comes from — recorded decision `CASE-FIRST-OBJECT-DEAD-END-1`). `DRYRUN-SILENT-CAST-1` stays open with its cause verified.
 > ⬆ **52 → 58 (P3 35 → 41) on 2026-10-09**: filed six P3 findings from the Enterprise demo UI test — `DRYRUN-SAMPLE-SEED-1`, `DRYRUN-SILENT-CAST-1`, `DECISION-RULES-ACTIONS-PIN-1`, `BOOTSTRAP-EDITION-ENTERPRISE-1`, `INCIDENT-CREATE-NEEDS-ENTITY-1`, `INCIDENT-COMMANDER-TWO-FIELDS-1`.
 > ⬇ **54 → 52 (P3 37 → 35) on 2026-10-09**: closed P3 `MODULE-REORG-REVIEW-1` (c) — the six EDITIONS cells (SP-ACQ-09 Kafka, SP-PRS-06 ASN.1, CP-10 Reconciliation, JOB-05 Risk Scores, CP-11 Case Management, CP-16 Action Requests) re-confirmed against the generated matrix, `tools/offering-classpath.mjs` (Personal 16 jars, none of the six modules) and the 2026-10-08 Personal boot proof (`/bootstrap` ops, cases, actionRequests, scoring, reconciliation all false); no cell needed a fix. Closed P3 `MODULE-REORG-D-MR2` (a DONE record row; the layout lives in `okf/backend/module-taxonomy.md`). Dropped the stale `.claude/launch.json` note from `MODULE-REORG-P3-THIN-JARS` (both `inspecto-geolink*` entries already equal the Professional classpath minus oidc/secrets/geo-country).
@@ -163,10 +164,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 35<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 53<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 35<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -293,7 +294,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Step catalog & node types
 
 - **P3** · **Step Processor catalog** — ✅ **The 2026-09-23 hold on new Step Processors was LIFTED (operator, 2026-10-06)** — the operator named `transform.analytics.running` first (delivered 2026-10-06 as `transform.running`); `sink.file.excel` was also named and DELIVERED 2026-10-06 as `sink.excel`. Build the next one only when the operator names it. 119 processors: **40**<!--count:processors-delivered--> delivered / **18**<!--count:processors-partial--> partial / 61 planned (`processor-catalog.contract.json`). Each partial is its own product decision (Kafka consumer, XPath grammar, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email sinks…) — pick one by name. ⚠ A catalog entry is a `BuiltinNodeType` case compiled by `RecipeCompiler`/`ProcessorCatalog`, **not** the `ConsignmentProcessor` SPI; the namespace is `transform.*`; a new node type needs a flat-config home too; and both contract JSONs under `inspecto-ui/` are generated from Java and must be regenerated in the same change. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
-- **P3** · `DRYRUN-SILENT-CAST-1` — **values a declared type nulls are counted but never shown: a run that blanked data reports SUCCESS.** Settled 2026-10-09 with a real ingest of `csv_example` (3 rows, one `AMOUNT: not-a-number` declared DOUBLE): the row is KEPT with `AMOUNT = NULL`, `rejected_rows = 0`, status `SUCCESS`, and the batch audit records `cast_failures = 1` (`ConsignmentAuditWriter`, `IngestOutcome.castFailures`: "values a declared type coercion silently nulled while the row was KEPT"). The dry-run behaves the same (`RowShaper` plain `TRY_CAST`) but does not count it. Gap: no Control API run/batch view and no SPA screen exposes `cast_failures` (only the status CSV and the assistant's operational tables carry it). Fix: expose it on the run/batch API, show it on Runs / run detail as a warning, and make the dry-run report it as a warning. (found driving the Enterprise demo bundle, 2026-10-09)
 
 ### 3.2 Pipelines — execution, lanes & Consignments
 
