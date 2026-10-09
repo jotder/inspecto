@@ -93,6 +93,19 @@ public interface ObjectAccess {
      */
     boolean transition(String objectId, String action, String actor);
 
+    /**
+     * Merge {@code attributes} over an object's stored attribute bag and audit the write as an
+     * {@code OBJECT_ACTIVITY} event whose {@code action} is {@code what}, naming {@code actor}. {@code false}
+     * when no such object exists or the implementation cannot write attributes (the default) — never a throw,
+     * so a caller updating a possibly-stale id is not disturbed by it.
+     *
+     * <p>Added for {@link IncidentAccess#openOrUpdateIncident}: a re-run whose findings changed refreshes the
+     * active Incident instead of being suppressed as its duplicate (KPI residual 10).
+     */
+    default boolean saveAttributes(String objectId, Map<String, String> attributes, String actor, String what) {
+        return false;
+    }
+
     /** Relate two objects — {@code relationship} is the {@code LinkRelationship} name, e.g. {@code
      *  "ESCALATED_FROM"} (the enum is module vocabulary). Used by alert→incident promotion. */
     void link(String fromId, String toId, String relationship, String actor);

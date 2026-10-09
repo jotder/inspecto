@@ -66,6 +66,13 @@ public final class ObjectServiceAccess implements ObjectAccess {
     }
 
     @Override
+    public boolean saveAttributes(String objectId, Map<String, String> attributes, String actor, String what) {
+        if (service.get(objectId).isEmpty()) return false;
+        service.saveAttributes(objectId, attributes, actor, what);
+        return true;
+    }
+
+    @Override
     public Map<String, String> activeAttributeIndex(ObjectType kind, String scope, String attribute) {
         // ⚠ service.active(...) is the SAME not-terminal filter hasActiveMatching above relies on — that
         // shared call is what keeps this read from disagreeing with the dedupe that guards the write.

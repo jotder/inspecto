@@ -83,4 +83,38 @@ class IncidentAccessTest {
         assertTrue(incidents.openIncident("t", "m", "error", "orders",
                 Map.of("rule", "r1"), "rule").isPresent(), "a terminal incident is out of the convention");
     }
+
+    @Test
+    void openOrUpdateMergesChangedFindingsIntoTheActiveIncident() {
+        // KPI residual 10: a same-day re-run with different findings updates the Pipeline-day Incident.
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        IncidentAccess incidents = IncidentAccess.over(objects::access);
+        String id = incidents.openOrUpdateIncident("t", "m", "WARNING", "cdr",
+                Map.of("pipelineDay", "cdr@2026-08-09", "missingFiles", "3"), "pipelineDay").orElseThrow();
+
+        assertTrue(incidents.openOrUpdateIncident("t", "m", "WARNING", "cdr",
+                Map.of("pipelineDay", "cdr@2026-08-09", "missingFiles", "3"), "pipelineDay").isEmpty(),
+                "unchanged findings stay suppressed");
+        assertEquals(Optional.of(id), incidents.openOrUpdateIncident("t", "m", "WARNING", "cdr",
+                Map.of("pipelineDay", "cdr@2026-08-09", "missingFiles", "5"), "pipelineDay"));
+        assertEquals("5", objects.get(id).orElseThrow().attributes().get("missingFiles"));
+        assertEquals(1, objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).size());
+
+        // negative probe: openIncident keeps its suppress-only contract — it must not write the change.
+        assertTrue(incidents.openIncident("t", "m", "WARNING", "cdr",
+                Map.of("pipelineDay", "cdr@2026-08-09", "missingFiles", "9"), "pipelineDay").isEmpty());
+        assertEquals("5", objects.get(id).orElseThrow().attributes().get("missingFiles"));
+    }
+
+    @Test
+    void openOrUpdateOpensWhenNoActiveIncidentCarriesTheKey() {
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        IncidentAccess incidents = IncidentAccess.over(objects::access);
+        String a = incidents.openOrUpdateIncident("t", "m", "WARNING", "cdr",
+                Map.of("pipelineDay", "cdr@2026-08-09"), "pipelineDay").orElseThrow();
+        String b = incidents.openOrUpdateIncident("t", "m", "WARNING", "cdr",
+                Map.of("pipelineDay", "cdr@2026-08-10"), "pipelineDay").orElseThrow();
+        assertNotEquals(a, b, "another day is another Incident, never an update of the first");
+        assertEquals("cdr@2026-08-09", objects.get(a).orElseThrow().attributes().get("pipelineDay"));
+    }
 }

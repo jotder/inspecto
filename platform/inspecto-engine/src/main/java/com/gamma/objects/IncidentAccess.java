@@ -44,6 +44,24 @@ public interface IncidentAccess {
                                   String dedupeAttribute);
 
     /**
+     * As {@link #openIncident}, except that when an active Incident already carries the same
+     * {@code dedupeAttribute} value and any of {@code attributes} differ from its stored values, those
+     * attributes are merged into it (audited as an {@code OBJECT_ACTIVITY} {@code findings-updated} event by
+     * actor {@code system}) instead of being suppressed. Unchanged findings are still suppressed. The title and
+     * message of the existing Incident are not rewritten — only its attribute bag.
+     *
+     * <p>The default only opens, so a recording stand-in (dry run, pack harness) keeps its open-only contract.
+     *
+     * @return the opened or updated Incident's id; empty when suppressed (unchanged, or under a dry run)
+     * @since 4.0.0
+     */
+    default Optional<String> openOrUpdateIncident(String title, String message, String severity,
+                                                  String scope, Map<String, String> attributes,
+                                                  String dedupeAttribute) {
+        return openIncident(title, message, severity, scope, attributes, dedupeAttribute);
+    }
+
+    /**
      * The production implementation over the {@link ObjectAccess} seam, resolved lazily so boot wiring can
      * register the service before the Object Engine is constructed.
      *
@@ -52,19 +70,45 @@ public interface IncidentAccess {
      * methods, so none of it has to travel with the domain.
      */
     static IncidentAccess over(Supplier<ObjectAccess> objects) {
-        return (title, message, severity, scope, attributes, dedupeAttribute) -> {
-            ObjectAccess svc = objects.get();
-            // ⚠ No dedupe VALUE means no dedupe — never a match. `Objects.equals(null, null)` is true, so
-            // comparing an absent key against another Incident that also lacks it made two unrelated
-            // Incidents in the same scope look like duplicates and SILENTLY swallowed the second. Nothing in
-            // this contract obliges a caller to put `dedupeAttribute` in `attributes`, and the engine's own
-            // two callers only avoid it by always populating "rule". An extra Incident an operator can close
-            // beats an Incident that never opened.
-            String key = dedupeAttribute == null ? null : attributes.get(dedupeAttribute);
-            boolean active = key != null && !key.isBlank()
-                    && svc.hasActiveMatching(ObjectType.INCIDENT, scope, Map.of(dedupeAttribute, key));
-            if (active) return Optional.empty();
-            return Optional.of(svc.open(ObjectType.INCIDENT, title, message, severity, scope, attributes));
+        return new IncidentAccess() {
+            @Override
+            public Optional<String> openIncident(String title, String message, String severity, String scope,
+                                                 Map<String, String> attributes, String dedupeAttribute) {
+                ObjectAccess svc = objects.get();
+                // ⚠ No dedupe VALUE means no dedupe — never a match. `Objects.equals(null, null)` is true, so
+                // comparing an absent key against another Incident that also lacks it made two unrelated
+                // Incidents in the same scope look like duplicates and SILENTLY swallowed the second. Nothing in
+                // this contract obliges a caller to put `dedupeAttribute` in `attributes`, and the engine's own
+                // two callers only avoid it by always populating "rule". An extra Incident an operator can close
+                // beats an Incident that never opened.
+                String key = dedupeKey(attributes, dedupeAttribute);
+                boolean active = key != null
+                        && svc.hasActiveMatching(ObjectType.INCIDENT, scope, Map.of(dedupeAttribute, key));
+                if (active) return Optional.empty();
+                return Optional.of(svc.open(ObjectType.INCIDENT, title, message, severity, scope, attributes));
+            }
+
+            @Override
+            public Optional<String> openOrUpdateIncident(String title, String message, String severity, String scope,
+                                                         Map<String, String> attributes, String dedupeAttribute) {
+                ObjectAccess svc = objects.get();
+                String key = dedupeKey(attributes, dedupeAttribute);
+                String existing = key == null ? null
+                        : svc.activeAttributeIndex(ObjectType.INCIDENT, scope, dedupeAttribute).get(key);
+                if (existing == null) return openIncident(title, message, severity, scope, attributes, dedupeAttribute);
+                Object stored = svc.summary(existing).map(m -> m.get("attributes")).orElse(Map.of());
+                Map<?, ?> current = stored instanceof Map<?, ?> m ? m : Map.of();
+                boolean changed = attributes.entrySet().stream()
+                        .anyMatch(e -> !java.util.Objects.equals(e.getValue(), current.get(e.getKey())));
+                if (!changed) return Optional.empty();
+                return svc.saveAttributes(existing, attributes, "system", "findings-updated")
+                        ? Optional.of(existing) : Optional.empty();
+            }
         };
+    }
+
+    private static String dedupeKey(Map<String, String> attributes, String dedupeAttribute) {
+        String key = dedupeAttribute == null ? null : attributes.get(dedupeAttribute);
+        return key == null || key.isBlank() ? null : key;
     }
 }

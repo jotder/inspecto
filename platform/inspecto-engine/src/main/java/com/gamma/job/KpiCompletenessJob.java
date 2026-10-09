@@ -160,8 +160,8 @@ final class KpiCompletenessJob implements Job {
     /**
      * ONE Incident per Pipeline-day (operator, 2026-10-06, §7-g): scope = the pipeline id, deduped centrally by
      * {@link IncidentAccess} on {@code pipelineDay} = {@code <pipeline>@<day>}, carrying both halves' findings.
-     * ⚠ {@code IncidentAccess} has no update: a later run the same day whose findings differ is suppressed as
-     * the duplicate. An absent grant leaves the run signal-only; a dry run opens nothing.
+     * A later run the same day whose findings differ updates that Incident's attributes (audited); identical
+     * findings are suppressed. An absent grant leaves the run signal-only; a dry run opens nothing.
      */
     private static void openIncident(JobContext ctx, String pipeline, String recordDay, VolumeBaseline.Assessment a,
                                      boolean volumeBreach, FileSequenceGaps.Report gaps) {
@@ -191,7 +191,7 @@ final class KpiCompletenessJob implements Job {
         }
         String what = volumeBreach && gaps != null && gaps.hasGaps() ? "volume and files"
                 : volumeBreach ? "volume below baseline" : "missing files";
-        incidents.get().openIncident("Completeness: " + pipeline + " " + recordDay + " — " + what,
+        incidents.get().openOrUpdateIncident("Completeness: " + pipeline + " " + recordDay + " — " + what,
                 msg.toString(), "WARNING", pipeline, attrs, "pipelineDay");
     }
 
