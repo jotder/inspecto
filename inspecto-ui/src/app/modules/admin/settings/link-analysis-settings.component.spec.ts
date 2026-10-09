@@ -181,6 +181,76 @@ describe('LinkAnalysisSettingsComponent', () => {
         expect(el.textContent).toContain('drafts.expireAfterDays must be longer than hibernation');
     });
 
+    describe('Working Set size limit (maxSetBytes)', () => {
+        const SET = { maxSetBytes: null, maxSetBytesInForce: 67108864 };
+
+        it('is hidden when the server does not report the key', () => {
+            expect(setup().el.textContent).not.toContain('Working Set size limit');
+        });
+
+        it('shows the value in force in MiB with the 413 hint (a11y)', async () => {
+            const { el } = setup({ served: SET });
+            expect(el.textContent).toContain('Working Set size limit (bytes)');
+            expect(el.textContent).toContain('In force: 64 MiB (67108864 bytes)');
+            expect(el.textContent).toContain('refused with 413');
+            await expectNoA11yViolations(el);
+        });
+
+        it('saves an edited limit and a blank one (null = inherit), and a save never erases a stated one', () => {
+            const { c, api, submit } = setup({ served: { maxSetBytes: 1048576, maxSetBytesInForce: 1048576 } });
+            expect(c.form.controls.maxSetBytes.value).toBe(1048576);
+            submit();
+            expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ maxSetBytes: 1048576 }));
+            c.form.controls.maxSetBytes.setValue(2048);
+            submit();
+            expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ maxSetBytes: 2048 }));
+            c.form.controls.maxSetBytes.setValue(null);
+            submit();
+            expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ maxSetBytes: null }));
+        });
+
+        it('does not send the key when the server did not report it', () => {
+            const { api, submit } = setup();
+            submit();
+            expect(api.save.mock.calls[0][0]).not.toHaveProperty('maxSetBytes');
+        });
+
+        it.each([1023, 1073741825, 1.5])('refuses %s client-side, with the error tied to the field, and does not save', (bad) => {
+            const { c, el, api, fixture, submit } = setup({ served: SET });
+            c.form.controls.maxSetBytes.setValue(bad);
+            submit();
+            fixture.detectChanges();
+            expect(api.save).not.toHaveBeenCalled();
+            const input = el.querySelector<HTMLInputElement>('input[formcontrolname="maxSetBytes"]')!;
+            const described = (input.getAttribute('aria-describedby') ?? '').split(' ');
+            const error = el.querySelector('mat-error');
+            expect(error?.textContent).toContain('from 1024 (1 KiB) to 1073741824 (1 GiB)');
+            expect(described).toContain(error!.id);
+        });
+
+        it('accepts the bounds 1024 and 1073741824', () => {
+            const { c, api, submit } = setup({ served: SET });
+            c.form.controls.maxSetBytes.setValue(1024);
+            submit();
+            c.form.controls.maxSetBytes.setValue(1073741824);
+            submit();
+            expect(api.save).toHaveBeenCalledTimes(2);
+        });
+
+        it("shows the server's 422 in its words", () => {
+            const msg = 'maxSetBytes must be 1024..1073741824 (1 KiB..1 GiB), got 5';
+            const { el, submit } = setup({
+                served: SET,
+                save: () =>
+                    throwError(
+                        () => new HttpErrorResponse({ status: 422, error: { error: { message: msg } } }),
+                    ),
+            });
+            submit();
+            expect(el.textContent).toContain(msg);
+        });
+    });
+
     it('is read only without the authoring capability', () => {
         const { el } = setup({ canEdit: false });
         expect(el.querySelector('button[type="submit"]')).toBeNull();
