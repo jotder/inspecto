@@ -199,6 +199,27 @@ class ReconRunJobTest {
                 .filter(o -> o.kind() == com.gamma.workflow.ObjectType.INCIDENT).count();
     }
 
+    /** Operator 2026-10-09: no whole-period fallback — an undated Reconciliation fails the run, naming the fix. */
+    @Test
+    void anUndatedReconciliationFailsTheRunNamingTheFix(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        Path dataDir = dir.resolve("data");
+        seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0)");
+        seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0)");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
+        store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
+        store.write("reconciliation", "undated", Map.of("datasets", List.of("a_ds", "b_ds"),
+                "keyColumns", List.of("region", "product"), "compareColumns", List.of(Map.of("column", "amount"))));
+        System.setProperty("assist.write.root", writeRoot.toString());
+        JobConfig cfg = new JobConfig("r", "recon.run", null, null, true, false, Map.of("reconciliation", "undated"), null, null);
+        CapturingContext ctx = new CapturingContext(Map.of("reconciliation", "undated"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new ReconRunJob(cfg, dataDir.toString(), () -> null).run(ctx));
+        assertTrue(e.getMessage().contains("'a_ds' has no date column") && e.getMessage().contains("role: temporal"), e.getMessage());
+        assertNull(ctx.type.get(), "no Signal for a run that compared nothing");
+    }
+
     @Test
     void unknownReconciliationFailsClosed(@TempDir Path dir) throws Exception {
         System.setProperty("assist.write.root", dir.resolve("cfg").toString());

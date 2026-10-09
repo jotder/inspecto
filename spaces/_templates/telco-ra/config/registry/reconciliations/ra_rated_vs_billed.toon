@@ -1,5 +1,5 @@
 name: ra_rated_vs_billed
-leftDataset: rated_usage_dataset
+leftDataset: rated_usage_monthly_dataset
 rightDataset: billed_invoice_dataset
 keyColumns[1]: SUBSCRIBER_ID
 includeRecordCount: false

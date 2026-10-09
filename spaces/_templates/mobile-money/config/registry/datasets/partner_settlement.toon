@@ -1,1 +1,4 @@
 physicalRef: partner_settlement/database
+dateField: period_start
+calculated[1]{name,expr}:
+  period_start,"CAST(date_trunc('month', settle_date) AS DATE)"

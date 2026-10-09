@@ -1,1 +1,2 @@
 physicalRef: bank_statement/database
+dateField: value_ts

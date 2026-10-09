@@ -1,1 +1,2 @@
 physicalRef: wallet_txn/database
+dateField: txn_ts

@@ -1,1 +1,2 @@
 physicalRef: mediated_xdr/database
+dateField: EVENT_DATE

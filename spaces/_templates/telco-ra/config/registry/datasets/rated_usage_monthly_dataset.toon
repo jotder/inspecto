@@ -1,0 +1,4 @@
+physicalRef: rated_usage/database
+dateField: BILL_PERIOD_START
+calculated[1]{name,expr}:
+  BILL_PERIOD_START,"CAST(date_trunc('month', EVENT_DATE) AS DATE)"

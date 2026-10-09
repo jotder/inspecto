@@ -175,17 +175,19 @@ class ControlApiReconDayTest {
     }
 
     @Test
-    void noSideWithADayColumnComparesTheWholeRelationsAndSaysSo(@TempDir Path root) throws Exception {
+    void noSideWithADayColumnIsRefusedToo(@TempDir Path root) throws Exception {
+        // Operator 2026-10-09, reversing the whole-period fallback: before this an all-undated Reconciliation
+        // answered 200 with dayScoped:false over every row of both stores.
         try (Ctx c = open(root)) {
-            JsonNode r = run(c, "{\"id\":\"whole_period\"}");
-            assertFalse(r.get("dayScoped").asBoolean());
-            assertTrue(r.get("day").isNull());
-            assertEquals(0, r.get("availableDays").size());
-            assertEquals(11, r.get("totals").get("b").get("__records").asInt(), "every day of CRM (D1 6 + D2 5): unscoped");
-            HttpResponse<String> withDay = post(c.port, "/spaces/s1/recon/run", "{\"id\":\"whole_period\",\"day\":\"" + D2 + "\"}");
-            assertEquals(422, withDay.statusCode(), "a day cannot be read where no side has one: " + withDay.body());
-            // and the dated reconciliations say they are day-scoped
-            assertTrue(run(c, "{\"id\":\"two_way\"}").get("dayScoped").asBoolean());
+            for (String body : List.of("{\"id\":\"whole_period\"}", "{\"id\":\"whole_period\",\"day\":\"" + D2 + "\"}")) {
+                HttpResponse<String> r = post(c.port, "/spaces/s1/recon/run", body);
+                assertEquals(422, r.statusCode(), body + " -> " + r.body());
+                assertTrue(r.body().contains("undated_ds") && r.body().contains("no date column")
+                        && r.body().contains("role: temporal") && r.body().contains("dateField"), r.body());
+            }
+            for (String route : List.of("/spaces/s1/recon/breaks", "/spaces/s1/recon/whole_period/record"))
+                assertEquals(422, post(c.port, route, route.endsWith("record") ? "" : "{\"id\":\"whole_period\"}").statusCode(), route);
+            assertFalse(run(c, "{\"id\":\"two_way\"}").has("dayScoped"), "no dayScoped flag any more");
         }
     }
 

@@ -26,13 +26,16 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   (ISO); absent = the **latest** day present on any side. Each side's relation is filtered to that day of its
   Dataset's temporal column — `columns[].role: temporal` (`DatasetRelation.temporalColumn`), else `dateField`. A DATE
   column is compared bare, a TIMESTAMP as a half-open range (so Parquet row-group statistics can skip), anything else
-  through `TRY_CAST(… AS DATE)`. ⛔ **Decision (operator, 2026-10-09, revised the same day):** when SOME sides declare a
-  day column and another does not, that side is a **422 naming the fix** (an unscoped side would compare 30 days of one
-  system against one day of another and report every key as a Break); when **NO** side declares one, the whole
-  relations are compared and the answer says **`dayScoped: false`** (`day` null, `availableDays` empty; a `day` then is
-  a 422). The first cut refused every undated Reconciliation; the full gate showed the committed telco-ra and
-  mobile-money templates are whole-period Reconciliations (rated-vs-billed compares a month's invoices), so the
-  all-undated case became the explicit unscoped answer instead. `availableDays` = the distinct days across
+  through `TRY_CAST(… AS DATE)`. ⛔ **Decision (operator, 2026-10-09, final): every side must be dated.** A side whose
+  Dataset declares no temporal column is a **422** — *"Dataset 'X' has no date column; mark one 'role: temporal' in
+  its columns or set its dateField"* — whether the other sides are dated or not, on every route, and a `recon.run` Job
+  fails with the same message. There is **no whole-period fallback and no `dayScoped` flag**: this REVERSES the same
+  day's interim answer (`7a4ce0465`: all-undated compared the whole relations as `dayScoped:false`, Board label "Whole
+  period"), which existed only because the telco-ra and mobile-money templates were undated. Those templates are now
+  dated instead (below). A **monthly** comparison stays monthly by dating BOTH sides with their period's first day (a
+  calculated `…_PERIOD_START` column, `dateField` on it): the one "day" (e.g. 2026-07-01) then holds the whole month,
+  and each day still compares only that day's rows. `recon.run` takes `day` from a trigger argument, else its config
+  `day`, else the latest. `availableDays` = the distinct days across
   the sides, newest first, capped 366. A `day` that is not an ISO date is a 422 and is the only form that reaches SQL.
 * **One pass** (`ReconService.dayRun`): the grain FULL OUTER JOIN chain is materialised once as `__grain`, each row
   classified by `__cls` bits (missing on A/B/C, value break, cardinality break); totals, every pair's summary and the
@@ -117,6 +120,17 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   WHOLE, whatever their status — an open Break 91 days back is gone (setting its status later re-appends it
   identity-only). Then a file cap, `MAX_STATE_BREAKS` = 4 × `MAX_BREAKS` = 200,000: the oldest days go whole until
   the file fits. The day just recorded and the undated (pre-RECON-PERF-1) Breaks are never dropped.
+* **Shipped templates, dated** (operator, 2026-10-09): telco-ra — `switch_xdr`, `mediated_xdr`, `rated_usage` Datasets
+  `dateField: EVENT_DATE` (`ra_xdr_completeness` is per day; its golden test runs the Job once per corpus day and
+  checks the union, since no xDR spans two days); `ra_rated_vs_billed` compares the new `rated_usage_monthly_dataset`
+  (`BILL_PERIOD_START = date_trunc('month', EVENT_DATE)`) with `billed_invoice_dataset` (`BILL_PERIOD_START` from
+  `BILL_PERIOD || '-01'`) — monthly, unchanged expectations. mobile-money — `wallet_txn` `dateField: txn_ts`,
+  `bank_statement` `dateField: value_ts` (`mm_bank_float` per day); `mm_partner_settlement` compares the new
+  `wallet_txn_monthly` with `partner_settlement`, both dated by the month's first day, so a payment settled the next day
+  (the corpus' benign 9913) still matches — ⚠ a payment on the last day of a month settled on the 1st would now be two
+  Breaks. The git-excluded `spaces/telco-assurance` Reconciliations (ra_c01/c02/c15) were already dated.
+  ⚠ The tracked `spaces/demo` `orders_regional_recon` is undated and is now refused (its rollup side has no date) —
+  left open in the BACKLOG row.
 * **Open residuals** are tracked as `RECON-PERF-RESIDUALS-1` in [`BACKLOG.md`](../../../BACKLOG.md).
 
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked

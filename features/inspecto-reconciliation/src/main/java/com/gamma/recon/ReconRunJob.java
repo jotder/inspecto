@@ -90,10 +90,13 @@ public final class ReconRunJob implements Job {
         java.util.function.Function<String, Map<String, Object>> datasetFor = dsId -> store.get("dataset", dsId)
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + dsId + "'"));
-        // ONE day, like the Board (RECON-PERF-1, operator 2026-10-09): the Job's `day` parameter, else the latest
-        // day present on any side.
+        // ONE day, like the Board (RECON-PERF-1, operator 2026-10-09): a trigger's `day` argument, else the Job's
+        // `day` parameter, else the latest day present on any side. An undated Reconciliation fails the run here,
+        // naming the Dataset and the fix (no whole-period fallback - operator, 2026-10-09).
+        String day = ctx.params() == null ? null : ctx.params().get("day");
+        if (day == null || day.isBlank()) day = cfg.opt("day", null);
         ReconDay.Scoped scoped = ReconDay.resolve(config, datasetFor,
-                dsId -> DatasetRelation.relationSql(datasetFor.apply(dsId), dataRoot, views), dataRoot, cfg.opt("day", null));
+                dsId -> DatasetRelation.relationSql(datasetFor.apply(dsId), dataRoot, views), dataRoot, day);
         ReconService.Spec spec = scoped.spec();
 
         Map<String, Object> summary = ReconService.dayRun(spec, 0, 0, 0, 0, 0).day().summary();
@@ -116,7 +119,7 @@ public final class ReconRunJob implements Job {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("reconciliation", reconId);
-        if (scoped.day() != null) payload.put("day", scoped.day());   // a Signal payload holds no nulls
+        payload.put("day", scoped.day());
         payload.put("missingLeft", missingLeft);
         payload.put("missingRight", missingRight);
         payload.put("valueBreak", valueBreak);
@@ -127,7 +130,7 @@ public final class ReconRunJob implements Job {
         if (breaks > 0) openIncident(ctx, reconId, missingLeft, missingRight, valueBreak, breaks);
         String notRecorded = fresh == null ? computeError : recordRun(ctx, writeRoot, reconId, fresh, scoped.day());
 
-        return JobResult.ok("recon.run '" + reconId + "'" + (scoped.day() == null ? "" : " " + scoped.day()) + ": " + breaks + " break(s) ("
+        return JobResult.ok("recon.run '" + reconId + "' " + scoped.day() + ": " + breaks + " break(s) ("
                 + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)"
                 + (notRecorded == null ? "" : " — run not recorded: " + notRecorded),
                 (System.nanoTime() - t0) / 1_000_000L);

@@ -77,8 +77,6 @@ export interface ReconRunResult {
     statistics: { rowCount: number; elapsedMs: number; truncated: boolean; cached?: boolean };
     /** The ONE day compared (RECON-PERF-1, operator 2026-10-09) — the requested day, or the latest present. */
     day?: string;
-    /** False when no side declares a day column: the whole relations were compared (`day` is then null). */
-    dayScoped?: boolean;
     /** Every day present across the sides, newest first (capped server-side). */
     availableDays?: string[];
     /** The grain-row filter this page was cut with. */

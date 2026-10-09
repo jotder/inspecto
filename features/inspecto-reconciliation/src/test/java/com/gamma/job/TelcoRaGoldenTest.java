@@ -93,13 +93,25 @@ class TelcoRaGoldenTest {
         System.setProperty("assist.write.root", writeRoot.toString());
 
         // ── Reconciliations, through the template's own recon.run Jobs ──
+        // A Reconciliation reads ONE day (operator 2026-10-09: no whole-period fallback). ra_xdr_completeness is
+        // dated by EVENT_DATE, so it is run once per corpus day and its Breaks are the union over the days (no xDR
+        // spans two days). ra_rated_vs_billed is dated by its bill period's first day (both sides), so its one
+        // "day", 2026-07-01, is the whole July bill period - it stays a monthly comparison and runs once.
         for (String recon : List.of("ra_xdr_completeness", "ra_rated_vs_billed")) {
             JobConfig cfg = JobConfig.load(templateJob(recon).toString());
             assertEquals("recon.run", cfg.type());
-            JobResult r = new ReconRunJob(cfg, dataDir.toString(), () -> null).run(new Ctx(cfg.params()));
-            assertEquals("SUCCESS", r.status(), r.message());
-            assertTrue(r.message().contains(": " + CORPUS.planted.get(recon).size() + " break(s)"),
-                    recon + ": the run reports every pair's Breaks: " + r.message());
+            List<String> days = "ra_xdr_completeness".equals(recon) ? List.of(TelcoRaCorpus.DAYS) : java.util.Collections.singletonList(null);
+            int reported = 0;
+            for (String day : days) {
+                Map<String, String> params = new java.util.HashMap<>(cfg.params());
+                if (day != null) params.put("day", day);
+                JobResult r = new ReconRunJob(cfg, dataDir.toString(), () -> null).run(new Ctx(params));
+                assertEquals("SUCCESS", r.status(), r.message());
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile(": (\\d+) break\\(s\\)").matcher(r.message());
+                assertTrue(m.find(), r.message());
+                reported += Integer.parseInt(m.group(1));
+            }
+            assertEquals(CORPUS.planted.get(recon).size(), reported, recon + ": the runs report every pair's Breaks");
             Set<String> flagged = new TreeSet<>();
             for (ReconBreaks.Break b : new ReconStateStore(writeRoot).read(recon).breaks())
                 flagged.add(b.pair() + "|" + b.type() + "|" + b.key());
@@ -298,7 +310,15 @@ class TelcoRaGoldenTest {
             for (String d : List.of("ra_leakage", "ra_data_quality")) seeded.put(d, schema(dataDir, d));
             com.gamma.job.JobService js = svc.jobService().orElseThrow();
             js.eventLog(com.gamma.event.EventLog.global());
-            for (String j : List.of("ra_xdr_lost", "ra_xdr_completeness", "ra_rated_vs_billed", "ra_rerating")) {
+            // ra_xdr_completeness is per day (see above): one trigger per corpus day, each carrying its `day`
+            for (String day : TelcoRaCorpus.DAYS) {
+                long done = js.runsFor("ra_xdr_completeness").stream().filter(r -> !"SKIPPED".equals(r.status())).count();
+                assertTrue(js.triggerRun("ra_xdr_completeness", null, Map.of("day", day)).isPresent(), day);
+                JobRun run = await(() -> js.runsFor("ra_xdr_completeness").stream().filter(r -> !"SKIPPED".equals(r.status())).count() > done
+                        ? js.lastRunOf("ra_xdr_completeness").orElse(null) : null);
+                assertEquals("SUCCESS", run.status(), day + ": " + run.message());
+            }
+            for (String j : List.of("ra_xdr_lost", "ra_rated_vs_billed", "ra_rerating")) {
                 assertTrue(js.triggerRun(j, null).isPresent(), j);
                 JobRun run = await(() -> js.runsFor(j).stream().filter(r -> !"SKIPPED".equals(r.status())).findFirst().orElse(null));
                 assertEquals("SUCCESS", run.status(), j + ": " + run.message());

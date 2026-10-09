@@ -1,1 +1,2 @@
 physicalRef: switch_xdr/database
+dateField: EVENT_DATE
