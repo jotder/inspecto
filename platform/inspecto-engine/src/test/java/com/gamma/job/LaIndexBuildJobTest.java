@@ -102,6 +102,31 @@ class LaIndexBuildJobTest {
         assertFalse(seen.get().allowFull(), "a full build is never started unless the Job says so");
     }
 
+    private static long waitMsOf(String raw) throws Exception {
+        var seen = new AtomicReference<LinkIndexAccess.Request>();
+        Map<String, Object> m = new HashMap<>(PARAMS);       // timeout_seconds = 5
+        m.put("name", "xdr_index");
+        m.put("type", "la.index.build");
+        if (raw != null) m.put("wait_seconds", raw);
+        new LaIndexBuildJob(JobConfig.fromMap(Map.of("job", m))).run(new Ctx(false,
+                grantOf(r -> { seen.set(r); return outcome("UP_TO_DATE", "none", null); }), PARAMS));
+        return seen.get().waitMs();
+    }
+
+    @Test
+    void waitSecondsIsUnsetByDefaultAndOtherwiseCappedByTimeoutSeconds() throws Exception {
+        assertEquals(-1L, waitMsOf(null), "unset keeps the built-in six-wait bound");
+        assertEquals(0L, waitMsOf("0"));
+        assertEquals(3_000L, waitMsOf("3"));
+        assertEquals(5_000L, waitMsOf("900"), "never longer than timeout_seconds (5)");
+    }
+
+    @Test
+    void aNegativeOrNonNumericWaitSecondsFailsTheRun() {
+        for (String bad : List.of("-1", "soon"))
+            assertThrows(IllegalArgumentException.class, () -> waitMsOf(bad), bad);
+    }
+
     @Test
     void everyRefusalFailureAndUnfinishedBuildFailsTheRunWithItsReason() throws Exception {
         for (String result : List.of("REFUSED", "FAILED", "RUNNING")) {
@@ -130,14 +155,14 @@ class LaIndexBuildJobTest {
         PlatformServices dry = DryRunServices.wrap(grantOf(r -> { calls.add(r); return outcome("BUILT", "full", null); }),
                 new Ctx(true, PlatformServices.none(), PARAMS).log());
         Outcome o = dry.find(LinkIndexAccess.class).orElseThrow().build(
-                new LinkIndexAccess.Request("j", "d", "s", "t", null, null, null, null, List.of(), "o", true, 1L));
+                new LinkIndexAccess.Request("j", "d", "s", "t", null, null, null, null, List.of(), "o", true, 1L, -1L));
         assertEquals(Outcome.DRY_RUN, o.result());
         assertTrue(calls.isEmpty());
     }
 
     @Test
     void theAccessFailsClosedWhenTheLinkAnalysisModuleOrWriteRootIsAbsent(@TempDir Path root) {
-        var req = new LinkIndexAccess.Request("j", "d", "s", "t", null, null, null, null, List.of(), "o", false, 1L);
+        var req = new LinkIndexAccess.Request("j", "d", "s", "t", null, null, null, null, List.of(), "o", false, 1L, -1L);
         assertThrows(IllegalStateException.class, () -> LinkIndexAccess.over(() -> null, () -> root, () -> null).build(req));
         assertThrows(IllegalStateException.class,
                 () -> LinkIndexAccess.over(() -> (w, d, q) -> outcome("BUILT", "full", null), () -> null, () -> null).build(req));

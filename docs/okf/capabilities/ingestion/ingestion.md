@@ -452,7 +452,7 @@ merge. `IndexAppendTest.aThirtyDayBackfillAnswersEveryReadLikeTheDayByDayRunAcro
 answers every read like the day-by-day run (first day full, append per day, compact at the delta cap) and that a backfill
 missing one day does not. While the range lands, each committed batch fires `job.dataset.produced`; a Job run that finds a
 build in flight WAITS and re-plans (at most 6 waits, 2 s backoff doubling to 60 s, within `timeout_seconds`, every attempt
-audited), so the daily trigger need not be paused (operator, 2026-10-06).
+audited), so the daily trigger need not be paused (operator, 2026-10-06). That default bound (about 122 s) does not outlast a FULL build at 10^8 rows (852-929 s measured), so the Job takes `wait_seconds`: unset keeps the six-wait bound, `0` never waits, any other value is a TIME budget (same backoff, last sleep trimmed) clamped to `timeout_seconds`; a negative or non-numeric value fails the Run. Read from the saved config only, like every other Job param (no per-run override).
 
 **Delivery checks (T8, operator 2026-10-06).** Declare the feed's parts on the Collector:
 `gap_detection.file_template: "XDR_{yyyyMMdd}_part{seq}*"` + `seq_scope: PER_BUCKET` (`seq_scope` is required when the

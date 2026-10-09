@@ -17,7 +17,7 @@ public final class ScheduledLinkIndexBuilder implements LinkIndexBuilder {
     public LinkIndexAccess.Outcome build(Path writeRoot, Path dataRoot, LinkIndexAccess.Request q) {
         ScheduledIndexBuild.Outcome o = ScheduledIndexBuild.run(writeRoot, dataRoot, new ScheduledIndexBuild.Request(
                 q.job(), q.dataset(), q.sourceCol(), q.targetCol(), q.kindCol(), q.timeCol(), q.timeColZone(),
-                q.weightCol(), q.attrCols(), q.owner(), q.allowFull(), q.timeoutMs()));
+                q.weightCol(), q.attrCols(), q.owner(), q.allowFull(), q.timeoutMs(), q.waitMs()));
         return new LinkIndexAccess.Outcome(o.result(), o.mode(), o.code(), o.message(), o.edges(), o.nodes(), o.deltas());
     }
 }

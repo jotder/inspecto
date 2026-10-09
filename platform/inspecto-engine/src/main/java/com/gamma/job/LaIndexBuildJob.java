@@ -60,11 +60,12 @@ final class LaIndexBuildJob implements Job {
         // EVERY input comes from the SAVED config, never ctx.params(): the resolved ladder lets trigger args, a manual
         // trigger body and signal bind override WHAT is built under the recorded owner's authority. No per-run knob.
         Map<String, String> p = cfg.params();
+        long timeoutSeconds = timeoutSeconds(p.get("timeout_seconds"));
         LinkIndexAccess.Request req = new LinkIndexAccess.Request(cfg.name(), need(p, "dataset"),
                 need(p, "source_col"), need(p, "target_col"), opt(p, "kind_col"), opt(p, "time_col"),
                 opt(p, "time_col_zone"), opt(p, "weight_col"), list(opt(p, "attr_cols")), need(p, "owner"),
                 "true".equalsIgnoreCase(String.valueOf(p.get("allow_full")).trim()),
-                timeoutSeconds(p.get("timeout_seconds")) * 1000L);
+                timeoutSeconds * 1000L, waitMs(p.get("wait_seconds"), timeoutSeconds));
 
         LinkIndexAccess.Outcome o = index.build(req);
 
@@ -99,6 +100,19 @@ final class LaIndexBuildJob implements Job {
 
     private static List<String> list(String csv) {
         return csv == null ? List.of() : Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+    }
+
+    /** {@code wait_seconds}: unset = -1 (the built-in six-wait bound); else 0..timeout_seconds, clamped; negative or non-numeric fails the Run. */
+    static long waitMs(String raw, long timeoutSeconds) {
+        if (raw == null || raw.isBlank()) return -1L;
+        long v;
+        try {
+            v = Long.parseLong(raw.trim());
+        } catch (NumberFormatException bad) {
+            throw new IllegalArgumentException("la.index.build param 'wait_seconds' must be a whole number of seconds");
+        }
+        if (v < 0) throw new IllegalArgumentException("la.index.build param 'wait_seconds' must not be negative");
+        return Math.min(v, timeoutSeconds) * 1000L;
     }
 
     private static long timeoutSeconds(String raw) {
