@@ -558,6 +558,11 @@ newest day first) on `ra_overview`, and a `ra_switch_kpi_completeness` Job over 
 (it refuses unless the consignment-output store is durable). Pinned by `KpiCompletenessJobTest` and
 `KpiCompletenessWidgetTest` (template created through `POST /spaces`, tile rendered through `POST /bi/query`).
 ⚠ The table shows every stored day, newest first; it does not filter to the latest day.
+**Before the first run (LIVEFIX2, 2026-10-09).** The template also ships `data/kpi_completeness/schema-seed.parquet`
+(zero rows, the store's nine columns) and the Job's ownership marker `.kpi-completeness-output`, so a fresh Space's
+tile reads as empty instead of DuckDB's "No files found" (which also leaked the server path). The marker is needed:
+without it `claim()` refuses the pre-existing directory and the first run fails. The seed stays beside the Job's
+file; the Dataset's `**/*.parquet` glob unions the two by name. Pinned by `KpiCompletenessWidgetTest`.
 **Editor field (operator, 2026-10-09).** The gap node carries a `NodeAttributes.GAP` spec — `file_template`
 and `seq_scope` only (`sequence` keeps its grammar in the dialog's free-form section). The node lowers to
 `collector.gap_detection` (`PipelineEditable.gapSection`); `NodeConfigNameContractTest.gapTemplateAttributesReachTheEngine`

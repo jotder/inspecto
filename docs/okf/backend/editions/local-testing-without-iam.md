@@ -88,7 +88,11 @@ users[2]{id,displayName,title,roles}:
 - The picker lists the **union across every Space** under `-Dspaces.root` (or the single
   `-Dassist.write.root`). The same id defined **differently** in two Spaces is refused
   (`IllegalStateException` when the list is built — at `/bootstrap` or sign-in, not at boot); the
-  same id defined identically is allowed. Roles still resolve per request against the bound Space,
+  same id defined identically is allowed. The refusal names the user and BOTH Spaces (LIVEFIX2,
+  2026-10-09). When `/bootstrap` answers that 500, the SPA no longer draws a signed-in shell: `SessionService`
+  records `bootstrapError`, `loginRequired()` turns true, and the sign-in page shows the server's message with
+  no picker and a *Try again* button. A 401 the SPA did not expect (`authMode` none) routes to sign-in the same
+  way. An unreachable backend (status 0) still degrades to Personal — the connectivity banner owns that. Roles still resolve per request against the bound Space,
   so one Demo User can hold different capabilities in different Spaces.
 - No committed Space ships a `demo-users.toon`; a Space intended for a demo must author one.
 

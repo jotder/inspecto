@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **53<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 37<!--count:backlog-p3--> × P3** —
 > ⬇ **53 → 52 (P3 37 → 36) on 2026-10-10**: closed P3 `MEASURE-SQL-BIND-1` — `MeasureCompiler.compile` returns `Compiled(sql, params)`: every flat `filters` value and `when` operand is a bound parameter (`ConditionSql.predicateBound` for `when`); BI query (incl. the bound-query `WITH`), shared Dashboards, KPIs, Risk Scores, Screening, Alert Rule Measure probes and the `report` Job run it as a prepared statement; `materialize` and `transform.summarize` carry no values and refuse one (`unboundSql()`); the BI response still echoes the literal rendering (`render`). Results unchanged (`MeasureCompilerBindTest` runs both forms over five column types); as-built in `okf/backend/module-reorganisation-decisions.md`.
 > ⬇ **54 → 53 (P2 17 → 16) on 2026-10-10**: closed P2 `PACK-AML-1` — the `aml` Space Template: two synthetic feeds, four per-account typology Jobs (structuring, threshold crossing, smurfing fan-in, watch-list traffic) with Alert Rules, an account Risk Score + pending Alert Rule, a disabled-until-Entity-Lists `screening.run` Job, a Link Analysis view + four money pattern packs, an illustrative STR Report Template, golden-tested. Cut (cannot ship in a template): Entity Lists, Investigation Templates and the value-Measure Alert Rule (runtime state). As-built in `okf/capabilities/spaces/spaces.md` §3.5.4.
 > ⬇ **55 → 54 (P3 38 → 37) on 2026-10-09**: closed P3 `TELCO-FRAUD-CONTENT-GAPS-1` — the `telco-fraud` Space Template gained recharge fraud, data-charging bypass and internal fraud (three Jobs, per-entity Alert Rules, sink seeds, dashboard Widgets, runbook sections; golden 13 rules / 54 Alerts, mutation-checked). As-built in OKF spaces §3.5; cuts (KPIs, volume column, staff register) recorded there.
@@ -173,10 +173,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 53<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -404,6 +404,8 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 - **P3** · **Job framework — space-to-space comparison (residuals)** — ✅ the comparison SHIPPED 2026-09-24 (`space.comparison` Job Type + `POST /space-comparisons` on `canAdminister`; all four design decisions taken "go with recommendations", each recorded with how to reverse it in `archived-documents/plans-archive/space-comparison-design.md` §5). Left, each waiting for a real ask: (a) **a scheduled / authored cross-Space comparison** — refused by design today (no Subject ⇒ own-Space-only grant); needs a persisted, attributable, revocable grant, which is a new operator decision, not plumbing · (b) *compare every registered Space* — only with a `SpaceConfigRoot` enumeration decision (design Q1 (b) / Q4) · (c) persisting comparison rows — the data-residency call (Q3) · (d) no UI surface; API only. Predictive maintenance stays deferred to AGT-5 regardless. → `okf/backend/control-plane/jobs.md` § *Space comparison*
 
 #### API contract & vocabulary
+
+- **P3** · `ERR-4XX-PATH-ECHO-1` — `POST /bi/query` 422s now strip absolute server paths (`ServerFaults.withoutServerPaths`, LIVEFIX2 2026-10-09). **Open:** the other 4xx routes that echo a DuckDB message to the author (`ComponentRoutes` SQL-structure, Query / Dataset previews, `DbBrowserRoutes` query) are not swept; route each through the same helper with its Space roots. → `okf/capabilities/control-api/control-api.md` (decision log, 2026-10-09)
 
 
 

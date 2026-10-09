@@ -380,7 +380,10 @@ today in that zone; a future `asOf`, one before year 1, or an Instant the calend
 forms (`+05:30`) are refused — `ZoneOffset.UTC`'s id `Z` is unknown to DuckDB, so UTC is the region id `UTC`. ⚠ A Dataset the caller cannot read answers **404
 exactly as an absent one** — a KPI is never a way round Dataset sharing. The KPI tile binds with
 `options.kpi.kpiId` and then shows ONLY the server's numbers — "No data" for a null value, "KPI unavailable" on a
-read error; the hand-set Widget inputs apply only with no `kpiId`. A `band` KPI's delta and target lines drop the
+read error; the hand-set Widget inputs apply only with no `kpiId`. A KPI Widget with a `kpiId` and **no `datasetId`**
+(every shipped template KPI tile) is *KPI-bound* (`isKpiBound`, `widget-types.ts`): the dashboard editor, the Menu
+viewer and `WidgetHostComponent` render it without a Dataset, run no query, and apply the as-of date but not the
+cross-filter or drill. Before LIVEFIX2 (2026-10-09) the editor drew "Dataset for “” not found." for each one. A `band` KPI's delta and target lines drop the
 up/down wording and take their tone from the server's band. A delivered `kpi` Requirement creates one
 only by the explicit `POST /requirements/{id}/kpi` (`canAuthorWorkbench`), which takes its
 `target`/`unit`/`title` and reads the direction off its `comparator`. In the UI that is the **Create KPI** button

@@ -100,7 +100,11 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   all-rows tree on the Board and widget; `ReconPageLoader` runs every request through `switchMap`, so a newer
   day/page/filter cancels the one in flight. Day/page/filter/sample are URL query params on the Board and Breaks page,
   component state in the widget — never saved. While a request runs a spinner says *"Comparing HLR, CRM and CBS for
-  2026-09-26…"*; the empty state is never shown in flight; an error offers Retry.
+  2026-09-26…"*; the empty state is never shown in flight; an error offers Retry only when retrying can help (status 0, 429,
+  5xx — `isRetryable` in `recon-page.loader.ts`); a 4xx refusal such as a 422 "no date column" says to fix the
+  Dataset or the Reconciliation instead, with a link to the Datasets library. Loading the Reconciliation itself
+  says "not found" only for a 404; any other failure shows "Reconciliation unavailable" with the server's reason
+  (LIVEFIX2, 2026-10-09).
 * **Row tint, no RAG column** (operator, 2026-10-09): rows are tinted by band (ok / warn / breach, and a key missing
   on a side) with the design-system status tones (`statusRowClasses`/`statusEdgeClasses`/`statusIconClasses` in
   `status-badge.component.ts`, the sanctioned colour owner), never a status text column. Colour is not the only cue
