@@ -748,6 +748,7 @@ final class PipelineConfigParser {
                         readToon(schemaFile);
                 mergeSiblingStructure(schemaCfg, schemaFile, b);
                 mergeSiblingMapping(schemaCfg, schemaFile, b);
+                applyMapFields(schemaCfg, b);
                 Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
                 requireZoneForTimestampTz(schemaCfg, b.sourceTimezone, "schemas[col=" + colCount + "]");
                 declaredColumns.addAll(columnNamesOf(schemaCfg));
@@ -789,6 +790,7 @@ final class PipelineConfigParser {
                 mergeSiblingStructure(b.singleSchema, schemaFile, b);
                 mergeSiblingMapping(b.singleSchema, schemaFile, b);
                 applyMappingFile(proc, b.singleSchema, configDir, b);
+                applyMapFields(b.singleSchema, b);
                 Identifiers.validateSchema(b.singleSchema, "schema_file");
                 requireZoneForTimestampTz(b.singleSchema, b.sourceTimezone, "schema_file");
                 declaredColumns.addAll(columnNamesOf(b.singleSchema));
@@ -1428,6 +1430,25 @@ final class PipelineConfigParser {
         }
         mapping.put("rules", rules);
         log.info("[CONFIG] mapping_file {} supplies mapping.rules ({} rule(s))", ref, rules.size());
+    }
+
+    /**
+     * The Record Transformer projection slot ({@code processing.map.fields[]}, written by the pipeline
+     * editor) becomes the schema's {@code mapping.fields[]} — the only projection Stage-1 ingest reads
+     * ({@link DataTransformer#recordFields}). Without this the slot was saved but never executed: the
+     * landed store carried only the raw columns. Applied before the schema is validated, and only when
+     * every row names a catalog {@code fn}; it outranks a mapping file or inline rules, as authored rows
+     * are the editor's view of the whole projection.
+     */
+    private static void applyMapFields(Map<String, Object> schema, Builder b) {
+        if (b.mapConfig == null || !RecordTransform.isFieldList(b.mapConfig.fields())) return;
+        Map<String, Object> mapping = castMapAt(schema, "mapping");
+        if (mapping == null) {
+            mapping = new LinkedHashMap<>();
+            schema.put("mapping", mapping);
+        }
+        mapping.put("fields", b.mapConfig.fields());
+        log.info("[CONFIG] processing.map supplies mapping.fields ({} field(s))", b.mapConfig.fields().size());
     }
 
     // ── dir validation ────────────────────────────────────────────────────────
