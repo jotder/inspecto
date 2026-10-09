@@ -65,13 +65,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- The shared Conditions grammar (already transitive via the core; declared for direct use). -->
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-util</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs/PipelineConfigBatchTest
              boot a real CollectorService + ControlApi in the end-to-end policy tests (same pattern
              as the core's control tests; test scope is not transitive, so declared explicitly). -->

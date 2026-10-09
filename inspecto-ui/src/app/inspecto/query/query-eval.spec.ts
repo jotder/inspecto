@@ -69,7 +69,6 @@ describe('evaluateRows', () => {
     });
 });
 
-
 /** The Condition Language extensions — same rows and expectations as Java ConditionExtensionsTest. */
 describe('evaluateRows — Condition Language extensions', () => {
     const X_COLS: ColumnMeta[] = [
@@ -105,7 +104,9 @@ describe('evaluateRows — Condition Language extensions', () => {
     it('negate inverts a group; a NULL cell is "not > 3" so it is selected', () => {
         expect(run(c('n1', '>', '3'))).toEqual([1, 2, 5]);
         expect(run(neg(c('n1', '>', '3')))).toEqual([3, 4]);
-        expect(ids(evaluateRows(m({ ...group('OR', [c('a', '=', 'Alpha'), c('n2', '>', '8')]), negate: true }), XS))).toEqual([2, 4, 5]);
+        expect(
+            ids(evaluateRows(m({ ...group('OR', [c('a', '=', 'Alpha'), c('n2', '>', '8')]), negate: true }), XS)),
+        ).toEqual([2, 4, 5]);
     });
 
     it('an empty or incomplete negated group still imposes no constraint; negate:false is plain', () => {

@@ -31,8 +31,7 @@
         {{ loadError() }}
         <button mat-button type="button" (click)="load()">Try again</button>
     </inspecto-alert>
-    } @else {
-    @if (perCaseType) {
+    } @else { @if (perCaseType) {
     <div class="flex flex-wrap items-end gap-3">
         <inspecto-option-picker
             class="min-w-60 flex-1"
@@ -55,15 +54,14 @@
     </div>
     }
     <p class="text-secondary text-sm">
-        These are the questions your team answers in a {{ data.typeLabel }}'s Findings panel. A change applies to
-        {{ scopeText() }}.
+        These are the questions your team answers in a {{ data.typeLabel }}'s Findings panel. A change applies to {{
+        scopeText() }}.
     </p>
     @if (caseType() && !authored()) {
     <inspecto-alert variant="info" title="No own form yet">
         Cases of type “{{ caseType() }}” use the shared form below. Saving creates this type’s own form.
     </inspecto-alert>
-    }
-    @if (!canEdit()) {
+    } @if (!canEdit()) {
     <inspecto-alert variant="info" title="View only">
         Changing the Findings fields needs permission to manage Incidents and Cases.
     </inspecto-alert>
@@ -147,11 +145,10 @@
         <!-- Field -->
         <section aria-labelledby="ff-edit-heading" class="flex min-w-0 flex-col gap-2">
             <h3 id="ff-edit-heading" class="text-xs font-bold uppercase tracking-wider opacity-60">Field</h3>
-            @if (selected(); as f) {
-            @if (isLocked(f)) {
+            @if (selected(); as f) { @if (isLocked(f)) {
             <inspecto-alert variant="info" title="Built-in: the Case's Impact">
-                This field is the Case's confirmed Impact — the amount Case analytics sum. You can rename it; it
-                can't be removed or changed otherwise.
+                This field is the Case's confirmed Impact — the amount Case analytics sum. You can rename it; it can't
+                be removed or changed otherwise.
             </inspecto-alert>
             }
             <form [formGroup]="fieldForm" class="flex flex-col gap-3" (submit)="$event.preventDefault()">

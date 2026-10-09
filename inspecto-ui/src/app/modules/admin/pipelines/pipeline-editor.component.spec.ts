@@ -921,7 +921,10 @@ describe('PipelineEditorComponent', () => {
             // An unlowerable `transform.select` node still renders + flags on an opened graph: the
             // unsupported-nodes banner derives from the FULL catalog, not the filtered palette.
             c.select('demo');
-            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'legacy', type: 'transform.select', config: {} }] }));
+            c.model.update((m) => ({
+                ...m!,
+                nodes: [...m!.nodes, { id: 'legacy', type: 'transform.select', config: {} }],
+            }));
             expect(c.unsupportedNodes().map((n) => n.id)).toEqual(['legacy']);
         });
 
