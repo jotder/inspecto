@@ -183,7 +183,8 @@ async function openInv(store: InvestigationSessionStore) {
     await store.open('inv-1');
 }
 
-describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
+// Full-component renders run 5-7s on the CI runner, past vitest's 5s default.
+describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () => {
     it('start state: explains the binding, starts from the projection, and passes axe', async () => {
         const { fixture, el, inv, button } = create();
         expect(el.textContent).toContain("the query's filter is not applied");
