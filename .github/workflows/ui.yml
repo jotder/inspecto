@@ -4,14 +4,16 @@ name: UI
 # ag-Grid / Chart.js / AntV G6). Kept fully separate from the Java ci.yml: the Node toolchain
 # never enters the Maven reactor. Path-filtered to inspecto-ui/** so backend-only changes
 # don't trigger a frontend build (and vice-versa).
+# WHEN IT RUNS (operator, 2026-10-09): NOT on push. Nightly, on demand (Actions -> UI -> "Run workflow", or
+# `gh workflow run UI --ref master`) and on a pull request that touches inspecto-ui/**.
 
 on:
-  push:
-    branches: [master, main, 3.x]
-    paths: ['inspecto-ui/**', '.github/workflows/ui.yml']
   pull_request:
     branches: [master, main, 3.x]
     paths: ['inspecto-ui/**', '.github/workflows/ui.yml']
+  schedule:
+    - cron: '45 1 * * *'   # 01:45 UTC nightly
+  workflow_dispatch:
 
 permissions:
   contents: read

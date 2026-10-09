@@ -1,8 +1,11 @@
 name: CI
 
-# Runs the test suite on every push and pull request so regressions land at
-# review time instead of in production. The build is a two-module Maven reactor
-# (core engine + optional assist agent); the full suite finishes in ~30 seconds.
+# WHEN IT RUNS (operator, 2026-10-09: "full build nightly only, ad-hoc any time"):
+#   - every push / PR: ONLY the fast no-build `guards` job (and the seconds-long Windows launcher guard);
+#   - the full `test` job (Maven reactor + Postgres): nightly, on demand, on a pull request and on a release tag.
+# Run it now: GitHub -> Actions -> CI -> "Run workflow", or `gh workflow run CI --ref master`.
+# Why: lanes pushed several times an hour and each push paid ~15-20 min of reactor; commits now stay local
+# until a batch of features passes its local tests, and the nightly run is the backstop.
 
 on:
   push:
@@ -10,6 +13,9 @@ on:
     tags: ['v*']
   pull_request:
     branches: [master, main, 3.x]
+  schedule:
+    - cron: '30 1 * * *'   # 01:30 UTC nightly (nightly-perf runs at 02:17)
+  workflow_dispatch:
 
 # Default GITHUB_TOKEN perms, narrowed to just reading this repo — eoiagent is built from source
 # below, so no GitHub Packages auth is needed here.
@@ -340,6 +346,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Not on a plain branch push (see the header): nightly, on demand, on a PR and on a release tag.
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is
     # installed separately or pointed at — which left `PostgresStateStoreTest` reporting 11 SKIPPED and the
     # only proof that the JDBC stores run on real Postgres (chiefly `percentile_cont`, the one piece of

@@ -23,6 +23,17 @@ Adoptium had published no 27 build as of 2026-09-17. ⚠ The GraalVM cache still
 25.1.3 (Linux); the Linux entry is the jmods source for the cross-built runtime and is NOT the toolchain.
 See the `build-verify` skill for exact local paths.)
 
+## When GitHub CI runs (operator, 2026-10-09)
+- **Every push / PR:** only `ci.yml`'s no-build `guards` job (~1 min) and the seconds-long `launchers-windows` guard,
+  plus `branch-policy.yml`.
+- **Full build** (`ci.yml` `test`: the Maven reactor with Postgres; `ui.yml`: the SPA lint/test/build) runs **nightly**
+  (01:30 / 01:45 UTC), **on demand** (GitHub -> Actions -> CI or UI -> *Run workflow*, or `gh workflow run CI --ref master`
+  / `gh workflow run UI --ref master`), on a pull request, and (`ci.yml`) on a `v*` release tag.
+- **Why:** parallel lanes pushed several times an hour and each push paid ~15-20 min of reactor. Commits now stay LOCAL
+  until a batch of features passes its local tests (unit tests per change; the full local gate before the batch push),
+  and the nightly run is the backstop. ⚠ A broken push is therefore found by the next nightly or an ad-hoc run, not at
+  push time: run the full local gate before every push, and trigger CI by hand after a push that touched shared seams.
+
 ## Mandatory DuckDB native-access flag
 
 Every JVM launch (engine, tests, serve scripts) **must** pass:
