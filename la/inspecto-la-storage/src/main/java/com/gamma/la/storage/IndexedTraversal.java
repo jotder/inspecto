@@ -39,10 +39,22 @@ public final class IndexedTraversal {
      * @param monotonic  each edge's time must not precede the previous edge's
      * @param maxHours   the whole path must span at most this many hours (null = unbounded)
      * @param maxGapHours each edge must follow the previous one within this many hours (null = unbounded; the caller requires {@code monotonic})
-     * @param filterSql  rendered predicate over the index columns, or null
+     * @param filterSql  predicate over the index columns with {@code ?} placeholders, or null
+     * @param filterBinds its positional values (repeated per statement arm by the reader)
      */
     public record Params(String start, String target, boolean undirected, int maxDepth, int maxEdgeYield, int limit,
-                         boolean temporal, boolean monotonic, Double maxHours, Double maxGapHours, String filterSql) { }
+                         boolean temporal, boolean monotonic, Double maxHours, Double maxGapHours, String filterSql,
+                         List<String> filterBinds) {
+        public Params {
+            filterBinds = filterBinds == null ? List.of() : List.copyOf(filterBinds);
+        }
+
+        /** No bound values (an unfiltered walk, or a filter with none). */
+        public Params(String start, String target, boolean undirected, int maxDepth, int maxEdgeYield, int limit,
+                      boolean temporal, boolean monotonic, Double maxHours, Double maxGapHours, String filterSql) {
+            this(start, target, undirected, maxDepth, maxEdgeYield, limit, temporal, monotonic, maxHours, maxGapHours, filterSql, List.of());
+        }
+    }
 
     public record PathRow(List<String> nodes, int hops, double weight) { }
 
@@ -80,7 +92,7 @@ public final class IndexedTraversal {
             }
             if (keys.isEmpty()) break;
             if (keys.size() > FRONTIER_CAP) throw new FrontierOverCap(keys.size());
-            Map<String, List<Edge>> edges = reader.edges(new ArrayList<>(keys), sides, p.filterSql(), p.maxEdgeYield());
+            Map<String, List<Edge>> edges = reader.edges(new ArrayList<>(keys), sides, p.filterSql(), p.filterBinds(), p.maxEdgeYield());
             for (List<Edge> perKey : edges.values())
                 if (perKey.size() >= p.maxEdgeYield()) yieldCapped = true;            // a key's own edges reached the yield: say so
             List<Walk> next = new ArrayList<>();

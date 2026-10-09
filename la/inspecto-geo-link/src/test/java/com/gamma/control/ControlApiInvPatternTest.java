@@ -159,6 +159,38 @@ class ControlApiInvPatternTest {
         }
     }
 
+    /**
+     * LA-FILTER-SQL-BIND-1 - the filter's operands are BOUND on the branching route's legs statement AND its probe. Six hostile source
+     * names each add a fan-in leg into the hub, so the unfiltered motif's first layer grows; a filter excluding exactly those six
+     * ({@code src != each}) must give the golden answer back. A value spliced as text, a lost bind or a mis-ordered bind cannot.
+     */
+    @Test
+    void aHostileFilterValueIsDataOnTheBranchingLegsAndProbe(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        JsonNode fx = fixture();
+        List<String> hostile = List.of("o'brien", "\\' OR '1'='1", "'; DROP TABLE tx_ds; --", "x /* c */ y -- z", "100%_wild\\", "zürich ☃ 日本");
+        StringBuilder extra = new StringBuilder("SELECT * FROM (VALUES ");
+        for (int i = 0; i < hostile.size(); i++)
+            extra.append(i == 0 ? "" : ",").append("('").append(hostile.get(i).replace("'", "''")).append("','MULE-HUB-01','2026-03-01 13:3")
+                    .append(i).append(":00',960.0)");
+        extra.append(") AS x(src, dst, TS, AMOUNT)");
+        StringBuilder items = new StringBuilder();
+        for (String h : hostile)
+            items.append(items.isEmpty() ? "" : ",").append("{\"kind\":\"condition\",\"field\":\"src\",\"operator\":\"!=\",\"value\":")
+                    .append(JSON.writeValueAsString(h)).append('}');
+        try (Ctx c = open(cfg, root)) {
+            seed(c, rowsSql(fx, extra.toString()));
+            JsonNode unfiltered = ok(c, motif(fx).toString());
+            assertNull(unfiltered.get("refusal"), unfiltered.toString());
+            assertNotEquals(expected(fx), canonAll(unfiltered), "twin: the six extra legs are in the unfiltered answer");
+
+            ObjectNode filtered = motif(fx);
+            filtered.set("filter", JSON.readTree("{\"kind\":\"group\",\"op\":\"AND\",\"items\":[" + items + "]}"));
+            JsonNode data = ok(c, filtered.toString());
+            assertNull(data.get("refusal"), data.toString());
+            assertEquals(expected(fx), canonAll(data), "the bound filter removes exactly the hostile sources");
+        }
+    }
+
     @Test
     void closureGoldenMatchesOnlyTheRingThatReturnsToItsOrigin(@TempDir Path cfg, @TempDir Path root) throws Exception {
         JsonNode closure = fixture().get("closure");

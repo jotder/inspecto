@@ -4,6 +4,7 @@ import com.gamma.la.api.IndexedRead.Fitted;
 import com.gamma.la.api.IndexedRead.Outcome;
 import com.gamma.la.api.IndexedRead.Reason;
 import com.gamma.la.api.IndexedRead.Selection;
+import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.storage.IndexReader;
 import com.gamma.la.storage.IndexReader.Folded;
 import com.gamma.la.storage.IndexReader.Side;
@@ -57,15 +58,15 @@ final class IndexedNeighbors {
                 extraCols.add("a" + at);
             }
             if (rq.filter() == null) return Fitted.ok(null);
-            String sql = IndexedRead.renderFilter(rq.filter(), m, utc);
-            return sql == null ? Fitted.no(Reason.filter_not_indexed) : Fitted.ok(sql);
+            DatasetProvider.BoundFilter f = IndexedRead.renderFilter(rq.filter(), m, utc);
+            return f == null ? Fitted.no(Reason.filter_not_indexed) : Fitted.ok(f);
         });
         if (!sel.usable()) return sel.flat();
 
         try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), policy)) {
             Set<Folded> distinct = new LinkedHashSet<>();                                    // a self-loop arrives from both copies
-            distinct.addAll(reader.fold(rq.value(), Side.OUT, extraCols, null, sel.filterSql()));
-            distinct.addAll(reader.fold(rq.value(), Side.IN, extraCols, null, sel.filterSql()));
+            distinct.addAll(reader.fold(rq.value(), Side.OUT, extraCols, null, sel.filterSql(), sel.filterBinds()));
+            distinct.addAll(reader.fold(rq.value(), Side.IN, extraCols, null, sel.filterSql(), sel.filterBinds()));
             List<Folded> sorted = new ArrayList<>(distinct);
             sorted.sort((a, b) -> {
                 int c = Long.compare(b.count(), a.count());
