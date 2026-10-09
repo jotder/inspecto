@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-regulatory-reporting</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto - Regulatory Reporting (optional)</name>
+    <description>
+        OPTIONAL add-on module (REGULATORY-REPORTING-1, 2026-10-09): regulator-format reports (a SAR / STR is the
+        motivating case) assembled from a Case or Incident, its member Incidents and its evidence (attachment notes),
+        rendered from a Report Template to XML, CSV or JSON, approved four-eyes, then submitted to a file-drop folder.
+        The routes (/regulatory-reports*), the store (a signed JSON file per report under regulatory-reports/ in the
+        write root - NOT an operational-store family), the renderer and the file drop. Package com.gamma.regreporting.
+
+        Contributed through com.gamma.spi.http.RouteModule only (feature id "regulatoryReporting"). It REQUIRES
+        inspecto-ops (it reads Cases, Incidents, links and notes through ObjectService and applies ObjectRoutes'
+        scope guard, as inspecto-case-management does); the approver roster, approver check and the Pending Change
+        key it signs with stay in the core.
+
+        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles). THIN: no
+        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal)
+        never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/WriteGates/HostContext, the engine (Job SPI), the event log. Compile scope,
+             as inspecto-ops and inspecto-scoring do. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- The objects a report is assembled from (ObjectService reads, ObjectRoutes' scope guard, OpsEngine). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-ops</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest the moved HTTP
+             tests boot a real CollectorService + ControlApi with. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Platform test kit (FakeApiContext + RouteModuleContract TCK) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- Engine-SPI TCK (test-jar of inspecto-engine) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

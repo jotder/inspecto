@@ -16,6 +16,9 @@ v1 contract, queries, observability, the job scheduler, and multi-space hosting.
 * [Action Requests](action-requests.md) - an outbound API call raised from an Incident / Case (or a Decision
   Rule's `invoke-api`), four-eyes approved, signed with the Pending Change key, sent once to an https Connection
   with bounded retries under one idempotency key; redirects never followed.
+* [Regulatory Reporting](regulatory-reporting.md) - a regulator-format report (SAR / STR shaped) rendered once from
+  a Report Template over a Case or Incident and its evidence, four-eyes approved, submitted to a jailed file drop;
+  the AUDIT rows are the submission log (REGULATORY-REPORTING-1).
 * [Tags](tags.md) - the cross-entity label graph (D7): Tag vs Tag Assignment, the central
   `(tag, targetKind, targetId)` store, rename propagation, and the per-target gate that keeps a tag from
   ever becoming an access grant.

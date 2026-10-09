@@ -52,6 +52,7 @@ module (build role · offering role · binding time) and the Offerings that comp
 * `features/inspecto-reconciliation/` — Reconciliation (`reconciliation`; feature `reconciliation`).
 * `features/inspecto-scoring/` — Scoring (`scoring`; feature `scoring`; requires `entity-list`).
 * `features/inspecto-action-requests/` — Action Requests (`action-requests`; feature `actionRequests`; requires `notify-channels`); page: [action-requests](../control-plane/action-requests.md).
+* `features/inspecto-regulatory-reporting/` — Regulatory Reporting (`regulatory-reporting`; feature `regulatoryReporting`; requires `ops`); page: [regulatory-reporting](../control-plane/regulatory-reporting.md).
 
 ## `la/` — link analysis (optional)
 

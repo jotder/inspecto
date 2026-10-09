@@ -314,6 +314,11 @@ system: the evidence cannot say something the code does not.
 | POST | `/recon/promote` | gated | `canManageIncidents` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java:71` |
 | POST | `/recon/rows` | exempt | read-shaped | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java:67` |
 | POST | `/recon/run` | exempt | stateless-compute | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java:63` |
+| POST | `/regulatory-reports` | gated | `canWorkIncidents` | `features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/RegulatoryReportRoutes.java:83` |
+| POST | `/regulatory-reports/([^/]+)/approve` | gated | `canApproveChanges` | `features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/RegulatoryReportRoutes.java:87` |
+| POST | `/regulatory-reports/([^/]+)/decline` | gated | `canApproveChanges` | `features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/RegulatoryReportRoutes.java:89` |
+| POST | `/regulatory-reports/([^/]+)/request-approval` | gated | `canWorkIncidents` | `features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/RegulatoryReportRoutes.java:85` |
+| POST | `/regulatory-reports/([^/]+)/retry` | gated | `canApproveChanges` | `features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/RegulatoryReportRoutes.java:91` |
 | POST | `/requirements` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:45` |
 | POST | `/requirements/([^/]+)/decision` | gated | `canTriageRequirements` | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:46` |
 | POST | `/requirements/([^/]+)/deliver` | gated | `canTriageRequirements` | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:48` |

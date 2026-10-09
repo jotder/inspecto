@@ -79,6 +79,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `observability` - Observability (metrics endpoint + events feed API) | features | optional | — | — | ✅ | ✅ | ✅ |
 | `ops` - Case management and objects | features | optional | — | — | ✅ | ✅ | ✅ |
 | `reconciliation` - Reconciliation | features | optional | — | — | ✅ | ✅ | ✅ |
+| `regulatory-reporting` - Regulatory Reporting | features | optional | `ops` | — | ✅ | ✅ | ✅ |
 | `scoring` - Scoring | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
 | `geo-link` - Geo and link adapters over platform data | la | optional | `la-api`, `la-core` | — | ✅ | ✅ | ✅ |
 | `la-api` - Link analysis and geo routes | la | optional | `la-core`, `la-storage` | — | ✅ | ✅ | ✅ |
@@ -112,6 +113,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | multiEntity | `exchange` | — | built | built | built |
 | premiumConnectors | `connectors-kafka` | — | built | built | built |
 | reconciliation | `reconciliation` | — | built | built | built |
+| regulatoryReporting | `regulatory-reporting` | — | built | built | built |
 | scoringLists | `entity-list`, `scoring` | — | built | built | built |
 | telecomIndustryPack | `telecom-asn1` | — | built | built | built |
 | workflowSla | planned in `engine` | — | planned | planned | planned |
@@ -129,10 +131,10 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 
 | | Personal | Professional | Enterprise | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 16 | 37 | 40 | 40 |
+| First-party jars (processor + connectors + optional + core thin) | 16 | 38 | 41 | 41 |
 | of which core thin jars | 14 | 14 | 14 | 14 |
-| Optional modules beyond Personal | 0 | 21 | 24 | 24 |
-| Total on the classpath (+ third-party sidecars) | 16 | 38 | 41 | 41 |
+| Optional modules beyond Personal | 0 | 22 | 25 | 25 |
+| Total on the classpath (+ third-party sidecars) | 16 | 39 | 42 | 42 |
 <!-- offerings-matrix:end -->
 
 ## Preview — not a customer-facing tier
@@ -474,6 +476,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | CP-15 | Delivery channels (mail, webhooks, delivery-status receipts) | — | 🟡 | 🟡 | ✅ **GATED 2026-09-07 (EDG-01 cell 1) — the P cell is now true of the build.** Both transports moved into `inspecto-notify-channels`, a Professional+/Enterprise-only module: `WebhookChannel` came out of `inspecto-engine` (an unconditional dependency, so it shipped everywhere) and `SmtpEmailChannel` out of `inspecto-connectors` (whose sidecar `package.ps1` copies into EVERY edition by explicit decision). Personal now registers **zero** `NotificationChannel` providers — pinned by `NoChannelShipsInThePersonalBuildTest`, which runs in the DEFAULT build and asserts the SPI is empty. In-app delivery is intrinsic to `NotificationService` and is unaffected. ⚠ Still 🟡 for S/E: soft-bounce retry and the SES/SNS adapter remain deferred (D8) — bounce suppression itself SHIPPED 2026-09-07. ⛔ The inbound `DeliveryStatusAdapter`s stay in `inspecto-connectors`: they are inert without a configured signing key and `DeliveryStatusRoutes` 404s an unconfigured adapter. |
 | CP-17 | Incident governance — authored Workflow, SLA policy per (object type, priority) with a business calendar, Escalation Rules (`ASSURE-WORKFLOW-SLA-1`) | — | ✅ | ✅ | `inspecto-ops` applies them (hot-reloaded from `registry/workflows|sla-policies|escalation-rules/`, the SLA sweep); the `/components/workflow|sla-policy|escalation-rule` write routes are core and `canAdminister`-gated, so Personal can store a document nothing runs. Refused by every import. As-built: [`okf/capabilities/incidents/incidents.md`](okf/capabilities/incidents/incidents.md) §3 *Incident governance* |
 | CP-16 | Action Requests — four-eyes approved outbound API calls from Incidents / Cases and the Decision Rule `invoke-api` consequence | — | ✅ | ✅ | **SHIPPED 2026-09-27** (`ASSURE-ACTION-REQUESTS-1`); **an optional module since 2026-10-08** (`MODULE-REORG-P7`: `inspecto-action-requests`, feature `actionRequests`, Professional and above, `requires` `notify-channels` for the wire). The routes, the store, the dispatcher and the `invoke-api` consequence are the module; the base approver-eligibility check, the approver roster and the Pending Change hold stay core. It reaches its Incident / Case through the `LinkedSubjectProvider` seam (`inspecto-ops` contributes both) and the wire is `inspecto-notify-channels` (`HttpWebhookSinkTransport.exchange`), so a bundle without the module - **Personal** - answers **503** on EVERY `/action-requests*` route naming it (it used to serve a read-only empty list and 503 only on create), `/bootstrap` reports `features.actionRequests=false`, and `invoke-api` reports *unavailable* naming the module (it used to report *skipped*/*unavailable* without objects). Without ops the module still answers 503 on create (no subject provider). Egress = the `sink.webhook` Connection rules plus a deny-by-default address policy with a per-Space **Egress Allowlist** (`/settings/egress`) and a pinned connect; redirects never followed. As-built: [`okf/backend/control-plane/action-requests.md`](okf/backend/control-plane/action-requests.md) |
+| CP-18 | Regulatory Reporting — regulator-format reports (SAR / STR shaped) from a Case or Incident and its evidence, rendered from a Report Template (XML / CSV / JSON), four-eyes approved, submitted to a jailed file drop | — | ✅ | ✅ | **SHIPPED 2026-10-09** (`REGULATORY-REPORTING-1`) as the optional module `inspecto-regulatory-reporting` (feature `regulatoryReporting`, Professional and above, `requires` `ops`); on Personal every `/regulatory-reports*` path answers 503 naming the module. File drop only — no live regulator API. As built: `okf/backend/control-plane/regulatory-reporting.md`. |
 
 ### Security & identity [`SEC`]
 

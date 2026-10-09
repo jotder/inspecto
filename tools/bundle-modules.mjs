@@ -72,6 +72,7 @@ const MODULES = [
     { artifactId: 'inspecto-scoring', dir: 'features/inspecto-scoring', bundleFile: 'inspecto-scoring.jar', from: 'professional' },  // MODULE-REORG-1 P7: the Scoring add-on (risk-score routes + risk.score + save checks; NOT Personal)
     { artifactId: 'inspecto-case-management', dir: 'features/inspecto-case-management', bundleFile: 'inspecto-case-management.jar', from: 'professional' },  // MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, from-entities, caserule.evaluate; requires ops; NOT Personal)
     { artifactId: 'inspecto-action-requests', dir: 'features/inspecto-action-requests', bundleFile: 'inspecto-action-requests.jar', from: 'professional' },  // MODULE-REORG-P7: the Action Requests add-on (/action-requests* + invoke-api; reaches subjects through LinkedSubjectProvider; NOT Personal)
+    { artifactId: 'inspecto-regulatory-reporting', dir: 'features/inspecto-regulatory-reporting', bundleFile: 'inspecto-regulatory-reporting.jar', from: 'professional' },  // REGULATORY-REPORTING-1: the Regulatory Reporting add-on (/regulatory-reports*; requires ops; NOT Personal)
     // PKG-5 (2026-09-12): the assist agent ships Professional and above, as an OPTIONAL component. NB it is
     // a DEFAULT-reactor module, unlike the gated ones around it — package.ps1 lists it in $modules only so
     // that pass builds its shaded `sidecar` artifact. The staged file is the sidecar, never the thin jar.
@@ -125,7 +126,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 23, Enterprise 26, Preview 26 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 24, Enterprise 27, Preview 27 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

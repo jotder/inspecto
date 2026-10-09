@@ -897,6 +897,25 @@ built: [`okf/backend/control-plane/action-requests.md`](okf/backend/control-plan
 "webhook call" or "outbound action" for this — a **webhook** is the `sink.webhook` Step or a notification
 channel, neither of which is approved. ⛔ Not a **Pending Change**: that holds a config change; this holds a call.
 
+**Regulatory Report** — A regulator-format document (a SAR / STR is the motivating case) assembled from ONE
+**Case** or **Incident** — its fields, its member Incidents and its evidence (attachment notes) — plus the values
+its maker types (the narrative), rendered ONCE from a **Report Template** and fixed from then on. Lifecycle
+*draft → pending → approved → submitted | failed*, plus *declined* (the checker refused it) and *expired*; a
+different person (`canApproveChanges`) approves it, and approving **submits** it. ⛔ *rejected* is reserved for a
+regulator's refusal — never the checker's (that is *declined*). *(Added 2026-10-09, `REGULATORY-REPORTING-1`; as built:
+[`okf/backend/control-plane/regulatory-reporting.md`](okf/backend/control-plane/regulatory-reporting.md).)* ⛔ Not a
+**Report** Job (a scheduled table export) and not a **Pending Change** (that holds config).
+
+**Report Template** — The definition of one regulator format: its output **fields** (each a source path into the
+report context, or a constant), the format (XML, CSV, JSON) and the **file drop** a submitted report lands in.
+Built-ins ship with the module; a Space's own live in `regulatory-report-templates/` (a pack's content). *(Added
+2026-10-09, `REGULATORY-REPORTING-1`.)* ⛔ Not a **Space Template** (a whole Space's content) nor a notification
+template.
+
+**Submission** (of a Regulatory Report) — Writing an approved report's exact bytes to its template's **file drop**
+(the only delivery built: no live regulator API). The hash-chained AUDIT rows `regulatory-report.submitted` are the
+**submission log**. *(Added 2026-10-09, `REGULATORY-REPORTING-1`.)*
+
 **Egress Allowlist** — The per-Space list (`egress.toon`, `GET|PUT /settings/egress`, `canAdminister`) of host
 names and CIDR ranges an **Action Request** may reach although the egress policy denies their address class by
 default (loopback, link-local, private, CGNAT, this host…). A host entry lifts only the private classes; a CIDR lifts
@@ -1201,7 +1220,7 @@ settings. An **Edition** (§14 `PKG`) is an Offering that lists other Offerings;
 and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *product tier*.
 
 **Add-on** — A horizontal, domain-neutral Optional module set sold to any customer (Incidents, Case Management,
-Reconciliation, Scoring & Lists, Action Requests, Workflow & SLA, Link Analysis & Investigations, AI Assist &
+Reconciliation, Scoring & Lists, Action Requests, Regulatory Reporting, Workflow & SLA, Link Analysis & Investigations, AI Assist &
 Intelligence, Integration & Delivery, Premium Connectors, Multi-entity / Group). **Tiers** (Personal ·
 Professional · Enterprise) are deployment and compliance posture, not Add-ons.
 

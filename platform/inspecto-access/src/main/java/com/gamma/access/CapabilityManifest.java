@@ -319,6 +319,14 @@ public final class CapabilityManifest {
             // with the other Incident-creation routes at the top.)
             new Entry("POST", "/recon/([^/]+)/record", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/recon/([^/]+)/breaks/status", Roles.CAN_OPERATE_RUNS),
+            // RegulatoryReportRoutes (REGULATORY-REPORTING-1) — drafting a regulator-format report from a Case /
+            // Incident and sending it for approval is working it; approving, declining and retrying the submission is
+            // oversight, the Pending Change capability reused (four-eyes enforced in the handler, always).
+            new Entry("POST", "/regulatory-reports", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/regulatory-reports/([^/]+)/request-approval", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/regulatory-reports/([^/]+)/approve", Roles.CAN_APPROVE_CHANGES),
+            new Entry("POST", "/regulatory-reports/([^/]+)/decline", Roles.CAN_APPROVE_CHANGES),
+            new Entry("POST", "/regulatory-reports/([^/]+)/retry", Roles.CAN_APPROVE_CHANGES),
             // RequirementRoutes
             // ⛔ `POST /requirements` is deliberately NOT here. The route-gating audit called it "an
             // inconsistency, not a judgement call" because its two siblings are gated — that is WRONG, and
