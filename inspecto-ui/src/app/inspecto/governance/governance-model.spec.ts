@@ -4,6 +4,7 @@ import {
     GOVERNED_OBJECT_TYPES,
     describeEscalationRule,
     escalationRuleContent,
+    escalationRuleDraft,
     slaContent,
     slaDraft,
     splitList,
@@ -157,6 +158,51 @@ describe('governance-model', () => {
             expect(escalationRuleContent({ ...draft, when: next }, stored)).not.toHaveProperty('when');
             const g = { ...WHEN, op: 'OR' as const };
             expect(escalationRuleContent({ ...draft, when: g as never }, stored)['when']).toEqual(g);
+        });
+    });
+
+    describe('escalationRuleDraft', () => {
+        const stored = {
+            id: 'r1',
+            objectType: 'CASE',
+            on: 'age',
+            afterMinutes: 30,
+            priority: 'P1',
+            reassign: 'lead',
+            notify: true,
+            'x-keep': 1,
+            when: {
+                kind: 'group',
+                op: 'AND',
+                items: [{ kind: 'condition', field: 'status', operator: '=', value: 'OPEN' }],
+            },
+        };
+
+        it('round-trips a stored rule through the form draft without losing a key', () => {
+            const d = escalationRuleDraft(stored);
+            expect(d).toMatchObject({
+                id: 'r1',
+                objectType: 'CASE',
+                on: 'age',
+                target: 'resolution',
+                afterMinutes: 30,
+                notify: true,
+                raisePriority: false,
+            });
+            expect(escalationRuleContent(d, stored)).toEqual(stored);
+        });
+
+        it('copies the when tree so editing it cannot mutate the stored rule', () => {
+            const d = escalationRuleDraft(stored);
+            expect(d.when).toEqual(stored.when);
+            expect(d.when).not.toBe(stored.when);
+        });
+
+        it('negative probe: a when that is not a condition group is left undefined so a save keeps it as stored', () => {
+            const odd = { ...stored, when: 'status == OPEN' };
+            const d = escalationRuleDraft(odd);
+            expect(d.when).toBeUndefined();
+            expect(escalationRuleContent(d, odd)['when']).toBe('status == OPEN');
         });
     });
 });

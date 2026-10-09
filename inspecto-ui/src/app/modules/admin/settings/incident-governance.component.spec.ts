@@ -204,4 +204,110 @@ describe('IncidentGovernanceComponent', () => {
             expect(toggle(el).getAttribute('aria-describedby')).toBe(err.id);
         });
     });
+
+    describe('Escalation Rule edit', () => {
+        const STORED = {
+            type: 'escalation-rule',
+            name: 'age-page',
+            ref: 'escalation-rule/age-page',
+            contentHash: 'h-1',
+            content: {
+                id: 'age-page',
+                objectType: 'CASE',
+                on: 'age',
+                afterMinutes: 30,
+                priority: 'P1',
+                raisePriority: true,
+                'x-note': 'kept',
+                when: {
+                    kind: 'group',
+                    op: 'AND',
+                    items: [{ kind: 'condition', field: 'status', operator: '=', value: 'OPEN' }],
+                },
+            },
+        };
+        const editButton = (el: HTMLElement, name: string) =>
+            el.querySelector<HTMLButtonElement>(`button[aria-label="Edit Escalation Rule ${name}"]`)!;
+
+        function editing() {
+            const s = setup();
+            s.components.list.mockReturnValue(of([RULE, STORED] as never));
+            s.c.load();
+            s.fixture.detectChanges();
+            editButton(s.el, 'age-page').click();
+            s.fixture.detectChanges();
+            return s;
+        }
+
+        it('loads the stored rule into the form with its id fixed and says which rule is edited (no a11y violations)', async () => {
+            const { c, el, fixture, button } = editing();
+            expect(c.rule.controls.id.disabled).toBe(true);
+            expect(c.rule.getRawValue()).toMatchObject({
+                id: 'age-page',
+                on: 'age',
+                afterMinutes: 30,
+                priority: 'P1',
+                raisePriority: true,
+                notify: false,
+            });
+            expect(el.querySelector('[data-testid="rule-editing"]')?.textContent).toContain('age-page');
+            expect(button('Save Escalation Rule')).toBeTruthy();
+            expect(button('Add Escalation Rule')).toBeUndefined();
+            expect(c.whenGroup.items.length).toBe(1);
+            expect(c.whenGroup).not.toBe(STORED.content.when);
+            await fixture.whenStable();
+            await expectNoA11yViolations(el);
+        });
+
+        it('saves with PUT under the stored name and hash, keeps unmodelled keys and objectType, then leaves edit mode', () => {
+            const { c, fixture, components } = editing();
+            c.rule.patchValue({ afterMinutes: 45 });
+            c.addRule();
+            fixture.detectChanges();
+            expect(components.create).not.toHaveBeenCalled();
+            const [kind, id, body, opts] = components.update.mock.calls.at(-1) as unknown as [
+                string,
+                string,
+                Record<string, unknown>,
+                { ifMatch?: string },
+            ];
+            expect([kind, id, opts.ifMatch]).toEqual(['escalation-rule', 'age-page', 'h-1']);
+            expect(body).toMatchObject({
+                id: 'age-page',
+                objectType: 'CASE',
+                on: 'age',
+                afterMinutes: 45,
+                'x-note': 'kept',
+            });
+            expect(body['when']).toEqual(STORED.content.when);
+            expect(c.editing()).toBeNull();
+            expect(c.rule.controls.id.enabled).toBe(true);
+        });
+
+        it("negative probe: a refused save stays in edit mode with the author's changes", () => {
+            const { c, fixture, el, components } = editing();
+            components.update.mockReturnValueOnce(
+                throwError(
+                    () => new HttpErrorResponse({ status: 409, error: { error: 'changed since you opened it' } }),
+                ) as never,
+            );
+            c.rule.patchValue({ afterMinutes: 90 });
+            c.addRule();
+            fixture.detectChanges();
+            expect(c.editing()?.name).toBe('age-page');
+            expect(c.rule.getRawValue().afterMinutes).toBe(90);
+            expect(el.textContent).toContain('changed since you opened it');
+        });
+
+        it('cancel returns the form to adding a new rule', () => {
+            const { c, fixture, button } = editing();
+            button('Cancel')!.click();
+            fixture.detectChanges();
+            expect(c.editing()).toBeNull();
+            expect(c.rule.controls.id.enabled).toBe(true);
+            expect(c.rule.getRawValue().id).toBe('');
+            expect(c.whenGroup.items.length).toBe(0);
+            expect(button('Add Escalation Rule')).toBeTruthy();
+        });
+    });
 });

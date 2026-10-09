@@ -31,6 +31,7 @@ import {
     WEEK_DAYS,
     describeEscalationRule,
     escalationRuleContent,
+    escalationRuleDraft,
     governanceId,
     slaContent,
     slaDraft,
@@ -297,6 +298,15 @@ import {
                                         <button
                                             mat-icon-button
                                             type="button"
+                                            class="ml-auto"
+                                            (click)="editRule(r)"
+                                            [attr.aria-label]="'Edit Escalation Rule ' + r.name"
+                                        >
+                                            <mat-icon svgIcon="heroicons_outline:pencil"></mat-icon>
+                                        </button>
+                                        <button
+                                            mat-icon-button
+                                            type="button"
                                             (click)="removeRule(r.name)"
                                             [attr.aria-label]="'Delete Escalation Rule ' + r.name"
                                         >
@@ -310,6 +320,11 @@ import {
                         <p class="text-secondary text-sm">No Escalation Rules.</p>
                     }
                     @if (canEdit()) {
+                        @if (editing(); as e) {
+                            <p class="text-sm font-medium" role="status" data-testid="rule-editing">
+                                Editing Escalation Rule <span class="font-mono">{{ e.name }}</span>
+                            </p>
+                        }
                         <form [formGroup]="rule" class="flex flex-wrap items-start gap-3" (ngSubmit)="addRule()">
                             <mat-form-field class="w-48">
                                 <mat-label>Rule id</mat-label>
@@ -401,7 +416,12 @@ import {
                                     }
                                 </div>
                             </div>
-                            <button mat-flat-button color="primary" type="submit">Add Escalation Rule</button>
+                            <button mat-flat-button color="primary" type="submit">
+                                {{ editing() ? 'Save Escalation Rule' : 'Add Escalation Rule' }}
+                            </button>
+                            @if (editing()) {
+                                <button mat-stroked-button type="button" (click)="cancelEdit()">Cancel</button>
+                            }
                         </form>
                     }
                 </section>
@@ -428,10 +448,14 @@ export class IncidentGovernanceComponent implements OnInit {
         { value: 'response', label: 'Response target' },
     ];
     readonly rules = signal<ComponentDef[]>([]);
+    /** The stored rule the form is editing (null = the form adds a new rule). */
+    readonly editing = signal<ComponentDef | null>(null);
     /** The match context an Escalation Rule's `when` is evaluated over (server `escalationContext`). */
     readonly contextColumns = ESCALATION_CONTEXT_COLUMNS;
     /** The new rule's `when` tree; the condition-group editor mutates it in place. */
     whenGroup = emptyGroup('AND');
+    /** True while editing a rule whose stored `when` is not a condition group the editor can show. */
+    private whenOpaque = false;
     readonly whenOpen = signal(false);
     readonly whenIssues = signal<string[]>([]);
     private readonly whenTouched = signal(false);
@@ -608,9 +632,62 @@ export class IncidentGovernanceComponent implements OnInit {
             if (issues.length) this.whenOpen.set(true);
             return;
         }
+        const editing = this.editing();
+        if (editing) {
+            const stored = editing.content;
+            const draft: EscalationRuleDraft = {
+                ...this.rule.getRawValue(),
+                objectType: String(stored['objectType'] ?? this.type),
+                // A stored `when` the editor cannot show stays as stored unless the author built a new one.
+                when: this.whenOpaque && !this.whenGroup.items.length ? undefined : this.whenGroup,
+            };
+            this.report(
+                this.components.update('escalation-rule', editing.name, escalationRuleContent(draft, stored), {
+                    ifMatch: editing.contentHash,
+                }),
+                'Escalation Rule',
+                () => this.cancelEdit(),
+            );
+            return;
+        }
         const draft: EscalationRuleDraft = { ...this.rule.getRawValue(), objectType: this.type, when: this.whenGroup };
         this.report(this.components.create('escalation-rule', escalationRuleContent(draft)), 'Escalation Rule');
+        this.resetWhen();
+    }
+
+    /** Load a stored rule into the form; its id is fixed while editing (a rename is delete + add). */
+    editRule(r: ComponentDef): void {
+        const d = escalationRuleDraft(r.content);
+        this.editing.set(r);
+        this.rule.reset({
+            id: d.id || r.name,
+            on: d.on,
+            target: d.target,
+            afterMinutes: d.afterMinutes ?? 60,
+            priority: d.priority,
+            reassign: d.reassign,
+            notify: d.notify,
+            raisePriority: d.raisePriority,
+        });
+        this.rule.controls.id.disable();
+        this.resetWhen();
+        this.whenOpaque = d.when === undefined && r.content['when'] !== undefined;
+        if (d.when) {
+            this.whenGroup = d.when;
+            this.whenOpen.set(d.when.items.length > 0);
+        }
+    }
+
+    cancelEdit(): void {
+        this.editing.set(null);
+        this.rule.controls.id.enable();
+        this.rule.reset();
+        this.resetWhen();
+    }
+
+    private resetWhen(): void {
         this.whenGroup = emptyGroup('AND');
+        this.whenOpaque = false;
         this.whenIssues.set([]);
         this.whenTouched.set(false);
         this.whenOpen.set(false);
@@ -636,12 +713,13 @@ export class IncidentGovernanceComponent implements OnInit {
             });
     }
 
-    private report(call: Observable<unknown>, what: string): void {
+    private report(call: Observable<unknown>, what: string, onSaved?: () => void): void {
         this.lastError.set(null);
         call.subscribe({
             next: (res) => {
                 const held = (res as { status?: string } | null)?.status === 'pending';
                 this.toastr.success(held ? `${what} submitted for approval` : `${what} saved`);
+                onSaved?.();
                 this.load();
             },
             error: (err: HttpErrorResponse) => this.lastError.set(apiErrorMessage(err, `${what} was refused`)),

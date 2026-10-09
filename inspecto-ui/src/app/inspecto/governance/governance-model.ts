@@ -199,6 +199,28 @@ export function escalationRuleContent(
     return out;
 }
 
+/**
+ * The form draft of a stored Escalation Rule — the inverse of {@link escalationRuleContent} for the keys it models.
+ * `when` is a deep copy (the condition-group editor mutates its group in place), or `undefined` when the stored
+ * value is not a condition group, so a save carries it forward untouched.
+ */
+export function escalationRuleDraft(content: Record<string, unknown> | null | undefined): EscalationRuleDraft {
+    const c = content ?? {};
+    const after = c['afterMinutes'];
+    return {
+        id: String(c['id'] ?? ''),
+        objectType: String(c['objectType'] ?? ''),
+        on: c['on'] === 'age' ? 'age' : 'breach',
+        target: c['target'] === 'response' ? 'response' : 'resolution',
+        afterMinutes: after === undefined || after === null || after === '' ? null : Number(after),
+        priority: String(c['priority'] ?? ''),
+        reassign: String(c['reassign'] ?? ''),
+        notify: c['notify'] === true,
+        raisePriority: c['raisePriority'] === true,
+        when: isGroup(c['when']) ? structuredClone(c['when']) : undefined,
+    };
+}
+
 const isGroup = (v: unknown): v is ConditionGroup =>
     !!v && typeof v === 'object' && Array.isArray((v as ConditionGroup).items);
 
