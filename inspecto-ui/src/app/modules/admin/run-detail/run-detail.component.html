@@ -223,6 +223,17 @@
                 and retried — they reappear as Pending on the Files tab without any action needed.
             </inspecto-alert>
         }
+        @if (activeTab === 'batches' && nulledValues() && !loading()) {
+            <inspecto-alert
+                class="mt-4 block"
+                variant="warning"
+                title="{{ nulledValues() }} value(s) did not match their declared type"
+                data-testid="cast-failures"
+            >
+                Each was stored as empty and its row was kept, so these consignments still read as successful. The
+                cast_failures column shows which ones; check the source values against the schema's types.
+            </inspecto-alert>
+        }
         <!-- Commit retries (X1): the per-pipeline bounded COMMIT retry queue, with retry-now / cancel -->
         @if (activeTab === 'retries') {
             <app-commit-retries-panel [pipeline]="name" />

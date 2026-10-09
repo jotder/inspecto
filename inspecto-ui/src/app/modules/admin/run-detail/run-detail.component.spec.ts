@@ -8,8 +8,9 @@ import { ToastrService } from 'ngx-toastr';
 import { AuditRow, LensService, RunsService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
+
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { RunDetailComponent } from './run-detail.component';
+import { RunDetailComponent, castFailures } from './run-detail.component';
 
 const BATCH: AuditRow = { consignment_id: 'b1', status: 'SUCCESS' };
 // The server's quarantine listing is synthesized off the on-disk layout and carries no batch id.
@@ -277,6 +278,28 @@ describe('RunDetailComponent', () => {
         fixture.detectChanges();
         expect(notice()).toBe(true);
         expect(el.textContent).toContain('reappear as Pending');
+    });
+
+    it('warns when consignments nulled values that did not match their declared type (cast_failures)', () => {
+        const fixture = create();
+        const el = fixture.nativeElement as HTMLElement;
+        const banner = () => el.querySelector('[data-testid="cast-failures"]');
+        expect(banner()).toBeNull(); // no cast_failures cell → no banner
+
+        vi.spyOn(TestBed.inject(RunsService), 'batches').mockReturnValue(
+            of([
+                { ...BATCH, cast_failures: '' }, // blank = not measured: counts as nothing
+                { consignment_id: 'b2', status: 'SUCCESS', cast_failures: '2' },
+                { consignment_id: 'b3', status: 'SUCCESS', cast_failures: '1' },
+            ]),
+        );
+        fixture.componentInstance.loadTab();
+        fixture.detectChanges();
+        expect(banner()?.textContent).toContain('3 value(s) did not match their declared type');
+    });
+
+    it('negative probe: zero cast_failures raise no warning', () => {
+        expect(castFailures([{ cast_failures: '0' }, { cast_failures: '' }, { cast_failures: 'n/a' }])).toBe(0);
     });
 
     it('renders with no a11y violations', async () => {

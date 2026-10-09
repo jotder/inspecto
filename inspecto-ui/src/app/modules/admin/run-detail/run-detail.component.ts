@@ -130,6 +130,11 @@ export class RunDetailComponent implements OnInit {
     readonly rows = signal<AuditRow[]>([]); // generic grid (batches/lineage/quarantine/commits)
     /** Batches tab only: whether any consignment is FAILED — gates the retry-is-automatic notice. */
     readonly hasFailedBatches = signal(false);
+    /**
+     * Values a declared type nulled while their row was KEPT, summed over the listed consignments (`cast_failures`;
+     * blank = not measured). A run that blanked data still reports SUCCESS, so this is the only signal it happened.
+     */
+    readonly nulledValues = signal(0);
     lineageBatchId = '';
 
     // files tab
@@ -184,6 +189,7 @@ export class RunDetailComponent implements OnInit {
                     ),
                 );
                 this.hasFailedBatches.set(tab === 'batches' && this.rows().some((r) => r['status'] === 'FAILED'));
+                this.nulledValues.set(tab === 'batches' ? castFailures(this.rows()) : 0);
                 this.loading.set(false);
             },
             error: () => {
@@ -435,4 +441,12 @@ export class RunDetailComponent implements OnInit {
     back(): void {
         this.router.navigate(['/runs']);
     }
+}
+
+/** Sum of the `cast_failures` cells; a blank or non-numeric cell is "not measured" and counts as nothing. */
+export function castFailures(rows: AuditRow[]): number {
+    return rows.reduce((n, r) => {
+        const v = Number(r['cast_failures']);
+        return n + (r['cast_failures'] && Number.isFinite(v) && v > 0 ? v : 0);
+    }, 0);
 }
