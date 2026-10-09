@@ -116,6 +116,9 @@ class ConfigRegistryTest {
         reg.rebuild(List.of(p));   // nothing changed on disk
         assertSame(first, reg.get("mini_etl").orElseThrow(),
                 "an unchanged config (and its schemas) is not re-parsed across rebuilds");
+        bumpMtime(p);              // touched, content identical: the fingerprint is the content, not the time
+        reg.rebuild(List.of(p));
+        assertSame(first, reg.get("mini_etl").orElseThrow(), "a touch alone does not re-parse");
     }
 
     @Test
@@ -124,7 +127,7 @@ class ConfigRegistryTest {
         ConfigRegistry reg = new ConfigRegistry();
         reg.rebuild(List.of(p));
         var first = reg.get("mini_etl").orElseThrow();
-        bumpMtime(p);
+        Files.writeString(p, Files.readString(p).replace("threads: 2", "threads: 4"));
         reg.rebuild(List.of(p));
         assertNotSame(first, reg.get("mini_etl").orElseThrow(), "a changed pipeline file is re-parsed");
     }
@@ -135,10 +138,28 @@ class ConfigRegistryTest {
         ConfigRegistry reg = new ConfigRegistry();
         reg.rebuild(List.of(p));
         var first = reg.get("mini_etl").orElseThrow();
-        bumpMtime(dir.resolve("mini_schema.toon"));   // a referenced schema, not the pipeline file
+        Path schema = dir.resolve("mini_schema.toon");   // a referenced schema, not the pipeline file
+        Files.writeString(schema, Files.readString(schema) + "\n");
         reg.rebuild(List.of(p));
         assertNotSame(first, reg.get("mini_etl").orElseThrow(),
                 "editing a referenced schema file re-parses the pipeline");
+    }
+
+    /** A same-size edit inside one mtime tick (or on a coarse-timestamp filesystem) must still re-parse: keyed on
+     *  the modification time alone, the registry kept running the OLD config. */
+    @Test
+    void aSameSizeEditInTheSameMtimeTickReloads(@TempDir Path dir) throws Exception {
+        Path p = PipelineConfigBatchTest.writePipeline(dir, "");
+        ConfigRegistry reg = new ConfigRegistry();
+        reg.rebuild(List.of(p));
+        var first = reg.get("mini_etl").orElseThrow();
+        java.nio.file.attribute.FileTime tick = Files.getLastModifiedTime(p);
+        String text = Files.readString(p);
+        assertTrue(text.contains("threads: 2"));
+        Files.writeString(p, text.replace("threads: 2", "threads: 3"));
+        Files.setLastModifiedTime(p, tick);
+        reg.rebuild(List.of(p));
+        assertNotSame(first, reg.get("mini_etl").orElseThrow(), "a same-tick edit is re-parsed");
     }
 
     @Test
@@ -152,7 +173,7 @@ class ConfigRegistryTest {
         assertTrue(reg.configForPath(dir.resolve("nope_pipeline.toon")).isEmpty());
     }
 
-    /** Push a file's mtime forward so the change is detected regardless of filesystem timestamp granularity. */
+    /** Push a file's mtime forward without changing its content. */
     private static void bumpMtime(Path p) throws Exception {
         long t = Files.getLastModifiedTime(p).toMillis() + 5_000L;
         Files.setLastModifiedTime(p, java.nio.file.attribute.FileTime.fromMillis(t));

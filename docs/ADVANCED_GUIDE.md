@@ -71,8 +71,9 @@ my downstream fire" problems.
 
 ### The poll loop (`CollectorService.runAllOnce`)
 One cycle, under a single **`ingestLock` (`ReentrantLock`)** held for the whole cycle:
-1. **Config rebuild** — `ConfigRegistry.rebuild(registry)`: mtime-cached re-index of `*_pipeline.toon`. Re-parses
-   only changed files (+ their referenced schema/grammar/segment files). Steady-state cycles do no parse I/O.
+1. **Config rebuild** — `ConfigRegistry.rebuild(registry)`: content-fingerprinted re-index of `*_pipeline.toon`
+   (SHA-256 of each file: a modification time missed an edit inside one mtime tick). Re-parses only changed files
+   (+ their referenced schema/grammar/segment files). Steady-state cycles read and hash the files but do no parsing.
 2. **Filter to runnable set** — skip pipelines that are *paused*, `active: false` (default false = opt-in), or
    not due this tick (`dueThisTick` evaluates the `PipelineTrigger`: interval/cron/event/manual). Each survivor gets
    `cfg.forNewRun()` (cheap timestamp re-stamp, no re-parse).
