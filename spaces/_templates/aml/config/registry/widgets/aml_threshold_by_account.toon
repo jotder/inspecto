@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: aml_threshold
+controls:
+  x[1]{field}:
+    account_id
+  y[1]{field,agg}:
+    cash_total,sum
+options:
+  title: Daily cash total by account

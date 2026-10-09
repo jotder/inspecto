@@ -1,0 +1,24 @@
+entityType: account
+highThreshold: 60
+factors[3]:
+  - id: structuring
+    label: "Near-limit cash deposits in the look-back window"
+    dataset: aml_structuring
+    key: account_id
+    measure: "max(near_limit_deposits)"
+    weight: 10
+    cap: 50
+  - id: smurfing
+    label: "Distinct small-transfer payers into the account"
+    dataset: aml_fan_in
+    key: account_id
+    measure: "max(payers)"
+    weight: 4
+    cap: 40
+  - id: high_risk_wires
+    label: "Wires to the high-risk jurisdiction list"
+    dataset: aml_high_risk_traffic
+    key: account_id
+    measure: "max(high_risk_wires)"
+    weight: 10
+    cap: 30

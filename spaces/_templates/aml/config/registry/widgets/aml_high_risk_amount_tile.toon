@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Wired to high-risk jurisdictions
+  kpi:
+    kpiId: aml_high_risk_amount

@@ -1,0 +1,8 @@
+name: inbound-collector
+label: Inbound collector
+category: money
+description: Many parties converging INTO one account (they → M → target). Start from the collector and follow incoming links.
+steps[3]{direction}:
+  ""
+  in
+  in

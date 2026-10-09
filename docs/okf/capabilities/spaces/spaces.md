@@ -794,6 +794,36 @@ requirement is declared by Offering placement (`offerings/professional.toon` `co
   customer's), tiered / campaign commission and fee tables (flat rates are configuration today — the runbook warns),
   vendor feed mappings.
 
+#### 3.5.4 The `aml` function pack (`PACK-AML-1`, 2026-10-10)
+
+Configuration only (no platform or add-on source edit; the one build change is two TEST-scope dependencies in
+`inspecto-scoring`'s pom so its golden test can run Screening and load a Report Template). Needs Professional or
+Enterprise; listed in `offerings/professional.toon` `contentPacks`. Two synthetic feeds: `aml_txn` (account ledger:
+`CASH_DEPOSIT`, `CASH_WITHDRAWAL`, `TRANSFER`, `WIRE`; `account_id` pays `counterparty_id`; `DECIMAL(18,2)`) and
+`aml_parties` (party-register snapshot). Country codes XA-XF are placeholders.
+
+- **Four `sql.template` typologies** (03:00, keep-earlier-windows shape, zero-row seed per sink, a `lookback_days`
+  of 6 for the three that read a week): `aml_structuring` (cash deposits in `[limit x (1 - band), limit)`, alert `gt 4`),
+  `aml_threshold` (a day's cash total, single or split, `gt 10000`), `aml_fan_in` (distinct payers of transfers at most
+  1,000 into one account, the smurfing shape, `gt 9`) and `aml_high_risk_traffic` (WIRE rows to the Job's
+  `high_risk_countries` list, `gt 5000`). Every Alert Rule is per account and CRITICAL (a WARNING rule opened no Incident
+  in the golden sweep).
+- **Risk Score `aml_account`** (structuring x10 cap 50, smurfing payers x4 cap 40, high-risk wires x10 cap 30, high at 60) +
+  PENDING `aml_high_risk_account`. Two accounts each have two signals AT their own rules' thresholds (silent) that together
+  score 60 / 66.
+- **Screening**: the shipped `aml_screening` Job (`screening.run` over `aml_parties`, lists `aml_sanctions,aml_pep`) ships
+  `enabled: false`, because Entity Lists are facts in the Space's own log and cannot ship in a template.
+- **Link Analysis**: the `aml_account_transfers` view and four money pattern packs (layering chain, pass-through, inbound
+  collector, circular flow). **Reporting**: `config/regulatory-report-templates/aml-str.toon`, an ILLUSTRATIVE STR shape.
+- **Verification.** `AmlPackGoldenTest` + `AmlScreeningGoldenTest` in `inspecto-scoring` (one module carries Scoring,
+  Screening and Regulatory Reporting): corpus pinned to `AmlCorpus` (seed 20261010, `-Daml.regenerate=true`), exact offenders
+  per typology with look-alikes AT the threshold, outside the look-back and of another kind, exact Risk Score outcomes, exact
+  Screening Hits (reordered name, exact, identifier-only, PEP; two look-alikes silent; a re-run raises nothing). Mutation-checked:
+  lowering the `aml_structuring` rule's `threshold` to 3 fails on the at-threshold look-alike `AC100003`.
+- **Deliberately cut (a template cannot carry them).** Investigation Templates and the `structuring` / `valueWeightedLinks` value-Measure
+  Alert Rule need a live Investigation (runtime state, no registry kind) - the runbook says how to bind one; Entity List seeding;
+  a real regulator's report schema; counterparty-name screening of every transaction (the register is screened instead).
+
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 
 A bundle is a *serialised, self-describing subgraph* of the component graph for **instance-to-instance

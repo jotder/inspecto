@@ -1,0 +1,9 @@
+name: aml_threshold
+dataset: aml_threshold
+measure: max(cash_total)
+by[1]: account_id
+comparator: gt
+threshold: 10000
+stormCap: 500
+severity: CRITICAL
+description: "Threshold crossing: a day's cash deposits over the reporting limit"

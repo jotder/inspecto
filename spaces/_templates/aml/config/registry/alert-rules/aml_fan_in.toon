@@ -1,0 +1,9 @@
+name: aml_fan_in
+dataset: aml_fan_in
+measure: max(payers)
+by[1]: account_id
+comparator: gt
+threshold: 9
+stormCap: 500
+severity: CRITICAL
+description: "Smurfing: many distinct payers into one account"

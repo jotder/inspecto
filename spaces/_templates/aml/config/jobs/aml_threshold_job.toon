@@ -1,0 +1,13 @@
+job:
+  name: aml_threshold
+  type: sql.template
+  description: "Threshold crossing - one account's cash deposits in a day add up to more than the reporting limit (single or split)"
+  sql: "WITH cur AS (SELECT account_id, CAST($window_start AS DATE) AS window_date, sum(amount) AS cash_total, count(*) AS cash_deposits, max(amount) AS largest_deposit FROM aml_txn WHERE txn_type = 'CASH_DEPOSIT' AND txn_ts >= CAST($window_start AS TIMESTAMP) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY account_id) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM aml_threshold WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: aml_txn,aml_threshold
+  sink_dataset: aml_threshold
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  reporting_limit: "10000"
+  enabled: true

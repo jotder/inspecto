@@ -1,0 +1,9 @@
+name: aml_high_risk_traffic
+dataset: aml_high_risk_traffic
+measure: max(high_risk_amount)
+by[1]: account_id
+comparator: gt
+threshold: 5000
+stormCap: 500
+severity: CRITICAL
+description: "Wires to the high-risk jurisdiction watch list"

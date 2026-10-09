@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Cash deposited by accounts over the limit
+  kpi:
+    kpiId: aml_cash_over_limit

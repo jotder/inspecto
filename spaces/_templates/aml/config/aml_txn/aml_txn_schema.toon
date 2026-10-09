@@ -1,0 +1,36 @@
+raw:
+  name: AML_TXN
+  format: CSV
+  fields[7]{name,selector,type,description,unit,classification}:
+    txn_id,"0",VARCHAR,"Core-banking transaction identifier","","INTERNAL"
+    txn_ts,"1",TIMESTAMP,"Transaction time (one agreed timezone, naive)","","INTERNAL"
+    txn_type,"2",VARCHAR,"CASH_DEPOSIT, CASH_WITHDRAWAL, TRANSFER (domestic) or WIRE (cross-border)","","INTERNAL"
+    account_id,"3",VARCHAR,"The account the transaction belongs to (the payer of a TRANSFER or WIRE)","","CONFIDENTIAL"
+    counterparty_id,"4",VARCHAR,"The other account (the payee of a TRANSFER or WIRE); empty for cash","","CONFIDENTIAL"
+    amount,"5","DECIMAL(18,2)","Transaction amount in the reporting currency","USD","INTERNAL"
+    country,"6",VARCHAR,"Counterparty country (synthetic user-assigned codes XA-XF); empty for cash","","INTERNAL"
+mapping:
+  canonicalName: aml_txn
+  rawName: AML_TXN
+  fields[7]:
+    - name: txn_id
+      from: txn_id
+      fn: keep
+    - name: txn_ts
+      from: txn_ts
+      fn: keep
+    - name: txn_type
+      from: txn_type
+      fn: keep
+    - name: account_id
+      from: account_id
+      fn: keep
+    - name: counterparty_id
+      from: counterparty_id
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: country
+      from: country
+      fn: keep

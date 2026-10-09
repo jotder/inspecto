@@ -1,0 +1,35 @@
+name: aml_txn
+active: true
+
+dirs:
+  poll:       data/inbox/aml_txn
+  database:   data/aml_txn/database
+  backup:     data/aml_txn/backup
+  temp:       data/aml_txn/temp
+  errors:     data/aml_txn/errors
+  quarantine: data/aml_txn/quarantine
+  markers:    data/aml_txn/markers
+  status_dir: data/aml_txn/status
+  log_dir:    data/aml_txn/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: aml_txn_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "AML_TXN_{yyyyMMdd}"

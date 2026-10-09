@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: aml_structuring
+controls:
+  x[1]{field}:
+    account_id
+  y[1]{field,agg}:
+    near_limit_deposits,sum
+options:
+  title: Near-limit cash deposits by account

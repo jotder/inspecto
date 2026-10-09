@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: aml_high_risk_traffic
+controls:
+  x[1]{field}:
+    account_id
+  y[1]{field,agg}:
+    high_risk_amount,sum
+options:
+  title: High-risk wires by account

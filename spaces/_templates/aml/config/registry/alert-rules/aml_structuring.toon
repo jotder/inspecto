@@ -1,0 +1,9 @@
+name: aml_structuring
+dataset: aml_structuring
+measure: max(near_limit_deposits)
+by[1]: account_id
+comparator: gt
+threshold: 4
+stormCap: 500
+severity: CRITICAL
+description: "Structuring: repeated cash deposits just under the reporting limit"
