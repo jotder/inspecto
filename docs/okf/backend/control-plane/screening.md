@@ -79,6 +79,16 @@ screened subjects, matches and new hits. Test: `ScreeningJobTest`.
 - **Audit**: `EventType.AUDIT` rows `screening.run.hits` (one per Run: counts) and `screening.hit.decided` (hit id, list,
   from → to, decider). Never the screened name.
 
+## The SPA pane (`/screening`, nav *Operations ▸ Screening Hits*)
+`modules/admin/screening/` over `ScreeningService` (`inspecto/api`). The nav entry carries `navFeature: 'screening'`,
+so it hides when `/bootstrap` `features.screening` is not `true`. Open / Escalated / All filter, a data-table of hits
+(Match Score as a percentage, state as a status badge: open info, escalated warning, confirmed error, dismissed
+success), and a detail card with the score, subject, source run and history. The decision row (Escalate / Dismiss /
+Confirm match, a required reason, the hit's `version` sent with it) shows only with `LensService.canWorkIncidents()`,
+only for the decisions the state still allows, and never on a record whose integrity check failed. A 503 from the list
+is latched into an explained notice, not a toast. Specs: `screening.component.spec.ts` (axe included) and the
+`navigation.service.spec.ts` case for the feature flag; proved end to end in the preview over a seeded Space.
+
 ## Decisions (SCR-D1 … SCR-D14, lane 2026-10-09, operator away)
 Matching in Java, not DuckDB SQL (folding, token-set scoring and golden tests are plain there; DuckDB only reads rows) ·
 threshold per request / per Job, no Space settings file (a new fixed config name needs reserved-path and import-inventory
@@ -91,4 +101,4 @@ Run refuses a subset. Provenance: `docs/archived-documents/plans-archive/screeni
 - Blocking misses a typo in the first letter of **every** token (Gaddafi / Qadhafi alone is never compared); there are no
   phonetic keys or transliteration tables beyond look-alike folding.
 - A Run lists every hit document to dedupe (no index); fine for thousands of hits, not for millions.
-- No SPA pane yet; no four-eyes on `confirmed`; `check` cannot raise hits; no Space-level threshold default.
+- No four-eyes on `confirmed`; `check` cannot raise hits; no Space-level threshold default.

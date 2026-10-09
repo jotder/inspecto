@@ -162,6 +162,10 @@ export const appRoutes: Route[] = [
                 path: 'action-requests',
                 loadChildren: () => import('app/modules/admin/action-requests/action-requests.routes'),
             }, // ASSURE-ACTION-REQUESTS-1
+            {
+                path: 'screening',
+                loadChildren: () => import('app/modules/admin/screening/screening.routes'),
+            }, // SCREENING-1
             { path: 'autonomy', loadChildren: () => import('app/modules/admin/autonomy/autonomy.routes') }, // AGT-5 P4 autonomy dashboard
             { path: 'learning', loadChildren: () => import('app/modules/admin/learning/learning.routes') }, // AGT-5 P5 learning dashboard
             { path: 'notification-center', redirectTo: 'settings/notifications' },

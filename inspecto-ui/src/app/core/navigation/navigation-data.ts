@@ -123,6 +123,14 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 link: '/action-requests',
             },
             {
+                id: 'screening',
+                navFeature: 'screening',
+                title: 'Screening Hits',
+                type: 'basic',
+                icon: 'heroicons_outline:magnifying-glass-circle',
+                link: '/screening',
+            },
+            {
                 id: 'autonomy',
                 navFeature: 'ops',
                 title: 'Autonomy',
