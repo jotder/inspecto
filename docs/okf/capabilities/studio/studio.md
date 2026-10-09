@@ -380,7 +380,7 @@ today in that zone; a future `asOf`, one before year 1, or an Instant the calend
 forms (`+05:30`) are refused — `ZoneOffset.UTC`'s id `Z` is unknown to DuckDB, so UTC is the region id `UTC`. ⚠ A Dataset the caller cannot read answers **404
 exactly as an absent one** — a KPI is never a way round Dataset sharing. The KPI tile binds with
 `options.kpi.kpiId` and then shows ONLY the server's numbers — "No data" for a null value, "KPI unavailable" on a
-read error; the hand-set Widget inputs apply only with no `kpiId`. A KPI Widget with a `kpiId` and **no `datasetId`**
+read error; the hand-set Widget inputs apply only with no `kpiId`. A **new** KPI Widget's "Compare with (prior period)" starts as none (`—`): Show-Me's `autoAssignChannels` (`show-me.ts`) never guesses the optional `compare` channel, so no delta badge shows until a prior period is chosen; a saved compare is untouched (`KPI-DEFAULT-COMPARE-1`, 2026-10-10 — it used to take the second measure and fake a "Down 75% vs prior period"). A KPI Widget with a `kpiId` and **no `datasetId`**
 (every shipped template KPI tile) is *KPI-bound* (`isKpiBound`, `widget-types.ts`): the dashboard editor, the Menu
 viewer and `WidgetHostComponent` render it without a Dataset, run no query, and apply the as-of date but not the
 cross-filter or drill. Before LIVEFIX2 (2026-10-09) the editor drew "Dataset for “” not found." for each one. A `band` KPI's delta and target lines drop the

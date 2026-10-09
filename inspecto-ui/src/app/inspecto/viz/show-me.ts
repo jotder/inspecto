@@ -110,6 +110,8 @@ export function autoAssignChannels(plugin: VizPlugin, fields: VizField[], rowCou
     for (const control of plugin.controls) {
         // An optional break-down (bar's `series`, treemap's `subgroup`) stays empty.
         if ((control.channel === 'series' || control.channel === 'subgroup') && !control.required) continue;
+        // KPI-DEFAULT-COMPARE-1: a KPI's prior period is never guessed — an unrelated measure fakes a delta badge.
+        if (control.channel === 'compare' && !control.required) continue;
         const pick = takeNext(control.acceptRoles, pools, used);
         if (!pick) continue;
         const cv: ChannelValue = control.isMeasure ? { field: pick.name, agg: 'sum' } : { field: pick.name };

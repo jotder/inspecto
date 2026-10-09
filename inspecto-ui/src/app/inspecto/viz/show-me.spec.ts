@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isolateViz, registerViz } from './viz-registry';
 import { recommend, autoAssignChannels } from './show-me';
-import { BAR_PLUGIN, BUBBLE_PLUGIN, BUILTIN_VIZ_PLUGINS, PIE_PLUGIN, TABLE_PLUGIN } from './plugins';
+import { BAR_PLUGIN, BUBBLE_PLUGIN, KPI_PLUGIN, BUILTIN_VIZ_PLUGINS, PIE_PLUGIN, TABLE_PLUGIN } from './plugins';
+import { channelMeasureId } from './query-spec';
 import { ControlSpec, VizField, VizPlugin } from './viz-types';
 
 function plugin(type: string, fit: VizPlugin['meta']['fit'], controls: ControlSpec[]): VizPlugin {
@@ -85,6 +86,24 @@ describe('autoAssignChannels', () => {
         const values = autoAssignChannels(BAR, CATEGORICAL_FIELDS);
         expect(values.x?.[0].field).toBe('tariff');
         expect(values.y?.[0].field).toBe('duration_s');
+    });
+
+    // KPI-DEFAULT-COMPARE-1: a new KPI must not bind an unrelated second measure as its prior period.
+    it('leaves a new KPI widget with no compare, so it renders no delta badge', () => {
+        const fields: VizField[] = [
+            { name: 'goals', type: 'number', role: 'measure' },
+            { name: 'shots', type: 'number', role: 'measure' },
+        ];
+        const values = autoAssignChannels(KPI_PLUGIN, fields);
+        expect(values.value?.[0]).toEqual({ field: 'goals', agg: 'sum' });
+        expect(values.compare).toBeUndefined();
+        const props = KPI_PLUGIN.transformProps([{ [channelMeasureId({ field: 'goals' })]: 10, [channelMeasureId({ field: 'shots' })]: 40 }], values);
+        expect(props.compare).toBeUndefined();
+    });
+
+    it('keeps an explicitly saved KPI compare', () => {
+        const saved = { value: [{ field: 'goals' }], compare: [{ field: 'prev' }] };
+        expect(KPI_PLUGIN.transformProps([{ [channelMeasureId({ field: 'goals' })]: 10, [channelMeasureId({ field: 'prev' })]: 8 }], saved).compare).toBe(8);
     });
 });
 
