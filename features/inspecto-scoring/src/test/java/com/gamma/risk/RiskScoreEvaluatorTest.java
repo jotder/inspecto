@@ -130,8 +130,8 @@ class RiskScoreEvaluatorTest {
         // The premise, proven: the SAME query run raw DOES quote the value — so the wrapper is what hides it.
         Throwable rawT = assertThrows(Exception.class, () -> com.gamma.query.QueryExecutor.run(
                 new com.gamma.query.QueryExecutor.Request("spend_num", rel.apply("spend_num"),
-                        com.gamma.query.MeasureCompiler.compile(m.factors().get(0).valueSpec(10)), 10, 0,
-                        List.of(), List.of())));
+                        com.gamma.query.MeasureCompiler.compile(m.factors().get(0).valueSpec(10)).sql(), 10, 0,
+                        List.of(), List.of(), com.gamma.query.MeasureCompiler.compile(m.factors().get(0).valueSpec(10)).params())));
         assertTrue(rawT.getMessage().contains("447700900123"), "DuckDB's own message quotes the cell: " + rawT.getMessage());
 
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> RiskScoreEvaluator.evaluate(m, rel, NO_MASK));

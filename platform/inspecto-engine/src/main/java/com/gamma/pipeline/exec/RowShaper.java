@@ -753,7 +753,8 @@ public final class RowShaper {
         body.put("measures", measures);
         if (node.cfg("group_by") instanceof List<?> groupBy && !groupBy.isEmpty()) body.put("groupBy", groupBy);
         body.put("limit", Integer.MAX_VALUE);
-        String select = MeasureCompiler.compile(MeasureCompiler.parse(body, Integer.MAX_VALUE, Integer.MAX_VALUE));
+        String select = MeasureCompiler.compile(MeasureCompiler.parse(body, Integer.MAX_VALUE, Integer.MAX_VALUE))
+                .unboundSql();   // embedded in CREATE TABLE ... AS
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
         return List.of(new Relation(PipelineRel.DATA, data));

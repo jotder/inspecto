@@ -65,21 +65,21 @@ final class BiRoutes implements RouteModule {
         // 1. Parse + compile the spec (validated identifiers / typed literals only).
         MeasureCompiler.Spec spec;
         MeasureCompiler.Spec probe;
-        String sql;       // the probe statement that is EXECUTED (cap + 1)
-        String echoSql;   // the statement for the ORIGINAL spec (LIMIT = cap) that the response echoes
+        MeasureCompiler.Compiled sql;   // the probe statement that is EXECUTED (cap + 1), its values bound
+        String echoSql;   // the statement for the ORIGINAL spec (LIMIT = cap) that the response echoes, values rendered
         try {
             spec = MeasureCompiler.parse(body, DEFAULT_LIMIT, MAX_LIMIT);
             // One row PAST the cap: the compiled statement carries its own LIMIT, so asking for exactly the cap
             // could never come back truncated (statistics.truncated was always false). QueryExecutor trims it.
             probe = spec.withLimit(spec.limit() + 1);
             sql = MeasureCompiler.compile(probe);
-            echoSql = MeasureCompiler.compile(spec);
+            echoSql = MeasureCompiler.render(spec);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
         // 2. Defence in depth: the compiled text still passes the same guard as caller-authored SQL.
-        List<Finding> findings = SqlGuard.check(sql);
+        List<Finding> findings = SqlGuard.check(sql.sql());
         if (!findings.isEmpty())
             return ApiContext.respondJson(ex, 422, Map.of(
                     "error", "compiled BI query failed the SQL safety check", "findings", findings));
@@ -102,16 +102,19 @@ final class BiRoutes implements RouteModule {
         //    + session context), never baked at save time, and the whole statement is re-guarded.
         String queryId = ApiContext.str(body, "query");
         if (queryId != null) {
-            sql = boundQuerySql(ex, store, queryId, probe);
-            echoSql = boundQuerySql(ex, store, queryId, spec);
-            List<Finding> boundFindings = SqlGuard.check(sql);
+            String with = boundQueryWith(ex, store, queryId, spec);
+            MeasureCompiler.Compiled over = MeasureCompiler.compile(overBound(probe));
+            // The WITH carries no placeholders (the query text is rendered), so the Measure's parameters stay in order.
+            sql = new MeasureCompiler.Compiled(with + over.sql(), over.params());
+            echoSql = with + MeasureCompiler.render(overBound(spec));
+            List<Finding> boundFindings = SqlGuard.check(sql.sql());
             if (!boundFindings.isEmpty())
                 return ApiContext.respondJson(ex, 422, Map.of(
                         "error", "bound query '" + queryId + "' failed the SQL safety check", "findings", boundFindings));
         }
 
-        QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql,
-                spec.limit(), 0, List.of(), List.of());
+        QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql.sql(),
+                spec.limit(), 0, List.of(), List.of(), sql.params());
         try {
             return response(QueryExecutor.run(req), echoSql);
         } catch (SQLException e) {
@@ -123,12 +126,12 @@ final class BiRoutes implements RouteModule {
     private static final String BOUND = "__bound_query";
 
     /**
-     * Compile {@code spec} over the saved query {@code queryId}'s result:
-     * {@code WITH "__bound_query" AS (<rendered query text>) SELECT … FROM "__bound_query"}. The query must
+     * The {@code WITH "__bound_query" AS (<rendered query text>) } prefix that puts {@code spec} over the saved
+     * query {@code queryId}'s result ({@link #overBound} then compiles {@code SELECT … FROM "__bound_query"}). The query must
      * exist and be visible (else 404, like a dataset), be {@code type:sql} with text, and read the SAME
      * dataset the spec names (the dataset view it references is the one registered for the run).
      */
-    private static String boundQuerySql(HttpExchange ex, ComponentStore store, String queryId, MeasureCompiler.Spec spec) {
+    private static String boundQueryWith(HttpExchange ex, ComponentStore store, String queryId, MeasureCompiler.Spec spec) {
         Map<String, Object> query;
         try {
             query = store.get("query", queryId).map(ComponentRegistry.Component::content).orElse(null);
@@ -154,9 +157,13 @@ final class BiRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         resolved = resolved.strip().replaceAll(";+$", "").strip();
-        MeasureCompiler.Spec overQuery = new MeasureCompiler.Spec(BOUND, spec.measures(), spec.groupBy(),
+        return "WITH \"" + BOUND + "\" AS (" + resolved + ") ";
+    }
+
+    /** {@code spec} re-pointed at the bound query's CTE. */
+    private static MeasureCompiler.Spec overBound(MeasureCompiler.Spec spec) {
+        return new MeasureCompiler.Spec(BOUND, spec.measures(), spec.groupBy(),
                 spec.grains(), spec.filters(), spec.orderBy(), spec.limit(), spec.when());
-        return "WITH \"" + BOUND + "\" AS (" + resolved + ") " + MeasureCompiler.compile(overQuery);
     }
 
     /** The Result Set contract (same shape as {@code /queries/{id}/run}) + the compiled SQL for transparency. */

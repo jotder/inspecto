@@ -121,7 +121,7 @@ final class ShareRoutes implements RouteModule {
         // can neither drop it (seeing more than the Dashboard shows) nor swap in another.
         Map<String, Object> fenced = new LinkedHashMap<>(body);
         MeasureCompiler.Spec spec;
-        String sql;
+        MeasureCompiler.Compiled sql;
         try {
             // UIE-5 (d): and the Dashboard's DEFAULT date range, for a Dataset that has its date column — same fence.
             List<Map<String, Object>> filters = new ArrayList<>(SharedDashboardFilter.terms(dashboard.get("filter"), dataset));
@@ -133,7 +133,7 @@ final class ShareRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
-        List<Finding> findings = SqlGuard.check(sql);
+        List<Finding> findings = SqlGuard.check(sql.sql());
         if (!findings.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "compiled query failed the SQL safety check");
         String relationSql;
         try {
@@ -144,7 +144,7 @@ final class ShareRoutes implements RouteModule {
         }
         try {
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                    spec.dataset(), relationSql, sql, spec.limit(), 0, List.of(), List.of()));
+                    spec.dataset(), relationSql, sql.sql(), spec.limit(), 0, List.of(), List.of(), sql.params()));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("rows", r.rows());
             out.put("rowCount", r.rowCount());

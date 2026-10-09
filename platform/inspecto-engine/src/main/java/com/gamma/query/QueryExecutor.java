@@ -47,7 +47,7 @@ public final class QueryExecutor {
      */
     public record Request(String datasetName, String relationSql, String sql,
                           int limit, int offset, List<String> projection, List<Sort> sort,
-                          List<String> binds) {
+                          List<?> binds) {
 
         /** Existing callers: no bound parameters. Keeps the 7-arg shape source-compatible. */
         public Request(String datasetName, String relationSql, String sql,
@@ -266,14 +266,16 @@ public final class QueryExecutor {
 
     /**
      * A {@link java.sql.PreparedStatement} over {@code sql} with {@code binds} set positionally. Values are
-     * set as strings and left for DuckDB to coerce against the column's own type — the same widening the
-     * inline-literal path relied on, so a template's behaviour does not change with how it is executed.
+     * set with {@code setObject}: a Rule Template's binds are strings, left for DuckDB to coerce against the
+     * column's own type — the same widening the inline-literal path relied on, so a template's behaviour does
+     * not change with how it is executed; a compiled Measure's binds carry their own SQL cast
+     * ({@link MeasureCompiler#compile}).
      */
-    private static java.sql.PreparedStatement prepared(SqlSandbox sandbox, String sql, List<String> binds)
+    private static java.sql.PreparedStatement prepared(SqlSandbox sandbox, String sql, List<?> binds)
             throws SQLException {
         java.sql.PreparedStatement ps = sandbox.preparedStatement(sql);
         try {
-            for (int i = 0; i < binds.size(); i++) ps.setString(i + 1, binds.get(i));
+            for (int i = 0; i < binds.size(); i++) ps.setObject(i + 1, binds.get(i));
         } catch (SQLException e) {
             ps.close();
             throw e;

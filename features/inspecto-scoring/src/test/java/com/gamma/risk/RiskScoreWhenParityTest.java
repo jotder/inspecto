@@ -96,8 +96,9 @@ class RiskScoreWhenParityTest {
     /** entity to count, run in UTC so TIMESTAMPTZ text is deterministic. */
     private static Map<String, Double> values(RiskScoreModel m) throws Exception {
         MeasureCompiler.Spec spec = m.factors().get(0).valueSpec(100);
+        MeasureCompiler.Compiled sql = MeasureCompiler.compile(spec);
         QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request("ev", rel.apply("ev"),
-                MeasureCompiler.compile(spec), 100, 0, List.of(), List.of()), SqlSandboxPolicy.defaultPolicy(), ZoneId.of("UTC"));
+                sql.sql(), 100, 0, List.of(), List.of(), sql.params()), SqlSandboxPolicy.defaultPolicy(), ZoneId.of("UTC"));
         Map<String, Double> out = new TreeMap<>();
         for (Map<String, Object> row : r.rows())
             out.put(String.valueOf(row.get("ent")), ((Number) row.get(spec.measures().get(0).id())).doubleValue());

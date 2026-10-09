@@ -36,13 +36,14 @@ public final class KpiEvaluator {
      * Measure is {@link MeasureCompiler}'s own SELECT over that CTE. With the session TimeZone set to the same zone
      * ({@link #run}), a DATE, TIMESTAMP or TIMESTAMPTZ column is compared on the same instants wherever it runs.
      */
-    static String sql(KpiDefinition kpi, KpiDefinition.Window w) {
+    static MeasureCompiler.Compiled sql(KpiDefinition kpi, KpiDefinition.Window w) {
         String col = com.gamma.util.SqlIdent.q(kpi.timeField());
-        String measure = MeasureCompiler.compile(new MeasureCompiler.Spec(WINDOW, List.of(kpi.measure()), List.of(),
+        MeasureCompiler.Compiled measure = MeasureCompiler.compile(new MeasureCompiler.Spec(WINDOW, List.of(kpi.measure()), List.of(),
                 Map.of(), List.of(), List.of(), 1));
-        return "WITH " + com.gamma.util.SqlIdent.q(WINDOW) + " AS (SELECT * FROM " + com.gamma.util.SqlIdent.q(kpi.dataset())
+        // The window CTE carries no placeholders, so the Measure's parameters are the statement's, in order.
+        return new MeasureCompiler.Compiled("WITH " + com.gamma.util.SqlIdent.q(WINDOW) + " AS (SELECT * FROM " + com.gamma.util.SqlIdent.q(kpi.dataset())
                 + " WHERE " + col + " >= TIMESTAMPTZ '" + instant(kpi, w.from()) + "' AND " + col + " < TIMESTAMPTZ '"
-                + instant(kpi, w.to()) + "') " + measure;
+                + instant(kpi, w.to()) + "') " + measure.sql(), measure.params());
     }
 
     private static String instant(KpiDefinition kpi, LocalDate d) {
@@ -67,12 +68,12 @@ public final class KpiEvaluator {
     }
 
     private static Double run(KpiDefinition kpi, String relationSql, KpiDefinition.Window w) throws SQLException, IOException {
-        String sql = sql(kpi, w);
-        List<Finding> findings = SqlGuard.check(sql);
+        MeasureCompiler.Compiled sql = sql(kpi, w);
+        List<Finding> findings = SqlGuard.check(sql.sql());
         if (!findings.isEmpty())
             throw new IllegalArgumentException("compiled KPI query failed the SQL safety check: " + findings.get(0).message());
-        QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(kpi.dataset(), relationSql, sql, 1, 0,
-                List.of(), List.of()), com.gamma.sql.SqlSandboxPolicy.defaultPolicy(), kpi.zone());
+        QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(kpi.dataset(), relationSql, sql.sql(), 1, 0,
+                List.of(), List.of(), sql.params()), com.gamma.sql.SqlSandboxPolicy.defaultPolicy(), kpi.zone());
         if (r.rows().isEmpty()) return null;
         return r.rows().get(0).get(kpi.measure().id()) instanceof Number n ? n.doubleValue() : null;
     }

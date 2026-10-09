@@ -28,15 +28,15 @@ class MeasureCompilerWhenTest {
 
     @Test
     void absentOrEmptyWhenLeavesTheCompiledSqlUntouched() {
-        String plain = MeasureCompiler.compile(MeasureCompiler.parse(body(null), 10, 10));
-        assertEquals(plain, MeasureCompiler.compile(MeasureCompiler.parse(body(Map.of()), 10, 10)));
-        assertEquals(plain, MeasureCompiler.compile(MeasureCompiler.parse(body(Map.of("kind", "group", "op", "AND", "items", List.of())), 10, 10)));
+        String plain = MeasureCompiler.render(MeasureCompiler.parse(body(null), 10, 10));
+        assertEquals(plain, MeasureCompiler.render(MeasureCompiler.parse(body(Map.of()), 10, 10)));
+        assertEquals(plain, MeasureCompiler.render(MeasureCompiler.parse(body(Map.of("kind", "group", "op", "AND", "items", List.of())), 10, 10)));
         assertTrue(plain.contains("WHERE \"a\" = 'x' GROUP BY"), plain);
     }
 
     @Test
     void whenIsAndedAfterTheUntouchedFlatTerms() {
-        String sql = MeasureCompiler.compile(MeasureCompiler.parse(body(tree("s", "=", "FAILED")), 10, 10));
+        String sql = MeasureCompiler.render(MeasureCompiler.parse(body(tree("s", "=", "FAILED")), 10, 10));
         assertTrue(sql.contains("WHERE \"a\" = 'x' AND (CAST(\"s\" AS VARCHAR) = 'FAILED') GROUP BY"), sql);
     }
 
@@ -44,14 +44,14 @@ class MeasureCompilerWhenTest {
     void whenAloneBecomesTheWhereClause() {
         Map<String, Object> b = body(tree("s", "=", "F"));
         b.remove("filters");
-        assertTrue(MeasureCompiler.compile(MeasureCompiler.parse(b, 10, 10)).contains(" WHERE (CAST(\"s\" AS VARCHAR) = 'F') GROUP BY"));
+        assertTrue(MeasureCompiler.render(MeasureCompiler.parse(b, 10, 10)).contains(" WHERE (CAST(\"s\" AS VARCHAR) = 'F') GROUP BY"));
     }
 
     @Test
     void theSevenArgConstructorStaysSourceCompatibleWithNoWhen() {
         MeasureCompiler.Spec s = new MeasureCompiler.Spec("d", List.of(), List.of("k"), Map.of(), List.of(), List.of(), 5);
         assertNull(s.when());
-        assertEquals("SELECT \"k\" FROM \"d\" ORDER BY \"k\" ASC LIMIT 5", MeasureCompiler.compile(s));
+        assertEquals("SELECT \"k\" FROM \"d\" ORDER BY \"k\" ASC LIMIT 5", MeasureCompiler.render(s));
     }
 
     @Test
@@ -64,7 +64,7 @@ class MeasureCompilerWhenTest {
 
     @Test
     void hostileColumnAndValueAreEscapedIntoQuotedTokens() {
-        String sql = MeasureCompiler.compile(MeasureCompiler.parse(
+        String sql = MeasureCompiler.render(MeasureCompiler.parse(
                 body(tree("s\"; DROP TABLE t; --", "=", "x' OR '1'='1")), 10, 10));
         assertTrue(sql.contains("\"s\"\"; DROP TABLE t; --\""), "the identifier's quote is doubled: " + sql);
         assertTrue(sql.contains("'x'' OR ''1''=''1'"), "the value's quote is doubled: " + sql);

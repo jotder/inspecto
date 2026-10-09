@@ -181,7 +181,7 @@ final class MaterializeTask {
         body.put("limit", limit);
         if (measures.isEmpty() && groupBy.isEmpty())
             return "SELECT * FROM " + q(source) + " LIMIT " + limit;
-        return MeasureCompiler.compile(MeasureCompiler.parse(body, limit, MAX_ROWS + 1));
+        return MeasureCompiler.compile(MeasureCompiler.parse(body, limit, MAX_ROWS + 1)).unboundSql();   // embedded in COPY
     }
 
     /** Clear invisible leftovers of a crashed prior run (never touches live {@code *.parquet}). */

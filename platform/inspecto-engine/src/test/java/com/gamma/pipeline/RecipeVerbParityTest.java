@@ -130,7 +130,7 @@ class RecipeVerbParityTest {
         body.put("measures", measures);
         body.put("groupBy", groupBy);
 
-        String sql = MeasureCompiler.compile(MeasureCompiler.parse(body, 1000, 100_000));
+        String sql = MeasureCompiler.render(MeasureCompiler.parse(body, 1000, 100_000));
         assertTrue(sql.contains("COUNT(*)"), sql);
         assertTrue(sql.contains("SUM(\"GROSS\")"), sql);
         assertTrue(sql.contains("GROUP BY \"REGION\""), sql);

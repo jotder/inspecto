@@ -27,7 +27,7 @@ class MeasureCompilerTest {
         assertEquals("SELECT \"region\", SUM(\"amount\") AS \"sum_amount\", COUNT(*) AS \"count\" "
                         + "FROM \"sales\" WHERE \"amount\" > 10 AND \"region\" IN ('EU', 'US') "
                         + "GROUP BY \"region\" ORDER BY \"sum_amount\" DESC LIMIT 50",
-                MeasureCompiler.compile(spec));
+                MeasureCompiler.render(spec));
     }
 
     /** DETERMINISM (BI-QUERY-TRUNCATION-1): a LIMIT with no orderBy would return an arbitrary subset of the
@@ -36,10 +36,10 @@ class MeasureCompilerTest {
     void aLimitWithoutOrderByOrdersByTheGroupingKeys() {
         assertEquals("SELECT \"region\", \"tier\", COUNT(*) AS \"count\" FROM \"sales\" "
                         + "GROUP BY \"region\", \"tier\" ORDER BY \"region\" ASC, \"tier\" ASC LIMIT 500",
-                MeasureCompiler.compile(parse(Map.of("dataset", "sales",
+                MeasureCompiler.render(parse(Map.of("dataset", "sales",
                         "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region", "tier")))));
         assertEquals("SELECT COUNT(*) AS \"count\" FROM \"sales\" LIMIT 500",
-                MeasureCompiler.compile(parse(Map.of("dataset", "sales",
+                MeasureCompiler.render(parse(Map.of("dataset", "sales",
                         "measures", List.of(Map.of("agg", "count"))))), "scalar: nothing to order");
     }
 
@@ -47,12 +47,12 @@ class MeasureCompilerTest {
     void anExplicitOrderByIsLeftByteIdenticalAndNoCapMeansNoSort() {
         assertEquals("SELECT \"region\", COUNT(*) AS \"count\" FROM \"sales\" GROUP BY \"region\" "
                         + "ORDER BY \"count\" DESC LIMIT 500",
-                MeasureCompiler.compile(parse(Map.of("dataset", "sales",
+                MeasureCompiler.render(parse(Map.of("dataset", "sales",
                         "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region"),
                         "orderBy", List.of(Map.of("field", "count", "dir", "desc"))))));
         // Integer.MAX_VALUE is the "no cap" sentinel (RowShaper, DatasetMeasureProbe): it cannot truncate, so no sort.
         assertEquals("SELECT \"region\", COUNT(*) AS \"count\" FROM \"sales\" GROUP BY \"region\" LIMIT 2147483647",
-                MeasureCompiler.compile(MeasureCompiler.parse(Map.of("dataset", "sales",
+                MeasureCompiler.render(MeasureCompiler.parse(Map.of("dataset", "sales",
                         "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region")),
                         Integer.MAX_VALUE, Integer.MAX_VALUE)));
     }
@@ -61,8 +61,8 @@ class MeasureCompilerTest {
     void withLimitChangesOnlyTheLimit() {
         MeasureCompiler.Spec spec = parse(Map.of("dataset", "sales",
                 "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region")));
-        assertEquals(MeasureCompiler.compile(spec).replace("LIMIT 500", "LIMIT 501"),
-                MeasureCompiler.compile(spec.withLimit(501)));
+        assertEquals(MeasureCompiler.render(spec).replace("LIMIT 500", "LIMIT 501"),
+                MeasureCompiler.render(spec.withLimit(501)));
     }
 
     @Test
@@ -78,7 +78,7 @@ class MeasureCompilerTest {
                 "dataset", "d", "measures", List.of(Map.of("agg", "count")),
                 "filters", List.of(Map.of("field", "name", "op", "=", "value", "O'Brien"),
                         Map.of("field", "active", "op", "=", "value", true))));
-        String sql = MeasureCompiler.compile(spec);
+        String sql = MeasureCompiler.render(spec);
         assertTrue(sql.contains("\"name\" = 'O''Brien'"), sql);
         assertTrue(sql.contains("\"active\" = true"), sql);
     }
@@ -97,7 +97,7 @@ class MeasureCompilerTest {
         MeasureCompiler.Spec inSpec = parse(Map.of("dataset", "d",
                 "measures", List.of(Map.of("agg", "count")),
                 "filters", List.of(Map.of("field", "x", "op", "weird", "value", 1))));
-        assertThrows(IllegalArgumentException.class, () -> MeasureCompiler.compile(inSpec), "unknown op");
+        assertThrows(IllegalArgumentException.class, () -> MeasureCompiler.render(inSpec), "unknown op");
     }
 
     @Test
@@ -107,7 +107,7 @@ class MeasureCompilerTest {
                 "measures", List.of(Map.of("agg", "sum", "field", "amount")),
                 "groupBy", List.of("event_time", "region"),
                 "grains", Map.of("event_time", "month")));
-        String sql = MeasureCompiler.compile(spec);
+        String sql = MeasureCompiler.render(spec);
         // Aliased back to the column's own name, so the client reads the same key it does offline.
         assertTrue(sql.contains("STRFTIME(DATE_TRUNC('month', \"event_time\"), '%Y-%m') AS \"event_time\""), sql);
         // The un-truncated column must not survive into the GROUP BY — that was the live-only defect.
@@ -119,7 +119,7 @@ class MeasureCompilerTest {
     @Test
     void dayAndWeekBucketToIsoDatesTheUiAlsoProduces() {
         for (String grain : List.of("day", "week")) {
-            String sql = MeasureCompiler.compile(parse(Map.of(
+            String sql = MeasureCompiler.render(parse(Map.of(
                     "dataset", "d", "measures", List.of(Map.of("agg", "count")),
                     "groupBy", List.of("t"), "grains", Map.of("t", grain))));
             assertTrue(sql.contains("STRFTIME(DATE_TRUNC('" + grain + "', \"t\"), '%Y-%m-%d')"), sql);
@@ -128,7 +128,7 @@ class MeasureCompilerTest {
 
     @Test
     void aBucketedQueryStillPassesTheSqlGuard() {
-        String sql = MeasureCompiler.compile(parse(Map.of(
+        String sql = MeasureCompiler.render(parse(Map.of(
                 "dataset", "d", "measures", List.of(Map.of("agg", "count")),
                 "groupBy", List.of("t"), "grains", Map.of("t", "week"))));
         assertTrue(com.gamma.sql.SqlGuard.isReadOnly(sql),
@@ -159,7 +159,7 @@ class MeasureCompilerTest {
                 "measures", List.of(Map.of("agg", "count")),
                 "filters", List.of(Map.of("field", "x", "op", "isNull"),
                         Map.of("field", "y", "op", "notNull"))));
-        String sql = MeasureCompiler.compile(spec);
+        String sql = MeasureCompiler.render(spec);
         assertTrue(sql.contains("\"x\" IS NULL") && sql.contains("\"y\" IS NOT NULL"), sql);
     }
 }

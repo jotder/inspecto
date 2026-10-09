@@ -135,8 +135,9 @@ public final class RiskScoreEvaluator {
             // never come back truncated and a run past it silently scored a subset (found by the S3 preview).
             MeasureCompiler.Spec spec = f.valueSpec(maxEntities + 1);
             String valueId = spec.measures().get(0).id();
+            MeasureCompiler.Compiled valueSql = MeasureCompiler.compile(spec);
             QueryExecutor.Result r = run(model, f, "indicator", new QueryExecutor.Request(
-                    f.dataset(), relation, MeasureCompiler.compile(spec), maxEntities, 0, List.of(), List.of()), policy);
+                    f.dataset(), relation, valueSql.sql(), maxEntities, 0, List.of(), List.of(), valueSql.params()), policy);
             if (r.truncated())
                 throw new IllegalStateException("risk-score '" + model.id() + "' factor '" + f.id()
                         + "' names more than " + maxEntities + " entities — refusing to score a subset; raise the cap "
@@ -152,9 +153,9 @@ public final class RiskScoreEvaluator {
             if (!f.evidence().isEmpty()) {
                 // One row past the cap, for the same reason as the indicator read: the compiled statement carries its
                 // own LIMIT, so asking for exactly the cap could never come back truncated (BI-QUERY-TRUNCATION-1).
+                MeasureCompiler.Compiled evidenceSql = MeasureCompiler.compile(f.evidenceSpec(maxEvidenceRows + 1));
                 QueryExecutor.Result ev = run(model, f, "evidence", new QueryExecutor.Request(f.dataset(), relation,
-                        MeasureCompiler.compile(f.evidenceSpec(maxEvidenceRows + 1)), maxEvidenceRows, 0,
-                        List.of(), List.of()), policy);
+                        evidenceSql.sql(), maxEvidenceRows, 0, List.of(), List.of(), evidenceSql.params()), policy);
                 evidenceTruncated |= ev.truncated();
                 for (Map<String, Object> row : ev.rows()) {
                     Object k = row.get(f.key());

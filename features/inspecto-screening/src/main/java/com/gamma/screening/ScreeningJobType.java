@@ -157,9 +157,10 @@ public final class ScreeningJobType implements JobTypeProvider {
         private static QueryExecutor.Result read(Params p, String relation, List<String> columns) {
             MeasureCompiler.Spec spec = new MeasureCompiler.Spec(p.dataset(), List.of(), columns, Map.of(), List.of(),
                     List.of(), p.maxRows() + 1);
+            MeasureCompiler.Compiled compiled = MeasureCompiler.compile(spec);
             try {
-                return QueryExecutor.run(new QueryExecutor.Request(p.dataset(), relation, MeasureCompiler.compile(spec),
-                        p.maxRows() + 1, 0, List.of(), List.of()), SqlSandboxPolicy.defaultPolicy());
+                return QueryExecutor.run(new QueryExecutor.Request(p.dataset(), relation, compiled.sql(),
+                        p.maxRows() + 1, 0, List.of(), List.of(), compiled.params()), SqlSandboxPolicy.defaultPolicy());
             } catch (Exception e) {
                 throw new IllegalStateException(ID + ": reading dataset '" + p.dataset() + "' failed ("
                         + e.getClass().getSimpleName() + "; details withheld because they may quote source values) - "

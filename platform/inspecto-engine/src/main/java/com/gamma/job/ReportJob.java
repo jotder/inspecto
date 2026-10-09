@@ -275,8 +275,8 @@ final class ReportJob implements Job {
                 : MeasureCompiler.parse(body, 10_000, 100_000);
         // One row PAST the cap (BI-QUERY-TRUNCATION-1): the compiled statement ends in its own LIMIT, so asking for
         // exactly the cap could never show the result was cut. The executor trims back to the cap and flags it.
-        String sql = spec != null ? MeasureCompiler.compile(spec.withLimit(spec.limit() + 1))
-                : "SELECT * FROM " + SqlIdent.q(cfg.require("dataset")) + " LIMIT " + (limit + 1);
+        MeasureCompiler.Compiled sql = spec != null ? MeasureCompiler.compile(spec.withLimit(spec.limit() + 1))
+                : new MeasureCompiler.Compiled("SELECT * FROM " + SqlIdent.q(cfg.require("dataset")) + " LIMIT " + (limit + 1), List.of());
 
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         Map<String, Object> dataset = store.get("dataset", cfg.require("dataset"))
@@ -290,7 +290,7 @@ final class ReportJob implements Job {
         // maximum, so an unclamped `limit` above it would leave the executor waiting for rows the SQL can never return.
         int cap = spec != null ? spec.limit() : limit;
         return QueryExecutor.run(new QueryExecutor.Request(
-                cfg.require("dataset"), relationSql, sql, cap, 0, List.of(), List.of()));
+                cfg.require("dataset"), relationSql, sql.sql(), cap, 0, List.of(), List.of(), sql.params()));
     }
 
     /** The configured row cap (default 10,000), as the request carries it. */

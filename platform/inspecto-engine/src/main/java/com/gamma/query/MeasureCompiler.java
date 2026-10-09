@@ -14,8 +14,8 @@ import static com.gamma.util.Values.trimToNull;
  * file's declared "swap seam between offline AlaSQL and a backend DuckDB endpoint"): same aggregation set,
  * same {@code agg_field} measure ids, same filter semantics, so a widget's QuerySpec round-trips 1:1.
  *
- * <p>Everything is built from <b>validated identifiers and typed literals</b> — no caller SQL text ever
- * enters the statement — and the compiled text is still {@code SqlGuard}-checked by the route (defence in
+ * <p>Everything is built from <b>validated identifiers and bound, typed parameters</b> — no caller SQL text
+ * and no filter value ever enters the statement ({@code MEASURE-SQL-BIND-1}) — and the compiled text is still {@code SqlGuard}-checked by the route (defence in
  * depth). Unknown aggregation, operator, or a non-identifier field → {@link IllegalArgumentException}
  * (→ 422 at the route).
  */
@@ -56,8 +56,8 @@ public final class MeasureCompiler {
      * raw value, which is what every widget sent before the grain reached the wire.
      *
      * <p>{@code when} is an optional {@link ConditionTree} group (the structured condition authored in the UI),
-     * ANDed after the flat {@code filters} and rendered by {@link ConditionSql} — escaped identifiers and
-     * literals, never author text. It is ADDITIVE: the flat {@code filters} keep their own typed-literal
+     * ANDed after the flat {@code filters} and rendered by {@link ConditionSql#predicateBound} — escaped identifiers and
+     * bound operand values, never author text. It is ADDITIVE: the flat {@code filters} keep their own typed-literal
      * semantics untouched (see {@link ConditionSql} for how {@code when} types by operand text instead).
      * {@code null} or empty = no extra constraint.
      */
@@ -188,8 +188,45 @@ public final class MeasureCompiler {
                 Math.max(1, Math.min(maxLimit, limit)), when);
     }
 
-    /** Compile the spec to the guarded SELECT (the dataset is referenced by its registered view name). */
-    public static String compile(Spec spec) {
+    /**
+     * A compiled statement whose filter values are JDBC parameters: one {@code ?} in {@code sql} per entry of
+     * {@code params}, in order ({@code MEASURE-SQL-BIND-1}).
+     */
+    public record Compiled(String sql, List<Object> params) {
+
+        /**
+         * The text, for a site that embeds it in a statement it cannot bind ({@code COPY ... TO},
+         * {@code CREATE TABLE ... AS}). Only a spec without {@code filters} / {@code when} has no parameters, so
+         * any other spec is refused rather than run with its placeholders unset.
+         */
+        public String unboundSql() {
+            if (!params.isEmpty())
+                throw new IllegalStateException("measure spec carries " + params.size() + " bound value(s); it must run as a prepared statement");
+            return sql;
+        }
+    }
+
+    /**
+     * Compile the spec to the guarded SELECT (the dataset is referenced by its registered view name). Every
+     * {@code filters} and {@code when} operand value is bound as a parameter, never rendered into the text —
+     * only validated, quoted identifiers and fixed SQL reach the statement.
+     */
+    public static Compiled compile(Spec spec) {
+        List<Object> params = new ArrayList<>();
+        String sql = build(spec, params);
+        return new Compiled(sql, List.copyOf(params));
+    }
+
+    /**
+     * The same statement with operand values rendered as escaped literals — for DISPLAY only (the SQL a BI
+     * response echoes) and for save-time validation. Never executed.
+     */
+    public static String render(Spec spec) {
+        return build(spec, null);
+    }
+
+    /** {@code p} collects bound operand values; {@code null} renders them as escaped literals. */
+    private static String build(Spec spec, List<Object> p) {
         List<String> select = new ArrayList<>();
         // A bucketed dimension keeps its own name as the alias, so the client reads back the same column
         // whether or not a grain was applied.
@@ -202,9 +239,16 @@ public final class MeasureCompiler {
                 .append(" FROM ").append(q(spec.dataset()));
 
         List<String> whereTerms = new ArrayList<>();
-        for (Filter f : spec.filters()) whereTerms.add(filterTerm(f));
+        for (Filter f : spec.filters()) whereTerms.add(filterTerm(f, p));
         if (spec.when() != null && !spec.when().isEmpty()) {
-            String w = ConditionSql.predicate(spec.when());
+            String w;
+            if (p == null) {
+                w = ConditionSql.predicate(spec.when());
+            } else {
+                ConditionSql.Bound b = ConditionSql.predicateBound(spec.when());
+                w = b.sql();
+                if (!"TRUE".equals(w)) p.addAll(b.params());
+            }
             if (!"TRUE".equals(w)) whereTerms.add(w);
         }
         if (!whereTerms.isEmpty()) {
@@ -259,35 +303,57 @@ public final class MeasureCompiler {
         };
     }
 
-    private static String filterTerm(Filter f) {
+    private static String filterTerm(Filter f, List<Object> p) {
         String col = q(f.field());
         String op = f.op() == null ? "=" : f.op().trim();
         return switch (op) {
-            case "=", "==", "eq" -> col + " = " + literal(f.value());
-            case "!=", "<>", "ne" -> col + " <> " + literal(f.value());
-            case ">", "gt" -> col + " > " + literal(f.value());
-            case ">=", "gte" -> col + " >= " + literal(f.value());
-            case "<", "lt" -> col + " < " + literal(f.value());
-            case "<=", "lte" -> col + " <= " + literal(f.value());
-            case "like" -> col + " LIKE " + literal(trimToNull(f.value()));
+            case "=", "==", "eq" -> col + " = " + literal(f.value(), p);
+            case "!=", "<>", "ne" -> col + " <> " + literal(f.value(), p);
+            case ">", "gt" -> col + " > " + literal(f.value(), p);
+            case ">=", "gte" -> col + " >= " + literal(f.value(), p);
+            case "<", "lt" -> col + " < " + literal(f.value(), p);
+            case "<=", "lte" -> col + " <= " + literal(f.value(), p);
+            case "like" -> col + " LIKE " + literal(trimToNull(f.value()), p);
             case "isNull" -> col + " IS NULL";
             case "notNull" -> col + " IS NOT NULL";
             case "in" -> {
                 if (!(f.value() instanceof List<?> vs) || vs.isEmpty())
                     throw new IllegalArgumentException("'in' filter needs a non-empty value list");
                 List<String> lits = new ArrayList<>();
-                for (Object v : vs) lits.add(literal(v));
+                for (Object v : vs) lits.add(literal(v, p));
                 yield col + " IN (" + String.join(", ", lits) + ")";
             }
             default -> throw new IllegalArgumentException("unknown filter op '" + op + "'");
         };
     }
 
-    /** A typed SQL literal: numbers and booleans verbatim, everything else a single-quoted string. */
-    private static String literal(Object v) {
+    /**
+     * A typed operand. Rendering ({@code p == null}): numbers and booleans verbatim, everything else a
+     * single-quoted string. Binding: the value is added to {@code p} and the placeholder keeps the literal's
+     * type — an integral number as {@code BIGINT}, any other number as {@code DOUBLE} (so {@code 5.5} is never
+     * coerced to an integer column's type and rounded), a boolean as {@code BOOLEAN}, and a string as a bare
+     * {@code ?} that DuckDB types from the column, as it types a string literal.
+     */
+    private static String literal(Object v, List<Object> p) {
         if (v == null) throw new IllegalArgumentException("filter value must not be null (use isNull/notNull)");
-        if (v instanceof Number || v instanceof Boolean) return v.toString();
-        return "'" + v.toString().replace("'", "''") + "'";
+        if (p == null) {
+            if (v instanceof Number || v instanceof Boolean) return v.toString();
+            return "'" + v.toString().replace("'", "''") + "'";
+        }
+        if (v instanceof Byte || v instanceof Short || v instanceof Integer || v instanceof Long) {
+            p.add(((Number) v).longValue());
+            return "CAST(? AS BIGINT)";
+        }
+        if (v instanceof Number n) {
+            p.add(n.doubleValue());
+            return "CAST(? AS DOUBLE)";
+        }
+        if (v instanceof Boolean) {
+            p.add(v);
+            return "CAST(? AS BOOLEAN)";
+        }
+        p.add(v.toString());
+        return "?";
     }
 
     private static String safeIdent(String s, String what) {

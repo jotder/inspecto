@@ -89,7 +89,7 @@ class KpiEvaluatorTest {
     void theWindowIsCutByTypedTimestamptzLiteralsInTheKpisZone() {
         KpiDefinition k = KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
                 "timeField", "order_date", "grain", "month", "timezone", "Asia/Kolkata"));
-        String sql = KpiEvaluator.sql(k, k.current(AS_OF));
+        String sql = KpiEvaluator.sql(k, k.current(AS_OF)).sql();
         assertEquals("WITH \"__kpi_window\" AS (SELECT * FROM \"orders\" WHERE \"order_date\" >= TIMESTAMPTZ"
                 + " '2026-08-01 00:00:00+05:30' AND \"order_date\" < TIMESTAMPTZ '2026-08-14 00:00:00+05:30')"
                 + " SELECT SUM(\"amount\") AS \"sum_amount\" FROM \"__kpi_window\" LIMIT 1", sql);

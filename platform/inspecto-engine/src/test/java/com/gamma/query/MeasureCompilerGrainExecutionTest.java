@@ -33,9 +33,9 @@ class MeasureCompilerGrainExecutionTest {
                 "groupBy", List.of("event_time"),
                 "grains", Map.of("event_time", grain),
                 "orderBy", List.of(Map.of("field", "event_time", "dir", "asc"))), 500, 10_000);
-        String sql = MeasureCompiler.compile(spec);
-        return QueryExecutor.run(new QueryExecutor.Request("events", RELATION, sql, 500, 0,
-                List.of(), List.of())).rows();
+        MeasureCompiler.Compiled sql = MeasureCompiler.compile(spec);
+        return QueryExecutor.run(new QueryExecutor.Request("events", RELATION, sql.sql(), 500, 0,
+                List.of(), List.of(), sql.params())).rows();
     }
 
     private static String key(Map<String, Object> row) {

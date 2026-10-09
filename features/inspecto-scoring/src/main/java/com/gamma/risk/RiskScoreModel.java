@@ -313,8 +313,8 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
                 List.copyOf(filters), when, weight, cap, List.copyOf(evidence));
         // Compile both queries now: an unknown aggregation, operator or unsafe identifier fails the SAVE.
         try {
-            MeasureCompiler.compile(f.valueSpec(1));
-            MeasureCompiler.compile(f.evidenceSpec(1));
+            MeasureCompiler.render(f.valueSpec(1));
+            MeasureCompiler.render(f.evidenceSpec(1));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(at + ": " + e.getMessage(), e);
         }

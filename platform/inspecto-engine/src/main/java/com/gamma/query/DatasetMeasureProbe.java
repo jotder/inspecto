@@ -98,7 +98,7 @@ public final class DatasetMeasureProbe {
 
             MeasureCompiler.Spec spec = new MeasureCompiler.Spec(
                     datasetId, List.of(measure), List.of(), Map.of(), List.of(), List.of(), 1);
-            String sql = MeasureCompiler.compile(spec);
+            MeasureCompiler.Compiled sql = MeasureCompiler.compile(spec);
 
             ComponentStore store = new ComponentStore(root.resolve("registry"));
             Map<String, Object> dataset = store.get("dataset", datasetId)
@@ -111,7 +111,7 @@ public final class DatasetMeasureProbe {
                     new ViewStore(root.resolve("views")));
 
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                    datasetId, relationSql, sql, 1, 0, List.of(), List.of()));
+                    datasetId, relationSql, sql.sql(), 1, 0, List.of(), List.of(), sql.params()));
             if (r.rows().isEmpty()) return OptionalDouble.empty();
             Object v = r.rows().get(0).get(measure.id());
             return v instanceof Number n ? OptionalDouble.of(n.doubleValue()) : OptionalDouble.empty();
@@ -149,7 +149,7 @@ public final class DatasetMeasureProbe {
             MeasureCompiler.Measure measure = m.group(1) != null
                     ? new MeasureCompiler.Measure("count", null)
                     : new MeasureCompiler.Measure(m.group(2), m.group(3));
-            String grouped = MeasureCompiler.compile(new MeasureCompiler.Spec(
+            MeasureCompiler.Compiled grouped = MeasureCompiler.compile(new MeasureCompiler.Spec(
                     datasetId, List.of(measure), List.copyOf(by), Map.of(), List.of(), List.of(), Integer.MAX_VALUE));
             String op = switch (comparator) {
                 case "gt" -> ">";
@@ -158,14 +158,14 @@ public final class DatasetMeasureProbe {
                 case "lte" -> "<=";
                 default -> throw new IllegalArgumentException("unknown comparator '" + comparator + "'");
             };
-            String sql = "SELECT *, COUNT(*) OVER () AS " + SqlIdent.q(TOTAL) + " FROM (" + grouped + ") AS "
+            String sql = "SELECT *, COUNT(*) OVER () AS " + SqlIdent.q(TOTAL) + " FROM (" + grouped.sql() + ") AS "
                     + SqlIdent.q("g") + " WHERE " + SqlIdent.q(measure.id()) + " " + op + " "
                     + java.math.BigDecimal.valueOf(threshold).toPlainString()
                     + " ORDER BY " + String.join(", ", by.stream().map(SqlIdent::q).toList());
             String relationSql = relationSql(datasetId);
             if (relationSql == null) return Optional.empty();
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                    datasetId, relationSql, sql, Math.max(1, limit), 0, List.of(), List.of()));
+                    datasetId, relationSql, sql, Math.max(1, limit), 0, List.of(), List.of(), grouped.params()));
             if (r.rows().isEmpty()) return Optional.of(new Breaches(List.of(), 0));
             List<Breach> keys = new java.util.ArrayList<>(r.rows().size());
             for (Map<String, Object> row : r.rows()) {
