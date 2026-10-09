@@ -1,5 +1,5 @@
 name: telco_fraud_overview
-tiles[14]{widgetId,span}:
+tiles[17]{widgetId,span}:
   irsf_exposure_seconds_tile,1
   premium_rate_exposure_tile,1
   roaming_exposure_tile,1
@@ -14,3 +14,6 @@ tiles[14]{widgetId,span}:
   fraud_dealer_idle,2
   fraud_voucher_by_serial,2
   fraud_reversal_by_line,2
+  fraud_recharge_by_line,2
+  fraud_data_bypass_by_line,2
+  fraud_internal_by_staff,2

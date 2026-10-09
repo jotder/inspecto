@@ -1,0 +1,9 @@
+name: fraud_recharge
+dataset: fraud_recharge
+measure: max(small_topups)
+by[1]: msisdn
+comparator: gt
+threshold: 8
+stormCap: 500
+severity: WARNING
+description: "Recharge fraud"

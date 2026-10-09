@@ -130,3 +130,24 @@ feed into `data/inbox/<feed>` to ingest it.
 - **Check:** what was bought with each payment before it was reversed; the payment instrument.
 - **Act:** block the instrument; limit payments on the line.
 - **Silent by design:** a subscriber with a few reversals, or many payments with none reversed.
+
+## Recharge fraud - `fraud_recharge`
+
+- **Detects:** card-testing / top-up velocity: PAYMENT top-ups under `small_amount` (default 5) per line in the window, above `threshold` (default 8). Only lines with at least `min_candidate_topups` (default 3) small top-ups are kept.
+- **Check:** the payment instrument behind each small top-up; whether the line was then drained (SIM-swap, premium-rate or IRSF Alerts on the same line).
+- **Act:** block the instrument; hold further top-ups on the line until the owner is verified.
+- **Silent by design:** a line with a few small top-ups, a heavy bill-payer whose top-ups are all above `small_amount`, and small VOUCHER redemptions (a different channel, covered by `fraud_voucher`).
+
+## Data-charging bypass - `fraud_data_bypass`
+
+- **Detects:** seconds of originated DATA sessions rated at zero (`charge = 0`) per line in the window, above `threshold` (default 7200), outside the APNs in `zero_rated_apns`. In the CDR feed a DATA record carries the session seconds in `duration_s` and the APN in `b_number`. Only lines with at least `min_candidate_seconds` (default 600) unrated seconds are kept.
+- **Check:** the APN and the rating plan of the line; whether the session was tethered or tunnelled through a zero-rated service.
+- **Act:** fix the rating or charging-policy gap; bill back where the contract allows; suspend the line.
+- **Silent by design:** properly charged data however long, and sessions on a zero-rated APN. **Exemption lists are a trust decision:** fill `zero_rated_apns` (comma-separated; `none` exempts nothing) from the operator's own product catalogue, never from a value a subscriber controls.
+
+## Internal fraud - `fraud_internal`
+
+- **Detects:** SIM swaps performed per staff user in the window (`dealer_id` of a SIM_SWAP event is the staff user), above `threshold` (default 5), outside the registered swap desks in `exempt_staff`.
+- **Check:** the swapped lines against the owners' requests and the customer-care tickets; whether the staff user's own lines or relatives' lines are among them; the payments out of the swapped lines (`fraud_sim_swap`).
+- **Act:** suspend the staff user's swap right pending review; refer to HR and internal audit.
+- **Silent by design:** a staff user with a few swaps, and the exempt desks. `exempt_staff` (default `HELPDESK`) silences whatever it names: fill it only from the operator's verified register of back-office desks.

@@ -1,0 +1,9 @@
+name: fraud_data_bypass
+dataset: fraud_data_bypass
+measure: max(unrated_seconds)
+by[1]: msisdn
+comparator: gt
+threshold: 7200
+stormCap: 500
+severity: CRITICAL
+description: "Data-charging bypass"

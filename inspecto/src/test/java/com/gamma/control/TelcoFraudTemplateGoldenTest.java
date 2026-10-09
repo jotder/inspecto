@@ -54,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * {@code ASSURE-PACK-TELCO-FRAUD-1} golden test. Boots the shipped {@code spaces/_templates/telco-fraud} Space
  * Template through {@code POST /spaces} (every seed gate), ingests the synthetic corpus through the template's
- * own three Pipelines on the production Consignment path ({@link CollectorProcessor#run}), runs all ten
+ * own three Pipelines on the production Consignment path ({@link CollectorProcessor#run}), runs all thirteen
  * {@code sql.template} detection Jobs as authored, then evaluates the per-entity Alert Rules with the production
  * grouped Measure probe and {@link AlertService}. Each Alert Rule must raise EXACTLY its planted offenders
  * (including one just above its threshold) and no planted look-alike (including one exactly at it).
@@ -62,10 +62,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class TelcoFraudTemplateGoldenTest {
 
     /** Expected Alerts per Alert Rule — the golden counts. */
-    private static final Map<String, Integer> EXPECTED = new TreeMap<>(Map.of(
-            "fraud_irsf", 5, "fraud_wangiri", 4, "fraud_simbox", 4, "fraud_premium_rate", 5, "fraud_roaming", 4,
-            "fraud_sim_swap", 4, "fraud_identity", 3, "fraud_dealer", 3, "fraud_voucher", 4, "fraud_reversal", 4));
-    private static final int TOTAL = 40;
+    private static final Map<String, Integer> EXPECTED = new TreeMap<>(Map.ofEntries(
+            Map.entry("fraud_irsf", 5), Map.entry("fraud_wangiri", 4), Map.entry("fraud_simbox", 4),
+            Map.entry("fraud_premium_rate", 5), Map.entry("fraud_roaming", 4), Map.entry("fraud_sim_swap", 4),
+            Map.entry("fraud_identity", 3), Map.entry("fraud_dealer", 3), Map.entry("fraud_voucher", 4),
+            Map.entry("fraud_reversal", 4), Map.entry("fraud_recharge", 5), Map.entry("fraud_data_bypass", 5),
+            Map.entry("fraud_internal", 4)));
+    private static final int TOTAL = 54;
 
     private static final Map<String, String> FEED_COLUMNS = Map.of(
             "cdr", "{'record_id':'VARCHAR','start_ts':'TIMESTAMP','direction':'VARCHAR','service':'VARCHAR',"
@@ -119,7 +122,7 @@ class TelcoFraudTemplateGoldenTest {
         Path space = createSpace(root);
         ingest(space);
         List<JobConfig> jobs = jobs(space.resolve("config"));
-        assertEquals(10, jobs.size());
+        assertEquals(13, jobs.size());
         for (JobConfig j : jobs) {
             assertEquals("0 2 * * *", j.cron(), j.name() + " cron");
             assertEquals("$yesterday", j.params().get("window_start"), j.name());
@@ -196,7 +199,7 @@ class TelcoFraudTemplateGoldenTest {
         ingest(space);
 
         List<JobConfig> jobs = jobs(config);
-        assertEquals(10, jobs.size(), "one detection Job per typology");
+        assertEquals(13, jobs.size(), "one detection Job per typology");
         List<AlertRule> rules = rules(config);
         assertEquals(EXPECTED.keySet(), new TreeSet<>(rules.stream().map(AlertRule::name).toList()));
         DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> config, () -> data);
@@ -294,7 +297,7 @@ class TelcoFraudTemplateGoldenTest {
                     assertTrue(bars.getOrDefault(offender, 0.0) > 0, id + ": planted offender " + offender + " has a bar: " + bars);
                 typologiesShown.add(dataset);
             }
-            assertEquals(14, tiles, "four KPI tiles and ten typology Widgets");
+            assertEquals(17, tiles, "four KPI tiles and thirteen typology Widgets");
             assertEquals(EXPECTED.keySet(), typologiesShown, "every typology has a Widget on the dashboard");
         } finally {
             api.close();
@@ -412,7 +415,8 @@ class TelcoFraudTemplateGoldenTest {
      * would raise every one (the voucher rule has none: a serial redeemed again on another day IS the fraud).
      */
     private static final String RECURRING = "'99970001011', '+28900000005', '0028900000005', '99970001114', "
-            + "'99970001211', '99970001311', '99970001412', 'DOC-F0002', 'D90', '99970001811'";
+            + "'99970001211', '99970001311', '99970001412', 'DOC-F0002', 'D90', '99970001811', '99970001911', "
+            + "'99970002611', 'zero.operator.apn', 'S111', 'HELPDESK'";
 
     /** Days 2..n: a copy of the ingested day-1 feeds with every identifier (bar {@link #RECURRING}) suffixed
      *  {@code -d}, shifted d-1 days. */
