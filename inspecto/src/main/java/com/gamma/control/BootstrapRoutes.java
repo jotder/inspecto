@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.AccessDecider;
+import com.gamma.spi.auth.AccessDeciders;
 import com.gamma.spi.auth.Authenticator;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
@@ -90,9 +92,13 @@ final class BootstrapRoutes implements RouteModule {
         return data;
     }
 
-    /** Auth-free core = Personal; the Professional build (security module + {@code -Dauth.mode=oidc}) reports itself. */
-    private static String edition() {
-        return "none".equalsIgnoreCase(System.getProperty("auth.mode", "none")) ? "personal" : "professional";
+    /**
+     * Auth-free core = Personal; an authenticated build reports Professional, or Enterprise when an
+     * {@link AccessDecider} (the policy module) is installed — the edition's defining extra, not a property guess.
+     */
+    static String edition() {
+        if ("none".equalsIgnoreCase(System.getProperty("auth.mode", "none"))) return "personal";
+        return AccessDeciders.active().isPresent() ? "enterprise" : "professional";
     }
 
     private static Map<String, Object> features(ApiContext api) {
