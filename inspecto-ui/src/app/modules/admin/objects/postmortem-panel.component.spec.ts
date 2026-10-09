@@ -96,6 +96,11 @@ describe('PostmortemPanelComponent', () => {
     });
 
     // Operator, 2026-09-26 (INCIDENT-FINISH-GATE-1): PUT /objects/{id}/postmortem (canWorkIncidents), not the PATCH.
+    it('defaults the Incident Commander to the assignee the header calls Commander until one is recorded', () => {
+        const { c } = create({ ...INCIDENT, attributes: { category: 'Data Quality' } });
+        expect(c.form.controls.commander.value).toBe('operator');
+    });
+
     it('saves the edited postmortem on the postmortem route (causeAnalysis shape)', () => {
         const { c, api } = create();
         c.form.controls.downtime.setValue('2 hours');

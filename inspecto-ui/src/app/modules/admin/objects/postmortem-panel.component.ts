@@ -250,7 +250,8 @@ export class PostmortemPanelComponent {
     private rebuild(o: OperationalObject): void {
         const p = parsePostmortem(o) ?? emptyPostmortem();
         this.form.patchValue({
-            commander: p.commander,
+            // The drawer header calls the assignee the Commander: default the field to it until one is recorded.
+            commander: p.commander || o.assignee || '',
             incidentDate: p.incidentDate,
             downtime: p.downtime,
             businessImpact: p.businessImpact,
