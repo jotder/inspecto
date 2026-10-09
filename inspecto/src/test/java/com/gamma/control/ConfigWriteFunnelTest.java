@@ -282,7 +282,7 @@ class ConfigWriteFunnelTest {
             Map.entry("InvestigationRoutes#sealList", "READS the Identity Fact log to seal a list into an "
                     + "Investigation op (LA-17) — the signal matches opening the log, which is not a write; "
                     + ENTITY_FACTS),
-            // SCREENING-1 (lane 2026-10-09): PENDING OPERATOR APPROVAL - guard-inventory entries are operator calls.
+            // SCREENING-1: operator-approved 2026-10-09 (a read of the Identity Fact log, never a write).
             Map.entry("Screener#load", "READS the Identity Fact log to fold the Entity Lists a screening is matched against (SCREENING-1) - opening the log, not a write; Screening never appends a fact; " + ENTITY_FACTS),
             Map.entry("ActionRequestRoutes#propose", ACTION_REQUESTS),
             Map.entry("ActionRequestRoutes#decide", ACTION_REQUESTS), Map.entry("ActionRequestRoutes#retry", ACTION_REQUESTS),

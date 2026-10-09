@@ -23,10 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * or {@code mode} in a Space file all throw {@link SafetyPolicyUnreadableException}. The server file may name
  * Spaces whose policy is <em>required</em> ({@code require_spaces}, D7): a named Space with no file is
  * unreadable too, because naming is what makes a deletion detectable. An un-named absent Space file narrows
- * nothing. Parsed files are cached by their CONTENT: the file is re-read on every load (it is a few hundred
- * bytes) and re-parsed only when the text changed. A cache keyed by (mtime, size) missed a same-length edit
- * landing inside one timestamp tick (coarse on Linux, a whole second on some filesystems), so a TIGHTENED
- * policy could be ignored until the next edit: fail-open.
+ * nothing. Parsed files are cached by their exact text: a policy file is tiny, and an (mtime, size) stamp read a
+ * same-size rewrite inside one mtime tick as unchanged, so a tightened policy could be ignored.
  */
 public final class SafetyPolicyFiles {
 
@@ -99,8 +97,7 @@ public final class SafetyPolicyFiles {
             if (!Files.exists(file)) { CACHE.remove(file); return null; }
             text = Files.readString(file, StandardCharsets.UTF_8);
         } catch (IOException | RuntimeException e) {
-            CACHE.remove(file);
-            throw new SafetyPolicyUnreadableException(file.toString(), String.valueOf(e.getMessage()), e);
+            throw new SafetyPolicyUnreadableException(file.toString(), "cannot read: " + e, e);
         }
         Entry cached = CACHE.get(file);
         if (cached != null && cached.text().equals(text)) {

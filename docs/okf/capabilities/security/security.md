@@ -262,7 +262,7 @@ serves `POST /auth/exchange | /auth/refresh | /auth/logout`, delegating to the `
 `com.gamma.access.Roles` (`platform/inspecto-access`) holds the **seed table** and the doc grammar. Role *assignment* is the IdP's
 (claims); role *definitions* are data. `Roles.effective(ex)` overlays the bound Space's `roles.toon`
 (`Roles.FILE`, `Roles.java:62`) **per role name** — an authored `[]` revokes a seed role, unnamed seed roles
-keep their defaults — mtime-cached so edits apply on the next request with no restart. **Fail-closed:** an
+keep their defaults — cached by the file's text (not mtime + size: a same-size rewrite inside one mtime tick read stale and fail-open) so edits apply on the next request with no restart. **Fail-closed:** an
 existing-but-unreadable `roles.toon` suspends *all* role grants. `GET/PUT /access/roles` author it
 (`AccessRoutes.java:46-47`; PUT gated `canConfigureAccess`); Settings ▸ Access ▸ **Roles** edits it with
 `source: authored|seed` badges, a strike-through overlay for capabilities an Access Profile denies, and a
@@ -355,7 +355,7 @@ on the `AccessDecider` SPI. Personal and Standard never bundle it and behave byt
   literals and dotted refs over a nested `Map` context, strict-Boolean truthiness, type-mismatch-is-false,
   offset-bearing parse errors. Pinned by `ConditionsTest`.
 - **The document.** Per-Space `access-policies.toon` (`AccessPolicies.FILE`, `AccessPolicies.java:49`): rows
-  `{name, effect: allow|deny, target: {actions?, resourceKinds?}, when?}`; mtime-cached; one validate
+  `{name, effect: allow|deny, target: {actions?, resourceKinds?}, when?}`; cached by the file's text; one validate
   grammar shared by the file parser and `GET/PUT /access/policies` (`AccessRoutes.java:49-50`; a `when` that
   does not parse is `422`). **Unreadable doc ⇒ the engine DENIES loudly**, never "no policies". Authoring
   is core (the routes exist in every edition); *evaluation* is Enterprise.
