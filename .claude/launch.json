@@ -32,6 +32,16 @@
       "port": 8095
     },
     {
+      "name": "inspecto-demo-spaces",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd inspecto-demo && set PORT=%PORT% && set SPACES_ROOT=..\\spaces && call .\\serve-demo.bat"
+      ],
+      "autoPort": true,
+      "port": 8096
+    },
+    {
       "name": "inspecto-backend",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
