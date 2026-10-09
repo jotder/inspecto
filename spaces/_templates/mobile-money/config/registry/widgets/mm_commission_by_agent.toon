@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: mm_commission
+controls:
+  x[1]{field}:
+    agent_id
+  y[1]{field,agg}:
+    commission_variance,sum
+options:
+  title: Commission variance by agent

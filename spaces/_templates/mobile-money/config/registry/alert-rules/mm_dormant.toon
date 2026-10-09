@@ -1,0 +1,9 @@
+name: mm_dormant
+dataset: mm_dormant
+measure: max(outflow)
+by[1]: wallet_id
+comparator: gt
+threshold: 500
+stormCap: 500
+severity: WARNING
+description: "Dormant-wallet reactivation"

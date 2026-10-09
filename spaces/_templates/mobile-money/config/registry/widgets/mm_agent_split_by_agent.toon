@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: mm_agent_split
+controls:
+  x[1]{field}:
+    agent_id
+  y[1]{field,agg}:
+    max_split_count,sum
+options:
+  title: Near-limit cash-ins by agent

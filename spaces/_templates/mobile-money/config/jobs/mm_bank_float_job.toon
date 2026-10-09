@@ -1,0 +1,6 @@
+job:
+  name: mm_bank_float
+  type: recon.run
+  reconciliation: mm_bank_float
+  cron: "0 4 * * *"
+  enabled: true

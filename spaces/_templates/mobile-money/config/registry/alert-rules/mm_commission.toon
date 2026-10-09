@@ -1,0 +1,9 @@
+name: mm_commission
+dataset: mm_commission
+measure: max(commission_variance)
+by[1]: agent_id
+comparator: gt
+threshold: 5
+stormCap: 500
+severity: WARNING
+description: "Commission over / under-pay"

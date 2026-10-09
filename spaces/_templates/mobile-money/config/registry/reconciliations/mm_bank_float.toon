@@ -1,0 +1,12 @@
+name: mm_bank_float
+datasets[2]: wallet_txn,bank_statement
+keyColumns[1]: txn_id
+includeRecordCount: false
+cardinality: one_to_many
+filters:
+  wallet_txn: "txn_type IN ('BANK_OUT', 'BANK_IN')"
+columnMap:
+  bank_statement:
+    txn_id: bank_ref
+compareColumns[1]{column,agg,toleranceType,tolerance}:
+  amount,sum,absolute,0.01

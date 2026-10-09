@@ -1,0 +1,32 @@
+raw:
+  name: WALLETS
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    snapshot_date,"0",DATE,"Register snapshot day","","INTERNAL"
+    wallet_id,"1",VARCHAR,"Wallet identifier","","CONFIDENTIAL"
+    msisdn,"2",VARCHAR,"The line the wallet is provisioned on","","CONFIDENTIAL"
+    kyc_tier,"3",INTEGER,"KYC tier (1 basic, 2 standard, 3 full)","","INTERNAL"
+    status,"4",VARCHAR,"ACTIVE, SUSPENDED or CLOSED","","INTERNAL"
+    last_activity_date,"5",DATE,"Last day the wallet moved money before the snapshot","","INTERNAL"
+mapping:
+  canonicalName: wallets
+  rawName: WALLETS
+  fields[6]:
+    - name: snapshot_date
+      from: snapshot_date
+      fn: keep
+    - name: wallet_id
+      from: wallet_id
+      fn: keep
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: kyc_tier
+      from: kyc_tier
+      fn: keep
+    - name: status
+      from: status
+      fn: keep
+    - name: last_activity_date
+      from: last_activity_date
+      fn: keep

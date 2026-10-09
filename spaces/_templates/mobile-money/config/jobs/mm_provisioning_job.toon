@@ -1,0 +1,12 @@
+job:
+  name: mm_provisioning
+  type: sql.template
+  description: "Provisioning mismatch - an ACTIVE wallet on a line the core network does not hold ACTIVE"
+  sql: "WITH cur AS (SELECT w.wallet_id, CAST($window_start AS DATE) AS window_date, w.msisdn, coalesce(c.status, 'MISSING') AS core_status, 1 AS mismatch FROM wallets w LEFT JOIN core_subscribers c ON c.snapshot_date = w.snapshot_date AND regexp_replace(c.msisdn, '[^0-9]', '', 'g') = regexp_replace(w.msisdn, '[^0-9]', '', 'g') WHERE w.snapshot_date = CAST($window_start AS DATE) AND w.status = 'ACTIVE' AND coalesce(c.status, 'MISSING') <> 'ACTIVE') SELECT * FROM cur UNION ALL BY NAME SELECT * FROM mm_provisioning WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: wallets,core_subscribers,mm_provisioning
+  sink_dataset: mm_provisioning
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  enabled: true

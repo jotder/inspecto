@@ -1,0 +1,6 @@
+job:
+  name: mm_risk_score
+  type: risk.score
+  model: mm_agent
+  cron: "30 4 * * *"
+  enabled: true

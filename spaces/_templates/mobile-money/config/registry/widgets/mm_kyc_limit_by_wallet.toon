@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: mm_kyc_limit
+controls:
+  x[1]{field}:
+    wallet_id
+  y[1]{field,agg}:
+    excess,sum
+options:
+  title: Outflow over KYC limit by wallet

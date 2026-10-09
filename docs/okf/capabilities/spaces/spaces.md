@@ -192,7 +192,7 @@ contents[]}` — the UI's `SpaceTemplateInfo`) beside a `config/` tree and an op
 unreadable template is warned and skipped, never fatal. The SPA's gallery (`SpaceTemplateGalleryDialog`) is
 two-step ask-the-minimum and renders whatever the server publishes. **What is published: five templates** —
 `orders-starter` (a pipeline, a quality rule, a dataset and a live dashboard), and, since 2026-09-30,
-`business-assurance`, `telco-fraud` and `telco-ra` (below) and `payment-fraud` slice 1 (§3.5.1). Nothing named Financial Audit or Link Analysis
+`business-assurance`, `telco-fraud` and `telco-ra` (below) and `payment-fraud` slice 1 (§3.5.1), and since 2026-10-09 the `mobile-money` industry pack (§3.5.3). Nothing named Financial Audit or Link Analysis
 exists (§2, §5).
 
 **`telco-ra` — the telecom revenue-assurance pack** (`ASSURE-PACK-TELCO-RA-1`, wave 5.2 of the assurance plan,
@@ -750,6 +750,47 @@ would forge the ownership marker, so a template declares the rule as PENDING ins
   `payment_account`. Tests: `PendingAlertRulesTest` (pending, refused + audited, created once, never overwritten, held
   under an approval policy, a `DecisionRuleGuard` refusal stays pending, `lastRefusal` absent before a run / served after a refusal / gone after success, path scrub), `ControlApiSpaceTemplateSeedGateTest` (capability and content refusal at apply) and
   `PaymentFraudDashboardTest` (the live Space's own `pf_risk_score` run creates and arms it).
+
+#### 3.5.3 The `mobile-money` industry pack (`PACK-MOBILE-MONEY-1`, 2026-10-09)
+
+Configuration only (no platform edit, no new Step Processor). Five synthetic feeds, each a Pipeline + Schema:
+`wallet_txn` (the wallet-platform ledger: `CASH_IN`, `CASH_OUT`, `P2P`, `BILL_PAY`, `BANK_OUT`, `BANK_IN`, with
+`fee` and agent `commission`), `bank_statement` (the trust-account statement, `bank_ref` = the platform's
+`txn_id`), `partner_settlement` (biller / aggregator files, `txn_ref`), and the daily snapshots `wallets` (KYC tier,
+status, `last_activity_date`) and `core_subscribers`. Money is `DECIMAL(18,2)`. Needs Professional or Enterprise; the
+requirement is declared by Offering placement (`offerings/professional.toon` `contentPacks`), not a template key.
+
+- **Two Reconciliations** (`recon.run`, 04:00): `mm_bank_float` (ledger `BANK_*` rows vs the statement) and
+  `mm_partner_settlement` (ledger `BILL_PAY` rows vs settlement lines). Both select their ledger side with the
+  Recon `filters` key and map the counterparty's reference with `columnMap`, so no extra feed is needed;
+  `cardinality: one_to_many` + `includeRecordCount: false` let one transfer settle in several lines (a duplicate
+  ledger id IS a Break); amount tolerance `0.01` absolute.
+- **Seven `sql.template` typologies** (03:00 over `$yesterday`..`$today`, the telco-fraud keep-earlier-windows
+  shape, zero-row seed snapshot per sink), each with a per-entity Alert Rule keyed on the offender alone:
+  `mm_commission` (agent; `|paid - amount x rate|` per type, `gt 5`, `direction` OVERPAID / UNDERPAID),
+  `mm_fee` (wallet; overcharge vs `greatest(fee_min, amount x fee_rate)`, `gt 1`; undercharge is reported, never
+  alerted), `mm_agent_split` (agent; most cash-ins in `[limit x (1 - band), limit)` into one wallet, `gt 3`),
+  `mm_round_trip` (agent; wallets cashing out >= `round_trip_ratio` at the SAME agent within
+  `round_trip_minutes`, `gt 2`), `mm_dormant` (wallet; outflow after `dormant_days` idle, `gt 500`),
+  `mm_kyc_limit` (wallet; outflow over the tier limit, a wallet missing from the register held to tier 1 — fail
+  closed; `max(breach) gte 1` because a threshold must be positive) and `mm_provisioning` (wallet; ACTIVE wallet on
+  a line missing / non-ACTIVE in core, numbers compared digits-only; `gte 1`). Provisioning is not a
+  Reconciliation: Recon compares aggregated numerics, not a status vocabulary.
+- **Agent Risk Score** `mm_agent` (Scoring & Lists): split x10 (cap 50) + round-trip wallets x15 (cap 60) +
+  commission variance x1 (cap 30), high at 60; `mm_high_risk_agent` ships PENDING (§3.5.2). Two signals each AT
+  their own rule's threshold (silent there) score 60 together — the reason the score exists.
+- **KPIs / dashboard / runbook.** Four KPI tiles (commission variance, fees overcharged, dormant outflow, outflow over
+  KYC limits) + seven typology bars on `mobile_money_overview`; `config/runbooks/mobile-money-runbooks.md`.
+- **Verification.** `MobileMoneyPackGoldenTest` (inspecto-reconciliation: `POST /spaces`, production-path ingest
+  of all five feeds, both Reconciliations' exact Breaks incl. a re-run, exact offenders for 26 Alerts with zero
+  look-alikes, same-window re-run duplicates nothing, day 2 keeps day 1, seed snapshots pinned, every dashboard tile
+  renders) and `MobileMoneyRiskScoreGoldenTest` (inspecto-scoring: exact high-risk set A701/A702/A720, the pending
+  rule's shape) — two modules because none carries both add-ons. Corpus: `MobileMoneyCorpus`, seed 20261009,
+  regenerate with `-Dmobilemoney.regenerate=true`. Mutation-checked: lowering `mm_round_trip` to 1 fails on the
+  at-threshold look-alikes. `ControlApiSpaceTemplateSeedGateTest` applies it with the other shipped templates.
+- **Deliberately deferred.** An agent e-float statement reconciliation (no standard agent-side feed; needs a
+  customer's), tiered / campaign commission and fee tables (flat rates are configuration today — the runbook warns),
+  vendor feed mappings.
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 

@@ -1,0 +1,9 @@
+name: mm_provisioning
+dataset: mm_provisioning
+measure: max(mismatch)
+by[1]: wallet_id
+comparator: gte
+threshold: 1
+stormCap: 500
+severity: WARNING
+description: "Provisioning mismatch wallet vs core"

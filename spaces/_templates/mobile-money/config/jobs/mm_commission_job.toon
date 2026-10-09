@@ -1,0 +1,14 @@
+job:
+  name: mm_commission
+  type: sql.template
+  description: "Commission over / under-pay - agent commission paid vs the configured rate per transaction type"
+  sql: "WITH cur AS (SELECT agent_id, window_date, txns, commission_paid, commission_expected, abs(commission_paid - commission_expected) AS commission_variance, CASE WHEN commission_paid > commission_expected THEN 'OVERPAID' WHEN commission_paid < commission_expected THEN 'UNDERPAID' ELSE 'EXACT' END AS direction FROM (SELECT agent_id, CAST($window_start AS DATE) AS window_date, count(*) AS txns, sum(commission) AS commission_paid, sum(round(amount * CASE txn_type WHEN 'CASH_IN' THEN CAST($cash_in_rate AS DECIMAL(9,6)) ELSE CAST($cash_out_rate AS DECIMAL(9,6)) END, 2)) AS commission_expected FROM wallet_txn WHERE txn_type IN ('CASH_IN', 'CASH_OUT') AND agent_id IS NOT NULL AND txn_ts >= CAST($window_start AS TIMESTAMP) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY agent_id) t) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM mm_commission WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: wallet_txn,mm_commission
+  sink_dataset: mm_commission
+  cron: "0 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  retention_days: "30"
+  cash_in_rate: "0.005"
+  cash_out_rate: "0.01"
+  enabled: true

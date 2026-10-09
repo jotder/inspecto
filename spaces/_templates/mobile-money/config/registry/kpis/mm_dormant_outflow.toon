@@ -1,0 +1,8 @@
+name: mm_dormant_outflow
+title: Dormant-wallet outflow
+dataset: mm_dormant
+measure: sum(outflow)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

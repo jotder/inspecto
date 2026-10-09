@@ -1,0 +1,9 @@
+name: mm_kyc_limit
+dataset: mm_kyc_limit
+measure: max(breach)
+by[1]: wallet_id
+comparator: gte
+threshold: 1
+stormCap: 500
+severity: WARNING
+description: "KYC tier-limit breach"

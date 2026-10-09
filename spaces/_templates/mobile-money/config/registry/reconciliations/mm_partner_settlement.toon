@@ -1,0 +1,12 @@
+name: mm_partner_settlement
+datasets[2]: wallet_txn,partner_settlement
+keyColumns[1]: txn_id
+includeRecordCount: false
+cardinality: one_to_many
+filters:
+  wallet_txn: "txn_type = 'BILL_PAY'"
+columnMap:
+  partner_settlement:
+    txn_id: txn_ref
+compareColumns[1]{column,agg,toleranceType,tolerance}:
+  amount,sum,absolute,0.01
