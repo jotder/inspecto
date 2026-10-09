@@ -595,6 +595,20 @@ describe('DataTableComponent', () => {
             await expectNoA11yViolations(host);
         });
 
+        /** LA-A11Y-AUDIT-1 residual: host columns + loading + no rows used to mount ag-Grid's empty viewport. */
+        it('loading with host columns and no rows shows no grid (no empty scroll viewport), axe-clean', async () => {
+            const f = await create('mini');
+            f.componentRef.setInput('columns', [{ field: 'a', headerName: 'A' }]);
+            f.componentRef.setInput('rows', []);
+            f.componentRef.setInput('loading', true);
+            f.detectChanges();
+            const host = f.nativeElement as HTMLElement;
+            expect(grid(f)).toBeNull();
+            expect(host.querySelector('.ag-center-cols-viewport')).toBeNull();
+            expect(host.querySelector('inspecto-skeleton')).not.toBeNull();
+            await expectNoA11yViolations(host);
+        });
+
         describe('row-count caption (one-page grid, no pager)', () => {
             const captionEl = (f: { nativeElement: HTMLElement }) =>
                 f.nativeElement.querySelector('ag-grid-angular + div.text-xs') as HTMLElement | null;

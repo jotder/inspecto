@@ -365,11 +365,11 @@ export class DataTableComponent {
      *  header over a blank body, and axe flags it (`aria-required-children` — a grid with no data rows). */
     readonly showEmpty = computed(() => !this.loading() && this.displayRows().length === 0);
 
-    /** Loading with nothing to draw (no rows, so no derived columns either): a grid here is a header row with no
-     *  cells, which axe flags (LA-A11Y-AUDIT-1). A skeleton stands in until the first rows arrive. */
-    readonly showLoadingPlaceholder = computed(
-        () => this.loading() && this.displayRows().length === 0 && this.gridColumns().length === 0,
-    );
+    /** Loading with no rows: a grid here is either a header row with no cells (no columns derived yet) or, with
+     *  host-supplied columns, ag-Grid's own empty scroll viewport behind its loading overlay - axe flags both
+     *  (`aria-required-children`, `scrollable-region-focusable`; LA-A11Y-AUDIT-1). A skeleton stands in until the
+     *  first rows arrive. */
+    readonly showLoadingPlaceholder = computed(() => this.loading() && this.displayRows().length === 0);
 
     /** EMPTY-GRID-HSCROLL-1: an empty grid never draws a horizontal scrollbar, even when column min widths exceed the pane. */
     readonly suppressHScroll = computed(() => this.displayRows().length === 0);
