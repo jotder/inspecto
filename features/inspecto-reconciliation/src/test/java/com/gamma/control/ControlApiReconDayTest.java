@@ -273,7 +273,7 @@ class ControlApiReconDayTest {
             assertTrue(second.get("statistics").get("cached").asBoolean(), "the same day is computed once");
 
             // CRM's file changes: m3 now present on D2 — the cached day must not be served
-            Thread.sleep(1100);   // a coarse filesystem mtime must still move
+            Thread.sleep(2100);   // a coarse mtime must move AND the 2 s fingerprint memo (RECON-CACHE-1) lapse
             seed(c.data(), "crm", "('m1',1,DATE '" + D2 + "'),('m2',0,DATE '" + D2 + "'),('m3',1,DATE '" + D2 + "'),"
                     + "('m4',1,DATE '" + D2 + "'),('m5',1,DATE '" + D2 + "'),('m6',1,DATE '" + D2 + "'),"
                     + "('m7',1,DATE '2026-09-27')");
@@ -282,6 +282,36 @@ class ControlApiReconDayTest {
             assertEquals(List.of(), keys(after), "m3 is on CRM now");
             assertEquals(List.of("2026-09-27", D2, D1), strings(after.get("availableDays")),
                     "the days list is recomputed too: CRM's new day appears");
+        }
+    }
+
+    /**
+     * RECON-CACHE-1 (live 2026-10-10: 400-800 ms per page, back to page 1 included): page 1, page 2, page 1 again -
+     * the second and third requests are served from the cache BEFORE any DuckDB work (no sandbox opened to resolve
+     * the day, the scope and the grain both read back).
+     */
+    @Test
+    void pageOnePageTwoPageOneAgainDoNoDuckDbWorkAfterTheFirst(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String p1 = "{\"id\":\"two_way\",\"day\":\"" + D2 + "\",\"limit\":2}";
+            String p2 = "{\"id\":\"two_way\",\"day\":\"" + D2 + "\",\"limit\":2,\"offset\":2}";
+            long t0 = System.nanoTime();
+            assertFalse(run(c, p1).get("statistics").get("cached").asBoolean());
+            long firstMs = (System.nanoTime() - t0) / 1_000_000;
+            long opens = com.gamma.recon.ReconDayTestAccess.sandboxOpens();
+            long scopeHits = com.gamma.recon.ReconDayTestAccess.cacheHits("scope");
+            long grainHits = com.gamma.recon.ReconDayTestAccess.cacheHits("grain");
+            long t1 = System.nanoTime();
+            assertTrue(run(c, p2).get("statistics").get("cached").asBoolean());
+            long secondMs = (System.nanoTime() - t1) / 1_000_000;
+            long t2 = System.nanoTime();
+            JsonNode again = run(c, p1);
+            long thirdMs = (System.nanoTime() - t2) / 1_000_000;
+            assertTrue(again.get("statistics").get("cached").asBoolean());
+            System.out.println("RECON-CACHE page1 " + firstMs + " ms, page2 " + secondMs + " ms, page1 again " + thirdMs + " ms");
+            assertEquals(opens, com.gamma.recon.ReconDayTestAccess.sandboxOpens(), "a cached page opens no sandbox");
+            assertEquals(scopeHits + 2, com.gamma.recon.ReconDayTestAccess.cacheHits("scope"), "the day's scope is read back");
+            assertEquals(grainHits + 2, com.gamma.recon.ReconDayTestAccess.cacheHits("grain"), "the day's result is read back");
         }
     }
 
@@ -355,7 +385,7 @@ class ControlApiReconDayTest {
             assertEquals(before + 1, com.gamma.recon.ReconDayTestAccess.cacheHits("rows"), "the second rows answer is read back");
 
             // changed data is a new key: m3 appears on CRM D2, so its missing_right Break goes
-            Thread.sleep(1100);
+            Thread.sleep(2100);   // past the 2 s fingerprint memo (RECON-CACHE-1)
             seed(c.data(), "crm", "('m1',1,DATE '" + D2 + "'),('m2',0,DATE '" + D2 + "'),('m3',1,DATE '" + D2 + "'),"
                     + "('m4',1,DATE '" + D2 + "'),('m5',1,DATE '" + D2 + "'),('m6',1,DATE '" + D2 + "')");
             HttpResponse<String> b3 = post(c.port, "/spaces/s1/recon/breaks", q);

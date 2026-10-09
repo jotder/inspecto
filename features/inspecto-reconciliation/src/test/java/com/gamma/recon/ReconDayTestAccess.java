@@ -9,6 +9,9 @@ public final class ReconDayTestAccess {
     /** Cache reads of one key kind ({@code grain}, {@code breaks}, {@code rows}, ...) that found an entry. */
     public static long cacheHits(String kind) { return ReconDay.Cache.hits(kind); }
 
+    /** Sandboxes {@link ReconDay#resolve} has opened - a cache-served request opens none. */
+    public static long sandboxOpens() { return ReconDay.SANDBOX_OPENS.get(); }
+
     /** Lower (or restore, with 200_000) the most grain rows a cached day holds. */
     public static void setRowCap(int cap) { ReconRoutes.rowCap = cap; }
 }

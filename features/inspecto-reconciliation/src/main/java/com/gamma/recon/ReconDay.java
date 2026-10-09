@@ -71,7 +71,9 @@ public final class ReconDay {
                                  Function<String, String> relationSqlFor, Path dataRoot, String requestedDay)
             throws SQLException, IOException {
         String day = requestedDay == null || requestedDay.isBlank() ? null : isoDay(requestedDay.trim());
-        ReconService.Spec base = ReconConfigLoader.buildSpec(config, relationSqlFor);
+        // RECON-CACHE-1: resolving each side's relation walks its store (the consignment-filtered file list); a page
+        // burst reuses the spec for FINGERPRINT_TTL_MS, under the same "seen at most that late" contract.
+        ReconService.Spec base = brief("spec|" + dataRoot + "|" + config, () -> ReconConfigLoader.buildSpec(config, relationSqlFor));
         List<String> columns = new ArrayList<>();
         List<Map<String, Object>> datasets = new ArrayList<>();
         for (ReconService.Side side : base.sides()) {
@@ -80,11 +82,18 @@ public final class ReconDay {
             columns.add(temporalColumn(side.datasetId(), ds));   // an undated side throws the named fix
         }
         String fingerprint = fingerprint(base, datasets, dataRoot);
+        // RECON-CACHE-1: a resolved scope is a pure function of (inputs, requested day) - serve it BEFORE any DuckDB
+        // work. Opening a sandbox + typing every side (a LIMIT 0 over the whole store = every Parquet footer) cost
+        // 400-800 ms on EVERY page request, cache hit or not.
+        String scopeKey = fingerprint == null ? null : "scope|" + fingerprint + "|" + (day == null ? "latest" : day);
+        Scoped hit = scopeKey == null ? null : Cache.get(scopeKey);
+        if (hit != null) return hit;
 
         List<String> available = fingerprint == null ? null : Cache.get("days|" + fingerprint);
         List<String> dayExprs = new ArrayList<>();
         List<String> types = new ArrayList<>();
         List<ReconService.Side> sides = new ArrayList<>();
+        SANDBOX_OPENS.incrementAndGet();
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
             Connection conn = sandbox.connection();
             for (int i = 0; i < base.sides().size(); i++) {
@@ -122,8 +131,13 @@ public final class ReconDay {
         }
         ReconService.Spec scoped = new ReconService.Spec(List.copyOf(sides), base.keyColumns(), base.measures(),
                 base.includeRecordCount(), base.cardinality(), base.carriedImpact());
-        return new Scoped(scoped, day, available, fingerprint);
+        Scoped out = new Scoped(scoped, day, available, fingerprint);
+        if (scopeKey != null) Cache.put(scopeKey, out);
+        return out;
     }
+
+    /** Sandboxes opened by {@link #resolve} - a cache-served request opens none. Read by tests. */
+    static final java.util.concurrent.atomic.AtomicLong SANDBOX_OPENS = new java.util.concurrent.atomic.AtomicLong();
 
     /** The Dataset's day column: {@code role: temporal}, else {@code dateField}; neither ⇒ 422 naming the fix. */
     static String temporalColumn(String datasetId, Map<String, Object> ds) {
@@ -264,6 +278,31 @@ public final class ReconDay {
     /** sha-256 over the spec and every side's input-file stamps; {@code null} = not enumerable ⇒ never cached. */
     static String fingerprint(ReconService.Spec spec, List<Map<String, Object>> datasets, Path dataRoot) {
         if (dataRoot == null) return null;
+        // RECON-CACHE-1: the walk + a stat per file (+ the consignment exclusion read) per side is tens of ms on its
+        // own; a page burst reuses it for FINGERPRINT_TTL_MS. A file rewritten inside that window is seen at most
+        // that late - and never mixed: the whole answer is keyed on the one fingerprint.
+        return brief("fp|" + dataRoot + "|" + spec + "|" + datasets, () -> computeFingerprint(spec, datasets, dataRoot));
+    }
+
+    /** {@code compute}'s value, reused for {@link #FINGERPRINT_TTL_MS} under {@code key}; a throw is not remembered. */
+    @SuppressWarnings("unchecked")
+    private static <T> T brief(String key, java.util.function.Supplier<T> compute) {
+        long now = System.nanoTime();
+        Object[] memo;
+        synchronized (FINGERPRINTS) { memo = FINGERPRINTS.get(key); }
+        if (memo != null && now - (long) memo[0] < FINGERPRINT_TTL_MS * 1_000_000L) return (T) memo[1];
+        T v = compute.get();
+        synchronized (FINGERPRINTS) { FINGERPRINTS.put(key, new Object[]{now, v}); }
+        return v;
+    }
+
+    /** How long a computed fingerprint (and a built spec) is reused. Not final only so a test can change it. */
+    static volatile long FINGERPRINT_TTL_MS = 2_000;
+    private static final Map<String, Object[]> FINGERPRINTS = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Object[]> e) { return size() > 64; }
+    };
+
+    private static String computeFingerprint(ReconService.Spec spec, List<Map<String, Object>> datasets, Path dataRoot) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.update(spec.toString().getBytes(StandardCharsets.UTF_8));
@@ -288,23 +327,42 @@ public final class ReconDay {
      * entries are never read, only aged out.
      */
     static final class Cache {
+        /** Result entries (grain / breaks / rows - a day's rows can be large). */
         static final int MAX_ENTRIES = 32;
-        private static final Map<String, Object> MAP = new LinkedHashMap<>(16, 0.75f, true) {
-            @Override protected boolean removeEldestEntry(Map.Entry<String, Object> e) { return size() > MAX_ENTRIES; }
-        };
+        /**
+         * Small entries (scope, days, prune, stats) live in their OWN LRU: sharing the 32 slots, a 3-side day's
+         * seven small entries evicted the very results they sat in front of (RECON-CACHE-1).
+         */
+        static final int MAX_SMALL_ENTRIES = 512;
+        private static final Map<String, Object> MAP = lru(MAX_ENTRIES);
+        private static final Map<String, Object> SMALL = lru(MAX_SMALL_ENTRIES);
 
-        /** Hits per key kind (the key up to its first {@code |}: grain, days, stats, breaks, rows) — read by tests. */
+        private static Map<String, Object> lru(int max) {
+            return new LinkedHashMap<>(16, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, Object> e) { return size() > max; }
+            };
+        }
+
+        private static Map<String, Object> tier(String key) {
+            return key.startsWith("grain|") || key.startsWith("breaks|") || key.startsWith("rows|") ? MAP : SMALL;
+        }
+
+        /** Hits per key kind (the key up to its first {@code |}: grain, scope, days, prune, stats, breaks, rows) — read by tests. */
         private static final Map<String, Long> HITS = new java.util.HashMap<>();
 
         @SuppressWarnings("unchecked")
         static synchronized <T> T get(String key) {
-            Object v = MAP.get(key);
+            Object v = tier(key).get(key);
             if (v != null) HITS.merge(key.substring(0, Math.max(0, key.indexOf('|'))), 1L, Long::sum);
             return (T) v;
         }
         static synchronized long hits(String kind) { return HITS.getOrDefault(kind, 0L); }
-        static synchronized void put(String key, Object value) { MAP.put(key, value); }
-        static synchronized void clear() { MAP.clear(); }
-        static synchronized int size() { return MAP.size(); }
+        static synchronized void put(String key, Object value) { tier(key).put(key, value); }
+        static synchronized void clear() {
+            MAP.clear();
+            SMALL.clear();
+            synchronized (FINGERPRINTS) { FINGERPRINTS.clear(); }
+        }
+        static synchronized int size() { return MAP.size() + SMALL.size(); }
     }
 }

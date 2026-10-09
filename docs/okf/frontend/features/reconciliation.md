@@ -56,7 +56,19 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   still runs the join. Rejected: raising the cap (a 200,000-group day already holds ~100 MB of row maps per entry, and
   the LRU keeps 32) and a summary-only entry (the join, not the aggregate, is the cost). `statistics.cached` says
   which. The same cache also holds `days|`, per-file day ranges (`stats|`), the per-day file choice (`prune|`) and the
-  `/recon/breaks` + `/recon/rows` answers — all in the one 32-entry LRU.
+  `/recon/breaks` + `/recon/rows` answers. ⛔ **Two tiers (`RECON-CACHE-1`, 2026-10-10):** the 32-entry LRU holds
+  only results (`grain|`, `breaks|`, `rows|`); the small entries (`scope|`, `days|`, `stats|`, `prune|`) have their own
+  512-entry LRU, so a 3-side day's seven small entries can no longer evict the results.
+* **Cache BEFORE DuckDB** (`RECON-CACHE-1`, found live 2026-10-10: every `/recon/run` page cost 400–800 ms, page 1
+  again included): `ReconDay.resolve` opened a sandbox and typed every side (a `LIMIT 0` over the whole store = every
+  Parquet footer) on EVERY request, before the grain lookup, and rebuilt the spec + walked/statted every store for the
+  fingerprint. Now the resolved `Scoped` is cached under `scope|<fingerprint>|<day or latest>` and served before any
+  sandbox opens, and the built spec + fingerprint are reused for 2 s (`ReconDay.FINGERPRINT_TTL_MS`) — ⚠ a file or
+  Dataset rewritten inside that window is seen up to 2 s late, never mixed (one fingerprint keys the whole answer).
+  Normal days (≤ 200,000 groups) cache the whole day once and slice every page from it; the per-page cache stays for
+  bigger days only. Harness (`ReconPerfTest#cachedPageRequestPath`, 30 d × 4,000 × 3): cached page ~98 ms → 0.07–0.2
+  ms. Pinned by `ControlApiReconDayTest#pageOnePageTwoPageOneAgainDoNoDuckDbWorkAfterTheFirst` (sandbox-open counter +
+  per-kind hit counts).
 * **File pruning** (`RECON-PERF-RESIDUALS-1` (1), 2026-10-09; `ReconDay.dayFiles`): a day reads ONLY the store's files
   whose Parquet footer statistics can hold it — each file's min/max of the temporal column (`parquet_metadata`, footers
   only), cached per input fingerprint; the side then reads `DatasetRelation.relationSqlOverFiles(kept)` and the day

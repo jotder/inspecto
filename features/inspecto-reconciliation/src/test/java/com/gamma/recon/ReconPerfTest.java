@@ -142,4 +142,32 @@ class ReconPerfTest {
         ReconDay.Cache.get(key);
         System.out.println("RECON-PERF cached breaks/rows read-back = " + (System.nanoTime() - t4) / 1_000 + " us");
     }
+    /**
+     * RECON-CACHE-1: the {@code /recon/run} request path over real {@code physicalRef} Datasets with a data root -
+     * resolve the day, look the day up, slice a page - for the first page, the next page and page 1 again.
+     */
+    @Test
+    void cachedPageRequestPath(@TempDir Path dir) throws Exception {
+        for (String[] s : new String[][]{{"hlr", "1"}, {"crm", "2"}, {"cbs", "3"}}) generate(dir, s[0], Integer.parseInt(s[1]));
+        java.util.Map<String, Object> cfg = java.util.Map.of("datasets", List.of("hlr", "crm", "cbs"), "keyColumns", List.of("msisdn"),
+                "compareColumns", List.of(java.util.Map.of("column", "active_flag")));
+        java.util.function.Function<String, java.util.Map<String, Object>> ds =
+                id -> java.util.Map.of("physicalRef", id, "dateField", "event_date");
+        java.util.function.Function<String, String> relOf = id -> com.gamma.query.DatasetRelation.relationSql(ds.apply(id), dir, null);
+        ReconDay.Cache.clear();
+        StringBuilder out = new StringBuilder("RECON-PERF request path:");
+        for (int[] p : new int[][]{{0}, {50}, {0}}) {
+            long t0 = System.nanoTime();
+            ReconDay.Scoped scoped = ReconDay.resolve(cfg, ds, relOf, dir, null);
+            String key = "grain|" + scoped.fingerprint() + "|" + scoped.day() + "|0";
+            ReconService.DayResult day = ReconDay.Cache.get(key);
+            if (day == null) {
+                day = ReconService.dayRun(scoped.spec(), 0, 0, p[0], 50, 200_000).day();
+                ReconDay.Cache.put(key, day);
+            }
+            day.page(0, p[0], 50);
+            out.append(" offset ").append(p[0]).append(" = ").append((System.nanoTime() - t0) / 1_000).append(" us;");
+        }
+        System.out.println(out);
+    }
 }
