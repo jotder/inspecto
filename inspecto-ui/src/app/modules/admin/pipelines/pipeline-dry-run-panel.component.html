@@ -16,7 +16,15 @@
         }
     </div>
     @if (error()) {
-        <p class="mt-2 text-sm" role="alert" style="color: var(--gamma-warn)">{{ error() }}</p>
+        @if (missingColumn(); as col) {
+            <p class="mt-2 text-sm" role="alert" style="color: var(--gamma-warn)">
+                The sample has no <span class="font-mono">{{ col }}</span> column. Name each row's keys after the
+                columns the parse Step outputs{{ capturedRows()?.length ? ', or use the captured sample' : '' }}.
+            </p>
+        }
+        <p class="mt-2 text-sm" [attr.role]="missingColumn() ? null : 'alert'" style="color: var(--gamma-warn)">
+            {{ error() }}
+        </p>
     }
     @if (result(); as r) {
         @for (w of r.warnings ?? []; track w) {

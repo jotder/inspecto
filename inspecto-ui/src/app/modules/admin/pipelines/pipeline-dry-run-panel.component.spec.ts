@@ -1,8 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
+import { PipelineDryRunPanelComponent, missingSampleColumn } from './pipeline-dry-run-panel.component';
 import { PipelineDryRunResult, PipelinesService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 
@@ -29,6 +30,27 @@ describe('PipelineDryRunPanelComponent', () => {
         cmp.run();
         expect(api.dryRunAuthored).toHaveBeenCalledWith('demo', [{ amt: '150' }]);
         expect(cmp.result()?.seedNode).toBe('src');
+    });
+
+    it('names a column the sample lacks in plain words, above the raw engine message', () => {
+        const raw =
+            'dry-run failed: Binder Error: Table "dryrun_seed" does not have a column named "ORDER_ID" Candidate bindings: "id"';
+        api.dryRunAuthored.mockReturnValue(
+            throwError(() => new HttpErrorResponse({ status: 422, error: { error: raw } })),
+        );
+        const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
+        fixture.componentRef.setInput('pipelineId', 'demo');
+        fixture.componentInstance.run();
+        fixture.detectChanges();
+        const alerts = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[role=alert]'));
+        expect(alerts.length).toBe(1);
+        expect(alerts[0].textContent).toContain('The sample has no ORDER_ID column');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Binder Error');
+    });
+
+    it('negative probe: an unrelated error gets no missing-column line', () => {
+        expect(missingSampleColumn('Sample must be valid JSON (an array of row objects)')).toBeNull();
+        expect(missingSampleColumn(null)).toBeNull();
     });
 
     it('rejects invalid JSON without calling the API', () => {

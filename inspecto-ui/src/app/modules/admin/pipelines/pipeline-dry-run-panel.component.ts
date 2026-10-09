@@ -59,6 +59,8 @@ export class PipelineDryRunPanelComponent {
     private readonly mine = computed(() => (this.outcome()?.id === this.pipelineId() ? this.outcome() : null));
     readonly result = computed(() => this.mine()?.result ?? null);
     readonly error = computed(() => this.mine()?.error ?? null);
+    /** A sample missing a column the Steps read, in plain words (the raw engine message stays below it). */
+    readonly missingColumn = computed(() => missingSampleColumn(this.error()));
 
     run(): void {
         const id = this.pipelineId();
@@ -77,4 +79,10 @@ export class PipelineDryRunPanelComponent {
             error: (err) => this.outcome.set({ id, error: apiErrorMessage(err, 'Dry-run failed') }),
         });
     }
+}
+
+/** The column a dry-run sample lacks, from the engine's `Binder Error ... does not have a column named "X"`. */
+export function missingSampleColumn(error: string | null): string | null {
+    const m = error?.match(/does not have a column named "([^"]+)"/);
+    return m ? m[1] : null;
 }
