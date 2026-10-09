@@ -85,4 +85,4 @@ Breaking changes are free on any surface (nothing after 3.x was in production): 
 - **The telecom-asn1 split packages** (`ingester`, `parse`) were first deliberate, then retired (P3g, `com.gamma.telecom.asn1`).
 
 ## Open rows (BACKLOG section Module architecture)
-`MODULE-REORG-1` (umbrella) - `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; Workflow & SLA second source) - `MODULE-REORG-P7-KERNEL` (step 7 declined; small leftovers).
+`MODULE-REORG-1` (umbrella) - `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; Workflow & SLA second source). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).
