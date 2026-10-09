@@ -49,6 +49,31 @@ public final class ServerFaults {
         return new ApiException(status, code, what + ": " + reason(t, fallback) + " — correlation id " + cid);
     }
 
+    /**
+     * LIVEFIX2 #1b: a 4xx that keeps a driver message (a DuckDB binder error the author must read) never carries
+     * the server's absolute layout. Each {@code root}'s absolute path — native or forward-slashed, any case — is
+     * replaced by its own directory name, so "C:/srv/spaces/ra/data/kpi/**" reads as "data/kpi/**".
+     */
+    public static String withoutServerPaths(String message, java.nio.file.Path... roots) {
+        if (message == null) return null;
+        String out = message;
+        for (java.nio.file.Path root : roots) {
+            if (root == null) continue;
+            java.nio.file.Path abs = root.toAbsolutePath().normalize();
+            String label = abs.getFileName() == null ? "" : abs.getFileName().toString();
+            String nativeForm = abs.toString();
+            for (String form : new String[] {nativeForm, nativeForm.replace('\\', '/')})
+                out = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(form), java.util.regex.Pattern.CASE_INSENSITIVE)
+                        .matcher(out).replaceAll(java.util.regex.Matcher.quoteReplacement(label));
+        }
+        // What survives is a path outside every root, or one DuckDB truncated in its "LINE 1:" echo — drop it whole.
+        return LEFTOVER_PATH.matcher(out).replaceAll("<path>");
+    }
+
+    /** A Windows drive path, or a POSIX absolute path of two or more segments, up to a quote or whitespace. */
+    private static final java.util.regex.Pattern LEFTOVER_PATH = java.util.regex.Pattern.compile(
+            "(?<![\\w.])(?:[A-Za-z]:[\\\\/]|/(?=[^\\s'\"/]+/))[^\\s'\"]*");
+
     /** A reason from the fixed list, by walking the cause chain; the text is inspected, never returned. */
     static String reason(Throwable t, String fallback) {
         for (Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause()) {

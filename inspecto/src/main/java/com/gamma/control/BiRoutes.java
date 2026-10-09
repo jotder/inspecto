@@ -118,7 +118,9 @@ final class BiRoutes implements RouteModule {
         try {
             return response(QueryExecutor.run(req), echoSql);
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: "
+                    + ServerFaults.withoutServerPaths(DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()),
+                            api.dataRoot(), writeRoot));
         }
     }
 

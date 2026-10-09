@@ -112,4 +112,16 @@ class ServerFaultsTest {
                 "query sandbox unavailable", "sandbox could not be opened", new RuntimeException(MARKER)),
                 503, "query sandbox unavailable: sandbox could not be opened");
     }
+
+    @Test
+    void withoutServerPathsNamesTheRootAndDropsTruncatedOrForeignPaths() {
+        Path data = Path.of(System.getProperty("java.io.tmpdir"), "srvx", "ra", "data").toAbsolutePath().normalize();
+        String fwd = data.toString().replace('\\', '/');
+        String msg = "No files found that match the pattern \"" + fwd + "/kpi/**/*.parquet\"\n"
+                + "LINE 1: read_parquet('" + fwd.substring(0, fwd.length() - 3) + "... also /opt/other/x.parquet";
+        String out = ServerFaults.withoutServerPaths(msg, data);
+        assertTrue(out.contains("\"data/kpi/**/*.parquet\""), out);
+        assertFalse(out.contains("srvx"), out);
+        assertFalse(out.contains("/opt/"), out);
+    }
 }

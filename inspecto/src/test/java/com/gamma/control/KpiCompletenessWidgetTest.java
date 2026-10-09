@@ -110,6 +110,61 @@ class KpiCompletenessWidgetTest {
         }
     }
 
+    @Test
+    void beforeTheJobHasEverRunTheTileReadsAsEmptyNotAnIoError(@TempDir Path root) throws Exception {
+        // LIVEFIX2 #1a: the template ships a zero-row schema seed (and the Job's ownership marker), so a fresh
+        // Space's tile answers zero rows instead of "No files found that match the pattern <absolute path>".
+        Path template = Path.of("..", "spaces", "_templates", "telco-ra").toAbsolutePath().normalize();
+        copyTree(template, root.resolve("_templates").resolve("telco-ra"));
+        DuckDbUtil.loadDriver();
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        try {
+            api.start();
+            call("http://localhost:" + api.port() + "/api/v1/spaces", "{\"id\":\"ra\",\"template\":\"telco-ra\"}");
+            String body = new ObjectMapper().writeValueAsString(Map.of("dataset", "kpi_completeness_dataset",
+                    "groupBy", List.of("pipeline", "record_day", "status"),
+                    "measures", List.of(Map.of("agg", "sum", "field", "rows"))));
+            JsonNode rows = V1Body.of(call("http://localhost:" + api.port() + "/api/v1/spaces/ra/bi/query", body)).get("rows");
+            assertEquals(0, rows.size(), rows.toString());
+        } finally {
+            api.close();
+            spaces.close();
+        }
+    }
+
+    @Test
+    void aMissingStoreRefusalNamesASpaceRelativePathNeverTheServersAbsoluteOne(@TempDir Path root) throws Exception {
+        // LIVEFIX2 #1b: the DuckDB "No files found that match the pattern ..." text reaches the client, but the
+        // Space's absolute data root is replaced by its directory name.
+        Path template = Path.of("..", "spaces", "_templates", "telco-ra").toAbsolutePath().normalize();
+        copyTree(template, root.resolve("_templates").resolve("telco-ra"));
+        DuckDbUtil.loadDriver();
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        try {
+            api.start();
+            call("http://localhost:" + api.port() + "/api/v1/spaces", "{\"id\":\"ra\",\"template\":\"telco-ra\"}");
+            Path store = root.resolve("ra").resolve("data").resolve("kpi_completeness");
+            try (Stream<Path> s = Files.list(store)) { for (Path f : s.toList()) Files.delete(f); }
+            Files.delete(store);
+            String body = new ObjectMapper().writeValueAsString(Map.of("dataset", "kpi_completeness_dataset",
+                    "groupBy", List.of("pipeline"), "measures", List.of(Map.of("agg", "sum", "field", "rows"))));
+            HttpResponse<String> r = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+                    URI.create("http://localhost:" + api.port() + "/api/v1/spaces/ra/bi/query"))
+                    .header("Authorization", "Bearer admin").header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(422, r.statusCode(), r.body());
+            String abs = root.toAbsolutePath().normalize().toString();
+            assertFalse(r.body().toLowerCase().contains(abs.toLowerCase()), r.body());
+            assertFalse(r.body().toLowerCase().contains(abs.replace('\\', '/').toLowerCase()), r.body());
+            assertTrue(r.body().contains("data/kpi_completeness"), r.body());
+        } finally {
+            api.close();
+            spaces.close();
+        }
+    }
+
     private static Map<String, Object> row(String pipeline, String day, String status, long rows) {
         Map<String, Object> m = new HashMap<>();
         m.put("pipeline", pipeline);
