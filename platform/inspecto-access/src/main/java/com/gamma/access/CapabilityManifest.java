@@ -188,6 +188,8 @@ public final class CapabilityManifest {
             // S3 preview: scores one entity and writes nothing. Previewing UNSAVED content additionally needs
             // canAuthorWorkbench, checked in the handler (D-RP4, operator 2026-10-06).
             new Entry("POST", "/risk-scores/preview", Roles.CAN_WORK_INCIDENTS),
+            // ScreeningRoutes (SCREENING-1) — deciding a Screening Hit is working a triage item (SCR-D13).
+            new Entry("POST", "/screening/hits/([^/]+)/decide", Roles.CAN_WORK_INCIDENTS),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.
@@ -485,6 +487,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/investigations/([^/]+)/dossier/verify", "read-shaped", "checks a Dossier manifest against the store (LA-12); persists nothing"),
             new Exemption("POST", "/inv/investigations/([^/]+)/dossier/bundle/verify", "read-shaped", "checks an exported Dossier bundle's seal, references and custody against the store (D-6); persists nothing"),
             new Exemption("POST", "/entity-lists/([^/]+)/match", "read-shaped", "matches body values against an Entity List (ASSURE-ENTITY-LISTS-1); persists nothing — a POST so keys never ride in a URL"),
+            new Exemption("POST", "/screening/check", "read-shaped", "scores body subjects against Entity Lists (SCREENING-1); persists nothing - a POST so names never ride in a URL"),
             new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
             new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),

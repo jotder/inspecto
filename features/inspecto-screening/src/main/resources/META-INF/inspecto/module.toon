@@ -1,0 +1,14 @@
+---
+id: screening
+title: Screening
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+absentMessage: "Screening is not installed in this bundle - it is provided by the optional inspecto-screening module (Professional edition and above)."
+provides:
+  features[1]: screening
+  contracts[1]: JobTypeProvider
+  jobTypes[1]: screening.run
+  routes[4]: "POST /screening/check","GET /screening/hits","GET /screening/hits/([^/]+)","POST /screening/hits/([^/]+)/decide"
+requires:
+  modules[1]: entity-list

@@ -111,6 +111,9 @@ public final class BundleExporter {
                     // Action Requests carry rendered payloads and target response excerpts, and are signed with
                     // that same key (ASSURE-ACTION-REQUESTS-1): operational records, never exported config.
                     if (entry.startsWith("action-requests/")) continue;
+                    // Screening Hits hold screened names and review decisions, signed with that same key (SCREENING-1):
+                    // operational records, never exported config.
+                    if (entry.startsWith("screening-hits/")) continue;
                     entries.put(entry, exportableBytes(f));
                     artifacts.add(artifact(entry, kindOf(f)));
                 }
