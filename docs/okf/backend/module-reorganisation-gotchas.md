@@ -38,7 +38,7 @@ Context: [module-taxonomy.md](module-taxonomy.md), [decisions](module-reorganisa
 - **`OptionalSpi` is fail-soft; a base provider must fail closed.** An absent or unloadable optional module contributes nothing silently; anything that must exist belongs in a base provider. A module's features are collected only after `register()` succeeded.
 - **Shaded jars collapse same-named resources** (every `module.toon` shared one path); the `---` separator in manifests tolerates a merge. A thin jar keeps its own.
 - **TOON has no comment syntax**: a `#` line in a manifest or Offering corrupts it.
-- **The per-Space `modules.toon` cache** keys on (mtime, size): a same-size rewrite inside one filesystem tick reads stale (a flaky test, fixed in `5556bf0b3`, was exactly this).
+- **The per-Space `modules.toon` cache** keys on (mtime, size): a same-size rewrite inside one filesystem tick reads stale (a flaky test, fixed in `cee0153eb`, was exactly this).
 - **A rebuild-from-modeled-state write drops every key it does not model**: never write a typed record back without carrying the unmodelled keys (`x-` kept, anything else refused 422).
 - **A disabled module's in-flight Run is not interrupted**, and `backup` / `intelligence` have no feature id so they cannot be switched off.
 
