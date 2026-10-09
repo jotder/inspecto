@@ -48,7 +48,8 @@ final class KpiCompletenessJob implements Job {
             ParameterDecl.required("pipeline", ParamType.STRING,
                     "The Pipeline whose received volume is assessed (the producer in the output registry)"),
             ParameterDecl.optional("record_day", ParamType.STRING, null,
-                    "The day assessed, yyyy-MM-dd. Default: yesterday in the operations zone (-Dops.timezone)"),
+                    "The day assessed, yyyy-MM-dd. Default: yesterday in the zone the Pipeline's record_day is written in "
+                            + "(UTC when it declares parsing.source_timezone), else the operations zone (-Dops.timezone)"),
             // K3: the rolling baseline. 28 / 7 / 0.3 are the design's proposed defaults (§7-f).
             ParameterDecl.of("baseline_window", ParamType.INTEGER).label("Baseline window (days)")
                     .min(1).max(366).defaultValue("28")
@@ -95,7 +96,10 @@ final class KpiCompletenessJob implements Job {
         // ⛔ First act, before the dry-run check: a dry run that skipped it would validate a config that cannot run.
         requireDurable(ctx.spaceId(), FAMILY, TOGGLE, "read the Pipeline's daily volume");
         String pipeline = cfg.require("pipeline");
-        String recordDay = cfg.opt("record_day", LocalDate.now(OperationsZone.resolve()).minusDays(1).toString());
+        String recordDay = cfg.opt("record_day", null);
+        if (recordDay == null)
+            recordDay = defaultRecordDay(pipelines.apply(pipeline).map(pc -> pc.csv() == null ? null
+                    : pc.csv().sourceTimezone()).orElse(null), OperationsZone.resolve(), java.time.Clock.systemUTC());
         LocalDate.parse(recordDay);   // a malformed day fails loudly, never compares as a string
         FileHalf files = "false".equalsIgnoreCase(cfg.opt("check_files", "true")) ? null : resolveFileHalf(ctx, pipeline);
         if (ctx.dryRun())
@@ -146,6 +150,19 @@ final class KpiCompletenessJob implements Job {
 
     /** Consecutive UNKNOWN days (nothing registered) a WARN needs — §7-h (operator, 2026-10-06). */
     static final int STREAK_DAYS = 3;
+
+    /**
+     * The default assessed day: "yesterday" in the zone the Pipeline's {@code record_day} is WRITTEN in
+     * (operator, 2026-10-09). A declared {@code parsing.source_timezone} makes ingest normalise event time to
+     * naive UTC ({@code SourceZones}), so record days are UTC days and yesterday is taken in UTC; the declared
+     * zone itself is NOT the zone record days are cut in. With no declared zone event time stays the data's
+     * own unstated wall clock, so the operations zone ({@code -Dops.timezone}) remains the best stand-in.
+     * ⚠ A per-field {@code raw.fields[].timezone} is not consulted here.
+     */
+    static String defaultRecordDay(String sourceTimezone, java.time.ZoneId opsZone, java.time.Clock clock) {
+        java.time.ZoneId zone = sourceTimezone == null || sourceTimezone.isBlank() ? opsZone : java.time.ZoneOffset.UTC;
+        return LocalDate.now(clock.withZone(zone)).minusDays(1).toString();
+    }
 
     /** Consecutive days ending at {@code recordDay} with no registered output, within the fetched series. */
     static int unknownStreak(List<DailyVolume> series, String recordDay) {

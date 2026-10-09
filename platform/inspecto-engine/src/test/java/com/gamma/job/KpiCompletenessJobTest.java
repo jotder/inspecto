@@ -230,6 +230,18 @@ class KpiCompletenessJobTest {
         }
     }
 
+    @Test
+    void defaultRecordDayIsYesterdayInTheZoneRecordDaysAreWrittenIn() {
+        // 2026-08-10T02:00Z: still 2026-08-09 in New York, already 2026-08-10 in UTC and Kolkata.
+        java.time.Clock clock = java.time.Clock.fixed(java.time.Instant.parse("2026-08-10T02:00:00Z"), java.time.ZoneOffset.UTC);
+        java.time.ZoneId ops = java.time.ZoneId.of("America/New_York");
+        // A non-UTC declared source zone normalises event time to UTC, so its record days are UTC days.
+        assertEquals("2026-08-09", KpiCompletenessJob.defaultRecordDay("Asia/Kolkata", ops, clock));
+        // negative probe: no declared zone falls back to the operations zone, which gives a DIFFERENT day here.
+        assertEquals("2026-08-08", KpiCompletenessJob.defaultRecordDay(null, ops, clock));
+        assertEquals("2026-08-08", KpiCompletenessJob.defaultRecordDay(" ", ops, clock));
+    }
+
     /** A {@link CapturingJobContext} that also grants {@link IncidentAccess}. */
     private static final class ServicesContext implements JobContext {
         final CapturingJobContext inner = new CapturingJobContext();

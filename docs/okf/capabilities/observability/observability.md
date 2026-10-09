@@ -515,7 +515,7 @@ There is no metrics-browsing UI and no backup/restore screen beyond the Jobs for
 (`inspecto-engine` `com.gamma.job.KpiCompletenessJob`) is K4 and the caller of K1 (`dailyVolume`) and K3
 (`VolumeBaseline.assess`). Its first act is `requireDurable` over `StoreHealth.of(spaceId)` — an absent
 entry refuses like `NOT_CONFIGURED`, dry runs included, and a refusal emits no `kpi.completeness.*` Signal.
-Parameters: `pipeline` (required), `record_day` (default yesterday in `-Dops.timezone`), `baseline_window`
+Parameters: `pipeline` (required), `record_day` (default yesterday in the zone the Pipeline's record days are written in — UTC when it declares `parsing.source_timezone`, since ingest then normalises event time to naive UTC; else `-Dops.timezone` (operator, 2026-10-09); a per-field `timezone` is not consulted), `baseline_window`
 28, `min_baseline_days` 7, `tolerance` 0.3. Signals (`com.gamma.signal.SignalType`, operator 2026-10-06):
 `kpi.completeness.evaluated` every run (WARN on BREACH), `kpi.completeness.breached` on BREACH only, plus
 one Incident per Pipeline through `IncidentAccess` (scope and dedupe key = the pipeline). ⛔ `NO_BASELINE` /
