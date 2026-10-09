@@ -73,13 +73,17 @@ final class DemoUsers {
      */
     static Map<String, User> all(Path spacesRoot) {
         Map<String, User> byId = new LinkedHashMap<>();
+        Map<String, String> spaceOf = new LinkedHashMap<>();
         if (spacesRoot == null || !Files.isDirectory(spacesRoot)) return byId;
         try (var dirs = Files.list(spacesRoot)) {
             for (Path space : dirs.sorted().toList()) {
+                String name = space.getFileName().toString();
                 for (User u : load(space.resolve("config"))) {
                     User prior = byId.putIfAbsent(u.id(), u);
+                    spaceOf.putIfAbsent(u.id(), name);
                     if (prior != null && !prior.equals(u))
-                        throw new IllegalStateException("Demo User '" + u.id() + "' is defined differently in two Spaces");
+                        throw new IllegalStateException("Demo User '" + u.id() + "' is defined differently in Spaces '"
+                                + spaceOf.get(u.id()) + "' and '" + name + "'");
                 }
             }
         } catch (java.io.IOException e) {

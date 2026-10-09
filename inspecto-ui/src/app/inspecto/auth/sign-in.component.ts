@@ -88,12 +88,25 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                             This workspace is secured. Continue with your organisation's single sign-on.
                         }
                     </p>
-                    @if (failed()) {
+                    @if (startupError(); as err) {
+                        <!-- LIVEFIX2 #3: /bootstrap answered an error — no sign-in can work until the server is fixed. -->
+                        <inspecto-alert
+                            class="mt-4 block text-left"
+                            variant="error"
+                            title="The server could not start a session"
+                            data-testid="startup-error"
+                        >
+                            {{ err }}
+                            <button mat-button type="button" (click)="reload()">Try again</button>
+                        </inspecto-alert>
+                    } @else if (failed()) {
                         <inspecto-alert class="mt-4 block text-left" variant="error" title="Sign-in failed">
                             We couldn't complete sign-in. Please try again.
                         </inspecto-alert>
                     }
-                    @if (demo()) {
+                    @if (startupError()) {
+                        <!-- No picker and no SSO button: either would lead to a session the server cannot serve. -->
+                    } @else if (demo()) {
                         <inspecto-alert class="mt-4 block text-left" variant="warning" title="Demo sign-in">
                             Not secure, local only. Pick who you are for this demo.
                         </inspecto-alert>
@@ -158,6 +171,8 @@ export class SignInComponent implements OnInit {
     readonly demoUsers = computed(() => this.session.demoUsers());
     /** R2-17: demo sign-in is on — the page must not claim security or SSO, nor pitch builder copy. */
     readonly demo = computed(() => this.demoUsers().length > 0);
+    /** LIVEFIX2 #3: the server's own message when `GET /bootstrap` answered an error. */
+    readonly startupError = computed(() => this.session.bootstrapError());
 
     ngOnInit(): void {
         // Already signed in (or Personal/offline where login is never required) → straight into the app.
@@ -167,6 +182,11 @@ export class SignInComponent implements OnInit {
         }
         this.failed.set(sessionStorage.getItem('inspecto.signInFailed') === '1');
         sessionStorage.removeItem('inspecto.signInFailed');
+    }
+
+    /** Re-run the whole startup (the bootstrap read is an app initializer). */
+    reload(): void {
+        window.location.reload();
     }
 
     async signIn(demoUserId?: string): Promise<void> {

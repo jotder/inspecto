@@ -101,7 +101,17 @@
         } @else if (pages.error(); as message) {
             <inspecto-alert class="mt-4 block" variant="error" title="The comparison failed">
                 {{ message }}
-                <button mat-button type="button" (click)="pages.retry()">Retry</button>
+                @if (pages.retryable()) {
+                    <button mat-button type="button" (click)="pages.retry()">Retry</button>
+                } @else {
+                    <p class="mt-1" data-testid="board-fix-hint">
+                        Retrying will not change this — fix the Dataset (<a
+                            [routerLink]="['/catalog/datasets']"
+                            class="underline"
+                            >open Datasets</a
+                        >) or this Reconciliation, then reopen it.
+                    </p>
+                }
             </inspecto-alert>
         } @else if (result(); as res) {
             <!-- Summary chips (the whole day, whatever the page) -->
@@ -163,6 +173,12 @@
                 }
             </div>
         }
+    } @else if (loadError(); as err) {
+        <inspecto-empty-state
+            icon="heroicons_outline:exclamation-triangle"
+            title="Reconciliation unavailable"
+            [message]="err"
+        />
     } @else if (!loading()) {
         <inspecto-empty-state
             icon="heroicons_outline:exclamation-triangle"

@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, catchError, map, of, switchMap, tap } from 'rxjs';
@@ -15,6 +16,11 @@ export class ReconPageLoader {
     readonly result = signal<ReconRunResult | null>(null);
     readonly loading = signal(false);
     readonly error = signal<string | null>(null);
+    /**
+     * LIVEFIX2 #4: whether asking again can help — a network failure (status 0), a 5xx or a 429. A 4xx refusal
+     * (422 "no date column") is about the Reconciliation or its Datasets, so the host offers a fix, not Retry.
+     */
+    readonly retryable = signal(true);
     /** The query of the request in flight, or of the last one answered. */
     readonly query = signal<ReconRunQuery | null>(null);
 
@@ -28,6 +34,7 @@ export class ReconPageLoader {
                     this.query.set(query);
                     this.loading.set(true);
                     this.error.set(null);
+                    this.retryable.set(true);
                 }),
                 switchMap(({ recon, query }) =>
                     exec.page(recon, query).pipe(
@@ -40,7 +47,10 @@ export class ReconPageLoader {
             .subscribe((out) => {
                 this.loading.set(false);
                 if (out.ok === true) this.result.set(out.r);
-                else this.error.set(apiErrorMessage(out.e, 'The reconciliation run failed.'));
+                else {
+                    this.retryable.set(isRetryable(out.e));
+                    this.error.set(apiErrorMessage(out.e, 'The reconciliation run failed.'));
+                }
             });
     }
 
@@ -52,4 +62,10 @@ export class ReconPageLoader {
     retry(): void {
         if (this.last) this.requests.next(this.last);
     }
+}
+
+/** A failure asking again can fix: no HTTP answer at all, a 5xx, or a 429. Anything else is a refusal. */
+export function isRetryable(e: unknown): boolean {
+    if (!(e instanceof HttpErrorResponse)) return true;
+    return e.status === 0 || e.status === 429 || e.status >= 500;
 }

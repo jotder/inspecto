@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, ParamMap, Router, convertToParamMap } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -81,6 +82,7 @@ async function create(
         params?: Record<string, string>;
         page?: (q: ReconRunQuery) => Observable<ReconRunResult>;
         settle?: boolean;
+        get?: () => Observable<Reconciliation>;
     } = {},
 ) {
     const recon: Reconciliation = { ...RECON, ...opts.patch };
@@ -105,7 +107,7 @@ async function create(
                 provide: Router,
                 useValue: { navigate, createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
             },
-            { provide: ReconciliationsService, useValue: { get: () => of(recon), save } },
+            { provide: ReconciliationsService, useValue: { get: opts.get ?? (() => of(recon)), save } },
             { provide: ReconApiService, useValue: { record, state } },
             {
                 provide: LensService,
@@ -131,6 +133,39 @@ async function create(
 }
 
 describe('ReconBoardComponent', () => {
+    it('a 422 refusal offers a fix, not Retry — retrying cannot change it (LIVEFIX2 #4)', async () => {
+        const refusal = new HttpErrorResponse({
+            status: 422,
+            error: { error: { message: 'Dataset mediation_daily has no date column' } },
+        });
+        const { el, fixture } = await create({ page: () => throwError(() => refusal), settle: false });
+        await vi.waitFor(() => expect(el.textContent).toContain('The comparison failed'));
+        fixture.detectChanges();
+        const buttons = Array.from(el.querySelectorAll('button')).map((b) => b.textContent?.trim());
+        expect(buttons).not.toContain('Retry');
+        expect(el.querySelector('[data-testid="board-fix-hint"]')).toBeTruthy();
+        await expectNoA11yViolations(el);
+    });
+
+    it('a 5xx comparison failure still offers Retry', async () => {
+        const down = new HttpErrorResponse({ status: 503 });
+        const { el, fixture } = await create({ page: () => throwError(() => down), settle: false });
+        await vi.waitFor(() => expect(el.textContent).toContain('The comparison failed'));
+        fixture.detectChanges();
+        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Retry')).toBe(true);
+        expect(el.querySelector('[data-testid="board-fix-hint"]')).toBeNull();
+    });
+
+    it('a 401 loading the Reconciliation is NOT "not found" (LIVEFIX2 #3)', async () => {
+        const { el, fixture } = await create({
+            get: () => throwError(() => new HttpErrorResponse({ status: 401 })),
+            settle: false,
+        });
+        fixture.detectChanges();
+        expect(el.textContent).not.toContain('Reconciliation not found');
+        expect(el.textContent).toContain('Reconciliation unavailable');
+    });
+
     it('loads the latest day and renders the summary, the TOTAL strip and the band-tinted rows', async () => {
         const { c, el, page } = await create();
         expect(page).toHaveBeenCalledWith(expect.objectContaining({ id: RECON.id }), {

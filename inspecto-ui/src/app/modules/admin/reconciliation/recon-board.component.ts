@@ -1,6 +1,7 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -72,6 +73,7 @@ interface TotalLine {
     standalone: true,
     imports: [
         InspectoPageHeaderComponent,
+        RouterLink,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,
@@ -108,6 +110,8 @@ export class ReconBoardComponent implements OnInit {
     /** The server-recorded run + Break lifecycle (R2-03) — what the aging strip reads. */
     readonly state = signal<ReconState | null>(null);
     readonly loading = signal(true);
+    /** The board's own read failed for a reason other than 404 — shown instead of "not found". */
+    readonly loadError = signal<string | null>(null);
     readonly recording = signal(false);
     readonly savingBands = signal(false);
     /** Dataset id → readable label, read once on open (R2-16); empty until then, so sides show their ids. */
@@ -236,6 +240,9 @@ export class ReconBoardComponent implements OnInit {
             },
             error: (e) => {
                 this.loading.set(false);
+                // LIVEFIX2 #3: only a 404 is "not found"; anything else (401 included) keeps the server's reason.
+                if (!(e instanceof HttpErrorResponse && e.status === 404))
+                    this.loadError.set(apiErrorMessage(e, `Could not load reconciliation "${id}"`));
                 this.toastr.error(apiErrorMessage(e, `Could not load reconciliation "${id}"`));
             },
         });

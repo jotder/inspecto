@@ -20,7 +20,7 @@ const FAILED_KEY = 'inspecto.signInFailed';
  * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
-function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[] } = {}) {
+function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string } = {}) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => opts.loginRequired ?? true,
@@ -28,6 +28,7 @@ function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[] } = {}) 
         version: signal<string | null>(null),
         branding: signal({ logoDataUrl: null, caption: null, footerText: null }),
         demoUsers: signal<DemoUser[]>(opts.demoUsers ?? []),
+        bootstrapError: signal<string | null>(opts.bootstrapError ?? null),
     };
     const router = { navigate: vi.fn() };
     TestBed.configureTestingModule({
@@ -57,6 +58,18 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
         // screen that can act on it rather than being silently swallowed by a drive-by visit.
         expect(sessionStorage.getItem(FAILED_KEY)).toBe('1');
         expect(el.querySelector('inspecto-alert')).toBeNull();
+    });
+
+    it('a failed bootstrap shows the server reason and no sign-in control (LIVEFIX2 #3)', async () => {
+        const { el } = create({
+            bootstrapError: "Demo User 'admin' is defined differently in Spaces 'a' and 'b'",
+            demoUsers: [{ id: 'admin', displayName: 'Admin', title: '' }],
+        });
+        const alert = el.querySelector('[data-testid="startup-error"]');
+        expect(alert?.textContent).toContain("Demo User 'admin' is defined differently");
+        expect(el.querySelector('[data-demo-user]')).toBeNull();
+        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('SSO'))).toBe(false);
+        await expectNoA11yViolations(el);
     });
 
     it('stays on the screen and shows no failure alert on a first, clean visit', () => {

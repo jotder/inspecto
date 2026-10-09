@@ -17,6 +17,7 @@ function create(
         beginLogin: vi.fn(),
         version: signal<string | null>(version),
         demoUsers: signal([]),
+        bootstrapError: signal<string | null>(null),
         branding: signal({
             logoDataUrl: branding.logoDataUrl ?? null,
             caption: branding.caption ?? null,

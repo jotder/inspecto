@@ -1,9 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, firstValueFrom, map, Observable, of, tap } from 'rxjs';
 import { APP_ENVIRONMENT } from '../api/app-environment';
-import { apiUrl } from '../api/api-base';
+import { apiErrorMessage, apiUrl } from '../api/api-base';
 
 /**
  * OIDC endpoint configuration for the Professional-edition login redirect. Comes from `bootstrap.auth`
@@ -199,8 +199,18 @@ export class SessionService {
         );
     });
 
-    /** True only on Standard when there is no live session yet — the sole condition that shows sign-in. */
-    readonly loginRequired = computed(() => this.authMode() === 'oidc' && !this.authenticated());
+    /**
+     * LIVEFIX2 #3: the server ANSWERED `GET /bootstrap` with an error (a 4xx/5xx — e.g. a Demo User conflict), so the
+     * edition, the session and the capabilities are unknown. Not set for an unreachable backend (status 0): the
+     * connectivity banner owns that, and the shell still degrades to Personal. The sign-in page shows this text.
+     */
+    readonly bootstrapError = signal<string | null>(null);
+
+    /** True on Standard when there is no live session yet, or when the server failed to start the session at all
+     *  ({@link bootstrapError}) — a shell drawn over an unknown session is a fake signed-in state whose every call 401s. */
+    readonly loginRequired = computed(
+        () => this.bootstrapError() !== null || (this.authMode() === 'oidc' && !this.authenticated()),
+    );
 
     /** The current access token for the auth interceptor to attach, or null (Personal / signed-out). */
     token(): string | null {
@@ -214,7 +224,7 @@ export class SessionService {
      */
     async init(): Promise<void> {
         const boot = await firstValueFrom(
-            this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError(() => of({} as Bootstrap))),
+            this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError((e: unknown) => this.bootstrapFailed(e))),
         );
         this.edition.set(boot.edition ?? 'personal');
         this.version.set(boot.version?.trim() ? boot.version.trim() : null);
@@ -407,6 +417,18 @@ export class SessionService {
         if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
     }
 
+    /**
+     * LIVEFIX2 #3: an API call answered 401 while this SPA believed no sign-in was needed (`authMode` none — the
+     * bootstrap read failed, or the server's edition changed under a loaded page). Say so on the sign-in page.
+     */
+    onUnexpected401(): void {
+        if (this.bootstrapError() === null)
+            this.bootstrapError.set(
+                'The server requires sign-in, but this page started without a session. Reload to sign in.',
+            );
+        if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
+    }
+
     private redirectUri(): string {
         return `${window.location.origin}/auth/callback`;
     }
@@ -417,11 +439,19 @@ export class SessionService {
         window.location.assign(url);
     }
 
+    /** A failed bootstrap read: an answered error is recorded ({@link bootstrapError}); an unreachable one is not. */
+    private bootstrapFailed(e: unknown): Observable<Bootstrap> {
+        const status = e instanceof HttpErrorResponse ? e.status : 0;
+        if (status > 0) this.bootstrapError.set(apiErrorMessage(e, `The server answered ${status}.`));
+        return of({} as Bootstrap);
+    }
+
     private async loadSessionFromBootstrap(): Promise<void> {
         const boot = await firstValueFrom(
-            this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError(() => of({} as Bootstrap))),
+            this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError((e: unknown) => this.bootstrapFailed(e))),
         );
-        const authenticated = boot.session?.authenticated ?? true;
+        // An unread session is not a signed-in one: `?? true` held only for a payload that omits the slice.
+        const authenticated = this.bootstrapError() === null && (boot.session?.authenticated ?? true);
         this.authenticated.set(authenticated);
         this.actor.set(authenticated ? (boot.session?.actor ?? null) : null);
         this.subjectDisplayName.set(authenticated ? (boot.session?.displayName ?? null) : null);

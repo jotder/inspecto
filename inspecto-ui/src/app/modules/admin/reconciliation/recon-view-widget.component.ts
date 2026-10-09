@@ -60,7 +60,11 @@ import { ReconPageLoader } from './recon-page.loader';
                 } @else if (pages.error(); as message) {
                     <inspecto-alert class="block" variant="error">
                         {{ message }}
-                        <button mat-button type="button" (click)="pages.retry()">Retry</button>
+                        @if (pages.retryable()) {
+                            <button mat-button type="button" (click)="pages.retry()">Retry</button>
+                        } @else {
+                            <span>Fix the Dataset or the Reconciliation — retrying will not change this.</span>
+                        }
                     </inspecto-alert>
                 } @else if (result(); as res) {
                     <div class="text-secondary flex flex-wrap items-center gap-x-3 text-xs">

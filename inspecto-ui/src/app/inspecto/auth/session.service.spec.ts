@@ -36,6 +36,24 @@ describe('SessionService (W6d edition switch)', () => {
 
     afterEach(() => httpMock.verify());
 
+    it('a bootstrap the server ANSWERED with an error requires sign-in and keeps the reason (LIVEFIX2 #3)', async () => {
+        const done = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ error: { message: 'Internal error — correlation id c-1' } }, { status: 500, statusText: 'x' });
+        await done;
+        expect(svc.bootstrapError()).toContain('correlation id c-1');
+        expect(svc.loginRequired()).toBe(true);
+    });
+
+    it('an UNREACHABLE bootstrap (status 0) still degrades to Personal — the connectivity banner owns it', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).error(new ProgressEvent('error'), { status: 0 });
+        await done;
+        expect(svc.bootstrapError()).toBeNull();
+        expect(svc.loginRequired()).toBe(false);
+    });
+
     it('Personal/offline bootstrap ⇒ authMode none, no login, no /auth/refresh', async () => {
         const done = svc.init();
         httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });

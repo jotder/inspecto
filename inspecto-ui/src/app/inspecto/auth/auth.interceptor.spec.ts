@@ -17,6 +17,7 @@ function stubSession(mode: 'none' | 'oidc', token: string | null) {
         token: () => token,
         refresh: vi.fn(() => of('at-refreshed')),
         onAuthLost: vi.fn(),
+        onUnexpected401: vi.fn(),
     };
 }
 
@@ -85,6 +86,17 @@ describe('authInterceptor (W6d)', () => {
         http.get(`${base}/pipelines`).subscribe({ error: () => (errored = true) });
         httpMock.expectOne(`${base}/pipelines`).flush({}, { status: 401, statusText: 'Unauthorized' });
         expect(session.onAuthLost).toHaveBeenCalledOnce();
+        expect(errored).toBe(true);
+    });
+
+    it('a 401 under authMode none routes to sign-in instead of reaching the pane as a plain error (LIVEFIX2 #3)', () => {
+        const session = stubSession('none', null);
+        setup(session);
+        let errored = false;
+        http.get(`${base}/recon/x`).subscribe({ error: () => (errored = true) });
+        httpMock.expectOne(`${base}/recon/x`).flush({}, { status: 401, statusText: 'Unauthorized' });
+        expect(session.onUnexpected401).toHaveBeenCalledOnce();
+        expect(session.refresh).not.toHaveBeenCalled();
         expect(errored).toBe(true);
     });
 });

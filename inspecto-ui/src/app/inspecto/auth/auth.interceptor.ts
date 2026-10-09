@@ -19,7 +19,15 @@ const SESSION_PATHS = ['/auth/exchange', '/auth/refresh', '/auth/logout'];
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const session = inject(SessionService);
-    if (session.authMode() !== 'oidc') return next(req);
+    if (session.authMode() !== 'oidc')
+        // LIVEFIX2 #3: a 401 here means the server wants a session this SPA never learned about (its bootstrap
+        // failed or predates a restart). Route to sign-in with the reason — never let a pane read it as "not found".
+        return next(req).pipe(
+            catchError((err: HttpErrorResponse) => {
+                if (err.status === 401) session.onUnexpected401();
+                return throwError(() => err);
+            }),
+        );
 
     const base = inject(APP_ENVIRONMENT).apiBaseUrl;
     const isApi = req.url.startsWith(base + '/') || req.url.startsWith(base + '?') || req.url === base;
