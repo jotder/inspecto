@@ -1,5 +1,5 @@
 name: ba_revenue_outside_band
-dataset: ba_revenue_forecast
+dataset: revenue_forecast
 measure: max(outside_band)
 by[1]: ds
 comparator: gte

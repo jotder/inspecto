@@ -5,7 +5,7 @@ Synthetic content only. Every number below comes from the pack's generated corpu
 ## Alert Rule `ba_revenue_outside_band` (CRITICAL, one Alert and one Incident per day)
 
 **What fired.** The day's revenue fell outside the Holt-Winters forecast band (forecast ± 4σ̂) on
-Dataset `ba_revenue_forecast`. The Incident names the day as `key.ds`.
+Dataset `revenue_forecast` (the `ba_revenue_forecast` Job's sink). The Incident names the day as `key.ds`.
 
 1. Open the Dataset and read the day's `actual`, `forecast`, `lower_band`, `upper_band`.
 2. A **drop** below `lower_band`: check the Pipelines that feed revenue for that day. Look for late or
@@ -57,7 +57,7 @@ erosion is not assessed (`status = data_quality`), so a cost-feed outage cannot 
 ## Alert Rule `ba_margin_erosion` (WARNING, one Alert per product / channel / partner)
 
 **What fired.** Recent margin % (the last 28 days) is more than 5 points below the baseline margin %
-(the 28 days before) on Dataset `ba_margin_erosion`. The Alert names `product`, `channel` and `partner`.
+(the 28 days before) on Dataset `margin_erosion` (the `ba_margin_erosion` Job's sink). The Alert names `product`, `channel` and `partner`.
 
 1. Compare `baseline_margin_pct` and `recent_margin_pct`. Then look at the combination's rows in
    `ba_margin_lines`.
@@ -81,4 +81,6 @@ erosion is not assessed (`status = data_quality`), so a cost-feed outage cannot 
 
 Ingest a `daily_revenue` store (`ds DATE`, `revenue DOUBLE`) and a `margin_lines` store (`ds`, `product`,
 `channel`, `partner`, `revenue`, `cost`). Enable the Jobs `ba_revenue_forecast` and `ba_margin_erosion`.
-Then point the Datasets at the Jobs' sinks (`revenue_forecast`, `margin_erosion`) with `physicalRef`.
+The Alert Rules already read the Jobs' sink Datasets (`revenue_forecast`, `margin_erosion`), so they stay
+silent until the Jobs have written a run. The view-backed `ba_*` Datasets keep the synthetic corpus for the
+dashboard and for exploring the model.

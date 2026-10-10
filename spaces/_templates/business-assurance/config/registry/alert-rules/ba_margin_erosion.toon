@@ -1,5 +1,5 @@
 name: ba_margin_erosion
-dataset: ba_margin_erosion
+dataset: margin_erosion
 measure: max(erosion_pp)
 by[3]: product, channel, partner
 comparator: gt

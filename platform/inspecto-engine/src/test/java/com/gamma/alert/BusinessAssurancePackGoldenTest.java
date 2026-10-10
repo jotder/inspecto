@@ -87,11 +87,40 @@ class BusinessAssurancePackGoldenTest {
         String of(String rule) { return fired.stream().filter(a -> a.rule().equals(rule)).toList().toString(); }
     }
 
+    /** Each Job's sink Dataset (what the pack's Alert Rules read) and the view whose SQL the Job runs. */
+    private static final Map<String, String> SINK_TO_VIEW = Map.of(
+            "revenue_forecast", "ba_revenue_forecast", "margin_erosion", "ba_margin_erosion");
+
+    /**
+     * The pack's Alert Rules read the Job SINK Datasets (repointed 2026-10-10 after the live drive). A sweep
+     * first stands in for both Job runs: each view's SQL is written to {@code <data>/<sink>/run.parquet} beside
+     * the shipped zero-row seed, in a scratch data root, so the pack itself is never written.
+     */
     private static Sweep sweep(Path cfg) {
+        try {
+            Path data = Files.createTempDirectory("ba-sweep-data");
+            ViewStore views = new ViewStore(cfg.resolve("views"));
+            com.gamma.util.DuckDbUtil.loadDriver();
+            try (java.sql.Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+                 java.sql.Statement st = c.createStatement()) {
+                for (Map.Entry<String, String> e : SINK_TO_VIEW.entrySet()) {
+                    Path dir = Files.createDirectories(data.resolve(e.getKey()));
+                    Files.copy(PACK.resolve("data").resolve(e.getKey()).resolve("seed.parquet"), dir.resolve("seed.parquet"));
+                    st.execute("COPY (" + views.get(e.getValue()).orElseThrow().derivedSql() + ") TO '"
+                            + dir.resolve("run.parquet").toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+                }
+            }
+            return sweep(cfg, data);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static Sweep sweep(Path cfg, Path data) {
         ComponentStore store = new ComponentStore(cfg.resolve("registry"));
         List<AlertRule> rules = RULES.stream().map(n -> AlertRule.fromMap(store.get("alert-rule", n)
                 .map(ComponentRegistry.Component::content).orElseThrow())).toList();
-        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> null);
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> data);
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = new AlertService(rules, noPipelines(), emptyStore(), objects);
         svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
@@ -161,7 +190,7 @@ class BusinessAssurancePackGoldenTest {
         // Only the CRITICAL forecast breach opens an Incident; the WARNING erosion stays an Alert.
         assertEquals(1, s.incidents().size(), s.incidents().toString());
         assertEquals("2026-06-04", s.incidents().get(0).attributes().get("key.ds"));
-        assertTrue(s.incidents().get(0).title().contains("Daily revenue with its forecast and prediction band"),
+        assertTrue(s.incidents().get(0).title().contains("Daily revenue forecast and band (ba_revenue_forecast Job)"),
                 "the forecast Alert names its Dataset by description, as the erosion one does: " + s.incidents());
     }
 
@@ -236,6 +265,44 @@ class BusinessAssurancePackGoldenTest {
         assertEquals(List.of("150:band"), flags(renoised), "a different noise realization");
         assertEquals(1, sweep(renoised).count("ba_revenue_outside_band"));
         assertEquals(0, sweep(renoised).count("ba_revenue_regime_change") + sweep(renoised).count("ba_revenue_drift"));
+    }
+
+    /**
+     * A SECOND, independently built synthetic corpus (`ASSURE-PACK-BUSINESS-ASSURANCE-1` f, operator 2026-10-10):
+     * same schema, but a different weekly season (weekend-peaked {@code [260, -180, -140, -60, 20, 330, -230]}),
+     * a DOWNWARD trend ({@code 6000 - 4t}), noise sigma 45 from different Weyl offsets. Planted: a spike (day 70,
+     * -900), a level shift (+600 from day 110), a drift ramp (-15/day from day 140) and a 2-day excursion (days
+     * 125-126, +700). Look-alikes that must stay silent: a +300 day (40) that sits at ~0.8 of the band half-width,
+     * and a 5-day +110 bump (90-94) that reverts. The shipped constants (K = 3, k = 0.25, h = 8, z = 4) give
+     * exactly the intended detections with NO retune; each constant moved one notch turns this red (z 3 flags
+     * day 40, K 2 turns the excursion into a regime, h 3 fires drift on the bump, h 20 misses the ramp).
+     */
+    static final String SECOND_CORPUS = "SELECT ds, ROUND(6000.0 - 4.0 * t + list_extract([260.0, -180.0, -140.0,"
+            + " -60.0, 20.0, 330.0, -230.0], CAST(t % 7 AS INTEGER) + 1) + 45.0 * sqrt(-2.0 * ln(u1)) * cos(2.0 * pi() * u2)"
+            + " + CASE WHEN t = 40 THEN 300.0 WHEN t BETWEEN 90 AND 94 THEN 110.0 WHEN t = 70 THEN -900.0"
+            + " WHEN t IN (125, 126) THEN 700.0 ELSE 0.0 END + CASE WHEN t >= 110 THEN 600.0 ELSE 0.0 END"
+            + " + CASE WHEN t >= 140 THEN -15.0 * (t - 140) ELSE 0.0 END, 2) AS revenue FROM (SELECT ds, t,"
+            + " ((t + 1) * 0.4142135623730950 + 0.71828182) % 1.0 AS u1, ((t + 1) * 0.3247179572447460 + 0.14159265) % 1.0 AS u2"
+            + " FROM (SELECT ds, CAST(ds - DATE '2026-01-05' AS INTEGER) AS t FROM __base) q) g";
+
+    @Test
+    void aSecondCorpusGivesTheIntendedAlertsAndSilencesItsLookAlikes(@TempDir Path dir) throws Exception {
+        Path cfg = variant(dir.resolve("second"), "ba_revenue_forecast", "daily_revenue", SECOND_CORPUS);
+        assertEquals(List.of("70:band", "112:regime", "125:band", "126:band", "159:drift"), flags(cfg),
+                "spike, shift (K-th day), 2-day excursion (below K: two spikes, no regime), ramp; no look-alike");
+        var look = query(cfg, "ba_revenue_forecast", "SELECT actual - forecast AS gap, upper_band - forecast AS half"
+                + " FROM \"ba_revenue_forecast\" WHERE ds = DATE '2026-01-05' + 40").get(0);
+        assertTrue(num(look.get("gap")) > 0.75 * num(look.get("half")), "the day-40 look-alike is near the band: " + look);
+        Sweep s = sweep(cfg);
+        assertEquals(3, s.count("ba_revenue_outside_band"), s.fired().toString());
+        assertEquals(1, s.count("ba_revenue_regime_change"), s.fired().toString());
+        assertEquals(1, s.count("ba_revenue_drift"), s.fired().toString());
+        assertEquals(6, s.fired().size(), "5 revenue detections + the unchanged planted erosion: " + s.fired());
+        for (String m : List.of("2.5 AS z", "3.0 AS z")) {
+            Path z = variant(dir.resolve("z" + m.charAt(0)), "ba_revenue_forecast", "daily_revenue", SECOND_CORPUS,
+                    x -> x.replace("4.0 AS z", m));
+            assertTrue(flags(z).contains("40:band"), m + " must flag the look-alike, proving it is a near miss");
+        }
     }
 
     /**

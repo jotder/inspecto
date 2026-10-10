@@ -379,7 +379,11 @@ its own Alert Rule) instead of reading as a margin change; no baseline lines is 
 — revenue − cost by product / channel / partner, margin %, and `erosion_pp` = baseline (prior 28 days) margin %
 minus recent (last 28 days) margin %. Five per-entity Alert Rules (`ba_revenue_outside_band`,
 `ba_revenue_regime_change`, `ba_revenue_drift`: `max(<flag>)` `by [ds]` `gte 1`, CRITICAL; `ba_margin_erosion`:
-`max(erosion_pp)` `by [product, channel, partner]` `gt 5`, WARNING; `ba_margin_data_quality`, WARNING), three KPI
+`max(erosion_pp)` `by [product, channel, partner]` `gt 5`, WARNING; `ba_margin_data_quality`, WARNING) — since
+2026-10-10 they read the Jobs' **sink** Datasets `revenue_forecast` / `margin_erosion`, not the view-backed demo
+Datasets (**repointed after the live drive, operator 2026-10-10**), so a fresh Space raises nothing until the Jobs
+have written a run; the golden test stands in for both Job runs by writing each view's SQL to
+`data/<sink>/run.parquet` in a scratch data root before every sweep — three KPI
 definitions, one dashboard, and two **disabled** `sql.template` Jobs that run the SAME model
 SQL over the user's own `daily_revenue` / `margin_lines` stores (`BusinessAssurancePackGoldenTest` pins each view
 to contain its Job's SQL verbatim, and the Job's SQL to pass `SqlGuard`). ⚠ An Alert Rule `threshold` must be
@@ -388,8 +392,8 @@ Golden result: 2 detections (the planted −400 day, 2026-06-04; the planted +15
 false positives against 4 planted look-alikes; forecast RMSE 10.3 against the noise-free signal (σ = 20),
 MAPE 1.7 %. Variant corpora (the test rewrites the corpus under the view's own model SQL): a ±level shift from
 day 100 → exactly 1 regime change (day 102), then silence; a ±8/day ramp → exactly 1 drift detection within 21
-days (measured 19 / 13); a second corpus (series scaled x7 + 3000; a different noise realization) → only the planted spike, so the sigma-relative constants are not corpus-specific (`theConstantsHoldOnASecondSyntheticCorpus`; real customer series and a live-server drive are still untested); bad margin input → 2 data-quality Alerts, `new` and `insufficient` groups silent. The
-forecast Dataset's description is kept under 60 characters so Alert text names it (`DatasetMeasureProbe.label`). Runbooks: `config/runbooks/business-assurance-runbooks.md`.
+days (measured 19 / 13); a scaled / re-noised copy (series x7 + 3000; a different noise realization) → only the planted spike (`theConstantsHoldOnASecondSyntheticCorpus`); and an **independently built second corpus** (operator 2026-10-10: weekend-peaked season, downward trend 6000 − 4t, σ 45, other Weyl offsets) with a planted spike, a +600 shift, a −15/day ramp and a 2-day excursion, plus look-alikes (a +300 day at ~0.8 of the band half-width, a 5-day +110 bump) → exactly `70:band, 112:regime, 125:band, 126:band, 159:drift` with the **shipped constants, no retune needed** — each constant moved one notch (z 3, K 2, h 3, h 20) turns it red (`aSecondCorpusGivesTheIntendedAlertsAndSilencesItsLookAlikes`). The pack was **driven live 2026-10-10** (5 Alert Rules; *Evaluate now* fired `ba_revenue_outside_band` CRITICAL for 2026-06-04 and `ba_margin_erosion` WARNING 11.25 pp on P3/online/PB); real customer series remain untested; bad margin input → 2 data-quality Alerts, `new` and `insufficient` groups silent. The
+forecast Datasets' descriptions (view and sink) are kept under 60 characters so Alert text names them (`DatasetMeasureProbe.label`). Runbooks: `config/runbooks/business-assurance-runbooks.md`.
 
 **Product gaps the pack recorded** (both decided 2026-10-04): the forecast is NOT a Measure function — the
 Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert Rule would need an engine change;

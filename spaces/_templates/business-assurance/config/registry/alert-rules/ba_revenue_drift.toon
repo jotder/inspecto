@@ -1,5 +1,5 @@
 name: ba_revenue_drift
-dataset: ba_revenue_forecast
+dataset: revenue_forecast
 measure: max(drift_change)
 by[1]: ds
 comparator: gte
