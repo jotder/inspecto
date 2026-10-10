@@ -127,7 +127,7 @@ Design rules visible in the dependency graph:
 * **Ports point inward.** la-core defines `GraphEngine`, `GraphInput`, `DatasetProvider`, `CasePort`,
   `CollectorCoveragePort` and `InvestigationStoreProvider`; storage, geo-link and store-pg implement them. la-core
   never names an index class: `GraphInput.IndexRef` carries only primitives (version dir, seeds, estimates).
-* **The engine names no `la-*` class** (grep-true; LA route paths appear only as strings, and no named guard enforces it yet — `LA-DEMO-GUARDS-1`). The host reaches LA only through ServiceLoader SPIs it owns
+* **The engine names no `la-*` class** (grep-true; LA route paths appear only as strings, and enforced by `tools/check-engine-names-no-la.mjs`). The host reaches LA only through ServiceLoader SPIs it owns
   (`RouteModule`, `LinkIndexBuilder`, `InvestigationMeasureProbe`); absent jars degrade to
   `AbsentModuleRoutes` (503 `CAPABILITY_UNAVAILABLE`, "Professional edition and above").
 * **Entity Lists are not LA.** `/entity-lists/*` routes live in `features/inspecto-entity-list`; LA reads the same
