@@ -1,4 +1,6 @@
-afterRiskScore: aml_account
+afterScore:
+  kind: risk-score
+  model: aml_account
 dataset: risk_scores_aml_account_latest
 measure: "max(score)"
 by[2]: model, entity_key

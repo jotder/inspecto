@@ -5,6 +5,10 @@ offeringRole: optional
 bindingTime: boot
 absentMessage: "Anomaly Detection is not installed in this bundle - it is provided by the optional inspecto-anomaly module (Professional edition and above)."
 provides:
+  features[1]: anomaly
   configKinds[1]: anomaly-model
   contracts[2]: JobTypeProvider,ComponentKindValidator
   jobTypes[1]: anomaly.score
+  routes[2]: "GET /anomaly-scores/([^/]+)/([^/]+)","POST /anomaly-scores/preview"
+requires:
+  modules[1]: entity-list

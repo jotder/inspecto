@@ -81,11 +81,16 @@ export class AlertsComponent implements OnInit {
     readonly pendingColumnDefs: ColDef<PendingAlertRule>[] = [
         { field: 'name', headerName: 'Rule', flex: 1, minWidth: 160 },
         {
-            field: 'afterRiskScore',
-            headerName: 'Waits on Risk Score',
+            colId: 'afterScore',
+            headerName: 'Waits on',
             flex: 1,
             minWidth: 160,
-            valueFormatter: (p) => p.value || '—',
+            valueGetter: (p) => p.data?.afterScore ?? null,
+            valueFormatter: (p) => {
+                const a = p.value as PendingAlertRule['afterScore'];
+                if (!a) return '—';
+                return `${a.kind === 'anomaly-model' ? 'Anomaly Model' : 'Risk Score'} ${a.model}`;
+            },
         },
         { field: 'dataset', headerName: 'Dataset', flex: 1, minWidth: 140, valueFormatter: (p) => p.value || '—' },
         { field: 'error', headerName: 'Problem', flex: 2, minWidth: 160, valueFormatter: (p) => p.value || '' },

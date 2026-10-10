@@ -33,6 +33,27 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
 
     @Override public void validateInSpace(Path writeRoot, Supplier<Path> dataRoot, String id, Map<String, Object> content) {
         requireStorable(writeRoot, dataRoot, AnomalyModel.fromMap(id, content));
+        requireLists(com.gamma.entitylist.WatchListFeed.installed(), writeRoot, AnomalyLists.of(content));
+    }
+
+    /**
+     * Design §9, fail closed at save: a {@code watchList} must be a live {@code watch} Entity List and an
+     * {@code exclusionList} a live {@code exclusion} one, and the edition must carry Entity Lists at all.
+     */
+    static void requireLists(java.util.Optional<com.gamma.entitylist.WatchListFeed> provider, Path writeRoot,
+                             AnomalyLists lists) {
+        if (lists.watchList() == null && lists.exclusionList() == null) return;
+        com.gamma.entitylist.WatchListFeed feed = provider.orElseThrow(() -> new IllegalArgumentException(
+                "anomaly-model." + (lists.watchList() != null ? "watchList" : "exclusionList")
+                        + " needs Entity Lists, which this edition does not carry"));
+        try {
+            if (lists.watchList() != null)
+                feed.check(writeRoot, lists.watchList().list(), com.gamma.entitylist.WatchListFeed.WATCH);
+            if (lists.exclusionList() != null)
+                feed.check(writeRoot, lists.exclusionList(), com.gamma.entitylist.WatchListFeed.EXCLUSION);
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("anomaly-model lists cannot be checked: the Entity List log is unreadable", e);
+        }
     }
 
     @Override public void requireNotReserved(Path writeRoot, String type, String id, Map<String, Object> content) {

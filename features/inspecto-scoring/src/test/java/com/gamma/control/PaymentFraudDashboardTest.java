@@ -83,7 +83,7 @@ class PaymentFraudDashboardTest {
             JsonNode pending = V1Body.of(call(base + "/pay/alerts/rules/pending", null));
             assertEquals(1, pending.size(), pending.toString());
             assertEquals("pf_high_risk_account", pending.get(0).get("name").asText());
-            assertEquals("payment_account", pending.get(0).get("afterRiskScore").asText());
+            assertEquals("payment_account", pending.get(0).get("afterScore").get("model").asText());
             assertFalse(Files.exists(root.resolve("pay/config/registry/alert-rules/pf_high_risk_account.toon")));
         } finally {
             api.close();

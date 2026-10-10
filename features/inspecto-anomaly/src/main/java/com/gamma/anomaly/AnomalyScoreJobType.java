@@ -17,13 +17,19 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.signal.Severity;
 
+import com.gamma.entitylist.WatchListFeed;
+
+import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * The {@code anomaly.score} Job Type (ANOMALY-DETECTION-1): scores every entity of one saved {@code anomaly-model}
@@ -99,22 +105,66 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
                                 + "' names unknown dataset '" + datasetId + "'"));
                 return DatasetRelation.relationSql(ds, data, views);
             });
+            AnomalyLists lists = AnomalyLists.of(content);
+            int scoredBefore = run.scored().size();
+            run = exclude(WatchListFeed.installed(), writeRoot, model, lists, run);
+            int excluded = scoredBefore - run.scored().size();
             String version = AnomalyScoreEvaluator.version(content);
             AnomalyScoreEvaluator.write(data, model, version, ctx.runId(), now, run);
+            int fed = feedWatchList(WatchListFeed.installed(), writeRoot, data, model, lists, ctx.runId(), now, run.scored());
+            if (lists.exclusionList() != null)
+                ctx.log().info("excluded entities", "model", modelId, "list", lists.exclusionList(), "excluded", excluded);
+            if (lists.watchList() != null)
+                ctx.log().info("fed watch list", "model", modelId, "list", lists.watchList().list(), "written", fed);
 
             Map<String, Long> bands = AnomalyScoreEvaluator.bands(run.scored());
             long insufficient = run.scored().stream().filter(s -> s.insufficientCount() == model.features().size()).count();
             ctx.artifacts().dataset("scores", model.scoresDataset(), META, run.scored().size(), now);
             ctx.signals().emit(AnomalySignals.ANOMALY_SCORE_PRODUCED, Severity.INFO, Map.of("model", modelId,
                     "run", ctx.runId(), "scored", run.scored().size(), "elevated", bands.get("elevated"),
-                    "high", bands.get("high"), "insufficient", insufficient));
+                    "high", bands.get("high"), "insufficient", insufficient, "excluded", excluded));
             ctx.log().info("scored entities", "model", modelId, "period", run.period().toString(),
                     "entities", run.scored().size(), "elevated", bands.get("elevated"), "high", bands.get("high"),
-                    "insufficient", insufficient, "modelVersion", version);
+                    "insufficient", insufficient, "excluded", excluded, "modelVersion", version);
             return JobResult.ok("anomaly.score: " + run.scored().size() + " entit(ies) scored for " + run.period()
                     + ", " + bands.get("high") + " high -> dataset '" + model.scoresDataset() + "'",
                     (System.nanoTime() - t0) / 1_000_000L);
         }
+    }
+
+    /**
+     * Design §9: drop every entity that is a live member of the model's {@code exclusion} Entity List, before the
+     * scores are written (the caller logs the count as {@code excluded} — never silent). No {@code exclusionList} is
+     * a no-op; one with no installed provider (Personal) or naming a list that is not a live exclusion list fails the
+     * run, before anything is written.
+     */
+    static AnomalyScoreEvaluator.Run exclude(Optional<WatchListFeed> provider, Path writeRoot, AnomalyModel model,
+                                             AnomalyLists lists, AnomalyScoreEvaluator.Run run) throws IOException {
+        if (lists.exclusionList() == null) return run;
+        WatchListFeed feed = provider.orElseThrow(() -> new IllegalStateException("anomaly-model '" + model.id()
+                + "' excludes through list '" + lists.exclusionList() + "', but Entity Lists are not installed in this edition"));
+        Predicate<String> excluded = feed.check(writeRoot, lists.exclusionList(), WatchListFeed.EXCLUSION);
+        return new AnomalyScoreEvaluator.Run(run.period(),
+                run.scored().stream().filter(s -> !excluded.test(s.entityKey())).toList());
+    }
+
+    /**
+     * Design §9: add every {@code high} entity to the model's {@code watch} Entity List, expiring {@code ttlHours}
+     * after {@code now}. No {@code watchList} is a no-op; one with no installed provider (Personal) fails the run —
+     * the scores are already written, and the failure says the feed did not happen.
+     */
+    static int feedWatchList(Optional<WatchListFeed> provider, Path writeRoot, Path dataDir, AnomalyModel model,
+                             AnomalyLists lists, String runId, Instant now, List<AnomalyScorer.Scored> scored)
+            throws IOException {
+        AnomalyLists.WatchList w = lists.watchList();
+        if (w == null) return 0;
+        WatchListFeed feed = provider.orElseThrow(() -> new IllegalStateException("anomaly-model '" + model.id()
+                + "' feeds watch list '" + w.list() + "', but Entity Lists are not installed in this edition"));
+        List<String> keys = scored.stream().filter(s -> "high".equals(s.band())).map(AnomalyScorer.Scored::entityKey).toList();
+        if (keys.isEmpty()) return 0;
+        return feed.feed(writeRoot, dataDir, w.list(), keys, now.plus(Duration.ofHours(w.ttlHours())),
+                "job:anomaly.score:" + model.id(), "anomaly.score " + model.id() + " run " + runId + ": band high (score >= "
+                        + model.highThreshold() + ")");
     }
 
     /** The scores Dataset's fixed shape. */

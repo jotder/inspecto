@@ -44,7 +44,7 @@ addons:
     status: built
     modules[1]: screening
   anomalyDetection:
-    status: planned
+    status: built
     modules[1]: anomaly
   workflowSla:
     status: planned

@@ -137,11 +137,11 @@ class AmlPackGoldenTest {
 
         // The Risk Score's Alert Rule ships PENDING (its Dataset is the Job's own output); create it the documented way.
         Map<String, Object> pending = ToonHelper.load(cfg.resolve("pending/alert-rules/aml_high_risk_account.toon").toString());
-        assertEquals("aml_account", pending.get("afterRiskScore"));
+        assertEquals(Map.of("kind", "risk-score", "model", "aml_account"), pending.get("afterScore"));
         assertFalse(Files.exists(cfg.resolve("registry/alert-rules/aml_high_risk_account.toon")), "the rule must not ship armed");
         store.write("dataset", "risk_scores_aml_account_latest", Map.of("physicalRef", "risk_scores_aml_account_latest"));
         Map<String, Object> rule = new HashMap<>(pending);
-        rule.remove("afterRiskScore");
+        rule.remove("afterScore");
         rule.put("name", "aml_high_risk_account");
         store.write("alert-rule", "aml_high_risk_account", rule);
 

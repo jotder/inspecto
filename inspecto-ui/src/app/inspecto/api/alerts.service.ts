@@ -77,13 +77,13 @@ export interface AlertRule {
 }
 
 /**
- * A Space Template's Alert Rule still waiting on its Risk Score's first run (GET /alerts/rules/pending).
+ * A Space Template's Alert Rule still waiting on its score model's first run (GET /alerts/rules/pending).
  * Once a run refused it, `lastRefusal` carries the latest reason and time (the audit log keeps every refusal).
  */
 export interface PendingAlertRule {
     name: string;
-    /** The Risk Score model whose first run creates the rule. */
-    afterRiskScore?: string | null;
+    /** The score model whose first run creates the rule: its kind (`risk-score` | `anomaly-model`) and id. */
+    afterScore?: { kind: string; model: string } | null;
     dataset?: string | null;
     /** Set only when the pending file could not be read. */
     error?: string | null;

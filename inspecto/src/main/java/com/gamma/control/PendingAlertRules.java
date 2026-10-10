@@ -9,6 +9,7 @@ import com.gamma.audit.EventLevel;
 import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.alert.AnomalyScoreOutputs;
 import com.gamma.alert.RiskScoreOutputs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,14 +26,16 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * Deferred seed of an Alert Rule over a Space's own Risk Score output ({@code TEMPLATE-RISK-SCORE-ALERT-RULE-1},
- * operator 2026-10-06). A per-entity rule's {@code by} columns are checked against its Dataset's Schema at save, and
- * a Risk Score's {@code risk_scores_<model>_latest} store has no Schema until the model first runs — so a Space
- * Template declares such a rule as PENDING, in {@code config/pending/alert-rules/<name>.toon}: the rule body plus
- * {@code afterRiskScore: <model>}.
+ * Deferred seed of an Alert Rule over a Space's own score output ({@code TEMPLATE-RISK-SCORE-ALERT-RULE-1},
+ * operator 2026-10-06; generalised to every score kind by ANOMALY-DETECTION-1 D-AD7, operator 2026-10-10). A
+ * per-entity rule's {@code by} columns are checked against its Dataset's Schema at save, and a score model's
+ * {@code <prefix><model>_latest} store has no Schema until the model first runs — so a Space Template declares such a
+ * rule as PENDING, in {@code config/pending/alert-rules/<name>.toon}: the rule body plus
+ * {@code afterScore: {kind, model}}, where {@code kind} is a score kind of {@link #KINDS} ({@code risk-score} reads
+ * {@code risk_scores_<model>_latest}, {@code anomaly-model} reads {@code anomaly_scores_<model>_latest}).
  *
- * <p>When the {@code risk.score} Job for that model has written its output ({@code risk.score.produced}), each
- * pending rule naming the model goes through the normal save gate ({@link AlertRoutes#parse}, the {@code by} Schema
+ * <p>When that model's Job has written its output ({@code risk.score.produced} / {@code anomaly.score.produced}), each
+ * pending rule naming the kind and model goes through the normal save gate ({@link AlertRoutes#parse}, the {@code by} Schema
  * check included) and is written to {@code registry/alert-rules/} and armed; the {@code _latest} Dataset it reads is
  * registered first through the Dataset save gate, since the Risk Score gate refuses one before the output exists. Never forced:
  * <ul>
@@ -56,14 +59,49 @@ public final class PendingAlertRules {
 
     /** Config-relative directory of the pending rules. */
     public static final String DIR = "pending/alert-rules";
-    /** The key naming the Risk Score model whose first run releases the rule. */
-    public static final String AFTER = "afterRiskScore";
+    /** The key naming the score model whose first run releases the rule: {@code {kind, model}} (D-AD7). */
+    public static final String AFTER = "afterScore";
+
+    /** A score kind whose {@code _latest} output a pending rule may read: its prefix and ownership marker. */
+    record ScoreKind(String kind, String scoresPrefix, String latestSuffix, String ownerMarker) {
+        String latest(String model) { return scoresPrefix + model + latestSuffix; }
+        boolean ownedBy(Path dir, String model) {
+            return com.gamma.alert.ScoreOutputDirs.ownedBy(dir, ownerMarker, model);
+        }
+    }
+
+    /** Every score kind a pending rule can wait for, by component kind. */
+    static final Map<String, ScoreKind> KINDS = Map.of(
+            RiskScoreOutputs.KIND, new ScoreKind(RiskScoreOutputs.KIND, RiskScoreOutputs.SCORES_PREFIX,
+                    RiskScoreOutputs.LATEST_SUFFIX, RiskScoreOutputs.OWNER_MARKER),
+            AnomalyScoreOutputs.KIND, new ScoreKind(AnomalyScoreOutputs.KIND, AnomalyScoreOutputs.SCORES_PREFIX,
+                    AnomalyScoreOutputs.LATEST_SUFFIX, AnomalyScoreOutputs.OWNER_MARKER));
+
+    /** A parsed {@code afterScore}: the score kind and model id. */
+    record After(ScoreKind kind, String model) {}
+
+    /** Parse {@code afterScore}; throws {@link IllegalArgumentException} naming what is wrong. */
+    static After after(Object raw) {
+        if (!(raw instanceof Map<?, ?> m))
+            throw new IllegalArgumentException(AFTER + " must be {kind, model}: the score kind (one of "
+                    + new java.util.TreeSet<>(KINDS.keySet()) + ") and the model whose first run creates the rule");
+        for (Object k : m.keySet())
+            if (!"kind".equals(k) && !"model".equals(k))
+                throw new IllegalArgumentException(AFTER + ": unknown key '" + k + "' (expected [kind, model])");
+        ScoreKind kind = KINDS.get(String.valueOf(m.get("kind")));
+        if (kind == null)
+            throw new IllegalArgumentException(AFTER + ".kind must be one of " + new java.util.TreeSet<>(KINDS.keySet())
+                    + ", got '" + m.get("kind") + "'");
+        if (!(m.get("model") instanceof String model) || model.isBlank())
+            throw new IllegalArgumentException(AFTER + ".model must name the " + kind.kind() + " whose first run creates it");
+        return new After(kind, model);
+    }
     /** Extension of the sidecar holding a pending rule's latest refusal (not {@code .toon}, so never listed as a rule). */
     static final String REFUSAL_EXT = ".refusal";
 
     private PendingAlertRules() {}
 
-    /** The pending rules under {@code configRoot}: {@code {name, afterRiskScore, dataset}}, sorted by name. */
+    /** The pending rules under {@code configRoot}: {@code {name, afterScore: {kind, model}, dataset}}, sorted by name. */
     public static List<Map<String, Object>> list(Path configRoot) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Path f : files(configRoot)) {
@@ -85,31 +123,31 @@ public final class PendingAlertRules {
 
     /**
      * Template-time check of one pending rule (run by {@link TemplateSeedGate}): it parses as an Alert Rule, names a
-     * Risk Score model the template seeds, and reads that model's {@code _latest} store. Throws
+     * score kind and a model of that kind the template seeds, and reads that model's {@code _latest} store. Throws
      * {@link IllegalArgumentException} with the reason.
      */
     static void requireDeclarable(Path configRoot, Map<String, Object> body, String name) {
-        Object model = body.get(AFTER);
-        if (!(model instanceof String m) || m.isBlank())
-            throw new IllegalArgumentException(AFTER + " must name the Risk Score model whose first run creates it");
-        if (!new ComponentStore(configRoot.resolve("registry")).exists(RiskScoreOutputs.KIND, m))
-            throw new IllegalArgumentException(AFTER + " names unknown risk-score '" + m + "'");
+        After after = after(body.get(AFTER));
+        if (!new ComponentStore(configRoot.resolve("registry")).exists(after.kind().kind(), after.model()))
+            throw new IllegalArgumentException(AFTER + " names unknown " + after.kind().kind() + " '" + after.model() + "'");
         Map<String, Object> rule = ruleBody(body, name);
         AlertRule parsed = AlertRule.fromMap(rule);
-        String latest = RiskScoreOutputs.SCORES_PREFIX + m + RiskScoreOutputs.LATEST_SUFFIX;
+        String latest = after.kind().latest(after.model());
         if (!latest.equals(parsed.dataset()))
-            throw new IllegalArgumentException("a pending Alert Rule reads its Risk Score's output: dataset must be '"
+            throw new IllegalArgumentException("a pending Alert Rule reads its score model's output: dataset must be '"
                     + latest + "'");
     }
 
     /**
-     * After {@code modelId}'s Risk Score run wrote its output: create each pending rule over it through the save
-     * gate. Synchronized so two runs finishing together cannot both create one rule. Returns the names created.
+     * After the {@code kind} model {@code modelId}'s run wrote its output: create each pending rule over it through the
+     * save gate. Synchronized so two runs finishing together cannot both create one rule. Returns the names created.
+     * Serves every score kind (D-AD7); the name predates that and is kept because the config-writer guard
+     * inventories ({@code ConfigWriteFunnelTest.WRITERS}, {@code DecisionRuleWritersTest.GUARDED_BY}) pin it.
      */
-    public static synchronized List<String> onRiskScoreProduced(Path configRoot, Supplier<Path> dataRoot,
+    public static synchronized List<String> onRiskScoreProduced(Path configRoot, Supplier<Path> dataRoot, String kind,
                                                                 String modelId, AlertService alerts, EventLog events) {
         List<String> created = new ArrayList<>();
-        if (configRoot == null || modelId == null) return created;
+        if (configRoot == null || modelId == null || !KINDS.containsKey(kind)) return created;
         ComponentStore store = new ComponentStore(configRoot.resolve("registry"));
         for (Path f : files(configRoot)) {
             String name = nameOf(f);
@@ -117,37 +155,43 @@ public final class PendingAlertRules {
             try {
                 body = read(f);
             } catch (RuntimeException unreadable) {
-                audit(events, "alert-rule.pending.refused", name, modelId, "unreadable: " + unreadable.getMessage());
+                audit(events, "alert-rule.pending.refused", name, kind, modelId, "unreadable: " + unreadable.getMessage());
                 recordRefusal(configRoot, f, "the pending file could not be read");
                 continue;
             }
-            if (!modelId.equals(body.get(AFTER))) continue;
+            After after;
+            try {
+                after = after(body.get(AFTER));
+            } catch (IllegalArgumentException malformed) {
+                continue;   // names no kind + model, so no run can be its trigger (the template seed gate refuses it)
+            }
+            if (!kind.equals(after.kind().kind()) || !modelId.equals(after.model())) continue;
             try {
                 if (store.exists(AlertRoutes.TYPE, name)) {
                     Files.deleteIfExists(f);
                     Files.deleteIfExists(refusalFile(f));
-                    audit(events, "alert-rule.pending.dropped", name, modelId,
+                    audit(events, "alert-rule.pending.dropped", name, kind, modelId,
                             "an Alert Rule named '" + name + "' already exists; it was not overwritten");
                     continue;
                 }
-                for (String kind : List.of(AlertRoutes.TYPE, "dataset"))
-                    if (PendingChanges.governs(configRoot, kind))
-                        throw new IllegalArgumentException("this Space's approval policy holds " + kind + " changes, "
+                for (String held : List.of(AlertRoutes.TYPE, "dataset"))
+                    if (PendingChanges.governs(configRoot, held))
+                        throw new IllegalArgumentException("this Space's approval policy holds " + held + " changes, "
                                 + "and a deferred seed cannot be approved — create the rule through the Alert Rules page");
                 DecisionRuleGuard.refuseUnattended(ruleBody(body, name));
-                ensureLatestDataset(configRoot, dataRoot, store, modelId);
+                ensureLatestDataset(configRoot, dataRoot, store, after.kind(), modelId);
                 AlertRule rule = AlertRoutes.parse(configRoot, dataRoot, ruleBody(body, name));
                 store.write(AlertRoutes.TYPE, name, rule.toMap());
                 if (alerts != null) alerts.upsert(rule);
                 Files.deleteIfExists(f);
                 Files.deleteIfExists(refusalFile(f));
                 created.add(name);
-                audit(events, "alert-rule.pending.created", name, modelId, null);
+                audit(events, "alert-rule.pending.created", name, kind, modelId, null);
             } catch (ApiException | IllegalArgumentException refused) {
-                audit(events, "alert-rule.pending.refused", name, modelId, refused.getMessage());
+                audit(events, "alert-rule.pending.refused", name, kind, modelId, refused.getMessage());
                 recordRefusal(configRoot, f, refused.getMessage());
             } catch (IOException | UncheckedIOException io) {
-                audit(events, "alert-rule.pending.refused", name, modelId, "write failed: " + io.getMessage());
+                audit(events, "alert-rule.pending.refused", name, kind, modelId, "write failed: " + io.getMessage());
                 // An I/O message names host paths: the served reason says only that the write failed.
                 recordRefusal(configRoot, f, "write failed");
             }
@@ -156,18 +200,18 @@ public final class PendingAlertRules {
     }
 
     /**
-     * The Dataset the rule reads, {@code risk_scores_<model>_latest} (id = physicalRef), registered through the
+     * The Dataset the rule reads, {@code <prefix><model>_latest} (id = physicalRef), registered through the
      * Dataset save gate ({@link ComponentRoutes#validateKind}) if absent. It cannot be seeded with the template: the
-     * Risk Score save gate refuses a Dataset over its output store until the model has written it.
+     * score kind's save gate refuses a Dataset over its output store until the model has written it.
      */
     private static void ensureLatestDataset(Path configRoot, Supplier<Path> dataRoot, ComponentStore store,
-                                            String modelId) throws IOException {
-        String latest = RiskScoreOutputs.SCORES_PREFIX + modelId + RiskScoreOutputs.LATEST_SUFFIX;
+                                            ScoreKind kind, String modelId) throws IOException {
+        String latest = kind.latest(modelId);
         if (store.exists("dataset", latest)) return;
         Map<String, Object> ds = new LinkedHashMap<>(Map.of("physicalRef", latest));
         ComponentRoutes.validateKind(configRoot, dataRoot, "dataset", latest, ds);
-        if (dataRoot.get() == null || !RiskScoreOutputs.ownedBy(dataRoot.get().resolve(latest), modelId))
-            throw new IllegalArgumentException("risk-score '" + modelId + "' has not written '" + latest + "' yet");
+        if (dataRoot.get() == null || !kind.ownedBy(dataRoot.get().resolve(latest), modelId))
+            throw new IllegalArgumentException(kind.kind() + " '" + modelId + "' has not written '" + latest + "' yet");
         store.write("dataset", latest, ds);
     }
 
@@ -228,12 +272,12 @@ public final class PendingAlertRules {
         return rule;
     }
 
-    private static void audit(EventLog events, String action, String rule, String model, String reason) {
+    private static void audit(EventLog events, String action, String rule, String kind, String model, String reason) {
         String msg = switch (action) {
-            case "alert-rule.pending.created" -> "pending Alert Rule '" + rule + "' created after risk-score '"
+            case "alert-rule.pending.created" -> "pending Alert Rule '" + rule + "' created after " + kind + " '"
                     + model + "' ran";
             case "alert-rule.pending.dropped" -> "pending Alert Rule '" + rule + "' dropped: " + reason;
-            default -> "pending Alert Rule '" + rule + "' stays pending (retried on the next risk-score '" + model
+            default -> "pending Alert Rule '" + rule + "' stays pending (retried on the next " + kind + " '" + model
                     + "' run): " + reason;
         };
         if (reason == null) log.info(msg);
@@ -242,7 +286,7 @@ public final class PendingAlertRules {
         try {
             Event.Builder b = Event.builder(EventType.AUDIT).source("audit").message(msg)
                     .actor("system").actorType("system").action(action).actionCategory("configuration")
-                    .attr("alertRule", rule).attr("riskScore", model);
+                    .attr("alertRule", rule).attr("scoreKind", kind).attr("model", model);
             if (reason != null) b.attr("reason", reason).level(EventLevel.WARN);
             events.emit(b);
         } catch (RuntimeException ignored) {

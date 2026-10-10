@@ -255,7 +255,7 @@ public final class RiskScoreRoutes implements RouteModule {
             com.gamma.entitylist.WatchListFeed feed = com.gamma.entitylist.WatchListFeed.installed().orElseThrow(() ->
                     new IllegalArgumentException("risk-score.watchList needs Entity Lists, which this edition does not carry"));
             try {
-                feed.check(writeRoot, model.watchList().list());
+                feed.check(writeRoot, model.watchList().list(), com.gamma.entitylist.WatchListFeed.WATCH);
             } catch (java.io.IOException e) {
                 throw new IllegalArgumentException("risk-score.watchList cannot be checked: the Entity List log is unreadable", e);
             }

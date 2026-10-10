@@ -89,10 +89,10 @@ class RiskScoreWatchListFeedTest {
         EntityFactsForTest.create(root, "old-watch", "watch");
         EntityFactsForTest.append(root, "analyst-1", "list.retired", "old-watch", Map.of());
         WatchListFeed feed = WatchListFeed.installed().orElseThrow();
-        IllegalArgumentException purpose = assertThrows(IllegalArgumentException.class, () -> feed.check(root, "blocked"));
+        IllegalArgumentException purpose = assertThrows(IllegalArgumentException.class, () -> feed.check(root, "blocked", WatchListFeed.WATCH));
         assertTrue(purpose.getMessage().contains("'watch'"), purpose.getMessage());
-        assertThrows(IllegalArgumentException.class, () -> feed.check(root, "nope"), "an unknown list");
-        assertThrows(IllegalArgumentException.class, () -> feed.check(root, "old-watch"), "a retired list");
+        assertThrows(IllegalArgumentException.class, () -> feed.check(root, "nope", WatchListFeed.WATCH), "an unknown list");
+        assertThrows(IllegalArgumentException.class, () -> feed.check(root, "old-watch", WatchListFeed.WATCH), "a retired list");
         assertThrows(IllegalArgumentException.class, () -> feed.feed(root, data, "blocked", List.of("+441"),
                 Instant.now().plusSeconds(3600), "job:x", "r"), "a block list is never fed");
         EntityFactsForTest.create(root, "w", "watch");

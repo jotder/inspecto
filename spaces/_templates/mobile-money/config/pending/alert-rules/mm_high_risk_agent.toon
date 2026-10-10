@@ -1,4 +1,6 @@
-afterRiskScore: mm_agent
+afterScore:
+  kind: risk-score
+  model: mm_agent
 dataset: risk_scores_mm_agent_latest
 measure: "max(score)"
 by[2]: model, entity_key

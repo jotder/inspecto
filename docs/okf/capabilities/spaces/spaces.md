@@ -721,14 +721,17 @@ named by a Dataset (`RiskScoreRoutes.requireStorable`) — until the model first
 would forge the ownership marker, so a template declares the rule as PENDING instead, and nothing is forced.
 
 - **Where it is recorded (in the Space).** `config/pending/alert-rules/<name>.toon`: the Alert Rule body plus
-  `afterRiskScore: <model>`. It is copied with the template like any config file. At apply the seed gate checks it
-  (`TemplateSeedGate`, step after `kpi`): the edition carries Alert Rules, it parses (`AlertRule.fromMap`), it names a
-  `risk-score` the template seeds, and its `dataset` is that model's `risk_scores_<model>_latest`. The capability
+  `afterScore: {kind, model}` — `kind` is `risk-score` or `anomaly-model` (ANOMALY-DETECTION-1 D-AD7, operator
+  2026-10-10: one trigger key for every score kind; the old flat `afterRiskScore: <model>` is refused). It is copied
+  with the template like any config file. At apply the seed gate checks it (`TemplateSeedGate`, step after `kpi`): the
+  edition carries Alert Rules, it parses (`AlertRule.fromMap`), it names a model of that kind the template seeds, and
+  its `dataset` is that model's `_latest` store (`risk_scores_<model>_latest` / `anomaly_scores_<model>_latest`). The capability
   table classifies the path as `alert-rule` (`ImportCapabilityGuard`, `canAuthorAlertRules`) and so does the
   approval-policy classifier (`PendingChanges.kindOfConfigPath`).
-- **What fires it.** The `risk.score` Job emits `risk.score.produced` after it has written the scores; each Space's
-  `CollectorService` subscribes to its own event log and calls `PendingAlertRules.onRiskScoreProduced` for that model.
-  For each pending rule naming the model it registers the `_latest` Dataset (id = physicalRef) through the Dataset save
+- **What fires it.** The `risk.score` / `anomaly.score` Job emits `risk.score.produced` / `anomaly.score.produced`
+  (both core `SignalType` constants) after it has written the scores; each Space's `CollectorService` subscribes to its
+  own event log and calls `PendingAlertRules.onRiskScoreProduced(kind, model)` — the name predates D-AD7 and is kept
+  because the writer inventories below pin it. For each pending rule naming that kind and model it registers the `_latest` Dataset (id = physicalRef) through the Dataset save
   gate if absent, then runs `AlertRoutes.parse` (the `by` Schema check included), writes `registry/alert-rules/<name>`,
   arms it in the `AlertService` and deletes the pending file. **Once:** the pending file is the only trigger, and the
   call is synchronized; an Alert Rule already under that name is never overwritten (the pending entry is dropped).
@@ -743,7 +746,7 @@ would forge the ownership marker, so a template declares the rule as PENDING ins
   `#onRiskScoreProduced` runs `DecisionRuleGuard.refuseUnattended` — a background writer has no Subject to hold
   `canWorkIncidents`, so a rule body with an `invoke-api` consequence is refused (422, fail closed) and stays pending
   + audited like every other refusal.
-- **Status.** `GET /alerts/rules/pending` lists `{name, afterRiskScore, dataset}` for what is still waiting, plus
+- **Status.** `GET /alerts/rules/pending` lists `{name, afterScore: {kind, model}, dataset}` for what is still waiting, plus
   `lastRefusal: {reason, at}` once a run refused it (`PENDING-REFUSAL-REASON`, operator 2026-10-06). The latest refusal
   is kept beside the pending file in `<name>.refusal` (temp file + atomic move; the rule body is never touched, and the
   `.refusal` extension is never listed as a rule) and deleted with it on creation or drop; the AUDIT event is still

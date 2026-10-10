@@ -827,11 +827,17 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final com.gamma.notify.SecurityTriggers securityTriggers;
     private final java.util.function.Consumer<com.gamma.audit.Event> pendingAlertRuleSubscriber;
 
-    /** {@code risk.score.produced} → {@link com.gamma.control.PendingAlertRules#onRiskScoreProduced} for its model. */
+    /**
+     * {@code risk.score.produced} / {@code anomaly.score.produced} → {@link com.gamma.control.PendingAlertRules#onRiskScoreProduced}
+     * for that score kind and model (D-AD7: one deferred-seed mechanism for every score kind).
+     */
     private void onRiskScoreProduced(com.gamma.audit.Event e) {
         if (!com.gamma.audit.EventType.SIGNAL.equals(e.type())) return;
         com.gamma.signal.Signal sig = com.gamma.signal.Signal.fromEvent(e);
-        if (!com.gamma.signal.SignalType.RISK_SCORE_PRODUCED.equals(sig.type()) || !(sig.payload().get("model") instanceof String model)) return;
+        String kind = com.gamma.signal.SignalType.RISK_SCORE_PRODUCED.equals(sig.type()) ? com.gamma.alert.RiskScoreOutputs.KIND
+                : com.gamma.signal.SignalType.ANOMALY_SCORE_PRODUCED.equals(sig.type()) ? com.gamma.alert.AnomalyScoreOutputs.KIND
+                : null;
+        if (kind == null || !(sig.payload().get("model") instanceof String model)) return;
         java.nio.file.Path writeRoot = root.config();
         if (writeRoot == null) {
             String wr = System.getProperty("assist.write.root");
@@ -840,7 +846,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         com.gamma.control.PendingAlertRules.onRiskScoreProduced(writeRoot, () -> {
             String dd = System.getProperty("data.dir", root.dataDir());
             return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
-        }, model, alerting, eventLog);
+        }, kind, model, alerting, eventLog);
     }
 
     /** The alert engine (always present; empty until a rule is armed) — backs {@code /alerts}. */

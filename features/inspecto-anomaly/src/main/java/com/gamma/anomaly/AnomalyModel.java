@@ -37,7 +37,8 @@ import java.util.regex.Pattern;
  * </pre>
  *
  * Validated fail closed: every problem is an {@link IllegalArgumentException} naming the field (422 at the route).
- * Keys of later slices ({@code watchList}, {@code exclusionList}, {@code scoredPeriod} other than 1,
+ * {@code peers} is the Peer Group (§4.3); {@code watchList} / {@code exclusionList} are parsed by {@link AnomalyLists}
+ * (they act after / before scoring, not in it). Keys of later slices ({@code scoredPeriod} other than 1,
  * {@code bucket: hour}) are refused, not ignored.
  */
 public record AnomalyModel(String id, String entityType, int window, Seasonality seasonality, int minBaselinePoints,
@@ -45,10 +46,10 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
                            Integer maxEntities, String dataScope, String description, Peers peers,
                            List<Feature> features) {
 
-    public static final String KIND = "anomaly-model";
-    public static final String SCORES_PREFIX = "anomaly_scores_";
-    public static final String LATEST_SUFFIX = "_latest";
-    public static final String OWNER_MARKER = ".anomaly-score-output";
+    public static final String KIND = com.gamma.alert.AnomalyScoreOutputs.KIND;
+    public static final String SCORES_PREFIX = com.gamma.alert.AnomalyScoreOutputs.SCORES_PREFIX;
+    public static final String LATEST_SUFFIX = com.gamma.alert.AnomalyScoreOutputs.LATEST_SUFFIX;
+    public static final String OWNER_MARKER = com.gamma.alert.AnomalyScoreOutputs.OWNER_MARKER;
     public static final int MAX_FEATURES = 16;
     public static final int MAX_WINDOW_DAYS = 90;
     public static final int MAX_ENTITIES_CEILING = 2_000_000;
@@ -61,8 +62,8 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     private static final Pattern MODEL_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_]*");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType", "bucket",
             "window", "scoredPeriod", "seasonality", "minBaselinePoints", "elevatedThreshold", "highThreshold", "zCap",
-            "scale", "maxEntities", "dataScope", "description", "peers", "features");
-    private static final Set<String> LATER_KEYS = Set.of("watchList", "exclusionList");
+            "scale", "maxEntities", "dataScope", "description", "peers", "features", "watchList", "exclusionList");
+    private static final Set<String> LATER_KEYS = Set.of();
     private static final Set<String> PEER_KEYS = Set.of("by", "dataset", "key", "minGroupSize", "fallback");
     public static final int MAX_PEER_COLUMNS = 3;
     private static final Set<String> FEATURE_KEYS = Set.of("id", "label", "dataset", "key", "time", "measure",
@@ -93,6 +94,13 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
         public boolean zeroFilled() { return ZERO_FILLED_AGGS.contains(compiledMeasure().agg()); }
 
         public String displayLabel() { return label != null ? label : id; }
+
+        /** This feature narrowed to one entity (an extra bound {@code key = entityKey} filter) — the preview's input. */
+        public Feature forEntity(String entityKey) {
+            List<Map<String, Object>> narrowed = new ArrayList<>(filters);
+            narrowed.add(Map.of("field", key, "op", "=", "value", entityKey));
+            return new Feature(id, label, dataset, key, time, measure, List.copyOf(narrowed), direction, weight, unit);
+        }
 
         /**
          * The bucket spec: the Measure grouped by key and day, over {@code [from, to)} of {@code time}. The range
@@ -147,6 +155,12 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
         return out;
     }
 
+    /** This model with every feature narrowed to one entity ({@link Feature#forEntity}) — {@code POST /anomaly-scores/preview}. */
+    public AnomalyModel forEntity(String entityKey) {
+        return new AnomalyModel(id, entityType, window, seasonality, minBaselinePoints, elevatedThreshold, highThreshold,
+                zCap, scale, maxEntities, dataScope, description, peers, features.stream().map(f -> f.forEntity(entityKey)).toList());
+    }
+
     public String band(double score) {
         return score >= highThreshold ? "high" : score >= elevatedThreshold ? "elevated" : "normal";
     }
@@ -163,6 +177,7 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
             if (!MODEL_KEYS.contains(k))
                 throw new IllegalArgumentException("anomaly-model: unknown key '" + k + "' (expected " + new TreeSet<>(MODEL_KEYS) + ")");
         }
+        AnomalyLists.of(m);
         String entityType = Values.trimToNull(m.get("entityType"));
         if (entityType == null || !SAFE_IDENT.matcher(entityType).matches())
             throw new IllegalArgumentException("anomaly-model.entityType is required and must be a plain token");

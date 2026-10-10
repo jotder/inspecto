@@ -88,17 +88,23 @@ async function create(
 describe('AlertsComponent', () => {
     const pendingSection = (el: HTMLElement) => el.querySelector('#pending-rules-heading')?.closest('section') ?? null;
 
-    it('lists pending Template Alert Rules read-only with the Risk Score each waits on', async () => {
+    it('lists pending Template Alert Rules read-only with the score model each waits on', async () => {
         const { fixture } = await create({
             pendingRules: () =>
-                of([{ name: 'pf_high_risk_account', afterRiskScore: 'payment_account', dataset: 'pf_risk' }]),
+                of([
+                    {
+                        name: 'pf_high_risk_account',
+                        afterScore: { kind: 'risk-score', model: 'payment_account' },
+                        dataset: 'pf_risk',
+                    },
+                ]),
         });
         await fixture.whenStable();
         fixture.detectChanges();
         expect(fixture.componentInstance.pendingState()).toBe('ready');
         const text = pendingSection(fixture.nativeElement)!.textContent!;
         expect(text).toContain('pf_high_risk_account');
-        expect(text).toContain('payment_account');
+        expect(text).toContain('Risk Score payment_account');
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
@@ -108,7 +114,7 @@ describe('AlertsComponent', () => {
                 of([
                     {
                         name: 'pf_high_risk_account',
-                        afterRiskScore: 'payment_account',
+                        afterScore: { kind: 'risk-score', model: 'payment_account' },
                         dataset: 'pf_risk',
                         lastRefusal: {
                             reason: "risk-score 'payment_account' has not written it yet",
@@ -128,7 +134,7 @@ describe('AlertsComponent', () => {
 
     it('keeps the audit-log hint while no rule has been refused', async () => {
         const { fixture } = await create({
-            pendingRules: () => of([{ name: 'r1', afterRiskScore: 'm', dataset: 'd' }]),
+            pendingRules: () => of([{ name: 'r1', afterScore: { kind: 'anomaly-model', model: 'm' }, dataset: 'd' }]),
         });
         await fixture.whenStable();
         fixture.detectChanges();

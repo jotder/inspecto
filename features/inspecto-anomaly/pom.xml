@@ -24,7 +24,9 @@
         com.gamma.anomaly.
 
         Shares the output-marker writer (com.gamma.alert.ScoreOutputDirs), EvidenceMasker and the entity-key masking
-        helper with inspecto-scoring through the engine (D-AD5) - it does NOT depend on inspecto-scoring. THIN: no shade.
+        helper with inspecto-scoring through the engine (D-AD5) - it does NOT depend on inspecto-scoring. It depends on
+        inspecto-entity-list for the WatchListFeed seam (watchList / exclusionList). The read and preview routes are
+        AnomalyScoreRoutes (GET /anomaly-scores/{model}/{entityKey}, POST /anomaly-scores/preview). THIN: no shade.
         Built only under the edition-professional / -enterprise / -preview profiles.
     </description>
 
@@ -37,9 +39,23 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- The WatchListFeed seam (com.gamma.entitylist): a model's watchList feed and exclusionList test (design §9). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-list</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- EntityFactsForTest (append/read facts) for the watch-list / exclusion-list tests -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>

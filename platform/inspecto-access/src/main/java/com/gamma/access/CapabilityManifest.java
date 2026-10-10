@@ -188,6 +188,12 @@ public final class CapabilityManifest {
             // S3 preview: scores one entity and writes nothing. Previewing UNSAVED content additionally needs
             // canAuthorWorkbench, checked in the handler (D-RP4, operator 2026-10-06).
             new Entry("POST", "/risk-scores/preview", Roles.CAN_WORK_INCIDENTS),
+            // AnomalyScoreRoutes (ANOMALY-DETECTION-1 S4) — an entity's Anomaly Score, its explanation and recent runs,
+            // read while working the Incident its Alert Rule raised; data scopes and the row PDP apply beneath the gate.
+            new Entry("GET", "/anomaly-scores/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),
+            // Preview: scores one entity and writes nothing; UNSAVED content additionally needs canAuthorWorkbench,
+            // checked in the handler (as the Risk Score preview).
+            new Entry("POST", "/anomaly-scores/preview", Roles.CAN_WORK_INCIDENTS),
             // ScreeningRoutes (SCREENING-1) — deciding a Screening Hit is working a triage item (SCR-D13).
             new Entry("POST", "/screening/hits/([^/]+)/decide", Roles.CAN_WORK_INCIDENTS),
             // EnrichmentRoutes

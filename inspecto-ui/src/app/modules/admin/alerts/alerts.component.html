@@ -86,12 +86,12 @@
         />
     </div>
 
-    <!-- Template Alert Rules waiting on a Risk Score's first run (read-only; hidden where the route is absent) -->
+    <!-- Template Alert Rules waiting on a score model's first run (read-only; hidden where the route is absent) -->
     @if (pendingState() !== 'hidden') {
         <section class="mt-8" aria-labelledby="pending-rules-heading">
             <h2 id="pending-rules-heading" class="text-xl font-semibold tracking-tight">Pending Alert Rules</h2>
             <p class="text-secondary mt-1 text-sm">
-                Declared by a Space Template; each is created when its Risk Score first runs.
+                Declared by a Space Template; each is created when its Risk Score or Anomaly Model first runs.
                 @if (pendingHasRefusal()) {
                     The latest refusal's reason and time are shown per rule.
                 } @else {

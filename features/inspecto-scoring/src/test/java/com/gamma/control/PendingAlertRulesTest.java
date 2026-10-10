@@ -49,7 +49,9 @@ class PendingAlertRulesTest {
         store.write("risk-score", MODEL, model());
         Path pending = Files.createDirectories(config.resolve(PendingAlertRules.DIR));
         Files.writeString(pending.resolve(RULE + ".toon"), """
-                afterRiskScore: acct
+                afterScore:
+                  kind: risk-score
+                  model: acct
                 dataset: risk_scores_acct_latest
                 measure: "max(score)"
                 by[2]: model, entity_key
@@ -72,7 +74,7 @@ class PendingAlertRulesTest {
     }
 
     private List<String> produced() {
-        return PendingAlertRules.onRiskScoreProduced(config, () -> data, MODEL, null, events);
+        return PendingAlertRules.onRiskScoreProduced(config, () -> data, "risk-score", MODEL, null, events);
     }
 
     private void runRiskScore() throws Exception {
@@ -124,7 +126,9 @@ class PendingAlertRulesTest {
     @Test
     void anotherModelsRunDoesNotReleaseIt() throws Exception {
         runRiskScore();
-        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(config, () -> data, "other", null, events));
+        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(config, () -> data, "risk-score", "other", null, events));
+        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(config, () -> data, "anomaly-model", MODEL, null, events),
+                "an Anomaly Model of the same id is another score kind (D-AD7)");
         assertFalse(ruleExists());
         assertEquals(1, PendingAlertRules.list(config).size());
     }
@@ -159,7 +163,9 @@ class PendingAlertRulesTest {
     void aDecisionRuleGuardRefusalKeepsItPendingAndAudited() throws Exception {
         runRiskScore();
         Files.writeString(config.resolve(PendingAlertRules.DIR).resolve(RULE + ".toon"), """
-                afterRiskScore: acct
+                afterScore:
+                  kind: risk-score
+                  model: acct
                 dataset: risk_scores_acct_latest
                 measure: "max(score)"
                 comparator: gte
@@ -180,15 +186,28 @@ class PendingAlertRulesTest {
 
     @Test
     void theTemplateCheckRefusesARuleThatDoesNotReadItsModelsOutput() {
-        Map<String, Object> ok = Map.of("afterRiskScore", MODEL, "dataset", "risk_scores_acct_latest",
+        Map<String, Object> ok = Map.of("afterScore", Map.of("kind", "risk-score", "model", MODEL), "dataset", "risk_scores_acct_latest",
                 "measure", "max(score)", "comparator", "gte", "threshold", 60, "severity", "CRITICAL");
         PendingAlertRules.requireDeclarable(config, ok, RULE);
         Map<String, Object> other = new java.util.HashMap<>(ok);
         other.put("dataset", "pf_daily_summary");
         assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, other, RULE));
         Map<String, Object> unknown = new java.util.HashMap<>(ok);
-        unknown.put("afterRiskScore", "nope");
+        unknown.put("afterScore", Map.of("kind", "risk-score", "model", "nope"));
         assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, unknown, RULE));
+        // D-AD7: the trigger names its score kind; the old flat afterRiskScore form and an unknown kind are refused.
+        Map<String, Object> flat = new java.util.HashMap<>(ok);
+        flat.put("afterScore", MODEL);
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, flat, RULE))
+                .getMessage().contains("must be {kind, model}"));
+        Map<String, Object> kind = new java.util.HashMap<>(ok);
+        kind.put("afterScore", Map.of("kind", "kpi", "model", MODEL));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, kind, RULE))
+                .getMessage().contains("afterScore.kind must be one of [anomaly-model, risk-score]"));
+        Map<String, Object> wrongKind = new java.util.HashMap<>(ok);
+        wrongKind.put("afterScore", Map.of("kind", "anomaly-model", "model", MODEL));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, wrongKind, RULE))
+                .getMessage().contains("names unknown anomaly-model 'acct'"), "a risk-score of that id is not an anomaly-model");
     }
 
     // PENDING-REFUSAL-REASON (operator 2026-10-06): the latest refusal is served on the pending entry.

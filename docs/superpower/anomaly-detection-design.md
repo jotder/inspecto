@@ -417,7 +417,7 @@ carrying only JUnit; it yields to S1's pom at merge). No DuckDB, no Space access
   `peersOnly` (D-AD12). The explanation gains `peerBaseline {cohort, basis, median, mad, size, fellBack, insufficient}`,
   `zPeer`, `peersOnly` and `cohortShift` (only when the model declares peers), plus `baseline.basis` / `fellBack`.
   `recompute` re-derives both z from the stored numbers and is asserted equal over both corpora.
-- **Decision taken by the lane (operator to confirm): the cohort shift.** With §4.4's plain `max`, the §14
+- **The cohort shift — CONFIRMED (operator, 2026-10-10).** With §4.4's plain `max`, the §14
   whole-cohort-shift look-alike *cannot* stay normal, because every member's self z is high on the promotion day. So each
   member's self baseline is scaled by `k = peer median today / the cohort's usual daily median`. The usual is the
   model's own `BaselineStatistic` over the cohort's per-day medians, so seasonality applies. `k = 1` when the cohort is
@@ -438,6 +438,50 @@ carrying only JUnit; it yields to S1's pom at merge). No DuckDB, no Space access
   lookup that Risk Scores use, so it goes to S4 or S5. Partial NULLs in a multi-column `by` are skipped by
   `concat_ws`. SQL-side peer medians (the JVM computes them from the per-entity series already in memory) and their
   performance measurement come under D-AD9. A cohort shift per `by` sub-column is also not built.
+
+### 16.3 S4 as-built: routes, Entity Lists, Alert Rule flow, deferred seed (lane anom-routes, 2026-10-10)
+
+Built beside the S3 lane (peer groups in the scoring code), so the scoring internals are untouched: the preview and the
+exclusion run AROUND `AnomalyScoreEvaluator.evaluate`, never inside it.
+
+- **Routes** (`AnomalyScoreRoutes`, `RouteModule` feature id `anomaly`; manifest `provides.routes`, the module's
+  `openapi.fragment.json` merged into `docs/api/openapi-v1.json`, `CapabilityManifest` rows, route-gating evidence
+  regenerated). `GET /anomaly-scores/{model}/{entityKey}` reads the HISTORY store (newest first, at most 30 runs): the
+  first row is the latest score with its `features` explanation, all rows are the `history` sparkline. Gates as Risk
+  Scores: `canWorkIncidents`; unknown model / unparseable model / out-of-scope model (SEC-7d) / `RowScope` deny / no
+  row are one indistinguishable 404; the key is a bound parameter. `POST /anomaly-scores/preview` takes
+  `{model | content, entityKey, asOf?}`: unsaved content also needs `canAuthorWorkbench` and passes `fromMap` +
+  `requireStorable` (422); every feature is narrowed by a bound `key = entityKey` filter (`AnomalyModel.forEntity`), one
+  entity, a 512 MB / 2-thread / 10 s sandbox; nothing is written. Both mask the key on read (`EntityKeyMasking`, the
+  helper Risk Scores use) unless `canRevealLinkEntities`. Not ImportCapabilityGuard-`ACTS`-listed: `/anomaly-scores` is
+  under no writable kind's prefix (the kind's directory is `anomaly-models`).
+- **Entity Lists** (`AnomalyLists`, parsed beside the model so the record is unchanged): `watchList {list, ttlHours
+  1..24, default 24}` feeds every `high` entity after the write (`job:anomaly.score:<id>`, D-P5 expiry);
+  `exclusionList <id>` drops live members (exact or range, expired entries are scored again) before the write, logged
+  and signalled as `excluded`. Both are checked at save (live list of the right purpose, Entity Lists installed) and
+  fail the run when Entity Lists are absent. The seam is the existing `WatchListFeed`: its `check` now takes the purpose
+  (`WATCH` | `EXCLUSION`) and RETURNS the live-membership predicate — the one Identity-Fact-log read site stays
+  `RiskWatchListFeed#check`, so no writer-inventory entry was needed. The module now depends on `inspecto-entity-list`
+  (`requires.modules: entity-list`).
+  ⚠ **Exclusion vs peers (for the S3 merge):** exclusion runs on the scored list, AFTER the baselines. With peer groups
+  an excluded heavy user would still sit in its cohort's median; if that matters, move the filter into `evaluate`
+  before the peer medians. The entity cap also still counts excluded entities.
+- **Alert Rule flow** (`AnomalyScoreAlertTest`): the documented per-entity rule over `anomaly_scores_usage_latest`
+  raises exactly the planted `spike` + `masked` Incidents (`key.model`, `key.entity_key`) and both heal when the next
+  run's `_latest` scores an ordinary day — the production `DatasetMeasureProbe` + `AlertService`, no new path.
+- **D-AD7 deferred seed — generalised as decided.** The trigger is `afterScore: {kind, model}`; `PendingAlertRules`
+  holds a `KINDS` table (`risk-score` → `RiskScoreOutputs`, `anomaly-model` → the new engine
+  `com.gamma.alert.AnomalyScoreOutputs`, which `AnomalyModel`'s constants now alias). `anomaly.score.produced` moved to
+  core `SignalType.ANOMALY_SCORE_PRODUCED` (`AnomalySignals` aliases it) and `CollectorService` maps either Signal to its
+  kind. BREAKING: the three shipped pending rules (`aml`, `mobile-money`, `payment-fraud`) were rewritten to the new
+  form; `GET /alerts/rules/pending` serves `afterScore`; the AUDIT attributes are `scoreKind` + `model` (was
+  `riskScore`); the SPA Pending Alert Rules table shows "Risk Score x" / "Anomaly Model x".
+  ⚠ The writer keeps the name `PendingAlertRules#onRiskScoreProduced` (now `(…, kind, model, …)`): renaming it needs the
+  operator to update `ConfigWriteFunnelTest.WRITERS` (the `PENDING_ALERT_RULES` reason text) and
+  `DecisionRuleWritersTest.GUARDED_BY` (`PendingAlertRules#ensureLatestDataset` → `#onRiskScoreProduced`).
+- **Offering:** `anomalyDetection` is `status: built`; the EDITIONS matrix is regenerated.
+- **Not built here:** template CONTENT seeding an anomaly model + its pending rule (S5 ships the examples in
+  `telco-fraud` / `mobile-money` / `aml`), UI (S5), evidence rows, hour buckets, performance measurement.
 
 ## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 

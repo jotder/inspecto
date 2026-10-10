@@ -107,6 +107,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/alerts/rules` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:69` |
 | DELETE | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:74` |
 | PUT | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:71` |
+| POST | `/anomaly-scores/preview` | gated | `canWorkIncidents` | `features/inspecto-anomaly/src/main/java/com/gamma/anomaly/AnomalyScoreRoutes.java:69` |
 | POST | `/assist/(.+)` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:67` |
 | POST | `/assist/settings` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:60` |
 | POST | `/assist/settings/test` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:55` |

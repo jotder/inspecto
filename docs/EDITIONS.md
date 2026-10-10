@@ -71,7 +71,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `workflow` - Workflow and SLA models | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `action-requests` - Action Requests | features | optional | `notify-channels` | — | ✅ | ✅ | ✅ |
 | `agent` - Assistant agent | features | optional | — | — | ✅ | ✅ | ✅ |
-| `anomaly` - Anomaly Detection | features | optional | — | — | ✅ | ✅ | ✅ |
+| `anomaly` - Anomaly Detection | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
 | `backup` - Backup and restore | features | optional | — | — | ✅ | ✅ | ✅ |
 | `case-management` - Case Management | features | optional | `ops` | — | ✅ | ✅ | ✅ |
 | `entity-list` - Entity lists | features | optional | `entity-store` | — | ✅ | ✅ | ✅ |
@@ -108,7 +108,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 |---|---|:-:|:-:|:-:|:-:|
 | actionRequests | `action-requests` | — | built | built | built |
 | aiAssist | `agent` | — | built | built | built |
-| anomalyDetection | planned in `anomaly` | — | planned | planned | planned |
+| anomalyDetection | `anomaly` | — | built | built | built |
 | caseManagement | `case-management` | — | built | built | built |
 | incidents | planned in `engine`, `ops` | — | planned | planned | planned |
 | integrationDelivery | `notify-channels` | — | built | built | built |

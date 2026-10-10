@@ -80,7 +80,7 @@ class MobileMoneyRiskScoreGoldenTest {
     void theHighRiskAgentAlertRuleShipsPendingOnTheModelsLatestScores() throws Exception {
         Path pending = TEMPLATE.resolve("config/pending/alert-rules/mm_high_risk_agent.toon");
         Map<String, Object> body = ToonHelper.load(pending.toString());
-        assertEquals("mm_agent", body.get("afterRiskScore"));
+        assertEquals(Map.of("kind", "risk-score", "model", "mm_agent"), body.get("afterScore"));
         AlertRule rule = AlertRule.fromMap(new java.util.HashMap<>(Map.of("name", "mm_high_risk_agent",
                 "dataset", body.get("dataset"), "measure", body.get("measure"), "by", body.get("by"),
                 "comparator", body.get("comparator"), "threshold", body.get("threshold"))));

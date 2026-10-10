@@ -17,7 +17,8 @@ import com.gamma.entitystore.EntityListSidecar;
 import com.gamma.entitystore.EntityRegistry;
 
 /**
- * The Risk Score watch-list feed (ASSURE-ENTITY-LISTS-1, WS-12 x WS-22): the one {@link WatchListFeed}, over this
+ * The Risk Score / Anomaly Score watch-list feed (ASSURE-ENTITY-LISTS-1, WS-12 x WS-22) and exclusion-list test
+ * (ANOMALY-DETECTION-1 S4): the one {@link WatchListFeed}, over this
  * module's Identity Fact log. A {@code risk.score} run appends ONE {@code list.member.added} fact with every newly
  * high entity key, expiring at most 24 h later. Under D-P5 an expiring entry applies at once and is reviewed after,
  * so a Job needs no Pending Change. A key already on the list PERMANENTLY stays permanent; an expiring one has its
@@ -26,9 +27,14 @@ import com.gamma.entitystore.EntityRegistry;
 public final class RiskWatchListFeed implements WatchListFeed {
 
     @Override
-    public void check(Path writeRoot, String listId) throws IOException {
+    public java.util.function.Predicate<String> check(Path writeRoot, String listId, String purpose) throws IOException {
+        if (!WATCH.equals(purpose) && !EXCLUSION.equals(purpose))
+            throw new IllegalArgumentException("a score uses only a '" + WATCH + "' or '" + EXCLUSION + "' list, not '" + purpose + "'");
         EntityFactLog.Log head = new EntityFactLog(writeRoot).read();
-        watchList(EntityRegistry.fold(head.facts(), head.headSeq()).get(listId), listId, writeRoot);
+        EntityRegistry.EntityList l = live(EntityRegistry.fold(head.facts(), head.headSeq()).get(listId), listId, purpose,
+                writeRoot);
+        Instant now = Instant.now();
+        return raw -> raw != null && l.match(raw, now) != null;
     }
 
     @Override
@@ -61,10 +67,15 @@ public final class RiskWatchListFeed implements WatchListFeed {
     }
 
     private static EntityRegistry.EntityList watchList(EntityRegistry.EntityList l, String listId, Path writeRoot) {
-        if (l == null) throw new IllegalArgumentException("watch list '" + listId + "' is not an Entity List of this Space");
-        if (!"watch".equals(l.purpose()))
+        return live(l, listId, WATCH, writeRoot);
+    }
+
+    private static EntityRegistry.EntityList live(EntityRegistry.EntityList l, String listId, String purpose,
+                                                  Path writeRoot) {
+        if (l == null) throw new IllegalArgumentException(purpose + " list '" + listId + "' is not an Entity List of this Space");
+        if (!purpose.equals(l.purpose()))
             throw new IllegalArgumentException("Entity List '" + listId + "' has purpose '" + l.purpose()
-                    + "'; a Risk Score feeds only a 'watch' list");
+                    + "'; a score " + ("watch".equals(purpose) ? "feeds" : "excludes through") + " only a '" + purpose + "' list");
         if (l.retired()) throw new IllegalArgumentException("Entity List '" + listId + "' is retired");
         if (EntityListFacts.type(writeRoot, l.entityType()).isEmpty())
             throw new IllegalArgumentException("Entity List '" + listId + "' is of an Entity Type no longer in force");

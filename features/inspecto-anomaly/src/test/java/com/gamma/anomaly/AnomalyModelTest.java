@@ -74,7 +74,10 @@ class AnomalyModelTest {
         refused(with(m -> m.put("peers", Map.of("by", "msisdn"))), "cannot include the join key");
         refused(with(m -> m.put("peers", Map.of("by", "plan", "minGroupSize", 1))), "minGroupSize must be a whole number 2..");
         refused(with(m -> m.put("peers", Map.of("by", "plan", "fallback", "merge"))), "fallback must be none or population");
-        refused(with(m -> m.put("watchList", Map.of())), "watchList is not built yet");
+        refused(with(m -> m.put("watchList", Map.of())), "watchList.list must be an Entity List id");
+        refused(with(m -> m.put("watchList", Map.of("list", "w", "ttlHours", 25))), "ttlHours must be a whole number in 1..24");
+        refused(with(m -> m.put("watchList", Map.of("list", "w", "bogus", 1))), "watchList: unknown key 'bogus'");
+        refused(with(m -> m.put("exclusionList", "Not An Id")), "exclusionList must be an Entity List id");
         refused(with(m -> m.put("features", java.util.Collections.nCopies(17, ((List<?>) AnomalyCorpus.model().get("features")).get(0)))),
                 "at most 16 features");
         assertThrows(IllegalArgumentException.class, () -> AnomalyModel.fromMap("a-b", AnomalyCorpus.model()), "'-' in an id");
@@ -113,5 +116,17 @@ class AnomalyModelTest {
         assertEquals(java.util.Set.of("sub_id", "plan"), r.referencedColumns().get("subscribers"));
         assertTrue(r.datasetIds().contains("subscribers"));
         assertTrue(r.peers().populationFallback());
+    }
+
+    @Test
+    void theListHooksParseWithADefaultTtl() {
+        Map<String, Object> m = new java.util.LinkedHashMap<>(AnomalyCorpus.model());
+        m.put("watchList", Map.of("list", "usage-watch"));
+        m.put("exclusionList", "known-heavy");
+        AnomalyModel.fromMap("usage", m);
+        AnomalyLists l = AnomalyLists.of(m);
+        assertEquals(new AnomalyLists.WatchList("usage-watch", 24), l.watchList());
+        assertEquals("known-heavy", l.exclusionList());
+        assertEquals(new AnomalyLists(null, null), AnomalyLists.of(AnomalyCorpus.model()));
     }
 }

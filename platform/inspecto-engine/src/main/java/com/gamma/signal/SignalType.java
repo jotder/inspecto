@@ -104,4 +104,10 @@ public final class SignalType {
      * references this constant so the two cannot drift.
      */
     public static final String RISK_SCORE_PRODUCED = "risk.score.produced";
+
+    /**
+     * Signal type {@code anomaly.score.produced} — a CROSS-MODULE contract like {@link #RISK_SCORE_PRODUCED}: the
+     * anomaly module emits it and core ({@code CollectorService}) matches it to release deferred Alert Rules (D-AD7).
+     */
+    public static final String ANOMALY_SCORE_PRODUCED = "anomaly.score.produced";
 }

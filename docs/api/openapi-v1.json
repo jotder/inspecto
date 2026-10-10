@@ -11921,6 +11921,87 @@
         "x-generated" : true
       }
     },
+    "/anomaly-scores/preview" : {
+      "post" : {
+        "tags" : [ "anomaly-scores" ],
+        "summary" : "Preview one entity's Anomaly Score under a saved or unsaved model, writing nothing",
+        "operationId" : "previewAnomalyScore",
+        "description" : "ANOMALY-DETECTION-1 S4. Gated on canWorkIncidents; unsaved content also needs canAuthorWorkbench. Body: exactly one of model (a saved id) or content (an anomaly-model), plus entityKey (1-256 chars) and optional asOf (YYYY-MM-DD, UTC; the day before it is scored, default today). Every feature is narrowed to the entity by a bound filter; evaluation is bounded (one entity, a 10 s / 512 MB sandbox). No scores Dataset, Signal or watch-list entry is written. The entity key is masked unless the caller holds canRevealLinkEntities.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "entityKey" ],
+                "properties" : {
+                  "model" : { "type" : "string" },
+                  "content" : { "type" : "object" },
+                  "entityKey" : { "type" : "string", "maxLength" : 256 },
+                  "asOf" : { "type" : "string", "format" : "date" }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {model, entityType, entityKey, keyMasked, found, periodStart, score, band, raw, elevatedThreshold, highThreshold, insufficientCount, saved, features[{feature, label, bucket, observed, baseline{kind, median, mad, points, season}, unit, zSelf, deviation, direction, weight, contribution, share, insufficient, reason}]}"
+          },
+          "400" : {
+            "description" : "Not exactly one of model/content, a missing or over-long entityKey, or a bad asOf."
+          },
+          "403" : {
+            "description" : "The caller lacks canWorkIncidents, or canAuthorWorkbench for unsaved content, or previews content outside its data scopes."
+          },
+          "404" : {
+            "description" : "The saved model is unknown, unparseable or outside the caller's data scopes."
+          },
+          "422" : {
+            "description" : "The content fails the save-time checks, or a feature query fails."
+          },
+          "503" : {
+            "description" : "No Space write or data root."
+          }
+        }
+      }
+    },
+    "/anomaly-scores/{model}/{entityKey}" : {
+      "get" : {
+        "tags" : [ "anomaly-scores" ],
+        "summary" : "The latest Anomaly Score of one entity under a saved anomaly-model, with its explanation and recent runs",
+        "operationId" : "getAnomalyScore",
+        "description" : "ANOMALY-DETECTION-1 S4. Gated on canWorkIncidents. An unknown model, a model outside the caller's data scopes, a row the policy engine denies, or no score for the entity are all 404 (existence-hiding). score = 100 x (1 - exp(-raw / scale)) over the weighted RMS of per-feature robust z (D-AD6); every score is recomputable from its features. history lists the last 30 runs, newest first. The entity key is returned as the Space masked: token (keyMasked: true) unless the caller holds canRevealLinkEntities.",
+        "parameters" : [ {
+          "name" : "model",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9][A-Za-z0-9_]*$"
+          }
+        }, {
+          "name" : "entityKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 256
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {model, entityType, entityKey, keyMasked, score, band, raw, elevatedThreshold, highThreshold, periodStart, insufficientCount, modelVersion, runId, scoredAt, features[], history[{periodStart, score, band, runId}]}"
+          },
+          "403" : {
+            "description" : "The caller lacks canWorkIncidents."
+          },
+          "404" : {
+            "description" : "No visible score for that model and entity."
+          }
+        }
+      }
+    },
     "/regulatory-reports" : {
       "get" : {
         "tags" : [ "regulatory-reports" ],
