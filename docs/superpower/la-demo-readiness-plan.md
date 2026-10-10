@@ -134,7 +134,7 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 | DR-T6 | A pre-demo check reproduces the manual's §10 figures on the mule data (13 accounts near 0.985, `TILL-06` at 82 %) | MUST |
 | DR-T7 | Burst scripts for the limits: > 20 POSTs → 429, 19 concurrent runs → 503, a 6th concurrent build → 503 | SHOULD |
 | DR-T8 | A replay-versus-drift script: append a file to the bound Dataset; Replay hash unchanged, *Re-read* reports drift | MUST |
-| DR-T9 | `/inv/index` exposes bytes, per-table file counts and the dropped-NULL count | COULD |
+| DR-T9 | `/inv/index` exposes bytes, per-table file counts and the dropped-NULL count | COULD - BUILT (`tables`, `droppedNull`, `versions`; `ControlApiIndexTest`) |
 | DR-T10 | A tamper-evidence script for the Identity Fact log on a disposable Space | SHOULD |
 
 ## 4. Demo script (what the system can run once the MUST items land)
