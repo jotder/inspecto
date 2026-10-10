@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-anomaly</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Anomaly Detection (optional)</name>
+    <description>
+        OPTIONAL add-on module (ANOMALY-DETECTION-1, add-on anomalyDetection, Professional and above per D-AD4): the
+        anomaly-model component kind (AnomalyModel, validated fail closed by AnomalyKindValidator, with the reserved
+        anomaly_scores_ output stores), the pure scorer (AnomalyScorer: robust z, weighted RMS, 0-100 per D-AD6) and the
+        anomaly.score Job Type (AnomalyScoreJobType / AnomalyScoreEvaluator) writing anomaly_scores_{model} and _latest
+        with ownership markers. Baseline statistics live in the pure package com.gamma.anomaly.baseline. Package
+        com.gamma.anomaly.
+
+        Shares the output-marker writer (com.gamma.alert.ScoreOutputDirs), EvidenceMasker and the entity-key masking
+        helper with inspecto-scoring through the engine (D-AD5) - it does NOT depend on inspecto-scoring. THIN: no shade.
+        Built only under the edition-professional / -enterprise / -preview profiles.
+    </description>
+
+    <dependencies>
+        <!-- The core: the Job SPI, ComponentStore, DatasetRelation, QueryExecutor, MeasureCompiler, ScoreOutputDirs,
+             ComponentKindValidator and DuckDB. Compile scope, as inspecto-scoring does. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

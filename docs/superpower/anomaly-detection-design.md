@@ -1,6 +1,6 @@
 # Anomaly Detection add-on — design (`ANOMALY-DETECTION-1`)
 
-> **State: DESIGN 2026-10-10, decisions taken (operator, 2026-10-10); build not started.** In-flight plan for the BACKLOG row `ANOMALY-DETECTION-1`
+> **State: BUILDING — lane S1 built 2026-10-10 (see §16-A); decisions taken (operator, 2026-10-10).** In-flight plan for the BACKLOG row `ANOMALY-DETECTION-1`
 > (P3). The row's home is the offering map in
 > [module-reorganisation-decisions.md](../okf/backend/module-reorganisation-decisions.md), which files Anomaly
 > Detection as a not-built add-on. Every decision this design needs is in §17 (*Decisions*, D-AD1..D-AD12)
@@ -339,6 +339,39 @@ All follow the `angular-ui` rules (design-system components, no hard-coded colou
 | S5 | UI: authoring pane + preview, entity anomaly panel, dashboard tile; content examples in `telco-fraud`, `mobile-money`, `aml` templates | L |
 | S6 | Distil into an OKF concept (`okf/backend/control-plane/anomaly-scores.md`, not yet written), move residuals to BACKLOG, archive this plan | S |
 | later | ML scorer behind the same explanation shape (D-AD2); incremental baselines (D-AD9) | — |
+
+### 16-A. As built — lane S1 (2026-10-10)
+
+The operator re-cut the slices for parallel lanes: lane **S1** = this table's S1 plus the self-baseline half of S2;
+lane **S2** (another worktree, in parallel) = the pure peer / seasonal statistics in `com.gamma.anomaly.baseline`.
+
+- **D-AD5 move.** The output-marker writer, the `_latest` swap and the reserved-prefix test are
+  `com.gamma.alert.ScoreOutputDirs` (engine); the entity-key mask-on-read is `com.gamma.mask.EntityKeyMasking`
+  (engine); `EvidenceMasker` was already in the engine. `RiskScoreEvaluator`, `RiskScoreRoutes` and `RiskScoreOutputs`
+  delegate to them with byte-identical messages; the whole `inspecto-scoring` suite re-ran green.
+- **Module.** `features/inspecto-anomaly` (id `anomaly`, package `com.gamma.anomaly`, no dependency on scoring), in the
+  four edition profiles; add-on `anomalyDetection` `status: planned` in `offerings/professional.toon`; staged by
+  `package.ps1`, `tools/bundle-modules.mjs`, `tools/offering-classpath.mjs` and `.claude/launch.json`.
+- **Kind.** `anomaly-model` at `registry/anomaly-models/<id>.toon` (`ComponentRegistry` + `ComponentStore.WRITABLE_TYPES`),
+  `AnomalyModel.fromMap` fail closed, `AnomalyKindValidator` (Schema columns, `time` must be DATE/TIMESTAMP, output
+  collisions, reserved `anomaly_scores_` prefix with the `_latest` Dataset exception, marker `.anomaly-score-output`).
+  Refused as *not built yet*: `peers`, `watchList`, `exclusionList`, `bucket: hour`, `scoredPeriod` ≠ 1,
+  `seasonality` other than `none` / `weekday`.
+- **Seam.** The Job scores through `com.gamma.anomaly.baseline.BaselineStatistic` (`kind()`,
+  `compute(Map<LocalDateTime, Double> history, LocalDateTime scored)`), obtained from `BaselineStatistics.forModel`;
+  `SeasonalBaseline` (the S2 lane's class) implements it. S2 adds statistics there, not in the Job.
+- **Job.** `anomaly.score` (`model`, optional `as_of` YYYY-MM-DD, UTC days) scores the day before `as_of` over a window
+  that excludes it; one grouped statement per feature (MeasureCompiler, day grain); columns as §7.
+  **Reading of D-AD8 + §14 (the new-entity look-alike):** an entity's history starts at its **first bucket in the
+  window** (any feature); from there an empty count/sum day is 0. Densifying from the window start gave a two-day-old
+  entity 26 zero days and scored it `high` — the golden corpus caught it.
+- **Golden corpus + mutations** (`AnomalyGoldenCorpusTest`): planted `spike`, `masked` are exactly the `high` set;
+  look-alikes `heavy`, `flat`, `newbie`, `drop` stay `normal`. Red for the expected value: drop the 1-unit floor
+  (`flat` → elevated); mean for median (`masked` median 713, a background entity enters the top 2); scored day kept at
+  BOTH sites (Job + `SeasonalBaseline`) → 29 points. Keeping it at the Job alone is an equivalent mutant (the statistic
+  excludes the scored bucket itself). The Monday-peak and cohort-shift look-alikes belong to the S2 corpus.
+- **Not built in lane S1** (to BACKLOG via the row): evidence rows, ratio features, hour buckets, routes, watch /
+  exclusion lists, Alert Rule flow + D-AD7 seed, performance measurement, UI.
 
 ## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 

@@ -346,6 +346,7 @@ $caseMgmtJarSrc = $null
 $actionReqJarSrc = $null
 $regReportJarSrc = $null
 $screeningJarSrc = $null
+$anomalyJarSrc = $null
 if ($Edition -eq 'Standard') { $Edition = 'Professional' }
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
@@ -542,6 +543,14 @@ if ($Edition -ne 'Personal') {
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $screeningJarSrc -or -not (Test-Path $screeningJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $screeningTargetDir\inspecto-screening-*.jar."
+    }
+    # ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind + anomaly.score). THIN like inspecto-scoring; Professional and above (D-AD4).
+    $anomalyTargetDir = Join-Path $sandboxRoot 'features\inspecto-anomaly\target'
+    $anomalyJarSrc = Get-ChildItem -Path $anomalyTargetDir -Filter 'inspecto-anomaly-*.jar' -ErrorAction SilentlyContinue |
+                     Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                     Select-Object -First 1 -ExpandProperty FullName
+    if (-not $anomalyJarSrc -or -not (Test-Path $anomalyJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $anomalyTargetDir\inspecto-anomaly-*.jar."
     }
     # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Professional and above.
     $caseMgmtTargetDir = Join-Path $sandboxRoot 'features\inspecto-case-management\target'
@@ -961,6 +970,23 @@ if ($screeningJarSrc) {
         }
         Write-Host "  verified: RouteModule and JobTypeProvider registrations present in the Screening module" -ForegroundColor DarkGray
     } finally { $srZip.Dispose() }
+}
+if ($anomalyJarSrc) {
+    Copy-Item $anomalyJarSrc "$bundleDir\inspecto-anomaly.jar"
+    Write-Host "Bundled Anomaly Detection module -> inspecto-anomaly.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - anomaly.score would be an unknown Job Type.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $adZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-anomaly.jar")
+    try {
+        foreach ($svc in @(@('com.gamma.job.JobTypeProvider', 'com.gamma.anomaly.AnomalyScoreJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.anomaly.AnomalyKindValidator'))) {
+            $adEntry = $adZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
+            if (-not $adEntry) { throw "inspecto-anomaly.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
+            $adReader = New-Object System.IO.StreamReader($adEntry.Open())
+            try { $adBody = $adReader.ReadToEnd() } finally { $adReader.Dispose() }
+            if ($adBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-anomaly.jar's $($svc[0]) service file does not list $($svc[1]) - it lists only: $adBody" }
+        }
+        Write-Host "  verified: JobTypeProvider and ComponentKindValidator registrations present in the Anomaly Detection module" -ForegroundColor DarkGray
+    } finally { $adZip.Dispose() }
 }
 if ($caseMgmtJarSrc) {
     Copy-Item $caseMgmtJarSrc "$bundleDir\inspecto-case-management.jar"

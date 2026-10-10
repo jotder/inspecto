@@ -73,6 +73,9 @@ public final class ComponentStore {
                     // Risk Score model (ASSURE-RISK-SCORE-1, WS-22): one weighted-factor model per entity type,
                     // evaluated by the risk.score Job (com.gamma.risk.RiskScoreModel validates it at save).
                     "risk-score",
+                    // Anomaly Model (ANOMALY-DETECTION-1): per-entity robust baselines over Measure features, scored by
+                    // the anomaly.score Job (com.gamma.anomaly.AnomalyModel validates it at save; module inspecto-anomaly).
+                    "anomaly-model",
                     // Notification channel destinations (NotificationRoutes /notifications/channels* admin
                     // CRUD, 2026-07-18): the managed record of where a channel delivers; live delivery still
                     // resolves channels from notify.* JVM flags (ChannelConfig).

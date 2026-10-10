@@ -7,7 +7,7 @@ posture:
   objectsBackend: default
   postgresSidecar: bundled
 includes[1]: personal
-modules[23]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,case-management,action-requests,regulatory-reporting,reconciliation,scoring,screening,agent
+modules[24]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,case-management,action-requests,regulatory-reporting,reconciliation,scoring,screening,anomaly,agent
 contentPacks[2]: mobile-money,aml
 addons:
   linkAnalysis:
@@ -43,6 +43,9 @@ addons:
   screening:
     status: built
     modules[1]: screening
+  anomalyDetection:
+    status: planned
+    modules[1]: anomaly
   workflowSla:
     status: planned
     hostedBy[1]: engine

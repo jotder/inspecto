@@ -71,6 +71,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `workflow` - Workflow and SLA models | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `action-requests` - Action Requests | features | optional | `notify-channels` | — | ✅ | ✅ | ✅ |
 | `agent` - Assistant agent | features | optional | — | — | ✅ | ✅ | ✅ |
+| `anomaly` - Anomaly Detection | features | optional | — | — | ✅ | ✅ | ✅ |
 | `backup` - Backup and restore | features | optional | — | — | ✅ | ✅ | ✅ |
 | `case-management` - Case Management | features | optional | `ops` | — | ✅ | ✅ | ✅ |
 | `entity-list` - Entity lists | features | optional | `entity-store` | — | ✅ | ✅ | ✅ |
@@ -107,6 +108,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 |---|---|:-:|:-:|:-:|:-:|
 | actionRequests | `action-requests` | — | built | built | built |
 | aiAssist | `agent` | — | built | built | built |
+| anomalyDetection | planned in `anomaly` | — | planned | planned | planned |
 | caseManagement | `case-management` | — | built | built | built |
 | incidents | planned in `engine`, `ops` | — | planned | planned | planned |
 | integrationDelivery | `notify-channels` | — | built | built | built |
@@ -133,10 +135,10 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 
 | | Personal | Professional | Enterprise | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 16 | 39 | 42 | 42 |
+| First-party jars (processor + connectors + optional + core thin) | 16 | 40 | 43 | 43 |
 | of which core thin jars | 14 | 14 | 14 | 14 |
-| Optional modules beyond Personal | 0 | 23 | 26 | 26 |
-| Total on the classpath (+ third-party sidecars) | 16 | 40 | 43 | 43 |
+| Optional modules beyond Personal | 0 | 24 | 27 | 27 |
+| Total on the classpath (+ third-party sidecars) | 16 | 41 | 44 | 44 |
 <!-- offerings-matrix:end -->
 
 ## Preview — not a customer-facing tier

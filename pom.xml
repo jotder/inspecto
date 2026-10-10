@@ -145,6 +145,8 @@
                 <module>features/inspecto-regulatory-reporting</module>
                 <!-- SCREENING-1: the Screening add-on (fuzzy name / identifier matching against Entity Lists, screening.run, Screening Hits); requires entity-list. -->
                 <module>features/inspecto-screening</module>
+                <!-- ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind, anomaly.score Job); Professional and above (D-AD4). -->
+                <module>features/inspecto-anomaly</module>
             </modules>
         </profile>
         <profile>
@@ -178,6 +180,8 @@
                 <module>features/inspecto-regulatory-reporting</module>
                 <!-- SCREENING-1: the Screening add-on (fuzzy name / identifier matching against Entity Lists, screening.run, Screening Hits); requires entity-list. -->
                 <module>features/inspecto-screening</module>
+                <!-- ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind, anomaly.score Job); Professional and above (D-AD4). -->
+                <module>features/inspecto-anomaly</module>
             </modules>
         </profile>
         <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
@@ -224,6 +228,8 @@
                 <module>features/inspecto-regulatory-reporting</module>
                 <!-- SCREENING-1: the Screening add-on (fuzzy name / identifier matching against Entity Lists, screening.run, Screening Hits); requires entity-list. -->
                 <module>features/inspecto-screening</module>
+                <!-- ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind, anomaly.score Job); Professional and above (D-AD4). -->
+                <module>features/inspecto-anomaly</module>
             </modules>
         </profile>
         <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -263,6 +269,8 @@
                 <module>features/inspecto-regulatory-reporting</module>
                 <!-- SCREENING-1: the Screening add-on (fuzzy name / identifier matching against Entity Lists, screening.run, Screening Hits); requires entity-list. -->
                 <module>features/inspecto-screening</module>
+                <!-- ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind, anomaly.score Job); Professional and above (D-AD4). -->
+                <module>features/inspecto-anomaly</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —
