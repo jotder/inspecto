@@ -42,7 +42,7 @@ link index**; graph algorithms run in a bounded in-process pool over either inpu
              ┌────────────────────────┼─────────────────────────────────────────────┐
              │ INDEX BUILD (la-storage)                                              │
              │ POST /inv/index/builds  or  la.index.build Job                        │
-             │   (signal job.dataset.produced → link-index service →                 │
+             │   (signal pipeline.commit* → link-index service →                     │
              │    ScheduledLinkIndexBuilder → ScheduledIndexBuild, owner re-decided) │
              │        ▼                                                              │
              │ IndexPlan.classify ─▶ IndexBuildService ─▶ IndexBuilder (DuckDB COPY) │
@@ -85,6 +85,11 @@ link index**; graph algorithms run in a bounded in-process pool over either inpu
            ─▶ la.detect Job ─▶ AlertService ─▶ StandingDetection.decide (sweep:<id>) ─▶ Alert
 ```
 
+\* **Trigger.** A landed file commits a Consignment and emits `pipeline.commit` (mirrored in `JobService`);
+`job.dataset.produced` is emitted **only** by the `sql.template` Job. A `la.index.build` Job meant to refresh after a
+daily file must therefore use `on_signal: pipeline.commit` (guard `$signal.pipeline`) or `on_pipeline`. Each half is
+unit-tested on its own; no test yet runs commit → Job → index version (`LA-DEMO-INDEX-1`).
+
 Two invariants the diagram encodes: **raw values never leave through a response** (masking is the last step before
 serialisation, after every cache), and **the op log never re-reads a Dataset on replay** (rows are sealed into the
 entry at write time, so an index rebuild or a Dataset change cannot alter a recorded Investigation).
@@ -122,7 +127,7 @@ Design rules visible in the dependency graph:
 * **Ports point inward.** la-core defines `GraphEngine`, `GraphInput`, `DatasetProvider`, `CasePort`,
   `CollectorCoveragePort` and `InvestigationStoreProvider`; storage, geo-link and store-pg implement them. la-core
   never names an index class: `GraphInput.IndexRef` carries only primitives (version dir, seeds, estimates).
-* **The engine names no `la-*` class.** The host reaches LA only through ServiceLoader SPIs it owns
+* **The engine names no `la-*` class** (grep-true; LA route paths appear only as strings, and no named guard enforces it yet — `LA-DEMO-GUARDS-1`). The host reaches LA only through ServiceLoader SPIs it owns
   (`RouteModule`, `LinkIndexBuilder`, `InvestigationMeasureProbe`); absent jars degrade to
   `AbsentModuleRoutes` (503 `CAPABILITY_UNAVAILABLE`, "Professional edition and above").
 * **Entity Lists are not LA.** `/entity-lists/*` routes live in `features/inspecto-entity-list`; LA reads the same
@@ -160,12 +165,12 @@ Design rules visible in the dependency graph:
 | | Filesystem (`FsInvestigationStore`, default) | Postgres (`PgInvestigationStore`) |
 |---|---|---|
 | Selection | `-Dinvestigations.backend=fs` | `=db` + `investigations.db.url` (else `inspecto.db.url`, must be `jdbc:postgresql:`), password via `SecretResolver`; provider found by `SpiSlot` (exactly one) |
-| Layout | `<writeRoot>/audit/snapshots/<id>/` (header, log, sets, members, references, templates, pending, caselink, binding, `mask.key`, `drafts/`) | one schema per Space; tables `la_space`, `la_investigation`, `la_log`, `la_set`, `la_member`, `la_reference`, `la_alert_binding`, `la_pending`, `la_template`, `la_draft`; sealed bytes stored as `text`, immutability trigger |
+| Layout | `<writeRoot>/audit/snapshots/investigations/<id>/` (header, log, sets, members, references, templates, pending, caselink, binding, `mask.key`, `drafts/`) | one schema per Space; tables `la_space`, `la_investigation`, `la_log`, `la_set`, `la_member`, `la_reference`, `la_alert_binding`, `la_pending`, `la_template`, `la_draft`; sealed bytes stored as `text`, immutability trigger |
 | Concurrency | JVM monitor per directory + OS `FileChannel.lock` on `.store.lock` (two-JVM safe); `expectedVersion` check → `InvestigationVersionConflictException` | `SELECT … FOR NO KEY UPDATE` on the Investigation/Draft row in one short transaction; Space-wide Draft cap = `FOR UPDATE` on the `la_space` row |
 | Promote atomicity | intent file → append → mark promoted; `recoverDrafts` finishes or undoes a half promote | one transaction; nothing to recover |
 | Editions | every LA edition | Preview and Enterprise only |
 
-⚠ The FS layout's Javadoc says `investigations/<id>`; the code writes `audit/snapshots/<id>`. Creates, forks,
+⚠ The FS layout's Javadoc says `<audit root>/investigations/<id>`; the code writes `audit/snapshots/investigations/<id>`. Creates, forks,
 references, Case link and Alert Rule binding are last-writer-wins by design on FS.
 
 ### 3.3 Drafts (D-7)
@@ -175,7 +180,7 @@ references, Case link and Alert Rule binding are last-writer-wins by design on F
   continuously. Created by staging in a scratch dot-directory and an atomic move.
 * States `OPEN → HIBERNATED → DISCARDED | PROMOTED` (`DraftLifecycle`); expiry is a discard with `expired:true`.
   Defaults from `LinkAnalysisSettings.Drafts`: 50 open per Space, hibernate after 60 min, expire after 30 d.
-* Admission (`DraftAdmission`, la-api): one live Draft per member, Space cap, heavy-op permit `min(4, cores/3)`.
+* Admission (`DraftAdmission`, la-api): one live Draft per member, Space cap, heavy-op permit `max(1, min(4, cores/3))`.
 * Rebase (`DraftRebase`) carries effective ops and classifies conflicts `no-op | changed | superseded | blocked`;
   promote (`DraftPromote`) rebases to head and appends under the main lock, all-or-nothing, or becomes a pending
   four-eyes request when it carries a sensitive expand. **Storage is in la-core, orchestration in la-api.**
@@ -248,12 +253,13 @@ raw id that masking hides is answered as a nonexistent node; `reveal` needs `can
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`
   (exhaustive switch over `Algorithm`, so a new algorithm fails to compile until implemented), IndexRef →
   `SqlGraphEngine` (neighbourhood, ego network, seeds-only degree; caps throw `IndexCapExceeded`, no reroute).
-* **28 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB) and a node ceiling (e.g. 500 for
-  betweenness, 100,000 for shortest path).
-* **Budgets** (`GraphRunService`): default 50,000 nodes / 500,000 edges / 30 s; ceilings 500,000 / 5,000,000 /
-  300 s. Size is checked before work, the deadline at `RunControl` checkpoints; overrun ends `BUDGET_EXCEEDED` with
+* **28 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB, a hint) and a node ceiling (e.g. 500 for
+  betweenness, 100,000 for shortest path) that is the inline-versus-job threshold, not a limit — the budget refuses.
+  The toolbox exposes 18 with *Run on server* and 3 with *Run on index*; the other 7 are API-only.
+* **Budgets** (`GraphRunService`): shipped default 50,000 nodes / 500,000 edges / 30 s; ceilings 500,000 / 5,000,000 /
+  300 s (both are Space settings under `graphRun`, as are `index.threads` and `index.queue`). Size is checked before work, the deadline at `RunControl` checkpoints; overrun ends `BUDGET_EXCEEDED` with
   no result — never a silent cap.
-* **Pool:** 2 threads, queue 16 (`AbortPolicy` → `REJECTED`), finished-run retention 200, result cache 32 entries /
+* **Pool:** 2 threads, queue 16 (`AbortPolicy` → `REJECTED`, HTTP 503), finished-run retention 200, result cache 32 entries /
   10 min. Cache key = relation + row-scope fingerprint (a tripwire against crossing scopes) + algorithm + resolved
   params + weights + input identity. Only COMPLETED results are cached; masking applies after the cache.
 * **Parity:** Java and TypeScript assert the same hand-derived fixtures with canonical-v1 tie-breaks; the server has
@@ -261,7 +267,8 @@ raw id that masking hides is answered as a nonexistent node; `reveal` needs `can
 
 ## 6. HTTP surface (la-api, geo-link)
 
-18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, ~70 routes:
+18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **75 routes** (69 in la-api + 6 in geo-link;
+the live `GET /audit/route-inventory` lists 75 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
 |---|---|---|
@@ -270,9 +277,9 @@ raw id that masking hides is answered as a nonexistent node; `reveal` needs `can
 | Four-eyes / reveal | `…/pending/{p}/approve|deny`, `…/reveal` | `canApproveLinkExpansions`, `canRevealLinkEntities` |
 | Dossier | `…/dossier`, `/dossier/verify`, `/dossier/bundle`, `/dossier/bundle/verify` | read gate only |
 | Drafts | `…/drafts` create/list, `…/drafts/{d}` + `/log`, `/working-set`, `/replay`, `/conflicts`, `/ops`, `/undo`, `/discard`, `/rebase`, `/promote` | `canManageIncidents` + per-role act check |
-| Identity | `/inv/entity-identities`, `/group`, `/import`, `/{id}/retract` | `canManageIncidents` |
-| Graph Run | `/inv/graph/runs`, `/algorithms`, `/runs/{id}`, `/cancel` | `canRunLinkGraphAnalysis` |
-| Index | `/inv/index`, `/inv/index/builds`, `/builds/{id}`, `/cancel` | `canBuildLinkIndex` |
+| Identity | `/inv/entity-identities`, `/group`, `/import`, `/{id}/retract` | `canManageIncidents` (the reads too; `/import` has no UI) |
+| Graph Run | `/inv/graph/runs`, `/algorithms`, `/runs/{id}`, `/cancel` | `canRunLinkGraphAnalysis` on the POST that starts a run; list/get are read-gated; cancel is owner-or-admin, else 404 |
+| Index | `/inv/index`, `/inv/index/builds`, `/builds/{id}`, `/cancel` | `canBuildLinkIndex` on the POST that starts a build; the reads and cancel are not capability-gated |
 | Measures & detection (geo-link) | `…/{id}/measures`, `…/alert-rules`, `…/standing-detection` | `canAuthorAlertRules` |
 
 Capability constants are in `platform/inspecto-access` `Roles`. OpenAPI fragments
@@ -282,14 +289,15 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
 ### 6.1 Gate order for an `/inv` request
 
 1. `ControlApi.authenticate` → Subject (401 audited).
-2. `rateLimit` → `LinkAnalysisRateClasses`: 11 expensive POSTs share a per-subject `linkAnalysis` bucket (429);
-   Investigation routes are exempt (pinned by `LinkAnalysisRateClassCoverageTest`).
+2. `rateLimit` → `LinkAnalysisRateClasses`: 11 expensive POSTs share a per-subject `linkAnalysis` bucket (capacity 20,
+   refill 1 per 3 s, tunable `control.rateLimit.linkAnalysis.*`; 429); Investigation routes are exempt (pinned by `LinkAnalysisRateClassCoverageTest`).
 3. `authorize` → host ABAC PEP.
-4. `requireModuleEnabled` → feature `geoLink` in the Space's `modules.toon` (404 `MODULE_DISABLED`).
+4. `requireModuleEnabled` → feature `geoLink` in the Space's `modules.toon` (404 `MODULE_DISABLED`); then the host's
+   idempotency check, before the handler.
 5. `ApiContext.withCapability` → 403. ⚠ A no-op when there is no Subject (Personal / tests without an armed
    Authenticator).
 6. `InvestigationRoutes.open`: write root (503) → safe id (422) → header (404) → membership role (`Need`
-   READ / LEAD / APPROVE) → R3 Dataset visibility (`ComponentAccess.canView`, 404) → Enterprise PDP D-E7
+   READ / LEAD / APPROVE; a member of the linked Case also passes READ) → R3 Dataset visibility (`ComponentAccess.canView`, 404) → Enterprise PDP D-E7
    (`RowScope.visible`, can only narrow, 404) → deferred role refusal 403. **Non-members get 404-as-absence; a
    member lacking the role gets 403 only after R3 and the PDP have spoken.**
 7. Handler → `EntityMasking` on output → audit (`LinkEventTypes` via `EventSink` + `AuditTrail`; ≥500 and 401/403
@@ -319,6 +327,9 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
 | la-store-pg (Postgres Investigations) | — | — | — | ✓ | ✓ |
 | D-E7 PDP (`providers/inspecto-policy`) | — | — | — | ✓ | ✓ |
 
+Standard is a Professional alias in `tools/bundle-modules.mjs` (`offerings/standard.toon` does not exist). The Postgres store also needs
+`-Dinvestigations.backend=db` plus a `jdbc:postgresql:` URL; the jar alone keeps the filesystem store.
+
 Jars are staged by `inspecto/package.ps1`; `-Ui la-app` swaps the bundled SPA, not the edition. Enablement then runs
 Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Permitted (capability + gates above).
 
@@ -332,7 +343,7 @@ Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Pe
 | Index deltas | 8 | `append` refused, `compact` advised |
 | Index traversal | depth 2, frontier 20 | flat fallback with a closed `Reason` |
 | Open Drafts | 50 per Space, 1 per member | 409 |
-| Heavy Draft ops | `min(4, cores/3)` permits, never waited for | 429 |
+| Heavy Draft ops | `max(1, min(4, cores/3))` permits, never waited for | 429 |
 | Expensive exploration POSTs | per-subject `linkAnalysis` bucket | 429 |
 
 ## 10. Known seams and residuals

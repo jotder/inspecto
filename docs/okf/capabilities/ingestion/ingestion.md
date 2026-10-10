@@ -450,7 +450,7 @@ over the landed range (the `la.index.build` Job with `allow_full: true`, or `POS
 parsed in parallel by the Pipeline and the full build is one parallel DuckDB sort, so there are no per-day index builds to
 merge. `IndexAppendTest.aThirtyDayBackfillAnswersEveryReadLikeTheDayByDayRunAcrossThreeCompactions` pins that the backfill
 answers every read like the day-by-day run (first day full, append per day, compact at the delta cap) and that a backfill
-missing one day does not. While the range lands, each committed batch fires `job.dataset.produced`; a Job run that finds a
+missing one day does not. While the range lands, each committed batch emits `pipeline.commit` (`job.dataset.produced` is emitted only by the `sql.template` Job); a Job run that finds a
 build in flight WAITS and re-plans (at most 6 waits, 2 s backoff doubling to 60 s, within `timeout_seconds`, every attempt
 audited), so the daily trigger need not be paused (operator, 2026-10-06). That default bound (about 122 s) does not outlast a FULL build at 10^8 rows (852-929 s measured), so the Job takes `wait_seconds`: unset keeps the six-wait bound, `0` never waits, any other value is a TIME budget (same backoff, last sleep trimmed) clamped to `timeout_seconds`; a negative or non-numeric value fails the Run. Read from the saved config only, like every other Job param (no per-run override).
 
