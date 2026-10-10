@@ -195,6 +195,11 @@
             <inspecto-link-analysis-investigation-case
                 [investigationId]="h.id"
             ></inspecto-link-analysis-investigation-case>
+            <inspecto-link-analysis-members [investigationId]="h.id"></inspecto-link-analysis-members>
+            <inspecto-link-analysis-drafts
+                [investigationId]="h.id"
+                (promoted)="store.open(h.id)"
+            ></inspecto-link-analysis-drafts>
         } @else if (!store.busy()) {
             <button mat-stroked-button (click)="store.forget(store.activeId()!)">Forget this Investigation</button>
         }

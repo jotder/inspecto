@@ -782,6 +782,79 @@ export interface InvestigationCaseLink {
     reason: string;
 }
 
+// ── Members and Drafts (`InvestigationMemberRoutes`, `DraftRoutes`) ───────────────────────────────────
+
+export type InvestigationRole = 'lead' | 'analyst' | 'reviewer';
+
+/** `GET|POST /inv/investigations/{id}/members[/revoke]` — the current roles, the history, and the caller's own role. */
+export interface InvestigationMembers {
+    investigationId: string;
+    owner: string | null;
+    members: { subject: string; role: InvestigationRole }[];
+    history: {
+        seq: number;
+        ts: string;
+        actor: string;
+        subject: string;
+        role: InvestigationRole;
+        op: 'grant' | 'revoke';
+    }[];
+    /** The caller's role; null when no Subject is attached. */
+    you: InvestigationRole | null;
+}
+
+export type DraftStateName = 'open' | 'hibernated' | 'discarded' | 'promoted';
+
+/** One Draft as `GET …/drafts[/{draftId}]` shows it. */
+export interface InvestigationDraft {
+    draftId: string;
+    investigationId: string;
+    actor: string;
+    createdAt: string;
+    baseStep: number;
+    state: DraftStateName;
+    expired?: boolean;
+    lastAccessAt?: string;
+    expiresAt?: string;
+    expiryWarning?: boolean;
+    steps: number;
+    headStep: number;
+    /** Main-log steps appended since the fork. */
+    behind: number;
+    stale: boolean;
+    pinWarning: boolean;
+}
+
+export interface InvestigationDraftList {
+    investigationId: string;
+    items: InvestigationDraft[];
+    total: number;
+}
+
+export interface DraftConflict {
+    step: number;
+    op: string;
+    kind: string;
+    detail: string;
+    requiresConfirm: boolean;
+    oldRows?: number;
+    newRows?: number;
+}
+
+/** `GET …/drafts/{draftId}/conflicts` — what a rebase onto the current head would do; writes nothing. */
+export interface DraftConflictReport {
+    draftId: string;
+    baseStep: number;
+    mainHead: number;
+    behind: number;
+    effectiveOps: number;
+    carried: number;
+    conflicts: DraftConflict[];
+}
+
+/** `POST …/drafts/{draftId}/promote` — applied to the main log, or HELD as a pending four-eyes request (202). */
+export type DraftPromoteResult = { status?: 'pending'; pending?: PendingExpansion } & Record<string, unknown>;
+
 // ── LA-12: the Dossier (`DossierRoutes`) ──────────────────────────────────────────────────────────────
 
 export interface DossierQuery {
@@ -1370,6 +1443,75 @@ export class InvService {
     /** LA-24: remove the Case link — owner-only. */
     unlinkInvestigationCase(id: string): Observable<InvestigationCaseLink> {
         return this.http.delete<InvestigationCaseLink>(invPath(id, 'case'));
+    }
+
+    /** Members of an Investigation: the roles and the history. Any member reads; a non-member gets 404 (absence). */
+    investigationMembers(id: string): Observable<InvestigationMembers> {
+        return this.http.get<InvestigationMembers>(invPath(id, 'members'));
+    }
+
+    /** Grant (or change) a role — lead only. */
+    grantInvestigationMember(id: string, subject: string, role: InvestigationRole): Observable<InvestigationMembers> {
+        return this.http.post<InvestigationMembers>(invPath(id, 'members'), { subject, role });
+    }
+
+    /** Revoke a member — lead only; the last lead cannot be revoked (422). */
+    revokeInvestigationMember(id: string, subject: string): Observable<InvestigationMembers> {
+        return this.http.post<InvestigationMembers>(invPath(id, 'members/revoke'), { subject });
+    }
+
+    /** The caller's Drafts (a lead and a reviewer see all); `closed` adds discarded and promoted ones. */
+    investigationDrafts(id: string, closed = false): Observable<InvestigationDraftList> {
+        return this.http.get<InvestigationDraftList>(invPath(id, 'drafts'), {
+            params: toParams({ closed: closed ? 'true' : undefined }),
+        });
+    }
+
+    /** Fork a Draft at the head (or at `at`). One live Draft per member (409); a Space-wide cap (409). */
+    forkDraft(id: string, at?: number): Observable<InvestigationDraft> {
+        return this.http.post<InvestigationDraft>(invPath(id, 'drafts'), at === undefined ? {} : { at });
+    }
+
+    /** One relation page of a Draft's Working Set (the `total` is the true row count). */
+    draftWorkingSet(
+        id: string,
+        draftId: string,
+        of: WorkingSetRelationName,
+        limit = 1,
+    ): Observable<WorkingSetRelation> {
+        return this.http.get<WorkingSetRelation>(invPath(id, `drafts/${encodeURIComponent(draftId)}/working-set`), {
+            params: toParams({ of, limit }),
+        });
+    }
+
+    draftConflicts(id: string, draftId: string): Observable<DraftConflictReport> {
+        return this.http.get<DraftConflictReport>(invPath(id, `drafts/${encodeURIComponent(draftId)}/conflicts`));
+    }
+
+    /** Rebase onto the main head; `confirm` lists the superseded / blocked steps the caller accepts dropping. */
+    rebaseDraft(
+        id: string,
+        draftId: string,
+        confirm: number[],
+        expectHead: number,
+    ): Observable<Record<string, unknown>> {
+        return this.http.post<Record<string, unknown>>(invPath(id, `drafts/${encodeURIComponent(draftId)}/rebase`), {
+            confirm,
+            expectHead,
+        });
+    }
+
+    promoteDraft(id: string, draftId: string, expectHead: number): Observable<DraftPromoteResult> {
+        return this.http.post<DraftPromoteResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/promote`), {
+            expectHead,
+        });
+    }
+
+    discardDraft(id: string, draftId: string): Observable<{ discarded: boolean; alreadyDiscarded: boolean }> {
+        return this.http.post<{ discarded: boolean; alreadyDiscarded: boolean }>(
+            invPath(id, `drafts/${encodeURIComponent(draftId)}/discard`),
+            {},
+        );
     }
 
     /** LA-12: the dossier as JSON (all three renderings included). Owner-only; audited server-side. */
