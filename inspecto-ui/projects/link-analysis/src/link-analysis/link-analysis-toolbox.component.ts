@@ -551,6 +551,34 @@ export class LinkAnalysisToolboxComponent {
         this.serverTruncated.set(truncationNotice(r));
     }
 
+    /**
+     * An *All algorithms (server)* answer, fed by its result KIND into the views the browser algorithms fill: a ranking
+     * (`SCORES`, `HITS`) into the ranking, a partition (`COMMUNITIES`, connected components' disjoint `GROUPS`) into the
+     * communities. Any other kind stays in that group's own summary. Overlapping groups (cliques) are not a partition.
+     */
+    applyCatalogueResult(r: GraphRunResult): void {
+        const map = this.serverIds();
+        if (!map) return;
+        switch (r.kind) {
+            case 'SCORES':
+                return this.applyRanking(toNodeScores((r.scores ?? []) as GraphScoreView[], map));
+            case 'HITS':
+                return this.applyRanking(
+                    toNodeScores((this.centralityMetric() === 'authority' ? r.authorities : r.hubs) ?? [], map),
+                );
+            case 'COMMUNITIES':
+                return this.applyCommunities(toCommunityMap(r.communities ?? [], map));
+            case 'GROUPS':
+                if (r.algorithm !== 'connectedComponents') return;
+                return this.applyCommunities(
+                    toCommunityMap(
+                        (r.groups ?? []).flatMap((g) => g.map((id) => ({ id, community: g[0] }))),
+                        map,
+                    ),
+                );
+        }
+    }
+
     private applyServerAnswer(r: GraphRunResult, map: ServerIdMap): void {
         switch (r.algorithm) {
             case 'betweennessCentrality':

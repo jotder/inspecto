@@ -284,7 +284,11 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 * **Every algorithm of the 28-entry server catalogue is reachable from the toolbox** (`LA-ALGO-UI-PARITY-1`, DR-U11/U12):
   the *All algorithms (server)* group (`link-analysis-server-algorithms.component.ts`) builds its form from the
   catalogue's parameter descriptors, reuses `LinkAnalysisServerRunComponent` and reads any answer by its result kind
-  (`graph-run-summary.ts`) - no per-algorithm panel. The footer's `link-analysis-modules.component.ts` filters
+  (`graph-run-summary.ts`) - no per-algorithm panel. Every completed answer is also emitted (`resultChange`) to the
+  toolbox's `applyCatalogueResult`, which feeds it BY KIND into the same views the browser algorithms fill: `SCORES` /
+  `HITS` (PageRank, k-core, triangle count, Jaccard, centralities) → the ranking; `COMMUNITIES` and connected
+  components' disjoint `GROUPS` → the communities. Cliques (overlapping `GROUPS`) are not a partition and stay summary-only.
+  The footer's `link-analysis-modules.component.ts` filters
   `GET /modules` to `geo-link` + `la-*`. The browser still runs the 21 with local code (the earlier "27" count was stale).
   Older line follows: the algorithms run in the browser, on the main thread. The backend does SQL fold and filter only
   (`InvRoutes.java:36-39`, deliberate). Supported graph size is therefore bounded by one tab.

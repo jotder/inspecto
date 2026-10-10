@@ -135,6 +135,8 @@ export class LinkAnalysisServerAlgorithmsComponent {
     readonly nodeOptions = input<{ id: string; label: string }[]>([]);
     readonly serverIds = input<ServerIdMap | null>(null);
     readonly emphasisChange = output<GraphEmphasis | null>();
+    /** Every completed answer, so the host can feed a ranking or a partition into its own ranking / community views. */
+    readonly resultChange = output<GraphRunResult>();
 
     readonly algorithms = computed<GraphAlgorithm[]>(() => this.runs.catalogue()?.algorithms ?? []);
     readonly algorithmOptions = computed<PickerOption[]>(() =>
@@ -198,6 +200,7 @@ export class LinkAnalysisServerAlgorithmsComponent {
 
     onCompleted(r: GraphRunResult): void {
         this.summary.set(summarizeGraphRun(r, this.serverIds()));
+        this.resultChange.emit(r);
     }
 
     highlight(s: GraphRunSummary): void {

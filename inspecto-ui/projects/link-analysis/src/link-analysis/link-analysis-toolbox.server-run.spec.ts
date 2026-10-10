@@ -671,3 +671,56 @@ describe('LinkAnalysisToolboxComponent - a server cut-points answer never combin
         expect(c.analysisError()).toContain('No cut points');
     });
 });
+
+describe('LinkAnalysisToolboxComponent - All algorithms (server) results feed the ranking and community views', () => {
+    const base = { dropped: 0, elapsedMs: 1 };
+
+    it('a ranking kind (PageRank, k-core) fills the same ranking view a local Rank nodes run fills', () => {
+        const { c } = make();
+        c.applyCatalogueResult({
+            ...base,
+            algorithm: 'pageRank',
+            kind: 'SCORES',
+            scores: [
+                { id: 'c', label: 'c', score: 0.4 },
+                { id: 'zz', label: 'not drawn', score: 0.3 },
+                { id: 'a', label: 'a', score: 0.1 },
+            ],
+        });
+        expect(c.ranking().map((s) => s.id)).toEqual([nodeId('c'), nodeId('a')]);
+        expect(c.toolBadge('centrality')).toBe('top 2');
+    });
+
+    it('a partition kind (connected components, Louvain) fills the same community view', () => {
+        const { c, last } = make();
+        c.applyCatalogueResult({
+            ...base,
+            algorithm: 'connectedComponents',
+            kind: 'GROUPS',
+            groups: [
+                ['a', 'b', 'c'],
+                ['d', 'e'],
+            ],
+        });
+        expect(c.communities().map((x) => x.members.length)).toEqual([3, 2]);
+        expect(last()?.groups?.get(nodeId('d'))).toBe(last()?.groups?.get(nodeId('e')));
+        c.applyCatalogueResult({
+            ...base,
+            algorithm: 'louvainCommunities',
+            kind: 'COMMUNITIES',
+            communities: [
+                { id: 'a', community: 'a' },
+                { id: 'b', community: 'a' },
+            ],
+        });
+        expect(c.communities()).toEqual([{ id: nodeId('a'), members: [nodeId('a'), nodeId('b')] }]);
+    });
+
+    it('any other kind (a flag, overlapping cliques) leaves the ranking and community views alone', () => {
+        const { c } = make();
+        c.applyCatalogueResult({ ...base, algorithm: 'isForest', kind: 'FLAG', value: true });
+        c.applyCatalogueResult({ ...base, algorithm: 'cliques', kind: 'GROUPS', groups: [['a', 'b']] });
+        expect(c.ranking()).toEqual([]);
+        expect(c.communities()).toEqual([]);
+    });
+});
