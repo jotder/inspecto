@@ -1,0 +1,36 @@
+name: fraud_alarms
+active: true
+description: "Telecom Link Analysis showcase - Fraud Management System alarms. One 60-day extract (FRAUD_ALARMS_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/fraud_alarms
+  database:   data/fraud_alarms/database
+  backup:     data/fraud_alarms/backup
+  temp:       data/fraud_alarms/temp
+  errors:     data/fraud_alarms/errors
+  quarantine: data/fraud_alarms/quarantine
+  markers:    data/fraud_alarms/markers
+  status_dir: data/fraud_alarms/status
+  log_dir:    data/fraud_alarms/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: fraud_alarms_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

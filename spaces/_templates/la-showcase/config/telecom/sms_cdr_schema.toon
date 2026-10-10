@@ -1,0 +1,24 @@
+raw:
+  name: SMS_CDR
+  format: CSV
+  fields[4]{name,selector,type,description,unit,classification}:
+    orig_msisdn,"0",VARCHAR,"Originating MSISDN","","CONFIDENTIAL"
+    term_msisdn,"1",VARCHAR,"Terminating MSISDN","","CONFIDENTIAL"
+    ts,"2",TIMESTAMP,"Submit time","","INTERNAL"
+    message_type,"3",VARCHAR,"text","","INTERNAL"
+mapping:
+  canonicalName: sms_cdr
+  rawName: SMS_CDR
+  fields[4]:
+    - name: orig_msisdn
+      from: orig_msisdn
+      fn: keep
+    - name: term_msisdn
+      from: term_msisdn
+      fn: keep
+    - name: ts
+      from: ts
+      fn: keep
+    - name: message_type
+      from: message_type
+      fn: keep

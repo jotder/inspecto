@@ -1,0 +1,36 @@
+raw:
+  name: CRM_KYC
+  format: CSV
+  fields[7]{name,selector,type,description,unit,classification}:
+    msisdn,"0",VARCHAR,"MSISDN","","CONFIDENTIAL"
+    id_doc_hash,"1",VARCHAR,"Hash of the identity document","","CONFIDENTIAL"
+    address_hash,"2",VARCHAR,"Hash of the registered address","","CONFIDENTIAL"
+    account_holder,"3",VARCHAR,"Customer id","","CONFIDENTIAL"
+    activation_date,"4",DATE,"Line activation day","","INTERNAL"
+    subscriber_type,"5",VARCHAR,"prepaid, postpaid or business","","INTERNAL"
+    kyc_complete,"6",BOOLEAN,"KYC checks complete","","INTERNAL"
+mapping:
+  canonicalName: crm_kyc
+  rawName: CRM_KYC
+  fields[7]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: id_doc_hash
+      from: id_doc_hash
+      fn: keep
+    - name: address_hash
+      from: address_hash
+      fn: keep
+    - name: account_holder
+      from: account_holder
+      fn: keep
+    - name: activation_date
+      from: activation_date
+      fn: keep
+    - name: subscriber_type
+      from: subscriber_type
+      fn: keep
+    - name: kyc_complete
+      from: kyc_complete
+      fn: keep

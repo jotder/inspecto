@@ -1,0 +1,36 @@
+name: hlr_eir
+active: true
+description: "Telecom Link Analysis showcase - HLR / EIR snapshot - MSISDN to IMSI to IMEI, call-forwarding settings, SIM-swap events. One 60-day extract (HLR_EIR_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/hlr_eir
+  database:   data/hlr_eir/database
+  backup:     data/hlr_eir/backup
+  temp:       data/hlr_eir/temp
+  errors:     data/hlr_eir/errors
+  quarantine: data/hlr_eir/quarantine
+  markers:    data/hlr_eir/markers
+  status_dir: data/hlr_eir/status
+  log_dir:    data/hlr_eir/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: hlr_eir_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,20 @@
+raw:
+  name: FRAUD_BLOCKLIST
+  format: CSV
+  fields[3]{name,selector,type,description,unit,classification}:
+    msisdn,"0",VARCHAR,"MSISDN","","CONFIDENTIAL"
+    listed_at,"1",TIMESTAMP,"Listed at","","INTERNAL"
+    reason,"2",VARCHAR,"Typology","","INTERNAL"
+mapping:
+  canonicalName: fraud_blocklist
+  rawName: FRAUD_BLOCKLIST
+  fields[3]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: listed_at
+      from: listed_at
+      fn: keep
+    - name: reason
+      from: reason
+      fn: keep
