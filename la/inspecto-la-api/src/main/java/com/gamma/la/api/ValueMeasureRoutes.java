@@ -88,6 +88,20 @@ public final class ValueMeasureRoutes implements RouteModule {
                     + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
         Map<String, Object> out = answer(spec, r);
+        // DR-D2: the entities leave as aliases when the Space masks them (a list-masked agent already carries the list's own token)
+        ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId.trim(), roles);
+        out.put("masking", mask.describe());
+        if (mask.active()) {
+            List<Map<String, Object>> shown = new java.util.ArrayList<>();
+            for (Map<String, Object> row : r.entities()) {
+                Map<String, Object> c = new LinkedHashMap<>(row);
+                for (String k : List.of("entity", "source", "target"))
+                    if (c.get(k) != null && !String.valueOf(c.get(k)).startsWith(com.gamma.entitystore.MaskTokens.TOKEN_PREFIX))
+                        c.put(k, mask.out(c.get(k)));
+                shown.add(c);
+            }
+            out.put("entities", shown);
+        }
         out.put("fences", Map.of("maxEntities", ValueMeasures.MAX_ENTITIES, "timeoutSeconds",
                 ValueMeasures.TIMEOUT_SECONDS, "maxWindowDays", ValueMeasures.MAX_WINDOW_DAYS));
         try {

@@ -260,7 +260,10 @@ export class LinkAnalysisInvestigationComponent {
         const n = this.store.selected();
         if (!n) return;
         const entityType = this.store.activeRef()?.entityType;
-        this.store.apply({ op: 'seed', ids: rawIdsOf(n), ...(entityType ? { entityType } : {}) });
+        // DR-D3: seeding is what the query graph was for - draw the Working Set it just grew, so Expand/Keep/Hide act on it.
+        this.store
+            .apply({ op: 'seed', ids: rawIdsOf(n), ...(entityType ? { entityType } : {}) })
+            .then((ok) => ok && this.store.showWorkingSet.set(true));
     }
 
     /** The expand form's Advanced rung fields (LA-SPA-OWED-SURFACES-1). */

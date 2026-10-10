@@ -276,6 +276,8 @@ export class LinkAnalysisToolboxComponent {
      * Subject holds `canRunLinkGraphAnalysis`.
      */
     readonly investigationId = input<string | null>(null);
+    /** DR-D3: an Investigation is open (even when the canvas draws the query graph and no id is passed). */
+    readonly investigationOpen = input(false);
     /**
      * How many nodes the open Investigation's Working Set has (hidden ones left out), or null when the canvas shows a
      * query graph. A server run reads the Working Set, so when one is open THAT is the size the browser-or-server

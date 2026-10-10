@@ -229,6 +229,10 @@ export class LinkAnalysisServerRunComponent {
      * step is sent: the canvas always shows the committed head, which is the server's default.
      */
     readonly investigationId = input<string | null>(null);
+    /** DR-D3: an Investigation IS open but the canvas draws the query graph, so no id is passed - say that, not "open one". */
+    readonly investigationOpen = input(false);
+    private readonly notDrawn =
+        "the canvas is showing the query graph - untick 'Show the query graph (to pick seeds)' in the Investigation tab so it draws the Working Set.";
     /** A reason the run cannot start yet that the toolbox knows (e.g. no source and sink picked); '' = none. */
     readonly hold = input('');
     /** May the Subject start a run (`canRunLinkGraphAnalysis`)? */
@@ -270,7 +274,9 @@ export class LinkAnalysisServerRunComponent {
         if (!this.allowed())
             return 'Running on the index needs the Run link graph analysis capability, which your role does not hold.';
         if (!this.investigationId())
-            return 'Running on the index starts from an Investigation - open or start an Investigation first.';
+            return this.investigationOpen()
+                ? `Running on the index starts from the Working Set, but ${this.notDrawn}`
+                : 'Running on the index starts from an Investigation - open or start an Investigation first.';
         const hops = this.params()['hops'];
         if (this.algorithm() === 'neighborhood' && typeof hops === 'number' && hops > 2)
             return 'The index answers at most 2 hops. Lower the hops, or run it on the Working Set.';
@@ -324,7 +330,9 @@ export class LinkAnalysisServerRunComponent {
         if (!this.allowed())
             return 'Running on the server needs the Run link graph analysis capability, which your role does not hold.';
         if (!this.investigationId())
-            return "Running on the server works on an Investigation's Working Set - open or start an Investigation first.";
+            return this.investigationOpen()
+                ? `Running on the server works on the Working Set, but ${this.notDrawn}`
+                : "Running on the server works on an Investigation's Working Set - open or start an Investigation first.";
         return this.hold();
     });
     /**

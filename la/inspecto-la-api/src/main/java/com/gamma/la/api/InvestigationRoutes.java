@@ -2003,10 +2003,22 @@ public final class InvestigationRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     static Object masked(Inv inv, Object out) throws IOException {
         EntityMasking mask = EntityMasking.of(inv, List.of());
+        // DR-D2: a Working Set in the answer names, per masked entity, the alias the query graph shows for it (the Space's key)
+        Map<String, String> exploreAliases = new LinkedHashMap<>();
+        if (mask.masking() && out instanceof Map<?, ?> o && o.get("workingSet") instanceof Map<?, ?> ws
+                && ws.get("entities") instanceof List<?> ents)
+            for (Object e : ents)
+                if (e instanceof Map<?, ?> row && row.get("id") instanceof String raw && mask.hidesRaw(raw))
+                    exploreAliases.put(mask.tokenOf(raw), ExplorationMasking.alias(inv.writeRoot(), raw));
         Object masked = LinkIds.stamp(mask.apply(out));   // D-U9: link ids minted from what the caller sees
         if (!(masked instanceof Map<?, ?> m)) return masked;
         Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) m);
         copy.put("masking", mask.describe());
+        if (!exploreAliases.isEmpty() && copy.get("workingSet") instanceof Map<?, ?> w) {
+            Map<String, Object> wsCopy = new LinkedHashMap<>((Map<String, Object>) w);
+            wsCopy.put("exploreAliases", exploreAliases);
+            copy.put("workingSet", wsCopy);
+        }
         return copy;
     }
 
@@ -2016,7 +2028,14 @@ public final class InvestigationRoutes implements RouteModule {
                 || l.stream().noneMatch(o -> o instanceof String v && v.startsWith(EntityMasking.TOKEN_PREFIX)))
             return body;
         Map<String, Object> out = new LinkedHashMap<>(body);
-        out.put("ids", EntityMasking.of(inv, List.of()).resolve(strings(l)));
+        EntityMasking mask = EntityMasking.of(inv, List.of());
+        List<String> ids = new ArrayList<>();
+        for (String id : mask.resolve(strings(l))) {
+            // DR-D2: an alias minted by an exploration read (the Space's key) is resolved from the server's book
+            String viaExploration = id.startsWith(EntityMasking.TOKEN_PREFIX) ? ExplorationMasking.lookup(inv.writeRoot(), id) : null;
+            ids.add(viaExploration != null ? viaExploration : id);
+        }
+        out.put("ids", ids);
         return out;
     }
 

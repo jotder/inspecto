@@ -39,7 +39,9 @@ export function rawIdsOf(node: G6Node): string[] {
 export function idsInWorkingSet(node: G6Node, ws: WorkingSet | null): string[] {
     if (!ws) return [];
     const members = new Set(ws.entities.map((e) => e.id));
-    return rawIdsOf(node).filter((id) => members.has(id));
+    // DR-D2: the query graph shows the Space's alias, the Working Set this Investigation's own - `exploreAliases` pairs them.
+    const viaExploration = new Map(Object.entries(ws.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
+    return rawIdsOf(node).map((id) => (members.has(id) ? id : (viaExploration.get(id) ?? id))).filter((id) => members.has(id));
 }
 
 /**

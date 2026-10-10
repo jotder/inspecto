@@ -1,6 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParameterCodec, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { apiUrl, toParams } from '@inspecto/core/api/api-base';
 import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import type { BranchStage } from '@inspecto/core/graph/branching-stage';
@@ -21,7 +21,17 @@ export interface ProjectionTriple {
     attrs?: Record<string, string | null>;
 }
 
+/** DR-D2: what a read says about masking — the Space's `maskingMode`, whether THIS read masked its ids, and why. */
+export interface MaskingNote {
+    mode: 'none' | 'typed' | 'all' | string;
+    /** Exploration reads: a boolean. Investigation answers: how many ids are masked. */
+    masked: boolean | number;
+    basis: string;
+}
+
 export interface ProjectionResult {
+    /** DR-D2: ids of a masked read are `masked:<hex>` aliases (the Space's key); hand an alias back to expand or seed. */
+    masking?: MaskingNote;
     /** Heaviest first — the server orders by count so a node cap keeps the densest subgraph. */
     rows: ProjectionTriple[];
     /** True when the server row limit cut the projection short. */
@@ -119,6 +129,7 @@ export interface RecursivePath {
 }
 
 export interface RecursivePathsResult {
+    masking?: MaskingNote;
     paths: RecursivePath[];
     /** The path limit OR the edge-yield fence cut the answer short. */
     truncated: boolean;
@@ -520,6 +531,8 @@ export interface WorkingSet {
     excluded: WorkingSetExclusion[];
     /** LA-19: ABSENT when no entity is annotated (an unannotated state hashes as it did before). */
     annotations?: WorkingSetAnnotation[];
+    /** DR-D2: this Investigation's alias of a masked entity → the alias the query graph shows for it (the Space's key). */
+    exploreAliases?: Record<string, string>;
     /** D-U9: ABSENT when no link is annotated. */
     linkAnnotations?: WorkingSetLinkAnnotation[];
     hash: string;
@@ -1203,13 +1216,18 @@ export const STRICT_QUERY_CODEC: HttpParameterCodec = {
 export class InvService {
     private http = inject(HttpClient);
 
+    /** DR-D2: the masking the last exploration read was served under — what the "Masking: …" badge shows. */
+    readonly masking = signal<MaskingNote | null>(null);
+    private noted = <T extends { masking?: MaskingNote }>(o: Observable<T>): Observable<T> =>
+        o.pipe(tap((r) => r.masking && this.masking.set(r.masking)));
+
     project(req: ProjectionRequest): Observable<ProjectionResult> {
-        return this.http.post<ProjectionResult>(apiUrl('/inv/projection'), req);
+        return this.noted(this.http.post<ProjectionResult>(apiUrl('/inv/projection'), req));
     }
 
     /** Phase E incremental expand: the one-hop neighborhood of `req.value` within the mapping. */
     neighbors(req: NeighborsRequest): Observable<ProjectionResult> {
-        return this.http.post<ProjectionResult>(apiUrl('/inv/projection/neighbors'), req);
+        return this.noted(this.http.post<ProjectionResult>(apiUrl('/inv/projection/neighbors'), req));
     }
 
     /** LA-08: node + edge mappings over several Datasets in one call. One unviewable Dataset ⇒ the whole call 404s. */

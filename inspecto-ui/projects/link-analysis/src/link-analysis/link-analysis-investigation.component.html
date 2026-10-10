@@ -237,6 +237,9 @@
             @if (store.selected(); as n) {
                 <div class="text-xs">
                     Selected: <strong>{{ n.data.label }}</strong>
+                    @if (n.data.label.startsWith('masked:')) {
+                        <span class="text-secondary">(masked)</span>
+                    }
                     @if (!selectedInSet().length) {
                         <span class="text-secondary">(not in the Working Set)</span>
                     }

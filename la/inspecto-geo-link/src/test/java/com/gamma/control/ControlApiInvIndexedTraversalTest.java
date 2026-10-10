@@ -295,7 +295,7 @@ class ControlApiInvIndexedTraversalTest {
             JsonNode off = traverse(c, body);
             assertEquals("dataset", off.at("/source/kind").asText());
             assertEquals("index_disabled", off.at("/source/reason").asText());
-            assertEquals(List.of("paths", "truncated", "edgeYieldCapped", "fences", "source"), fieldNames(off), "today's body plus source, nothing else");
+            assertEquals(List.of("paths", "truncated", "edgeYieldCapped", "masking", "fences", "source"), fieldNames(off), "today's body plus masking (DR-D2) and source, nothing else");
             settings(c, ENABLED);
             JsonNode on = traverse(c, body);
             assertEquals("index", on.at("/source/kind").asText());

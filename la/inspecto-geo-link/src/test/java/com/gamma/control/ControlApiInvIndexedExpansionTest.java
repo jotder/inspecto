@@ -266,7 +266,7 @@ class ControlApiInvIndexedExpansionTest {
             String body = nbody("n_ds", "A", "\"linkKindCol\":\"kind\"");
             JsonNode off = neighbors(c, body);
             assertEquals("index_disabled", off.at("/source/reason").asText(), "an index exists but index.enabled is off (the default)");
-            assertEquals(List.of("rows", "truncated", "columnTypes", "source"), fieldNames(off), "today's body plus source, nothing else");
+            assertEquals(List.of("masking", "rows", "truncated", "columnTypes", "source"), fieldNames(off), "today's body plus masking (DR-D2) and source, nothing else");
             settings(c, ENABLED);
             assertEquals("index", neighbors(c, body).at("/source/kind").asText(), "the twin: enabled");
 

@@ -28,6 +28,7 @@ import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from '
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import type { LaAiDraft, LaDataset } from '@inspecto/link-analysis/la-host';
 import { LA_AI_ASSIST, LaHostSlotComponent } from '@inspecto/link-analysis/la-host';
+import { InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisView } from './link-analysis.service';
 import { ColumnLike, LinkShape, rankDatasets, suggestLinkColumns } from './la-starter';
 
@@ -70,6 +71,8 @@ export interface QuerySummaryItem {
 export class LinkAnalysisQueryPanelComponent implements OnInit {
     private fb = inject(FormBuilder);
     private datasetRows = inject(DatasetRowsService);
+    /** DR-D2: the masking the last exploration read was served under, for the badge. */
+    readonly masking = inject(InvService).masking;
     /** The host's AI assist component, rendered through `<inspecto-la-host-slot>`. */
     readonly aiAssist = inject(LA_AI_ASSIST).assist;
     readonly aiAssistOutputs = { applyDraft: (d: LaAiDraft) => this.applyProjectionDraft(d) };

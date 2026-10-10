@@ -546,3 +546,24 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
         expect(store.queuedSeeds()).toEqual([]);
     });
 });
+
+describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (DR-D3)', { timeout: 20_000 }, () => {
+    it('a successful Seed of a picked query-graph node draws the Working Set again; a failed one does not', async () => {
+        const { fixture, store, inv, button } = create();
+        await openInv(store);
+        store.showWorkingSet.set(false);
+        store.selected.set({ id: 'n1', data: { label: 'acct-a', kind: 'entity' } } as never);
+        fixture.detectChanges();
+        inv.appendInvestigationOp.mockReturnValueOnce(throwError(() => new Error('refused')));
+        button('Seed').click();
+        await fixture.whenStable();
+        expect(store.showWorkingSet()).toBe(false);
+        button('Seed').click();
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).toHaveBeenLastCalledWith(
+            'inv-1',
+            expect.objectContaining({ op: 'seed', ids: ['acct-a'] }),
+        );
+        expect(store.showWorkingSet()).toBe(true);
+    });
+});
