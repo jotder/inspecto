@@ -144,7 +144,24 @@ public final class ComponentStore {
 
     /** @param registryRoot the parent of {@code grammars/}, {@code schemas/}, {@code transforms/}, {@code sinks/}. */
     public ComponentStore(Path registryRoot) {
+        this(registryRoot, null);
+    }
+
+    private ComponentStore(Path registryRoot, ComponentRegistry frozen) {
         this.registryRoot = Objects.requireNonNull(registryRoot, "registryRoot").normalize();
+        this.frozen = frozen;
+    }
+
+    /** A {@link #get} answered from ONE scan taken now, else {@code null} = every get re-scans. */
+    private final ComponentRegistry frozen;
+
+    /**
+     * This store with its reads served from ONE registry scan taken now - for a request that reads several
+     * components (RECON-PERF-RESIDUALS-1 (11): each {@link #get} re-parses the whole registry, ~10 ms on a demo
+     * Space). Writes still go to disk; the snapshot does not see them.
+     */
+    public ComponentStore snapshot() {
+        return new ComponentStore(registryRoot, ComponentRegistry.scan(registryRoot));
     }
 
     public Path root() {
@@ -160,7 +177,7 @@ public final class ComponentStore {
     /** One component by {@code type}/{@code id} (its in-file identity), if present. */
     public Optional<ComponentRegistry.Component> get(String type, String id) {
         validateType(type);
-        return ComponentRegistry.scan(registryRoot).resolve(type + "/" + validId(id));
+        return (frozen != null ? frozen : ComponentRegistry.scan(registryRoot)).resolve(type + "/" + validId(id));
     }
 
     public boolean exists(String type, String id) {

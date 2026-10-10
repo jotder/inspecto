@@ -69,6 +69,15 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   bigger days only. Harness (`ReconPerfTest#cachedPageRequestPath`, 30 d × 4,000 × 3): cached page ~98 ms → 0.07–0.2
   ms. Pinned by `ControlApiReconDayTest#pageOnePageTwoPageOneAgainDoNoDuckDbWorkAfterTheFirst` (sandbox-open counter +
   per-kind hit counts).
+* **One registry scan per request** (`RECON-PERF-RESIDUALS-1` (11), measured idle 2026-10-10): the service-level
+  harness hid it — over real HTTP (`ControlApiReconDayTest#cachedPageRouteTiming`, `RECON_PERF=1`, 4,000 keys × 3
+  sides) a CACHED page still cost 38–63 ms server-side (`metadata.durationMs`), 50–83 ms wall. Split: spec build +
+  fingerprint ~0.1 ms (memoized), DuckDB 0, but `ComponentStore.get` re-parses the WHOLE registry per call and a page
+  made four (the recon + three Datasets, ~10 ms each). `ReconRoutes.scoped` now reads through
+  `ComponentStore.snapshot()` (one scan, then lookups): cached page 12–30 ms server, 28–61 ms wall; the uncached first
+  page is unchanged (340–750 ms, DuckDB). Pinned by `ComponentRegistry.scanCount()` in the pageOne/pageTwo test (≤ 4
+  for two cached pages; the per-get mutant reads 8). The remaining ~10 ms is that one scan + the envelope; a bigger
+  Space registry scales it — cache the scan by directory mtime only if a live Space shows it.
 * **File pruning** (`RECON-PERF-RESIDUALS-1` (1), 2026-10-09; `ReconDay.dayFiles`): a day reads ONLY the store's files
   whose Parquet footer statistics can hold it — each file's min/max of the temporal column (`parquet_metadata`, footers
   only), cached per input fingerprint; the side then reads `DatasetRelation.relationSqlOverFiles(kept)` and the day

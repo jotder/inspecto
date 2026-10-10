@@ -666,7 +666,9 @@ public final class ReconRoutes implements RouteModule {
      */
     private ReconDay.Scoped scoped(ApiContext api, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        // RECON-PERF-RESIDUALS-1 (11): ONE registry scan per request - the recon + each side's Dataset were a
+        // whole-registry re-parse apiece (~40 ms of a cached page on the demo Space).
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry")).snapshot();
 
         Map<String, Object> config;
         if (body.get("config") instanceof Map<?, ?> inline) {

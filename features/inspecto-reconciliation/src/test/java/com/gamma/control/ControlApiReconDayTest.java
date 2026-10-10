@@ -301,6 +301,7 @@ class ControlApiReconDayTest {
             long opens = com.gamma.recon.ReconDayTestAccess.sandboxOpens();
             long scopeHits = com.gamma.recon.ReconDayTestAccess.cacheHits("scope");
             long grainHits = com.gamma.recon.ReconDayTestAccess.cacheHits("grain");
+            long scans = com.gamma.pipeline.ComponentRegistry.scanCount();
             long t1 = System.nanoTime();
             assertTrue(run(c, p2).get("statistics").get("cached").asBoolean());
             long secondMs = (System.nanoTime() - t1) / 1_000_000;
@@ -312,6 +313,11 @@ class ControlApiReconDayTest {
             assertEquals(opens, com.gamma.recon.ReconDayTestAccess.sandboxOpens(), "a cached page opens no sandbox");
             assertEquals(scopeHits + 2, com.gamma.recon.ReconDayTestAccess.cacheHits("scope"), "the day's scope is read back");
             assertEquals(grainHits + 2, com.gamma.recon.ReconDayTestAccess.cacheHits("grain"), "the day's result is read back");
+            // RECON-PERF-RESIDUALS-1 (11): ONE registry scan per cached page, not one per component read (was 4 per
+            // page). The counter is JVM-wide and the Space's own listeners scan too (one per request here), so the
+            // bound is 2 per page; one scan per component read makes it 8 (mutation-checked).
+            long pageScans = com.gamma.pipeline.ComponentRegistry.scanCount() - scans;
+            assertTrue(pageScans <= 4, "two cached pages scanned the registry " + pageScans + " times");
         }
     }
 
@@ -486,5 +492,49 @@ class ControlApiReconDayTest {
         List<String> out = new ArrayList<>();
         for (JsonNode n : arr) out.add(n.asText());
         return out;
+    }
+
+    /**
+     * RECON-PERF-RESIDUALS-1 (11), measurement only (RECON_PERF=1): the full {@code /recon/run} route over HTTP on
+     * ~4,000 keys x 3 sides (the ra_c01 live shape) - page 1, page 2, page 1 again - wall clock and the server's
+     * {@code metadata.durationMs}.
+     */
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "RECON_PERF", matches = "1")
+    void cachedPageRouteTiming(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            ComponentStore store = new ComponentStore(root.resolve("s1/config/registry"));
+            for (String[] s : new String[][]{{"bhlr", "1"}, {"bcrm", "2"}, {"bcbs", "3"}}) {
+                Path partition = c.data.resolve(s[0]).resolve("dt=2026");
+                Files.createDirectories(partition);
+                String parquet = partition.resolve("data.parquet").toString().replace(File.separatorChar, '/');
+                File db = DuckDbUtil.tempDbFile("recon_perf_seed_");
+                try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
+                    st.execute("COPY (SELECT 'm' || i AS msisdn, CASE WHEN i % (37 * " + s[1] + ") = 0 THEN 0 ELSE 1 END AS active,"
+                            + " DATE '" + D2 + "' AS event_date FROM range(0, 4000 + " + s[1] + " * 20) t(i)"
+                            + " WHERE i % (50 + " + s[1] + ") <> 0) TO '" + parquet + "' (FORMAT PARQUET)");
+                } finally {
+                    DuckDbUtil.deleteTempDb(db);
+                }
+                store.write("dataset", s[0] + "_ds", Map.of("physicalRef", s[0], "dateField", "event_date"));
+            }
+            store.write("reconciliation", "big", Map.of("datasets", List.of("bhlr_ds", "bcrm_ds", "bcbs_ds"),
+                    "keyColumns", List.of("msisdn"), "compareColumns", List.of(Map.of("column", "active"))));
+            for (int round = 0; round < 3; round++) {
+                com.gamma.recon.ReconDayTestAccess.clearCache();
+                StringBuilder out = new StringBuilder("RECON-PERF route round " + round + ":");
+                for (int offset : new int[]{0, 50, 0, 50, 0}) {
+                    long t0 = System.nanoTime();
+                    HttpResponse<String> r = post(c.port, "/spaces/s1/recon/run", "{\"id\":\"big\",\"limit\":50,\"offset\":" + offset + "}");
+                    long wallUs = (System.nanoTime() - t0) / 1_000;
+                    assertEquals(200, r.statusCode(), r.body());
+                    JsonNode full = new com.fasterxml.jackson.databind.ObjectMapper().readTree(r.body());
+                    out.append(" off ").append(offset).append(" wall=").append(wallUs).append("us server=")
+                            .append(full.path("metadata").path("durationMs").asText()).append("ms cached=")
+                            .append(V1Body.of(r.body()).get("statistics").get("cached").asBoolean()).append(';');
+                }
+                System.out.println(out);
+            }
+        }
     }
 }

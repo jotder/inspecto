@@ -118,6 +118,11 @@ public final class ComponentRegistry {
         return new ComponentRegistry(Map.of());
     }
 
+    private static final java.util.concurrent.atomic.AtomicLong SCANS = new java.util.concurrent.atomic.AtomicLong();
+
+    /** Registry scans taken in this JVM so far - read by tests that pin how many a request costs. */
+    public static long scanCount() { return SCANS.get(); }
+
     /**
      * Scan {@code registryRoot} — the parent of {@code connections/}, {@code grammars/}, {@code schemas/},
      * {@code transforms/}, {@code sinks/} — into an indexed registry. A missing root or sub-directory is
@@ -125,6 +130,7 @@ public final class ComponentRegistry {
      * {@code type/name} warns and the later file wins (matching {@code ConfigRegistry}).
      */
     public static ComponentRegistry scan(Path registryRoot) {
+        SCANS.incrementAndGet();
         Map<String, Component> idx = new LinkedHashMap<>();
         if (registryRoot != null && Files.isDirectory(registryRoot)) {
             for (Map.Entry<String, String> e : TYPE_BY_DIR.entrySet()) {
