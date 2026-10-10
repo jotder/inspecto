@@ -151,3 +151,10 @@ feed into `data/inbox/<feed>` to ingest it.
 - **Check:** the swapped lines against the owners' requests and the customer-care tickets; whether the staff user's own lines or relatives' lines are among them; the payments out of the swapped lines (`fraud_sim_swap`).
 - **Act:** suspend the staff user's swap right pending review; refer to HR and internal audit.
 - **Silent by design:** a staff user with a few swaps, and the exempt desks. `exempt_staff` (default `HELPDESK`) silences whatever it names: fill it only from the operator's verified register of back-office desks.
+
+## Manual adjustment fraud - `fraud_adjustment`
+
+- **Detects:** manual ADJUSTMENT credits summed per staff agent in the window (`agent_id` of an ADJUSTMENT payment is the agent that posted it), above `threshold` (default 500), outside the registered billing-correction desks in `exempt_agents`.
+- **Check:** each credited line against a complaint or billing-dispute ticket; whether the credited lines belong to the agent, relatives or a reseller; whether the credit was then spent or transferred out.
+- **Act:** suspend the agent's adjustment right pending review; reverse unsupported credits; refer to HR and internal audit.
+- **Silent by design:** an agent with a few small goodwill credits, and the exempt desks. `exempt_agents` (default `BILLING-DESK`) silences whatever it names: fill it only from the operator's verified register of billing-correction desks.

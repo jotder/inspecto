@@ -1,0 +1,9 @@
+name: fraud_adjustment
+dataset: fraud_adjustment
+measure: max(adjusted_amount)
+by[1]: agent_id
+comparator: gt
+threshold: 500
+stormCap: 500
+severity: CRITICAL
+description: "Manual adjustment fraud"

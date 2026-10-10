@@ -54,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * {@code ASSURE-PACK-TELCO-FRAUD-1} golden test. Boots the shipped {@code spaces/_templates/telco-fraud} Space
  * Template through {@code POST /spaces} (every seed gate), ingests the synthetic corpus through the template's
- * own three Pipelines on the production Consignment path ({@link CollectorProcessor#run}), runs all thirteen
+ * own three Pipelines on the production Consignment path ({@link CollectorProcessor#run}), runs all fourteen
  * {@code sql.template} detection Jobs as authored, then evaluates the per-entity Alert Rules with the production
  * grouped Measure probe and {@link AlertService}. Each Alert Rule must raise EXACTLY its planted offenders
  * (including one just above its threshold) and no planted look-alike (including one exactly at it).
@@ -67,8 +67,8 @@ class TelcoFraudTemplateGoldenTest {
             Map.entry("fraud_premium_rate", 5), Map.entry("fraud_roaming", 4), Map.entry("fraud_sim_swap", 4),
             Map.entry("fraud_identity", 3), Map.entry("fraud_dealer", 3), Map.entry("fraud_voucher", 4),
             Map.entry("fraud_reversal", 4), Map.entry("fraud_recharge", 5), Map.entry("fraud_data_bypass", 5),
-            Map.entry("fraud_internal", 4)));
-    private static final int TOTAL = 54;
+            Map.entry("fraud_internal", 4), Map.entry("fraud_adjustment", 4)));
+    private static final int TOTAL = 58;
 
     private static final Map<String, String> FEED_COLUMNS = Map.of(
             "cdr", "{'record_id':'VARCHAR','start_ts':'TIMESTAMP','direction':'VARCHAR','service':'VARCHAR',"
@@ -77,7 +77,7 @@ class TelcoFraudTemplateGoldenTest {
             "subscriber_events", "{'event_id':'VARCHAR','event_ts':'TIMESTAMP','event_type':'VARCHAR',"
                     + "'msisdn':'VARCHAR','dealer_id':'VARCHAR','id_doc':'VARCHAR'}",
             "payments", "{'txn_id':'VARCHAR','txn_ts':'TIMESTAMP','txn_type':'VARCHAR','msisdn':'VARCHAR',"
-                    + "'amount':'DOUBLE','voucher_serial':'VARCHAR','ref_txn_id':'VARCHAR'}");
+                    + "'amount':'DOUBLE','voucher_serial':'VARCHAR','ref_txn_id':'VARCHAR','agent_id':'VARCHAR'}");
 
     private static final String UNION = ") SELECT * FROM cur UNION ALL BY NAME ";
 
@@ -122,7 +122,7 @@ class TelcoFraudTemplateGoldenTest {
         Path space = createSpace(root);
         ingest(space);
         List<JobConfig> jobs = jobs(space.resolve("config"));
-        assertEquals(13, jobs.size());
+        assertEquals(14, jobs.size());
         for (JobConfig j : jobs) {
             assertEquals("0 2 * * *", j.cron(), j.name() + " cron");
             assertEquals("$yesterday", j.params().get("window_start"), j.name());
@@ -199,7 +199,7 @@ class TelcoFraudTemplateGoldenTest {
         ingest(space);
 
         List<JobConfig> jobs = jobs(config);
-        assertEquals(13, jobs.size(), "one detection Job per typology");
+        assertEquals(14, jobs.size(), "one detection Job per typology");
         List<AlertRule> rules = rules(config);
         assertEquals(EXPECTED.keySet(), new TreeSet<>(rules.stream().map(AlertRule::name).toList()));
         DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> config, () -> data);
@@ -297,7 +297,7 @@ class TelcoFraudTemplateGoldenTest {
                     assertTrue(bars.getOrDefault(offender, 0.0) > 0, id + ": planted offender " + offender + " has a bar: " + bars);
                 typologiesShown.add(dataset);
             }
-            assertEquals(17, tiles, "four KPI tiles and thirteen typology Widgets");
+            assertEquals(18, tiles, "four KPI tiles and fourteen typology Widgets");
             assertEquals(EXPECTED.keySet(), typologiesShown, "every typology has a Widget on the dashboard");
         } finally {
             api.close();
@@ -416,7 +416,7 @@ class TelcoFraudTemplateGoldenTest {
      */
     private static final String RECURRING = "'99970001011', '+28900000005', '0028900000005', '99970001114', "
             + "'99970001211', '99970001311', '99970001412', 'DOC-F0002', 'D90', '99970001811', '99970001911', "
-            + "'99970002611', 'zero.operator.apn', 'S111', 'HELPDESK'";
+            + "'99970002611', 'zero.operator.apn', 'S111', 'HELPDESK', 'A211', 'BILLING-DESK'";
 
     /** Days 2..n: a copy of the ingested day-1 feeds with every identifier (bar {@link #RECURRING}) suffixed
      *  {@code -d}, shifted d-1 days. */
@@ -424,7 +424,7 @@ class TelcoFraudTemplateGoldenTest {
         Map<String, String[]> ids = Map.of(
                 "cdr", new String[] {"start_ts", "record_id", "a_number", "b_number"},
                 "subscriber_events", new String[] {"event_ts", "event_id", "msisdn", "dealer_id", "id_doc"},
-                "payments", new String[] {"txn_ts", "txn_id", "msisdn", "voucher_serial", "ref_txn_id"});
+                "payments", new String[] {"txn_ts", "txn_id", "msisdn", "voucher_serial", "ref_txn_id", "agent_id"});
         try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
             for (Map.Entry<String, String[]> feed : ids.entrySet()) {
                 Path db = data.resolve(feed.getKey()).resolve("database");

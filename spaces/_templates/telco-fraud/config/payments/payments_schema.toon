@@ -1,18 +1,19 @@
 raw:
   name: PAYMENTS
   format: CSV
-  fields[7]{name,selector,type,description,unit,classification}:
+  fields[8]{name,selector,type,description,unit,classification}:
     txn_id,"0",VARCHAR,"Transaction identifier","","INTERNAL"
     txn_ts,"1",TIMESTAMP,"Transaction time","","INTERNAL"
-    txn_type,"2",VARCHAR,"VOUCHER (EVD / voucher redemption), PAYMENT or REVERSAL","","INTERNAL"
+    txn_type,"2",VARCHAR,"VOUCHER (EVD / voucher redemption), PAYMENT, REVERSAL or ADJUSTMENT (a manual credit posted by staff)","","INTERNAL"
     msisdn,"3",VARCHAR,"Subscriber number","","CONFIDENTIAL"
     amount,"4",DOUBLE,"Transaction amount","USD","INTERNAL"
     voucher_serial,"5",VARCHAR,"Voucher serial (VOUCHER only)","","INTERNAL"
     ref_txn_id,"6",VARCHAR,"The PAYMENT a REVERSAL reverses","","INTERNAL"
+    agent_id,"7",VARCHAR,"Staff agent that posted an ADJUSTMENT","","INTERNAL"
 mapping:
   canonicalName: payments
   rawName: PAYMENTS
-  fields[7]:
+  fields[8]:
     - name: txn_id
       from: txn_id
       fn: keep
@@ -33,4 +34,7 @@ mapping:
       fn: keep
     - name: ref_txn_id
       from: ref_txn_id
+      fn: keep
+    - name: agent_id
+      from: agent_id
       fn: keep

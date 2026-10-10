@@ -41,7 +41,7 @@ final class TelcoFraudCorpus {
     private final Random rnd = new Random(SEED);
     private final StringBuilder cdr = new StringBuilder("record_id,start_ts,direction,service,a_number,b_number,duration_s,charge,roaming,cell_id\n");
     private final StringBuilder events = new StringBuilder("event_id,event_ts,event_type,msisdn,dealer_id,id_doc\n");
-    private final StringBuilder payments = new StringBuilder("txn_id,txn_ts,txn_type,msisdn,amount,voucher_serial,ref_txn_id\n");
+    private final StringBuilder payments = new StringBuilder("txn_id,txn_ts,txn_type,msisdn,amount,voucher_serial,ref_txn_id,agent_id\n");
     private int cdrSeq, eventSeq, txnSeq;
 
     /** Alert Rule name → the keys it must raise (exactly these). */
@@ -72,8 +72,12 @@ final class TelcoFraudCorpus {
     }
 
     private String txn(LocalDateTime t, String type, String msisdn, double amount, String serial, String ref) {
+        return txn(t, type, msisdn, amount, serial, ref, "");
+    }
+
+    private String txn(LocalDateTime t, String type, String msisdn, double amount, String serial, String ref, String agent) {
         String id = f("T%07d", ++txnSeq);
-        payments.append(f("%s,%s,%s,%s,%.2f,%s,%s", id, ts(t), type, msisdn, amount, serial, ref)).append('\n');
+        payments.append(f("%s,%s,%s,%s,%.2f,%s,%s,%s", id, ts(t), type, msisdn, amount, serial, ref, agent)).append('\n');
         return id;
     }
 
@@ -266,6 +270,15 @@ final class TelcoFraudCorpus {
         swapLine = swaps("S112", 2, swapLine);
         swaps("HELPDESK", 40, swapLine);                        // the registered swap desk: many swaps by design
         plant("fraud_internal", keys("S101", "S102", "S103", "S104"), keys("S111", "S112", "HELPDESK"));
+
+        // ---- 14 Manual adjustment fraud (gt 500 of ADJUSTMENT credits per staff agent in a day; exempt_agents BILLING-DESK)
+        int adjLine = 2801;
+        for (String agent : new String[] {"A201", "A202", "A203"}) adjLine = adjustments(agent, 6, 150, adjLine);
+        adjLine = adjustments("A204", 1, 500.01, adjLine);              // JUST above: 500.01
+        adjLine = adjustments("A211", 4, 125, adjLine);                 // AT the threshold: 500
+        adjLine = adjustments("A212", 3, 40, adjLine);                  // a few small goodwill credits
+        adjustments("BILLING-DESK", 30, 200, adjLine);                  // the billing-correction desk: large credits by design
+        plant("fraud_adjustment", keys("A201", "A202", "A203", "A204"), keys("A211", "A212", "BILLING-DESK"));
         return this;
     }
 
@@ -278,6 +291,12 @@ final class TelcoFraudCorpus {
     /** {@code n} one-hour-ish DATA sessions of {@code secs} on line {@code i}, each rated {@code charge}. */
     private void data(int i, int n, int secs, double charge, String apn) {
         for (int c = 0; c < n; c++) call(at(21, c), "MO", "DATA", home(i), apn, secs, charge, false, "C800");
+    }
+
+    /** {@code n} ADJUSTMENT credits of {@code amount} by {@code agent} on fresh lines from {@code line}; returns the next free line. */
+    private int adjustments(String agent, int n, double amount, int line) {
+        for (int c = 0; c < n; c++, line++) txn(at(13, c), "ADJUSTMENT", home(line), amount, "", "", agent);
+        return line;
     }
 
     /** {@code n} SIM swaps by {@code staff} on fresh lines starting at {@code line}; returns the next free line. */

@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: fraud_adjustment
+controls:
+  x[1]{field}:
+    agent_id
+  y[1]{field,agg}:
+    adjusted_amount,max
+options:
+  title: Manual adjustment credits by staff agent
