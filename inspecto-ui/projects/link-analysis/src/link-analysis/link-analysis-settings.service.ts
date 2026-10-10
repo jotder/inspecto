@@ -127,7 +127,7 @@ const UNSET: LinkAnalysisLimits = {
  *
  * <p><b>Why this exists.</b> The shipped caps were measured on ONE host, ONE browser and ONE synthetic
  * graph shape (plan §1.7): the default layered layout draws 500 nodes in ~0.9 s but 750 in ~10.7 s, and
- * 25 of 27 algorithms are trivial at 2 000 nodes while suspicion score alone takes ~7 s — which is why it
+ * 25 of the 27 algorithms then counted (28 today) are trivial at 2 000 nodes while suspicion score alone takes ~7 s — which is why it
  * now carries its OWN lower cap (750, the last measured point under a second; the curve is quadratic).
  * An analyst's
  * laptop, a denser graph or a different edge-to-node ratio all move those numbers, so a single

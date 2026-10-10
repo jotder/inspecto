@@ -68,6 +68,7 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { ServerPathsState, ServerPatternState } from './entity-projection';
 import { indexSourceNote } from './index-source';
 import { IndexMappingTarget, LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
+import { LinkAnalysisServerAlgorithmsComponent } from './link-analysis-server-algorithms.component';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
 import { LinkAnalysisResultNextComponent } from './link-analysis-result-next.component';
 import { QueuedSeed, TOP_SEED_COUNT, topSeeds } from './la-starter';
@@ -117,7 +118,8 @@ type AnalysisTab =
     | 'similarity'
     | 'flow'
     | 'scoring'
-    | 'index-build';
+    | 'index-build'
+    | 'server-algorithms';
 
 /** The tool groups that can hand an over-cap run to the server (D-4 step 7). */
 type ServerTool =
@@ -179,6 +181,7 @@ type CentralityMetric =
         LinkAnalysisResultNextComponent,
         FormsModule,
         RiskScorePanelComponent,
+        LinkAnalysisServerAlgorithmsComponent,
         LinkAnalysisServerRunComponent,
         LinkAnalysisIndexBuildComponent,
     ],
@@ -333,6 +336,7 @@ export class LinkAnalysisToolboxComponent {
         { id: 'scoring', label: 'Suspicion score', icon: 'heroicons_outline:shield-exclamation' },
         { id: 'pattern', label: 'Pattern match', icon: 'heroicons_outline:magnifying-glass-circle' },
         { id: 'index-build', label: 'Edge index', icon: 'heroicons_outline:server-stack' },
+        { id: 'server-algorithms', label: 'All algorithms (server)', icon: 'heroicons_outline:server-stack' },
     ];
 
     /** The open tool group (accordion: one open at a time; `null` = all collapsed). */
@@ -652,6 +656,7 @@ export class LinkAnalysisToolboxComponent {
             case 'explain':
                 return this.explainText() ? this.label(this.explainFor()) : '';
             case 'index-build':
+            case 'server-algorithms':
                 return '';
             case 'centrality':
                 return this.ranking().length ? `top ${this.ranking().length}` : '';
