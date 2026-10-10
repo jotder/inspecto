@@ -153,6 +153,16 @@ Design rules visible in the dependency graph:
 * **Pending approvals (D-U7).** A sensitive `expand` is written as a pending request, never to the log, so
   four-eyes holds by construction; `replacePending(expected, new)` is the compare-and-set that closes the
   approve/deny race.
+* **Supernode suppression (2026-10-11).** An `expand` resolves `hubThreshold` (the op's own, else the Space's
+  `hub_threshold`, default 500) into its sealed rung, and seals `read.hubs [{id, degree}]`: row endpoints outside the
+  frontier whose distinct-contact degree (counted as `candidateDegreeMax` counts it: both directions, allowed kinds,
+  excluded pruned, in-window) exceeds it. Unlike `candidateDegreeMax` (which drops), a hub is admitted and flagged
+  `highConnectivity` (state hash gains the key only when flagged, so old logs hash unchanged; Working Set relation
+  column `highConnectivity`). Later frontiers leave flagged entities out (`rung.hubsHeld`) unless the op carries the
+  override `expandHubs: [ids]` or `includeHubs: true`, sealed in its params and named in the log line; a NAMED hub
+  without it is a 422. The degree check is one extra flat statement over the Dataset even when the index answered the
+  rows (rows and fingerprint untouched). Overriding is not a four-eyes trigger of its own: the budget / fan-out
+  thresholds already bound what it can admit.
 
 ### 3.2 InvestigationStore port and its two backends
 
@@ -222,7 +232,7 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
 * **Sidecar** (`EntityListSidecar`): a Parquet projection per list for SQL (`physicalRef` Dataset); a failed write
   never undoes the fact.
 * `LinkAnalysisSettings` is the one reader of `link-analysis.toon` (caps, masking, four-eyes thresholds, entity
-  types, distinct caps, `index` and `drafts` records, graph-run knobs); null = inherit default, never unbounded.
+  types, distinct caps, `hub_threshold`, `index` and `drafts` records, graph-run knobs); null = inherit default, never unbounded.
 
 ## 4. Link index (la-storage)
 

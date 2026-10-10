@@ -81,7 +81,7 @@ public final class WorkingSetRoutes implements RouteModule {
     private static final int CACHE_ENTRIES = 32;
 
     public static final Map<String, List<String>> COLUMNS = Map.of(
-            "entities", List.of("entityId", "type", "hop", "seedId", "opSeq", "hidden", "kept", "identity"),
+            "entities", List.of("entityId", "type", "hop", "seedId", "opSeq", "hidden", "kept", "identity", "highConnectivity"),
             "links", List.of("source", "target", "kind", "count", "opSeq"),
             "excluded", List.of("entityId", "opSeq", "reason"));
 
@@ -268,6 +268,7 @@ public final class WorkingSetRoutes implements RouteModule {
             r.put("hidden", s.hidden.contains(e.id()));
             r.put("kept", s.kept.contains(e.id()));
             r.put("identity", resolvedTo.getOrDefault(e.id(), e.id()));
+            r.put("highConnectivity", s.highConnectivity.contains(e.id()));   // supernode suppression: shown, not expanded further
             entities.add(r);
         }
         List<Map<String, Object>> links = new ArrayList<>();

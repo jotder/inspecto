@@ -170,7 +170,7 @@ final class SettingsRoutes implements RouteModule {
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
                 nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body),
-                setBytes(body), investigationBytes(body));
+                setBytes(body), investigationBytes(body), nodeCap(body, "hubThreshold"));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -195,6 +195,8 @@ final class SettingsRoutes implements RouteModule {
         m.put("maxSetBytesInForce", s.effectiveMaxSetBytes());
         m.put("maxInvestigationBytes", s.maxInvestigationBytes());
         m.put("maxInvestigationBytesInForce", s.effectiveMaxInvestigationBytes());
+        m.put("hubThreshold", s.hubThreshold());
+        m.put("hubThresholdInForce", s.effectiveHubThreshold());
         LinkAnalysisSettings.GraphRun g = s.graphRun();
         Map<String, Object> run = null;   // D-4: null = every knob inherits the service's shipped default
         if (g != null) {
