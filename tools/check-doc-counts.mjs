@@ -85,6 +85,26 @@ const MANIFEST = {
     // reconcilable into one number, and a marker called `transform-functions` would re-create exactly
     // the ambiguity this guard exists to end. Ambiguity in the NOUN is the root cause of the class:
     // "node types" meant three different sets before anyone noticed the counts disagreed.
+    // LA-DEMO-GUARDS-1 / DR-T2: the Link Analysis HTTP surface. The module.toon `provides.routes` lists are
+    // already pinned to what the RouteModules register (ModuleRoutesParity), so counting the lists is counting routes.
+    'la-api-routes': {
+        floor: 1,
+        what: 'Link Analysis routes declared by la-api module.toon (provides.routes)',
+        derive: () => moduleRoutes('la/inspecto-la-api'),
+        source: 'la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon',
+    },
+    'geo-link-routes': {
+        floor: 1,
+        what: 'Link Analysis routes declared by geo-link module.toon (provides.routes)',
+        derive: () => moduleRoutes('la/inspecto-geo-link'),
+        source: 'la/inspecto-geo-link/src/main/resources/META-INF/inspecto/module.toon',
+    },
+    'la-routes': {
+        floor: 1,
+        what: 'Link Analysis routes in total (la-api + geo-link)',
+        derive: () => moduleRoutes('la/inspecto-la-api') + moduleRoutes('la/inspecto-geo-link'),
+        source: 'la/inspecto-la-api + la/inspecto-geo-link module.toon',
+    },
     'sql-mapping-functions': {
         floor: 2,
         what: 'SQL functions the mapping grid offers (NOT the 30 ASN vendor functions)',
@@ -324,6 +344,12 @@ function read(rel) {
     const p = join(ROOT, rel);
     if (!existsSync(p)) throw new Error(`derive source is missing: ${rel}`);
     return readFileSync(p, 'utf8');
+}
+/** Entries of `provides.routes[N]: "GET /x","POST /y"` in a module's module.toon - counted, not read from N. */
+function moduleRoutes(dir) {
+    const m = read(`${dir}/src/main/resources/META-INF/inspecto/module.toon`).match(/^\s*routes\[\d+\]:\s*(.*)$/m);
+    if (!m) throw new Error(`${dir}: no provides.routes line`);
+    return (m[1].match(/"[^"]*"/g) || []).length;
 }
 function json(rel) { return JSON.parse(read(rel)); }
 

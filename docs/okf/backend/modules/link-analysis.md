@@ -281,7 +281,7 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
 
 ## 6. HTTP surface (la-api, geo-link)
 
-18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **75 routes** (69 in la-api + 6 in geo-link;
+18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **75**<!--count:la-routes--> routes (**69**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 75 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
