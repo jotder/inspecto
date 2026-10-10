@@ -26,6 +26,8 @@ final class HealthDetails {
 
     static Map<String, Object> of(ApiContext api) {
         Map<String, Object> subs = new LinkedHashMap<>();
+        var skipped = HostContext.of(api).spaces().skipped();
+        if (HostContext.of(api).spaces().size() == 0) return withSpaces(subs, skipped);
 
         Path writeRoot = api.writeRoot();
         if (writeRoot == null) {
@@ -92,11 +94,25 @@ final class HealthDetails {
         StoreHealth.liveOf(HostContext.of(api).service().spaceId()).forEach((family, r) ->
                 subs.put("live." + family, sub(r.status() == StoreHealth.Status.UP ? "UP" : "DOWN", r.detail())));
 
+        return withSpaces(subs, skipped);
+    }
+
+    /**
+     * The {@code spaces} section (HA-RUNLEASE-DB-CREDENTIALS-1): each configured Space that did NOT boot, with a
+     * coded reason and no secrets. Any skipped Space makes the overall status DOWN. With zero Spaces booted the
+     * per-Space subsystems do not exist, so this is all the route can report.
+     */
+    private static Map<String, Object> withSpaces(Map<String, Object> subs,
+                                                  java.util.List<com.gamma.service.SpaceManager.SkippedSpace> skipped) {
+        if (!skipped.isEmpty())
+            subs.put("spaces", sub("DOWN", skipped.size() + " configured Space(s) failed to boot"));
         boolean down = subs.values().stream()
                 .anyMatch(s -> "DOWN".equals(((Map<?, ?>) s).get("status")));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("status", down ? "DOWN" : "UP");
         out.put("subsystems", subs);
+        out.put("spaces", Map.of("skipped", skipped.stream()
+                .map(k -> Map.of("space", k.space(), "code", k.code(), "detail", k.detail())).toList()));
         return out;
     }
 

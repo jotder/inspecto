@@ -140,6 +140,19 @@ class ControlApiHealthDetailsTest {
         }
     }
 
+    /** HA-RUNLEASE-DB-CREDENTIALS-1: a password in a store target or failure message never reaches the response. */
+    @Test
+    void credentialsInAStoreTargetAreNotServed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root.toString(), List.of())) {
+            StoreHealth.degraded(c.svc().spaceId(), "runLease.run",
+                    "jdbc:postgresql://db:5432/x?user=lease&password=hunter2", "refused: //lease:hunter2@db");
+            String body = client.send(HttpRequest.newBuilder(URI.create(
+                    "http://localhost:" + c.port + "/api/v1/health/details")).GET().build(), BodyHandlers.ofString()).body();
+            assertTrue(body.contains("runLease.run"), body);
+            assertFalse(body.contains("hunter2"), body);
+        }
+    }
+
     private int status(int port, String path) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
                 BodyHandlers.ofString()).statusCode();

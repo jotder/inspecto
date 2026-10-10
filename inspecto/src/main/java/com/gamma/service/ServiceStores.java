@@ -328,15 +328,15 @@ final class ServiceStores {
                 ? OperationalDb.rawBackendUrl(OperationalDb.Family.RUN_LEASE, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.RUN_LEASE, root, root.runLeaseDbUrl());
         try {
-            DbRunLease lease = DbRunLease.open(url, System.getProperty("run.lease.db.user"),
-                    System.getProperty("run.lease.db.password"), root.id(), scope,
+            DbRunLease lease = DbRunLease.open(url, OperationalDb.userFor(OperationalDb.Family.RUN_LEASE),
+                    OperationalDb.passwordFor(OperationalDb.Family.RUN_LEASE), root.id(), scope,
                     System.getProperty("run.lease.owner"), DbRunLease.DEFAULT_TTL);
-            log.info("Run lease ({}): database ({})", scope, url);
+            log.info("Run lease ({}): database ({})", scope, StoreHealth.mask(url));
             StoreHealth.record(root.id(), subsystem, StoreHealth.Status.UP, url, "shared run lease");
             return lease;
         } catch (Exception e) {
             log.warn("Could not open the run lease ({}) at {} — falling back to the in-process guard: {}",
-                    scope, url, e.getMessage());
+                    scope, StoreHealth.mask(url), StoreHealth.mask(e.getMessage()));
             StoreHealth.degraded(root.id(), subsystem, url,
                     "run exclusion fell back to per-process — another pod can run the same pipeline "
                             + "concurrently: " + e.getMessage());

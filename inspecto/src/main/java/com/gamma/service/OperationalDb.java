@@ -101,7 +101,7 @@ public final class OperationalDb {
         // node the in-heap guard is both correct and free. Defaulting to a DB would create a file for
         // every Personal install to coordinate a fleet of one.
         RUN_LEASE("Run lease", "run.lease.backend", "heap", Mode.URL_OR_ENGINE,
-                "run.lease.db.url", null, null, SpaceRoot::runLeaseDbUrl),
+                "run.lease.db.url", "run.lease.db.user", "run.lease.db.password", SpaceRoot::runLeaseDbUrl),
         PROVENANCE("Provenance", "provenance.backend", "none", Mode.URL_OR_ENGINE,
                 "provenance.db.url", null, null, SpaceRoot::provenanceDbUrl),
         CONSIGNMENT_OUTPUTS("Consignment outputs", "consignment.outputs.backend", "duckdb", Mode.URL_OR_ENGINE,
@@ -515,10 +515,15 @@ public final class OperationalDb {
                  java.sql.Statement st = c.createStatement()) {
                 st.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
             } catch (java.sql.SQLException ex) {
-                throw new IllegalStateException("could not create PostgreSQL schema " + schema + " for Space '"
+                throw new SchemaCreateException("could not create PostgreSQL schema " + schema + " for Space '"
                         + root.id() + "' at " + url.split("\\?", 2)[0] + ": " + ex.getMessage(), ex);
             }
         }
+    }
+
+    /** {@link #ensureSpaceSchemas} could not create the Space's schema; lets a boot report a coded reason. */
+    public static final class SchemaCreateException extends IllegalStateException {
+        SchemaCreateException(String message, Throwable cause) { super(message, cause); }
     }
 
     /** As {@link #urlFor}, for the credential half — a per-family value first, then the shared one. */

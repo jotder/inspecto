@@ -64,6 +64,8 @@ public final class SpaceManager implements AutoCloseable {
     private static final long CLOSE_DEADLINE_MS = 10_000;
 
     private final ConcurrentHashMap<SpaceId, SpaceContext> spaces = new ConcurrentHashMap<>();
+    /** Spaces found on disk and owned by this pod whose boot FAILED, by directory name — see {@link #skipped()}. */
+    private final ConcurrentHashMap<String, SkippedSpace> skipped = new ConcurrentHashMap<>();
     /** Serialises the rare create/delete admin mutations; reads ({@link #space}/{@link #current}) stay lock-free. */
     private final Object lifecycleLock = new Object();
     /** The container root ({@code -Dspaces.root}) new spaces are created under; {@code null} in single-tenant mode. */
@@ -75,6 +77,19 @@ public final class SpaceManager implements AutoCloseable {
     private volatile NotificationPreferenceOverrides notificationOverrides = NotificationPreferenceOverrides.inMemory();
 
     private SpaceManager() {}
+
+    /**
+     * A Space that is configured here but did not boot. {@code code} is a stable machine value
+     * ({@code SPACE_SCHEMA_CREATE_FAILED} / {@code SPACE_BOOT_FAILED}); {@code detail} is a fixed sentence with
+     * <b>no</b> exception text, because this is served by {@code /health/details} and a driver message can echo
+     * a URL. The full cause is in the boot log.
+     */
+    public record SkippedSpace(String space, String code, String detail) {}
+
+    /** Every configured-but-unbooted Space, ordered by directory name; empty when none. */
+    public List<SkippedSpace> skipped() {
+        return skipped.values().stream().sorted(java.util.Comparator.comparing(SkippedSpace::space)).toList();
+    }
 
     /** The deployment's per-Subject notification preference overrides — backs {@code /notifications/preferences}. */
     public NotificationPreferenceOverrides notificationOverrides() {
@@ -246,6 +261,11 @@ public final class SpaceManager implements AutoCloseable {
         } catch (Exception e) {
             DiscoveredRoots.unregister(root.id());   // a space that never joined must not leave a root behind
             log.warn("Skipping space dir {} — failed to load: {}", dir, e.getMessage());
+            String name = dir.getFileName().toString();
+            skipped.put(name, e instanceof OperationalDb.SchemaCreateException
+                    ? new SkippedSpace(name, "SPACE_SCHEMA_CREATE_FAILED",
+                            "could not create the Space's PostgreSQL schema (credentials or reachability) - see the boot log")
+                    : new SkippedSpace(name, "SPACE_BOOT_FAILED", "the Space failed to load - see the boot log"));
         }
     }
 

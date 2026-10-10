@@ -574,7 +574,13 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // shows why must stay up) but is reported here - 200 + DEGRADED, the files named.
         get ("/health", (e, m) -> {
             List<String> bad = com.gamma.config.safety.SafetyPolicy.unreadable();
-            return bad.isEmpty() ? Map.of("status", "UP") : Map.of("status", "DEGRADED", "safetyPolicy", bad);
+            if (bad.isEmpty() && spaces.skipped().isEmpty()) return Map.of("status", "UP");
+            // Public route: a COUNT only - the Space ids and reasons are on /health/details (auth-gated).
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            out.put("status", "DEGRADED");
+            if (!bad.isEmpty()) out.put("safetyPolicy", bad);
+            if (!spaces.skipped().isEmpty()) out.put("spacesSkipped", spaces.skipped().size());
+            return out;
         });
         // MNT-15: per-subsystem health — deeper than the liveness probe, auth-gated (not a public path).
         get ("/health/details", (e, m) -> HealthDetails.of(this));
@@ -583,8 +589,14 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // lease-DB outage hits every node at once, and read-only serving (dashboards, Investigations) does not
         // need the lease — run-starting paths already fail closed without it. The outage is reported on
         // /health/details (live.runLease.<scope>), in the log, and as the inspecto_run_lease_db_reachable gauge.
-        get ("/ready",  (e, m) -> Map.of("status", "READY",
-                "pipelines", spaces.size() == 0 ? 0 : service().pipelines().size()));
+        // ⛔ But NOT ready when Spaces ARE configured here and NONE booted (HA-RUNLEASE-DB-CREDENTIALS-1): that node
+        // would answer 503 to every Space request while a load balancer sent it traffic. Zero *configured* stays READY.
+        get ("/ready",  (e, m) -> {
+            if (spaces.size() == 0 && !spaces.skipped().isEmpty())
+                throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "not ready: " + spaces.skipped().size()
+                        + " configured Space(s) failed to boot and none is serving - see /health/details (spaces)");
+            return Map.of("status", "READY", "pipelines", spaces.size() == 0 ? 0 : service().pipelines().size());
+        });
         // ⚠ GET /metrics moved to the optional inspecto-observability module (EDG-01 cell 5, EDITIONS CP-13).
         // Only the EXPOSITION moved — MetricRegistry is called by nine classes across three modules and stays
         // core. It remains in PUBLIC_PATHS and isInfraRoute below so the module's route is reachable

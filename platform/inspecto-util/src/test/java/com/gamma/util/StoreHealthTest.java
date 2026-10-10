@@ -168,4 +168,20 @@ class StoreHealthTest {
         assertEquals(Map.of(), StoreHealth.liveDown());
         assertEquals(Map.of(), StoreHealth.liveOf(null));
     }
+
+    /** HA-RUNLEASE-DB-CREDENTIALS-1: /health/details serves target+detail, so neither may carry a password. */
+    @Test
+    void credentialsInATargetOrDetailAreMaskedEverywhereItIsStored() {
+        String url = "jdbc:postgresql://db:5432/x?user=lease&password=hunter2&sslmode=require";
+        String userinfo = "jdbc:postgresql://lease:hunter2@db:5432/x";
+        StoreHealth.record("s", "runLease.run", StoreHealth.Status.UP, url, "opened " + userinfo);
+        StoreHealth.live("s", "runLease.run", false, userinfo, "refused: " + url);
+        for (StoreHealth.Resolved r : List.of(StoreHealth.of("s").get("runLease.run"), StoreHealth.liveOf("s").get("runLease.run")))
+            assertFalse((r.target() + r.detail()).contains("hunter2"), r.toString());
+        assertEquals("jdbc:postgresql://db:5432/x?user=lease&password=***&sslmode=require",
+                StoreHealth.of("s").get("runLease.run").target(), "only the secret is masked; the rest stays diagnosable");
+        assertEquals("jdbc:postgresql://lease:***@db:5432/x", StoreHealth.liveOf("s").get("runLease.run").target());
+        assertNull(StoreHealth.mask(null));
+        assertEquals("jdbc:duckdb:/a/b.db", StoreHealth.mask("jdbc:duckdb:/a/b.db"));
+    }
 }

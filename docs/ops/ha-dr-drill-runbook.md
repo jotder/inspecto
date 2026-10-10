@@ -214,9 +214,12 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    (the `inspecto.env` example above), the Space was skipped at boot — `could not create PostgreSQL schema
    space_drill … The server requested SCRAM-based authentication, but no password was provided` — because
    `OperationalDb.ensureSpaceSchemas` reads the shared `-Dinspecto.db.user/password`, not the run-lease ones. The
-   node still came up healthy with **0 Spaces** (`/health` 200). Workaround used: credentials in the URL (they
-   then appear in the `GET /health/details` `store.runLease.*` detail). Needs a decision: honour the per-family
-   credentials here, or fix the runbook example and make a node with no bootable Space not report ready.
+   node still came up healthy with **0 Spaces** (`/health` 200). **Fixed 2026-10-10 (`HA-RUNLEASE-DB-CREDENTIALS-1`):**
+   the run lease's `-Drun.lease.db.user/password` (falling back to the shared `-Dinspecto.db.user/password`) now
+   authenticate both the lease connection and the per-Space schema creation, so the `inspecto.env` example above
+   works as written; a node where Spaces are configured but none booted answers `/ready` 503 and `/health`
+   `DEGRADED`, and `GET /health/details` lists each skipped Space with a coded reason under `spaces.skipped`.
+   Credentials (URL userinfo and a password, token or secret query parameter) are masked in `/health/details` — no need to put them in the URL.
 2. **A graceful stop does not release a held lease** (above) — restarting the holder costs the full TTL whenever
    a cycle is in flight.
 3. **At-least-once on `kill -9`** (above) — root-caused to the output-before-acknowledgement window with
