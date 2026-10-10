@@ -17,6 +17,7 @@ import {
 } from '@inspecto/core/graph';
 import { GraphSelection, mergeGraphs } from '@inspecto/link-analysis/graph/graph-analysis';
 import {
+    IndexSource,
     InvService,
     MultiProjectionMappingSummary,
     MultiProjectionResult,
@@ -29,6 +30,7 @@ import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { firstValueFrom } from 'rxjs';
 import { CHART_CATEGORICAL_NEUTRAL } from '@inspecto/core/theme/chart-tokens';
 import type { LaDatasets } from '@inspecto/link-analysis/la-host';
+import { combineSources } from './index-source';
 
 /**
  * The P3 **entity-projection** GraphSource (GLOSSARY §11): fold a Dataset's rows into a business
@@ -140,6 +142,8 @@ export interface ProjectionError {
 export interface ProjectedGraph extends G6GraphData {
     /** True when the node cap cut the projection short — surfaced as a banner. */
     truncated: boolean;
+    /** An incremental expand only (DR-U4): where the neighbours were read from - the link index or the Dataset. */
+    source?: IndexSource;
     /**
      * Links the Working Set canvas left off because it holds more than the render ceiling
      * ({@code WORKING_SET_LINK_RENDER_CEILING}); absent or 0 = every link is drawn. Never a silent cut.
@@ -338,7 +342,7 @@ export class EntityProjectionGraphSource implements GraphSource {
             }),
         );
         const typed = withColumnTypes(p, res.columnTypes);
-        return { ...projectTriples(res.rows, res.truncated, typed), idMappings: [typed] };
+        return { ...projectTriples(res.rows, res.truncated, typed), idMappings: [typed], source: res.source };
     }
 }
 
@@ -522,7 +526,7 @@ export class MultiProjectionGraphSource implements GraphSource {
                     ),
                 ),
             );
-            return projectMultiResult({
+            const merged = projectMultiResult({
                 nodes: [],
                 edges: answers.flatMap((a, i) => {
                     const m = calls[i].m;
@@ -542,6 +546,7 @@ export class MultiProjectionGraphSource implements GraphSource {
                 })),
                 truncated: answers.some((a) => a.truncated),
             });
+            return { ...merged, source: combineSources(answers.map((a) => a.source)) };
         } catch (err) {
             throw new Error(invErrorMessage(err, 'The multi-Dataset expand failed.'), { cause: err });
         }
@@ -559,6 +564,8 @@ export interface ServerPathsState {
     depthLimit: number;
     /** The longest path returned, in hops (0 when none). */
     deepest: number;
+    /** DR-U4: where the walk was answered from - the link index (a version) or the Dataset (a closed reason). */
+    source?: IndexSource;
 }
 
 /**
@@ -609,6 +616,7 @@ export function recursivePathsToGraph(
             edgeYieldCapped: res.edgeYieldCapped,
             depthLimit: res.fences.maxDepth,
             deepest: res.paths.reduce((m, p) => Math.max(m, p.hops), 0),
+            source: res.source,
         },
     };
 }

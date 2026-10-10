@@ -63,7 +63,8 @@ import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { ServerPathsState, ServerPatternState } from './entity-projection';
-import { LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
+import { indexSourceNote } from './index-source';
+import { IndexMappingTarget, LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
 import { LinkAnalysisResultNextComponent } from './link-analysis-result-next.component';
 import { QueuedSeed, TOP_SEED_COUNT, topSeeds } from './la-starter';
@@ -260,6 +261,8 @@ export class LinkAnalysisToolboxComponent {
     /** LA-11: the last server traversal's answer, mapped onto the graph by the host (null = none yet). */
     readonly serverPaths = input<ServerPathsState | null>(null);
     readonly serverPathsBusy = input(false);
+    /** DR-U4: where the server path search was answered from, in words. */
+    readonly serverPathsSourceNote = computed(() => indexSourceNote(this.serverPaths()?.source));
     /**
      * LA-14b: the projection behind the graph was cut by the server's link cap. A branching motif's legs are small
      * one-off amounts that sort LAST and are cut FIRST, so on a truncated graph the browser matcher may be looking
@@ -294,6 +297,8 @@ export class LinkAnalysisToolboxComponent {
     readonly canRunOnServer = input(true);
     /** Does the Subject hold `canBuildLinkIndex`? */
     readonly canBuildIndex = input(true);
+    /** DR-U5: the loaded query's edge mappings, for the Edge index tool's "Index / Flat" line and first-build prefill. */
+    readonly indexMappings = input<IndexMappingTarget[]>([]);
 
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();

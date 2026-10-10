@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api/api-base';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -24,6 +25,7 @@ import {
     LinkIndexBuildMode,
     LinkIndexBuildRequest,
     LinkIndexBuildView,
+    LinkIndexList,
     LinkIndexSummary,
 } from '@inspecto/link-analysis/api/graph-runs.service';
 
@@ -32,6 +34,56 @@ const MODES: { id: LinkIndexBuildMode; label: string; help: string }[] = [
     { id: 'append', label: 'Append', help: 'Index only the files added since the live version.' },
     { id: 'compact', label: 'Compact', help: 'Merge the appended deltas into one sorted main.' },
 ];
+
+/** One edge mapping of the loaded query: what a read of it would look up in a link index. */
+export interface IndexMappingTarget {
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    kindCol?: string;
+    label: string;
+}
+
+/**
+ * DR-U5: for each loaded mapping, whether a read is served from a listed link index ("Index") or from the Dataset
+ * ("Flat"), with the reason in plain words. Judged on Dataset and source/target columns - the server decides the rest
+ * (kind, time, filter) per read and says so on that read's `source`.
+ */
+export function indexVsFlat(
+    list: LinkIndexList | null,
+    mappings: IndexMappingTarget[],
+): { label: string; index: boolean; text: string }[] {
+    if (!list) return [];
+    const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+    return mappings.map((m) => {
+        const hit = list.indexes.find(
+            (i) =>
+                i.dataset === m.dataset &&
+                same(i.mapping.sourceCol, m.sourceCol) &&
+                same(i.mapping.targetCol, m.targetCol),
+        );
+        if (!hit) {
+            const other = list.indexes.some((i) => i.dataset === m.dataset);
+            const why = other
+                ? 'the link index of this Dataset was built over different columns'
+                : 'no link index has been built for it';
+            return { label: m.label, index: false, text: `${m.label}: reads the Dataset (flat) - ${why}.` };
+        }
+        if (!list.enabled)
+            return {
+                label: m.label,
+                index: false,
+                text: `${m.label}: link index v${hit.version} is built, but serving is off, so reads use the Dataset (flat).`,
+            };
+        if (hit.stale)
+            return {
+                label: m.label,
+                index: false,
+                text: `${m.label}: link index v${hit.version} is stale; a read may use the Dataset (flat) until it is rebuilt.`,
+            };
+        return { label: m.label, index: true, text: `${m.label}: reads are served from link index v${hit.version}.` };
+    });
+}
 
 /** The sentence a refused build start reads as; each status means something specific on `POST /inv/index/builds`. */
 export function indexBuildErrorMessage(err: unknown): string {
@@ -67,12 +119,32 @@ export function indexBuildErrorMessage(err: unknown): string {
         DecimalPipe,
         MatButtonModule,
         MatIconModule,
+        RouterLink,
         InspectoAlertComponent,
         ChipComponent,
         InspectoSchemaFormComponent,
     ],
     template: `
-        @if (index() || enabled()) {
+        @if (known()) {
+            <p class="text-sm" role="status" data-testid="index-serving">
+                @if (enabled()) {
+                    <strong>Link index serving is on</strong> for this Space: a read is answered from a fresh link index,
+                    and from the Dataset otherwise.
+                } @else {
+                    <strong>Link index serving is off</strong> for this Space: every read uses the Dataset (flat). An
+                    index built here is kept, and used once serving is on.
+                }
+                Only an administrator changes this, in
+                <a routerLink="/settings/link-analysis" data-testid="index-settings-link">Settings &gt; Link Analysis</a>.
+            </p>
+            @for (m of mappingStates(); track m.label) {
+                <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="index-vs-flat">
+                    <inspecto-chip variant="soft" [tone]="m.index ? 'primary' : 'neutral'">{{
+                        m.index ? 'Index' : 'Flat'
+                    }}</inspecto-chip>
+                    <span>{{ m.text }}</span>
+                </p>
+            }
             @if (index(); as ix) {
                 <div class="flex flex-wrap items-center gap-2">
                     @if (choices().length > 1) {
@@ -137,10 +209,18 @@ export function indexBuildErrorMessage(err: unknown): string {
             }
             @if (choosingMapping()) {
                 <p class="text-secondary mt-1 text-sm" data-testid="new-mapping-help">
-                    Choose the Dataset and the columns to index. A new mapping is always built in full; append and
-                    compact only apply to a listed index.
+                    @if (index()) {
+                        Choose the Dataset and the columns to index.
+                    } @else {
+                        This Space has no link index yet: choose the Dataset and the columns to index.
+                    }
+                    A new mapping is always built in full; append and compact only apply to a listed index.
                 </p>
-                <inspecto-schema-form [specs]="mappingSpecs" [optionLoaders]="mappingLoaders"></inspecto-schema-form>
+                <inspecto-schema-form
+                    [specs]="mappingSpecs"
+                    [optionLoaders]="mappingLoaders"
+                    [initial]="mappingInitial()"
+                ></inspecto-schema-form>
             } @else {
                 <fieldset class="mt-2 flex flex-wrap items-center gap-3" [disabled]="busy()">
                     <legend class="text-secondary text-sm">Build mode</legend>
@@ -168,7 +248,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                     (click)="start()"
                 >
                     <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                    Build index
+                    {{ index() && !newMapping() ? 'Build index' : 'Build first index (Full)' }}
                 </button>
                 @if (cancellable()) {
                     <button mat-stroked-button data-testid="cancel-build" [disabled]="cancelling()" (click)="cancel()">
@@ -219,7 +299,7 @@ export function indexBuildErrorMessage(err: unknown): string {
             }
         } @else {
             <p class="text-secondary text-sm" data-testid="no-index">
-                No index to build: the Space serves none yet, or index support is off.
+                The server did not say which link indexes this Space has, so none can be built from here.
             </p>
         }
     `,
@@ -230,6 +310,8 @@ export class LinkAnalysisIndexBuildComponent {
 
     /** May the Subject build an index (`canBuildLinkIndex`)? */
     readonly allowed = input(true);
+    /** The loaded query's edge mappings - what the "Index / Flat" line judges. Empty = no query loaded. */
+    readonly mappings = input<IndexMappingTarget[]>([]);
 
     readonly modes = MODES;
     readonly mode = signal<LinkIndexBuildMode | null>(null);
@@ -253,8 +335,19 @@ export class LinkAnalysisIndexBuildComponent {
     private readonly mappingForm = viewChild(InspectoSchemaFormComponent);
     readonly cancelling = signal(false);
 
-    /** Index support is on for the Space (`index.enabled`) — a build of a new mapping needs no listed index. */
+    /** `GET /inv/index` answered (false = the server cannot say, e.g. the Link Analysis module is absent). */
+    readonly known = computed(() => !!this.runs.indexes());
+    /** Index serving is on for the Space (`index.enabled`). A build needs no serving: it is allowed with serving off. */
     readonly enabled = computed(() => !!this.runs.indexes()?.enabled);
+    /** For each loaded mapping: is a read of it served from a listed index, or flat - and why not. */
+    readonly mappingStates = computed(() => indexVsFlat(this.runs.indexes(), this.mappings()));
+    /** The first mapping of the loaded query, prefilled into the first-build form. */
+    readonly mappingInitial = computed<Record<string, unknown> | undefined>(() => {
+        const m = this.mappings()[0];
+        return m
+            ? { dataset: m.dataset, sourceCol: m.sourceCol, targetCol: m.targetCol, kindCol: m.kindCol ?? '' }
+            : undefined;
+    });
     /** The mapping form shows when the analyst asked for it, and always when there is no listed index to rebuild. */
     readonly choosingMapping = computed(() => this.newMapping() || !this.index());
     readonly cancellable = computed(() => {
@@ -263,8 +356,7 @@ export class LinkAnalysisIndexBuildComponent {
     });
 
     readonly choices = computed<LinkIndexSummary[]>(() => {
-        const l = this.runs.indexes();
-        return l?.enabled ? l.indexes : [];
+        return this.runs.indexes()?.indexes ?? [];
     });
     readonly index = computed<LinkIndexSummary | null>(() => {
         const all = this.choices();

@@ -244,6 +244,18 @@ describe('EntityProjectionGraphSource.expand (Phase E, incremental expand)', () 
         expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:alice', 'entity:bob']);
     });
 
+    it('DR-U4: carries the server `source` of a neighbours read onto the expanded graph', async () => {
+        const source = { kind: 'index', version: 4, stale: false, fingerprint: 'known' } as const;
+        const inv = {
+            neighbors: () => of({ rows: [{ source: 'alice', target: 'bob', kind: null, count: 1 }], truncated: false, source }),
+        } as never;
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, inv);
+        const g = (await src.expand('entity:bob', 'bob', {
+            projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' },
+        })) as ProjectedGraph;
+        expect(g.source).toEqual(source);
+    });
+
     it('refuses a multi-mapping query (no way to know which mapping owns the node)', async () => {
         const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, {} as never);
         await expect(

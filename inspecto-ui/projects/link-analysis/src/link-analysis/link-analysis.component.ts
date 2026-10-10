@@ -44,7 +44,9 @@ import {
     apiErrorMessage,
 } from '@inspecto/core/api';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
-import { InvService, MultiProjectionMappingSummary } from '@inspecto/link-analysis/api/inv.service';
+import { indexSourceNote } from './index-source';
+import { IndexMappingTarget } from './link-analysis-index-build.component';
+import { IndexSource, InvService, MultiProjectionMappingSummary } from '@inspecto/link-analysis/api/inv.service';
 import { OfferShareDialog, OfferShareResult } from '@inspecto/core/components/offer-share.dialog';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
@@ -480,6 +482,9 @@ export class LinkAnalysisComponent implements OnInit {
     /** LA-11: the last server traversal, mapped onto the graph; reset with every fresh graph. */
     readonly serverPaths = signal<ServerPathsState | null>(null);
     readonly serverPathsBusy = signal(false);
+    /** DR-U4: where the last incremental expand read its neighbours from (the link index or the Dataset); null = none yet. */
+    readonly expandSource = signal<IndexSource | null>(null);
+    readonly expandSourceNote = computed(() => indexSourceNote(this.expandSource()));
     /** LA-14b: the last whole-Dataset branching pattern search. */
     readonly serverPattern = signal<ServerPatternState | null>(null);
     readonly serverPatternBusy = signal(false);
@@ -537,6 +542,16 @@ export class LinkAnalysisComponent implements OnInit {
         }
         return [];
     });
+    /** DR-U5: the same edge mappings, as the Edge index tool judges them (served from an index, or flat). */
+    readonly indexMappings = computed<IndexMappingTarget[]>(() =>
+        this.traversalTargets().map((t) => ({
+            dataset: t.dataset,
+            sourceCol: t.sourceCol,
+            targetCol: t.targetCol,
+            kindCol: t.linkKindCol,
+            label: t.label,
+        })),
+    );
     readonly traversalMappingOptions = computed<PickerOption[]>(() =>
         this.traversalTargets().map((t, i) => ({ value: String(i), label: t.label })),
     );
@@ -1087,6 +1102,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         this.serverPaths.set(null);
+        this.expandSource.set(null);
         this.serverPattern.set(null);
         this.temporalFindings.set(null);
         this.temporalError.set('');
@@ -1747,6 +1763,7 @@ export class LinkAnalysisComponent implements OnInit {
         if (!run || !source?.expand) return;
         try {
             const extra = await source.expand(id, nodeLabel, run.query, spellings);
+            this.expandSource.set((extra as ProjectedGraph).source ?? null);
             this.graph.update((g) => (g ? mergeGraphs([g, extra]) : extra));
             // LA-02: an expand that hit the server's row limit, or the browser's node cap, leaves the
             // working set INCOMPLETE. `mergeGraphs` returns a bare `G6GraphData` and structurally drops

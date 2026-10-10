@@ -349,6 +349,9 @@
                                     <span class="text-secondary ml-auto text-[11px]">{{ time(e.at) }}</span>
                                 </div>
                                 <div class="text-xs" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
+                                @if (readSuffix(e); as how) {
+                                    <div class="text-secondary text-[11px]" data-testid="step-read-source">{{ how }}</div>
+                                }
                                 @if (e.params?.reason) {
                                     <div class="text-secondary text-xs">Reason: {{ e.params!.reason }}</div>
                                 }

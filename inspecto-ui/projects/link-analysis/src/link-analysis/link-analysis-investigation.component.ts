@@ -30,7 +30,8 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
-import { expandFallbackNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
+import { stepReadSuffix } from './index-source';
+import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
@@ -193,7 +194,11 @@ export class LinkAnalysisInvestigationComponent {
     });
 
     /** Why the last expand was answered by the flat Dataset instead of the edge index; null when it was not (or no step yet). */
-    readonly fallbackNote = computed(() => expandFallbackNote(this.store.lastStep()?.read));
+    readonly fallbackNote = computed(() => expandSourceNote(this.store.lastStep()?.read));
+    /** DR-U4: a log step's sealed read, when the server's log view says the link index answered it. */
+    readSuffix(e: InvestigationLogEntry): string | null {
+        return stepReadSuffix(e.read);
+    }
 
     readonly counts = computed(() => {
         const ws = this.store.workingSet();

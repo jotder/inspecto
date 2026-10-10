@@ -29,11 +29,22 @@ export interface MaskingNote {
     basis: string;
 }
 
+/**
+ * Where an index-capable read was answered from (`source` on `POST /inv/projection/neighbors` and
+ * `POST /inv/traversal/recursive-paths`; `IndexedRead.Outcome.source()`). `kind: 'index'` carries the version it read;
+ * `kind: 'dataset'` carries one of the closed fallback `reason` codes (see `index-source.ts`).
+ */
+export type IndexSource =
+    | { kind: 'index'; version: number; stale: boolean; staleReason?: string; fingerprint?: string }
+    | { kind: 'dataset'; reason: string; details?: string };
+
 export interface ProjectionResult {
     /** DR-D2: ids of a masked read are `masked:<hex>` aliases (the Space's key); hand an alias back to expand or seed. */
     masking?: MaskingNote;
     /** Heaviest first — the server orders by count so a node cap keeps the densest subgraph. */
     rows: ProjectionTriple[];
+    /** `neighbors` only: where the read was answered from. Absent on a plain projection (never index-served). */
+    source?: IndexSource;
     /** True when the server row limit cut the projection short. */
     truncated: boolean;
     /** LA-17 D-M6: column → the Entity Type typing it; an untyped column is absent. */
@@ -137,6 +148,8 @@ export interface RecursivePathsResult {
     edgeYieldCapped: boolean;
     /** The fences actually applied, after server-side clamping. */
     fences: { maxDepth: number; maxEdgeYield: number; timeoutMs: number };
+    /** Where the walk was answered from: the link index (a version) or the Dataset (a closed reason). */
+    source?: IndexSource;
 }
 
 /**
@@ -419,6 +432,8 @@ export interface InvestigationStepResult {
         rowCount: number;
         fingerprint: string;
         readAt: string;
+        /** Only when an expand was answered by the link index: the version it read (never part of the fingerprint). */
+        index?: { version: number; stale: boolean; fingerprint?: string };
         /** Only when an expand was answered by the flat Dataset: the closed reason (never part of the fingerprint). */
         fallback?: { reason: string; details?: string };
     };
@@ -609,7 +624,16 @@ export interface InvestigationLogEntry {
         };
     undoes?: number;
     undoneBy: number | null;
-    read?: { dataset: string; readAt: string; rowCount: number; truncated: boolean; fingerprint: string };
+    read?: {
+        dataset: string;
+        readAt: string;
+        rowCount: number;
+        truncated: boolean;
+        fingerprint: string;
+        /** As on the step result: the sealed read's source, when the server's log view carries it. */
+        index?: { version: number; stale: boolean; fingerprint?: string };
+        fallback?: { reason: string; details?: string };
+    };
     derivedFrom?: { investigation: string; step: number };
     workingSetHash: string;
     /** The server's plain-language line for this step. */

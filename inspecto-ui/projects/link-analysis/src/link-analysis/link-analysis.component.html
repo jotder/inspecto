@@ -90,6 +90,11 @@
                 The projection hit the node cap — narrow the dataset or filter to see everything.
             </inspecto-alert>
         }
+        @if (expandSourceNote(); as note) {
+            <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-source">
+                Last neighbour expand: {{ note }}
+            </p>
+        }
         @if (mappingSummary().length) {
             <p class="text-secondary m-0 flex flex-wrap gap-x-4 text-xs" aria-label="Rows per mapping">
                 @for (m of mappingSummary(); track $index) {
@@ -985,6 +990,7 @@
                             [labelOf]="labelOf"
                             [timeAttr]="timeColumn()"
                             [traversalMappings]="traversalMappingOptions()"
+                            [indexMappings]="indexMappings()"
                             [serverPaths]="serverPaths()"
                             [serverPathsBusy]="serverPathsBusy()"
                             [graphTruncated]="truncated()"

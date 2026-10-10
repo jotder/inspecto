@@ -500,6 +500,30 @@ describe('LinkAnalysisToolboxComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('find paths (server): says where the answer came from (DR-U4)', () => {
+        const { fixture, c } = make();
+        fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'calls: A → B' }]);
+        const state = { paths: [], truncated: false, edgeYieldCapped: false, depthLimit: 6, deepest: 0 };
+        fixture.componentRef.setInput('serverPaths', { ...state, source: { kind: 'index', version: 3, stale: false } });
+        c.tab.set('server-paths');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="paths-source"]')?.textContent?.trim()).toBe(
+            'Answered from the link index v3.',
+        );
+        fixture.componentRef.setInput('serverPaths', {
+            ...state,
+            source: { kind: 'dataset', reason: 'filter_not_indexed' },
+        });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="paths-source"]')?.textContent?.trim()).toBe(
+            'Answered from the Dataset because the link index cannot apply this filter.',
+        );
+        fixture.componentRef.setInput('serverPaths', state);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="paths-source"]')).toBeNull();
+    });
+
     /** LA-A11Y-AUDIT-1 (WCAG 2.5.8): result buttons were 148x18 px; min-h-6 = 24 px. */
     it('the Communities, Components and Cliques result buttons carry the 24 px minimum height', () => {
         const { fixture, c } = make();

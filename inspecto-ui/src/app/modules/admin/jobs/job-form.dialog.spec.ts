@@ -819,3 +819,118 @@ describe('JobFormDialog — risk.score', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });
+
+/**
+ * DR-U10 (LA-DEMO-INDEX-1): the two Link Analysis Job Types are authorable with no hand-written TOON. The form is
+ * descriptor-driven, so what is pinned here is the contract the host registers (`JobService`): the 12 `la.index.build`
+ * parameters (required ones in the required tier), `la.detect` declaring none, and the trigger a daily build uses.
+ */
+describe('JobFormDialog - the Link Analysis Job Types', () => {
+    const decl = (name: string, type: string, over: Record<string, unknown> = {}) => ({
+        name,
+        type,
+        required: false,
+        deduce: '',
+        default: '',
+        description: '',
+        ...over,
+    });
+    const INDEX_BUILD: JobTypeDescriptor = {
+        id: 'la.index.build',
+        title: 'Link Analysis index build',
+        description: 'Builds or refreshes the Link Analysis Index of one Dataset mapping.',
+        parameters: [
+            decl('dataset', 'DATASET_REF', { required: true, label: 'Dataset' }),
+            decl('source_col', 'STRING', { required: true, label: 'Source column' }),
+            decl('target_col', 'STRING', { required: true, label: 'Target column' }),
+            decl('owner', 'STRING', { required: true, label: 'Owner (user id)' }),
+            decl('kind_col', 'STRING', { label: 'Kind column' }),
+            decl('time_col', 'STRING', { label: 'Time column' }),
+            decl('time_col_zone', 'STRING', { label: 'Time column zone' }),
+            decl('weight_col', 'STRING', { label: 'Weight column' }),
+            decl('attr_cols', 'STRING', { label: 'Attribute columns' }),
+            decl('allow_full', 'BOOLEAN', { label: 'Allow a full build', default: 'false' }),
+            decl('timeout_seconds', 'INTEGER', { label: 'Wait at most (s)', default: '3600' }),
+            decl('wait_seconds', 'INTEGER', { label: 'Wait for a running build (s)', min: 0 }),
+        ],
+        emits: ['la.index.build.completed'],
+        artifacts: [],
+        requires: ['link-index'],
+    } as unknown as JobTypeDescriptor;
+    const DETECT: JobTypeDescriptor = {
+        id: 'la.detect',
+        title: 'Link Analysis standing detection',
+        description: 'Evaluates the Alert Rules bound to Investigations on a schedule.',
+        parameters: [],
+        emits: ['la.detect.completed'],
+        artifacts: [],
+        requires: ['alerts'],
+    } as unknown as JobTypeDescriptor;
+
+    async function open(type: string) {
+        const out = create(
+            { job: { name: 'j', type, cron: '0 0 6 * * *', onPipeline: null, enabled: true, params: {} } },
+            undefined,
+            vi.fn(() => of(type === 'la.detect' ? DETECT : INDEX_BUILD)),
+            () => of([INDEX_BUILD, DETECT]),
+        );
+        await Promise.resolve();
+        out.fixture.detectChanges();
+        await Promise.resolve();
+        out.fixture.detectChanges();
+        return out;
+    }
+
+    it('lists both types in the Type picker, from the server catalog', async () => {
+        const { c } = await open('la.index.build');
+        const type = c.attributes().find((a) => a.key === 'type')!;
+        expect(type.options!.map((o) => o.value)).toEqual(['la.index.build', 'la.detect']);
+    });
+
+    it('renders la.index.build with its twelve fields, the four required ones first-class', async () => {
+        const { c } = await open('la.index.build');
+        const specs = c.paramSpecs();
+        expect(specs.map((s) => s.key)).toEqual([
+            'dataset',
+            'source_col',
+            'target_col',
+            'owner',
+            'kind_col',
+            'time_col',
+            'time_col_zone',
+            'weight_col',
+            'attr_cols',
+            'allow_full',
+            'timeout_seconds',
+            'wait_seconds',
+        ]);
+        expect(specs.filter((s) => s.tier === 'required').map((s) => s.key)).toEqual([
+            'dataset',
+            'source_col',
+            'target_col',
+            'owner',
+        ]);
+        expect(specs.find((s) => s.key === 'dataset')!.type).toBe('autocomplete');
+        expect(specs.find((s) => s.key === 'allow_full')!.type).toBe('boolean');
+        const wait = specs.find((s) => s.key === 'wait_seconds')!;
+        expect([wait.type, wait.min]).toEqual(['number', 0]);
+        expect(c.typeRequires()).toEqual(['link-index']);
+    });
+
+    it('renders la.detect as a schedule only: no parameters, and not flagged as a missing descriptor', async () => {
+        const { c } = await open('la.detect');
+        expect(c.paramSpecs()).toEqual([]);
+        expect(c.descriptorMissing()).toBe(false);
+        expect(c.selectedType()?.id).toBe('la.detect');
+    });
+
+    it('offers pipeline.commit and a guard on the Pipeline for the signal trigger', async () => {
+        const { c } = await open('la.index.build');
+        const on = c.attributes().find((a) => a.key === 'onSignal')!;
+        const when = c.attributes().find((a) => a.key === 'when')!;
+        expect(on.placeholder).toBe('e.g. pipeline.commit');
+        expect(on.help).toContain('pipeline.commit');
+        expect(when.placeholder).toContain('$signal.pipeline');
+        expect(when.help).toContain('$signal.pipeline');
+    });
+});

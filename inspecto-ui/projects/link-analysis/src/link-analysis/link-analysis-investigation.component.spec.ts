@@ -343,7 +343,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         await store.apply({ op: 'expand' } as never);
         fixture.detectChanges();
         const note = el.querySelector('[data-testid="expand-fallback"]');
-        expect(note?.textContent).toContain('not the edge index');
+        expect(note?.textContent).toContain('Answered from the Dataset because');
         expect(note?.textContent).toContain('the rung has a window');
         expect(note?.getAttribute('role')).toBe('status');
         await expectNoA11yViolations(el);

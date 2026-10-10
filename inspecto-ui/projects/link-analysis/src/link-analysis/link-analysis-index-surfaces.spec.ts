@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
 import { GammaConfigService } from '@gamma/services/config';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
@@ -21,6 +22,7 @@ import { EntityProjection } from '@inspecto/core/graph';
 import { buildServerIdMap } from './graph-run-apply';
 import { workingSetToGraph } from './investigation-state';
 import {
+    IndexMappingTarget,
     LinkAnalysisIndexBuildComponent,
     indexBuildCancelMessage,
     indexBuildErrorMessage,
@@ -122,6 +124,7 @@ function makeToolbox(runs = runsMock()) {
         imports: [LinkAnalysisToolboxComponent],
         providers: [
             provideNoopAnimations(),
+            provideRouter([]),
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             { provide: ComponentsService, useValue: { list: () => of([]) } },
             { provide: GraphRunsService, useValue: runs },
@@ -213,14 +216,22 @@ describe('Toolbox Explain tab - egoNetwork and seeds-only degreeCentrality on th
     });
 });
 
-function makeBuild(opts: { list?: LinkIndexList | null; allowed?: boolean; runs?: ReturnType<typeof runsMock> } = {}) {
+function makeBuild(
+    opts: {
+        list?: LinkIndexList | null;
+        allowed?: boolean;
+        runs?: ReturnType<typeof runsMock>;
+        mappings?: IndexMappingTarget[];
+    } = {},
+) {
     const runs = opts.runs ?? runsMock({ indexes: signal(opts.list === undefined ? LIST : opts.list) });
     TestBed.configureTestingModule({
         imports: [LinkAnalysisIndexBuildComponent],
-        providers: [provideNoopAnimations(), { provide: GraphRunsService, useValue: runs }],
+        providers: [provideNoopAnimations(), provideRouter([]), { provide: GraphRunsService, useValue: runs }],
     });
     const fixture = TestBed.createComponent(LinkAnalysisIndexBuildComponent);
     if (opts.allowed === false) fixture.componentRef.setInput('allowed', false);
+    if (opts.mappings) fixture.componentRef.setInput('mappings', opts.mappings);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     const q = (id: string) => el.querySelector<HTMLElement>(`[data-testid="${id}"]`);
@@ -238,9 +249,13 @@ describe('LinkAnalysisIndexBuildComponent - the build mode control', () => {
         expect(makeBuild({ list: null }).q('no-index')).not.toBeNull();
     });
 
-    it('says so when index.enabled is off', () => {
+    it('with serving off keeps the listed index and says serving is off (a build never needs serving on)', () => {
         const list = { enabled: false, indexes: [index()] } as unknown as LinkIndexList;
-        expect(makeBuild({ list }).q('no-index')).not.toBeNull();
+        const { q } = makeBuild({ list });
+        expect(q('no-index')).toBeNull();
+        expect(q('index-serving')!.textContent).toContain('Link index serving is off');
+        expect(q('build-index-version')!.textContent).toContain('version 3');
+        expect(q('start-build')).not.toBeNull();
     });
 
     it('shows the version, the server advice and its reasons, and preselects the advised mode', () => {
@@ -434,6 +449,76 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
         expect(q('new-mapping')).toBeNull(); // nothing to choose against: the form is the only way
         expect(el.querySelector('inspecto-schema-form')).not.toBeNull();
         expect(q('start-build')).not.toBeNull();
+    });
+
+    it('DR-U5: serving off and no index at all - states it, links to Settings, and builds the FIRST index in full', () => {
+        const list = { enabled: false, indexes: [] } as unknown as LinkIndexList;
+        const mappings: IndexMappingTarget[] = [
+            { dataset: 'calls', sourceCol: 'a', targetCol: 'b', kindCol: 'k', label: 'calls: a -> b' },
+        ];
+        const runs = runsMock({
+            indexes: signal(list),
+            startBuild: vi.fn(() => of(bv({ status: 'RUNNING' }))),
+            watchBuild: vi.fn(() => new Subject<LinkIndexBuildView>()),
+        });
+        const { q, el, fixture } = makeBuild({ runs, mappings });
+        expect(q('no-index')).toBeNull();
+        expect(q('index-serving')!.textContent).toContain('Link index serving is off');
+        expect(q('index-serving')!.textContent).toContain('administrator');
+        expect(q('index-settings-link')!.getAttribute('href')).toBe('/settings/link-analysis');
+        expect(q('index-vs-flat')!.textContent).toContain('Flat');
+        expect(q('index-vs-flat')!.textContent).toContain('no link index has been built for it');
+        expect(q('start-build')!.textContent).toContain('Build first index (Full)');
+        expect(el.querySelector('inspecto-schema-form')).not.toBeNull();
+        // the form is prefilled from the loaded query's mapping
+        const form = fixture.debugElement.query((d) => d.name === 'inspecto-schema-form').componentInstance as {
+            value(): Record<string, unknown>;
+        };
+        expect(form.value()).toMatchObject({ dataset: 'calls', sourceCol: 'a', targetCol: 'b' });
+        q('start-build')!.click();
+        expect(runs.startBuild).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'calls', sourceCol: 'a', targetCol: 'b', mode: 'full' }),
+        );
+    });
+
+    it('DR-U5: without the capability the first build is disabled with the reason', () => {
+        const list = { enabled: false, indexes: [] } as unknown as LinkIndexList;
+        const { q } = makeBuild({ list, allowed: false });
+        expect((q('start-build') as HTMLButtonElement).disabled).toBe(true);
+        expect(q('build-blocked')!.textContent).toContain('Build link index capability');
+    });
+
+    it('DR-U5: labels each loaded mapping Index or Flat, with the reason', () => {
+        const m = (dataset: string, s: string, t: string): IndexMappingTarget => ({
+            dataset,
+            sourceCol: s,
+            targetCol: t,
+            label: `${dataset}: ${s} -> ${t}`,
+        });
+        const mappings = [m('calls', 'A', 'B'), m('calls', 'x', 'y'), m('other', 'a', 'b')];
+        const texts = (list: LinkIndexList) =>
+            Array.from(makeBuild({ list, mappings }).el.querySelectorAll('[data-testid="index-vs-flat"]')).map(
+                (e) => e.textContent!.replace(/\s+/g, ' ').trim(),
+            );
+        const on = texts({ enabled: true, indexes: [index()] } as unknown as LinkIndexList);
+        expect(on[0]).toContain('Index');
+        expect(on[0]).toContain('reads are served from link index v3');
+        expect(on[1]).toContain('built over different columns');
+        expect(on[2]).toContain('no link index has been built for it');
+        TestBed.resetTestingModule();
+        const off = texts({ enabled: false, indexes: [index()] } as unknown as LinkIndexList);
+        expect(off[0]).toContain('built, but serving is off');
+        TestBed.resetTestingModule();
+        const stale = texts({ enabled: true, indexes: [index({ stale: true })] } as unknown as LinkIndexList);
+        expect(stale[0]).toContain('is stale');
+    });
+
+    it('shows the Index stale chip for a stale listed index', () => {
+        const { q, el } = makeBuild({
+            list: { enabled: true, indexes: [index({ stale: true, reason: 'files added' })] } as unknown as LinkIndexList,
+        });
+        expect(el.textContent).toContain('Index stale');
+        expect(q('index-serving')!.textContent).toContain('Link index serving is on');
     });
 
     it('is axe-clean with the mapping form open', async () => {
