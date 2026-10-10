@@ -7,6 +7,8 @@ import com.gamma.alert.ScoreOutputDirs;
 import com.gamma.anomaly.baseline.Baseline;
 import com.gamma.anomaly.baseline.BaselineStatistic;
 import com.gamma.anomaly.baseline.BaselineStatistics;
+import com.gamma.anomaly.baseline.PeerBaseline;
+import com.gamma.anomaly.baseline.RobustStats;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -111,24 +113,127 @@ public final class AnomalyScoreEvaluator {
                 throw new IllegalStateException(capMessage(model, f, maxEntities));
         }
         LocalDateTime scoredDay = period.atStartOfDay();
-        List<AnomalyScorer.Scored> scored = new ArrayList<>(series.size());
+        // Pass 1: each entity's zero-filled history and scored-day observation per feature.
+        Map<String, Map<String, Map<LocalDateTime, Double>>> histories = new TreeMap<>();
+        Map<String, Map<String, Double>> observedByFeature = new LinkedHashMap<>();   // feature → entity → observed
         for (Map.Entry<String, Map<String, Map<LocalDateTime, Double>>> e : series.entrySet()) {
             // The entity's history starts at its FIRST bucket in the window (any feature): an entity first seen two days
             // ago has two days of history, not 26 zeros before them. From there an empty count/sum day is 0 (D-AD8).
             LocalDateTime first = e.getValue().values().stream().flatMap(m -> m.keySet().stream())
                     .min(LocalDateTime::compareTo).orElse(scoredDay);
-            Map<String, AnomalyScorer.Input> inputs = new LinkedHashMap<>();
+            Map<String, Map<LocalDateTime, Double>> perFeature = new LinkedHashMap<>();
             for (AnomalyModel.Feature f : model.features()) {
                 Map<LocalDateTime, Double> history = new TreeMap<>(e.getValue().getOrDefault(f.id(), Map.of()));
                 if (f.zeroFilled())
                     for (LocalDateTime d = first; !d.isAfter(scoredDay); d = d.plusDays(1)) history.putIfAbsent(d, 0.0);
                 Double observed = history.remove(scoredDay);
-                Baseline b = statistic.compute(history, scoredDay);
-                inputs.put(f.id(), new AnomalyScorer.Input(observed, b));
+                perFeature.put(f.id(), history);
+                observedByFeature.computeIfAbsent(f.id(), k -> new LinkedHashMap<>()).put(e.getKey(), observed);
+            }
+            histories.put(e.getKey(), perFeature);
+        }
+        PeerSide peers = model.peers() == null ? null
+                : new PeerSide(model, cohorts(model, relationSql, policy), histories, observedByFeature, statistic, scoredDay);
+        // Pass 2: baselines and the score.
+        List<AnomalyScorer.Scored> scored = new ArrayList<>(series.size());
+        for (Map.Entry<String, Map<String, Map<LocalDateTime, Double>>> e : histories.entrySet()) {
+            Map<String, AnomalyScorer.Input> inputs = new LinkedHashMap<>();
+            for (AnomalyModel.Feature f : model.features()) {
+                Double observed = observedByFeature.get(f.id()).get(e.getKey());
+                Baseline self = statistic.compute(e.getValue().get(f.id()), scoredDay);
+                if (peers == null) {
+                    inputs.put(f.id(), new AnomalyScorer.Input(observed, self));
+                } else {
+                    PeerSide.Cohort c = peers.of(f, e.getKey());
+                    inputs.put(f.id(), new AnomalyScorer.Input(observed, self, c.baseline(), c.shift()));
+                }
             }
             scored.add(AnomalyScorer.score(model, e.getKey(), period.toString(), inputs));
         }
         return new Run(period, List.copyOf(scored));
+    }
+
+    /**
+     * The peer side of a run (design §4.3): per feature and cohort, the {@link PeerBaseline} of the scored-day
+     * observations, and the <b>cohort shift</b> {@code k = peer median today / the cohort's usual daily median} (the
+     * model's own {@link BaselineStatistic} over the cohort's daily medians). Each member's self baseline is scaled by
+     * {@code k}, so a day on which the whole cohort moves (a promotion) does not read as every member's own anomaly,
+     * while a member that moves alone still does. {@code k = 1} when the cohort is insufficient or its usual is not > 0.
+     */
+    private static final class PeerSide {
+        record Cohort(Baseline baseline, double shift) {}
+
+        private final PeerBaseline peer;
+        private final Map<String, String> cohortOf;
+        private final Map<String, Map<String, Map<LocalDateTime, Double>>> histories;
+        private final Map<String, Map<String, Double>> observedByFeature;
+        private final BaselineStatistic statistic;
+        private final LocalDateTime scoredDay;
+        private final Map<String, Cohort> cache = new LinkedHashMap<>();
+
+        PeerSide(AnomalyModel model, Map<String, String> cohortOf, Map<String, Map<String, Map<LocalDateTime, Double>>> histories,
+              Map<String, Map<String, Double>> observedByFeature, BaselineStatistic statistic, LocalDateTime scoredDay) {
+            this.peer = new PeerBaseline(model.peers().minGroupSize(), model.peers().populationFallback());
+            this.cohortOf = cohortOf;
+            this.histories = histories;
+            this.observedByFeature = observedByFeature;
+            this.statistic = statistic;
+            this.scoredDay = scoredDay;
+        }
+
+        Cohort of(AnomalyModel.Feature f, String entity) {
+            String cohort = cohortOf.get(entity);
+            return cache.computeIfAbsent(f.id() + "\u0000" + cohort, k -> compute(f, cohort));
+        }
+
+        private Cohort compute(AnomalyModel.Feature f, String cohort) {
+            Baseline b = peer.compute(observedByFeature.get(f.id()), cohortOf, cohort);
+            if (b.insufficient()) return new Cohort(b, 1.0);
+            boolean population = PeerBaseline.POPULATION.equals(b.basis());
+            Map<LocalDateTime, List<Double>> byDay = new TreeMap<>();
+            histories.forEach((entity, perFeature) -> {
+                if (!population && !cohort.equals(cohortOf.get(entity))) return;
+                perFeature.get(f.id()).forEach((d, v) -> {
+                    if (v != null && !v.isNaN()) byDay.computeIfAbsent(d, x -> new ArrayList<>()).add(v);
+                });
+            });
+            Map<LocalDateTime, Double> medians = new TreeMap<>();
+            byDay.forEach((d, vs) -> medians.put(d, RobustStats.median(vs)));
+            Baseline usual = statistic.compute(medians, scoredDay);
+            double k = usual.insufficient() || !(usual.median() > 0) ? 1.0 : b.median() / usual.median();
+            return new Cohort(b, k);
+        }
+    }
+
+    /**
+     * Entity → cohort key: ONE grouped statement over the peers Dataset, {@code max(concat_ws('|', by...))} per join
+     * key (a key with several cohort values gets the greatest, deterministically). A key with no cohort value is in
+     * the population only. Fails closed past {@link AnomalyModel#MAX_ENTITIES_CEILING} keys.
+     */
+    private static Map<String, String> cohorts(AnomalyModel model, Function<String, String> relationSql,
+                                               SqlSandboxPolicy policy) {
+        AnomalyModel.Peers p = model.peers();
+        StringBuilder by = new StringBuilder();
+        for (String c : p.by()) by.append(by.isEmpty() ? "" : ", ").append("CAST(").append(q(c)).append(" AS VARCHAR)");
+        String sql = "SELECT CAST(" + q(p.key()) + " AS VARCHAR) AS entity_key, max(concat_ws('|', " + by + ")) AS cohort "
+                + "FROM " + q(p.dataset()) + " WHERE " + q(p.key()) + " IS NOT NULL GROUP BY 1";
+        QueryExecutor.Result r;
+        try {
+            r = QueryExecutor.run(new QueryExecutor.Request(p.dataset(), relationSql.apply(p.dataset()), sql,
+                    AnomalyModel.MAX_ENTITIES_CEILING, 0, List.of(), List.of()), policy, java.time.ZoneId.of("UTC"));
+        } catch (Exception e) {
+            throw new IllegalStateException("anomaly-model '" + model.id() + "' peers: the cohort query over dataset '"
+                    + p.dataset() + "' failed (" + e.getClass().getSimpleName()
+                    + "; details withheld because they may quote source values) - check the column types");
+        }
+        if (r.truncated())
+            throw new IllegalStateException("anomaly-model '" + model.id() + "' peers: dataset '" + p.dataset()
+                    + "' has more than " + AnomalyModel.MAX_ENTITIES_CEILING + " keys - refusing to score a subset");
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map<String, Object> row : r.rows())
+            if (row.get("cohort") != null && !String.valueOf(row.get("cohort")).isEmpty())
+                out.put(String.valueOf(row.get("entity_key")), String.valueOf(row.get("cohort")));
+        return out;
     }
 
     private static String capMessage(AnomalyModel model, AnomalyModel.Feature f, int maxEntities) {

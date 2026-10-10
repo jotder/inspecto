@@ -67,7 +67,13 @@ class AnomalyModelTest {
         refused(with(m -> m.put("elevatedThreshold", 90)), "0 < elevatedThreshold < highThreshold");
         refused(with(m -> m.put("maxEntities", 2_000_001)), "maxEntities must be a whole number 1..2000000");
         refused(with(m -> m.put("features", List.of())), "at least one feature");
-        refused(with(m -> m.put("peers", Map.of())), "peers is not built yet");
+        refused(with(m -> m.put("peers", Map.of())), "peers.by must name 1..3 cohort columns");
+        refused(with(m -> m.put("peers", Map.of("by", List.of("a", "b", "c", "d")))), "1..3 cohort columns");
+        refused(with(m -> m.put("peers", Map.of("by", "plan", "bogus", 1))), "peers: unknown key 'bogus'");
+        refused(with(m -> m.put("peers", Map.of("by", "plan; drop"))), "must be a plain column/name token");
+        refused(with(m -> m.put("peers", Map.of("by", "msisdn"))), "cannot include the join key");
+        refused(with(m -> m.put("peers", Map.of("by", "plan", "minGroupSize", 1))), "minGroupSize must be a whole number 2..");
+        refused(with(m -> m.put("peers", Map.of("by", "plan", "fallback", "merge"))), "fallback must be none or population");
         refused(with(m -> m.put("watchList", Map.of())), "watchList is not built yet");
         refused(with(m -> m.put("features", java.util.Collections.nCopies(17, ((List<?>) AnomalyCorpus.model().get("features")).get(0)))),
                 "at most 16 features");
@@ -91,5 +97,21 @@ class AnomalyModelTest {
     void aDuplicateFeatureIdIsRefused() {
         Object f = ((List<?>) AnomalyCorpus.model().get("features")).get(0);
         refused(with(m -> m.put("features", List.of(f, f))), "duplicate feature id 'data_mb'");
+    }
+
+    @Test
+    void peersParseWithDefaultsFromTheFirstFeature() {
+        AnomalyModel m = AnomalyModel.fromMap("usage", with(x -> x.put("peers", Map.of("by", List.of("plan")))));
+        assertEquals(List.of("plan"), m.peers().by());
+        assertEquals("usage", m.peers().dataset(), "defaults to the first feature's Dataset");
+        assertEquals("msisdn", m.peers().key(), "defaults to the first feature's key");
+        assertEquals(30, m.peers().minGroupSize());
+        assertFalse(m.peers().populationFallback(), "D-AD11: no silent fallback");
+        assertTrue(m.referencedColumns().get("usage").contains("plan"), "the cohort column is checked against the Schema");
+        AnomalyModel r = AnomalyModel.fromMap("usage", with(x -> x.put("peers", Map.of("by", "plan", "dataset", "subscribers",
+                "key", "sub_id", "minGroupSize", 5, "fallback", "population"))));
+        assertEquals(java.util.Set.of("sub_id", "plan"), r.referencedColumns().get("subscribers"));
+        assertTrue(r.datasetIds().contains("subscribers"));
+        assertTrue(r.peers().populationFallback());
     }
 }

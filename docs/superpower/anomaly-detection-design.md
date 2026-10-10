@@ -399,6 +399,46 @@ carrying only JUnit; it yields to S1's pom at merge). No DuckDB, no Space access
 - Not done here (S2's Job half, after merge): zero-inflation of missing buckets (caller's choice), SQL-side
   median/MAD, performance measurement (D-AD9).
 
+### 16.2 S3 as-built: peer groups + fallback (lane anom-peers, 2026-10-10)
+
+- **Config.** `peers: {by[1..3], dataset?, key?, minGroupSize? (2.., default 30), fallback? (none | population)}`.
+  `dataset` defaults to the first feature's Dataset and `key` to the first feature's key (the join column in the peers
+  Dataset; added because §4.3's "joined on the entity key" names no column). `by` may not include `key`. The peers
+  Dataset and its `key` + `by` columns join `datasetIds()` / `referencedColumns()`, so `requireStorable` checks them
+  against the Schema on every writer with no validator change. `peers` left `LATER_KEYS`.
+- **Cohort query.** ONE grouped statement over the peers Dataset: `max(concat_ws('|', by...))` per key. A key with
+  several cohort values takes the greatest (deterministic); a key with none is in the population only; past
+  `MAX_ENTITIES_CEILING` keys the run fails; a failure withholds the DuckDB message (§8).
+- **Peer baseline** = `PeerBaseline` (S2's class, unchanged) over the scored-day observations of the scored entities,
+  after D-AD8 zero-filling, cached per feature and cohort. A cohort below `minGroupSize` is `insufficient` (D-AD11 a);
+  `fallback: population` is opt-in and flagged `fellBack`, basis `population` (D-AD11 b).
+- **Scorer.** `dev = max(dev(zSelf), dev(zPeer))` (§4.4). A feature is insufficient only when it has no observation or
+  neither baseline. Self insufficient but peers usable means the feature is scored on peers only and flagged
+  `peersOnly` (D-AD12). The explanation gains `peerBaseline {cohort, basis, median, mad, size, fellBack, insufficient}`,
+  `zPeer`, `peersOnly` and `cohortShift` (only when the model declares peers), plus `baseline.basis` / `fellBack`.
+  `recompute` re-derives both z from the stored numbers and is asserted equal over both corpora.
+- **Decision taken by the lane (operator to confirm): the cohort shift.** With §4.4's plain `max`, the §14
+  whole-cohort-shift look-alike *cannot* stay normal, because every member's self z is high on the promotion day. So each
+  member's self baseline is scaled by `k = peer median today / the cohort's usual daily median`. The usual is the
+  model's own `BaselineStatistic` over the cohort's per-day medians, so seasonality applies. `k = 1` when the cohort is
+  insufficient or its usual is not > 0. The shift is multiplicative, so the floor stays in feature units and a heavy
+  member of a doubled cohort is expected at 2x its own usual. It shows in `reason` as `, xk cohort shift = expected`
+  and is stored as `cohortShift`. A member that moves alone (`promo_spike`, 10x on a 2x day) is still `high`.
+- **Golden peer corpus** (`AnomalyPeerCorpus`, `AnomalyPeerGoldenCorpusTest`, 7 tests; 345 subscribers, cohorts
+  PRE / POST / PROMO / SOLO from a reference `subscribers` Dataset). `high` is exactly `adjuster` (U5: one feature 10x
+  its peers, self normal), `promo_spike` and `simbox` (U2: self normal, both features moderately above peers,
+  zPeer between 4 and zCap, sessions zPeer exactly 6). The PROMO cohort (doubled), `newpeer` (2 days, peers only) and
+  `loner` (cohort of 1) stay `normal`. Mutants run, and each one turned a named assertion red for the expected value:
+  cohort shift off (all 100 PROMO members `high`); peer z dropped from `dev` (`simbox` and `adjuster` drop out of
+  `high`); a cohort of 1 allowed (`loner` gets a peer score).
+- **Gotcha.** With peers declared, S1's *always-heavy* look-alike becomes U5, a persistent outlier against its
+  cohort. That is correct for peers. A legitimately heavy entity then belongs on the `exclusionList` (S4), not in a
+  weaker peer rule. S1's self-only corpus is unchanged and still green.
+- **Deferred.** Refusing a classified cohort column at save (§10) is not built: it needs the Schema classification
+  lookup that Risk Scores use, so it goes to S4 or S5. Partial NULLs in a multi-column `by` are skipped by
+  `concat_ws`. SQL-side peer medians (the JVM computes them from the per-entity series already in memory) and their
+  performance measurement come under D-AD9. A cohort shift per `by` sub-column is also not built.
+
 ## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 
 Every recommendation below was approved as written; the *Decided* column is binding.

@@ -1,5 +1,6 @@
 package com.gamma.anomaly;
 
+import com.gamma.anomaly.baseline.PeerBaseline;
 import com.gamma.anomaly.baseline.Seasonality;
 import com.gamma.anomaly.baseline.SeasonalBaseline;
 import com.gamma.query.MeasureCompiler;
@@ -29,17 +30,20 @@ import java.util.regex.Pattern;
  * minBaselinePoints: 7           elevatedThreshold: 60   highThreshold: 80
  * zCap: 10   scale: 3            maxEntities: 500000 (1..2000000; default -Danomaly.score.maxEntities, else 200000)
  * dataScope: fraud
+ * peers: {by[1..3]: cohort columns, dataset (default the first feature's), key (default the first feature's key),
+ *         minGroupSize (default 30), fallback: population (opt-in, D-AD11 b)}
  * features[n]: {id, label, dataset, key, time, measure (count | agg(field)), filters, direction (up|down|both),
  *               weight, unit (the absolute spread floor, default 1)}
  * </pre>
  *
  * Validated fail closed: every problem is an {@link IllegalArgumentException} naming the field (422 at the route).
- * Keys of later slices ({@code peers}, {@code watchList}, {@code exclusionList}, {@code scoredPeriod} other than 1,
+ * Keys of later slices ({@code watchList}, {@code exclusionList}, {@code scoredPeriod} other than 1,
  * {@code bucket: hour}) are refused, not ignored.
  */
 public record AnomalyModel(String id, String entityType, int window, Seasonality seasonality, int minBaselinePoints,
                            double elevatedThreshold, double highThreshold, double zCap, double scale,
-                           Integer maxEntities, String dataScope, String description, List<Feature> features) {
+                           Integer maxEntities, String dataScope, String description, Peers peers,
+                           List<Feature> features) {
 
     public static final String KIND = "anomaly-model";
     public static final String SCORES_PREFIX = "anomaly_scores_";
@@ -57,12 +61,23 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     private static final Pattern MODEL_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_]*");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType", "bucket",
             "window", "scoredPeriod", "seasonality", "minBaselinePoints", "elevatedThreshold", "highThreshold", "zCap",
-            "scale", "maxEntities", "dataScope", "description", "features");
-    private static final Set<String> LATER_KEYS = Set.of("peers", "watchList", "exclusionList");
+            "scale", "maxEntities", "dataScope", "description", "peers", "features");
+    private static final Set<String> LATER_KEYS = Set.of("watchList", "exclusionList");
+    private static final Set<String> PEER_KEYS = Set.of("by", "dataset", "key", "minGroupSize", "fallback");
+    public static final int MAX_PEER_COLUMNS = 3;
     private static final Set<String> FEATURE_KEYS = Set.of("id", "label", "dataset", "key", "time", "measure",
             "filters", "direction", "weight", "unit");
 
     public enum Direction { UP, DOWN, BOTH }
+
+    /**
+     * The Peer Group (design §4.3): the cohort of an entity is the {@code by} column value(s) of its rows in
+     * {@code dataset}, joined on {@code key} = the entity key. {@code populationFallback} is the opt-in
+     * {@code fallback: population} (D-AD11 b).
+     */
+    public record Peers(List<String> by, String dataset, String key, int minGroupSize, boolean populationFallback) {
+        public Peers { by = List.copyOf(by); }
+    }
 
     /** One feature: a Measure over one Dataset, grouped by its key column and by the day of its {@code time} column. */
     public record Feature(String id, String label, String dataset, String key, String time, String measure,
@@ -110,6 +125,7 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     public Set<String> datasetIds() {
         Set<String> out = new LinkedHashSet<>();
         for (Feature f : features) out.add(f.dataset());
+        if (peers != null) out.add(peers.dataset());
         return out;
     }
 
@@ -122,6 +138,11 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
             cols.add(f.time());
             if (f.compiledMeasure().field() != null) cols.add(f.compiledMeasure().field());
             for (Map<String, Object> flt : f.filters()) cols.add(String.valueOf(flt.get("field")));
+        }
+        if (peers != null) {
+            Set<String> cols = out.computeIfAbsent(peers.dataset(), d -> new LinkedHashSet<>());
+            cols.add(peers.key());
+            cols.addAll(peers.by());
         }
         return out;
     }
@@ -190,8 +211,39 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
                 throw new IllegalArgumentException("anomaly-model.features: duplicate feature id '" + f.id() + "'");
             features.add(f);
         }
+        Peers peers = m.get("peers") == null ? null : peers(m.get("peers"), features.get(0));
         return new AnomalyModel(id, entityType, window, seasonality, minPoints, elevated, high, zCap, scale,
-                maxEntities, scope, Values.trimToNull(m.get("description")), features);
+                maxEntities, scope, Values.trimToNull(m.get("description")), peers, features);
+    }
+
+    private static Peers peers(Object raw, Feature first) {
+        String at = "anomaly-model.peers";
+        if (!(raw instanceof Map<?, ?> pm)) throw new IllegalArgumentException(at + " must be an object {by, dataset, key, minGroupSize, fallback}");
+        for (Object k : pm.keySet())
+            if (!PEER_KEYS.contains(String.valueOf(k)))
+                throw new IllegalArgumentException(at + ": unknown key '" + k + "' (expected " + new TreeSet<>(PEER_KEYS) + ")");
+        Object byRaw = pm.get("by");
+        List<?> byList = byRaw instanceof List<?> l ? l : byRaw == null ? List.of() : List.of(byRaw);
+        if (byList.isEmpty() || byList.size() > MAX_PEER_COLUMNS)
+            throw new IllegalArgumentException(at + ".by must name 1.." + MAX_PEER_COLUMNS + " cohort columns");
+        List<String> by = new ArrayList<>();
+        for (int i = 0; i < byList.size(); i++) {
+            String c = ident(byList.get(i), at + ".by[" + i + "]");
+            if (by.contains(c)) throw new IllegalArgumentException(at + ".by: duplicate column '" + c + "'");
+            by.add(c);
+        }
+        String dataset = Values.trimToNull(pm.get("dataset"));
+        if (dataset == null) dataset = first.dataset();
+        else if (!SAFE_ID.matcher(dataset).matches())
+            throw new IllegalArgumentException(at + ".dataset '" + dataset + "' must be a Dataset id");
+        String key = pm.get("key") == null ? first.key() : ident(pm.get("key"), at + ".key");
+        if (by.contains(key)) throw new IllegalArgumentException(at + ".by cannot include the join key '" + key + "'");
+        int size = whole(pm.get("minGroupSize"), at + ".minGroupSize", 2, MAX_ENTITIES_CEILING,
+                PeerBaseline.DEFAULT_MIN_GROUP_SIZE);
+        String fb = Values.trimToNull(pm.get("fallback"));
+        if (fb != null && !"population".equals(fb) && !"none".equals(fb))
+            throw new IllegalArgumentException(at + ".fallback must be none or population, got '" + fb + "'");
+        return new Peers(by, dataset, key, size, "population".equals(fb));
     }
 
     private static Feature feature(int i, Map<?, ?> fm) {
