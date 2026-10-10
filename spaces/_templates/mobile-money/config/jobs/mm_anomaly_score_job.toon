@@ -1,0 +1,6 @@
+job:
+  name: mm_anomaly_score
+  type: anomaly.score
+  model: mm_wallet_activity
+  cron: "45 4 * * *"
+  enabled: true

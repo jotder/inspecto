@@ -1,0 +1,35 @@
+entityType: account
+description: "Each account's daily outgoing transfer and wire count and value against its own last 28 days (same weekday first). An account that suddenly sends far more than it usually does is high - the onset of layering through a previously quiet account"
+bucket: day
+window: 28
+seasonality: weekday
+minBaselinePoints: 3
+elevatedThreshold: 60
+highThreshold: 80
+maxEntities: 500000
+features[2]:
+  - id: out_count
+    label: "Outgoing transfers and wires"
+    dataset: aml_txn
+    key: account_id
+    time: txn_ts
+    measure: count
+    filters[1]:
+      - field: txn_type
+        op: in
+        value[2]: TRANSFER, WIRE
+    direction: up
+    weight: 1
+  - id: out_value
+    label: "Outgoing transfer and wire value (USD)"
+    dataset: aml_txn
+    key: account_id
+    time: txn_ts
+    measure: "sum(amount)"
+    filters[1]:
+      - field: txn_type
+        op: in
+        value[2]: TRANSFER, WIRE
+    direction: up
+    weight: 1
+    unit: 100

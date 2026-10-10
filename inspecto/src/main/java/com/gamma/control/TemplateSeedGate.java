@@ -92,7 +92,7 @@ final class TemplateSeedGate {
      * Each deferred Alert Rule ({@code pending/alert-rules/}, {@code TEMPLATE-RISK-SCORE-ALERT-RULE-1}) meets what can
      * be judged before its Risk Score runs: the edition carries Alert Rules, it parses, and it reads the
      * {@code _latest} output of a Risk Score model this template seeds. Its {@code by} Schema check runs when it is
-     * created ({@link PendingAlertRules#onRiskScoreProduced}).
+     * created ({@link PendingAlertRules#onScoreProduced}).
      */
     private static void requirePendingAlertRules(Path config) {
         Path dir = config.resolve(PendingAlertRules.DIR);

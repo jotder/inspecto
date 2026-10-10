@@ -1,0 +1,10 @@
+afterScore:
+  kind: anomaly-model
+  model: mm_wallet_activity
+dataset: anomaly_scores_mm_wallet_activity_latest
+measure: "max(score)"
+by[2]: model, entity_key
+comparator: gte
+threshold: 80
+severity: CRITICAL
+description: "Unusual wallet activity: the wallet's Anomaly Score reached the model's high threshold (80) in its latest run"

@@ -1,0 +1,54 @@
+entityType: subscriber
+description: "Each calling number's daily outgoing voice, SMS and data use against its own last 28 days (same weekday first). A line that suddenly calls, texts or browses far more than it usually does is high - the early shape of SIM-box, IRSF and account takeover"
+bucket: day
+window: 28
+seasonality: weekday
+minBaselinePoints: 3
+elevatedThreshold: 60
+highThreshold: 80
+maxEntities: 500000
+features[3]:
+  - id: voice_out_s
+    label: "Outgoing voice seconds"
+    dataset: cdr
+    key: a_number
+    time: start_ts
+    measure: "sum(duration_s)"
+    filters[2]:
+      - field: direction
+        op: eq
+        value: MO
+      - field: service
+        op: eq
+        value: VOICE
+    direction: up
+    weight: 1
+    unit: 60
+  - id: sms_out
+    label: "Outgoing SMS"
+    dataset: cdr
+    key: a_number
+    time: start_ts
+    measure: count
+    filters[2]:
+      - field: direction
+        op: eq
+        value: MO
+      - field: service
+        op: eq
+        value: SMS
+    direction: up
+    weight: 1
+  - id: data_s
+    label: "Data session seconds"
+    dataset: cdr
+    key: a_number
+    time: start_ts
+    measure: "sum(duration_s)"
+    filters[1]:
+      - field: service
+        op: eq
+        value: DATA
+    direction: up
+    weight: 1
+    unit: 60

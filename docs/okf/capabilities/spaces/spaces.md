@@ -730,8 +730,7 @@ would forge the ownership marker, so a template declares the rule as PENDING ins
   approval-policy classifier (`PendingChanges.kindOfConfigPath`).
 - **What fires it.** The `risk.score` / `anomaly.score` Job emits `risk.score.produced` / `anomaly.score.produced`
   (both core `SignalType` constants) after it has written the scores; each Space's `CollectorService` subscribes to its
-  own event log and calls `PendingAlertRules.onRiskScoreProduced(kind, model)` — the name predates D-AD7 and is kept
-  because the writer inventories below pin it. For each pending rule naming that kind and model it registers the `_latest` Dataset (id = physicalRef) through the Dataset save
+  own event log and calls `PendingAlertRules.onScoreProduced(kind, model)` (renamed from `onRiskScoreProduced`, operator 2026-10-10). For each pending rule naming that kind and model it registers the `_latest` Dataset (id = physicalRef) through the Dataset save
   gate if absent, then runs `AlertRoutes.parse` (the `by` Schema check included), writes `registry/alert-rules/<name>`,
   arms it in the `AlertService` and deletes the pending file. **Once:** the pending file is the only trigger, and the
   call is synchronized; an Alert Rule already under that name is never overwritten (the pending entry is dropped).
@@ -741,9 +740,9 @@ would forge the ownership marker, so a template declares the rule as PENDING ins
   model's next run. `alert-rule.pending.created` / `.dropped` record the other outcomes (actor `system`).
 - **Security inventories (operator, 2026-10-06).** `PendingAlertRules` is a *background template materializer*: it
   refuses while an approval policy governs `alert-rule`/`dataset`. `PendingAlertRules#ensureLatestDataset` is on
-  `ConfigWriteFunnelTest.WRITERS` with that reason (`#onRiskScoreProduced` reaches `PendingChanges.governs` itself, so
+  `ConfigWriteFunnelTest.WRITERS` with that reason (`#onScoreProduced` reaches `PendingChanges.governs` itself, so
   the scan counts it as held). Both sites are on `DecisionRuleWritersTest.GUARDED_BY`: before any write
-  `#onRiskScoreProduced` runs `DecisionRuleGuard.refuseUnattended` — a background writer has no Subject to hold
+  `#onScoreProduced` runs `DecisionRuleGuard.refuseUnattended` — a background writer has no Subject to hold
   `canWorkIncidents`, so a rule body with an `invoke-api` consequence is refused (422, fail closed) and stays pending
   + audited like every other refusal.
 - **Status.** `GET /alerts/rules/pending` lists `{name, afterScore: {kind, model}, dataset}` for what is still waiting, plus
@@ -832,6 +831,33 @@ Enterprise; listed in `offerings/professional.toon` `contentPacks`. Two syntheti
 - **Deliberately cut (a template cannot carry them).** Investigation Templates and the `structuring` / `valueWeightedLinks` value-Measure
   Alert Rule need a live Investigation (runtime state, no registry kind) - the runbook says how to bind one; Entity List seeding;
   a real regulator's report schema; counterparty-name screening of every transaction (the register is screened instead).
+
+#### 3.5.5 Anomaly Model examples in `telco-fraud`, `mobile-money` and `aml` (`ANOMALY-DETECTION-1` S5, 2026-10-10)
+
+Each pack ships one `anomaly-model` (`registry/anomaly-models/<id>.toon`), its `anomaly.score` Job
+(`config/jobs/<prefix>_anomaly_score_job.toon`, `cron: "45 4 * * *"`) and a deferred Alert Rule
+(`pending/alert-rules/`, `afterScore: {kind: anomaly-model, model: <id>}`, `max(score) gte 80` by
+`[model, entity_key]`, CRITICAL), created after the model's first run (D-AD7). All three use day buckets, a 28-day
+window, `seasonality: weekday`, `minBaselinePoints: 3` and `highThreshold: 80`.
+
+| Pack | Model | Entity | Features | Peers |
+|---|---|---|---|---|
+| `telco-fraud` | `tf_subscriber_usage` | `a_number` over `cdr` | outgoing voice seconds, outgoing SMS, data seconds | none (the pack has no subscriber register) |
+| `mobile-money` | `mm_wallet_activity` | `wallet_id` over `wallet_txn` | transaction count, transaction value | `kyc_tier` from `wallets` (`minGroupSize: 30`) |
+| `aml` | `aml_account_transfers` | `account_id` over `aml_txn` | outgoing TRANSFER + WIRE count and value | none (`aml_parties` is keyed by party, not account) |
+
+- **No Entity Lists.** No pack ships an Entity List, so no model carries a `watchList` / `exclusionList`; add one
+  after creating the Space (a known heavy user belongs on an `exclusion` list, §16.2 of the design).
+- **Zero-row seeds for the save gate.** The `anomaly-model` save gate reads each feature Dataset's Schema, and a fresh
+  Space has no ingested data, so each feature store ships `data/<feed>/database/schema-seed.parquet` (`cdr`,
+  `wallet_txn`, `wallets`, `aml_txn`; columns and types from the feed's schema TOON). The gate is not relaxed. The
+  seed stays beside the ingested files (zero rows; the store is read `union_by_name`).
+- **Edition.** Without the anomaly module the model is opaque config and its Job does not run; `telco-fraud`'s
+  description says that part needs Professional or Enterprise with Anomaly Detection.
+- **Tests.** `AnomalyTemplateModelsTest` (anomaly module) runs each pack's model through the kind's save gates
+  against the pack's registry and seeds and checks the Job + pending-rule wiring. `TelcoFraudTemplateGoldenTest`
+  counts only the `sql.template` detection Jobs. The pack golden corpora are not extended (one or ten days of data,
+  below the baseline window). No dashboard tile yet.
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 

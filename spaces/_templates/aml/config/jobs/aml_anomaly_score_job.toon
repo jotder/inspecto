@@ -1,0 +1,6 @@
+job:
+  name: aml_anomaly_score
+  type: anomaly.score
+  model: aml_account_transfers
+  cron: "45 4 * * *"
+  enabled: true

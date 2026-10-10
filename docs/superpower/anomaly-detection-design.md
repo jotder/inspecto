@@ -569,6 +569,36 @@ exclusion run AROUND `AnomalyScoreEvaluator.evaluate`, never inside it.
   ship widget 2 where the readers may see keys, until BI masking of classified columns covers scores Datasets.
   (c) The LA panel's dependence on a Risk Score model being named. (d) No evidence rows in the panel (S4 writes none).
 
+### 16.6 S5 lane C as-built: template content + writer rename (lane s5-content, 2026-10-10)
+
+- **Rename (operator-approved inventory edit, 2026-10-10).** `PendingAlertRules#onRiskScoreProduced` is now
+  `#onScoreProduced` (it serves both score kinds); `CollectorService`'s subscriber method too. Exactly two inventory
+  entries changed: the `PENDING_ALERT_RULES` reason in `ConfigWriteFunnelTest.WRITERS` and the
+  `DecisionRuleWritersTest.GUARDED_BY` value. The §16.3 note about the old name is superseded.
+- **Template content.** `telco-fraud` → `tf_subscriber_usage` (per `a_number` over `cdr`: outgoing voice seconds,
+  outgoing SMS, data seconds; no peers, the pack has no subscriber register); `mobile-money` → `mm_wallet_activity`
+  (per `wallet_id` over `wallet_txn`: count + `sum(amount)`; peers `by: [kyc_tier]` from `wallets`, `minGroupSize: 30`
+  — per wallet, not per agent, because only the wallet register carries a cohort column); `aml` →
+  `aml_account_transfers` (per `account_id` over `aml_txn`: TRANSFER + WIRE count and value; no peers, `aml_parties`
+  is keyed by party, not account). Each: day / 28 / `weekday` / `minBaselinePoints: 3` / high 80, an `anomaly.score`
+  Job (`45 4 * * *`) and a pending Alert Rule (`afterScore: {kind: anomaly-model, model}`, `max(score) gte 80` by
+  `[model, entity_key]`). No `watchList` / `exclusionList`: no pack ships an Entity List.
+- **Gotcha — the save gate needs a Schema at apply.** `requireStorable` probes each feature Dataset, and a fresh Space
+  has no data, so the first run of `AnomalyTemplateModelsTest` refused all three ("No files found"). As the sink
+  Datasets already do, each feature store ships a zero-row `data/<feed>/database/schema-seed.parquet` (`cdr`,
+  `wallet_txn`, `wallets`, `aml_txn`, types from the schema TOON); the gate is not relaxed. Unlike a sink seed, no
+  run replaces it — it stays as a zero-row file read `union_by_name`.
+- **Tests.** New `AnomalyTemplateModelsTest` (3): each pack's model passes `validate` + `validateInSpace` against
+  the pack's own registry and seeds, its Job names it, its pending rule reads `anomaly_scores_<id>_latest` at the
+  model's high threshold. `TelcoFraudTemplateGoldenTest.jobs()` now counts only `sql.template` Jobs (it asserted 14).
+- **Deferred — pack golden extension (not feasible here).** The committed corpora cover one day (`telco-fraud`,
+  `mobile-money`) or ten (`aml`), below a 28-day window with weekday seasonality, and plant no behavioural shift; and
+  the golden tests live in `inspecto` / `inspecto-scoring` / `inspecto-reconciliation`, which do not depend on the
+  anomaly module. Doing it needs a multi-week corpus per pack (regenerated, drift-pinned) and an anomaly-module test.
+- **Deferred — dashboard tile (lane B designs it).** It would go on each pack's overview dashboard
+  (`telco_fraud_overview`, `mobile_money_overview`, `aml_overview`) bound to `anomaly_scores_<id>_latest`, beside the
+  Risk Score tile where one exists.
+
 ## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 
 Every recommendation below was approved as written; the *Decided* column is binding.

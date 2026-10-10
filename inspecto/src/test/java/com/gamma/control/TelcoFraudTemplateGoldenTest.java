@@ -545,11 +545,14 @@ class TelcoFraudTemplateGoldenTest {
         return rules;
     }
 
+    /** The detection Jobs ({@code sql.template}); the pack's {@code anomaly.score} Job needs the anomaly module. */
     private static List<JobConfig> jobs(Path config) throws Exception {
         List<JobConfig> jobs = new ArrayList<>();
         try (Stream<Path> files = Files.list(config.resolve("jobs"))) {
-            for (Path f : files.filter(p -> p.getFileName().toString().endsWith("_job.toon")).sorted().toList())
-                jobs.add(JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(ToonHelper.load(f.toString()), "job"))));
+            for (Path f : files.filter(p -> p.getFileName().toString().endsWith("_job.toon")).sorted().toList()) {
+                JobConfig j = JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(ToonHelper.load(f.toString()), "job")));
+                if ("sql.template".equals(j.type())) jobs.add(j);
+            }
         }
         return jobs;
     }

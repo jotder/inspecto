@@ -1,0 +1,10 @@
+afterScore:
+  kind: anomaly-model
+  model: tf_subscriber_usage
+dataset: anomaly_scores_tf_subscriber_usage_latest
+measure: "max(score)"
+by[2]: model, entity_key
+comparator: gte
+threshold: 80
+severity: CRITICAL
+description: "Unusual subscriber usage: the calling number's Anomaly Score reached the model's high threshold (80) in its latest run"

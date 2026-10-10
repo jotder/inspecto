@@ -134,16 +134,16 @@ class AnomalyScoreAlertTest {
         EventLog events = EventLog.create();
         events.addSubscriber(e -> { if (EventType.AUDIT.equals(e.type())) audit.add(e); });
 
-        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(cfg, () -> data, "anomaly-model", "usage", null, events),
+        assertEquals(List.of(), PendingAlertRules.onScoreProduced(cfg, () -> data, "anomaly-model", "usage", null, events),
                 "before the first run there is no output: it stays pending");
         assertEquals(1, PendingAlertRules.list(cfg).size());
         assertEquals(Map.of("kind", "anomaly-model", "model", "usage"), PendingAlertRules.list(cfg).get(0).get("afterScore"));
-        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(cfg, () -> data, "risk-score", "usage", null, events),
+        assertEquals(List.of(), PendingAlertRules.onScoreProduced(cfg, () -> data, "risk-score", "usage", null, events),
                 "a Risk Score of the same id is another score kind");
 
         score(cfg, data, AnomalyCorpus.AS_OF, "r1");
         assertEquals(List.of("usage_anomaly"),
-                PendingAlertRules.onRiskScoreProduced(cfg, () -> data, "anomaly-model", "usage", null, events));
+                PendingAlertRules.onScoreProduced(cfg, () -> data, "anomaly-model", "usage", null, events));
         ComponentStore store = new ComponentStore(cfg.resolve("registry"));
         Map<String, Object> created = store.get("alert-rule", "usage_anomaly").orElseThrow().content();
         assertEquals("anomaly_scores_usage_latest", created.get("dataset"));

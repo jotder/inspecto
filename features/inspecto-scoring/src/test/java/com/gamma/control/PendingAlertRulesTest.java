@@ -74,7 +74,7 @@ class PendingAlertRulesTest {
     }
 
     private List<String> produced() {
-        return PendingAlertRules.onRiskScoreProduced(config, () -> data, "risk-score", MODEL, null, events);
+        return PendingAlertRules.onScoreProduced(config, () -> data, "risk-score", MODEL, null, events);
     }
 
     private void runRiskScore() throws Exception {
@@ -126,8 +126,8 @@ class PendingAlertRulesTest {
     @Test
     void anotherModelsRunDoesNotReleaseIt() throws Exception {
         runRiskScore();
-        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(config, () -> data, "risk-score", "other", null, events));
-        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(config, () -> data, "anomaly-model", MODEL, null, events),
+        assertEquals(List.of(), PendingAlertRules.onScoreProduced(config, () -> data, "risk-score", "other", null, events));
+        assertEquals(List.of(), PendingAlertRules.onScoreProduced(config, () -> data, "anomaly-model", MODEL, null, events),
                 "an Anomaly Model of the same id is another score kind (D-AD7)");
         assertFalse(ruleExists());
         assertEquals(1, PendingAlertRules.list(config).size());

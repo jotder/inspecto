@@ -141,11 +141,10 @@ public final class PendingAlertRules {
     /**
      * After the {@code kind} model {@code modelId}'s run wrote its output: create each pending rule over it through the
      * save gate. Synchronized so two runs finishing together cannot both create one rule. Returns the names created.
-     * Serves every score kind (D-AD7); the name predates that and is kept because the config-writer guard
-     * inventories ({@code ConfigWriteFunnelTest.WRITERS}, {@code DecisionRuleWritersTest.GUARDED_BY}) pin it.
+     * Serves every score kind (D-AD7).
      */
-    public static synchronized List<String> onRiskScoreProduced(Path configRoot, Supplier<Path> dataRoot, String kind,
-                                                                String modelId, AlertService alerts, EventLog events) {
+    public static synchronized List<String> onScoreProduced(Path configRoot, Supplier<Path> dataRoot, String kind,
+                                                            String modelId, AlertService alerts, EventLog events) {
         List<String> created = new ArrayList<>();
         if (configRoot == null || modelId == null || !KINDS.containsKey(kind)) return created;
         ComponentStore store = new ComponentStore(configRoot.resolve("registry"));

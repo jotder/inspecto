@@ -230,7 +230,7 @@ class ConfigWriteFunnelTest {
 
     private static final String PENDING_ALERT_RULES = "background template materializer (operator, 2026-10-06); "
             + "refuses while an approval policy governs alert-rule/dataset — its only caller, "
-            + "PendingAlertRules#onRiskScoreProduced, checks PendingChanges.governs for both kinds first";
+            + "PendingAlertRules#onScoreProduced, checks PendingChanges.governs for both kinds first";
 
     /** Writer sites ({@code SimpleClass#method}) that do not reach the hold themselves, each with its reason. */
     static final Map<String, String> WRITERS = new TreeMap<>(Map.ofEntries(

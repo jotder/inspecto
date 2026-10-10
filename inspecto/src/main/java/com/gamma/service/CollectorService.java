@@ -650,7 +650,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.addSubscriber(securityTriggers);
         // TEMPLATE-RISK-SCORE-ALERT-RULE-1: a template's PENDING Alert Rule over a Risk Score output is created,
         // through the normal save gate, once that model's risk.score Job has written the output it reads.
-        this.pendingAlertRuleSubscriber = this::onRiskScoreProduced;
+        this.pendingAlertRuleSubscriber = this::onScoreProduced;
         this.eventLog.addSubscriber(pendingAlertRuleSubscriber);
         String viewsFile = System.getProperty("events.views.file");
         this.savedViews = new SavedViewStore(viewsFile == null ? null : Path.of(viewsFile));
@@ -828,10 +828,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final java.util.function.Consumer<com.gamma.audit.Event> pendingAlertRuleSubscriber;
 
     /**
-     * {@code risk.score.produced} / {@code anomaly.score.produced} → {@link com.gamma.control.PendingAlertRules#onRiskScoreProduced}
+     * {@code risk.score.produced} / {@code anomaly.score.produced} → {@link com.gamma.control.PendingAlertRules#onScoreProduced}
      * for that score kind and model (D-AD7: one deferred-seed mechanism for every score kind).
      */
-    private void onRiskScoreProduced(com.gamma.audit.Event e) {
+    private void onScoreProduced(com.gamma.audit.Event e) {
         if (!com.gamma.audit.EventType.SIGNAL.equals(e.type())) return;
         com.gamma.signal.Signal sig = com.gamma.signal.Signal.fromEvent(e);
         String kind = com.gamma.signal.SignalType.RISK_SCORE_PRODUCED.equals(sig.type()) ? com.gamma.alert.RiskScoreOutputs.KIND
@@ -843,7 +843,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             String wr = System.getProperty("assist.write.root");
             writeRoot = (wr == null || wr.isBlank()) ? null : java.nio.file.Path.of(wr);
         }
-        com.gamma.control.PendingAlertRules.onRiskScoreProduced(writeRoot, () -> {
+        com.gamma.control.PendingAlertRules.onScoreProduced(writeRoot, () -> {
             String dd = System.getProperty("data.dir", root.dataDir());
             return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
         }, kind, model, alerting, eventLog);

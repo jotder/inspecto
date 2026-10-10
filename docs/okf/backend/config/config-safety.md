@@ -834,7 +834,7 @@ Added after the 2026-09-26 verification:
   non-governable kinds, Job/engine writes, the Identity Fact log). Removing the `/import` refusal turns it red.
   `PendingAlertRules#ensureLatestDataset` is on it as a background template materializer (operator, 2026-10-06) —
   see [spaces §3.5.2](../../capabilities/spaces/spaces.md); `DecisionRuleWritersTest.GUARDED_BY` lists it and
-  `#onRiskScoreProduced`, which runs `DecisionRuleGuard.refuseUnattended` before writing.
+  `#onScoreProduced`, which runs `DecisionRuleGuard.refuseUnattended` before writing.
 
 **The apply** — approve replays the stored request (method, route path + query, body, `If-Match`) through
 `ApiContext.replay`, with the Pending Change stamped on the replay (`ATTR_APPROVED_CHANGE`). Every gate of that
