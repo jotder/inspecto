@@ -66,6 +66,8 @@ final class DbConnections {
             java.util.Properties props = new java.util.Properties();
             if (user != null) props.setProperty("user", user);
             if (user != null && pass != null) props.setProperty("password", pass);
+            // pgjdbc 42.7.12 no longer bounds the authentication read; a peer that accepts and stays silent hung forever
+            props.putIfAbsent("loginTimeout", "10");
             applyProxy(profile, url, tunnel != null, props);
             Connection conn = DriverManager.getConnection(url, props);
             return new Handle(conn, tunnel);
