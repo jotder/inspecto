@@ -389,7 +389,14 @@ public final class InvestigationRoutes implements RouteModule {
                 entry.put("groups", groups);
             }
             if (op.equals("expand")) {
-                List<String> frontier = ids.isEmpty() ? new ArrayList<>(before.entities.keySet()) : sorted(ids);
+                for (String i : strings(params.get("expandHubs")))
+                    if (!before.entities.containsKey(i))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' in 'expandHubs' is not in the Working Set");
+                Frontier fr = frontier(ids, params, before, true);
+                List<String> frontier = fr.ids();
+                if (frontier.isEmpty() && !fr.held().isEmpty())
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — every entity in the Working Set is flagged "
+                            + "high connectivity; name the ones to expand through in 'expandHubs' (or send 'includeHubs': true)");
                 if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — the Working Set is empty");
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER
@@ -399,7 +406,7 @@ public final class InvestigationRoutes implements RouteModule {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this expand is sensitive " + sensitive.get("exceeded")
                             + " - four-eyes approval applies to the main log, so a Draft cannot hold it; lower the budget / fan-out or ask a lead to expand");
                 if (sensitive != null) return masked(inv, requestExpansion(ex, inv, params, sensitive, before));
-                entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, before, "")));
+                entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, "")));
             }
             return masked(inv, commit(ex, inv, log, entry, before));
         });
@@ -443,11 +450,13 @@ public final class InvestigationRoutes implements RouteModule {
             e.put("groups", groups);
         }
         if (op.equals("expand")) {
-            List<String> frontier = ids.isEmpty() ? new ArrayList<>(state.entities.keySet()) : sorted(ids);
-            if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand - the Working Set is empty");
+            Frontier fr = frontier(ids, params, state, true);
+            List<String> frontier = fr.ids();
+            if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand - the Working Set is empty"
+                    + (fr.held().isEmpty() ? "" : " of entities not flagged high connectivity"));
             if (frontier.size() > MAX_FRONTIER)
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
-            e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, state, ""), pins == null ? Map.of() : pins));
+            e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, state, ""), pins == null ? Map.of() : pins));
         }
         return e;
     }
@@ -570,11 +579,8 @@ public final class InvestigationRoutes implements RouteModule {
             }
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
-                List<String> named = strings(p.get("ids"));
-                List<String> frontier = new ArrayList<>();
-                for (String n : named.isEmpty() ? state.entities.keySet() : sorted(named))
-                    if (state.entities.containsKey(n)) frontier.add(n);
-                e.put("read", read(api, ex, parent, expandRung(api, ex, parent, p, frontier, state, "fork step " + step + ": ")));
+                Frontier fr = frontier(strings(p.get("ids")), p, state, false);
+                e.put("read", read(api, ex, parent, expandRung(api, ex, parent, p, fr, state, "fork step " + step + ": ")));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -661,8 +667,10 @@ public final class InvestigationRoutes implements RouteModule {
             // moment's head over the NEW binding, never the authored atSeq or groups.
             if (op.equals("resolve")) e.put("resolution", sealResolution(writeRoot, h, params.get("atSeq"), "template step " + step + ": "));
             if (op.equals("expand")) {
-                List<String> frontier = new ArrayList<>(state.entities.keySet());
-                if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " expands an empty Working Set");
+                Frontier fr = frontier(List.of(), params, state, false);
+                List<String> frontier = fr.ids();
+                if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " expands an empty Working Set"
+                        + (fr.held().isEmpty() ? "" : " (every entity is flagged high connectivity)"));
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " would expand " + frontier.size()
                             + " entities; an expand frontier is capped at " + MAX_FRONTIER);
@@ -674,7 +682,7 @@ public final class InvestigationRoutes implements RouteModule {
                             + " — four-eyes applies and a template names no frontier to approve; save the template "
                             + "with a smaller budget/fan-out and expand further from the Investigation, where the "
                             + "step can be approved");
-                e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, state, "template step " + step + ": ")));
+                e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, state, "template step " + step + ": ")));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -890,6 +898,10 @@ public final class InvestigationRoutes implements RouteModule {
             r.put("fingerprint", read.get("fingerprint"));
             r.put("readAt", read.get("readAt"));
             r.put("fanOutCapped", read.get("fanOutCapped"));
+            if (read.get("hubs") instanceof List<?> hubs) {   // supernode suppression: how many this step left flagged in the Working Set
+                long flagged = hubs.stream().filter(o -> o instanceof Map<?, ?> m && after.highConnectivity.contains(String.valueOf(m.get("id")))).count();
+                r.put("hubsFlagged", flagged);
+            }
             if (read.get("index") != null) r.put("index", read.get("index"));   // D-3 step 6: only when the index answered
             if (read.get("fallback") != null) r.put("fallback", read.get("fallback"));   // only when it fell back, and why
             r.put("rung", read.get("query"));   // the rung as READ: window resolved, frontier and exclusions included
@@ -922,8 +934,14 @@ public final class InvestigationRoutes implements RouteModule {
      * fan-out, never one per member (the four-eyes thresholds are compared with those same numbers, D-U7).
      */
     private Map<String, Object> expandRung(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> p,
-                                           List<String> frontier, InvestigationEvaluator.State s, String where) {
+                                           Frontier fr, InvestigationEvaluator.State s, String where) {
+        List<String> frontier = fr.ids();
         Map<String, Object> q = rung(p, frontier, s);
+        // Supernode suppression: the threshold in force is RESOLVED into the sealed rung (the op's own, else the Space's
+        // hub_threshold), so a reread and the log line use what this read used, whatever the setting says later.
+        q.put("hubThreshold", p.get("hubThreshold") instanceof Number n ? n.intValue()
+                : LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveHubThreshold());
+        if (!fr.held().isEmpty()) q.put("hubsHeld", fr.held());
         if (!Boolean.TRUE.equals(p.get("merged"))) return q;
         requireResolution(s, where);
         TreeMap<String, String> groupOf = new TreeMap<>(), anchorOf = new TreeMap<>();
@@ -971,6 +989,32 @@ public final class InvestigationRoutes implements RouteModule {
         merged.put("anchorOf", anchorOf);
         q.put("merged", merged);
         return q;
+    }
+
+    /** An expand's frontier ({@code ids}) and the flagged entities it left out ({@code held}), both sorted. */
+    record Frontier(List<String> ids, List<String> held) { }
+
+    /**
+     * Supernode suppression: the frontier an expand runs from — the named ids, or the whole Working Set — less every entity a
+     * sealed read flagged {@code highConnectivity}, unless the op overrides it ({@code includeHubs: true}, or the id in
+     * {@code expandHubs}; both sealed in the op's params, so the audit shows the override and replay is unchanged). With
+     * {@code strict} (an append, a Draft promote's re-seal) a NAMED flagged id that is not overridden is refused (422), never
+     * silently dropped; the readers that already drop ids that left the Working Set (fork, approval, template) leave it out.
+     * A merged expand still widens to every member of a touched identity group (a group is one identity).
+     */
+    private static Frontier frontier(List<String> named, Map<String, Object> p, InvestigationEvaluator.State s, boolean strict) {
+        boolean includeAll = Boolean.TRUE.equals(p.get("includeHubs"));
+        Set<String> override = new HashSet<>(strings(p.get("expandHubs")));
+        List<String> ids = new ArrayList<>(), held = new ArrayList<>();
+        for (String n : named.isEmpty() ? s.entities.keySet() : sorted(named)) {
+            if (!s.entities.containsKey(n)) continue;
+            if (s.highConnectivity.contains(n) && !includeAll && !override.contains(n)) held.add(n);
+            else ids.add(n);
+        }
+        if (strict && !named.isEmpty() && !held.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, held + (held.size() == 1 ? " is" : " are") + " flagged high connectivity (more distinct contacts than "
+                    + "the hub threshold of the expand that admitted them) - name them in 'expandHubs' (or send 'includeHubs': true) to expand through them");
+        return new Frontier(ids, held);
     }
 
     /** Whether raw value {@code v} keys, under a member type's sealed normaliser, to a member of sealed group {@code g}. */
@@ -1084,8 +1128,6 @@ public final class InvestigationRoutes implements RouteModule {
         }
         if (!frontier.isEmpty() && (indexed == null || !indexed.served())) {
             Map<String, Object> h = inv.header();
-            String src = SqlIdent.q(String.valueOf(h.get("sourceCol")));
-            String tgt = SqlIdent.q(String.valueOf(h.get("targetCol")));
             String kind = h.get("linkKindCol") == null ? null : SqlIdent.q(String.valueOf(h.get("linkKindCol")));
             List<String> binds = new ArrayList<>();
             StringBuilder sql = new StringBuilder("WITH fr(id, g) AS (VALUES ")
@@ -1094,35 +1136,7 @@ public final class InvestigationRoutes implements RouteModule {
                 binds.add(f);
                 binds.add(groupOf.get(f) == null ? f : String.valueOf(groupOf.get(f)));
             }
-            sql.append(", ev0 AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt)
-               .append(" AS VARCHAR) AS t, ").append(kind == null ? "CAST(NULL AS VARCHAR)" : "CAST(" + kind + " AS VARCHAR)")
-               .append(" AS k");
-            if (timed) sql.append(", ").append(InvestigationTime.instantExpr(
-                    SqlIdent.q(String.valueOf(h.get("timeCol"))),
-                    h.get("timeColZone") == null ? null : String.valueOf(h.get("timeColZone")), binds)).append(" AS ts");
-            sql.append(" FROM ").append(SqlIdent.q(dataset)).append(" WHERE ").append(src).append(" IS NOT NULL AND ")
-               .append(tgt).append(" IS NOT NULL");
-            if (kinds != null) {
-                sql.append(" AND CAST(").append(kind).append(" AS VARCHAR) IN (")
-                   .append(String.join(",", Collections.nCopies(kinds.size(), "?"))).append(")");
-                binds.addAll(kinds);
-            }
-            if (!excluded.isEmpty()) {
-                String out = String.join(",", Collections.nCopies(excluded.size(), "?"));
-                sql.append(" AND CAST(").append(src).append(" AS VARCHAR) NOT IN (").append(out)
-                   .append(") AND CAST(").append(tgt).append(" AS VARCHAR) NOT IN (").append(out).append(")");
-                binds.addAll(excluded);
-                binds.addAll(excluded);
-            }
-            sql.append(")");
-            if (timed) {
-                sql.append(", ev1 AS (SELECT *, timezone(?, ts) AS lt FROM ev0), ev AS (SELECT * FROM ev1 WHERE TRUE");
-                binds.add(InvestigationTime.localZone(window));
-                if (window != null) InvestigationTime.predicates(window, sql, binds);
-                sql.append(")");
-            } else {
-                sql.append(", ev AS (SELECT * FROM ev0)");
-            }
+            appendEvents(sql, binds, h, dataset, kinds, excluded, window, timed);
             sql.append(", pairs AS (SELECT s, t, k, COUNT(*) AS cnt, ")
                .append(timed ? "COUNT(DISTINCT CAST(lt AS DATE))" : "0").append(" AS days FROM ev GROUP BY s, t, k)");
             boolean degree = degMin != null || degMax != null;
@@ -1193,7 +1207,93 @@ public final class InvestigationRoutes implements RouteModule {
         read.put("fingerprint", InvestigationEvaluator.sha256(canonical(rows)));   // rows ONLY: where they were read from never enters it
         if (indexed != null && indexed.served()) read.put("index", indexed.readIndex());
         else if (indexed != null) read.put("fallback", indexed.readFallback());   // why the flat Dataset answered; never in the fingerprint
+        // Supernode suppression: sealed beside the rows (absent on a rung with no hubThreshold - every read before it existed)
+        if (query.get("hubThreshold") instanceof Number t)
+            read.put("hubs", hubs(inv, relationSql, rows, frontier, kinds, excluded, window, timed, t.intValue()));
         return read;
+    }
+
+    /**
+     * Supernode suppression — the endpoints of {@code rows} outside the frontier whose distinct-contact degree exceeds
+     * {@code threshold}, as {@code [{id, degree}]} sorted by id. The degree is counted exactly as {@code candidateDegreeMax}
+     * counts it (distinct counterparties over the rung's events: both directions, allowed link kinds, excluded entities
+     * pruned, inside the window) by one flat statement over the Dataset, whichever source answered the rows; the rows and
+     * their fingerprint are untouched.
+     */
+    private static List<Map<String, Object>> hubs(Inv inv, String relationSql, List<Map<String, Object>> rows, List<String> frontier,
+                                                  List<String> kinds, List<String> excluded, Map<String, Object> window, boolean timed,
+                                                  int threshold) {
+        TreeSet<String> candidates = new TreeSet<>();
+        for (Map<String, Object> r : rows)
+            for (String end : List.of("source", "target"))
+                if (r.get(end) != null) candidates.add(String.valueOf(r.get(end)));
+        candidates.removeAll(frontier);
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (candidates.isEmpty()) return out;
+        List<String> binds = new ArrayList<>(candidates);
+        StringBuilder sql = new StringBuilder("WITH c(id) AS (VALUES ")
+                .append(String.join(",", Collections.nCopies(candidates.size(), "(?)"))).append(")");
+        appendEvents(sql, binds, inv.header(), inv.dataset(), kinds, excluded, window, timed);
+        sql.append(" SELECT id, COUNT(DISTINCT o) AS d FROM (SELECT s AS id, t AS o FROM ev WHERE s IN (SELECT id FROM c) "
+                + "UNION ALL SELECT t AS id, s AS o FROM ev WHERE t IN (SELECT id FROM c)) u GROUP BY id "
+                + "HAVING COUNT(DISTINCT o) > CAST(? AS BIGINT) ORDER BY id");
+        binds.add(Integer.toString(threshold));
+        try {
+            DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
+                    inv.dataset(), relationSql, sql.toString(), candidates.size(), 0, List.of(), List.of(), binds));
+            for (Map<String, Object> row : r.rows()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", String.valueOf(row.get("id")));
+                m.put("degree", ((Number) row.get("d")).longValue());
+                out.add(m);
+            }
+        } catch (SQLException | IOException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the high-connectivity check over dataset '" + inv.dataset()
+                    + "' failed: " + e.getMessage());
+        }
+        return out;
+    }
+
+    /**
+     * The {@code ev0}/{@code ev} CTEs of an expand read (appended after the caller's own first CTE): the events with both
+     * endpoints present, of an allowed link kind, touching no excluded entity, and - when {@code timed} - with their
+     * instant ({@code ts}) and local time ({@code lt}), inside the window when one applies. Shared by the one-hop read and
+     * its supernode degree check, so both see exactly the same events.
+     */
+    private static void appendEvents(StringBuilder sql, List<String> binds, Map<String, Object> h, String dataset, List<String> kinds,
+                                     List<String> excluded, Map<String, Object> window, boolean timed) {
+        String src = SqlIdent.q(String.valueOf(h.get("sourceCol")));
+        String tgt = SqlIdent.q(String.valueOf(h.get("targetCol")));
+        String kind = h.get("linkKindCol") == null ? null : SqlIdent.q(String.valueOf(h.get("linkKindCol")));
+        sql.append(", ev0 AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt)
+           .append(" AS VARCHAR) AS t, ").append(kind == null ? "CAST(NULL AS VARCHAR)" : "CAST(" + kind + " AS VARCHAR)")
+           .append(" AS k");
+        if (timed) sql.append(", ").append(InvestigationTime.instantExpr(
+                SqlIdent.q(String.valueOf(h.get("timeCol"))),
+                h.get("timeColZone") == null ? null : String.valueOf(h.get("timeColZone")), binds)).append(" AS ts");
+        sql.append(" FROM ").append(SqlIdent.q(dataset)).append(" WHERE ").append(src).append(" IS NOT NULL AND ")
+           .append(tgt).append(" IS NOT NULL");
+        if (kinds != null) {
+            sql.append(" AND CAST(").append(kind).append(" AS VARCHAR) IN (")
+               .append(String.join(",", Collections.nCopies(kinds.size(), "?"))).append(")");
+            binds.addAll(kinds);
+        }
+        if (!excluded.isEmpty()) {
+            String out = String.join(",", Collections.nCopies(excluded.size(), "?"));
+            sql.append(" AND CAST(").append(src).append(" AS VARCHAR) NOT IN (").append(out)
+               .append(") AND CAST(").append(tgt).append(" AS VARCHAR) NOT IN (").append(out).append(")");
+            binds.addAll(excluded);
+            binds.addAll(excluded);
+        }
+        sql.append(")");
+        if (timed) {
+            sql.append(", ev1 AS (SELECT *, timezone(?, ts) AS lt FROM ev0), ev AS (SELECT * FROM ev1 WHERE TRUE");
+            binds.add(InvestigationTime.localZone(window));
+            if (window != null) InvestigationTime.predicates(window, sql, binds);
+            sql.append(")");
+        } else {
+            sql.append(", ev AS (SELECT * FROM ev0)");
+        }
     }
 
     /**
@@ -1618,7 +1718,10 @@ public final class InvestigationRoutes implements RouteModule {
      * {@code linkKinds} (null = all) · {@code window} ("inherit" the Investigation's current window — the default —
      * "full", or an override object) · {@code minEvents} (default 1) · {@code minDistinctDays} ·
      * {@code candidateDegreeMin}/{@code Max} (evaluated within the window) · {@code maxFanOut} (strongest first) ·
-     * {@code budget} (rows read; a breach sets {@code truncated}).
+     * {@code budget} (rows read; a breach sets {@code truncated}) · supernode suppression: {@code hubThreshold} (an
+     * integer >= 1; absent = the Space's {@code hub_threshold}, default 500, resolved into the sealed rung), and the
+     * analyst's override, {@code includeHubs: true} (every flagged entity) or {@code expandHubs: [ids]} (those named) —
+     * see {@link #frontier}. Unlike {@code candidateDegreeMax}, which drops a candidate, a hub is ADMITTED and flagged.
      */
     private static void expandParams(Map<String, Object> body, Map<String, Object> p) {
         if (body.containsKey("limit"))   // renamed by LA-13 — refused, never silently replaced by the default
@@ -1649,6 +1752,26 @@ public final class InvestigationRoutes implements RouteModule {
         p.put("candidateDegreeMin", dMin);
         p.put("candidateDegreeMax", dMax);
         p.put("maxFanOut", body.get("maxFanOut") == null ? null : positive(body, "maxFanOut", 1));
+        // Supernode suppression: each key is sealed only when stated, so an expand without them seals exactly as before.
+        if (body.get("hubThreshold") != null) p.put("hubThreshold", positive(body, "hubThreshold", 1));
+        Object includeHubs = body.get("includeHubs");
+        if (includeHubs != null && !(includeHubs instanceof Boolean))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'includeHubs' must be a boolean, got " + includeHubs);
+        if (Boolean.TRUE.equals(includeHubs)) p.put("includeHubs", true);
+        Object expandHubs = body.get("expandHubs");
+        if (expandHubs != null) {
+            if (!(expandHubs instanceof List<?> l) || l.size() > MAX_IDS)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expandHubs' must be a list of at most " + MAX_IDS + " entity ids");
+            java.util.TreeSet<String> hubs = new java.util.TreeSet<>();
+            for (Object o : l) {
+                String v = o == null ? "" : String.valueOf(o);
+                if (v.isBlank() || v.length() > MAX_ID_LENGTH)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every 'expandHubs' id must be a non-blank string of at most "
+                            + MAX_ID_LENGTH + " chars");
+                hubs.add(v);
+            }
+            if (!hubs.isEmpty()) p.put("expandHubs", new ArrayList<>(hubs));
+        }
     }
 
     private static int positive(Map<String, Object> body, String key, int min) {
@@ -1713,7 +1836,7 @@ public final class InvestigationRoutes implements RouteModule {
                         + (r.get("fanOutCapped") instanceof Number c && c.longValue() > 0
                                 ? ", " + c + " more left out by the fan-out cap" : "")
                         + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at its budget of " + q.get("budget") : "")
-                        + "." + approvalClause(e);
+                        + "." + hubClause(r, q, p) + approvalClause(e);
             }
             case "window" -> p.get("window") == null
                     ? "Cleared the time window: later expansions read the full time range."
@@ -1860,6 +1983,30 @@ public final class InvestigationRoutes implements RouteModule {
     static String approvalClause(Map<String, Object> e) {
         return e.get("approval") instanceof Map<?, ?> a
                 ? " Four-eyes: requested by " + a.get("requestedBy") + ", approved by " + a.get("approvedBy") + "." : "";
+    }
+
+    /**
+     * Supernode suppression, in plain language: the analyst's override, the flagged entities this frontier left out, and the
+     * candidates the read flagged. Empty for a read sealed before the feature (no {@code hubs}) with nothing to say.
+     */
+    private static String hubClause(Map<String, Object> r, Map<String, Object> q, Map<String, Object> p) {
+        StringBuilder out = new StringBuilder();
+        if (Boolean.TRUE.equals(p.get("includeHubs")))
+            out.append(" Analyst override: expanded through every high-connectivity entity.");
+        else if (!strings(p.get("expandHubs")).isEmpty())
+            out.append(" Analyst override: expanded through high-connectivity ").append(list(strings(p.get("expandHubs")))).append(".");
+        List<String> held = strings(q.get("hubsHeld"));
+        if (!held.isEmpty())
+            out.append(" Left out ").append(held.size()).append(" high-connectivity entit").append(held.size() == 1 ? "y" : "ies")
+               .append(" (not expanded): ").append(list(held)).append(".");
+        if (r.get("hubs") instanceof List<?> hubs && !hubs.isEmpty()) {
+            List<String> ids = new ArrayList<>();
+            for (Object o : hubs) if (o instanceof Map<?, ?> m) ids.add(String.valueOf(m.get("id")));
+            out.append(" Flagged ").append(ids.size()).append(" entit").append(ids.size() == 1 ? "y" : "ies")
+               .append(" as high connectivity (more than ").append(q.get("hubThreshold"))
+               .append(" distinct contacts) - shown, but not expanded further: ").append(list(ids)).append(".");
+        }
+        return out.toString();
     }
 
     private static String list(List<String> ids) {
@@ -2022,20 +2169,23 @@ public final class InvestigationRoutes implements RouteModule {
         return copy;
     }
 
-    /** An op body whose {@code ids} may carry pseudonyms this Investigation issued, each resolved to its entity. */
+    /** An op body whose {@code ids} (and an expand's {@code expandHubs}) may carry pseudonyms this Investigation issued, each resolved to its entity. */
     private static Map<String, Object> resolvePseudonyms(Inv inv, Map<String, Object> body) throws IOException {
-        if (!(body.get("ids") instanceof List<?> l)
-                || l.stream().noneMatch(o -> o instanceof String v && v.startsWith(EntityMasking.TOKEN_PREFIX)))
-            return body;
-        Map<String, Object> out = new LinkedHashMap<>(body);
-        EntityMasking mask = EntityMasking.of(inv, List.of());
-        List<String> ids = new ArrayList<>();
-        for (String id : mask.resolve(strings(l))) {
-            // DR-D2: an alias minted by an exploration read (the Space's key) is resolved from the server's book
-            String viaExploration = id.startsWith(EntityMasking.TOKEN_PREFIX) ? ExplorationMasking.lookup(inv.writeRoot(), id) : null;
-            ids.add(viaExploration != null ? viaExploration : id);
+        Map<String, Object> out = body;
+        for (String key : List.of("ids", "expandHubs")) {
+            if (!(body.get(key) instanceof List<?> l)
+                    || l.stream().noneMatch(o -> o instanceof String v && v.startsWith(EntityMasking.TOKEN_PREFIX)))
+                continue;
+            if (out == body) out = new LinkedHashMap<>(body);
+            EntityMasking mask = EntityMasking.of(inv, List.of());
+            List<String> ids = new ArrayList<>();
+            for (String id : mask.resolve(strings(l))) {
+                // DR-D2: an alias minted by an exploration read (the Space's key) is resolved from the server's book
+                String viaExploration = id.startsWith(EntityMasking.TOKEN_PREFIX) ? ExplorationMasking.lookup(inv.writeRoot(), id) : null;
+                ids.add(viaExploration != null ? viaExploration : id);
+            }
+            out.put(key, ids);
         }
-        out.put("ids", ids);
         return out;
     }
 
@@ -2043,6 +2193,10 @@ public final class InvestigationRoutes implements RouteModule {
      * Whether an expand is SENSITIVE under the Space's four-eyes thresholds (D-U7): its row budget above
      * {@code fourEyesBudgetAbove}, or its {@code maxFanOut} above {@code fourEyesFanOutAbove} — an unbounded fan-out
      * exceeds any fan-out threshold. Null when it is not (or no threshold is set, the shipped default).
+     * ⚠ Expanding THROUGH a high-connectivity entity ({@code includeHubs} / {@code expandHubs}) is deliberately not a trigger
+     * of its own (decided 2026-10-11): what such an expand can admit is bounded by exactly these two numbers, so a Space that
+     * wants a second person on wide expands already gets one (an unbounded fan-out through a hub is sensitive whenever a
+     * fan-out threshold is set), and the override itself is sealed in the op's params and named in its log line.
      */
     private static Map<String, Object> sensitivity(Inv inv, Map<String, Object> params) {
         LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(inv.writeRoot());
@@ -2184,10 +2338,8 @@ public final class InvestigationRoutes implements RouteModule {
                 out = untilWon(() -> {
             List<Map<String, Object>> log = readLog(inv);
             InvestigationEvaluator.State before = stateBefore(inv, log);
-            List<String> named = strings(params.get("ids"));
-            List<String> frontier = new ArrayList<>();
-            for (String n : named.isEmpty() ? before.entities.keySet() : sorted(named))
-                if (before.entities.containsKey(n)) frontier.add(n);
+            Frontier fr = frontier(strings(params.get("ids")), params, before, false);
+            List<String> frontier = fr.ids();
             if (frontier.isEmpty())
                 throw new ApiException(409, ErrorCodes.CONFLICT, "nothing left to expand — the entities this request names have left the "
                         + "Working Set since it was made; deny it instead");
@@ -2198,7 +2350,7 @@ public final class InvestigationRoutes implements RouteModule {
             entry.put("op", "expand");
             entry.put("params", params);
             entry.put("approval", approval);
-            entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, before, "")));
+            entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, "")));
             return (Map<String, Object>) commit(ex, inv, log, entry, before);
                 });
             } catch (IOException | RuntimeException failed) {

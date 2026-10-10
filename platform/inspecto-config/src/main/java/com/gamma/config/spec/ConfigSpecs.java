@@ -1290,6 +1290,10 @@ public final class ConfigSpecs {
                         "Distinct values per bound column a seedBy (LA-17) may scan to find an Entity List's "
                                 + "members in the Dataset; above it the seed is refused, never sampled; "
                                 + "absent = 20000."),
+                FieldSpec.of("hub_threshold", "Supernode (hub) threshold", FieldType.INT,
+                        "An expand candidate with more distinct contacts than this (in the rung's window) is added to "
+                                + "the Working Set, flagged high connectivity, and not expanded further unless the analyst "
+                                + "overrides (expandHubs / includeHubs); an expand's own hubThreshold wins; absent = 500."),
                 FieldSpec.of("max_set_bytes", "Maximum Working Set size (bytes)", FieldType.INT,
                         "The most sealed Working Set text one step may store (UTF-8 bytes, 1024..1073741824); a set above "
                                 + "it is refused with 413 PAYLOAD_TOO_LARGE, never truncated, on both the filesystem and the "

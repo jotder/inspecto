@@ -257,7 +257,7 @@ A Space may require a stated **purpose** for sensitive steps; when asked, it is 
 | Op | Effect |
 |---|---|
 | **seed** | Put starting entities into the Working Set (by id, or from an Entity List). |
-| **expand** | Follow links one hop. Options (the *hop ladder*): direction, link kinds, time **window**, minimum events / distinct days, candidate degree bounds, fan-out cap, **budget**. |
+| **expand** | Follow links one hop. Options (the *hop ladder*): direction, link kinds, time **window**, minimum events / distinct days, candidate degree bounds, fan-out cap, **budget**, and a **hub threshold** (default 500, set per Space): an entity with more distinct contacts is added but flagged *high connectivity* and not expanded further unless you name it in `expandHubs` (or send `includeHubs`). |
 | **window** | Set the time range later expands inherit. |
 | **exclude** | Remove entities — a **reason is required**. Stays excluded. |
 | **hide / keep** | Hide from view only; **keep** protects an entity from exclusion. |

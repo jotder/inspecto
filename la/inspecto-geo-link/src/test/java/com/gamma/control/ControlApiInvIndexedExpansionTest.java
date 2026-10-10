@@ -446,10 +446,10 @@ class ControlApiInvIndexedExpansionTest {
             assertTrue(expand(c, "[\"A\"]", List.of(), "", "").at("/read/index").isMissingNode());
             new ViewStore(root.resolve("views")).write(new ViewDefinition("n_view", "flow-x", List.of(), view(), "2026-10-03T00:00:00Z"));
             assertFalse(expand(c, "[\"A\"]", List.of(), "", "").at("/read/index").isMissingNode(), "restored: served again");
-            // disabled: exactly today's step shape
+            // disabled: exactly today's step shape (plus supernode suppression's hubsFlagged)
             settings(c, DISABLED);
             JsonNode off = expand(c, "[\"A\"]", List.of(), "", "");
-            assertEquals(List.of("rowCount", "fingerprint", "readAt", "fanOutCapped", "fallback", "rung"), fieldNames(off.get("read")));
+            assertEquals(List.of("rowCount", "fingerprint", "readAt", "fanOutCapped", "hubsFlagged", "fallback", "rung"), fieldNames(off.get("read")));
             assertEquals("index_disabled", off.at("/read/fallback/reason").asText());
         }
     }
