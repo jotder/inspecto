@@ -88,7 +88,8 @@ link index**; graph algorithms run in a bounded in-process pool over either inpu
 \* **Trigger.** A landed file commits a Consignment and emits `pipeline.commit` (mirrored in `JobService`);
 `job.dataset.produced` is emitted **only** by the `sql.template` Job. A `la.index.build` Job meant to refresh after a
 daily file must therefore use `on_signal: pipeline.commit` (guard `$signal.pipeline`) or `on_pipeline`. Each half is
-unit-tested on its own; no test yet runs commit → Job → index version (`LA-DEMO-INDEX-1`).
+unit-tested, and `ControlApiIndexRefreshOnCommitTest` (`la/inspecto-geo-link`) runs commit → `pipeline.commit` → Job → index
+version N+1 → indexed read, plus the negative on `job.dataset.produced` (`LA-DEMO-INDEX-1`, DR-T1).
 
 Two invariants the diagram encodes: **raw values never leave through a response** (masking is the last step before
 serialisation, after every cache), and **the op log never re-reads a Dataset on replay** (rows are sealed into the
