@@ -302,27 +302,11 @@ public final class RiskScoreEvaluator {
      * Anything else — a directory with no marker, or another model's — is refused, untouched.
      */
     static void claim(Path dir, String modelId) throws IOException {
-        if (!Files.exists(dir)) {
-            Files.createDirectories(dir);
-            Files.writeString(dir.resolve(OWNER_MARKER), modelId);
-            return;
-        }
-        if (!ownedBy(dir, modelId))
-            throw new IllegalStateException("risk-score '" + modelId + "' refuses to write into '" + dir.getFileName()
-                    + "': the directory exists and was not created by this model");
+        com.gamma.alert.ScoreOutputDirs.claim(dir, OWNER_MARKER, "risk-score", modelId);
     }
 
     private static void swapIn(Path dir, Path tmp, String name) throws IOException {
-        List<Path> stale = new ArrayList<>();
-        try (DirectoryStream<Path> old = Files.newDirectoryStream(dir, "scores-*.parquet")) {
-            for (Path p : old) {
-                Path hidden = p.resolveSibling(p.getFileName() + ".stale");
-                Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
-                stale.add(hidden);
-            }
-        }
-        Files.move(tmp, dir.resolve(name), StandardCopyOption.ATOMIC_MOVE);
-        for (Path p : stale) Files.deleteIfExists(p);
+        com.gamma.alert.ScoreOutputDirs.swapIn(dir, tmp, name, "scores-*.parquet");
     }
 
     private static String sqlStr(Path p) {

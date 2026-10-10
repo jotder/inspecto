@@ -161,8 +161,7 @@ public final class RiskScoreRoutes implements RouteModule {
     private static void putEntityKey(HttpExchange ex, Path writeRoot, Map<String, Object> out, String entityKey) {
         boolean reveal = ApiContext.subject(ex)
                 .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
-        out.put("entityKey", reveal ? entityKey : EvidenceMasker.forSpace(writeRoot).tokenFor(entityKey));
-        out.put("keyMasked", !reveal);
+        com.gamma.mask.EntityKeyMasking.put(out, writeRoot, entityKey, reveal);
     }
 
     /** SEC-7d as the GET applies it: a data-scoped caller reaches only a model carrying a scope it holds. */
@@ -315,11 +314,8 @@ public final class RiskScoreRoutes implements RouteModule {
     /** {@link #requireNotReserved(ApiContext, String, String, Map)} against an explicit write root. */
     static void requireNotReserved(Path writeRoot, String type, String id, Map<String, Object> content) {
         String prefix = RiskScoreModel.SCORES_PREFIX;
-        java.util.List<String> named = new java.util.ArrayList<>();
-        named.add(id);
-        for (String k : STORE_KEYS) if (content.get(k) instanceof String v && !v.isBlank()) named.add(v);
-        boolean reserved = named.stream().map(RiskScoreRoutes::firstSegment)
-                .anyMatch(n -> n.toLowerCase(java.util.Locale.ROOT).startsWith(prefix));
+        java.util.List<String> named = com.gamma.alert.ScoreOutputDirs.namedStores(id, content, STORE_KEYS);
+        boolean reserved = com.gamma.alert.ScoreOutputDirs.anyReserved(named, prefix);
         if (!reserved) return;
         if ("dataset".equals(type) && id != null && id.equals(content.get("physicalRef"))
                 && named.size() == 2 && id.endsWith(RiskScoreModel.LATEST_SUFFIX) && writeRoot != null) {
@@ -330,17 +326,5 @@ public final class RiskScoreRoutes implements RouteModule {
         throw new IllegalArgumentException(type + " '" + id + "' names a store under the reserved prefix '" + prefix
                 + "' (Risk Score outputs); only a Dataset with id = physicalRef = " + prefix
                 + "<model>" + RiskScoreModel.LATEST_SUFFIX + " over a saved model is allowed");
-    }
-
-    /** The first path segment of a store reference, normalised ({@code ./a/../risk_scores_x/y} → {@code risk_scores_x}). */
-    private static String firstSegment(String ref) {
-        String n = ref.trim().replace('\\', '/');
-        java.util.Deque<String> parts = new java.util.ArrayDeque<>();
-        for (String p : n.split("/")) {
-            if (p.isEmpty() || p.equals(".")) continue;
-            if (p.equals("..")) { if (!parts.isEmpty()) parts.removeLast(); continue; }
-            parts.addLast(p);
-        }
-        return parts.isEmpty() ? "" : parts.getFirst();
     }
 }

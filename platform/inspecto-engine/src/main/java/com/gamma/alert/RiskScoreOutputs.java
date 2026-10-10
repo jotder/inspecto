@@ -1,7 +1,5 @@
 package com.gamma.alert;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -23,11 +21,6 @@ public final class RiskScoreOutputs {
 
     /** Whether {@code dir} is a scores directory THIS model created (its marker names the model). */
     public static boolean ownedBy(Path dir, String modelId) {
-        Path marker = dir.resolve(OWNER_MARKER);
-        try {
-            return Files.isRegularFile(marker) && modelId.equals(Files.readString(marker).trim());
-        } catch (IOException e) {
-            return false;
-        }
+        return ScoreOutputDirs.ownedBy(dir, OWNER_MARKER, modelId);
     }
 }
