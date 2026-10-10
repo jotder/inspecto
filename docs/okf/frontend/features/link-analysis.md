@@ -24,8 +24,8 @@ timestamp: 2026-07-07T00:00:00Z
 > fixtures from the library. Design and as-built facts: `docs/archived-documents/plans-archive/la-separation-d5-design.md` (archived).
 
 > **The second shell, `la-app` (D-5 step 6, 2026-10-02).** `inspecto-ui/projects/la-app/src` is a separate Angular application
-> (`ng build la-app` -> `dist/la-app/browser`; `gamma` is unchanged): a top bar (Link Analysis / Geo / Entity Lists, Space switcher, user
-> menu), a landing page, and the library's lazy routes. Sign-in is the CORE's OIDC code (`inspecto/auth`), not a second client. It
+> (`ng build la-app` -> `dist/la-app/browser`; `gamma` is unchanged): a LEFT navigation rail (Link Analysis / Geo / Entity Lists, Space switcher, user
+> menu; slim 64px icons by default, 224px with labels via the toggle, remembered in `localStorage` `la-app.rail-expanded`; under `md` (960px) the same markup is a 3rem top bar; no header or footer, the footer text is the brand tooltip and shows when the rail is expanded; the shell host sets `--shell-chrome-height` to `0rem` beside the rail and `3rem` as a top bar, which the Link Analysis root height formula reads; measured 2026-10-10, 1440x900 canvas 722x772 slim / 562x772 expanded, 1280x720 868x592), a landing page, and the library's lazy routes. Sign-in is the CORE's OIDC code (`inspecto/auth`), not a second client. It
 > answers the ten `la-host` tokens in `la-host.providers.ts`; `LA_APP_TOKEN_PROVISION` lists them and a spec pins that the list is the
 > ten. **Six are real** (`LA_DATASETS` over the Component registry, `LA_CASES`, `LA_TAGS`, `LA_TRANSFER`, `LA_AI_ASSIST`, `LA_FEATURES`) and
 > **four are stubs** that report once on the console (`console.info`, never an error) and set `available: false` so the library hides the
