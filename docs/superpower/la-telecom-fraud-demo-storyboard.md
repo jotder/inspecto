@@ -43,7 +43,7 @@ Persona: a fraud analyst. Story: an IRSF/Wangiri alert fires on `MSISDN-A`; the 
 
 ## 3. Connection types → what must exist (note 10)
 
-| Link kind | Source Dataset | Mapping (from → to) | Fit |
+| Link kind | Origin Dataset | Mapping (from → to) | Fit |
 |---|---|---|---|
 | Voice call | Voice CDR | A-number → B-number | HAVE |
 | SMS | SMS CDR | orig MSISDN → term MSISDN | HAVE |
@@ -118,7 +118,7 @@ Sprint 1 UI flow; pattern-stage feasibility (read-only).
 The customer's source list, with the notes' numbering, is the table in §1's bracket references; the three data-model
 tables (link types, source data, guardrails) are reproduced in §3, §4 and below.
 
-| Source | Fields needed |
+| Stream / Reference | Fields needed |
 |---|---|
 | Voice CDR | A-number, B-number, start time, duration, call type, redirecting/forwarding number, IMSI, IMEI, destination type |
 | SMS CDR | originating and terminating MSISDN, timestamp, message type |
