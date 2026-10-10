@@ -113,6 +113,8 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     /** Columns offered by the projection mapping selects — the picked Dataset's declared columns, or the
      *  ones the rows seam probes off its store. */
     readonly datasetColumns = signal<string[]>([]);
+    /** The picked Dataset's first date-typed column ('' = none declared) - the default event time of an Investigation. */
+    readonly datasetTimeColumn = signal('');
 
     /**
      * Extra entity-projection mappings beyond the primary one above (Phase C, multi-entity/multi-dataset
@@ -312,6 +314,7 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     private async onDatasetPicked(id: string): Promise<void> {
         const meta = await this.columnMetaForDataset(id);
         this.datasetColumns.set(meta.map((c) => c.name));
+        this.datasetTimeColumn.set(meta.find((c) => c.type === 'date')?.name ?? '');
         const f = this.queryForm.controls;
         // Pre-fill only a blank mapping: a loaded saved view, or the analyst's own pick, is never overwritten.
         const guess = !f.sourceCol.value && !f.targetCol.value ? suggestLinkColumns(meta) : null;

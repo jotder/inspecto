@@ -673,6 +673,10 @@ export class LinkAnalysisComponent implements OnInit {
         const cols = this.attrColumns();
         return workingSetOptionsFor(this.profile(), cols).timeColumn ?? cols.find((c) => isTemporalColumn(g, c)) ?? '';
     });
+    /** {@link investigationTimeColumn}, else the picked Dataset's first date-typed column (the graph may carry no attrs). */
+    investigationTimeDefault(): string {
+        return this.investigationTimeColumn() || this.queryPanel?.datasetTimeColumn() || '';
+    }
     /** Cutoff (epoch millis) — edges dated after this are hidden; `null` until the slider is touched. */
     readonly timeCutoff = signal<number | null>(null);
     /** Every edge-`attrs` key present anywhere in the loaded graph — the column picker's options. */

@@ -1121,26 +1121,26 @@ export function findCycles(g: G6GraphData, opts: { limit?: number; maxLen?: numb
 
 /**
  * {@link findCycles}, SHORTEST FIRST. `findCycles` enumerates from the smallest start node and stops at `limit`,
- * so on a big graph a short planted ring (A→B→C→D→A) can be cut off behind dozens of long cycles. This widens
- * `maxLen` one hop at a time and stops as soon as the cap is reached, so every cycle shorter than the final
- * length is complete; the result is ordered by length (stable within a length).
+ * so on a big graph a short planted ring (A→B→C→D→A) can be cut off behind dozens of other cycles. This widens
+ * `maxLen` one hop at a time and keeps up to `limit` cycles PER LENGTH; the result is ordered by length (stable
+ * within a length).
  */
 export function findCyclesShortestFirst(
     g: G6GraphData,
     opts: { limit?: number; maxLen?: number } = {},
 ): GraphSelection[] {
     const { limit = 50, maxLen = 8 } = opts;
-    // `done` = every cycle shorter than `len` (a pass that was not capped enumerated them all).
-    let done: GraphSelection[] = [];
+    // `limit` caps EACH length, so dozens of 2-hop reciprocal pairs cannot crowd out a 4-hop ring. The work is
+    // bounded too: a per-pass result cap and a time budget (widening stops, shorter lengths are already kept).
+    const started = Date.now();
+    const out: GraphSelection[] = [];
     for (let len = 1; len <= maxLen; len++) {
-        const cap = limit + done.length;
-        const res = findCycles(g, { limit: cap, maxLen: len });
-        const ofLen = res.filter((c) => c.nodeIds.length === len);
-        if (res.length >= cap) return sortCyclesShortestFirst([...done, ...ofLen]);
-        done = [...done, ...ofLen];
-        if (done.length >= limit) break;
+        const res = findCycles(g, { limit: 2000, maxLen: len });
+        // Parallel links give the same ring once per link combination: one row per node sequence.
+        out.push(...distinctPaths(g, res.filter((c) => c.nodeIds.length === len)).slice(0, limit));
+        if (res.length >= 2000 || Date.now() - started > 1500) break;
     }
-    return sortCyclesShortestFirst(done);
+    return sortCyclesShortestFirst(out);
 }
 
 /** Stable ordering of cycles by length (shortest first). */

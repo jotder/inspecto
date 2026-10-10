@@ -226,6 +226,22 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         expect(c.datasetColumns()).toEqual(['caller_id']);
     });
 
+    it('remembers the picked Dataset‘s first date-typed column as the default event time (DR-D7)', async () => {
+        const columns = vi.fn(() =>
+            Promise.resolve([
+                { name: 'payer', type: 'string' },
+                { name: 'booked_at', type: 'date' },
+            ]),
+        );
+        const { fixture, c } = make('entity-projection', [{ provide: DatasetRowsService, useValue: { columns } }]);
+        fixture.componentRef.setInput('datasets', [
+            { id: 'cdr', name: 'cdr', kind: 'physical', sourceName: 'switch_cdr_live', columns: [] },
+        ]);
+        c.queryForm.patchValue({ datasetId: 'cdr' });
+        await fixture.whenStable();
+        expect(c.datasetTimeColumn()).toBe('booked_at');
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = make();
         await expectNoA11yViolations(fixture.nativeElement);
