@@ -335,7 +335,7 @@ a job can re-run it with different values. A first-class Component kind (`rule-t
 and note it is **not** a fourth member of the triad above: it carries no engine, it is a stored query shape. The
 `:fieldValue` placeholder namespace is distinguished from `$`-Parameters and `${ENV:…}` secrets in §7.
 
-**Anomaly Model** *(added 2026-10-10, operator decision D-AD1 — ANOMALY-DETECTION-1, design only)* — The authored
+**Anomaly Model** *(added 2026-10-10, operator decision D-AD1 — ANOMALY-DETECTION-1; as built: [`okf/backend/control-plane/anomaly-scores.md`](okf/backend/control-plane/anomaly-scores.md))* — The authored
 **Type** (Component kind `anomaly-model`) that scores each entity against its own history and its **Peer Group**: a
 set of **Features**, a baseline window, seasonality and thresholds. ⛔ Not a **Risk Score** model (absolute weighted
 factors), not a `baseline` **Expectation** (batch data quality).

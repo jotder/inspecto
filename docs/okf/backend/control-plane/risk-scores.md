@@ -16,6 +16,8 @@ A **Risk Score** (ASSURE-RISK-SCORE-1, WS-22; term chosen by operator decision D
 entity type. It is **computed on the server by a Job**, never by a Step Processor (the operator's hold on
 new Step Processors stands). The Link Analysis `suspicionScore` is a different thing: a client-side graph
 centrality composite. Keep the two apart.
+An **Anomaly Score** ("unusual for itself or its peers") is a third, separate concept: [Anomaly Scores](anomaly-scores.md).
+Its `_latest` Dataset can be a Risk Score factor (`measure: max(score)`).
 
 ## The model — the `risk-score` component kind
 

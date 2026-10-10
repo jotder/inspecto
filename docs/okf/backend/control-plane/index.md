@@ -27,6 +27,9 @@ v1 contract, queries, observability, the job scheduler, and multi-space hosting.
 * [Risk Scores](risk-scores.md) - the `risk-score` component kind, the `risk.score` Job writing the scores
   Dataset (reproducible factors, `_latest` snapshot), `GET /risk-scores/{model}/{entityKey}`, and Incident
   priority through a per-entity Alert Rule (ASSURE-RISK-SCORE-1).
+* [Anomaly Scores](anomaly-scores.md) - the `anomaly-model` component kind, the `anomaly.score` Job (self + Peer Group
+  baselines, cohort shift), `GET /anomaly-scores/{model}/{entityKey}` + preview, the `afterScore` pending Alert Rule,
+  the Studio pane and the entity anomaly panel (ANOMALY-DETECTION-1).
 * [Entity Lists — assurance entries](entity-lists.md) - range / CIDR and expiring entries, the match route, the
   Parquet sidecar Dataset, four-eyes on list changes (kind `entity-list`, D-P5) and the Risk Score watch-list
   feed, on top of the LA-17 Identity Fact log (ASSURE-ENTITY-LISTS-1).

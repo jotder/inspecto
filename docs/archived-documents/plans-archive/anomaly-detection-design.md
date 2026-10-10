@@ -1,8 +1,8 @@
 # Anomaly Detection add-on — design (`ANOMALY-DETECTION-1`)
 
-> **State: BUILDING — lane S1 built 2026-10-10 (see §16-A); decisions taken (operator, 2026-10-10).** In-flight plan for the BACKLOG row `ANOMALY-DETECTION-1`
+> **State: COMPLETE + ARCHIVED 2026-10-10 — S1..S5 shipped; as-built truth in [anomaly-scores](../../okf/backend/control-plane/anomaly-scores.md), residuals in `ANOMALY-DETECTION-RESIDUALS-1`.** In-flight plan for the BACKLOG row `ANOMALY-DETECTION-1`
 > (P3). The row's home is the offering map in
-> [module-reorganisation-decisions.md](../okf/backend/module-reorganisation-decisions.md), which files Anomaly
+> [module-reorganisation-decisions.md](../../okf/backend/module-reorganisation-decisions.md), which files Anomaly
 > Detection as a not-built add-on. Every decision this design needs is in §17 (*Decisions*, D-AD1..D-AD12)
 > all approved as recommended (operator, 2026-10-10).
 
@@ -13,10 +13,10 @@ unlike itself, or unlike its peers, and why?"*:
 
 | Existing capability | What it compares | Why it is not entity anomaly detection |
 |---|---|---|
-| `baseline` Expectation ([observability §3.10](../okf/capabilities/observability/observability.md)) | an input's profile (row count, null rate, mean…) against the median of the last N accepted profiles, optionally per `groupBy` group | data-quality gate on a batch; fixed percent/absolute limits; no per-entity history, no seasonality, no explanation beyond the cell |
-| Business-assurance forecast bands ([spaces §3.5](../okf/capabilities/spaces/spaces.md)) | a daily series against a Holt-Winters forecast ± 4σ̂ (MAD of week-on-week differences), with a regime rule and CUSUM | one hand-authored SQL view per series; a few aggregate series, not thousands of entities |
-| Completeness KPI `VolumeBaseline` ([observability §3.9](../okf/capabilities/observability/observability.md)) | a Pipeline's daily volume against a rolling baseline (28 days, ≥ 7, tolerance 0.3) | per Pipeline, not per business entity |
-| Risk Scores ([risk-scores.md](../okf/backend/control-plane/risk-scores.md)) | weighted indicators (Measures) per entity, explainable, reproducible | **absolute** thresholds the author picks; nothing compares an entity with its own history or its peers |
+| `baseline` Expectation ([observability §3.10](../../okf/capabilities/observability/observability.md)) | an input's profile (row count, null rate, mean…) against the median of the last N accepted profiles, optionally per `groupBy` group | data-quality gate on a batch; fixed percent/absolute limits; no per-entity history, no seasonality, no explanation beyond the cell |
+| Business-assurance forecast bands ([spaces §3.5](../../okf/capabilities/spaces/spaces.md)) | a daily series against a Holt-Winters forecast ± 4σ̂ (MAD of week-on-week differences), with a regime rule and CUSUM | one hand-authored SQL view per series; a few aggregate series, not thousands of entities |
+| Completeness KPI `VolumeBaseline` ([observability §3.9](../../okf/capabilities/observability/observability.md)) | a Pipeline's daily volume against a rolling baseline (28 days, ≥ 7, tolerance 0.3) | per Pipeline, not per business entity |
+| Risk Scores ([risk-scores.md](../../okf/backend/control-plane/risk-scores.md)) | weighted indicators (Measures) per entity, explainable, reproducible | **absolute** thresholds the author picks; nothing compares an entity with its own history or its peers |
 
 The competitive matrix (`docs/stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`, row L) marks *explainable
 anomaly detection* **P** for us and **Y** for most competitors. The fraud and assurance packs (`telco-fraud`,
