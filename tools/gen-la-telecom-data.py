@@ -20,9 +20,11 @@ Numbering (every number is invented; country codes 999/998 are not assigned to a
   9989100xxxx  premium-rate international range (IRSF / Wangiri callback destinations)
   998200xxxxx  ordinary international numbers
 
-The degree ladder from the suspect WANGIRI-A (shortest paths, every link kind folded undirected):
+The degree ladder from the suspect WANGIRI-A (shortest paths, every link kind folded undirected, with the HUB supernode
+flagged high-connectivity and NOT expanded - expanded, the hub puts most numbers within 4 hops):
   d1 WANGIRI-B (shared_device) and PREMIUM-01 (forwarding)   d2 IRSF-01 (voice to PREMIUM-01)
   d3 SUBFRAUD-01..05 (shared_identity: IRSF-01's id document) d4 SIMBOX-01 (shared_payment: SUBFRAUD-03's card)
+  d4 MULE-01 (sim_history: SUBFRAUD-04's line passed to the mule's customer CUST-M01); d5 the other mules
 The background is built so no shortcut exists: Wangiri victims come from clusters 0-39, the SIM box terminates calls
 only into clusters 60-99, and a cluster never calls outside itself (except the HUB). Pinned by TelecomLinksGoldenTest.
 """
@@ -155,8 +157,9 @@ for m in BG + [HUB]:
             else:
                 recharge.append([m, f"V{h('voucher', m, when)[:10].upper()}", f"AGT-{rng.randint(1, 40):03d}", "", fmt(when)])
 for c in rng.sample(CLUSTERS, 25):                           # ownership transfers inside a cluster -> sim_history
-    m, to = rng.sample(c, 2)
+    m, to = rng.sample(c, 2)                                 # `to`'s holder takes over m, then hands `to` on
     prov.append([m, customer[m], customer[to], "ownership_transfer", fmt(ts())])
+    prov.append([to, customer[to], f"CUST-{h('cust2', to)[:8].upper()}", "ownership_transfer", fmt(ts())])
 for m in rng.sample(BG, 20):                                 # call forwarding to voicemail-like cluster mate
     c = CLUSTERS[BG.index(m) // CLUSTER]
     hlr.append([m, imsi_of(m, 2), imeis[m][0], rng.choice([x for x in c if x != m]), ""])
@@ -249,13 +252,16 @@ for m in WANGIRI + IRSF + SUBFRAUD:
         hlr.append([m, imsi_of(m), imeis[m][0], "", ""])
 FRAUD_CARD = h("card", "fraud-card-7")
 recharge.append([SUBFRAUD[2], "", "", FRAUD_CARD, fmt(ts(45, 60, 9, 18))])   # the d3 -> d4 hop
+recharge.append([SUBFRAUD[4], "VSUBF0000005", "AGT-666", "", fmt(ts(45, 60, 9, 18))])  # d3 -> the mule ring at d4
 for m in SIMBOX:
     for _ in range(4):
         recharge.append([m, "", "", FRAUD_CARD if m == SIMBOX[0] else h("card", "simbox", m), fmt(ts(20, 60, 9, 18))])
 for k, m in enumerate(SIMBOX):
     for j in range(1, 4):
         prov.append([m, f"CUST-S0{k + 1}", f"CUST-S0{k + 1}", "sim_swap", fmt(START + timedelta(days=10 + 12 * j, hours=k))])
+prov.append([MULES[0], "CUST-M00", "CUST-M01", "ownership_transfer", fmt(datetime(2026, 8, 20, 10))])  # the recruited mule
 prov.append([SIMBOX[5], "CUST-S06", "CUST-M01", "ownership_transfer", fmt(datetime(2026, 9, 2, 14))])  # MULE-01 <-> SIMBOX-06
+prov.append([SUBFRAUD[3], "CUST-F04", "CUST-M01", "ownership_transfer", fmt(datetime(2026, 9, 20, 15))])  # MULE-01 <-> SUBFRAUD-04
 
 # Fraud history.
 blocklist += [[WANGIRI[1], "2026-09-01 09:00:00", "wangiri"], [SIMBOX[2], "2026-09-15 09:00:00", "simbox"],

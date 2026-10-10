@@ -103,7 +103,31 @@ class TelecomLinksGoldenTest {
         perKind.forEach((k, n) -> assertTrue(n > 0, k));
         Set<String> pairs = new HashSet<>();
         for (Map<String, Object> l : links)
-            assertTrue(pairs.add(l.get("a_msisdn") + "|" + l.get("b_msisdn") + "|" + l.get("link_kind")), "one row per pair and kind: " + l);
+            assertTrue(pairs.add(l.get("a_msisdn") + "|" + l.get("b_msisdn") + "|" + l.get("link_kind")), "one row per ordered pair and kind: " + l);
+    }
+
+    @Test
+    void theSharedKindsAreEmittedInBothDirections() {
+        Set<String> kinds = Set.of("shared_device", "shared_identity", "shared_payment", "sim_history");
+        for (Map<String, Object> l : links) {
+            if (!kinds.contains((String) l.get("link_kind"))) continue;
+            Map<String, Object> back = link((String) l.get("b_msisdn"), (String) l.get("a_msisdn"), (String) l.get("link_kind"));
+            assertEquals(l.get("via"), back.get("via"), "the mirror row carries the same key: " + l);
+            assertEquals(l.get("events"), back.get("events"));
+        }
+    }
+
+    @Test
+    void simHistoryComesOnlyFromRealTransfers() {
+        for (Map<String, Object> l : links)
+            if (l.get("link_kind").equals("sim_history"))
+                assertFalse(((String) l.get("a_msisdn")).equals(l.get("b_msisdn")), String.valueOf(l));
+        // a customer holding two lines (no transfer) is shared_identity only, never sim_history
+        long twoLineOnly = links.stream().filter(l -> l.get("link_kind").equals("shared_identity")).filter(l ->
+                find((String) l.get("a_msisdn"), (String) l.get("b_msisdn"), "sim_history") == null).count();
+        assertTrue(twoLineOnly > 0);
+        assertNull(find(SIMBOX.get(0), SIMBOX.get(0), "sim_history"));
+        assertEquals("subscriber:CUST-M01", link(SUBFRAUD.get(3), MULES.get(0), "sim_history").get("via"));
     }
 
     @Test
@@ -135,12 +159,13 @@ class TelecomLinksGoldenTest {
             assertFalse(via.matches(".*agent:AGT-0\\d\\d.*"), "a retail agent serving ~60 lines makes no pair: " + l);
         }
         long devicePairs = links.stream().filter(l -> l.get("link_kind").equals("shared_device")).count();
-        assertTrue(devicePairs <= 20, "only the planted handsets are shared: " + devicePairs);
+        assertTrue(devicePairs <= 40, "only the planted handsets are shared (both directions): " + devicePairs);
     }
 
+    /** The demo expands degree by degree with the HUB flagged high-connectivity and NOT expanded (hubThreshold 500). */
     @Test
-    void theSuspectReachesTheRingsDegreeByDegree() {
-        Map<String, Integer> d = distancesFrom(SUSPECT);
+    void theSuspectReachesTheRingsDegreeByDegreeWithTheHubNotExpanded() {
+        Map<String, Integer> d = distancesFrom(SUSPECT, HUB);
         Map<String, Integer> expected = new LinkedHashMap<>();
         expected.put(WANGIRI_B, 1);
         expected.put(PREMIUM_01, 1);
@@ -148,11 +173,17 @@ class TelecomLinksGoldenTest {
         expected.put(IRSF.get(0), 2);
         for (String m : SUBFRAUD) expected.put(m, 3);
         expected.put(SIMBOX.get(0), 4);
+        expected.put(SIMBOX.get(5), 4);
+        for (String m : MULES) expected.put(m, 4);
         Map<String, Integer> actual = new LinkedHashMap<>();
         expected.keySet().forEach(m -> actual.put(m, d.get(m)));
-        assertEquals(expected, actual, "shortest distances from the suspect " + SUSPECT);
-        Set<Integer> ladder = new TreeSet<>(d.values());
-        assertTrue(ladder.containsAll(Set.of(1, 2, 3, 4)), ladder.toString());
+        assertEquals(expected, actual, "shortest distances from the suspect " + SUSPECT + ", hub not expanded");
+        // the intended path, hop by hop
+        assertNotNull(link(SUSPECT, PREMIUM_01, "forwarding"));
+        assertNotNull(link(IRSF.get(0), PREMIUM_01, "voice"));
+        assertNotNull(link(IRSF.get(0), SUBFRAUD.get(2), "shared_identity"));
+        assertTrue(String.valueOf(link(SUBFRAUD.get(2), SIMBOX.get(0), "shared_payment").get("via")).startsWith("card:"));
+        assertTrue(String.valueOf(link(SUBFRAUD.get(4), MULES.get(1), "shared_payment").get("via")).contains("agent:AGT-666"));
     }
 
     @Test
@@ -247,11 +278,13 @@ class TelecomLinksGoldenTest {
         return adj;
     }
 
-    private static Map<String, Integer> bfs(Map<String, Set<String>> adj, String from) {
+    private static Map<String, Integer> bfs(Map<String, Set<String>> adj, String from, String... notExpanded) {
         Map<String, Integer> d = new HashMap<>(Map.of(from, 0));
         ArrayDeque<String> q = new ArrayDeque<>(List.of(from));
+        Set<String> stop = Set.of(notExpanded);
         while (!q.isEmpty()) {
             String x = q.poll();
+            if (stop.contains(x)) continue;   // reached and shown, never expanded
             for (String y : adj.getOrDefault(x, Set.of()))
                 if (d.putIfAbsent(y, d.get(x) + 1) == null) q.add(y);
         }
@@ -259,7 +292,7 @@ class TelecomLinksGoldenTest {
     }
 
     /** Shortest undirected hop counts over every link kind - how Link Analysis expands degree by degree. */
-    private static Map<String, Integer> distancesFrom(String m) { return bfs(adjacency(null), m); }
+    private static Map<String, Integer> distancesFrom(String m, String... notExpanded) { return bfs(adjacency(null), m, notExpanded); }
 
     private static Set<String> component(String m, String kind) { return bfs(adjacency(kind), m).keySet(); }
 
