@@ -69,7 +69,7 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   orchestrator running many `.toon` sources concurrently in one JVM, bounded by `Semaphore(sources.max)`.
   Total worker pressure = `sources.max × processing.threads × duckdb_threads`.
 
-### Failover is at-least-once unless the output tree is shared (`HA-KILL9-DOUBLE-INGEST-1`)
+### Failover is at-least-once unless the output tree is shared (`HA-KILL9-DOUBLE-INGEST-1`, closed 2026-10-10; residual `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1`)
 
 The acknowledgement (backup move, then the node-local processed marker) is written AFTER the output on purpose,
 so a node killed between the two leaves a durable output and an un-acked file; a survivor re-ingests it.
