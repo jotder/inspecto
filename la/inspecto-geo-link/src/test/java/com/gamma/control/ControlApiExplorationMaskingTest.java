@@ -155,7 +155,7 @@ class ControlApiExplorationMaskingTest {
             assertTrue(burst.get("results").get(0).get("source").asText().startsWith("masked:"));
 
             JsonNode measure = ok(c, "GET", "/inv/value-measures?dataset=calls_ds&sourceCol=caller&targetCol=callee"
-                    + "&linkKindCol=channel&name=valueWeightedLinks&valueCol=amt&timeCol=ts&from=2026-09-24&to=2026-09-25", null, false);
+                    + "&linkKindCol=channel&name=valueWeightedLinks&valueCol=amt&timeCol=ts&from=2026-09-24T00:00:00Z&to=2026-09-25T00:00:00Z", null, false);
             assertEquals("all", measure.at("/masking/mode").asText());
             for (JsonNode e : measure.get("entities")) {
                 for (String k : List.of("source", "target"))
@@ -235,6 +235,37 @@ class ControlApiExplorationMaskingTest {
                     "the Working Set names the exploration alias of each masked entity, so the UI keeps them one entity");
             JsonNode replay = ok(c, "POST", "/inv/investigations/case-a/replay", "{}", false);
             assertEquals(aliasA, replay.at("/workingSet/exploreAliases").get(invAlias).asText(), "the replay carries it too");
+        }
+    }
+
+    /**
+     * DR-T4: a SWEEP, not a sample. On a Space with {@code masking_mode all}, after an Investigation holds a seed, an
+     * expand and an annotation over the planted raw ids, every {@code /inv} read below must answer 200 (so a route that
+     * quietly started 404/500ing cannot hide a leak) and its whole body is scanned for each raw id.
+     */
+    @Test
+    void everyInvReadOnAMaskedSpaceIsScannedForRawIds(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, plain())) {
+            settings(c, "masking_mode: all\n");
+            String aliasA = aliasOf(ok(c, "POST", PROJECTION, "{" + BASE + "}", false), 0, "source");
+            assertEquals(200, send(c, "POST", "/inv/investigations", "{\"id\":\"sweep\",\"purpose\":\"DR-T4 sweep\","
+                    + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"timeCol\":\"ts\"}").statusCode());
+            for (String op : List.of("{\"op\":\"seed\",\"ids\":[\"" + aliasA + "\"]}", "{\"op\":\"expand\",\"ids\":[\"" + aliasA + "\"]}")) {
+                HttpResponse<String> r = send(c, "POST", "/inv/investigations/sweep/ops", op);
+                assertEquals(200, r.statusCode(), op + " -> " + r.body());
+                for (String raw : RAW) assertFalse(r.body().contains(raw), "op answer leaked " + raw + ": " + r.body());
+            }
+            String inv = "/inv/investigations";
+            List<String[]> reads = List.of(
+                    new String[]{"GET", inv, null}, new String[]{"GET", inv + "/sweep/log", null},
+                    new String[]{"GET", inv + "/sweep/working-set", null}, new String[]{"GET", inv + "/sweep/coverage?from=2026-09-24T00:00:00Z&to=2026-09-25T00:00:00Z", null},
+                    new String[]{"GET", inv + "/sweep/members", null}, new String[]{"GET", inv + "/sweep/references", null},
+                    new String[]{"POST", inv + "/sweep/replay", "{}"}, new String[]{"GET", inv + "/sweep/dossier", null},
+                    new String[]{"GET", inv + "/sweep/drafts", null}, new String[]{"GET", "/inv/entity-identities", null},
+                    new String[]{"GET", "/inv/graph/algorithms", null}, new String[]{"GET", "/inv/graph/runs", null},
+                    new String[]{"GET", "/inv/index", null}, new String[]{"GET", "/inv/snapshots", null},
+                    new String[]{"GET", "/inv/investigation-templates", null}, new String[]{"GET", "/inv/schema/relationships", null});
+            for (String[] rd : reads) ok(c, rd[0], rd[1], rd[2], false);
         }
     }
 }
