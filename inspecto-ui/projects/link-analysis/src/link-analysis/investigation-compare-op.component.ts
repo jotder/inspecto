@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import type { InvestigationWindow } from '@inspecto/link-analysis/api/inv.service';
@@ -18,7 +18,15 @@ import { windowForm, windowOf } from './investigation-rung-form';
     selector: 'inspecto-la-compare-op',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, InspectoAlertComponent, InvestigationWindowFieldsComponent],
+    // FormsModule is what puts NgForm on a plain `<form>`: it cancels the native submit (a page reload that lost every
+    // in-memory Investigation). ReactiveFormsModule alone does not — only a `[formGroup]` form is covered by it. (DR-D1)
+    imports: [
+        FormsModule,
+        ReactiveFormsModule,
+        MatButtonModule,
+        InspectoAlertComponent,
+        InvestigationWindowFieldsComponent,
+    ],
     host: { class: 'block' },
     template: `
         <section

@@ -1,9 +1,20 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    afterNextRender,
+    computed,
+    inject,
+    input,
+    signal,
+    untracked,
+    viewChild,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { ShowOnDirtyErrorStateMatcher } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, merge } from 'rxjs';
 import {
     AlertSeverity,
     InvService,
@@ -11,16 +22,18 @@ import {
     ValueMeasureAlertRuleResult,
     ValueMeasureResult,
 } from '@inspecto/link-analysis/api/inv.service';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { apiErrorMessage, LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { columnOptionLoader, datasetOptionLoader } from '@inspecto/core/components/entity-option-loaders';
 import { InspectoOptionPickerComponent } from '@inspecto/core/components/option-picker.component';
 import { InspectoSchemaFormComponent } from '@inspecto/core/components/schema-form.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { isUnavailable } from './link-analysis-template.dialogs';
+import { limitRefusalMessage } from './limit-refusal';
 import { LinkAnalysisBoundRulesComponent } from './link-analysis-bound-rules.component';
 import { LinkAnalysisStandingMonitorComponent } from './link-analysis-standing-monitor.component';
 import {
+    MAX_WINDOW_DAYS,
     VALUE_MEASURES,
     VALUE_MEASURE_THRESHOLDS,
     valueMeasureAttributes,
@@ -31,11 +44,13 @@ import {
 
 /** A value-measure failure in the analyst's words; 422 carries the server's own sentence verbatim. */
 export function valueMeasureErrorMessage(err: unknown, fallback: string): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'You do not have the capability this needs. Server: ' + server;
+            return 'You are not allowed to do this with your current role. Ask an administrator if you need it.';
         case 404:
             return 'That Dataset (or Investigation) is not available to you. Server: ' + server;
         case 409:
@@ -81,15 +96,36 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
             <h3 id="la-value-measures-heading" class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
                 Value Measures
             </h3>
-            <p class="text-secondary m-0">Reads the whole Dataset in the window — never the filtered view on screen.</p>
+            <p class="text-secondary m-0" data-test="vm-intro">
+                Reads the whole Dataset in the window — never the filtered view on screen. A window is at most
+                {{ maxDays }} days: From and To, or a rolling last (up to 744h).
+            </p>
             <inspecto-schema-form
                 [specs]="specs"
                 [initial]="seed()"
                 [optionLoaders]="loaders"
                 (submitted)="run()"
             ></inspecto-schema-form>
+            <fieldset class="m-0 flex flex-wrap gap-2 border-0 p-0" data-test="vm-window">
+                <legend class="text-secondary p-0 text-xs font-semibold">
+                    Fixed window (or use the rolling one above)
+                </legend>
+                <mat-form-field subscriptSizing="dynamic">
+                    <mat-label>From (inclusive)</mat-label>
+                    <input matInput type="date" [formControl]="fromDate" data-test="vm-from" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                    <mat-label>To (exclusive)</mat-label>
+                    <input matInput type="date" [formControl]="toDate" data-test="vm-to" />
+                </mat-form-field>
+            </fieldset>
+            @if (issue(); as why) {
+                <p class="text-secondary m-0" data-test="vm-issue">{{ why }}</p>
+            }
             <div>
-                <button mat-stroked-button type="button" [disabled]="busy()" (click)="run()">Run Measure</button>
+                <button mat-stroked-button type="button" data-test="vm-run" [disabled]="!canRun()" (click)="run()">
+                    Run Measure
+                </button>
             </div>
 
             @if (error()) {
@@ -135,6 +171,11 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                         Watching binds over the open Investigation's Dataset and roles ({{ investigation()!.dataset }});
                         run the Measure over those to watch it.
                     </p>
+                } @else if (!canAuthor()) {
+                    <p class="text-secondary m-0" data-test="watch-no-cap">
+                        Watching a Measure arms an Alert Rule, and your role cannot author Alert Rules. Ask an
+                        administrator to arm it for you.
+                    </p>
                 } @else {
                     <form
                         [formGroup]="watchForm"
@@ -148,7 +189,8 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                         </p>
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Alert Rule name</mat-label>
-                            <input matInput formControlName="name" autocomplete="off" />
+                            <input matInput formControlName="name" autocomplete="off" [errorStateMatcher]="onDirty" />
+                            <mat-hint>Letters, digits, dot, dash and underscore only.</mat-hint>
                             @if (watchForm.controls.name.hasError('required')) {
                                 <mat-error>A name is required.</mat-error>
                             } @else if (watchForm.controls.name.hasError('pattern')) {
@@ -188,9 +230,18 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
 })
 export class LinkAnalysisValueMeasuresComponent {
     private inv = inject(InvService);
+    private lens = inject(LensService);
+
+    readonly maxDays = MAX_WINDOW_DAYS;
+    /** Shows a name error as soon as the field is edited, not only after it is left (DR-D6). */
+    readonly onDirty = new ShowOnDirtyErrorStateMatcher();
+    /** Arming a rule needs Alert Rule authoring; without it the Watch form is replaced by a plain sentence (DR-D6). */
+    readonly canAuthor = computed(() => this.lens.canAuthorAlertRules());
 
     /** The open Investigation, if any — seeds the Dataset and roles, and is what "Watch" binds to. */
     readonly investigation = input<InvestigationHeader | null>(null);
+    /** The time column the analyst bound for the graph (the query mapping), prefilled into the Time column. */
+    readonly timeCol = input('');
 
     readonly specs = valueMeasureAttributes();
     readonly loaders = {
@@ -228,10 +279,17 @@ export class LinkAnalysisValueMeasuresComponent {
                       sourceCol: h.sourceCol,
                       targetCol: h.targetCol,
                       linkKindCol: h.linkKindCol ?? '',
+                      ...(untracked(this.timeCol) ? { timeCol: untracked(this.timeCol) } : {}),
                   }
                 : {}),
         };
     });
+
+    /** The fixed window, as `YYYY-MM-DD` from the native date pickers (blank = no fixed window). */
+    readonly fromDate = new FormControl('', { nonNullable: true });
+    readonly toDate = new FormControl('', { nonNullable: true });
+    /** Bumped on every edit so {@link canRun} / {@link issue} (which read form state) re-evaluate. */
+    private readonly edits = signal(0);
 
     readonly form = viewChild.required(InspectoSchemaFormComponent);
     readonly busy = signal(false);
@@ -261,6 +319,38 @@ export class LinkAnalysisValueMeasuresComponent {
         );
     });
 
+    constructor() {
+        afterNextRender(() => {
+            const f = this.form().form;
+            merge(f.valueChanges, f.statusChanges, this.fromDate.valueChanges, this.toDate.valueChanges).subscribe(
+                () => {
+                    // An edit makes the last refusal stale: clear it, and re-evaluate the button.
+                    this.error.set('');
+                    this.edits.update((n) => n + 1);
+                },
+            );
+            this.edits.update((n) => n + 1);
+        });
+    }
+
+    /** Every value the query is built from: the schema form plus the fixed-window dates. */
+    private values(): Record<string, unknown> {
+        return { ...this.form().value(), from: this.fromDate.value, to: this.toDate.value };
+    }
+
+    /** What is wrong with the window, in words — null when it is fine (or the form is not drawn yet). */
+    readonly issue = computed(() => {
+        // 0 = the form is not drawn yet (the required view query cannot be read before the first render).
+        return this.edits() ? valueMeasureWindowIssue(this.values()) : null;
+    });
+
+    /** Run Measure is enabled only while every field is valid and the window is sound. */
+    readonly canRun = computed(() => {
+        if (!this.edits()) return false;
+        const f = this.form();
+        return !this.busy() && !this.issue() && (f.form.valid || f.form.disabled);
+    });
+
     readonly watchForm = new FormGroup({
         name: new FormControl('', {
             nonNullable: true,
@@ -274,13 +364,13 @@ export class LinkAnalysisValueMeasuresComponent {
     async run(): Promise<void> {
         const form = this.form();
         if (this.busy() || !form.validate()) return;
-        const issue = valueMeasureWindowIssue(form.value());
+        const issue = valueMeasureWindowIssue(this.values());
         if (issue) {
             this.unavailable.set(false);
             this.error.set(issue);
             return;
         }
-        const q = valueMeasureQuery(form.value());
+        const q = valueMeasureQuery(this.values());
         this.busy.set(true);
         this.error.set('');
         this.unavailable.set(false);

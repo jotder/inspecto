@@ -26,6 +26,7 @@ import {
     RecursivePathsResult,
 } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
+import { limitRefusalMessage } from './limit-refusal';
 import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { firstValueFrom } from 'rxjs';
 import { CHART_CATEGORICAL_NEUTRAL } from '@inspecto/core/theme/chart-tokens';
@@ -352,6 +353,8 @@ export class EntityProjectionGraphSource implements GraphSource {
  * the WHOLE call, so the message says no partial graph was drawn. A 422 carries the server's own reason.
  */
 export function invErrorMessage(err: unknown, fallback: string): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     if (err instanceof HttpErrorResponse && err.status === 404) {
         return (
             'A Dataset in this query is not available to you (unknown, or not shared with you) — ' +

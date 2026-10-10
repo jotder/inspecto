@@ -9,7 +9,7 @@ import { ComponentsService, DbBrowserService, EventsService, LensService } from 
 import { InvService, InvestigationHeader, ValueMeasureResult } from '@inspecto/link-analysis/api/inv.service';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { LinkAnalysisValueMeasuresComponent } from './link-analysis-value-measures.component';
+import { LinkAnalysisValueMeasuresComponent, valueMeasureErrorMessage } from './link-analysis-value-measures.component';
 import { valueMeasureQuery, valueMeasureWindowIssue } from './value-measures';
 
 const HEADER: InvestigationHeader = {
@@ -48,13 +48,24 @@ const ANSWER: ValueMeasureResult = {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.Eager,
     imports: [LinkAnalysisValueMeasuresComponent],
-    template: `<inspecto-link-analysis-value-measures [investigation]="inv()"></inspecto-link-analysis-value-measures>`,
+    template: `<inspecto-link-analysis-value-measures
+        [investigation]="inv()"
+        [timeCol]="timeCol()"
+    ></inspecto-link-analysis-value-measures>`,
 })
 class HostComponent {
     readonly inv = signal<InvestigationHeader | null>(HEADER);
+    readonly timeCol = signal('');
 }
 
-function setup(opts: { valueMeasures?: () => unknown; investigation?: InvestigationHeader | null } = {}) {
+function setup(
+    opts: {
+        valueMeasures?: () => unknown;
+        investigation?: InvestigationHeader | null;
+        canAuthor?: boolean;
+        timeCol?: string;
+    } = {},
+) {
     const inv = {
         valueMeasures: vi.fn((_q: unknown) => (opts.valueMeasures ? opts.valueMeasures() : of(ANSWER))),
         boundAlertRules: vi.fn(() => of({ investigation: 'inv-1', rules: [] })),
@@ -67,7 +78,7 @@ function setup(opts: { valueMeasures?: () => unknown; investigation?: Investigat
         providers: [
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
-            { provide: LensService, useValue: { canAuthorAlertRules: () => true } },
+            { provide: LensService, useValue: { canAuthorAlertRules: () => opts.canAuthor ?? true } },
             { provide: EventsService, useValue: { search: () => of([]) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
             { provide: ComponentsService, useValue: { list: () => of([{ name: 'transfers' }]) } },
@@ -76,12 +87,17 @@ function setup(opts: { valueMeasures?: () => unknown; investigation?: Investigat
     });
     const fixture = TestBed.createComponent(HostComponent);
     if (opts.investigation !== undefined) fixture.componentInstance.inv.set(opts.investigation);
+    if (opts.timeCol) fixture.componentInstance.timeCol.set(opts.timeCol);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     const debug = fixture.debugElement.children[0];
     const c = debug.componentInstance as LinkAnalysisValueMeasuresComponent;
     const fill = (v: Record<string, unknown>) => {
-        c.form().form.patchValue(v);
+        const { from, to, ...rest } = v;
+        // The fixed window is two date pickers outside the schema form.
+        if (from !== undefined) c.fromDate.setValue(String(from));
+        if (to !== undefined) c.toDate.setValue(String(to));
+        c.form().form.patchValue(rest);
         fixture.detectChanges();
     };
     const run = async () => {
@@ -234,6 +250,114 @@ describe('LinkAnalysisValueMeasuresComponent', () => {
         await run();
         expect(inv.valueMeasures).not.toHaveBeenCalled();
         expect(el.textContent).toContain('not both');
+    });
+});
+
+describe('Value Measures form (DR-D4)', () => {
+    const runButton = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('[data-test="vm-run"]')!;
+
+    it('prefills the Dataset, the roles and the bound time column from the Investigation / query mapping', async () => {
+        const { c, fixture } = setup({ timeCol: 'ts' });
+        await fixture.whenStable();
+        expect(c.form().form.value).toMatchObject({
+            dataset: 'transfers',
+            sourceCol: 'payer',
+            targetCol: 'payee',
+            linkKindCol: 'kind',
+            timeCol: 'ts',
+        });
+    });
+
+    it('uses date pickers for the fixed window, not free text', () => {
+        const { el } = setup();
+        expect(el.querySelector('input[data-test="vm-from"]')!.getAttribute('type')).toBe('date');
+        expect(el.querySelector('input[data-test="vm-to"]')!.getAttribute('type')).toBe('date');
+    });
+
+    it('states the 31-day cap before anything is run', () => {
+        const { el } = setup();
+        expect(el.querySelector('[data-test="vm-intro"]')!.textContent).toContain('at most 31 days');
+    });
+
+    it('disables Run Measure while the window is missing or over 31 days, and enables it once valid', async () => {
+        const { el, c, fixture, fill } = setup();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        fill({ valueCol: 'amount', timeCol: 'ts' });
+        expect(runButton(el).disabled).toBe(true); // no window yet
+        expect(el.querySelector('[data-test="vm-issue"]')!.textContent).toContain('Give a window');
+        fill({ from: '2026-01-01', to: '2026-04-11' }); // 100 days
+        expect(runButton(el).disabled).toBe(true);
+        expect(el.querySelector('[data-test="vm-issue"]')!.textContent).toContain('at most 31 days');
+        fill({ from: '2026-09-01', to: '2026-09-08' });
+        expect(runButton(el).disabled).toBe(false);
+        expect(c.issue()).toBeNull();
+    });
+
+    it('disables Run Measure while a column is invalid', async () => {
+        const { el, fixture, fill } = setup();
+        await fixture.whenStable();
+        fill({ ...WINDOW, valueCol: 'not a column!' });
+        expect(runButton(el).disabled).toBe(true);
+        fill({ valueCol: 'amount' });
+        expect(runButton(el).disabled).toBe(false);
+    });
+
+    it('clears a stale refusal as soon as an input changes', async () => {
+        const { el, c, fixture, fill, run } = setup({
+            valueMeasures: () =>
+                throwError(
+                    () => new HttpErrorResponse({ status: 422, error: { error: { message: 'unknown column' } } }),
+                ),
+        });
+        await fixture.whenStable();
+        fill(WINDOW);
+        await run();
+        expect(c.error()).toContain('unknown column');
+        fill({ valueCol: 'amount2' });
+        expect(c.error()).toBe('');
+        expect(el.querySelector('inspecto-alert')).toBeNull();
+    });
+
+    it('sends the picked dates as the window', async () => {
+        const { inv, fill, run } = setup();
+        fill(WINDOW);
+        await run();
+        const q = inv.valueMeasures.mock.calls[0][0] as unknown as Record<string, unknown>;
+        expect(q).toMatchObject({ from: '2026-09-01', to: '2026-09-08' });
+    });
+});
+
+describe('Watch (DR-D6)', () => {
+    it('is replaced by a plain sentence, never a capability id, for a user who cannot author Alert Rules', async () => {
+        const { el, fill, run } = setup({ canAuthor: false });
+        fill(WINDOW);
+        await run();
+        expect(el.querySelector('form[aria-label="Watch this value Measure"]')).toBeNull();
+        const note = el.querySelector('[data-test="watch-no-cap"]')!.textContent!;
+        expect(note).toContain('cannot author Alert Rules');
+        expect(note).not.toMatch(/canAuthor|alerts\.author/);
+    });
+
+    it('shows the Alert Rule name constraint inline as soon as the name is edited, and says it up front', async () => {
+        const { el, c, fixture, fill, run } = setup();
+        fill(WINDOW);
+        await run();
+        expect(el.textContent).toContain('Letters, digits, dot, dash and underscore only.');
+        c.watchForm.controls.name.setValue('has spaces');
+        c.watchForm.controls.name.markAsDirty();
+        fixture.detectChanges();
+        expect(el.querySelector('mat-error')?.textContent).toContain('Letters, digits, dot, dash and underscore');
+    });
+});
+
+describe('valueMeasureErrorMessage 403 (DR-D6)', () => {
+    it('never shows the raw capability id', () => {
+        const e = new HttpErrorResponse({
+            status: 403,
+            error: { error: { message: 'missing capability canAuthorAlertRules' } },
+        });
+        expect(valueMeasureErrorMessage(e, 'f')).not.toContain('canAuthorAlertRules');
     });
 });
 

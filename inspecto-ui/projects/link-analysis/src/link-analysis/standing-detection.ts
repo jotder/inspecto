@@ -1,4 +1,5 @@
 import { apiErrorMessage } from '@inspecto/core/api';
+import { limitRefusalMessage } from './limit-refusal';
 
 /** The ten refusal codes of `StandingDetection` (stable: they ride the response and the audit trail). */
 export const STANDING_REFUSAL_CODES = [
@@ -67,6 +68,8 @@ export function standingRefusalCode(err: unknown): StandingRefusalCode | null {
 
 /** Enabling standing detection failed — in the analyst's words; a coded refusal gets its plain-language help. */
 export function standingDetectionErrorMessage(err: unknown): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const code = standingRefusalCode(err);
     if (code) {
         const h = STANDING_REFUSAL_HELP[code];

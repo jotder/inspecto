@@ -868,6 +868,17 @@ export interface DossierVerifyResult {
 
 // ── LA-23: Investigation Template, Measures, Alert Rules ──────────────────────────────────────────────
 
+/** One row of `GET /inv/investigation-templates` — the caller's own templates, newest first. */
+export interface InvestigationTemplateSummary {
+    id: string;
+    title: string | null;
+    createdAt: string;
+    dataset: string | null;
+    investigation: string | null;
+    parameters: number;
+    ops: number;
+}
+
 export interface InvestigationTemplate {
     id: string;
     title: string | null;
@@ -1387,6 +1398,11 @@ export class InvService {
         body: { id?: string; title?: string } = {},
     ): Observable<InvestigationTemplate> {
         return this.http.post<InvestigationTemplate>(invPath(id, 'template'), body);
+    }
+
+    /** LA-23 / DR-D6: the caller's own templates, newest first — what the Instantiate picker lists. */
+    investigationTemplates(): Observable<{ templates: InvestigationTemplateSummary[] }> {
+        return this.http.get<{ templates: InvestigationTemplateSummary[] }>(apiUrl('/inv/investigation-templates'));
     }
 
     investigationTemplate(templateId: string): Observable<InvestigationTemplate> {

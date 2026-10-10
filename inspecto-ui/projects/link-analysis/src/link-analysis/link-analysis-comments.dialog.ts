@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -28,6 +28,7 @@ export interface LinkAnalysisCommentsData {
 @Component({
     standalone: true,
     imports: [
+        FormsModule, // NgForm on the plain `<form>` cancels the native submit (DR-D1)
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,

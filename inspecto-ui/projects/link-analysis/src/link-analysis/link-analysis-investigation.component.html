@@ -669,7 +669,10 @@
         }
 
         <!-- ── LA-18 value Measures over the whole Dataset; Watch binds to the open Investigation ── -->
-        <inspecto-link-analysis-value-measures [investigation]="store.header()"></inspecto-link-analysis-value-measures>
+        <inspecto-link-analysis-value-measures
+            [investigation]="store.header()"
+            [timeCol]="timeCol()"
+        ></inspecto-link-analysis-value-measures>
 
         @if (store.workingSet()?.excluded?.length) {
             <section aria-label="Excluded entities">

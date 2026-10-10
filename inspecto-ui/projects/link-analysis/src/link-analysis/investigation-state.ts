@@ -5,6 +5,7 @@ import { apiErrorMessage } from '@inspecto/core/api';
 import { resolveEntityId } from '@inspecto/core/graph';
 import { ProjectedGraph, projectTriples } from './entity-projection';
 import { readSourceNote } from './index-source';
+import { limitRefusalMessage } from './limit-refusal';
 
 /**
  * LA-10 — the pure half of the Investigation panel: how a server Working Set becomes the canvas graph, which
@@ -135,6 +136,8 @@ export function moveStep(order: number[], index: number, delta: number): number[
  * no longer view. 403 is the capability gate (`canManageIncidents`). 409 and 422 carry the server's own reason.
  */
 export function investigationErrorMessage(err: unknown, fallback: string): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
@@ -175,6 +178,8 @@ export function entityListErrorMessage(
     onInvestigation = false,
     forbidden = 'You are not allowed to change Entity Lists (it needs the Incident-management capability).',
 ): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
@@ -214,6 +219,8 @@ export function identityKeyOf(type: EntityTypeRef | undefined, value: string): s
  * retract of an unknown or already-retracted assertion; 422 carries the server's reason. 503 is a deployment state.
  */
 export function identityErrorMessage(err: unknown, fallback: string): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {

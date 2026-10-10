@@ -294,7 +294,10 @@ is conservative: if more than one type could claim a value, it stays unmatched a
 
 ### 9.8 Value Measures (whole-Dataset behaviour detectors)
 Choose a Dataset and column roles (value, time, link kind), a window (from/to, or **last N hours/days**, at most 31
-days, evaluated in UTC) and a Measure. Thresholds are shown and editable.
+days, evaluated in UTC) and a Measure. The Dataset, the link columns and the bound time column are prefilled from the open
+Investigation; From and To are date pickers; **Run Measure** stays disabled, with the reason beside it, until the form is
+valid. **Watch** is shown only to users who can author Alert Rules. Refusals for size (413) and the per-user rate limit
+(a burst of 20, then one request every 3 seconds, 429) are explained in plain sentences.
 
 | Measure | Flags |
 |---|---|
@@ -317,7 +320,7 @@ reports anything **changed, missing or added**. Tampering is detectable.
 ### 9.10 Templates
 **Save as template** turns an Investigation's method into a reusable recipe: seeds become parameters; your ad-hoc
 exclusions are **dropped** (they name specific entities) and the preview tells you what was dropped or generalised.
-**Instantiate** builds a new Investigation over the same or another Dataset.
+**Instantiate** builds a new Investigation over the same or another Dataset; you pick the template from a list of your own.
 
 ### 9.11 Widgets
 **Pin to a Widget** puts a Working Set on a Dashboard. **Frozen** (default) shows the Working Set as of a pinned step;

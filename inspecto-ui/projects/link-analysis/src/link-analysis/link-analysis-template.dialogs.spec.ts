@@ -116,7 +116,11 @@ describe('InstantiateTemplateDialog (LA-23)', () => {
     it('loads the template by id, then instantiates with params and the Dataset roles', async () => {
         const investigationTemplate = vi.fn(() => of(TEMPLATE));
         const instantiateTemplate = vi.fn(() => of({ id: 'inv-2', header: {}, steps: 2, workingSet: {} }));
-        const close = configure(undefined, { investigationTemplate, instantiateTemplate });
+        const close = configure(undefined, {
+            investigationTemplate,
+            instantiateTemplate,
+            investigationTemplates: vi.fn(() => of({ templates: [] })),
+        });
         const f = TestBed.createComponent(InstantiateTemplateDialog);
         f.detectChanges();
         const c = f.componentInstance;
@@ -147,8 +151,74 @@ describe('InstantiateTemplateDialog (LA-23)', () => {
         expect(close).toHaveBeenCalledWith(expect.objectContaining({ id: 'inv-2' }));
     });
 
+    it('offers the templates of the Space in a picker (no typed id) and says so when there are none', async () => {
+        const summary = (id: string, title: string | null) => ({
+            id,
+            title,
+            createdAt: '',
+            dataset: 'calls',
+            investigation: 'inv-1',
+            parameters: 1,
+            ops: 4,
+        });
+        configure(undefined, {
+            investigationTemplates: vi.fn(() =>
+                of({ templates: [summary('tpl-1', 'Burner method'), summary('tpl-2', null)] }),
+            ),
+        });
+        const f = TestBed.createComponent(InstantiateTemplateDialog);
+        f.detectChanges();
+        await f.whenStable();
+        f.detectChanges();
+        const c = f.componentInstance;
+        expect(c.templateOptions().map((o) => [o.value, o.label])).toEqual([
+            ['tpl-1', 'Burner method'],
+            ['tpl-2', 'tpl-2'],
+        ]);
+        const el = f.nativeElement as HTMLElement;
+        expect(el.textContent).not.toContain('Template id');
+        expect(el.querySelector('inspecto-option-picker')).not.toBeNull();
+        expect(el.querySelector('input[matinput]')).toBeNull();
+    });
+
+    it('tells the analyst how to get a first template when the Space has none', async () => {
+        configure(undefined, { investigationTemplates: vi.fn(() => of({ templates: [] })) });
+        const f = TestBed.createComponent(InstantiateTemplateDialog);
+        f.detectChanges();
+        await f.whenStable();
+        f.detectChanges();
+        expect((f.nativeElement as HTMLElement).querySelector('[data-test="no-templates"]')?.textContent).toContain(
+            'no Investigation Templates',
+        );
+    });
+
+    it('Load cancels the native form submit (DR-D1: no page navigation)', async () => {
+        configure(undefined, {
+            investigationTemplates: vi.fn(() => of({ templates: [] })),
+            investigationTemplate: vi.fn(() => of(TEMPLATE)),
+        });
+        const f = TestBed.createComponent(InstantiateTemplateDialog);
+        f.detectChanges();
+        f.componentInstance.templateId.setValue('tpl-1');
+        f.detectChanges();
+        const el = f.nativeElement as HTMLElement;
+        const seen: Event[] = [];
+        const onSubmit = (e: Event) => seen.push(e);
+        el.ownerDocument.addEventListener('submit', onSubmit);
+        try {
+            (el.querySelector('form button[type="submit"]') as HTMLButtonElement).click();
+        } finally {
+            el.ownerDocument.removeEventListener('submit', onSubmit);
+        }
+        expect(seen.length).toBe(1);
+        expect(seen[0].defaultPrevented).toBe(true);
+    });
+
     it('explains a 404 template as absent-or-not-yours', async () => {
-        configure(undefined, { investigationTemplate: vi.fn(http(404)) });
+        configure(undefined, {
+            investigationTemplate: vi.fn(http(404)),
+            investigationTemplates: vi.fn(() => of({ templates: [] })),
+        });
         const f = TestBed.createComponent(InstantiateTemplateDialog);
         f.detectChanges();
         f.componentInstance.templateId.setValue('tpl-9');

@@ -22,6 +22,28 @@ function setup(applyOk = true, serverError = '') {
 }
 
 describe('InvestigationCompareOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', () => {
+    /** DR-D1: the page reloaded on Compare and seal and every in-memory Investigation was lost — a plain `<form>`
+     *  whose native submit nothing cancelled. This clicks the REAL button and reads the submit event's verdict; a spec
+     *  that only called `submit()` passed against the broken form. */
+    it('Compare and seal cancels the native form submit (no page navigation)', async () => {
+        const { fixture, store, el } = setup();
+        const seen: Event[] = [];
+        const onSubmit = (e: Event) => seen.push(e);
+        el.ownerDocument.addEventListener('submit', onSubmit);
+        try {
+            const button = Array.from(el.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Compare and seal'),
+            ) as HTMLButtonElement;
+            button.click();
+            await fixture.whenStable();
+        } finally {
+            el.ownerDocument.removeEventListener('submit', onSubmit);
+        }
+        expect(seen.length).toBe(1);
+        expect(seen[0].defaultPrevented).toBe(true);
+        expect(store.apply).not.toHaveBeenCalled(); // both windows are empty, so nothing is sent
+    });
+
     it('appends a compare op carrying both windows', async () => {
         const { cmp, store, el } = setup();
         await expectNoA11yViolations(el);
