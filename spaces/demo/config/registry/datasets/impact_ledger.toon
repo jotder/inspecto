@@ -1,0 +1,3 @@
+name: impact_ledger
+physicalRef: impact_ledger
+description: "Impact ledger: one row per Incident/Case with a typed impact per run (suspected/confirmed/recovered/prevented/outstanding per currency, WS-10)"

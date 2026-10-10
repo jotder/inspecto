@@ -3,8 +3,8 @@ physicalRef: orders_by_region
 description: Materialized from dataset 'orders_dataset' (job 'orders_by_region_materialize')
 materialized:
   rows: 4
-  at: "2026-09-23T23:30:00.083910200Z"
   from: orders_dataset
+  at: "2026-10-09T23:30:00.203640700Z"
 columns[2]{name,type,role}:
   REGION,string,dimension
   sum_gross,number,measure
