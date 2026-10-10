@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (never the static port) on the graphs of the six parity fixtures {@code graph-*-parity.fixture.json} — the SAME files the
  * TypeScript specs and la-graph's own parity tests read — and asserted against the fixture's hand-derived {@code expected}
  * (exact for discrete answers, the fixture's own tolerance for floats). {@link #everyAlgorithmWasExercised} fails if one of
- * the 28 never went through {@code engine.run} here.
+ * the 28 never went through {@code engine.run} here. The server-only {@code propagatedRisk} has no fixture; it is checked
+ * engine == la-graph.
  */
 class GraphEngineParityTest {
 
@@ -338,7 +339,31 @@ class GraphEngineParityTest {
         }
     }
 
-    /** No silent gap: every one of the 28 catalogued algorithms went through {@code engine.run} in this class. */
+    // ── propagatedRisk: server-side only, so engine == la-graph (no browser twin, no fixture) ──────────────────────
+
+    @Test
+    void propagatedRiskThroughTheEngineIsTheLaGraphFunction() {
+        GraphInput in = GraphInput.of(
+                List.of(new GraphInput.Node("A", "A"), new GraphInput.Node("B", "B"), new GraphInput.Node("C", "C"),
+                        new GraphInput.Node("D", "D")),
+                List.of(new GraphInput.Edge("e1", "A", "B"), new GraphInput.Edge("e2", "B", "C"), new GraphInput.Edge("e3", "C", "D")),
+                Map.of());
+        var viaEngine = ((GraphResult.PropagatedRisks) run(Algorithm.PROPAGATED_RISK, in,
+                "nodeScores", Map.of("A", 60, "D", 20), "direction", "out")).risks();
+        var direct = com.gamma.la.graph.GraphPropagation.propagatedRisk(
+                new com.gamma.la.graph.GraphAlgorithms.Graph(
+                        List.of(new com.gamma.la.graph.GraphAlgorithms.Node("A", "A"), new com.gamma.la.graph.GraphAlgorithms.Node("B", "B"),
+                                new com.gamma.la.graph.GraphAlgorithms.Node("C", "C"), new com.gamma.la.graph.GraphAlgorithms.Node("D", "D")),
+                        List.of(new com.gamma.la.graph.GraphAlgorithms.Edge("e1", "A", "B"),
+                                new com.gamma.la.graph.GraphAlgorithms.Edge("e2", "B", "C"),
+                                new com.gamma.la.graph.GraphAlgorithms.Edge("e3", "C", "D"))),
+                Map.of("A", 60.0, "D", 20.0), List.of(), List.of(1.0, 0.6, 0.35, 0.15),
+                com.gamma.la.graph.GraphAlgorithms.Direction.OUT, com.gamma.la.graph.RunControl.NONE);
+        assertEquals(direct, viaEngine);
+        assertEquals(60 * 0.35 + 20, viaEngine.stream().filter(r -> r.id().equals("D")).findFirst().orElseThrow().raw(), 1e-9);
+    }
+
+    /** No silent gap: every one of the 29 catalogued algorithms went through {@code engine.run} in this class. */
     @AfterAll
     static void everyAlgorithmWasExercised() {
         Set<Algorithm> missing = EnumSet.allOf(Algorithm.class);

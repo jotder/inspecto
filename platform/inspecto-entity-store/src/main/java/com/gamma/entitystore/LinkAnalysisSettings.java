@@ -23,7 +23,8 @@ import java.util.Map;
  * {@link EntityTypes Entity Types} (LA-17, design §4.1); plus {@code mergedDistinctCap}, the distinct values per bound
  * column a merged {@code expand} may scan to find a group's member values (LA-17 merged traversal, operator
  * 2026-09-30; default {@link #DEFAULT_MERGED_DISTINCT_CAP}, refused above it, never sampled) and its {@code seedBy}
- * twin {@code seedByDistinctCap} (default {@link #DEFAULT_SEED_BY_DISTINCT_CAP}, same posture); plus the {@link GraphRun}
+ * twin {@code seedByDistinctCap} (default {@link #DEFAULT_SEED_BY_DISTINCT_CAP}, same posture); plus {@code hubThreshold},
+ * the supernode threshold an {@code expand} flags candidates above (default {@link #DEFAULT_HUB_THRESHOLD}); plus the {@link GraphRun}
  * knobs of the server-side graph-run service (D-4). Persisted as
  * {@code link-analysis.toon} in the space's config tree (crash-safe TOON, mirroring {@link GeoSettings}
  * and {@link SchedulerSettings}); the keys are declared in {@link ConfigSpecs#linkAnalysisSettings()}.
@@ -47,7 +48,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
                                    Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
-                                   Integer maxSetBytes, Long maxInvestigationBytes) {
+                                   Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold) {
 
     /**
      * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
@@ -141,7 +142,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     public static final String FILE = "link-analysis.toon";
-    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -173,6 +174,18 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     /** The per-Investigation total set budget in force, in bytes: the stated one, else {@link #DEFAULT_MAX_INVESTIGATION_BYTES}. */
     public long effectiveMaxInvestigationBytes() {
         return maxInvestigationBytes != null ? maxInvestigationBytes : DEFAULT_MAX_INVESTIGATION_BYTES;
+    }
+
+    /** The shipped default of {@code hub_threshold}: an expand candidate with more distinct contacts than this is flagged. */
+    public static final int DEFAULT_HUB_THRESHOLD = 500;
+
+    /**
+     * The supernode threshold in force (an expand's {@code hubThreshold} when the op leaves it unstated): the stated one,
+     * else {@link #DEFAULT_HUB_THRESHOLD}. A candidate whose in-window distinct-contact degree exceeds it is admitted,
+     * flagged {@code highConnectivity}, and not expanded further unless the analyst overrides.
+     */
+    public int effectiveHubThreshold() {
+        return hubThreshold != null ? hubThreshold : DEFAULT_HUB_THRESHOLD;
     }
 
     /** The graph-run knobs in force: the stated ones; a field never stated is {@code null} inside (the service's default). */
@@ -214,6 +227,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (seedByDistinctCap != null) m.put("seed_by_distinct_cap", seedByDistinctCap);
         if (maxSetBytes != null) m.put("max_set_bytes", maxSetBytes);
         if (maxInvestigationBytes != null) m.put("max_investigation_bytes", maxInvestigationBytes);
+        if (hubThreshold != null) m.put("hub_threshold", hubThreshold);
         if (graphRun != null && !graphRun.isNone()) {
             Map<String, Object> g = new LinkedHashMap<>();
             if (graphRun.maxNodes() != null) g.put("max_nodes", graphRun.maxNodes());
@@ -258,7 +272,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
                     entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
                     optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")),
-                    optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"));
+                    optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"), optInt(m, "hub_threshold"));
         } catch (Exception e) {
             return EMPTY;
         }

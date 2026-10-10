@@ -1,0 +1,36 @@
+name: recharge
+active: true
+description: "Telecom Link Analysis showcase - Prepaid top-ups. One 60-day extract (RECHARGE_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/recharge
+  database:   data/recharge/database
+  backup:     data/recharge/backup
+  temp:       data/recharge/temp
+  errors:     data/recharge/errors
+  quarantine: data/recharge/quarantine
+  markers:    data/recharge/markers
+  status_dir: data/recharge/status
+  log_dir:    data/recharge/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: recharge_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -44,7 +44,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Server-side graph analysis over an Investigation's Working Set (LA separation D-4 step 6, design §3.3): the 28
+ * Server-side graph analysis over an Investigation's Working Set (LA separation D-4 step 6, design §3.3): the 29
  * {@code inspecto-la-graph} algorithms behind {@link GraphRunService}, over HTTP.
  *
  * <ul>
@@ -69,7 +69,8 @@ import java.util.TreeSet;
  *
  * <p><b>Masked (D-U6).</b> The engine and its cache hold raw ids; {@link GraphResultJson} masks every id on the way out,
  * AFTER the cache, with the Investigation's {@link EntityMasking}. A masked pseudonym is accepted back as a node-id
- * parameter ({@code from}/{@code to}/{@code node}) and resolved to its entity, as an op's {@code ids} are.
+ * parameter ({@code from}/{@code to}/{@code node}, and {@code propagatedRisk}'s {@code nodeScores} keys and {@code seeds}) and
+ * resolved to its entity, as an op's {@code ids} are.
  *
  * <p><b>Which rows.</b> The Working Set at {@code at} (default: the committed head), minus entities a {@code hide} op hid
  * and the links touching them (counted in {@code input.hiddenEntities}); a {@code resolve} identity group is NOT merged -
@@ -176,6 +177,7 @@ public final class GraphRunRoutes implements RouteModule {
                 if (p.min() != null) pm.put("min", p.min());
                 if (p.max() != null) pm.put("max", p.max());
                 if (!p.allowed().isEmpty()) pm.put("allowed", p.allowed());
+                if (p.maxSize() != null) pm.put("maxSize", p.maxSize());
                 params.add(pm);
             }
             o.put("params", params);
@@ -240,6 +242,7 @@ public final class GraphRunRoutes implements RouteModule {
             if (params.get(node) instanceof String s)
                 // a RAW id the masking hides is treated as a node that does not exist, so the answer cannot tell whether it is in the Working Set
                 params.put(node, mask.hidesRaw(s) ? ABSENT_NODE + node : mask.resolve(List.of(s)).get(0));
+        if (algorithm == Algorithm.PROPAGATED_RISK) unmaskNodeKeyed(params, mask);
 
         GraphInput input;
         String relationKey;
@@ -315,6 +318,29 @@ public final class GraphRunRoutes implements RouteModule {
         if (v.status().terminal()) return out;                                                // 200
         ex.getResponseHeaders().set("Location", "/api/v1/inv/graph/runs/" + v.id());
         return ApiContext.respondJson(ex, 202, out);
+    }
+
+    /**
+     * {@code propagatedRisk}'s node-keyed parameters ({@code nodeScores} keys, {@code seeds}) name nodes the caller saw, so a
+     * pseudonym resolves to its entity and a hidden raw id names no node, exactly as {@code from}/{@code to}/{@code node} do.
+     * Malformed values are passed through untouched for {@link Algorithm#resolve} to refuse with its 422.
+     */
+    private static void unmaskNodeKeyed(Map<String, Object> params, EntityMasking mask) {
+        if (params.get("nodeScores") instanceof Map<?, ?> scores) {
+            Map<Object, Object> out = new LinkedHashMap<>();
+            int hidden = 0;
+            for (Map.Entry<?, ?> e : scores.entrySet())
+                out.put(e.getKey() instanceof String s && !s.isBlank()
+                        ? (mask.hidesRaw(s) ? ABSENT_NODE + "nodeScores" + hidden++ : mask.resolve(List.of(s)).get(0))
+                        : e.getKey(), e.getValue());
+            params.put("nodeScores", out);
+        }
+        if (params.get("seeds") instanceof List<?> seeds) {
+            List<Object> out = new ArrayList<>(seeds.size());
+            for (Object o : seeds)
+                out.add(o instanceof String s && !s.isBlank() ? (mask.hidesRaw(s) ? ABSENT_NODE + "seed" : mask.resolve(List.of(s)).get(0)) : o);
+            params.put("seeds", out);
+        }
     }
 
     private static Algorithm algorithm(Map<String, Object> body) {

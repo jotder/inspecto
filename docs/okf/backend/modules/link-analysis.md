@@ -88,7 +88,8 @@ link index**; graph algorithms run in a bounded in-process pool over either inpu
 \* **Trigger.** A landed file commits a Consignment and emits `pipeline.commit` (mirrored in `JobService`);
 `job.dataset.produced` is emitted **only** by the `sql.template` Job. A `la.index.build` Job meant to refresh after a
 daily file must therefore use `on_signal: pipeline.commit` (guard `$signal.pipeline`) or `on_pipeline`. Each half is
-unit-tested on its own; no test yet runs commit → Job → index version (`LA-DEMO-INDEX-1`).
+unit-tested, and `ControlApiIndexRefreshOnCommitTest` (`la/inspecto-geo-link`) runs commit → `pipeline.commit` → Job → index
+version N+1 → indexed read, plus the negative on `job.dataset.produced` (`LA-DEMO-INDEX-1`, DR-T1).
 
 Two invariants the diagram encodes: **raw values never leave through a response** (masking is the last step before
 serialisation, after every cache), and **the op log never re-reads a Dataset on replay** (rows are sealed into the
@@ -114,7 +115,7 @@ entry at write time, so an index rebuild or a Dataset change cannot alter a reco
 
 | Module (manifest id) | Role | Key classes |
 |---|---|---|
-| `la-graph` | Leaf algorithm library, line-for-line port of the SPA's `graph-analysis.ts` | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `RunControl`, `GraphAborted` |
+| `la-graph` | Leaf algorithm library, line-for-line port of the SPA's `graph-analysis.ts` | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `GraphPropagation` (server-only), `RunControl`, `GraphAborted` |
 | `la-core` (platform, optional, boot) | Domain + ports, no HTTP routes | `InvestigationEvaluator`, `InvestigationStore`/`InvestigationStores`/`FsInvestigationStore`, `InvestigationMembers`, `DraftStore`/`DraftLifecycle`/`DraftCheckpoints`/`DraftIndex`, `GraphRunService`, `GraphEngine`, `InMemoryGraphEngine`, `GraphInput`, `Algorithm`, `GraphBudget`, `LinkEventTypes`, ports `DatasetProvider`/`CasePort`/`CollectorCoveragePort` |
 | `la-storage` | The link index (D-3) and the index-backed engine | `IndexBuilder`, `IndexBuildService`, `IndexStore`, `IndexManifest`, `IndexMapping`, `IndexPlan`, `IndexReader`, `IndexPins`, `BucketFunction`, `IndexedTraversal`, `SqlGraphEngine`, `RoutingGraphEngine` |
 | `la-api` (feature `geoLink`) | HTTP surface and orchestration | 18 `RouteModule`s (below), `EntityMasking`, `InvestigationMemberStore`, `DraftAdmission`/`DraftRebase`/`DraftPromote`, `IndexedRead` + `Indexed*`, `IndexStaleness`, `IndexBuildServices`, `GraphRunServices`, `StandingDetection`, `ScheduledIndexBuild` |
@@ -153,6 +154,16 @@ Design rules visible in the dependency graph:
 * **Pending approvals (D-U7).** A sensitive `expand` is written as a pending request, never to the log, so
   four-eyes holds by construction; `replacePending(expected, new)` is the compare-and-set that closes the
   approve/deny race.
+* **Supernode suppression (2026-10-11).** An `expand` resolves `hubThreshold` (the op's own, else the Space's
+  `hub_threshold`, default 500) into its sealed rung, and seals `read.hubs [{id, degree}]`: row endpoints outside the
+  frontier whose distinct-contact degree (counted as `candidateDegreeMax` counts it: both directions, allowed kinds,
+  excluded pruned, in-window) exceeds it. Unlike `candidateDegreeMax` (which drops), a hub is admitted and flagged
+  `highConnectivity` (state hash gains the key only when flagged, so old logs hash unchanged; Working Set relation
+  column `highConnectivity`). Later frontiers leave flagged entities out (`rung.hubsHeld`) unless the op carries the
+  override `expandHubs: [ids]` or `includeHubs: true`, sealed in its params and named in the log line; a NAMED hub
+  without it is a 422. The degree check is one extra flat statement over the Dataset even when the index answered the
+  rows (rows and fingerprint untouched). Overriding is not a four-eyes trigger of its own: the budget / fan-out
+  thresholds already bound what it can admit.
 
 ### 3.2 InvestigationStore port and its two backends
 
@@ -222,7 +233,7 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
 * **Sidecar** (`EntityListSidecar`): a Parquet projection per list for SQL (`physicalRef` Dataset); a failed write
   never undoes the fact.
 * `LinkAnalysisSettings` is the one reader of `link-analysis.toon` (caps, masking, four-eyes thresholds, entity
-  types, distinct caps, `index` and `drafts` records, graph-run knobs); null = inherit default, never unbounded.
+  types, distinct caps, `hub_threshold`, `index` and `drafts` records, graph-run knobs); null = inherit default, never unbounded.
 
 ## 4. Link index (la-storage)
 
@@ -266,9 +277,16 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`
   (exhaustive switch over `Algorithm`, so a new algorithm fails to compile until implemented), IndexRef →
   `SqlGraphEngine` (neighbourhood, ego network, seeds-only degree; caps throw `IndexCapExceeded`, no reroute).
-* **28 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB, a hint) and a node ceiling (e.g. 500 for
+* **29 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB, a hint) and a node ceiling (e.g. 500 for
   betweenness, 100,000 for shortest path) that is the inline-versus-job threshold, not a limit — the budget refuses.
-  The toolbox exposes 18 with *Run on server* and 3 with *Run on index*; the other 7 are API-only.
+  The toolbox has dedicated controls for 18 (*Run on server*) and 3 (*Run on index*); its catalogue-driven *All
+  algorithms (server)* panel runs every other one, EXCEPT an algorithm with a list/map parameter it has no control for
+  (today only `propagatedRisk`), which it labels *API only* with Run held and the reason stated.
+* **`propagatedRisk`** (server-only, `GraphPropagation`, no TS twin; JOB, ceiling 1,000): `raw(n) = own(n) + Σ own(o) ×
+  weights[d(o,n)]` over origins `o ≠ n` within `weights.size()` (≤ 6) shortest hops; `score = min(raw, 100)`. Params:
+  `nodeScores` (id → 0-100, request-only — nodes carry no attributes, so no `scoreAttribute`; no Space default yet),
+  `seeds` (empty = every node with own > 0), `weights` (each in [0,1], default `[1, .6, .35, .15]`), `direction`. Each
+  node returns its top 5 `factors` (origin, distance, weight, contribution) and `contributors` (the full count).
 * **Budgets** (`GraphRunService`): shipped default 50,000 nodes / 500,000 edges / 30 s; ceilings 500,000 / 5,000,000 /
   300 s (both are Space settings under `graphRun`, as are `index.threads` and `index.queue`). Size is checked before work, the deadline at `RunControl` checkpoints; overrun ends `BUDGET_EXCEEDED` with
   no result — never a silent cap.
@@ -330,7 +348,10 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
   `AlertService.evaluateInvestigationRules` → `WorkingSetMeasures` → `StandingDetection.decide`, which re-decides
   before every read (refusals `NOT_ENABLED`, `NO_OWNER`, `BINDING_CHANGED`, `DATASET_GONE`, `DATASET_NOT_SHARED`,
   `ROLE_SHARE_ONLY`, `NOT_LEAD`, `MASKING_TIGHTENED`, `POLICY_DENIED`, `UNDECIDABLE`). The sweep holds no capability
-  of its own; a breach fires an Alert.
+  of its own; a breach fires an Alert. The Alert's `evidence` carries the aggregate breach facts only
+  (`LA-DETECT-ALERT-AGGREGATE-1`): `measure`, `threshold` (the `ValueMeasures.label` line), `breachCount`, and
+  `worstOf` / `worstValue` (the Measure's headline column on its first, worst-ordered row). Never an entity id,
+  name or alias; entities are named only inside the Investigation.
 
 ## 8. Editions and packaging
 

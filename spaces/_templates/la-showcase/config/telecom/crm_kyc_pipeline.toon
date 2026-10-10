@@ -1,0 +1,36 @@
+name: crm_kyc
+active: true
+description: "Telecom Link Analysis showcase - CRM / KYC subscriber register. One 60-day extract (CRM_KYC_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/crm_kyc
+  database:   data/crm_kyc/database
+  backup:     data/crm_kyc/backup
+  temp:       data/crm_kyc/temp
+  errors:     data/crm_kyc/errors
+  quarantine: data/crm_kyc/quarantine
+  markers:    data/crm_kyc/markers
+  status_dir: data/crm_kyc/status
+  log_dir:    data/crm_kyc/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: crm_kyc_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

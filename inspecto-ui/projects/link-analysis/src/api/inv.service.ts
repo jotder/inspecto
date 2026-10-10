@@ -610,6 +610,17 @@ export interface InvestigationReplayResult {
     diverged: boolean;
 }
 
+/** `GET …/drafts/{draftId}/replay` (DraftRoutes#replay). */
+export interface DraftReplayResult {
+    /** The main-log step the Draft forked at; its own steps are numbered after it. */
+    baseStep: number;
+    at: number;
+    workingSet: WorkingSet;
+    equivalent: boolean;
+    mismatches: number[];
+    setMismatches: number[];
+}
+
 export interface InvestigationLogEntry {
     step: number;
     kind: 'op' | 'undo';
@@ -1563,6 +1574,27 @@ export class InvService {
         return this.http.get<WorkingSetRelation>(invPath(id, `drafts/${encodeURIComponent(draftId)}/working-set`), {
             params: toParams({ of, limit }),
         });
+    }
+
+    /** A Draft's log: the main log's first `baseStep` entries, then the Draft's own (numbering continues). */
+    draftLog(id: string, draftId: string): Observable<InvestigationLog> {
+        return this.http.get<InvestigationLog>(invPath(id, `drafts/${encodeURIComponent(draftId)}/log`));
+    }
+
+    /** A Draft's full Working Set (entities + links + exclusions) re-folded from its log, plus the equivalence check
+     *  (`mismatches` = log positions, `setMismatches` = own steps whose persisted set disagrees). No `reread` (drift). */
+    draftReplay(id: string, draftId: string): Observable<DraftReplayResult> {
+        return this.http.get<DraftReplayResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/replay`));
+    }
+
+    /** Append one op to a Draft — the actor only; the SAME validation as the main log. */
+    appendDraftOp(id: string, draftId: string, op: InvestigationOpRequest): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/ops`), op);
+    }
+
+    /** Revert the Draft's latest effective op (only its OWN ops). */
+    undoDraft(id: string, draftId: string): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/undo`), {});
     }
 
     draftConflicts(id: string, draftId: string): Observable<DraftConflictReport> {

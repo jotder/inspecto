@@ -3,10 +3,32 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
-import { GraphAlgorithm, GraphRunResult, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import {
+    GraphAlgorithm,
+    GraphAlgorithmParam,
+    GraphParamType,
+    GraphRunResult,
+    GraphRunsService,
+} from '@inspecto/link-analysis/api/graph-runs.service';
 import { ServerIdMap } from './graph-run-apply';
 import { GraphRunSummary, summarizeGraphRun } from './graph-run-summary';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
+
+/** The parameter types this panel has a control for: a number field or a choice. */
+const EDITABLE: ReadonlySet<GraphParamType> = new Set<GraphParamType>(['INT', 'DOUBLE', 'ENUM']);
+
+export function isEditableParam(p: GraphAlgorithmParam): boolean {
+    return EDITABLE.has(p.type);
+}
+
+/**
+ * The parameters of `a` the panel cannot edit (a list or a map, e.g. `propagatedRisk`'s `nodeScores`). Non-empty = the
+ * algorithm is API only here: a number field would send a scalar the server refuses (422), and leaving them out would
+ * run on the defaults (`nodeScores` empty = every score 0) - so Run is held instead.
+ */
+export function apiOnlyParams(a: GraphAlgorithm): string[] {
+    return a.params.filter((p) => !isEditableParam(p)).map((p) => p.name);
+}
 
 /**
  * **All algorithms (server)** (DR-U11): every algorithm the server catalogue lists, runnable whatever the Working Set's
@@ -63,7 +85,8 @@ import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.compo
                             (ngModelChange)="setNode('node', $any($event))"
                         />
                     }
-                    @for (p of a.params; track p.name) {
+                    <!-- a list/map parameter gets no control: the algorithm is API only here (see hold) -->
+                    @for (p of editableParams(); track p.name) {
                         @if (p.type === 'ENUM') {
                             <label class="text-secondary text-sm">
                                 {{ p.name }}
@@ -135,16 +158,22 @@ export class LinkAnalysisServerAlgorithmsComponent {
     readonly nodeOptions = input<{ id: string; label: string }[]>([]);
     readonly serverIds = input<ServerIdMap | null>(null);
     readonly emphasisChange = output<GraphEmphasis | null>();
+    /** Every completed answer, so the host can feed a ranking or a partition into its own ranking / community views. */
+    readonly resultChange = output<GraphRunResult>();
 
     readonly algorithms = computed<GraphAlgorithm[]>(() => this.runs.catalogue()?.algorithms ?? []);
     readonly algorithmOptions = computed<PickerOption[]>(() =>
-        this.algorithms().map((a) => ({ value: a.id, label: a.label })),
+        this.algorithms().map((a) => ({
+            value: a.id,
+            label: apiOnlyParams(a).length ? `${a.label} (API only)` : a.label,
+        })),
     );
     readonly picked = signal('');
     readonly current = computed(() => {
         const all = this.algorithms();
         return all.find((a) => a.id === this.picked()) ?? all[0] ?? null;
     });
+    readonly editableParams = computed(() => (this.current()?.params ?? []).filter(isEditableParam));
     readonly nodeChoices = computed<PickerOption[]>(() =>
         this.nodeOptions().map((n) => ({ value: n.id, label: n.label })),
     );
@@ -166,6 +195,9 @@ export class LinkAnalysisServerAlgorithmsComponent {
     readonly hold = computed(() => {
         const a = this.current();
         if (!a) return '';
+        const apiOnly = apiOnlyParams(a);
+        if (apiOnly.length)
+            return `API only: this panel cannot edit ${apiOnly.join(', ')} yet - run it through POST /inv/graph/runs.`;
         const missing = [a.needsSource && 'from', a.needsTarget && 'to', a.needsNode && 'node'].filter(
             (k): k is string => !!k && !(k in this.params()),
         );
@@ -198,6 +230,7 @@ export class LinkAnalysisServerAlgorithmsComponent {
 
     onCompleted(r: GraphRunResult): void {
         this.summary.set(summarizeGraphRun(r, this.serverIds()));
+        this.resultChange.emit(r);
     }
 
     highlight(s: GraphRunSummary): void {

@@ -3,8 +3,12 @@ package com.gamma.la.core;
 import com.gamma.la.graph.GraphAborted;
 import com.gamma.la.graph.RunControl;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -400,10 +404,40 @@ public final class GraphRunService implements AutoCloseable {
         }
     }
 
-    private static String cacheKey(Request r, Map<String, Object> resolved) {
-        String identity = r.input().cacheIdentity();          // empty for a Working Set graph: its key is unchanged
-        return r.relationKey() + '\u0001' + r.scopeFingerprint() + '\u0001' + r.algorithm().id() + '\u0001'
-                + new TreeMap<>(resolved) + '\u0001' + r.weightsSpec() + (identity.isEmpty() ? "" : '\u0001' + identity);
+    /**
+     * SHA-256 of an UNAMBIGUOUS encoding of the request: every string is length-prefixed and every map/list says its size
+     * and type, so no two different requests encode alike ({@code seeds ["Smith, John"]} vs {@code ["Smith","John"]} did,
+     * under {@code toString()}), and a large parameter ({@code nodeScores}) is held as 64 hex chars, not a multi-MB key.
+     */
+    static String cacheKey(Request r, Map<String, Object> resolved) {
+        StringBuilder b = new StringBuilder();
+        for (String part : List.of(r.relationKey(), r.scopeFingerprint(), r.algorithm().id(), r.weightsSpec(), r.input().cacheIdentity()))
+            encode(part, b);
+        encode(new TreeMap<>(resolved), b);
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is a required JDK algorithm", e);
+        }
+    }
+
+    private static void encode(Object v, StringBuilder b) {
+        switch (v) {
+            case null -> b.append('N');
+            case String s -> b.append('S').append(s.length()).append(':').append(s);
+            case Map<?, ?> m -> {
+                b.append('M').append(m.size()).append(':');
+                for (Map.Entry<?, ?> e : m.entrySet()) {
+                    encode(String.valueOf(e.getKey()), b);
+                    encode(e.getValue(), b);
+                }
+            }
+            case List<?> l -> {
+                b.append('L').append(l.size()).append(':');
+                for (Object o : l) encode(o, b);
+            }
+            default -> encode(v.getClass().getSimpleName() + ':' + v, b);    // a number or a boolean
+        }
     }
 
     /** The measured size of an index run's answer: {@code {nodes, edges}} of a sub-graph, the scored nodes of a ranking. */

@@ -34,7 +34,9 @@ import java.util.TreeSet;
  *   <li>{@code expand} — adds the sealed one-hop rows. A row touching an excluded entity is dropped (exclude
  *       is gone from traversal); a new endpoint is admitted at {@code hop+1} of the frontier entity it hangs
  *       off, inheriting that entity's seed. The first row that reaches an entity wins, and rows are in a total
- *       order, so provenance is deterministic.</li>
+ *       order, so provenance is deterministic. Every admitted entity named in the SEALED {@code read.hubs} (endpoints
+ *       above the rung's hub threshold, supernode suppression) is flagged {@code highConnectivity}; an older read has
+ *       no {@code hubs} and flags nothing.</li>
  *   <li>{@code exclude {ids, reason}} — gone from display, traversal and counts: the entity and every link
  *       touching it leave the Working Set, and the id is remembered (with its reason and step) so later
  *       expands never re-admit it. ⚠ A KEPT entity is not removed — {@code keep} protects it — and the step
@@ -123,6 +125,11 @@ public final class InvestigationEvaluator {
         public final TreeMap<String, Exclusion> excluded = new TreeMap<>();
         public final TreeSet<String> hidden = new TreeSet<>();
         public final TreeSet<String> kept = new TreeSet<>();
+        /**
+         * Supernode suppression: admitted entities an {@code expand} SEALED as above its hub threshold ({@code read.hubs}).
+         * Displayed, but the route leaves them out of a later expand's frontier unless the analyst overrides.
+         */
+        public final TreeSet<String> highConnectivity = new TreeSet<>();
         /** Per-entity notes (LA-19), in step order per entity. They outlive a later exclusion: a note is history. */
         public final TreeMap<String, List<Annotation>> annotations = new TreeMap<>();
         /** Per-link notes (D-U9 remainder), keyed by the link key; like entity notes they outlive a later exclusion. */
@@ -328,6 +335,8 @@ public final class InvestigationEvaluator {
                 m.put("kept", kept.contains(e.id()));
                 // Only when resolved (LA-17 slice 2): an unresolved state hashes exactly as it did before.
                 if (resolvedTo.containsKey(e.id())) m.put("resolvedTo", resolvedTo.get(e.id()));
+                // Only when flagged (supernode suppression): an unflagged state hashes exactly as it did before.
+                if (highConnectivity.contains(e.id())) m.put("highConnectivity", true);
                 es.add(m);
             }
             List<Map<String, Object>> ls = new ArrayList<>();
@@ -424,6 +433,7 @@ public final class InvestigationEvaluator {
             c.excluded.putAll(excluded);
             c.hidden.addAll(hidden);
             c.kept.addAll(kept);
+            c.highConnectivity.addAll(highConnectivity);
             annotations.forEach((k, v) -> c.annotations.put(k, new ArrayList<>(v)));
             linkAnnotations.forEach((k, v) -> c.linkAnnotations.put(k, new ArrayList<>(v)));
             c.window = window;
@@ -562,6 +572,11 @@ public final class InvestigationEvaluator {
                     s.links.putIfAbsent(src + '\u0000' + tgt + '\u0000' + kind,
                             new Link(src, tgt, kind, ((Number) r.get("count")).longValue(), step));
                 }
+                // Supernode suppression: the read sealed which endpoints exceeded the rung's hub threshold (absent on older logs).
+                if (read.get("hubs") instanceof List<?> hubs)
+                    for (Object o : hubs)
+                        if (o instanceof Map<?, ?> h && s.entities.containsKey(String.valueOf(h.get("id"))))
+                            s.highConnectivity.add(String.valueOf(h.get("id")));
             }
             case "exclude" -> {
                 String reason = String.valueOf(p.get("reason"));
@@ -766,6 +781,7 @@ public final class InvestigationEvaluator {
         if (s.kept.contains(id)) return;   // keep protects it; the route reports it as protected
         s.entities.remove(id);
         s.hidden.remove(id);
+        s.highConnectivity.remove(id);
         s.links.values().removeIf(l -> l.source().equals(id) || l.target().equals(id));
         s.excluded.put(id, new Exclusion(step, reason));
     }

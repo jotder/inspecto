@@ -304,6 +304,24 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** Supernode suppression: the expand hub threshold is a per-Space setting, default 500. */
+    @Test
+    void linkAnalysisHubThresholdRoundTripsAndDefaults(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertTrue(def.get("hubThreshold").isNull(), "absent => inherit");
+            assertEquals(500, def.get("hubThresholdInForce").asInt(), "the shipped default");
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"hubThreshold\":250}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("hub_threshold: 250"), toon);
+            assertEquals(250, json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("hubThresholdInForce").asInt());
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"hubThreshold\":0}").statusCode(), "a threshold is >= 1");
+        }
+    }
+
     /** The seedBy twin of merged_distinct_cap: a per-Space setting, 1..100 000, default 20 000. */
     @Test
     void linkAnalysisSeedByDistinctCapRoundTripsAndDefaults(@TempDir Path root) throws Exception {

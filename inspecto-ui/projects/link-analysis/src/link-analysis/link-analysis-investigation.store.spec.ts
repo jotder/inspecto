@@ -68,6 +68,7 @@ function ws(ids: string[]): WorkingSet {
 function setup() {
     const logs: Record<string, InvestigationLog> = {};
     const sets: Record<string, WorkingSet> = {};
+    const bases: Record<string, number> = {};
     const inv = {
         createInvestigation: vi.fn(() => {
             logs['inv-1'] = { header: header('inv-1'), entries: [], total: 0, truncated: false };
@@ -89,10 +90,23 @@ function setup() {
         ),
         appendInvestigationOp: vi.fn(),
         undoInvestigation: vi.fn(),
+        draftLog: vi.fn((id: string, d: string) => of(structuredClone(logs[id + '/' + d]))),
+        draftReplay: vi.fn((id: string, d: string) =>
+            of({
+                baseStep: bases[id + '/' + d] ?? 0,
+                at: 0,
+                workingSet: sets[id + '/' + d],
+                equivalent: true,
+                mismatches: [],
+                setMismatches: [] as number[],
+            }),
+        ),
+        appendDraftOp: vi.fn(),
+        undoDraft: vi.fn(),
         reorderInvestigation: vi.fn(),
     };
     TestBed.configureTestingModule({ providers: [InvestigationSessionStore, { provide: InvService, useValue: inv }] });
-    return { store: TestBed.inject(InvestigationSessionStore), inv, logs, sets };
+    return { store: TestBed.inject(InvestigationSessionStore), inv, logs, sets, bases };
 }
 
 const step = (n: number, op: string) => ({
@@ -169,6 +183,114 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(store.effectiveSteps()).toEqual([]);
         expect(store.canUndo()).toBe(false);
         expect(store.canvas()?.nodes).toEqual([]);
+    });
+
+    it('LA-UI-DRAFT-OPS-1: with a Draft as the working scope, steps and undo go to the Draft, never the main log', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        logs['inv-1/d-1'] = { header: header('inv-1'), entries: [], total: 0, truncated: false };
+        sets['inv-1/d-1'] = ws([]);
+        expect(await store.useDraft('d-1')).toBe(true);
+        expect(inv.draftLog).toHaveBeenCalledWith('inv-1', 'd-1');
+
+        inv.appendDraftOp.mockImplementation(() => {
+            logs['inv-1/d-1'].entries.push(entry(1, { op: 'seed', params: { ids: ['4471'] } }));
+            sets['inv-1/d-1'] = ws(['4471']);
+            return of(step(1, 'seed'));
+        });
+        expect(await store.apply({ op: 'seed', ids: ['4471'] })).toBe(true);
+        expect(inv.appendDraftOp).toHaveBeenCalledWith('inv-1', 'd-1', { op: 'seed', ids: ['4471'] });
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+        expect(store.canvas()?.nodes.map((n) => n.id)).toEqual([entityId('msisdn', '4471')]);
+
+        inv.undoDraft.mockImplementation(() => {
+            sets['inv-1/d-1'] = ws([]);
+            return of(step(2, 'undo'));
+        });
+        expect(await store.undo()).toBe(true);
+        expect(inv.undoDraft).toHaveBeenCalledWith('inv-1', 'd-1');
+        expect(inv.undoInvestigation).not.toHaveBeenCalled();
+        expect(store.canvas()?.nodes).toEqual([]);
+
+        // back to the main log; closing (e.g. re-open after promote) also leaves the Draft
+        expect(await store.useDraft(null)).toBe(true);
+        expect(store.activeDraftId()).toBeNull();
+        await store.useDraft('d-1');
+        store.close();
+        expect(store.activeDraftId()).toBeNull();
+    });
+
+    it('LA-UI-DRAFT-FIX-1: a Draft that cannot be loaded never becomes the scope; the error is shown', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        sets['inv-1'] = ws(['4471']);
+        logs['inv-1'].entries = [entry(1, { op: 'seed' })];
+        await store.open('inv-1');
+        inv.draftLog.mockReturnValueOnce(
+            throwError(() => new HttpErrorResponse({ status: 404, error: { error: { message: 'no such draft' } } })),
+        );
+        expect(await store.useDraft('gone')).toBe(false);
+        expect(store.activeDraftId()).toBeNull();
+        expect(store.error()).not.toBe('');
+        expect(store.log()?.entries.length).toBe(1);
+        expect(store.workingSet()).toEqual(ws(['4471']));
+    });
+
+    it('LA-UI-DRAFT-FIX-1: Undo counts only the Draft’s OWN steps, never the main-log prefix', async () => {
+        const { store, logs, sets, bases } = setup();
+        await store.start(P, 'warrant 7');
+        logs['inv-1/d-1'] = {
+            header: header('inv-1'),
+            entries: [entry(1, { op: 'seed' }), entry(2, { op: 'expand' })],
+            total: 2,
+            truncated: false,
+        };
+        sets['inv-1/d-1'] = ws(['4471']);
+        bases['inv-1/d-1'] = 2;
+        await store.useDraft('d-1');
+        expect(store.canUndo()).toBe(false);
+
+        logs['inv-1/d-1'].entries.push(entry(3, { op: 'exclude' }));
+        logs['inv-1/d-1'].total = 3;
+        await store.useDraft('d-1');
+        expect(store.canUndo()).toBe(true);
+    });
+
+    it('LA-UI-DRAFT-FIX-1: Replay with a Draft as the scope replays the Draft, never the main log', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        logs['inv-1/d-1'] = { header: header('inv-1'), entries: [], total: 0, truncated: false };
+        sets['inv-1/d-1'] = ws(['77']);
+        await store.useDraft('d-1');
+        inv.replayInvestigation.mockClear();
+        inv.draftReplay.mockReturnValueOnce(
+            of({
+                baseStep: 0,
+                at: 1,
+                workingSet: ws(['77']),
+                equivalent: false,
+                mismatches: [],
+                setMismatches: [1],
+            }),
+        );
+        expect(await store.replay(false)).toBe(true);
+        expect(inv.replayInvestigation).not.toHaveBeenCalled();
+        expect(store.replayResult()?.equivalent).toBe(false);
+        expect(store.replayResult()?.mismatches).toEqual([1]);
+        expect(store.replayResult()?.reread).toBe(false);
+    });
+
+    it('LA-UI-DRAFT-FIX-1: re-opening after a promote leaves the Draft scope and reads the main log', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        sets['inv-1'] = ws([]);
+        logs['inv-1/d-1'] = { header: header('inv-1'), entries: [], total: 0, truncated: false };
+        sets['inv-1/d-1'] = ws([]);
+        await store.useDraft('d-1');
+        inv.investigationLog.mockClear();
+        expect(await store.open('inv-1')).toBe(true); // what the host does on (promoted)
+        expect(store.activeDraftId()).toBeNull();
+        expect(inv.investigationLog).toHaveBeenCalledWith('inv-1');
     });
 
     it('re-ordering FORKS: the fork is remembered with its parent and becomes the open Investigation', async () => {

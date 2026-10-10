@@ -1,0 +1,36 @@
+name: fraud_blocklist
+active: true
+description: "Telecom Link Analysis showcase - Numbers on the fraud block list. One 60-day extract (FRAUD_BLOCKLIST_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/fraud_blocklist
+  database:   data/fraud_blocklist/database
+  backup:     data/fraud_blocklist/backup
+  temp:       data/fraud_blocklist/temp
+  errors:     data/fraud_blocklist/errors
+  quarantine: data/fraud_blocklist/quarantine
+  markers:    data/fraud_blocklist/markers
+  status_dir: data/fraud_blocklist/status
+  log_dir:    data/fraud_blocklist/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: fraud_blocklist_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

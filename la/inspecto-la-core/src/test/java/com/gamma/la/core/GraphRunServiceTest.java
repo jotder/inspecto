@@ -748,4 +748,23 @@ class GraphRunServiceTest {
         assertEquals("materialised", mem.inputKind());
         assertEquals(0, mem.indexVersion());
     }
+
+    // ── cache key ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    private static String keyOf(Map<String, ?> raw) {
+        Request r = new Request("u", "inv-1", "rel-1", "scope-A", Algorithm.PROPAGATED_RISK, raw, "none", ring(3), GraphBudget.UNSTATED);
+        return GraphRunService.cacheKey(r, Algorithm.PROPAGATED_RISK.resolve(raw));
+    }
+
+    /** toString() made these pairs one key, so a later run was served the other's result: the encoding is unambiguous now. */
+    @Test
+    void requestsThatPrintAlikeGetDifferentCacheKeysAndTheKeyIsAFixedSizeHash() {
+        assertNotEquals(keyOf(Map.of("seeds", List.of("Smith, John"))), keyOf(Map.of("seeds", List.of("Smith", "John"))));
+        assertNotEquals(keyOf(Map.of("nodeScores", Map.of("a=1.0, b", 2))), keyOf(Map.of("nodeScores", Map.of("a", 1, "b", 2))));
+        assertEquals(keyOf(Map.of("nodeScores", Map.of("b", 2, "a", 1))), keyOf(Map.of("nodeScores", Map.of("a", 1.0, "b", 2.0))),
+                "the same request (any key order, int or double) is the same key");
+        Map<String, Object> big = new java.util.HashMap<>();
+        for (int i = 0; i < 10_000; i++) big.put("node-" + i, 50);
+        assertEquals(64, keyOf(Map.of("nodeScores", big)).length(), "SHA-256 hex, whatever the parameter size");
+    }
 }

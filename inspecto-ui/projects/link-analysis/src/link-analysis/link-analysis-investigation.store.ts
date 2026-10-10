@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { EntityProjection, G6Node } from '@inspecto/core/graph';
 import {
+    DraftReplayResult,
     InvService,
     InvestigationLog,
     InvestigationOpRequest,
@@ -24,6 +25,27 @@ import { DegreeOutcome, degreeOutcome, degreeState, presetRung } from './investi
 
 const EMPTY_SET: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
 
+interface Loaded {
+    log: InvestigationLog;
+    workingSet: WorkingSet;
+    baseStep: number;
+}
+
+/** A Draft's replay in the main replay's shape: its set mismatches count as mismatches too; never a re-read. */
+function fromDraftReplay(id: string, r: DraftReplayResult): InvestigationReplayResult {
+    const mismatches = [...new Set([...r.mismatches, ...r.setMismatches])].sort((a, b) => a - b);
+    return {
+        id,
+        at: r.at,
+        workingSet: r.workingSet,
+        equivalent: r.equivalent,
+        mismatches,
+        reread: false,
+        drift: [],
+        diverged: false,
+    };
+}
+
 /**
  * LA-10 — the Link Analysis screen's Investigation session: which Investigation is open, its op log, and the
  * Working Set it evaluates to. Provided by `LinkAnalysisComponent`, so it outlives the toolbox dock (the panel
@@ -40,6 +62,10 @@ export class InvestigationSessionStore {
     /** Every Investigation this screen knows about (created here or restored from a saved view). */
     readonly refs = signal<InvestigationRef[]>([]);
     readonly activeId = signal<string | null>(null);
+    /** LA-UI-DRAFT-OPS-1: the Draft that is the working scope — ops, undo, the log and the Working Set go to it; null = the main log. */
+    readonly activeDraftId = signal<string | null>(null);
+    /** The main-log step the scope Draft forked at — log entries up to it are the main prefix, not the Draft's own. */
+    readonly draftBaseStep = signal(0);
     readonly log = signal<InvestigationLog | null>(null);
     readonly workingSet = signal<WorkingSet | null>(null);
     readonly lastStep = signal<InvestigationStepResult | null>(null);
@@ -65,7 +91,11 @@ export class InvestigationSessionStore {
     readonly header = computed(() => this.log()?.header ?? null);
     readonly effectiveSteps = computed(() => effectiveOpSteps(this.log()?.entries ?? []));
     readonly truncatedSteps = computed(() => truncatedSteps(this.log()?.entries ?? []));
-    readonly canUndo = computed(() => this.effectiveSteps().length > 0);
+    /** A Draft's Undo reverts only its OWN steps, so the main-log prefix it forked from never counts. */
+    readonly canUndo = computed(() => {
+        const base = this.activeDraftId() ? this.draftBaseStep() : 0;
+        return this.effectiveSteps().some((e) => e.step > base);
+    });
     /** The projection the Investigation is bound to, rebuilt from its header (+ the remembered entity type). */
     readonly binding = computed<EntityProjection | null>(() => {
         const h = this.header();
@@ -112,6 +142,8 @@ export class InvestigationSessionStore {
     /** Leave the open Investigation (it stays remembered). */
     close(): void {
         this.activeId.set(null);
+        this.activeDraftId.set(null);
+        this.draftBaseStep.set(0);
         this.log.set(null);
         this.workingSet.set(null);
         this.lastStep.set(null);
@@ -231,7 +263,12 @@ export class InvestigationSessionStore {
         return this.run(
             `The ${op.op} step failed.`,
             async () => {
-                this.lastStep.set(await firstValueFrom(this.inv.appendInvestigationOp(id, op)));
+                const draft = this.activeDraftId();
+                this.lastStep.set(
+                    await firstValueFrom(
+                        draft ? this.inv.appendDraftOp(id, draft, op) : this.inv.appendInvestigationOp(id, op),
+                    ),
+                );
                 await this.refresh(id);
             },
             message,
@@ -242,8 +279,26 @@ export class InvestigationSessionStore {
         const id = this.activeId();
         if (!id) return false;
         return this.run('Undo failed.', async () => {
-            this.lastStep.set(await firstValueFrom(this.inv.undoInvestigation(id)));
+            const draft = this.activeDraftId();
+            this.lastStep.set(
+                await firstValueFrom(draft ? this.inv.undoDraft(id, draft) : this.inv.undoInvestigation(id)),
+            );
             await this.refresh(id);
+        });
+    }
+
+    /** Make a Draft (or, with null, the main log) the working scope. The scope changes only once its log and Working
+     *  Set have loaded — a Draft discarded elsewhere (404) leaves the current scope as it was, with the error shown. */
+    async useDraft(draftId: string | null): Promise<boolean> {
+        const id = this.activeId();
+        if (!id) return false;
+        return this.run(draftId ? 'Could not open the Draft.' : 'Could not open the Investigation.', async () => {
+            const loaded = await this.load(id, draftId);
+            if (this.activeId() !== id) return;
+            this.activeDraftId.set(draftId);
+            this.lastStep.set(null);
+            this.replayResult.set(null);
+            this.commit(loaded);
         });
     }
 
@@ -285,21 +340,44 @@ export class InvestigationSessionStore {
     async replay(reread: boolean): Promise<boolean> {
         const id = this.activeId();
         if (!id) return false;
+        const draft = this.activeDraftId();
         return this.run('Replay failed.', async () => {
-            const r = await firstValueFrom(this.inv.replayInvestigation(id, { reread }));
+            // A Draft's replay is the equivalence check only — it has no re-read (drift), so `reread` is not offered.
+            const r = draft
+                ? fromDraftReplay(id, await firstValueFrom(this.inv.draftReplay(id, draft)))
+                : await firstValueFrom(this.inv.replayInvestigation(id, { reread }));
             this.replayResult.set(r);
             this.workingSet.set(r.workingSet);
         });
     }
 
     private async refresh(id: string): Promise<void> {
+        const draft = this.activeDraftId();
+        const loaded = await this.load(id, draft);
+        if (this.activeId() !== id || this.activeDraftId() !== draft) return; // switched away meanwhile
+        this.commit(loaded);
+    }
+
+    /** Read the log and the Working Set of the main log or of a Draft — without touching the store. */
+    private async load(id: string, draft: string | null): Promise<Loaded> {
+        if (draft) {
+            const [log, replay] = await Promise.all([
+                firstValueFrom(this.inv.draftLog(id, draft)),
+                firstValueFrom(this.inv.draftReplay(id, draft)),
+            ]);
+            return { log, workingSet: replay.workingSet, baseStep: replay.baseStep };
+        }
         const [log, replay] = await Promise.all([
             firstValueFrom(this.inv.investigationLog(id)),
             firstValueFrom(this.inv.replayInvestigation(id, {})),
         ]);
-        if (this.activeId() !== id) return; // switched away meanwhile
-        this.log.set(log);
-        this.workingSet.set(replay.workingSet);
+        return { log, workingSet: replay.workingSet, baseStep: 0 };
+    }
+
+    private commit(l: Loaded): void {
+        this.log.set(l.log);
+        this.workingSet.set(l.workingSet);
+        this.draftBaseStep.set(l.baseStep);
     }
 
     private async run(

@@ -7,6 +7,7 @@ import com.gamma.la.graph.GraphAlgorithms.Graph;
 import com.gamma.la.graph.GraphCentrality;
 import com.gamma.la.graph.GraphIterative;
 import com.gamma.la.graph.GraphPaths;
+import com.gamma.la.graph.GraphPropagation;
 import com.gamma.la.graph.GraphStructure;
 import com.gamma.la.graph.GraphSuspicion;
 import com.gamma.la.graph.RunControl;
@@ -104,7 +105,15 @@ public final class InMemoryGraphEngine implements GraphEngine {
                 GraphIterative.HitsResult h = GraphIterative.hits(g, num(p, "iterations"), c);
                 yield new GraphResult.Hits(h.hubs(), h.authorities());
             }
+            case PROPAGATED_RISK -> new GraphResult.PropagatedRisks(GraphPropagation.propagatedRisk(g,
+                    typed(p, "nodeScores"), typed(p, "seeds"), typed(p, "weights"), dir(p), c));
         };
+    }
+
+    /** A collection parameter, already typed by {@link Algorithm#resolve}. */
+    @SuppressWarnings("unchecked")
+    private static <T> T typed(Map<String, Object> p, String k) {
+        return (T) p.get(k);
     }
 
     private static String str(Map<String, Object> p, String k) {

@@ -243,8 +243,7 @@ final class FsInvestigationLayout {
         Files.createDirectories(d);
         Path tmp = Files.createTempFile(d, ".bind-", ".tmp");
         Files.writeString(tmp, json, StandardCharsets.UTF_8);
-        Files.move(tmp, d.resolve(rule + ".json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        replaceAtomically(tmp, d.resolve(rule + ".json"));
     }
 
     /** One Alert Rule's binding to an Investigation, raw, or null when that rule was never bound to it. */
@@ -265,8 +264,7 @@ final class FsInvestigationLayout {
         Files.createDirectories(d);
         Path tmp = Files.createTempFile(d, ".req-", ".tmp");
         Files.writeString(tmp, json, StandardCharsets.UTF_8);
-        Files.move(tmp, d.resolve(requestId + ".json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        replaceAtomically(tmp, d.resolve(requestId + ".json"));
     }
 
     /** One pending-expand record, raw, or null when it was never written. */
@@ -300,8 +298,7 @@ final class FsInvestigationLayout {
         Path d = investigationDir(investigationId);
         Path tmp = Files.createTempFile(d, ".case-", ".tmp");
         Files.writeString(tmp, json, StandardCharsets.UTF_8);
-        Files.move(tmp, d.resolve("case-link.json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        replaceAtomically(tmp, d.resolve("case-link.json"));
     }
 
     /** The Investigation's Case link, raw, or null when it has none. */
@@ -355,6 +352,33 @@ final class FsInvestigationLayout {
     private static void deleteTree(Path p) throws IOException {
         try (var s = Files.walk(p)) {
             for (Path q : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(q);
+        }
+    }
+
+    /**
+     * Atomically replace {@code target} with {@code tmp}. On Windows a replacing rename fails with
+     * AccessDeniedException while another thread has the target open for reading (a concurrent read of the same
+     * record); that window is short, so the rename is retried briefly before giving up.
+     */
+    private static void replaceAtomically(Path tmp, Path target) throws IOException {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                Files.move(tmp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                return;
+            } catch (java.nio.file.AccessDeniedException busy) {
+                if (attempt >= 50) {
+                    Files.deleteIfExists(tmp);
+                    throw busy;
+                }
+                try {
+                    Thread.sleep(Math.min(2L + attempt, 20L));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    Files.deleteIfExists(tmp);
+                    throw busy;
+                }
+            }
         }
     }
 }

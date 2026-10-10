@@ -1,0 +1,18 @@
+name: telecom_fraud_network
+description: "Telecom fraud network - MSISDNs linked by voice, sms, forwarding, shared device, shared identity, SIM history and shared payment (telecom_links_dataset). Start from the suspect 99979100001 (Wangiri) and expand: degree 1 its twin SIM and the premium number its callbacks forward to, degree 2 the IRSF ring, degree 3 the subscription-fraud identity, degree 4 the SIM box. The taxi-dispatch line 99970000100 is the supernode (650 callers)."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: telecom_links_dataset
+    sourceCol: a_msisdn
+    targetCol: b_msisdn
+    linkKindCol: link_kind
+    attrCols[1]: via
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

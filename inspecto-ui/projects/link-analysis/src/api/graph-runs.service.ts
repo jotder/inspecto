@@ -38,7 +38,8 @@ export type GraphResultKind =
     | 'FLOW'
     | 'LINKS'
     | 'SUSPICION'
-    | 'GRAPH';
+    | 'GRAPH'
+    | 'PROPAGATED_RISK';
 
 export interface GraphScoreView {
     id: string;
@@ -48,6 +49,14 @@ export interface GraphScoreView {
 
 export interface GraphSuspicionView extends GraphScoreView {
     factors: { degree: number; betweenness: number; pageRank: number; core: number; triangles: number };
+}
+
+/** `propagatedRisk`: `score` is `raw` capped at 100; `factors` are the top contributing origins of `contributors`. */
+export interface GraphPropagatedRiskView extends GraphScoreView {
+    raw: number;
+    own: number;
+    contributors: number;
+    factors: { origin: string; distance: number; weight: number; contribution: number }[];
 }
 
 /** `edgeIds` are D-U9 wire ids (`linkId`), `nodeIds` the (possibly masked) entity ids - NOT the canvas's own ids. */
@@ -82,7 +91,7 @@ export interface GraphRunResult {
     truncated?: boolean;
     /** Per list: every top-level one, plus a nested one (`groups[0]`, `selection.nodeIds`) only when it was cut. */
     lists?: Record<string, GraphListCut>;
-    scores?: GraphScoreView[] | GraphSuspicionView[];
+    scores?: GraphScoreView[] | GraphSuspicionView[] | GraphPropagatedRiskView[];
     hubs?: GraphScoreView[];
     authorities?: GraphScoreView[];
     selection?: GraphSelectionView | null;
@@ -163,13 +172,20 @@ export interface GraphRunRequest {
     budget?: Partial<GraphBudgetView>;
 }
 
+/**
+ * The catalogue's parameter types. `DOUBLE_LIST` / `ID_LIST` / `SCORE_MAP` are JSON arrays / an id → number object; for
+ * them `min`/`max` bound each number and `maxSize` the entry count.
+ */
+export type GraphParamType = 'INT' | 'DOUBLE' | 'ENUM' | 'DOUBLE_LIST' | 'ID_LIST' | 'SCORE_MAP';
+
 export interface GraphAlgorithmParam {
     name: string;
-    type: string;
+    type: GraphParamType;
     default: unknown;
     min?: number;
     max?: number;
     allowed?: string[];
+    maxSize?: number;
 }
 
 export interface GraphAlgorithm {

@@ -1,0 +1,36 @@
+name: voice_cdr
+active: true
+description: "Telecom Link Analysis showcase - Voice call detail records - one row per call leg originated on the home network. One 60-day extract (VOICE_CDR_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/voice_cdr
+  database:   data/voice_cdr/database
+  backup:     data/voice_cdr/backup
+  temp:       data/voice_cdr/temp
+  errors:     data/voice_cdr/errors
+  quarantine: data/voice_cdr/quarantine
+  markers:    data/voice_cdr/markers
+  status_dir: data/voice_cdr/status
+  log_dir:    data/voice_cdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: voice_cdr_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
