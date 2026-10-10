@@ -99,8 +99,31 @@ Verified 2026-10-11 by two read-only audits (backend + UI), replacing the VERIFY
 
 Deferred: background (Job-backed) expand — degrees 3-4 fit the budget on demo data.
 
-**In flight (parallel, isolated worktrees):** seed data (S0); `propagatedRisk` (S2); hub flag on expand (S3);
-Sprint 1 UI flow; pattern-stage feasibility (read-only).
+**Shipped 2026-10-11 (pushed, `master` `dff65f5f8`), each with an independent review PASS:**
+S0 seed data + `telecom_links` / `telecom_msisdn_indicators` Jobs (data notes: `la-telecom-demo-data.md`);
+S1 "Investigate a number" (deep link `?seed=`, starter card, auto degrees 1-2, *Expand next degree* to 4, window
+anchored to the Dataset's latest `last_seen`, link-kind chips, Incident/Case link); S2 `propagatedRisk` algorithm
+(API only — the toolbox labels it so); S3 hub suppression on expand (`hubThreshold` / `includeHubs` / `expandHubs`,
+Space key `hub_threshold`, default 500). Pattern audit: Wangiri / IRSF / SIM box = indicator columns + Dataset Alert
+Rules; subscription ring, forwarding chain, payment ring = TOON pattern packs; no pattern-fed Alert Rule exists.
+
+**Next, in order:**
+1. **Expand weights by an events column** — expand counts rows (`COUNT(*)` per s,t,k in `InvestigationRoutes`), so
+   pre-aggregated `telecom_links` gives every pair 1, `minEvents ≥ 2` drops all links and caps rank lexically. Add an
+   optional events/weight column to the Investigation binding (SUM instead of COUNT), then restore the Telecom preset
+   `minEvents: 2`.
+2. **S2 UI** — node panel: `propagatedRisk` score + factors (scores fed from `telecom_msisdn_indicators`), CRM/KYC
+   attributes, Entity List status, case history; a renderer for `PROPAGATED_RISK` and list/map params; Space-level
+   default risk weights (`LinkAnalysisSettings.GraphRun`).
+3. **S3 rest** — node actions (add to watch/block Entity List, hide, attach); one-step attach (+ optional Incidents);
+   hub override button + hub threshold field in Settings → Link Analysis; three telecom pattern packs (TOON).
+4. **Hub review follow-ups** — degree check scans the flat Dataset even on the indexed path (compute from the index);
+   an entity already in the Working Set can be flagged by another frontier's rows; approval 409 says "left the Working
+   Set" when entities were only flagged; Draft/fork/template paths validate `expandHubs` less strictly than append.
+5. **Browser smoke** of §2 on the seeded `la-showcase` Space (never driven on screen yet).
+
+Open operator question: keep `four_eyes_fan_out_above: 5` in the showcase (first suspect expand waits for
+`fm.manager`; the UI shows "waiting for approval") or raise it for the telecom demo.
 
 ## 6. Open items before this can be rehearsed
 
