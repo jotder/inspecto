@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import {
     FormControl,
     FormGroup,
@@ -107,6 +107,14 @@ export class LinkAnalysisInvestigationComponent {
     readonly timeColumn = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
     /** The IANA zone a naive TIMESTAMP time column is in; blank = UTC (the server records that explicitly). */
     readonly timeColumnZone = new FormControl('', { nonNullable: true });
+
+    constructor() {
+        // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
+        effect(() => {
+            const col = this.timeCol();
+            if (this.timeColumn.pristine) this.timeColumn.setValue(col, { emitEvent: false });
+        });
+    }
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 
     readonly title = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
@@ -234,7 +242,7 @@ export class LinkAnalysisInvestigationComponent {
                 this.timeColumnZone.value,
             )
         ) {
-            this.timeColumn.reset('');
+            this.timeColumn.reset(this.timeCol());
             this.timeColumnZone.reset('');
             this.title.reset('');
             this.purpose.reset('');

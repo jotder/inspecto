@@ -179,13 +179,13 @@ loaded (cap 2 000 nodes; the heavier scores are capped lower and say so).
 | Group | Answers |
 |---|---|
 | **Shortest path** | How are A and B connected? *Fewest hops*, or weighted by tie strength. |
-| **All paths** | Every route between A and B up to a length. |
-| **Find paths (server)** | The same across the **whole Dataset** in the database — for graphs too big to load. Shows depth searched, and warns if capped. |
+| **All paths** | Every route between A and B up to a length. Parallel links between the same nodes count as ONE route, shown with how many links it stands for and their kinds. |
+| **Find paths (server)** | The same across the **whole Dataset** in the database — for graphs too big to load. Shows depth searched, and warns if capped. One row per route (parallel links collapsed, as in All paths). |
 | **Explain node** | A node's neighbourhood, degree and role in plain words. |
 | **Centrality** | Who is most important: degree, betweenness (brokers), closeness, eigenvector, Katz, PageRank, HITS. |
 | **Communities** | Natural clusters: label propagation or Louvain. |
 | **Connected components** | Separate islands. |
-| **Cycles** | Money or calls that return to where they started. |
+| **Cycles** | Money or calls that return to where they started. Listed shortest first with the hop count; the selected cycle is the one drawn on the canvas (the shortest is drawn first). |
 | **Cut points** | Nodes/links whose removal splits the network — single points of dependence. |
 | **Cohesive groups** | k-core, triangles, cliques — tightly knit cells. |
 | **Similarity & prediction** | Who looks alike; which links are likely missing. |
@@ -203,7 +203,7 @@ and the queued entities seeded as its first step. You can remove one from the qu
 
 ## 7. Pattern matching
 
-Pick a **pattern pack** to pre-fill the motif, edit the thresholds (they are always visible), run it.
+Pattern match opens on the first pack (its description is shown); *Custom motif* with no kinds set matches every link and says *Choose a pattern*. Pick a **pattern pack** to pre-fill the motif, edit the thresholds (they are always visible), run it.
 
 | Pack | Looks for |
 |---|---|

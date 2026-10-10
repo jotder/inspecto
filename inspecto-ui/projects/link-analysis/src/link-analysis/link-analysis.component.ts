@@ -75,7 +75,7 @@ import {
     redo as redoHistory,
     undo as undoHistory,
 } from '@inspecto/link-analysis/graph/graph-history';
-import { workingSetStats, attrColumns } from '@inspecto/link-analysis/graph/working-set-stats';
+import { workingSetStats, attrColumns, isTemporalColumn } from '@inspecto/link-analysis/graph/working-set-stats';
 import {
     DOMAIN_PROFILES,
     DomainProfileId,
@@ -662,6 +662,17 @@ export class LinkAnalysisComponent implements OnInit {
         { value: '', label: 'Off' },
         ...this.attrColumns().map((c) => ({ value: c, label: c })),
     ]);
+    /**
+     * The default event time of a new Investigation: the timeline's column when one is on, else the profile's
+     * time hint, else the first edge-attribute column whose every value parses as a date (what the working-set
+     * tiles use). '' when the loaded graph carries none.
+     */
+    readonly investigationTimeColumn = computed(() => {
+        const g = this.graph();
+        if (this.timeColumn() || !g) return this.timeColumn();
+        const cols = this.attrColumns();
+        return workingSetOptionsFor(this.profile(), cols).timeColumn ?? cols.find((c) => isTemporalColumn(g, c)) ?? '';
+    });
     /** Cutoff (epoch millis) — edges dated after this are hidden; `null` until the slider is touched. */
     readonly timeCutoff = signal<number | null>(null);
     /** Every edge-`attrs` key present anywhere in the loaded graph — the column picker's options. */

@@ -29,10 +29,12 @@ import { provideLaHostServices } from 'app/modules/admin/studio/la-host.provider
     template: `<inspecto-link-analysis-investigation
         [projection]="projection()"
         projectionIssue="Run a query first."
+        [timeCol]="timeCol()"
     ></inspecto-link-analysis-investigation>`,
 })
 class Host {
     readonly projection = signal<EntityProjection | null>({ datasetId: 'calls', sourceCol: 'A', targetCol: 'B' });
+    readonly timeCol = signal('');
 }
 
 const LOG: InvestigationLog = {
@@ -185,6 +187,24 @@ async function openInv(store: InvestigationSessionStore) {
 
 // Full-component renders run 5-7s on the CI runner, past vitest's 5s default.
 describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () => {
+    it('prefills the time column from the default (DR-D7) and starts with it', async () => {
+        const { fixture, el, inv, button } = create();
+        const host = fixture.componentInstance as unknown as { timeCol: { set(v: string): void } };
+        host.timeCol.set('booked_at');
+        fixture.detectChanges();
+        const field = Array.from(el.querySelectorAll('mat-form-field')).find((f) =>
+            f.textContent?.includes('Time column (optional)'),
+        );
+        expect((field?.querySelector('input') as HTMLInputElement).value).toBe('booked_at');
+        const purpose = el.querySelector('input[required]') as HTMLInputElement;
+        purpose.value = 'warrant 7';
+        purpose.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        button('Start Investigation').click();
+        await fixture.whenStable();
+        expect(inv.createInvestigation).toHaveBeenCalledWith(expect.objectContaining({ timeCol: 'booked_at' }));
+    });
+
     it('start state: explains the binding, starts from the projection, and passes axe', async () => {
         const { fixture, el, inv, button } = create();
         expect(el.textContent).toContain("the query's filter is not applied");
@@ -227,6 +247,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         await openInv(store);
         fixture.detectChanges();
 
+        expect(button('Re-order steps').textContent).toContain('creates a fork'); // DR-D8
         button('Re-order steps').click();
         fixture.detectChanges();
         expect(el.textContent).toContain('Re-ordering creates a fork');

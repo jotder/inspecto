@@ -150,7 +150,7 @@
                                                 class="underline-offset-2 hover:underline"
                                                 (click)="focusAllPath(p)"
                                             >
-                                                {{ patternMatchLabel(p) }}
+                                                {{ pathLabel(p) }}
                                             </button>
                                         </li>
                                     }
@@ -252,7 +252,7 @@
                                                         class="underline-offset-2 hover:underline"
                                                         (click)="focusAllPath(p)"
                                                     >
-                                                        {{ patternMatchLabel(p) }}
+                                                        {{ pathLabel(p) }}
                                                     </button>
                                                 </li>
                                             }
@@ -518,9 +518,14 @@
                             }
                             @if (cycles().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Cycles">
-                                    @for (c of cycles(); track $index) {
+                                    @for (c of cycles(); track $index; let i = $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusCycle(c)">
+                                            <button
+                                                class="underline-offset-2 hover:underline"
+                                                [class.font-semibold]="selectedCycle() === i"
+                                                [attr.aria-pressed]="selectedCycle() === i"
+                                                (click)="focusCycle(c, i)"
+                                            >
                                                 {{ cycleLabel(c) }}
                                             </button>
                                         </li>
@@ -911,6 +916,11 @@
                                     (ngModelChange)="loadPatternPack($event)"
                                 />
                             </div>
+                            @if (!loadedPack()) {
+                                <p class="text-sm text-secondary" role="status">
+                                    Choose a pattern — a custom motif with no link kinds set matches every link.
+                                </p>
+                            }
                             @if (loadedPack(); as pack) {
                                 <p class="text-sm text-secondary" role="status">
                                     {{ pack.description }}

@@ -15,7 +15,7 @@ import {
     resolveEntityId,
     typedOrEntityId,
 } from '@inspecto/core/graph';
-import { GraphSelection, mergeGraphs } from '@inspecto/link-analysis/graph/graph-analysis';
+import { DistinctPath, GraphSelection, distinctPaths, mergeGraphs } from '@inspecto/link-analysis/graph/graph-analysis';
 import {
     IndexSource,
     InvService,
@@ -558,7 +558,8 @@ export class MultiProjectionGraphSource implements GraphSource {
 
 /** What an LA-11 traversal found, in graph ids, with the server's fences stated rather than implied. */
 export interface ServerPathsState {
-    paths: GraphSelection[];
+    /** One entry per distinct node sequence — parallel links are collapsed (see {@link DistinctPath}). */
+    paths: DistinctPath[];
     /** The path limit or the edge-yield fence cut the answer short. */
     truncated: boolean;
     /** A recursion level hit `maxEdgeYield`: longer paths may exist that were never walked. */
@@ -585,8 +586,11 @@ export function recursivePathsToGraph(
 ): { graph: G6GraphData; state: ServerPathsState } {
     const nodes = new Map(base.nodes.map((n) => [n.id, n]));
     const edges = new Map(base.edges.map((e) => [e.id, e]));
-    const linkBetween = (a: string, b: string): string | undefined =>
-        [...edges.values()].find((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))?.id;
+    // Every working-set link between two nodes (either direction): parallel links all ride the same node path.
+    const linksBetween = (a: string, b: string): string[] =>
+        [...edges.values()]
+            .filter((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))
+            .map((e) => e.id);
 
     // A hop with no mintable id (an empty typed key -- the server refuses those) drops its whole path.
     const mintable = res.paths.filter((p) =>
@@ -602,19 +606,22 @@ export function recursivePathsToGraph(
         const edgeIds: string[] = [];
         for (let i = 1; i < nodeIds.length; i++) {
             const [a, b] = [nodeIds[i - 1], nodeIds[i]];
-            let id = linkBetween(a, b);
-            if (!id) {
-                id = `path:${a}->${b}`;
+            const ids = linksBetween(a, b);
+            if (!ids.length) {
+                const id = `path:${a}->${b}`;
                 edges.set(id, { id, source: a, target: b, data: { kind: 'path' } });
+                ids.push(id);
             }
-            edgeIds.push(id);
+            edgeIds.push(...ids);
         }
         return { nodeIds, edgeIds };
     });
+    const graph: G6GraphData = { nodes: [...nodes.values()], edges: [...edges.values()] };
     return {
-        graph: { nodes: [...nodes.values()], edges: [...edges.values()] },
+        graph,
         state: {
-            paths,
+            // The server returns one row per parallel link; show each node sequence once, with its count and kinds.
+            paths: distinctPaths(graph, paths),
             truncated: res.truncated,
             edgeYieldCapped: res.edgeYieldCapped,
             depthLimit: res.fences.maxDepth,

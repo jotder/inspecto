@@ -216,6 +216,39 @@ export function allPaths(
     return results;
 }
 
+/** A path de-duplicated by its node sequence: `count` raw paths (parallel links) collapsed into it. */
+export interface DistinctPath extends GraphSelection {
+    /** How many raw paths — one per parallel-link combination — share this node sequence. */
+    count: number;
+    /** The distinct link kinds along it (across every parallel link), in first-seen order. */
+    kinds: string[];
+}
+
+/**
+ * Collapse paths that visit the SAME nodes in the same order (they differ only in WHICH of several parallel
+ * links they ride) into one {@link DistinctPath}: edge ids are unioned so the whole bundle highlights, and
+ * the count and the distinct link kinds are kept. First-seen order is preserved.
+ */
+export function distinctPaths(g: G6GraphData, paths: GraphSelection[]): DistinctPath[] {
+    const kindOf = new Map(g.edges.map((e) => [e.id, e.data?.kind as string | undefined]));
+    const byKey = new Map<string, DistinctPath>();
+    for (const p of paths) {
+        const key = p.nodeIds.join('\u0000');
+        let d = byKey.get(key);
+        if (!d) {
+            d = { nodeIds: [...p.nodeIds], edgeIds: [], count: 0, kinds: [] };
+            byKey.set(key, d);
+        }
+        d.count += 'count' in p && typeof (p as DistinctPath).count === 'number' ? (p as DistinctPath).count : 1;
+        for (const id of p.edgeIds) {
+            if (!d.edgeIds.includes(id)) d.edgeIds.push(id);
+            const k = kindOf.get(id);
+            if (k && !d.kinds.includes(k)) d.kinds.push(k);
+        }
+    }
+    return [...byKey.values()];
+}
+
 /** The N-hop neighborhood subgraph around a node (root included; edges within the kept set). */
 export function neighborhood(
     g: G6GraphData,
@@ -1084,6 +1117,38 @@ export function findCycles(g: G6GraphData, opts: { limit?: number; maxLen?: numb
         nodePath.pop();
     }
     return results;
+}
+
+/**
+ * {@link findCycles}, SHORTEST FIRST. `findCycles` enumerates from the smallest start node and stops at `limit`,
+ * so on a big graph a short planted ring (A→B→C→D→A) can be cut off behind dozens of long cycles. This widens
+ * `maxLen` one hop at a time and stops as soon as the cap is reached, so every cycle shorter than the final
+ * length is complete; the result is ordered by length (stable within a length).
+ */
+export function findCyclesShortestFirst(
+    g: G6GraphData,
+    opts: { limit?: number; maxLen?: number } = {},
+): GraphSelection[] {
+    const { limit = 50, maxLen = 8 } = opts;
+    // `done` = every cycle shorter than `len` (a pass that was not capped enumerated them all).
+    let done: GraphSelection[] = [];
+    for (let len = 1; len <= maxLen; len++) {
+        const cap = limit + done.length;
+        const res = findCycles(g, { limit: cap, maxLen: len });
+        const ofLen = res.filter((c) => c.nodeIds.length === len);
+        if (res.length >= cap) return sortCyclesShortestFirst([...done, ...ofLen]);
+        done = [...done, ...ofLen];
+        if (done.length >= limit) break;
+    }
+    return sortCyclesShortestFirst(done);
+}
+
+/** Stable ordering of cycles by length (shortest first). */
+export function sortCyclesShortestFirst(cycles: GraphSelection[]): GraphSelection[] {
+    return cycles
+        .map((c, i) => ({ c, i }))
+        .sort((a, b) => a.c.nodeIds.length - b.c.nodeIds.length || a.i - b.i)
+        .map((x) => x.c);
 }
 
 /**

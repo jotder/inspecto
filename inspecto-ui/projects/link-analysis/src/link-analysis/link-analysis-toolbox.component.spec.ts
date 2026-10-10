@@ -132,6 +132,7 @@ describe('LinkAnalysisToolboxComponent', () => {
     it('pattern: builds a motif, matches it, gates on node kind, and focuses a match', () => {
         const { c, last } = make();
 
+        c.patternSteps.set([{}, { direction: 'out' }]); // the blank motif (the tool now opens on a pack)
         // default motif = any start → any out-edge → any node: every out-edge (a→b, b→c, d→e)
         c.runPattern();
         expect(c.patternMatches()).toHaveLength(3);
@@ -601,5 +602,66 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
         (el.querySelector('tbody tr') as HTMLElement).click();
         expect(picked).toHaveLength(1);
         expect(el.querySelector('[data-testid="result-next-hint"]')).toBeTruthy();
+    });
+});
+
+describe('LinkAnalysisToolboxComponent - DR-D5 results', () => {
+    it('Pattern match opens on the first pack, never a blank all-edges motif', () => {
+        const { fixture, c } = make();
+        expect(c.loadedPack()?.id).toBe('layering-chain');
+        c.toggleTool('pattern');
+        fixture.detectChanges();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain(c.loadedPack()!.description.slice(0, 30));
+        expect(text).not.toContain('Choose a pattern');
+        c.loadPatternPack('');
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Choose a pattern');
+    });
+
+    it('Cycles lists the shortest first, labels the length and draws only the selected cycle', () => {
+        const e = (id: string, source: string, target: string) => ({ id, source, target, data: { kind: 'link' } });
+        const nodeIds: string[] = [];
+        const edges: ReturnType<typeof e>[] = [];
+        for (let k = 0; k < 60; k++) {
+            const ring = Array.from({ length: 6 }, (_, i) => `c${String(k).padStart(2, '0')}_${i}`);
+            nodeIds.push(...ring);
+            ring.forEach((s, i) => edges.push(e(`${s}>`, s, ring[(i + 1) % 6])));
+        }
+        const planted = ['z1', 'z2', 'z3', 'z4'];
+        nodeIds.push(...planted);
+        planted.forEach((s, i) => edges.push(e(`${s}>`, s, planted[(i + 1) % 4])));
+        const gr: G6GraphData = { nodes: nodeIds.map((id) => ({ id, data: { label: id, kind: 'entity' } })), edges };
+        const { fixture, c, last } = make(gr);
+        c.runCycles();
+        fixture.detectChanges();
+        const lens = c.cycles().map((x) => x.nodeIds.length);
+        expect(lens).toEqual([...lens].sort((x, y) => x - y));
+        expect(c.cycleLabel(c.cycles()[0])).toBe('z1 → z2 → z3 → z4 → z1 (4 hops)');
+        // runCycles draws the shortest cycle (the planted ring), not the union of every cycle
+        expect(c.selectedCycle()).toBe(0);
+        expect(last()?.nodeIds).toEqual(planted);
+        c.focusCycle(c.cycles()[3], 3);
+        expect(c.selectedCycle()).toBe(3);
+        expect(last()?.nodeIds).toEqual(c.cycles()[3].nodeIds);
+    });
+
+    it('All paths shows a node path once, with its parallel-link count', () => {
+        const e = (id: string, source: string, target: string, kind: string) => ({
+            id,
+            source,
+            target,
+            data: { kind },
+        });
+        const gr: G6GraphData = {
+            nodes: ['a', 'b', 'c'].map((id) => ({ id, data: { label: id.toUpperCase(), kind: 'entity' } })),
+            edges: [e('1', 'a', 'b', 'wire'), e('2', 'a', 'b', 'cash'), e('3', 'b', 'c', 'wire')],
+        };
+        const { c } = make(gr);
+        c.pathFrom.set('a');
+        c.pathTo.set('c');
+        c.runAllPaths();
+        expect(c.allPathsResult()).toHaveLength(1);
+        expect(c.pathLabel(c.allPathsResult()[0])).toBe('A → B → C · 2 parallel links · wire, cash');
     });
 });

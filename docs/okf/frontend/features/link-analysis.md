@@ -924,7 +924,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   or says every day has data; it always states that per-Collector coverage is not assessed
   (`collectors.assessed:false`). A result is shown only while its Investigation is the open one. ⚠ The route
   needs a `timeCol` in the header and a bounded window: *Start Investigation* sends `timeCol` (since 2026-10-03)
-  from its optional *Time column* field, else the canvas time slider's column (`[timeCol]` input); *Start
+  from its *Time column* field, else the canvas time slider's column (`[timeCol]` input). The field is PREFILLED (2026-10-10, DR-D7) from the host's `investigationTimeColumn`: the timeline column, else the Domain Profile time hint, else the first edge-attribute column whose values all parse as dates (`isTemporalColumn`). DR-D5/D8 (same day): *Find paths*/*All paths* de-duplicate by node sequence (`distinctPaths`: count + link kinds; `allPaths` itself is untouched, it is the Java parity mirror); *Cycles* use `findCyclesShortestFirst` and draw the selected cycle; *Pattern match* opens on the first pack; *Re-order steps (creates a fork)…*; *Start
   Investigation* also asks *Time column zone (optional)* (an IANA zone; blank = UTC, recorded explicitly) and sends
   `timeColZone` only together with a time column — the server refuses a lone zone, and a `TIMESTAMPTZ` column
   refuses one in its own 422, shown verbatim. Without either, or before a `window` op bounds the
