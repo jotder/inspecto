@@ -292,6 +292,11 @@ Named lists of entities (watch lists, agent tills, accounts of interest) with ra
 expiry. A list can seed or exclude in bulk (*seedBy / excludeBy*); large lists may need a second approver.
 
 ### 9.6 Identity resolution
+The **Entity Lists** page also shows the **Identity Fact log**: its head (fact number and hash) and *Chain verified* —
+the server re-checks every link of the hash chain on each read, so a broken chain shows *Chain NOT verified* and nothing
+else. Cutting the end of a chain leaves a shorter valid chain, so note the head hash and compare it later. The same
+panel has the **mapping Dataset** import (Dataset, two columns, optional types, a reason); it reports counts only.
+
 **Identity resolution** panel: assert that two identifiers are the same entity (for example a phone number and a
 SIM), see a group's members and the assertions that joined them, retract one. Keys must be typed and normalised
 (`msisdn:+4477…`). A **mapping Dataset** can import many pairs at once. Inside an Investigation the **resolve** op
@@ -303,6 +308,10 @@ is conservative: if more than one type could claim a value, it stays unmatched a
 * **Measures** strip: entity count, link count, events, excluded count, deepest hop, links by kind.
 * **Watch this measure** creates an **Alert Rule** on an Investigation's Measure. It fires through the normal alert
   path and can open an Incident. It watches the sealed Working Set.
+* **A fired Alert names the Investigation, not the entities.** On the Alerts page, an Alert from an Investigation rule has
+  an *Open Investigation* action (it opens Link Analysis on that Investigation). The Alert carries the **count** only, by
+  design: an Alert is readable by people who are not members of the Investigation, so the breaching entities are read in
+  the Investigation (its Value Measures), where its access rules and masking apply.
 
 ### 9.8 Value Measures (whole-Dataset behaviour detectors)
 Choose a Dataset and column roles (value, time, link kind), a window (from/to, or **last N hours/days**, at most 31
@@ -328,6 +337,15 @@ A rule based on one of these is an Alert Rule that fires **once, on the count of
 reason, the exclusions, score tables, and a **SHA-256 manifest** over every stored artefact. Download the
 *steps* (plain language) and *method* statements, or the full JSON. **Verify** checks a manifest against the store and
 reports anything **changed, missing or added**. Tampering is detectable.
+
+**Sealed bundle.** *Download sealed bundle* gives one JSON file to hand outside the system: the Dossier, the
+Investigation's references and a seal over both (ids masked as the Space masks them). *Verify a bundle…* uploads a file
+back: an edited file fails the **seal** ("edited after export"), and the server also checks the Dossier against the
+store as it is now. Adding a reference after export never breaks a bundle.
+
+**References** (below the Dossier) lists the Investigation's pointers to records in other systems (system, type, id,
+optional URL and label). They are shown as text, never opened, never trusted and they grant no access; they cannot be
+edited or deleted — add a new one to supersede a wrong one. Adding needs the Incident-management permission and the owner.
 
 ### 9.10 Templates
 **Save as template** turns an Investigation's method into a reusable recipe: seeds become parameters; your ad-hoc
