@@ -68,7 +68,7 @@ public final class PatternRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.post("/inv/pattern/branching", (e, m) -> branching(api, e, api.body(e)));
-        api.post("/inv/pattern/temporal", (e, m) -> scan(api, e, api.body(e)));
+        api.post("/inv/pattern/temporal", (e, m) -> scan(api, e, api.body(e), true));
     }
 
     // ── POST /inv/pattern/temporal — burst / periodicity over each link's event times ─────────────────────────────
@@ -91,7 +91,13 @@ public final class PatternRoutes implements RouteModule {
      * {@value #TIMEOUT_SECONDS} s timeout, a result limit. Read-shaped: persists nothing, audited as
      * {@code LINK_PATTERN_MATCHED}. Output is endpoints and times the Dataset's own viewer could read - it never adds a column.
      */
+    /** The scan with RAW ids, for an Investigation op that narrows it to its Working Set and masks the answer itself. */
     static Map<String, Object> scan(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        return scan(api, ex, body, false);
+    }
+
+    /** {@code maskIds}: the stateless route answers aliases when the Space masks (DR-D2). */
+    static Map<String, Object> scan(ApiContext api, HttpExchange ex, Map<String, Object> body, boolean maskIds) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "temporal pattern");
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
@@ -204,7 +210,7 @@ public final class PatternRoutes implements RouteModule {
             ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
             for (Found f : found.subList(0, Math.min(limit, found.size()))) {
                 Map<String, Object> view = f.view();
-                if (mask.active())
+                if (maskIds && mask.active())
                     for (String k : List.of("entity", "source", "target"))
                         if (view.get(k) != null) view.put(k, mask.out(view.get(k)));
                 results.add(view);
