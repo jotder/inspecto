@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
 import {
     Dossier,
+    DossierBundleVerifyResult,
     DossierQuery,
     DossierVerifyResult,
     InvService,
@@ -189,6 +190,51 @@ function saveBlob(blob: Blob, name: string): void {
                     (change)="upload($event)"
                 />
             </div>
+            <div class="flex flex-wrap items-center gap-1" aria-label="Export bundle">
+                <button mat-stroked-button [disabled]="busy()" (click)="downloadBundle()">Download sealed bundle</button>
+                <button mat-button [disabled]="busy()" (click)="bundleFile.click()">Verify a bundle…</button>
+                <input
+                    #bundleFile
+                    type="file"
+                    accept="application/json,.json"
+                    class="hidden"
+                    aria-label="Dossier bundle JSON file"
+                    (change)="uploadBundle($event)"
+                />
+            </div>
+            <p class="text-secondary m-0">
+                The bundle is one file for someone outside the system: the Dossier, its references and a seal over both.
+                Any edit to the file breaks the seal; verify also asks the server whether the store still agrees.
+            </p>
+            @if (bundleResult(); as b) {
+                @if (b.verified) {
+                    <inspecto-alert variant="success" title="Bundle verified">
+                        The seal matches the file and the store still agrees with the Dossier.
+                        @if (b.referencesAddedSince) {
+                            {{ b.referencesAddedSince }} reference(s) were added after export; appending never breaks a
+                            bundle.
+                        }
+                    </inspecto-alert>
+                } @else {
+                    <inspecto-alert variant="error" title="Bundle NOT verified">
+                        <ul class="m-0 pl-4">
+                            @for (p of b.problems; track p) {
+                                <li>{{ p }}</li>
+                            }
+                        </ul>
+                    </inspecto-alert>
+                }
+                <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2" aria-label="Bundle verification detail">
+                    <dt class="text-secondary">Seal intact</dt>
+                    <dd class="m-0">{{ b.sealIntact ? 'yes' : 'no — edited after export' }}</dd>
+                    <dt class="text-secondary">Manifest root matches</dt>
+                    <dd class="m-0">{{ b.rootMatches ? 'yes' : 'no' }}</dd>
+                    <dt class="text-secondary">References intact</dt>
+                    <dd class="m-0">{{ b.referencesIntact ? 'yes' : 'no' }}</dd>
+                    <dt class="text-secondary">Store agrees (custody)</dt>
+                    <dd class="m-0">{{ b.custody.verified ? 'yes' : 'no' }}</dd>
+                </dl>
+            }
             @if (verifyResult(); as v) {
                 @if (v.verified) {
                     <inspecto-alert variant="success" title="Verified">
@@ -230,6 +276,7 @@ export class LinkAnalysisDossierComponent {
 
     readonly dossier = signal<Dossier | null>(null);
     readonly verifyResult = signal<DossierVerifyResult | null>(null);
+    readonly bundleResult = signal<DossierBundleVerifyResult | null>(null);
     readonly busy = signal(false);
     readonly error = signal('');
     readonly maxSnapshots = DOSSIER_MAX_SNAPSHOTS;
@@ -247,6 +294,7 @@ export class LinkAnalysisDossierComponent {
             untracked(() => {
                 this.dossier.set(null);
                 this.verifyResult.set(null);
+                this.bundleResult.set(null);
                 this.error.set('');
                 this.steps.set(null);
                 this.snapshotList.set(null);
@@ -339,6 +387,37 @@ export class LinkAnalysisDossierComponent {
         }
         const obj = parsed as { manifest?: unknown } | null;
         await this.verify(obj && typeof obj === 'object' && obj.manifest ? obj.manifest : parsed);
+    }
+
+    /** The bundle at the SAME step and snapshots as the dossier on screen (or the head when none is built). */
+    downloadBundle(): Promise<void> {
+        const d = this.dossier();
+        const q: DossierQuery = { at: d?.summary.at, snapshots: d?.summary.snapshots };
+        return this.run('Could not export the bundle.', async () => {
+            const bundle = await firstValueFrom(this.inv.dossierBundle(this.investigationId(), q));
+            saveBlob(
+                new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
+                `${this.investigationId()}-bundle.json`,
+            );
+        });
+    }
+
+    /** The uploaded file is sent whole: the seal covers all of it, so nothing is picked out or re-shaped here. */
+    async uploadBundle(event: Event): Promise<void> {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(await file.text());
+        } catch {
+            this.error.set(`${file.name} is not JSON — upload the bundle file this screen downloaded.`);
+            return;
+        }
+        await this.run('Bundle verification failed.', async () => {
+            this.bundleResult.set(await firstValueFrom(this.inv.verifyDossierBundle(this.investigationId(), parsed)));
+        });
     }
 
     private verify(manifest: unknown): Promise<void> {

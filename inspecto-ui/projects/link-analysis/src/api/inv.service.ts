@@ -939,6 +939,80 @@ export interface DossierVerifyResult {
     contentChanged: string[];
 }
 
+/** `GET …/dossier/bundle` — D-6: one portable, SEALED document. Kept opaque: what is saved is exactly what the server
+ *  sent, and the verify route (not this type) is the arbiter of the seal. */
+export type DossierBundle = Record<string, unknown> & { format?: string; investigationId?: string };
+
+/** `POST …/dossier/bundle/verify`. A seal that does not match is a RESULT (`verified: false`), never an error. */
+export interface DossierBundleVerifyResult {
+    id: string;
+    verified: boolean;
+    /** The seal still matches the bundle's content — false means the file was edited after export. */
+    sealIntact: boolean;
+    /** `custody.manifestRoot` is the embedded Dossier manifest's own root. */
+    rootMatches: boolean;
+    /** The bundle's references are still the FIRST ones of the store. */
+    referencesIntact: boolean;
+    /** References added after export (null when not intact) — appending never breaks a bundle. */
+    referencesAddedSince: number | null;
+    problems: string[];
+    /** The Dossier manifest checked against the store now (same shape as `…/dossier/verify`). */
+    custody: Partial<DossierVerifyResult>;
+}
+
+/** One external reference (`GET …/references`): a pointer, never fetched, never trusted, granting nothing. */
+export interface InvestigationReference {
+    seq: number;
+    key: string;
+    system: string;
+    type: string;
+    id: string;
+    url?: string;
+    label?: string;
+    addedBy?: string | null;
+    addedAt?: string;
+    trusted: false;
+}
+
+export interface InvestigationReferences {
+    investigationId: string;
+    references: InvestigationReference[];
+    count: number;
+    max: number;
+    note: string;
+}
+
+export interface InvestigationReferenceRequest {
+    system: string;
+    type: string;
+    id: string;
+    url?: string;
+    label?: string;
+}
+
+/** `POST /inv/entity-identities/import` — bulk assertions from a mapping Dataset's two columns. */
+export interface IdentityImportRequest {
+    dataset: string;
+    aCol: string;
+    bCol: string;
+    aType?: string;
+    bType?: string;
+    reason: string;
+    limit?: number;
+}
+
+/** The import's answer: COUNTS only — no key is echoed. */
+export interface IdentityImportResult {
+    imported: number;
+    skipped: { alreadyAsserted: number; duplicate: number; empty: number; self: number };
+    rowsRead: number;
+    truncated: boolean;
+    dataset: string;
+    fingerprint: string;
+    atSeq: number;
+    headHash: string;
+}
+
 // ── LA-23: Investigation Template, Measures, Alert Rules ──────────────────────────────────────────────
 
 /** One row of `GET /inv/investigation-templates` — the caller's own templates, newest first. */
@@ -1534,6 +1608,28 @@ export class InvService {
         return this.http.post<DossierVerifyResult>(invPath(id, 'dossier/verify'), { manifest });
     }
 
+    /** D-6: the sealed export bundle as JSON (masked per the Space; audited server-side). */
+    dossierBundle(id: string, q: DossierQuery = {}): Observable<DossierBundle> {
+        return this.http.get<DossierBundle>(invPath(id, 'dossier/bundle'), {
+            params: toParams({ at: q.at, snapshots: q.snapshots?.length ? q.snapshots.join(',') : undefined }),
+        });
+    }
+
+    /** D-6: check a held bundle — its seal, its manifest root, its references and the store's custody NOW. */
+    verifyDossierBundle(id: string, bundle: unknown): Observable<DossierBundleVerifyResult> {
+        return this.http.post<DossierBundleVerifyResult>(invPath(id, 'dossier/bundle/verify'), { bundle });
+    }
+
+    /** The Investigation's external references, in the order added (read gate: owner or Case member). */
+    investigationReferences(id: string): Observable<InvestigationReferences> {
+        return this.http.get<InvestigationReferences>(invPath(id, 'references'));
+    }
+
+    /** Append one reference (owner-only, Manage Incidents). Duplicate or full → 409. */
+    addInvestigationReference(id: string, req: InvestigationReferenceRequest): Observable<InvestigationReferences> {
+        return this.http.post<InvestigationReferences>(invPath(id, 'references'), req);
+    }
+
     /** LA-23: save the effective log as a write-once template. The answer lists what was dropped/generalised. */
     saveInvestigationTemplate(
         id: string,
@@ -1656,6 +1752,11 @@ export class InvService {
     /** → 201. Self-assertion / untyped key / type not in force → 422. */
     assertIdentity(req: IdentityAssertRequest): Observable<IdentityAssertResult> {
         return this.http.post<IdentityAssertResult>(apiUrl('/inv/entity-identities'), req);
+    }
+
+    /** → 201 (new assertions) or 200 (nothing new). Refuses a sensitive Dataset (four-eyes bound) and over-limit reads. */
+    importIdentities(req: IdentityImportRequest): Observable<IdentityImportResult> {
+        return this.http.post<IdentityImportResult>(apiUrl('/inv/entity-identities/import'), req);
     }
 
     /** Unknown or already-retracted assertion → 409. */

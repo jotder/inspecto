@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { Dossier, DossierVerifyResult, InvService } from '@inspecto/link-analysis/api/inv.service';
+import { Dossier, DossierBundleVerifyResult, DossierVerifyResult, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 
@@ -89,11 +89,26 @@ const FAILED: DossierVerifyResult = {
     contentChanged: ['entities'],
 };
 
+const BUNDLE = { format: 'inspecto-dossier-bundle/1', investigationId: 'inv-1', seal: { algorithm: 'SHA-256', value: 'x' } };
+
+const BUNDLE_TAMPERED: DossierBundleVerifyResult = {
+    id: 'inv-1',
+    verified: false,
+    sealIntact: false,
+    rootMatches: true,
+    referencesIntact: true,
+    referencesAddedSince: 0,
+    problems: ["the bundle's seal does not match its content — it was edited after export"],
+    custody: { verified: true },
+};
+
 function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
     const inv = {
         dossier: vi.fn(() => of(DOSSIER)),
         dossierRendering: vi.fn(() => of(new Blob(['steps']))),
         verifyDossier: vi.fn(() => of(FAILED)),
+        dossierBundle: vi.fn(() => of(BUNDLE)),
+        verifyDossierBundle: vi.fn(() => of(BUNDLE_TAMPERED)),
         sealedSnapshotIds: vi.fn(() =>
             of({ ids: Array.from({ length: 22 }, (_, i) => `s${i}`), total: 30, truncated: true }),
         ),
@@ -179,6 +194,45 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         const file = { name: 'd.json', text: () => Promise.resolve(JSON.stringify({ manifest: MANIFEST })) };
         await c.upload({ target: { files: [file], value: 'x' } } as unknown as Event);
         expect(inv.verifyDossier).toHaveBeenCalledWith('inv-1', MANIFEST);
+    });
+
+    it('downloads the sealed bundle at the on-screen step, saved as <id>-bundle.json', async () => {
+        const { c, inv } = create();
+        Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:b'), revokeObjectURL: vi.fn() });
+        const names: string[] = [];
+        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+            this: HTMLAnchorElement,
+        ) {
+            names.push(this.download);
+        });
+        await c.build();
+        await c.downloadBundle();
+        expect(inv.dossierBundle).toHaveBeenCalledWith('inv-1', { at: 2, snapshots: [] });
+        expect(names).toEqual(['inv-1-bundle.json']);
+        click.mockRestore();
+    });
+
+    it('verifies an uploaded bundle WHOLE and says a broken seal means the file was edited', async () => {
+        const { f, c, el, inv } = create();
+        const file = { name: 'b.json', text: () => Promise.resolve(JSON.stringify(BUNDLE)) };
+        await c.uploadBundle({ target: { files: [file], value: 'x' } } as unknown as Event);
+        f.detectChanges();
+        expect(inv.verifyDossierBundle).toHaveBeenCalledWith('inv-1', BUNDLE);
+        expect(el.textContent).toContain('Bundle NOT verified');
+        expect(el.textContent).toContain('edited after export');
+        expect(el.querySelector('[aria-label="Bundle verification detail"]')!.textContent).toContain(
+            'no — edited after export',
+        );
+        await expectNoA11yViolations(el);
+    });
+
+    it('refuses a non-JSON bundle upload without calling the server', async () => {
+        const { f, c, el, inv } = create();
+        const file = { name: 'b.json', text: () => Promise.resolve('not json') };
+        await c.uploadBundle({ target: { files: [file], value: 'x' } } as unknown as Event);
+        f.detectChanges();
+        expect(inv.verifyDossierBundle).not.toHaveBeenCalled();
+        expect(el.textContent).toContain('b.json is not JSON');
     });
 
     it('builds at a chosen step with chosen snapshots, capped at 20, and refuses a step beyond the log', async () => {
