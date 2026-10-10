@@ -12,6 +12,6 @@ export default [
     { path: 'widgets', loadChildren: () => import('./widgets/widgets.routes') },
     { path: 'dashboards', loadChildren: () => import('./dashboards/dashboards.routes') },
     { path: 'templates', loadChildren: () => import('./templates/templates.routes') },
-    { path: 'link-analysis', loadChildren: () => import('@inspecto/link-analysis/link-analysis/link-analysis.routes') },
+    { path: 'link-analysis', data: { hideShellFooter: true }, loadChildren: () => import('@inspecto/link-analysis/link-analysis/link-analysis.routes') },
     { path: 'geo-map', loadChildren: () => import('@inspecto/link-analysis/geo-map/geo-map.routes') },
 ] as Routes;

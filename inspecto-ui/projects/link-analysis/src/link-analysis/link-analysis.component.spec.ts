@@ -6,7 +6,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { of } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
 import { InvService, RecursivePathsRequest } from '@inspecto/link-analysis/api/inv.service';
@@ -61,6 +61,9 @@ class StubGraphView {
     @Input() layout: unknown;
     @Input() plugins: unknown;
 }
+
+// The Toolbox dock remembers an explicit open/close in sessionStorage; no test may inherit another's.
+beforeEach(() => sessionStorage.clear());
 
 function create(
     opts: {
@@ -1496,11 +1499,12 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         const root = el.firstElementChild as HTMLElement;
-        expect(root.classList).toContain('h-[calc(100dvh-var(--shell-chrome-height,7.5rem))]'); // header 4rem + footer 3.5rem
+        // header 4rem + footer 3.5rem; floored at 35rem so a short window scrolls the PAGE instead of crushing the canvas
+        expect(root.classList).toContain('h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)]');
         expect(root.classList).toContain('max-md:h-auto');
         expect(root.classList).not.toContain('h-full');
         const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
-        for (const c of ['min-h-0', 'flex-auto', 'overflow-hidden', 'max-md:min-h-[28rem]']) {
+        for (const c of ['min-h-[26.25rem]', 'flex-auto', 'overflow-hidden', 'max-md:min-h-[28rem]']) {
             expect(workspace.classList).toContain(c);
         }
         for (const dock of ['Query', 'Toolbox']) {
@@ -1513,6 +1517,116 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             d.textContent?.includes('Data'),
         );
         expect(strip).toBeTruthy();
+    });
+
+    it('keeps the canvas row at least 420px high (short windows scroll the page) and the page header floor holds it', () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+        expect(workspace.classList).toContain('min-h-[26.25rem]'); // 26.25rem = 420px
+        expect(workspace.classList).not.toContain('min-h-0');
+        // the root floor (35rem) leaves room for the chrome above the row plus that 420px
+        expect((el.firstElementChild as HTMLElement).className).toContain(',35rem)]');
+    });
+
+    it('puts the active-query status chips in the page-header title row, not in a row above the canvas', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
+        expect(status).toBeTruthy();
+        expect(status.closest('inspecto-page-header header')).toBeTruthy();
+        expect(status.textContent).toContain('nodes');
+        expect(status.querySelector('button[aria-label="Change the query"]')).toBeTruthy();
+        expect(el.querySelectorAll('[aria-label="Active query"]').length).toBe(1); // no second, separate panel
+    });
+
+    describe('Toolbox dock start state (width)', () => {
+        const media = (narrow: boolean): void => {
+            const noop = (): void => undefined;
+            vi.stubGlobal('matchMedia', (q: string) => ({
+                matches: narrow && q.includes('1299px'),
+                media: q,
+                addListener: noop,
+                removeListener: noop,
+                addEventListener: noop,
+                removeEventListener: noop,
+            }));
+        };
+        const toolboxRail = (el: HTMLElement): HTMLElement | null =>
+            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the view tools"]');
+
+        afterEach(() => {
+            vi.unstubAllGlobals();
+            sessionStorage.clear();
+        });
+
+        it('starts collapsed to its rail below 1300px and the Query dock stays open', () => {
+            sessionStorage.clear();
+            media(true);
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            expect(c.toolboxDockOpen()).toBe(false);
+            expect(c.queryDockOpen()).toBe(true);
+            expect(c.canvasMaximized()).toBe(false); // "Hide the side panels" is untouched
+            expect(toolboxRail(fixture.nativeElement)).toBeTruthy();
+        });
+
+        it('starts open at 1300px and wider', () => {
+            sessionStorage.clear();
+            media(false);
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            expect(fixture.componentInstance.toolboxDockOpen()).toBe(true);
+        });
+
+        it('remembers an explicit open (narrow) and an explicit close (wide) for the session', () => {
+            sessionStorage.clear();
+            media(true);
+            const a = create({ stubGraph: true });
+            a.fixture.detectChanges();
+            a.fixture.componentInstance.openAnalysis(); // the user opens it on demand
+            a.fixture.detectChanges();
+            expect(sessionStorage.getItem('inspecto.la.toolboxOpen')).toBe('true');
+            TestBed.resetTestingModule();
+            const b = create({ stubGraph: true }); // a fresh visit, still narrow
+            b.fixture.detectChanges();
+            expect(b.fixture.componentInstance.toolboxDockOpen()).toBe(true);
+
+            sessionStorage.clear();
+            media(false);
+            TestBed.resetTestingModule();
+            const c = create({ stubGraph: true });
+            c.fixture.detectChanges();
+            c.fixture.componentInstance.toolboxDockOpen.set(false);
+            c.fixture.detectChanges();
+            TestBed.resetTestingModule();
+            const d = create({ stubGraph: true });
+            d.fixture.detectChanges();
+            expect(d.fixture.componentInstance.toolboxDockOpen()).toBe(false);
+        });
+
+        it('writes nothing until the user acts (the viewport default is not a choice)', () => {
+            sessionStorage.clear();
+            media(true);
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            expect(sessionStorage.getItem('inspecto.la.toolboxOpen')).toBeNull();
+        });
+    });
+
+    it('docks are narrower by default: Query 220px (min 200), Toolbox 340px', () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        const q = fixture.debugElement.query(By.css('[inspectoSplit="link-analysis.query"]'));
+        const t = fixture.debugElement.query(By.css('[inspectoSplit="link-analysis.toolbox"]'));
+        expect(q.nativeElement.getAttribute('aria-valuemin')).toBe('200');
+        expect(q.nativeElement.getAttribute('aria-valuenow')).toBe('220');
+        expect(t.nativeElement.getAttribute('aria-valuenow')).toBe('340');
     });
 
     it('the starter cards are a11y-clean', async () => {

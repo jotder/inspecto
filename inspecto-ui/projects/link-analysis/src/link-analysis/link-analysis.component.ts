@@ -6,6 +6,7 @@ import {
     OnInit,
     ViewChild,
     computed,
+    effect,
     inject,
     signal,
 } from '@angular/core';
@@ -223,6 +224,24 @@ interface PresentationSnapshot {
 /** LA-11: paths asked for per search — a readable list; the server says `truncated` when more exist. */
 const SERVER_PATH_LIMIT = 100;
 
+/** Below this viewport width the Toolbox dock starts collapsed to its rail (canvas width); wider windows start open. */
+export const TOOLBOX_NARROW_PX = 1300;
+const TOOLBOX_OPEN_KEY = 'inspecto.la.toolboxOpen';
+
+/**
+ * The Toolbox dock's starting state: the user's explicit open/close from earlier this session (sessionStorage) wins;
+ * otherwise collapsed below {@link TOOLBOX_NARROW_PX} and open at or above it. A browser without `matchMedia` counts as wide.
+ */
+function initialToolboxOpen(): boolean {
+    try {
+        const saved = sessionStorage.getItem(TOOLBOX_OPEN_KEY);
+        if (saved === 'true' || saved === 'false') return saved === 'true';
+    } catch {
+        /* storage blocked — fall through to the viewport rule */
+    }
+    return !(window.matchMedia?.(`(max-width: ${TOOLBOX_NARROW_PX - 1}px)`).matches ?? false);
+}
+
 @Component({
     selector: 'inspecto-link-analysis',
     standalone: true,
@@ -345,7 +364,21 @@ export class LinkAnalysisComponent implements OnInit {
     /** The left dock (Query + Filter); collapses to an icon rail. */
     readonly queryDockOpen = signal(true);
     /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
-    readonly toolboxDockOpen = signal(true);
+    readonly toolboxDockOpen = signal(initialToolboxOpen());
+    private toolboxSeen = false;
+    /** Remember an explicit open/close for the session (the initial value is not an explicit choice). */
+    private readonly rememberToolbox = effect(() => {
+        const open = this.toolboxDockOpen();
+        if (!this.toolboxSeen) {
+            this.toolboxSeen = true;
+            return;
+        }
+        try {
+            sessionStorage.setItem(TOOLBOX_OPEN_KEY, String(open));
+        } catch {
+            /* storage blocked - the choice just is not remembered */
+        }
+    });
     readonly toolboxTab = signal<'analysis' | 'view' | 'investigation'>('analysis');
     /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). */
     readonly toolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [

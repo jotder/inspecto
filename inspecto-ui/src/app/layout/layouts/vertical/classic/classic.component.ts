@@ -13,7 +13,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, ActivatedRouteSnapshot, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { GammaLoadingBarComponent } from '@gamma/components/loading-bar';
 import {
     GammaNavigationItem,
@@ -37,7 +37,7 @@ import { BrandingService, LensService } from 'app/inspecto/api';
 import { allCommands } from 'app/inspecto/commands/command-registry';
 import 'app/inspecto/commands/app-commands';
 import { ShortcutsHelpDialog } from 'app/inspecto/shortcuts-help.dialog';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, filter, takeUntil } from 'rxjs';
 
 @Component({
     standalone: true,
@@ -66,6 +66,8 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
      * zonelessly marks no view dirty — as a field the sidebar's `[opened]`/`[mode]` bindings never
      * re-evaluated, so the nav stayed collapsed after a resize until some unrelated click ticked CD. */
     readonly isScreenSmall = signal(false);
+    /** A route that sets `data: { hideShellFooter: true }` (Link Analysis) takes the footer's 56 px back for its canvas. */
+    readonly footerHidden = signal(false);
     navigation: Navigation;
     /** Navigation actually rendered in the sidebar — the full tree, or flattened search results. */
     readonly displayedNavigation = signal<GammaNavigationItem[]>([]);
@@ -112,6 +114,14 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
         // Re-filter the sidebar when the lens or the saved Access Profiles change (both signals
         // are read inside _applyNavSearch via AccessStateService.filterNav).
         effect(() => this._applyNavSearch());
+        // the layout can mount AFTER the first NavigationEnd (sign-in redirect, lazy shell), so read the current state once
+        this.footerHidden.set(this._routeHidesFooter(this._router.routerState.snapshot.root));
+        this._router.events
+            .pipe(
+                filter((e) => e instanceof NavigationEnd),
+                takeUntil(this._unsubscribeAll)
+            )
+            .subscribe(() => this.footerHidden.set(this._routeHidesFooter(this._router.routerState.snapshot.root)));
     }
 
     // -----------------------------------------------------------------------------------------------------
@@ -265,5 +275,13 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
     private _applyNavSearch(): void {
         const full = this._accessState.filterNav(this.navigation?.default ?? []);
         this.displayedNavigation.set(this.navSearchActive ? flattenNavForSearch(full, this.navSearchQuery) : full);
+    }
+
+    /** True when any route on the active path (root to leaf) carries `data.hideShellFooter`. */
+    private _routeHidesFooter(route: ActivatedRouteSnapshot | null): boolean {
+        for (let r = route; r; r = r.firstChild) {
+            if (r.routeConfig?.data?.['hideShellFooter'] === true) return true;
+        }
+        return false;
     }
 }

@@ -1,11 +1,46 @@
-<div #studioRoot class="flex h-[calc(100dvh-var(--shell-chrome-height,7.5rem))] min-h-0 min-w-0 flex-auto flex-col p-4 max-md:h-auto">
+<div #studioRoot class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-md:h-auto">
     <!-- ── compact header (the canvas gets the space) ── -->
     <inspecto-page-header
         compact
         title="Link Analysis"
-        subtitle="Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it."
+        [subtitle]="graph() ? '' : 'Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it.'"
         [terms]="['Entity', 'Link', 'Dataset', 'Pipeline']"
     >
+        <!-- the active query as chips lives IN the title row (canvas height): edit-to-change + the counts; with a graph they replace the one-line subtitle so the row does not wrap -->
+        <div
+            badge
+            class="flex min-w-0 flex-1 items-center gap-2"
+            role="group"
+            aria-label="Active query"
+            data-testid="la-status"
+        >
+            @if (graph()) {
+                <mat-icon class="icon-size-4 shrink-0" svgIcon="heroicons_outline:circle-stack"></mat-icon>
+                <span class="shrink-0 text-sm font-medium">{{ sourceLabel() }}</span>
+                <!-- one line: a narrow window clips the chips instead of wrapping the title row onto a second and third -->
+                <div class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
+                    @for (item of querySummary(); track item.label) {
+                        <inspecto-chip>
+                            <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
+                            <span class="text-secondary">{{ item.label }}:</span>
+                            {{ item.value }}
+                        </inspecto-chip>
+                    }
+                </div>
+                <button
+                    mat-icon-button
+                    class="shrink-0"
+                    (click)="editQuery()"
+                    matTooltip="Change the query"
+                    aria-label="Change the query"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                </button>
+                <span class="text-secondary shrink-0 whitespace-nowrap text-xs">
+                    {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
+                </span>
+            }
+        </div>
         <ng-container actions>
             <button
                 mat-icon-button
@@ -26,7 +61,7 @@
         </ng-container>
     </inspecto-page-header>
 
-    <div class="mt-3 flex min-h-0 flex-auto flex-col gap-2">
+    <div class="mt-1 flex min-h-0 flex-auto flex-col gap-2">
         @if (loadError()) {
             <inspecto-alert variant="error" title="Query failed">{{ loadError() }}</inspecto-alert>
         }
@@ -672,7 +707,7 @@
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
-            class="relative flex min-h-0 min-w-0 flex-auto overflow-hidden max-md:min-h-[28rem] rounded-lg border max-md:!h-auto max-md:flex-col"
+            class="relative flex min-h-[26.25rem] min-w-0 flex-auto overflow-hidden max-md:min-h-[28rem] rounded-lg border max-md:!h-auto max-md:flex-col"
         >
             <!-- left dock — Query (+ Filter); collapses to an icon rail -->
             <aside
@@ -759,9 +794,9 @@
             <div
                 inspectoSplit="link-analysis.query"
                 #querySplit="inspectoSplit"
-                [min]="240"
+                [min]="200"
                 [max]="560"
-                [defaultWidth]="320"
+                [defaultWidth]="220"
                 class="max-md:hidden"
                 [class.hidden]="!queryDockOpen()"
                 aria-label="Resize the query panel (arrow keys or drag)"
@@ -770,37 +805,10 @@
             <!-- ══ canvas zone (graph + states + overlays) — the graph-fullscreen target ══ -->
             <div
                 #canvasZone
-                class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-2 max-md:min-h-[24rem]"
+                class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-1 max-md:min-h-[24rem]"
                 [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
             >
                 @if (graph(); as g) {
-                    <!-- top status panel: the active query as chips, with edit-to-change -->
-                    <div
-                        class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-1.5"
-                        aria-label="Active query"
-                    >
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                        <span class="text-sm font-medium">{{ sourceLabel() }}</span>
-                        @for (item of querySummary(); track item.label) {
-                            <inspecto-chip>
-                                <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
-                                <span class="text-secondary">{{ item.label }}:</span>
-                                {{ item.value }}
-                            </inspecto-chip>
-                        }
-                        <button
-                            mat-icon-button
-                            (click)="editQuery()"
-                            matTooltip="Change the query"
-                            aria-label="Change the query"
-                        >
-                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
-                        </button>
-                        <span class="text-secondary ml-auto text-xs">
-                            {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
-                        </span>
-                    </div>
-
                     @if (!workingSetCanvas() && timeColumn() && timeExtent(); as ext) {
                         <inspecto-link-analysis-timeline-playback
                             [graph]="displayed()"
