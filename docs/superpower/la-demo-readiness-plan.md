@@ -8,6 +8,18 @@ Backlog rows: `LA-DEMO-SEED-1`, `LA-DEMO-DEFECTS-1`, `LA-DEMO-INDEX-1`, `LA-UI-M
 This page lives in `docs/superpower/` while the work is in flight; when it ships, distil the as-built facts into
 `okf/frontend/features/link-analysis.md` and archive it.
 
+## 0. Operator decisions (2026-10-10)
+
+| Question | Decision |
+|---|---|
+| Scope and date | **No date: the full plan** (all 40 requirements, no cut line); built in four waves, waves 1 and 2 started together |
+| Masking in exploration views | **Mask the same way everywhere**: the canvas, node lists and exploration reads show aliases for masked types in `typed` / `all` mode, with a visible masking badge; seeding and expanding resolve through the alias (DR-D2) |
+| Where the seeded demo lives | **A new `la-showcase` Space Template** (the tracked `demo` Space is not edited); runtime state (Investigation, members, lists, Case, bound rule) comes from an idempotent seed script if no template mechanism exists |
+| Second approver | **`fm.manager`** holds Approve link expansions and is a reviewer on the seeded Investigation; `admin` keeps Reveal |
+| Alert authoring | **`fm.analyst` also holds Author Alert Rules** in the showcase (one persona can run the whole story) |
+| Link index default | **ON by default, product-wide** (a Space with a fresh published index serves reads from it; otherwise the flat read with a closed `Reason`; explicit `false` still disables). Not the recommended option (the alternative was showcase-only); it needs the full reactor gate and a staleness review |
+| Demo variants | **la-app and Personal as launch configurations**; the Postgres store as a documented runbook step (no Docker automation) |
+
 ## 1. Verdict
 
 **What a stakeholder can be shown today with no code change** (after seeding): the op log and its sealed replay (Replay
