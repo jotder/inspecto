@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 35<!--count:backlog-p3--> × P3** —
+> ⬇ **52 → 51 (P3 36 → 35) on 2026-10-10**: closed P3 *Completeness KPI residuals* — §7-d: `kpi.completeness` defaults `pipeline` from a single `on_pipeline:`, and a `pipeline` contradicting it is refused at save/load (422 naming both); §7-c: the best-effort `file_stages` index is a KNOWN LIMIT, the payload labels `missingFilesSource: "file-stages"` (operator, 2026-10-10). As-built in `okf/capabilities/observability/observability.md` §3.9.
 > ⇄ **52 rows on 2026-10-10 after merging origin/master into local master**: origin's rows (incl. P3 `TELCO-FRAUD-MANUAL-ADJUSTMENTS-1`) plus local's P2 `PIPELINE-EDITOR-VIEWSWITCH-LOSS-1`, `SHARE-SNAPSHOT-ON-APPROVE-1` and P3 `CATEGORY-SORT-ORDER-1`, `RECON-PERF-RESIDUALS-1`, less local's closed `MEASURE-SQL-BIND-1`; the per-side counts in the entries below are each side's own.
 > ⬆ **48 → 49 (P3 34 → 35) on 2026-10-10**: filed P3 `TELCO-FRAUD-MANUAL-ADJUSTMENTS-1` — the manual credit-adjustment angle of the discarded peer version of the telco-fraud gaps, kept as a demand-gated follow-up.
 > ⬇ **53 → 51 (P3 37 → 35) on 2026-10-10**: closed P3 `ERR-4XX-PATH-ECHO-1` (no absolute server paths in any 4xx echoing a DuckDB/SQL/IO message) and P3 `KPI-DEFAULT-COMPARE-1` (a new KPI Widget starts with no prior-period compare); integration branch integ14.
@@ -176,10 +177,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 35<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 35<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -189,7 +190,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 | [3.2](#32-pipelines--execution-lanes--consignments) | Pipelines — execution, lanes & Consignments | — | Row 15 · X5 |
 | [3.3](#33-acquisition-collectors--parsing) | Acquisition, Collectors & Parsing | [parser-field-tiers-interview-plan.md](superpower/parser-field-tiers-interview-plan.md) | D13 |
 | [3.4](#34-catalog-onboarding-datasets--lineage) | Catalog, Onboarding, Datasets & Lineage | — | — |
-| [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [cross-space-consequence-design.md](archived-documents/plans-archive/cross-space-consequence-design.md) | OPS-5 · Completeness KPI residuals |
+| [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [cross-space-consequence-design.md](archived-documents/plans-archive/cross-space-consequence-design.md) | OPS-5 |
 | [3.6](#36-analytics--queries-bi-studio--export) | Analytics — Queries, BI, Studio & Export | — | — |
 | [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](superpower/job-path-compat-survey.md) | Release notes for the next MAJOR |
 | [3.8](#38-security-policy-editions--compliance) | Security, Policy, Editions & Compliance | [route-gating-audit.md](superpower/route-gating-audit.md) · [policy-narrowing-design.md](archived-documents/plans-archive/policy-narrowing-design.md) | X-Actor · NFR-7 · SOC 2 · DATA-GOV-1 |
@@ -377,7 +378,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Alerting & freshness
 
-- **P3** · **Completeness KPI residuals** — hold LIFTED and **K1–K4 SHIPPED 2026-10-06** (`9492ad5d0` K1 · `1c41f2df1` K3 · `c16c9eab0` K4 · `ccd3d6b41` K2); as-built in `okf/capabilities/observability/observability.md` §3.9, design archived. Decided and recorded (operator, 2026-10-06): `SignalType` home; `KPI-UNKNOWN-1` end to end; the sequence template is the Collector's new optional `gap_detection.file_template` + `seq_scope` with a job-parameter override; K2 refuses when no template is set or `-Dfile.stages.backend` is off; `check_files` stays default true and the refusal names `check_files: false`; §7-g ONE Incident per Pipeline-day (deduped on `pipelineDay`), opened by a volume BREACH or a file gap, carrying both findings; §7-h 3+ consecutive unknown days emit `kpi.completeness.unknown_streak` at WARN, no Incident; §7-f 28 / 7 / 0.3 confirmed — all shipped `9e67ab457`. **Open:** (3) §7-c — `file_stages` is a best-effort index, so a missing-file count is only as complete as it; (4) §7-d — `pipeline` is required, not derived from `on_pipeline:`; ~~(6) §8-C — migrate the older dotted literals~~ ✅ 2026-10-09, residue ✅ 2026-10-10 (`JobService` / `LaIndexBuildJob` on `SignalType`; `risk.score.produced` is a core `SignalType` constant that `ScoringSignals` aliases): core names in `SignalType`, module names in per-module constants classes, all pinned by tests (operator, 2026-10-09); ~~(7) §8-D — a UI tile~~ ✅ 2026-10-09 (Signals behind a Dataset, operator 2026-10-09: the Job upserts a `kpi_completeness` store; the `telco-ra` template ships its Dataset, a table Widget on `ra_overview` and a disabled Job); ~~(8) the Pipeline editor has no field for `file_template` / `seq_scope`~~ ✅ 2026-10-09 (`NodeAttributes.GAP` on the gap node, served through the node-attributes contract; operator, 2026-10-09); ~~(9) `record_day` defaults to yesterday in `-Dops.timezone`~~ ✅ 2026-10-09 (the Pipeline's record-day zone: UTC with `parsing.source_timezone`, else `-Dops.timezone`; operator, 2026-10-09); ~~(10) `IncidentAccess` has no update~~ ✅ 2026-10-09 (`IncidentAccess.openOrUpdateIncident` merges changed findings into the active Pipeline-day Incident, audited). → `okf/capabilities/observability/observability.md` §3.9
 
 #### Signals, decisions & notifications
 

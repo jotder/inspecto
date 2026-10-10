@@ -202,6 +202,11 @@ public record JobConfig(String name, String type, String cron, String onPipeline
         // CHAIN-CONFIG-1: a consignment.process chain and its per-step config must align AT SAVE — every
         // API write and the boot loader funnel through here, so the refusal is not left to the next commit.
         if (ConsignmentProcessJobType.TYPE_ID.equals(type)) ConsignmentProcessJobType.requireAlignedChain(params);
+        // §7-d (operator, 2026-10-10): a kpi.completeness pipeline that contradicts its on_pipeline: refuses AT SAVE.
+        if (KpiCompletenessJob.TYPE.equals(type) && params.get("pipeline") != null && onPipeline != null
+                && !onPipeline.isBlank())
+            KpiCompletenessJob.effectivePipeline(name, params.get("pipeline"),
+                    java.util.Arrays.stream(onPipeline.split(",")).map(String::trim).filter(t -> !t.isEmpty()).toList());
         String deadline = params.get(DEADLINE_SECONDS);
         if (deadline != null && !deadline.isBlank()) JobDeadline.parse(deadline);   // fail closed at load
         return new JobConfig(name, type, cron, onPipeline, enabled, catchUp, params, onSignal, when, args, bind);

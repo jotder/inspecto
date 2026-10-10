@@ -45,8 +45,11 @@ final class KpiCompletenessJob implements Job {
 
     /** The declared parameters — {@code /jobs/types} publishes them and the form renders them. */
     static final List<ParameterDecl> PARAMS = List.of(
-            ParameterDecl.required("pipeline", ParamType.STRING,
-                    "The Pipeline whose received volume is assessed (the producer in the output registry)"),
+            // Optional in the declaration only because on_pipeline: may supply it (operator, 2026-10-10, §7-d):
+            // neither set still refuses — at run, in effectivePipeline.
+            ParameterDecl.optional("pipeline", ParamType.STRING, null,
+                    "The Pipeline whose received volume is assessed (the producer in the output registry). "
+                            + "Default: the Job's single on_pipeline: trigger"),
             ParameterDecl.optional("record_day", ParamType.STRING, null,
                     "The day assessed, yyyy-MM-dd. Default: yesterday in the zone the Pipeline's record_day is written in "
                             + "(UTC when it declares parsing.source_timezone), else the operations zone (-Dops.timezone)"),
@@ -95,7 +98,7 @@ final class KpiCompletenessJob implements Job {
         long t0 = System.nanoTime();
         // ⛔ First act, before the dry-run check: a dry run that skipped it would validate a config that cannot run.
         requireDurable(ctx.spaceId(), FAMILY, TOGGLE, "read the Pipeline's daily volume");
-        String pipeline = cfg.require("pipeline");
+        String pipeline = effectivePipeline(cfg.name(), cfg.opt("pipeline", null), cfg.onPipelines());
         String recordDay = cfg.opt("record_day", null);
         if (recordDay == null)
             recordDay = defaultRecordDay(pipelines.apply(pipeline).map(pc -> pc.csv() == null ? null
@@ -160,6 +163,26 @@ final class KpiCompletenessJob implements Job {
      * own unstated wall clock, so the operations zone ({@code -Dops.timezone}) remains the best stand-in.
      * ⚠ A per-field {@code raw.fields[].timezone} is not consulted here.
      */
+    /**
+     * The assessed Pipeline (operator, 2026-10-10, §7-d): the {@code pipeline} parameter, else the Job's ONE
+     * {@code on_pipeline:} trigger. Both set and different refuses — {@link JobConfig#fromMap} calls this at
+     * save and load, so the conflict never reaches a run. Neither set (or several triggers and no parameter)
+     * refuses too: the Job never guesses which Pipeline it measures.
+     */
+    static String effectivePipeline(String job, String pipeline, List<String> onPipelines) {
+        boolean hasParam = pipeline != null && !pipeline.isBlank();
+        if (hasParam && !onPipelines.isEmpty()
+                && onPipelines.stream().noneMatch(t -> t.equalsIgnoreCase(pipeline.trim())))
+            throw new IllegalArgumentException("Job '" + job + "' (" + TYPE + ") names pipeline '" + pipeline.trim()
+                    + "' but triggers on_pipeline '" + String.join(",", onPipelines)
+                    + "': they must name the same Pipeline. Remove the pipeline parameter to default it from on_pipeline.");
+        if (hasParam) return pipeline.trim();
+        if (onPipelines.size() == 1) return onPipelines.get(0);
+        throw new IllegalArgumentException("Job '" + job + "' (" + TYPE + ") requires param 'pipeline'"
+                + (onPipelines.isEmpty() ? " (or a single on_pipeline: trigger to default it from)"
+                        : ": on_pipeline names several Pipelines, so it cannot default one"));
+    }
+
     static String defaultRecordDay(String sourceTimezone, java.time.ZoneId opsZone, java.time.Clock clock) {
         java.time.ZoneId zone = sourceTimezone == null || sourceTimezone.isBlank() ? opsZone : java.time.ZoneOffset.UTC;
         return LocalDate.now(clock.withZone(zone)).minusDays(1).toString();
@@ -276,6 +299,9 @@ final class KpiCompletenessJob implements Job {
         if (r.scope() != null) payload.put("seqScope", r.scope().name());   // absent for a date-only template
         payload.put("observedFiles", r.observedFiles());
         payload.put("missingFiles", r.missingFiles());          // exact: interior holes, or empty days of a date-only template
+        // KNOWN LIMIT (operator, 2026-10-10, §7-c): file_stages is a best-effort index, so the count is only as
+        // complete as it — label where it came from rather than present it as ground truth.
+        payload.put("missingFilesSource", "file-stages");
         payload.put("emptyBuckets", r.emptyBuckets().size());   // buckets, never a file count
         payload.put("unmatchedFiles", r.unmatched());           // non-zero usually means a wrong template
     }

@@ -134,6 +134,41 @@ class KpiCompletenessJobTest {
                 .run(new CapturingJobContext()));
     }
 
+    /** §7-d (operator, 2026-10-10): no pipeline parameter ⇒ the Job's single on_pipeline: names it. */
+    @Test
+    void pipelineDefaultsFromOnPipeline() {
+        db.record(List.of(out("cdr", "2026-08-04", "/w/a.parquet", 70), out("other", "2026-08-04", "/w/o.parquet", 999)));
+        CapturingJobContext ctx = new CapturingJobContext();
+        JobResult r = new KpiCompletenessJob(new JobConfig("cdr_completeness", KpiCompletenessJob.TYPE, null, "cdr",
+                true, false, params("record_day", "2026-08-04", "check_files", "false"), null, null), null).run(ctx);
+        assertEquals("SUCCESS", r.status(), r.message());
+        Map<String, Object> s = ctx.signals.stream()
+                .filter(x -> SignalType.KPI_COMPLETENESS_EVALUATED.equals(x.get("__type"))).findFirst().orElseThrow();
+        assertEquals("cdr", s.get("pipeline"));
+        assertEquals(70L, s.get("rows"));
+    }
+
+    /** §7-d: a pipeline parameter that contradicts on_pipeline: is refused at save/load (JobRoutes maps it to 422). */
+    @Test
+    void pipelineContradictingOnPipelineIsRefusedAtLoad() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> JobConfig.fromMap(Map.of("job",
+                Map.of("name", "k", "type", KpiCompletenessJob.TYPE, "pipeline", "cdr", "on_pipeline", "other"))));
+        assertTrue(e.getMessage().contains("'cdr'") && e.getMessage().contains("'other'"), e.getMessage());
+        // the same Pipeline on both is not a conflict
+        assertEquals("cdr", JobConfig.fromMap(Map.of("job", Map.of("name", "k", "type", KpiCompletenessJob.TYPE,
+                "pipeline", "cdr", "on_pipeline", "CDR"))).params().get("pipeline"));
+    }
+
+    /** §7-d negative probe: neither set — and several triggers with no parameter — still refuse. */
+    @Test
+    void neitherPipelineNorSingleTriggerRefuses() {
+        assertThrows(IllegalArgumentException.class,
+                () -> KpiCompletenessJob.effectivePipeline("k", null, List.of()));
+        assertThrows(IllegalArgumentException.class,
+                () -> KpiCompletenessJob.effectivePipeline("k", " ", List.of("a", "b")));
+        assertEquals("a", KpiCompletenessJob.effectivePipeline("k", null, List.of("a")));
+    }
+
     @Test
     void isRegisteredAsABuiltInWithItsDeclaredSignals() throws Exception {
         try (Scheduler s = new Scheduler();
@@ -360,6 +395,7 @@ class KpiCompletenessJobTest {
             Map<String, Object> s = evaluated(ctx);
             assertEquals(TEMPLATE, s.get("fileTemplate"));
             assertEquals(1L, s.get("missingFiles"), "seq 3 is the one interior hole");
+            assertEquals("file-stages", s.get("missingFilesSource"), "the count is labelled as based on the file index (§7-c)");
             assertEquals(23, s.get("emptyBuckets"), "hours 01..23 are empty buckets, not a file count");
             assertEquals(0L, s.get("unmatchedFiles"));
         } finally {
