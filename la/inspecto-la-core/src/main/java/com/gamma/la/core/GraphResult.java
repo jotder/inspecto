@@ -5,6 +5,7 @@ import com.gamma.la.graph.GraphAlgorithms.Score;
 import com.gamma.la.graph.GraphAlgorithms.Selection;
 import com.gamma.la.graph.GraphCentrality.PredictedLink;
 import com.gamma.la.graph.GraphPaths.MaxFlowResult;
+import com.gamma.la.graph.GraphPropagation.Risk;
 import com.gamma.la.graph.GraphSuspicion.Suspicion;
 
 import java.util.List;
@@ -23,7 +24,7 @@ public record GraphResult(Algorithm algorithm, Payload payload, int dropped, lon
 
     /** The answer, by shape. */
     public sealed interface Payload permits Scores, Hits, OneSelection, Selections, Groups, Communities, Ids, Flag, Flow,
-            Links, Suspicions, SubGraph {
+            Links, Suspicions, PropagatedRisks, SubGraph {
         Algorithm.ResultKind kind();
     }
 
@@ -79,6 +80,11 @@ public record GraphResult(Algorithm algorithm, Payload payload, int dropped, lon
     /** Suspicion scores with the five factors. */
     public record Suspicions(List<Suspicion> scores) implements Payload {
         public Algorithm.ResultKind kind() { return Algorithm.ResultKind.SUSPICION; }
+    }
+
+    /** Propagated risk: per node its capped score, raw sum, own score and top contributing origins. */
+    public record PropagatedRisks(List<Risk> risks) implements Payload {
+        public Algorithm.ResultKind kind() { return Algorithm.ResultKind.PROPAGATED_RISK; }
     }
 
     /** A sub-graph (neighborhood, ego network). */

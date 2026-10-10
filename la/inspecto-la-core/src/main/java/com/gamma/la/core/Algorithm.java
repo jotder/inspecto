@@ -1,15 +1,18 @@
 package com.gamma.la.core;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
- * The catalogue of the 28 graph algorithms the server can run (LA separation D-4; the ports in {@code inspecto-la-graph},
+ * The catalogue of the 29 graph algorithms the server can run (LA separation D-4; the ports in {@code inspecto-la-graph},
  * D-S4). One constant per ported function; {@link #id()} is the TypeScript export name, so the browser, the wire and the
- * Java port speak one name.
+ * Java port speak one name. The 29th, {@link #PROPAGATED_RISK}, is server-side only (no TypeScript twin).
  *
  * <p><b>{@link #cost()} is a HINT, not a class.</b> The Java timings (design §6.2, {@code GraphAlgorithmsBench}) showed
  * that no algorithm is cheap at 10⁵ nodes, so SYNC/JOB cannot be a fixed split. {@link #cost()} keeps the design's
@@ -106,13 +109,21 @@ public enum Algorithm {
             Param.decimal("alpha", 0.1, 0, 1), Param.decimal("beta", 1, 0, 1_000), Param.integer("iterations", 100, 0, 10_000)),
     /** 91 / 1 823 / 49 213 ms. */
     HITS("hits", "HITS hubs and authorities", Cost.JOB, 1_000, ResultKind.HITS, false, false, false, false,
-            Param.integer("iterations", 100, 0, 10_000));
+            Param.integer("iterations", 100, 0, 10_000)),
+    /**
+     * Not benched; server-side only (no TypeScript twin). One BFS per origin, at most {@code weights.size()} (≤ 6) hops deep:
+     * never more than {@code closenessCentrality}'s unbounded BFS per node, so it takes closeness's ceiling.
+     */
+    PROPAGATED_RISK("propagatedRisk", "Propagated risk", Cost.JOB, 1_000, ResultKind.PROPAGATED_RISK, false, false, false,
+            false, Param.scoreMap("nodeScores", 0, 100, Param.MAX_ENTRIES), Param.idList("seeds", Param.MAX_ENTRIES),
+            Param.decimalList("weights", List.of(1.0, 0.6, 0.35, 0.15), 0, 1, 6), Param.DIRECTION);
 
     /** The design's complexity estimate — a HINT; see {@link Algorithm#inlineNodeCeiling()} for the decision input. */
     public enum Cost { SYNC, JOB }
 
     /** The shape of the answer; each is one {@link GraphResult.Payload} variant. */
-    public enum ResultKind { SCORES, HITS, SELECTION, SELECTIONS, GROUPS, COMMUNITIES, IDS, FLAG, FLOW, LINKS, SUSPICION, GRAPH }
+    public enum ResultKind { SCORES, HITS, SELECTION, SELECTIONS, GROUPS, COMMUNITIES, IDS, FLAG, FLOW, LINKS, SUSPICION, GRAPH,
+        PROPAGATED_RISK }
 
     /** The request names of the node-id parameters: {@code from}/{@code to} (a pair) and {@code node} (one). */
     public static final String FROM = "from", TO = "to", NODE = "node";
@@ -228,29 +239,79 @@ public enum Algorithm {
         return s;
     }
 
-    /** One tunable parameter of an algorithm: its name, type, default and range (or allowed choices). */
-    public record Param(String name, Type type, Object defaultValue, Double min, Double max, List<String> allowed) {
+    /**
+     * One tunable parameter of an algorithm: its name, type, default and range (or allowed choices). For the collection types
+     * {@code min}/{@code max} bound each NUMBER in it and {@code maxSize} the entry count (null for the scalar types).
+     * <ul>
+     *   <li>{@code DOUBLE_LIST} - a non-empty JSON array of numbers; resolved to a {@code List<Double>} in the given order.</li>
+     *   <li>{@code ID_LIST} - a JSON array of non-blank node-id strings; resolved sorted and de-duplicated (one cache key).</li>
+     *   <li>{@code SCORE_MAP} - a JSON object node id → number; resolved to a {@code Map<String, Double>} sorted by id.</li>
+     * </ul>
+     */
+    public record Param(String name, Type type, Object defaultValue, Double min, Double max, List<String> allowed, Integer maxSize) {
 
-        public enum Type { INT, DOUBLE, ENUM }
+        public enum Type { INT, DOUBLE, ENUM, DOUBLE_LIST, ID_LIST, SCORE_MAP }
+
+        /** The most entries a list or map parameter may take: the server's node ceiling ({@link GraphRunService.Limits#standard()}). */
+        public static final int MAX_ENTRIES = 500_000;
 
         /** The shared edge-direction parameter. */
         public static final Param DIRECTION = choice("direction", "both", "out", "in", "both");
 
         public static Param integer(String name, int dflt, int min, int max) {
-            return new Param(name, Type.INT, dflt, (double) min, (double) max, List.of());
+            return new Param(name, Type.INT, dflt, (double) min, (double) max, List.of(), null);
         }
 
         public static Param decimal(String name, double dflt, double min, double max) {
-            return new Param(name, Type.DOUBLE, dflt, min, max, List.of());
+            return new Param(name, Type.DOUBLE, dflt, min, max, List.of(), null);
         }
 
         public static Param choice(String name, String dflt, String... allowed) {
-            return new Param(name, Type.ENUM, dflt, null, null, List.of(allowed));
+            return new Param(name, Type.ENUM, dflt, null, null, List.of(allowed), null);
+        }
+
+        /** A non-empty list of numbers, each within {@code [min, max]}, at most {@code maxSize} long. */
+        public static Param decimalList(String name, List<Double> dflt, double min, double max, int maxSize) {
+            return new Param(name, Type.DOUBLE_LIST, List.copyOf(dflt), min, max, List.of(), maxSize);
+        }
+
+        /** A list of node ids, at most {@code maxSize}; the default is empty. */
+        public static Param idList(String name, int maxSize) {
+            return new Param(name, Type.ID_LIST, List.of(), null, null, List.of(), maxSize);
+        }
+
+        /** A node id → number map, each number within {@code [min, max]}, at most {@code maxSize} entries; the default is empty. */
+        public static Param scoreMap(String name, double min, double max, int maxSize) {
+            return new Param(name, Type.SCORE_MAP, Map.of(), min, max, List.of(), maxSize);
         }
 
         Object resolve(String algorithm, Object v) {
             if (v == null) return defaultValue;
             switch (type) {
+                case DOUBLE_LIST -> {
+                    if (!(v instanceof List<?> l))
+                        throw new InvalidGraphRequest(InvalidGraphRequest.Reason.BAD_TYPE, name, algorithm + ": '" + name + "' must be a list of numbers");
+                    size(algorithm, l.size(), 1);
+                    List<Double> out = new ArrayList<>(l.size());
+                    for (Object o : l) out.add(number(algorithm, o));
+                    return List.copyOf(out);
+                }
+                case ID_LIST -> {
+                    if (!(v instanceof List<?> l))
+                        throw new InvalidGraphRequest(InvalidGraphRequest.Reason.BAD_TYPE, name, algorithm + ": '" + name + "' must be a list of node ids");
+                    size(algorithm, l.size(), 0);
+                    TreeSet<String> out = new TreeSet<>();
+                    for (Object o : l) out.add(id(algorithm, o));
+                    return List.copyOf(out);
+                }
+                case SCORE_MAP -> {
+                    if (!(v instanceof Map<?, ?> m))
+                        throw new InvalidGraphRequest(InvalidGraphRequest.Reason.BAD_TYPE, name, algorithm + ": '" + name + "' must be an object of node id to number");
+                    size(algorithm, m.size(), 0);
+                    TreeMap<String, Double> out = new TreeMap<>();
+                    for (Map.Entry<?, ?> e : m.entrySet()) out.put(id(algorithm, e.getKey()), number(algorithm, e.getValue()));
+                    return Collections.unmodifiableMap(out);
+                }
                 case ENUM -> {
                     String s = v instanceof String str ? str.trim().toLowerCase(Locale.ROOT) : null;
                     if (s == null)
@@ -275,6 +336,28 @@ public enum Algorithm {
                 }
             }
             throw new IllegalStateException(type.name());
+        }
+
+        private void size(String algorithm, int n, int least) {
+            if (n < least || n > maxSize)
+                throw new InvalidGraphRequest(InvalidGraphRequest.Reason.OUT_OF_RANGE, name,
+                        algorithm + ": '" + name + "' must have " + least + " to " + maxSize + " entries, got " + n);
+        }
+
+        private double number(String algorithm, Object o) {
+            if (!(o instanceof Number n) || !Double.isFinite(n.doubleValue()))
+                throw new InvalidGraphRequest(InvalidGraphRequest.Reason.BAD_TYPE, name, algorithm + ": '" + name + "' holds a non-number: " + o);
+            double d = n.doubleValue();
+            if (d < min || d > max)
+                throw new InvalidGraphRequest(InvalidGraphRequest.Reason.OUT_OF_RANGE, name,
+                        algorithm + ": each number in '" + name + "' must be within [" + trim(min) + ", " + trim(max) + "], got " + o);
+            return d;
+        }
+
+        private String id(String algorithm, Object o) {
+            if (!(o instanceof String s) || s.isBlank())
+                throw new InvalidGraphRequest(InvalidGraphRequest.Reason.BAD_TYPE, name, algorithm + ": '" + name + "' holds a blank or non-string node id");
+            return s;
         }
 
         private static String trim(double d) {

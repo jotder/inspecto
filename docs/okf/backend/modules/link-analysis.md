@@ -114,7 +114,7 @@ entry at write time, so an index rebuild or a Dataset change cannot alter a reco
 
 | Module (manifest id) | Role | Key classes |
 |---|---|---|
-| `la-graph` | Leaf algorithm library, line-for-line port of the SPA's `graph-analysis.ts` | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `RunControl`, `GraphAborted` |
+| `la-graph` | Leaf algorithm library, line-for-line port of the SPA's `graph-analysis.ts` | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `GraphPropagation` (server-only), `RunControl`, `GraphAborted` |
 | `la-core` (platform, optional, boot) | Domain + ports, no HTTP routes | `InvestigationEvaluator`, `InvestigationStore`/`InvestigationStores`/`FsInvestigationStore`, `InvestigationMembers`, `DraftStore`/`DraftLifecycle`/`DraftCheckpoints`/`DraftIndex`, `GraphRunService`, `GraphEngine`, `InMemoryGraphEngine`, `GraphInput`, `Algorithm`, `GraphBudget`, `LinkEventTypes`, ports `DatasetProvider`/`CasePort`/`CollectorCoveragePort` |
 | `la-storage` | The link index (D-3) and the index-backed engine | `IndexBuilder`, `IndexBuildService`, `IndexStore`, `IndexManifest`, `IndexMapping`, `IndexPlan`, `IndexReader`, `IndexPins`, `BucketFunction`, `IndexedTraversal`, `SqlGraphEngine`, `RoutingGraphEngine` |
 | `la-api` (feature `geoLink`) | HTTP surface and orchestration | 18 `RouteModule`s (below), `EntityMasking`, `InvestigationMemberStore`, `DraftAdmission`/`DraftRebase`/`DraftPromote`, `IndexedRead` + `Indexed*`, `IndexStaleness`, `IndexBuildServices`, `GraphRunServices`, `StandingDetection`, `ScheduledIndexBuild` |
@@ -266,9 +266,14 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`
   (exhaustive switch over `Algorithm`, so a new algorithm fails to compile until implemented), IndexRef →
   `SqlGraphEngine` (neighbourhood, ego network, seeds-only degree; caps throw `IndexCapExceeded`, no reroute).
-* **28 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB, a hint) and a node ceiling (e.g. 500 for
+* **29 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB, a hint) and a node ceiling (e.g. 500 for
   betweenness, 100,000 for shortest path) that is the inline-versus-job threshold, not a limit — the budget refuses.
-  The toolbox exposes 18 with *Run on server* and 3 with *Run on index*; the other 7 are API-only.
+  The toolbox exposes 18 with *Run on server* and 3 with *Run on index*; the other 8 are API-only.
+* **`propagatedRisk`** (server-only, `GraphPropagation`, no TS twin; JOB, ceiling 1,000): `raw(n) = own(n) + Σ own(o) ×
+  weights[d(o,n)]` over origins `o ≠ n` within `weights.size()` (≤ 6) shortest hops; `score = min(raw, 100)`. Params:
+  `nodeScores` (id → 0-100, request-only — nodes carry no attributes, so no `scoreAttribute`; no Space default yet),
+  `seeds` (empty = every node with own > 0), `weights` (each in [0,1], default `[1, .6, .35, .15]`), `direction`. Each
+  node returns its top 5 `factors` (origin, distance, weight, contribution) and `contributors` (the full count).
 * **Budgets** (`GraphRunService`): shipped default 50,000 nodes / 500,000 edges / 30 s; ceilings 500,000 / 5,000,000 /
   300 s (both are Space settings under `graphRun`, as are `index.threads` and `index.queue`). Size is checked before work, the deadline at `RunControl` checkpoints; overrun ends `BUDGET_EXCEEDED` with
   no result — never a silent cap.

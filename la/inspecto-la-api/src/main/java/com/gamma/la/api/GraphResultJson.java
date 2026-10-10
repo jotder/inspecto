@@ -6,6 +6,8 @@ import com.gamma.la.core.LinkIds;
 import com.gamma.la.graph.GraphAlgorithms.Score;
 import com.gamma.la.graph.GraphAlgorithms.Selection;
 import com.gamma.la.graph.GraphCentrality.PredictedLink;
+import com.gamma.la.graph.GraphPropagation.Factor;
+import com.gamma.la.graph.GraphPropagation.Risk;
 import com.gamma.la.graph.GraphSuspicion.Suspicion;
 
 import java.util.ArrayList;
@@ -212,6 +214,31 @@ final class GraphResultJson {
                     f.put("core", s.factors().core());
                     f.put("triangles", s.factors().triangles());
                     o.put("factors", f);
+                    out.add(o);
+                }
+                m.put("scores", out);
+            }
+            case GraphResult.PropagatedRisks p -> {
+                // factors are at most GraphPropagation.FACTOR_LIMIT and are said by 'contributors': not cut here
+                List<Object> out = new ArrayList<>();
+                for (Risk r : cap.cut("scores", p.risks(), true)) {
+                    Map<String, Object> o = new LinkedHashMap<>();
+                    o.put("id", ids.node(r.id()));
+                    o.put("label", ids.node(r.label()));
+                    o.put("score", r.score());
+                    o.put("raw", r.raw());
+                    o.put("own", r.own());
+                    o.put("contributors", r.contributors());
+                    List<Object> factors = new ArrayList<>();
+                    for (Factor f : r.factors()) {
+                        Map<String, Object> fo = new LinkedHashMap<>();
+                        fo.put("origin", ids.node(f.origin()));
+                        fo.put("distance", f.distance());
+                        fo.put("weight", f.weight());
+                        fo.put("contribution", f.contribution());
+                        factors.add(fo);
+                    }
+                    o.put("factors", factors);
                     out.add(o);
                 }
                 m.put("scores", out);

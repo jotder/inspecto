@@ -189,12 +189,12 @@ class ControlApiGraphRunTest {
     // ── the catalogue ───────────────────────────────────────────────────────────────────────────────────────
 
     @Test
-    void theCatalogueListsAll28WithCeilingsAndTheSpacesDefaultsClampedAndEchoed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void theCatalogueListsAll29WithCeilingsAndTheSpacesDefaultsClampedAndEchoed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
         try (Ctx c = open(cfg, root, "masking_mode: none\ngraph_run:\n  max_nodes: 77\n  timeout_ms: 9000\n  threads: 3\n")) {
             JsonNode d = ok(c, "GET", "/inv/graph/algorithms", null, READER);       // a read: no capability
             assertEquals("memory", d.get("engine").asText());
-            assertEquals(28, d.get("algorithms").size());
+            assertEquals(29, d.get("algorithms").size());
             assertEquals(Algorithm.values().length, d.get("algorithms").size());
             JsonNode pr = null;
             for (JsonNode a : d.get("algorithms")) if ("pageRank".equals(a.get("id").asText())) pr = a;
@@ -476,6 +476,77 @@ class ControlApiGraphRunTest {
             assertEquals(3, d.get("budget").get("maxNodes").asInt());
             JsonNode own = ok(c, "POST", "/inv/graph/runs", run("degreeCentrality", "\"budget\":{\"maxNodes\":10}"), ANALYST);
             assertEquals("COMPLETED", own.get("status").asText(), "a request that states its own budget overrides the default");
+        }
+    }
+
+    // ── propagatedRisk ──────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void propagatedRiskAnswersWithScoresAndFactorsAndRefusesBadWeights422(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            JsonNode cat = null;
+            for (JsonNode a : ok(c, "GET", "/inv/graph/algorithms", null, READER).get("algorithms"))
+                if ("propagatedRisk".equals(a.get("id").asText())) cat = a;
+            assertEquals("PROPAGATED_RISK", cat.get("resultKind").asText());
+            JsonNode w = null;
+            for (JsonNode p : cat.get("params")) if ("weights".equals(p.get("name").asText())) w = p;
+            assertEquals("DOUBLE_LIST", w.get("type").asText());
+            assertEquals(6, w.get("maxSize").asInt());
+            assertEquals(4, w.get("default").size());
+
+            // n1 flagged 80; undirected: n2 and n3 are 1 hop (n1>n3 is a direct link), n4 is 2, n5 is 3
+            JsonNode d = ok(c, "POST", "/inv/graph/runs", run("propagatedRisk", "\"params\":{\"nodeScores\":{\"n1\":80}}"), ANALYST);
+            assertEquals("COMPLETED", d.get("status").asText());
+            JsonNode res = d.get("result");
+            assertEquals("PROPAGATED_RISK", res.get("kind").asText());
+            Map<String, JsonNode> by = new java.util.LinkedHashMap<>();
+            for (JsonNode s : res.get("scores")) by.put(s.get("id").asText(), s);
+            assertEquals(80, by.get("n2").get("score").asDouble(), 1e-9);
+            assertEquals(80, by.get("n3").get("score").asDouble(), 1e-9);
+            assertEquals(48, by.get("n4").get("score").asDouble(), 1e-9);
+            assertEquals(28, by.get("n5").get("score").asDouble(), 1e-9);
+            JsonNode f = by.get("n5").get("factors").get(0);
+            assertEquals("n1", f.get("origin").asText());
+            assertEquals(3, f.get("distance").asInt());
+            assertEquals(0.35, f.get("weight").asDouble(), 1e-9);
+            assertEquals(1, by.get("n5").get("contributors").asInt());
+            assertEquals(0, by.get("n5").get("own").asDouble(), 1e-9);
+
+            for (String bad : List.of(
+                    run("propagatedRisk", "\"params\":{\"weights\":[1,-0.5]}"),
+                    run("propagatedRisk", "\"params\":{\"weights\":[]}"),
+                    run("propagatedRisk", "\"params\":{\"weights\":[1,1,1,1,1,1,1]}"),
+                    run("propagatedRisk", "\"params\":{\"nodeScores\":{\"n1\":150}}"),
+                    run("propagatedRisk", "\"params\":{\"seeds\":\"n1\"}"))) {
+                HttpResponse<String> r = start(c, bad, ANALYST);
+                assertEquals(422, r.statusCode(), bad + " -> " + r.body());
+            }
+        }
+    }
+
+    @Test
+    void underMaskingPropagatedRiskTakesPseudonymsAndARawIdNamesNoNode(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            investigation(c);
+            String p1 = ok(c, "GET", INV + "/working-set?of=entities", null, ANALYST).get("rows").get(0).get("entityId").asText();
+            JsonNode d = ok(c, "POST", "/inv/graph/runs",
+                    run("propagatedRisk", "\"params\":{\"nodeScores\":{\"" + p1 + "\":50},\"seeds\":[\"" + p1 + "\"]}"), ANALYST);
+            JsonNode origin = null;
+            boolean fed = false;
+            for (JsonNode s : d.get("result").get("scores")) {
+                if (p1.equals(s.get("id").asText())) origin = s;
+                for (JsonNode f : s.get("factors")) fed |= p1.equals(f.get("origin").asText());
+            }
+            assertEquals(50, origin.get("own").asDouble(), 1e-9, "the pseudonym resolved to its entity and comes back masked");
+            assertTrue(fed, "factors name the origin by its pseudonym: " + d);
+            assertFalse(d.toString().matches(".*\"n[1-5]\".*"), "no raw id leaves: " + d);
+            // a raw id the masking hides is a node that does not exist: every score 0, as for an unknown id
+            String raw = strip(ok(c, "POST", "/inv/graph/runs", run("propagatedRisk", "\"params\":{\"nodeScores\":{\"n1\":50}}"), ANALYST).toString());
+            String absent = strip(ok(c, "POST", "/inv/graph/runs", run("propagatedRisk", "\"params\":{\"nodeScores\":{\"zz\":50}}"), ANALYST).toString());
+            assertEquals(absent, raw);
         }
     }
 
