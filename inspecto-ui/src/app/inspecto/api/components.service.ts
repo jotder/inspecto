@@ -32,6 +32,8 @@ export type ComponentType =
     | 'runbook'
     // A Risk Score model (ASSURE-RISK-SCORE-1) — the `risk.score` Job's `model` names one.
     | 'risk-score'
+    // An Anomaly Model (ANOMALY-DETECTION-1) — the `anomaly.score` Job's `model` names one.
+    | 'anomaly-model'
     // The Case desk's Findings fields (one per ObjectType, id = the lowercased type). Authored ONLY from the
     // Cases pane's Findings-fields dialog, never the Components pane (D8) — and its writes are gated on
     // `canManageIncidents`, not `canAuthorWorkbench` (D1).

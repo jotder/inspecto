@@ -157,4 +157,59 @@ class AnomalyPeerGoldenCorpusTest {
             assertEquals(s.score(), r[1], 1e-9, s.entityKey() + " score");
         }
     }
+
+    private static java.util.function.Function<String, String> relations(Path cfg, Path data) {
+        ComponentStore store = new ComponentStore(cfg.resolve("registry"));
+        ViewStore views = new ViewStore(cfg.resolve("views"));
+        return id -> DatasetRelation.relationSql(store.get("dataset", id).orElseThrow().content(), data, views);
+    }
+
+    /**
+     * Design §16.4 (a): the preview reads the WHOLE cohort for the peer medians and scores only the one entity, under
+     * the preview caps. The planted peer outlier previews exactly as the full run scores it. Mutant: narrowing the
+     * features to the entity ({@code model.forEntity}, the S4 behaviour) leaves a cohort of one, so no peer z.
+     */
+    @Test
+    void aPreviewComparesThePlantedPeerOutlierWithItsWholeCohort(@TempDir Path dir) throws Exception {
+        Path cfg = dir.resolve("config"), data = dir.resolve("data");
+        AnomalyPeerCorpus.plant(cfg, data);
+        AnomalyScoreEvaluator.Run p = AnomalyScoreEvaluator.preview(model, AnomalyPeerCorpus.AS_OF, relations(cfg, data),
+                "adjuster", AnomalyScoreRoutes.PREVIEW_POLICY);
+        assertEquals(1, p.scored().size(), "only the previewed entity is scored");
+        AnomalyScorer.Scored s = p.scored().get(0);
+        assertEquals("adjuster", s.entityKey());
+        assertEquals("high", s.band());
+        AnomalyScorer.FeatureResult mb = feature(s, "data_mb");
+        assertTrue(mb.zPeer() >= model.zCap(), "ten times its POST peers, zPeer " + mb.zPeer());
+        assertEquals(feature(byKey().get("adjuster"), "data_mb").peerBaseline().points(), mb.peerBaseline().points(),
+                "the preview's cohort is the full run's cohort");
+        assertEquals(byKey().get("adjuster").score(), s.score(), 1e-9, "the preview scores as the run does");
+
+        AnomalyScoreEvaluator.Run narrowed = AnomalyScoreEvaluator.evaluate(model.forEntity("adjuster"),
+                AnomalyPeerCorpus.AS_OF, relations(cfg, data), 1, AnomalyScoreEvaluator.MAX_BUCKET_ROWS,
+                AnomalyScoreRoutes.PREVIEW_POLICY);
+        assertTrue(feature(narrowed.scored().get(0), "data_mb").peerBaseline().insufficient(),
+                "the S4 narrowing left a cohort of one - the defect this fixes");
+    }
+
+    /**
+     * Design §16.4 (b): excluded keys are dropped in the bucket SQL (bound parameters) before the entity LIMIT, so a
+     * source over the cap only by its excluded entities is scored; one more real entity than the cap still fails.
+     */
+    @Test
+    void excludedKeysDoNotCountAgainstTheEntityCap(@TempDir Path dir) throws Exception {
+        Path cfg = dir.resolve("config"), data = dir.resolve("data");
+        AnomalyPeerCorpus.plant(cfg, data);
+        java.util.function.Predicate<String> heavy = k -> k.equals("adjuster")
+                || (k.matches("p\\d{3}") && Integer.parseInt(k.substring(1)) % 10 >= 5);
+        int kept = 345 - 61;
+        AnomalyScoreEvaluator.Run r = AnomalyScoreEvaluator.evaluate(model, AnomalyPeerCorpus.AS_OF, relations(cfg, data),
+                kept, AnomalyScoreEvaluator.MAX_BUCKET_ROWS, com.gamma.sql.SqlSandboxPolicy.defaultPolicy(), heavy);
+        assertEquals(kept, r.scored().size(), "345 keys, 61 excluded, cap 284: scored, not refused");
+        assertEquals(61, r.excluded());
+        IllegalStateException over = assertThrows(IllegalStateException.class, () -> AnomalyScoreEvaluator.evaluate(model,
+                AnomalyPeerCorpus.AS_OF, relations(cfg, data), kept - 1, AnomalyScoreEvaluator.MAX_BUCKET_ROWS,
+                com.gamma.sql.SqlSandboxPolicy.defaultPolicy(), heavy));
+        assertTrue(over.getMessage().contains("names more than " + (kept - 1) + " entities"), over.getMessage());
+    }
 }

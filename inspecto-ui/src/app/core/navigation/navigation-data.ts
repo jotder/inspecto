@@ -93,6 +93,14 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 link: '/risk-scores',
             },
             {
+                id: 'anomaly-models',
+                navFeature: 'anomaly',
+                title: 'Anomaly Models',
+                type: 'basic',
+                icon: 'heroicons_outline:chart-bar',
+                link: '/anomaly-models',
+            },
+            {
                 id: 'incidents',
                 navFeature: 'ops',
                 title: 'Incidents',

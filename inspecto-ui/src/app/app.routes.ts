@@ -112,6 +112,10 @@ export const appRoutes: Route[] = [
             { path: 'alerts', loadChildren: () => import('app/modules/admin/alerts/alerts.routes') },
             { path: 'runbooks', loadChildren: () => import('app/modules/admin/runbooks/runbooks.routes') },
             { path: 'risk-scores', loadChildren: () => import('app/modules/admin/risk-scores/risk-scores.routes') },
+            {
+                path: 'anomaly-models',
+                loadChildren: () => import('app/modules/admin/anomaly-models/anomaly-models.routes'),
+            },
             { path: 'cases', loadChildren: () => import('app/modules/admin/objects/cases.routes') },
             { path: 'incidents', loadChildren: () => import('app/modules/admin/objects/incidents.routes') },
             { path: 'tags', loadChildren: () => import('app/modules/admin/tags/tags.routes') },

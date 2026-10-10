@@ -60,6 +60,9 @@ public final class AnomalyScoreEvaluator {
     private static final ObjectMapper JSON = new ObjectMapper()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
+    /** Excludes nothing; the one predicate for which no per-feature key read is made. */
+    public static final Predicate<String> NONE = k -> false;
+
     private AnomalyScoreEvaluator() {}
 
     static int defaultMaxEntities(String raw) {
@@ -86,7 +89,7 @@ public final class AnomalyScoreEvaluator {
     /** Score every entity any feature names, for the day before {@code asOf} (a day boundary, UTC). */
     public static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql)
             throws SQLException, IOException {
-        return evaluate(model, asOf, relationSql, k -> false);
+        return evaluate(model, asOf, relationSql, NONE);
     }
 
     /**
@@ -101,19 +104,42 @@ public final class AnomalyScoreEvaluator {
 
     static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
                         int maxBucketRows, SqlSandboxPolicy policy) throws SQLException, IOException {
-        return evaluate(model, asOf, relationSql, maxEntities, maxBucketRows, policy, k -> false);
+        return evaluate(model, asOf, relationSql, maxEntities, maxBucketRows, policy, NONE);
     }
 
     static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
                         int maxBucketRows, SqlSandboxPolicy policy, Predicate<String> excluded)
             throws SQLException, IOException {
+        return evaluate(model, asOf, relationSql, maxEntities, maxBucketRows, policy, excluded, null);
+    }
+
+    /**
+     * {@code POST /anomaly-scores/preview}: score ONE entity under {@code policy} and write nothing. Without peers every
+     * feature is narrowed to the entity (a bound filter, cap 1). With peers the cohort medians and the cohort shift
+     * need the whole cohort, so the features are read in full (the model's own entity cap) and only {@code entityKey}
+     * is scored; a statement past the policy's caps fails the preview (fail closed, never a narrowed cohort).
+     */
+    static Run preview(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, String entityKey,
+                       SqlSandboxPolicy policy) throws SQLException, IOException {
+        if (model.peers() == null)
+            return evaluate(model.forEntity(entityKey), asOf, relationSql, 1, MAX_BUCKET_ROWS, policy, NONE, null);
+        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, policy, NONE, entityKey::equals);
+    }
+
+    /** As above; {@code scoreOnly} (null = everyone) limits which entities are SCORED, not which shape the baselines. */
+    private static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
+                                int maxBucketRows, SqlSandboxPolicy policy, Predicate<String> excluded,
+                                Predicate<String> scoreOnly) throws SQLException, IOException {
         java.util.Set<String> dropped = new java.util.HashSet<>();
         LocalDate period = asOf.minusDays(1);
         LocalDate from = period.minusDays(model.window());
         BaselineStatistic statistic = BaselineStatistics.forModel(model.seasonality(), model.minBaselinePoints());
         Map<String, Map<String, Map<LocalDateTime, Double>>> series = new TreeMap<>();   // entity → feature → day → value
         for (AnomalyModel.Feature f : model.features()) {
-            QueryExecutor.Result r = run(model, f, relationSql.apply(f.dataset()), from, asOf, maxEntities, maxBucketRows, policy);
+            String relation = relationSql.apply(f.dataset());
+            List<String> excludedKeys = excludedKeys(model, f, relation, from, asOf, maxBucketRows, policy, excluded);
+            dropped.addAll(excludedKeys);
+            QueryExecutor.Result r = run(model, f, relation, from, asOf, maxEntities, maxBucketRows, policy, excludedKeys);
             if (r.truncated())
                 throw new IllegalStateException(capMessage(model, f, maxEntities));
             for (Map<String, Object> row : r.rows()) {
@@ -159,6 +185,7 @@ public final class AnomalyScoreEvaluator {
         // Pass 2: baselines and the score.
         List<AnomalyScorer.Scored> scored = new ArrayList<>(series.size());
         for (Map.Entry<String, Map<String, Map<LocalDateTime, Double>>> e : histories.entrySet()) {
+            if (scoreOnly != null && !scoreOnly.test(e.getKey())) continue;
             Map<String, AnomalyScorer.Input> inputs = new LinkedHashMap<>();
             for (AnomalyModel.Feature f : model.features()) {
                 Double observed = observedByFeature.get(f.id()).get(e.getKey());
@@ -266,22 +293,70 @@ public final class AnomalyScoreEvaluator {
 
     /** The per-feature statement: bucket, fold to one row per entity. Only validated identifiers reach the text. */
     static String sql(AnomalyModel.Feature f, MeasureCompiler.Compiled inner, String valueId) {
+        return sql(f, inner, valueId, 0);
+    }
+
+    /**
+     * As above, dropping {@code excluded} keys (one bound {@code ?} each, after the inner params) BEFORE the grouping
+     * and so before the entity LIMIT (design §16.4): a source over the cap only by its excluded keys is scored.
+     */
+    static String sql(AnomalyModel.Feature f, MeasureCompiler.Compiled inner, String valueId, int excluded) {
         String key = q(f.key()), time = q(f.time()), v = q(valueId);
-        return "WITH b AS (" + inner.sql() + "), n AS (SELECT count(*) AS c FROM b) "
+        String b = excluded == 0 ? "b AS (" + inner.sql() + ")"
+                : "b0 AS (" + inner.sql() + "), b AS (SELECT * FROM b0 WHERE CAST(" + key + " AS VARCHAR) NOT IN ("
+                        + String.join(", ", java.util.Collections.nCopies(excluded, "?")) + "))";
+        return "WITH " + b + ", n AS (SELECT count(*) AS c FROM b) "
                 + "SELECT CAST(" + key + " AS VARCHAR) AS entity_key, "
                 + "string_agg(" + time + " || '=' || CAST(CAST(" + v + " AS DOUBLE) AS VARCHAR), ',' ORDER BY " + time + ") AS pts, "
                 + "(SELECT c FROM n) AS bucket_rows FROM b WHERE " + key + " IS NOT NULL AND " + v + " IS NOT NULL "
                 + "GROUP BY 1 ORDER BY 1";
     }
 
+    /**
+     * The feature's keys in range that {@code excluded} accepts. An exclusion Entity List's ranges and normaliser live
+     * in the predicate, so the distinct candidate keys are read first and tested in the JVM; the hits then reach the
+     * bucket statement as bound parameters. {@link #NONE} makes no read. Bounded by
+     * {@link AnomalyModel#MAX_ENTITIES_CEILING}, failing closed past it.
+     */
+    private static List<String> excludedKeys(AnomalyModel model, AnomalyModel.Feature f, String relation, LocalDate from,
+                                             LocalDate to, int maxBucketRows, SqlSandboxPolicy policy,
+                                             Predicate<String> excluded) {
+        if (excluded == null || excluded == NONE) return List.of();
+        QueryExecutor.Result r;
+        try {
+            MeasureCompiler.Spec spec = f.bucketSpec(from + " 00:00:00", to + " 00:00:00", maxBucketRows + 1);
+            MeasureCompiler.Compiled inner = MeasureCompiler.compile(spec);
+            String key = q(f.key());
+            r = QueryExecutor.run(new QueryExecutor.Request(f.dataset(), relation, "WITH b AS (" + inner.sql()
+                    + ") SELECT DISTINCT CAST(" + key + " AS VARCHAR) AS entity_key FROM b WHERE " + key + " IS NOT NULL",
+                    AnomalyModel.MAX_ENTITIES_CEILING, 0, List.of(), List.of(), inner.params()), policy, java.time.ZoneId.of("UTC"));
+        } catch (Exception e) {
+            throw new IllegalStateException("anomaly-model '" + model.id() + "' feature '" + f.id() + "': the key "
+                    + "query over dataset '" + f.dataset() + "' failed (" + e.getClass().getSimpleName()
+                    + "; details withheld because they may quote source values) - check the column types");
+        }
+        if (r.truncated())
+            throw new IllegalStateException("anomaly-model '" + model.id() + "' feature '" + f.id() + "' names more than "
+                    + AnomalyModel.MAX_ENTITIES_CEILING + " keys - refusing to score a subset");
+        List<String> out = new ArrayList<>();
+        for (Map<String, Object> row : r.rows()) {
+            String k = String.valueOf(row.get("entity_key"));
+            if (excluded.test(k)) out.add(k);
+        }
+        return out;
+    }
+
     private static QueryExecutor.Result run(AnomalyModel model, AnomalyModel.Feature f, String relation, LocalDate from,
-                                            LocalDate to, int maxEntities, int maxBucketRows, SqlSandboxPolicy policy) {
+                                            LocalDate to, int maxEntities, int maxBucketRows, SqlSandboxPolicy policy,
+                                            List<String> excludedKeys) {
         try {
             MeasureCompiler.Spec spec = f.bucketSpec(from + " 00:00:00", to + " 00:00:00", maxBucketRows + 1);
             MeasureCompiler.Compiled inner = MeasureCompiler.compile(spec);
             String valueId = spec.measures().get(0).id();
-            return QueryExecutor.run(new QueryExecutor.Request(f.dataset(), relation, sql(f, inner, valueId),
-                    maxEntities, 0, List.of(), List.of(), inner.params()), policy, java.time.ZoneId.of("UTC"));
+            List<Object> binds = new ArrayList<>(inner.params());
+            binds.addAll(excludedKeys);
+            return QueryExecutor.run(new QueryExecutor.Request(f.dataset(), relation, sql(f, inner, valueId, excludedKeys.size()),
+                    maxEntities, 0, List.of(), List.of(), binds), policy, java.time.ZoneId.of("UTC"));
         } catch (Exception e) {
             throw new IllegalStateException("anomaly-model '" + model.id() + "' feature '" + f.id() + "': the bucket "
                     + "query over dataset '" + f.dataset() + "' failed (" + e.getClass().getSimpleName()

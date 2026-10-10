@@ -1,0 +1,132 @@
+<div class="flex min-w-0 flex-auto flex-col">
+    <inspecto-page-header
+        title="Anomaly Models"
+        subtitle="Features over Datasets compared with each entity's own baseline and its Peer Group; an unusual day scores High."
+        [terms]="['Anomaly Model', 'Anomaly Score', 'Feature', 'Peer Group', 'Dataset', 'Alert Rule']"
+    >
+        @if (lens.canAuthorWorkbench()) {
+            <button actions mat-flat-button color="primary" type="button" (click)="create()">New Anomaly Model</button>
+        }
+        <button actions mat-icon-button type="button" aria-label="Refresh Anomaly Models" (click)="load()">
+            <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+        </button>
+    </inspecto-page-header>
+
+    <div class="flex flex-auto flex-col gap-6 p-6 sm:flex-row sm:p-10">
+        <nav class="sm:w-72" aria-label="Anomaly Models">
+            @if (loading()) {
+                <inspecto-skeleton [lines]="4"></inspecto-skeleton>
+            } @else if (error(); as e) {
+                <p class="text-warn text-sm" role="alert">{{ e }}</p>
+                <button mat-stroked-button type="button" class="mt-2" (click)="load()">Retry</button>
+            } @else if (models().length === 0) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:chart-bar"
+                    title="No Anomaly Models yet"
+                    message="An Anomaly Model is saved as an anomaly-model component; none are visible in this Space."
+                ></inspecto-empty-state>
+            } @else {
+                <ul class="flex flex-col gap-1">
+                    @for (m of models(); track m.id) {
+                        <li>
+                            <button
+                                type="button"
+                                class="hover:bg-hover w-full rounded-lg px-3 py-2 text-left"
+                                [class.bg-hover]="m.id === selectedId()"
+                                [attr.aria-current]="m.id === selectedId() ? 'true' : null"
+                                (click)="select(m.id)"
+                            >
+                                <span class="block text-sm font-semibold">{{ m.id }}</span>
+                                <span class="text-secondary block text-xs">
+                                    {{ m.entityType || 'entity' }} · {{ m.features.length }} features
+                                </span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </nav>
+
+        <section class="min-w-0 flex-auto" aria-live="polite">
+            @if (selected(); as m) {
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-lg font-semibold">{{ m.id }}</h2>
+                    <button mat-stroked-button type="button" (click)="history(m)">History</button>
+                    @if (lens.canAuthorWorkbench()) {
+                        <button mat-stroked-button type="button" (click)="edit(m.id)">Edit</button>
+                        <button mat-stroked-button type="button" (click)="remove(m.id)">Delete</button>
+                    }
+                    @if (lens.canAuthorAlertRules()) {
+                        <a mat-stroked-button routerLink="/alerts" [queryParams]="alertRuleParams(m)"
+                            >Add per-entity Alert Rule</a
+                        >
+                    }
+                </div>
+                @if (m.description) {
+                    <p class="text-secondary mt-1 text-sm">{{ m.description }}</p>
+                }
+                <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
+                    <dt class="text-secondary">Entity type</dt>
+                    <dd>{{ m.entityType || '—' }}</dd>
+                    <dt class="text-secondary">Baseline window</dt>
+                    <dd class="tabular-nums">{{ m.window != null ? m.window + ' days' : '—' }}</dd>
+                    <dt class="text-secondary">Seasonality</dt>
+                    <dd>{{ m.seasonality || 'none' }}</dd>
+                    <dt class="text-secondary">Thresholds</dt>
+                    <dd class="tabular-nums">
+                        Elevated {{ m.elevatedThreshold ?? '—' }} · High {{ m.highThreshold ?? '—' }}
+                    </dd>
+                    <dt class="text-secondary">Peer Group</dt>
+                    <dd>{{ m.peersBy.join(', ') || '—' }}</dd>
+                    <dt class="text-secondary">Data scope</dt>
+                    <dd>{{ m.dataScope || '—' }}</dd>
+                    <dt class="text-secondary">Watch List</dt>
+                    <dd>{{ m.watchList || '—' }}</dd>
+                    <dt class="text-secondary">Exclusion List</dt>
+                    <dd>{{ m.exclusionList || '—' }}</dd>
+                </dl>
+
+                <h3 class="mt-6 text-sm font-semibold">Features</h3>
+                <table class="mt-2 w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b">
+                            <th scope="col">Feature</th>
+                            <th scope="col">Dataset</th>
+                            <th scope="col">Key</th>
+                            <th scope="col">Time</th>
+                            <th scope="col">Measure</th>
+                            <th scope="col">Direction</th>
+                            <th scope="col">Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (f of m.features; track f.id) {
+                            <tr class="border-b">
+                                <td>{{ f.label || f.id }}</td>
+                                <td>{{ f.dataset }}</td>
+                                <td>{{ f.key }}</td>
+                                <td>{{ f.time }}</td>
+                                <td class="font-mono">{{ f.measure }}</td>
+                                <td>{{ f.direction }}</td>
+                                <td class="tabular-nums">{{ f.weight }}</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <h3 class="mt-6 text-sm font-semibold">Derived Datasets</h3>
+                <p class="text-secondary text-sm">
+                    Written by the anomaly.score Job, never authored: {{ m.outputs.join(' and ') }}. To raise Incidents,
+                    add a per-entity Alert Rule over the latest Dataset.
+                </p>
+
+                @if (lens.canWorkIncidents()) {
+                    <h3 class="mt-6 text-sm font-semibold">Preview an entity</h3>
+                    <app-anomaly-model-preview [model]="m.id"></app-anomaly-model-preview>
+                }
+            } @else if (models().length > 0) {
+                <p class="text-secondary text-sm">Select an Anomaly Model to see its Features.</p>
+            }
+        </section>
+    </div>
+</div>

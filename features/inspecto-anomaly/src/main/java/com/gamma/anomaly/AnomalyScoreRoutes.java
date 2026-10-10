@@ -162,8 +162,10 @@ public final class AnomalyScoreRoutes implements RouteModule {
      *   <li>Saved model: unknown, unparseable or outside the caller's data scopes → 404 (as the GET). Content:
      *       {@code fromMap} + the save-time Space checks → 422; a data-scoped caller may only preview content carrying
      *       a scope it holds (403).</li>
-     *   <li>Bounded evaluation: every feature narrowed to the entity (a bound filter), one entity, under
-     *       {@link #PREVIEW_POLICY}; a failed query → 422 with the evaluator's value-free message.</li>
+     *   <li>Bounded evaluation under {@link #PREVIEW_POLICY} ({@link AnomalyScoreEvaluator#preview}): without peers
+     *       every feature is narrowed to the entity (a bound filter); with peers the full cohort is read so its medians
+     *       and cohort shift are real, and only the entity is scored. A failed or over-cap query → 422 with the
+     *       evaluator's value-free message.</li>
      * </ol>
      * The entity key is masked in the response unless the caller holds {@code canRevealLinkEntities} (D-P8).
      */
@@ -229,12 +231,12 @@ public final class AnomalyScoreRoutes implements RouteModule {
         ViewStore views = new ViewStore(writeRoot.resolve("views"));
         AnomalyScoreEvaluator.Run run;
         try {
-            run = AnomalyScoreEvaluator.evaluate(model.forEntity(entityKey), asOf, datasetId -> {
+            run = AnomalyScoreEvaluator.preview(model, asOf, datasetId -> {
                 Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content)
                         .orElseThrow(() -> new IllegalArgumentException("anomaly-model feature names unknown dataset '"
                                 + datasetId + "'"));
                 return DatasetRelation.relationSql(ds, dataRoot, views);
-            }, 1, AnomalyScoreEvaluator.MAX_BUCKET_ROWS, PREVIEW_POLICY);
+            }, entityKey, PREVIEW_POLICY);
         } catch (IllegalArgumentException | IllegalStateException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }

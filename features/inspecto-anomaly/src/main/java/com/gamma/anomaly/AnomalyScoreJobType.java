@@ -140,7 +140,7 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
      */
     static Predicate<String> exclusion(Optional<WatchListFeed> provider, Path writeRoot, AnomalyModel model,
                                        AnomalyLists lists) throws IOException {
-        if (lists.exclusionList() == null) return k -> false;
+        if (lists.exclusionList() == null) return AnomalyScoreEvaluator.NONE;
         WatchListFeed feed = provider.orElseThrow(() -> new IllegalStateException("anomaly-model '" + model.id()
                 + "' excludes through list '" + lists.exclusionList() + "', but Entity Lists are not installed in this edition"));
         return feed.check(writeRoot, lists.exclusionList(), WatchListFeed.EXCLUSION);

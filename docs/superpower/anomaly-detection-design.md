@@ -487,6 +487,42 @@ exclusion run AROUND `AnomalyScoreEvaluator.evaluate`, never inside it.
 - **Not built here:** template CONTENT seeding an anomaly model + its pending rule (S5 ships the examples in
   `telco-fraud` / `mobile-money` / `aml`), UI (S5), evidence rows, hour buckets, performance measurement.
 
+### 16.4 S5 lane A as-built: preview with the full cohort, exclusion before the LIMIT, the authoring pane (lane s5-author, 2026-10-10)
+
+- **Preview with peers (operator-approved residual a).** `AnomalyScoreEvaluator.preview(model, asOf, relations,
+  entityKey, policy)` replaces the route's `model.forEntity(key)` narrowing. Without `peers` it still narrows every
+  feature to the entity (bound filter, cap 1). With `peers` it reads the features and the cohort in FULL (the model's
+  own entity cap) and scores only the entity (`scoreOnly`), so the cohort medians and the cohort shift are the run's.
+  The statements run under `PREVIEW_POLICY` (512 MB / 2 threads / 10 s); a statement past it fails the preview
+  (422, value-free message), never a narrowed cohort. Proven by
+  `AnomalyPeerGoldenCorpusTest#aPreviewComparesThePlantedPeerOutlierWithItsWholeCohort`: `adjuster` previews `high`,
+  `zPeer` at zCap, the same cohort size and score as the full run; the S4 narrowing in the same test leaves the peer
+  baseline `insufficient` (the defect).
+- **Exclusion before the LIMIT (residual b).** When the model names an `exclusionList`, each feature first reads its
+  DISTINCT keys in range (bounded by `MAX_ENTITIES_CEILING`, fail closed), tests them with the list's predicate in
+  the JVM (ranges and the list's normaliser live there), and passes the hits to the bucket statement as bound `?`
+  parameters in a `NOT IN` before the grouping, so before the entity LIMIT. No list = `AnomalyScoreEvaluator.NONE`, no
+  extra statement. Proven by `#excludedKeysDoNotCountAgainstTheEntityCap` (345 keys, 61 excluded, cap 284 scores;
+  cap 283 still fails naming the cap).
+- **UI: Studio ▸ Anomaly Models** (`/anomaly-models`, nav beside Risk Scores, `navFeature: anomaly`). List + detail
+  over `GET /components/anomaly-model`; create / edit (`PUT` + `If-Match`) / delete / History through the generic
+  component routes (no new backend route), gated on `canAuthorWorkbench`; the maker-checker 202 is read as held. The
+  form is a schema-form (window, seasonality, thresholds, Peer Group, Entity Lists, cap, scope) plus a Feature row
+  editor (Dataset picker over Datasets with a readable Schema, key / time column pickers, time offering only
+  TIMESTAMP/DATE columns, the shared `count | agg(column)` Measure grammar, direction, weight). A 422 lands on the
+  field or Feature row it names (`mapAnomalyRefusal`), verbatim, plus the banner. The preview box (gated on
+  `canWorkIncidents`, the route's gate) scores a SAVED model for one key and optional `asOf`: score + band badge, the
+  per-feature table (observed, self z, peer z, cohort shift, reason) and per feature an SVG strip of its baseline
+  (usual range median ± 3 MAD, median, observed point) with a text alternative. Files:
+  `inspecto/anomaly/anomaly-model-form.ts` (framework-free), `inspecto/api/anomaly-models.service.ts` (config +
+  preview only; the entity read stays lane B's `anomaly-scores.service.ts`), `modules/admin/anomaly-models/`.
+  `ComponentType` gained `anomaly-model`.
+- **Deferred.** The chart draws the baseline's median and MAD, not the day-by-day window: the preview response
+  carries no series, and adding one is a response-shape change left for a later slice. Feature `filters` and `unit`
+  are not edited in the pane (they ride through a save untouched). Previewing UNSAVED content (the route accepts it)
+  is not wired. The pane was not driven in the browser preview from this lane (no backend with the anomaly module
+  served from this worktree); unit specs + axe cover it.
+
 ## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 
 Every recommendation below was approved as written; the *Decided* column is binding.
