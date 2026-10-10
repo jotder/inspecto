@@ -335,6 +335,20 @@ a job can re-run it with different values. A first-class Component kind (`rule-t
 and note it is **not** a fourth member of the triad above: it carries no engine, it is a stored query shape. The
 `:fieldValue` placeholder namespace is distinguished from `$`-Parameters and `${ENV:…}` secrets in §7.
 
+**Anomaly Model** *(added 2026-10-10, operator decision D-AD1 — ANOMALY-DETECTION-1, design only)* — The authored
+**Type** (Component kind `anomaly-model`) that scores each entity against its own history and its **Peer Group**: a
+set of **Features**, a baseline window, seasonality and thresholds. ⛔ Not a **Risk Score** model (absolute weighted
+factors), not a `baseline` **Expectation** (batch data quality).
+
+**Anomaly Score** *(added 2026-10-10, D-AD1)* — The **Instance**: one 0–100 row per entity per `anomaly.score` run,
+stored with its explanation (per Feature: observed vs baseline, deviation, reason) so it is recomputable.
+
+**Feature** *(of an Anomaly Model; added 2026-10-10, D-AD1)* — One **Measure** per entity per time bucket whose
+behaviour an Anomaly Model baselines. Only in this sense; ⛔ never for a product capability.
+
+**Peer Group** *(of an Anomaly Model; added 2026-10-10, D-AD1)* — The cohort of entities (by a declared column, e.g.
+tariff plan) a Feature value is compared against when self history is short or as a second view.
+
 **Risk Score** *(added 2026-09-27, operator decision D-P1 — ASSURE-RISK-SCORE-1)* — An explainable 0–100 number
 per entity (subscriber, account, device, SIM, dealer, channel, partner, or free-form): `Σ weight × indicator`,
 each contribution held to its factor's cap, stored with its **factors** so every score is recomputable. The model

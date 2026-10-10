@@ -1,10 +1,10 @@
 # Anomaly Detection add-on — design (`ANOMALY-DETECTION-1`)
 
-> **State: DESIGN 2026-10-10, nothing built.** In-flight plan for the BACKLOG row `ANOMALY-DETECTION-1`
+> **State: DESIGN 2026-10-10, decisions taken (operator, 2026-10-10); build not started.** In-flight plan for the BACKLOG row `ANOMALY-DETECTION-1`
 > (P3). The row's home is the offering map in
 > [module-reorganisation-decisions.md](../okf/backend/module-reorganisation-decisions.md), which files Anomaly
-> Detection as a not-built add-on. Every decision this design needs is in §17 (*Decisions owed*, D-AD1..D-AD12)
-> with a recommendation; nothing is decided until the operator signs them.
+> Detection as a not-built add-on. Every decision this design needs is in §17 (*Decisions*, D-AD1..D-AD12)
+> all approved as recommended (operator, 2026-10-10).
 
 ## 1. Why — the gap
 
@@ -331,7 +331,7 @@ All follow the `angular-ui` rules (design-system components, no hard-coded colou
 
 | Slice | Content | Size |
 |---|---|---|
-| S0 | Sign D-AD1..D-AD12; GLOSSARY entries; BACKLOG row rewritten to point here | XS |
+| S0 | ✅ done 2026-10-10: D-AD1..D-AD12 signed, GLOSSARY entries, BACKLOG row points here | XS |
 | S1 | Module skeleton + Offering entry (`planned`); `anomaly-model` kind, `fromMap`, `requireStorable`, reserved prefix on every writer; `AnomalyScorer` pure + unit tests | M |
 | S2 | `anomaly.score` Job: self baselines, weekday/hour seasonality, outputs + marker + `_latest` swap, caps, `AnomalySignals`; golden corpus (self cases) + mutation checks; performance measured | L |
 | S3 | Peer groups + fallback; golden peer cases (U2, U5, cohort-shift look-alike) | M |
@@ -340,19 +340,21 @@ All follow the `angular-ui` rules (design-system components, no hard-coded colou
 | S6 | Distil into an OKF concept (`okf/backend/control-plane/anomaly-scores.md`, not yet written), move residuals to BACKLOG, archive this plan | S |
 | later | ML scorer behind the same explanation shape (D-AD2); incremental baselines (D-AD9) | — |
 
-## 17. Decisions owed (D-AD1..D-AD12)
+## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 
-| ID | Question | Options | Recommendation |
+Every recommendation below was approved as written; the *Decided* column is binding.
+
+| ID | Question | Options | Decided |
 |---|---|---|---|
-| D-AD1 | Names | (a) **Anomaly Model** (Type) / **Anomaly Score** (Instance) / **Feature** / **Peer Group**; (b) *Behaviour Profile* / *Behaviour Score*; (c) fold into Risk Score as a factor type | **(a)** — parallels Risk Score, says what it is; add to GLOSSARY §4 neighbourhood |
-| D-AD2 | Scoring method in v1 | (a) **robust z (median/MAD) + seasonality + peers, weighted RMS**; (b) also isolation forest; (c) pluggable SPI now | **(a)** — explainable by construction; keep the explanation shape fixed so (b) can come later behind it |
-| D-AD3 | New kind or extend Risk Score | (a) **new `anomaly-model` kind + `anomaly.score` Job**; (b) a `kind: anomaly` factor inside `risk-score`; (c) both | **(a)**, and document composing via the `_latest` Dataset as a Risk factor — one concept, one word; the math, caps and outputs differ |
-| D-AD4 | Placement | (a) **new optional module `inspecto-anomaly`, add-on `anomalyDetection`, Professional+**; (b) inside `inspecto-scoring`; (c) base | **(a)** — sold separately per D-MR9; (b) would ship it wherever scoring ships |
-| D-AD5 | Code sharing with scoring | (a) **extract the shared pieces (`EvidenceMasker`, key masking helper, output-marker writer) to the engine**; (b) depend on `scoring`; (c) copy | **(a)** — no copy (mirrors drift), no forced coupling of two add-ons |
-| D-AD6 | Score scale | (a) **0–100 via `1 − exp(−raw/3)` plus raw z kept**; (b) raw max-z only; (c) percentile within run | **(a)** — same tile/Alert Rule shape as Risk Scores; percentile (c) always flags someone even on a quiet day |
-| D-AD7 | Deferred Alert Rule seed trigger | (a) **generalise to `afterScore: {kind, model}`** for both; (b) add `afterAnomalyScore`; (c) no template seeding | **(a)** — breaking changes are free; one mechanism; moves `anomaly.score.produced` to core `SignalType` |
-| D-AD8 | Missing buckets | (a) **0 for count/sum, absent for avg/ratio (fixed by aggregation)**; (b) author-chosen per feature; (c) always absent | **(a)** — correct by default, nothing to get wrong |
-| D-AD9 | Baseline computation | (a) **full recompute from the feature Datasets each run**; (b) incremental per-entity state store; (c) (a) now, (b) when measured slow | **(c)** — measure in S2 first |
-| D-AD10 | Entity cap behaviour | (a) **configurable + fail (as Risk Scores, 2026-10-06)**; (b) score top-K by volume; (c) sample | **(a)** — partial scoring is a silent false negative |
-| D-AD11 | Peer cohort without enough members | (a) **`insufficient`, no peer score**; (b) fall back to the whole population; (c) merge small cohorts | **(a)**, with (b) as an opt-in `peers.fallback: population` — never silently change the comparison |
-| D-AD12 | Entities with no self history | (a) **peer-only score, flagged in the explanation**; (b) not scored until `minBaselinePoints`; (c) scored against population | **(a)** — new SIMs/merchants are where fraud starts; flagged so analysts see the basis |
+| D-AD1 | Names | (a) **Anomaly Model** (Type) / **Anomaly Score** (Instance) / **Feature** / **Peer Group**; (b) *Behaviour Profile* / *Behaviour Score*; (c) fold into Risk Score as a factor type | **(a)** — parallels Risk Score, says what it is; add to GLOSSARY §4 neighbourhood **(operator, 2026-10-10)** |
+| D-AD2 | Scoring method in v1 | (a) **robust z (median/MAD) + seasonality + peers, weighted RMS**; (b) also isolation forest; (c) pluggable SPI now | **(a)** — explainable by construction; keep the explanation shape fixed so (b) can come later behind it **(operator, 2026-10-10)** |
+| D-AD3 | New kind or extend Risk Score | (a) **new `anomaly-model` kind + `anomaly.score` Job**; (b) a `kind: anomaly` factor inside `risk-score`; (c) both | **(a)**, and document composing via the `_latest` Dataset as a Risk factor — one concept, one word; the math, caps and outputs differ **(operator, 2026-10-10)** |
+| D-AD4 | Placement | (a) **new optional module `inspecto-anomaly`, add-on `anomalyDetection`, Professional+**; (b) inside `inspecto-scoring`; (c) base | **(a)** — sold separately per D-MR9; (b) would ship it wherever scoring ships **(operator, 2026-10-10)** |
+| D-AD5 | Code sharing with scoring | (a) **extract the shared pieces (`EvidenceMasker`, key masking helper, output-marker writer) to the engine**; (b) depend on `scoring`; (c) copy | **(a)** — no copy (mirrors drift), no forced coupling of two add-ons **(operator, 2026-10-10)** |
+| D-AD6 | Score scale | (a) **0–100 via `1 − exp(−raw/3)` plus raw z kept**; (b) raw max-z only; (c) percentile within run | **(a)** — same tile/Alert Rule shape as Risk Scores; percentile (c) always flags someone even on a quiet day **(operator, 2026-10-10)** |
+| D-AD7 | Deferred Alert Rule seed trigger | (a) **generalise to `afterScore: {kind, model}`** for both; (b) add `afterAnomalyScore`; (c) no template seeding | **(a)** — breaking changes are free; one mechanism; moves `anomaly.score.produced` to core `SignalType` **(operator, 2026-10-10)** |
+| D-AD8 | Missing buckets | (a) **0 for count/sum, absent for avg/ratio (fixed by aggregation)**; (b) author-chosen per feature; (c) always absent | **(a)** — correct by default, nothing to get wrong **(operator, 2026-10-10)** |
+| D-AD9 | Baseline computation | (a) **full recompute from the feature Datasets each run**; (b) incremental per-entity state store; (c) (a) now, (b) when measured slow | **(c)** — measure in S2 first **(operator, 2026-10-10)** |
+| D-AD10 | Entity cap behaviour | (a) **configurable + fail (as Risk Scores, 2026-10-06)**; (b) score top-K by volume; (c) sample | **(a)** — partial scoring is a silent false negative **(operator, 2026-10-10)** |
+| D-AD11 | Peer cohort without enough members | (a) **`insufficient`, no peer score**; (b) fall back to the whole population; (c) merge small cohorts | **(a)**, with (b) as an opt-in `peers.fallback: population` — never silently change the comparison **(operator, 2026-10-10)** |
+| D-AD12 | Entities with no self history | (a) **peer-only score, flagged in the explanation**; (b) not scored until `minBaselinePoints`; (c) scored against population | **(a)** — new SIMs/merchants are where fraud starts; flagged so analysts see the basis **(operator, 2026-10-10)** |
