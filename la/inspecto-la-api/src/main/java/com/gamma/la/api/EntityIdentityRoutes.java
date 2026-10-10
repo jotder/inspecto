@@ -70,6 +70,12 @@ import java.util.regex.Pattern;
  */
 public final class EntityIdentityRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     static final String ASSERTED = "identity.asserted";
     static final String RETRACTED = "identity.retracted";
     private static final int MAX_KEY_LENGTH = 512;

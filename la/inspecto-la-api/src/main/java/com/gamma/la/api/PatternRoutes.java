@@ -59,6 +59,12 @@ import java.util.regex.Pattern;
  */
 public final class PatternRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     static final int MAX_LEGS = 100_000;
     private static final int DEFAULT_MATCHES = 200;

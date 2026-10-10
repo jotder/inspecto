@@ -87,6 +87,12 @@ import java.util.TreeSet;
  */
 public final class GraphRunRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     /** How long a run within its algorithm's inline ceiling is waited for before the answer becomes a 202. */
     static final long INLINE_WAIT_MS = 3_000;
     private static final int MAX_KINDS = 100;

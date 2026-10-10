@@ -113,6 +113,12 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  */
 public final class InvestigationRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     /** The fourteen ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold}, {@code snapshot}, {@code compare} and {@code temporal}). */
     private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",

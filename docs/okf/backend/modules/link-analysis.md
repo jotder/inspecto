@@ -307,7 +307,10 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
    refill 1 per 3 s, tunable `control.rateLimit.linkAnalysis.*`; 429); Investigation routes are exempt (pinned by `LinkAnalysisRateClassCoverageTest`).
 3. `authorize` → host ABAC PEP.
 4. `requireModuleEnabled` → feature `geoLink` in the Space's `modules.toon` (404 `MODULE_DISABLED`); then the host's
-   idempotency check, before the handler.
+   idempotency check, before the handler. ⚠ The gate only covers a route whose `RouteModule` overrides
+   `featureIds()` → `geoLink`; as of 2026-10-11 all 19 LA route modules (18 in `la-api` + geo-link's
+   `InvestigationMeasureRoutes`, whose manifest now declares `features[1]: geoLink`) do — a new LA route module
+   must too (pinned by `ControlApiGeoLinkModuleGateTest`).
 5. `ApiContext.withCapability` → 403. ⚠ A no-op when there is no Subject (Personal / tests without an armed
    Authenticator).
 6. `InvestigationRoutes.open`: write root (503) → safe id (422) → header (404) → membership role (`Need`

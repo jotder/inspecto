@@ -76,6 +76,12 @@ import java.util.Map;
  */
 public final class WorkingSetRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     private static final int DEFAULT_LIMIT = 1_000;
     private static final int MAX_LIMIT = 10_000;
     private static final int CACHE_ENTRIES = 32;

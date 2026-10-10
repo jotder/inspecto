@@ -38,6 +38,12 @@ import java.util.Map;
  */
 public final class InvestigationComparisonRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     @Override
     public void register(ApiContext api) {
         api.get("/inv/investigations/([^/]+)/compare", (e, m) -> compare(api, e, m.group(1)));

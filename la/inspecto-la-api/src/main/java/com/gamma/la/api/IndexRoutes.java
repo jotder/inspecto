@@ -80,6 +80,12 @@ import java.util.function.Supplier;
  */
 public final class IndexRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     /** The directory under a Space's write root that holds every index. */
     static final String INDEX_DIR = "la-index";
     private static final int MAX_ATTR_COLS = 50;

@@ -48,6 +48,12 @@ import java.util.regex.Pattern;
  */
 public final class InvestigationReferenceRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     /** The most references one Investigation may carry. */
     static final int MAX = 200;
 

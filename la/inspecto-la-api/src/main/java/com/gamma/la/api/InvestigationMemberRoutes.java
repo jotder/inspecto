@@ -43,6 +43,12 @@ import java.util.function.UnaryOperator;
  */
 public final class InvestigationMemberRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
