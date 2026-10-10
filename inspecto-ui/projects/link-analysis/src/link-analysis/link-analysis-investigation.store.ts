@@ -38,6 +38,8 @@ export class InvestigationSessionStore {
     /** Every Investigation this screen knows about (created here or restored from a saved view). */
     readonly refs = signal<InvestigationRef[]>([]);
     readonly activeId = signal<string | null>(null);
+    /** LA-UI-DRAFT-OPS-1: the Draft that is the working scope — ops, undo, the log and the Working Set go to it; null = the main log. */
+    readonly activeDraftId = signal<string | null>(null);
     readonly log = signal<InvestigationLog | null>(null);
     readonly workingSet = signal<WorkingSet | null>(null);
     readonly lastStep = signal<InvestigationStepResult | null>(null);
@@ -107,6 +109,7 @@ export class InvestigationSessionStore {
     /** Leave the open Investigation (it stays remembered). */
     close(): void {
         this.activeId.set(null);
+        this.activeDraftId.set(null);
         this.log.set(null);
         this.workingSet.set(null);
         this.lastStep.set(null);
@@ -182,7 +185,12 @@ export class InvestigationSessionStore {
         return this.run(
             `The ${op.op} step failed.`,
             async () => {
-                this.lastStep.set(await firstValueFrom(this.inv.appendInvestigationOp(id, op)));
+                const draft = this.activeDraftId();
+                this.lastStep.set(
+                    await firstValueFrom(
+                        draft ? this.inv.appendDraftOp(id, draft, op) : this.inv.appendInvestigationOp(id, op),
+                    ),
+                );
                 await this.refresh(id);
             },
             message,
@@ -193,9 +201,22 @@ export class InvestigationSessionStore {
         const id = this.activeId();
         if (!id) return false;
         return this.run('Undo failed.', async () => {
-            this.lastStep.set(await firstValueFrom(this.inv.undoInvestigation(id)));
+            const draft = this.activeDraftId();
+            this.lastStep.set(
+                await firstValueFrom(draft ? this.inv.undoDraft(id, draft) : this.inv.undoInvestigation(id)),
+            );
             await this.refresh(id);
         });
+    }
+
+    /** Make a Draft (or, with null, the main log) the working scope, then re-read the log and Working Set from it. */
+    async useDraft(draftId: string | null): Promise<boolean> {
+        const id = this.activeId();
+        if (!id) return false;
+        this.activeDraftId.set(draftId);
+        this.lastStep.set(null);
+        this.replayResult.set(null);
+        return this.run('Could not open the Draft.', () => this.refresh(id));
     }
 
     /** D-E4: re-ordering creates a FORK — remember it with its parent and switch to it. */
@@ -244,6 +265,17 @@ export class InvestigationSessionStore {
     }
 
     private async refresh(id: string): Promise<void> {
+        const draft = this.activeDraftId();
+        if (draft) {
+            const [log, replay] = await Promise.all([
+                firstValueFrom(this.inv.draftLog(id, draft)),
+                firstValueFrom(this.inv.draftReplay(id, draft)),
+            ]);
+            if (this.activeId() !== id || this.activeDraftId() !== draft) return;
+            this.log.set(log);
+            this.workingSet.set(replay.workingSet);
+            return;
+        }
         const [log, replay] = await Promise.all([
             firstValueFrom(this.inv.investigationLog(id)),
             firstValueFrom(this.inv.replayInvestigation(id, {})),

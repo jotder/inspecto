@@ -52,7 +52,9 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
  * main log's head (resolving any conflicts) and promote it, or discard it. Everything is decided by the SERVER; this panel
  * shows the Draft's state (`open` / `hibernated` / …), how far the main log has moved past it, its Working Set sizes and
  * the conflict report, and shows a refusal in place. A promote that crosses the four-eyes thresholds is HELD, not applied.
- * Emits `(promoted)` so the host re-reads the main log and Working Set.
+ * Emits `(promoted)` so the host re-reads the main log and Working Set. "Work on this Draft" emits `(scope)` with the Draft's
+ * id so the host routes the Investigation's steps and Undo to the Draft (`…/drafts/{draftId}/ops` · `/undo`); null = back to
+ * the main log (LA-UI-DRAFT-OPS-1).
  */
 @Component({
     selector: 'inspecto-link-analysis-drafts',
@@ -110,6 +112,16 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                     </div>
                     @if (d.state === 'open' || d.state === 'hibernated') {
                         <div class="flex flex-wrap items-center gap-1">
+                            @if (activeDraftId() === d.draftId) {
+                                <inspecto-status-badge value="info" label="working scope"></inspecto-status-badge>
+                                <button mat-button [disabled]="busy()" (click)="scope.emit(null)">
+                                    Back to the Investigation
+                                </button>
+                            } @else {
+                                <button mat-stroked-button [disabled]="busy()" (click)="scope.emit(d.draftId)">
+                                    Work on this Draft
+                                </button>
+                            }
                             <button mat-button [disabled]="busy()" (click)="showWorkingSet(d)">Working Set</button>
                             <button mat-button [disabled]="busy()" (click)="showConflicts(d)">Conflicts</button>
                             <button mat-button [disabled]="busy()" (click)="rebase(d)">Rebase</button>
@@ -151,6 +163,10 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
 export class LinkAnalysisDraftsComponent {
     readonly investigationId = input.required<string>();
     readonly promoted = output<void>();
+    /** The Draft that is the host's working scope (null = the main log). */
+    readonly activeDraftId = input<string | null>(null);
+    /** Asks the host to make this Draft (or, with null, the main log) the working scope. */
+    readonly scope = output<string | null>();
 
     private readonly inv = inject(InvService);
 
@@ -282,9 +298,10 @@ export class LinkAnalysisDraftsComponent {
     }
 
     async discard(d: InvestigationDraft): Promise<void> {
-        await this.run(
+        const done = await this.run(
             () => firstValueFrom(this.inv.discardDraft(this.investigationId(), d.draftId)),
             'Could not discard the Draft.',
         );
+        if (done && this.activeDraftId() === d.draftId) this.scope.emit(null);
     }
 }

@@ -1558,6 +1558,26 @@ export class InvService {
         });
     }
 
+    /** A Draft's log: the main log's first `baseStep` entries, then the Draft's own (numbering continues). */
+    draftLog(id: string, draftId: string): Observable<InvestigationLog> {
+        return this.http.get<InvestigationLog>(invPath(id, `drafts/${encodeURIComponent(draftId)}/log`));
+    }
+
+    /** A Draft's full Working Set (entities + links + exclusions), evaluated from its log. */
+    draftReplay(id: string, draftId: string): Observable<{ workingSet: WorkingSet }> {
+        return this.http.get<{ workingSet: WorkingSet }>(invPath(id, `drafts/${encodeURIComponent(draftId)}/replay`));
+    }
+
+    /** Append one op to a Draft — the actor only; the SAME validation as the main log. */
+    appendDraftOp(id: string, draftId: string, op: InvestigationOpRequest): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/ops`), op);
+    }
+
+    /** Revert the Draft's latest effective op (only its OWN ops). */
+    undoDraft(id: string, draftId: string): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/undo`), {});
+    }
+
     draftConflicts(id: string, draftId: string): Observable<DraftConflictReport> {
         return this.http.get<DraftConflictReport>(invPath(id, `drafts/${encodeURIComponent(draftId)}/conflicts`));
     }

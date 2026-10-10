@@ -14,11 +14,14 @@ import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
     imports: [LinkAnalysisDraftsComponent],
     template: `<inspecto-link-analysis-drafts
         investigationId="inv-1"
+        [activeDraftId]="active"
+        (scope)="active = $event"
         (promoted)="promoted = promoted + 1"
     ></inspecto-link-analysis-drafts>`,
 })
 class Host {
     promoted = 0;
+    active: string | null = null;
 }
 
 const DRAFT: InvestigationDraft = {
@@ -90,6 +93,23 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         expect(el.textContent).toContain('hibernated');
         expect(el.textContent).toContain('main moved 2 step(s)');
         await expectNoA11yViolations(el);
+    });
+
+    it('LA-UI-DRAFT-OPS-1: makes a Draft the working scope and goes back to the main log', async () => {
+        const { f, el } = await create();
+        await click(f, button(el, 'Work on this Draft'));
+        expect(f.componentInstance.active).toBe('d-1');
+        expect(el.textContent).toContain('working scope');
+        await expectNoA11yViolations(el);
+        await click(f, button(el, 'Back to the Investigation'));
+        expect(f.componentInstance.active).toBeNull();
+    });
+
+    it('LA-UI-DRAFT-OPS-1: discarding the working-scope Draft returns the scope to the main log', async () => {
+        const { f, el } = await create();
+        await click(f, button(el, 'Work on this Draft'));
+        await click(f, button(el, 'Discard'));
+        expect(f.componentInstance.active).toBeNull();
     });
 
     it('forks a Draft', async () => {
