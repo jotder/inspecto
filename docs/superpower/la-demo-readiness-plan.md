@@ -143,7 +143,7 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 | 0 | — | Smoke runner passes; modules ACTIVE; route inventory 75 | DR-T5, DR-T2 |
 | 1 | `fm.analyst` | *Follow the money* card → 170 nodes, 1,803 links; shortest path `SMURF-01`→`RELAY-01` via `MULE-HUB-01`; cut points = `MULE-HUB-01`; centrality `ACC-1008` | ready |
 | 2 | `fm.analyst` | Open the seeded Investigation; replay equal; append the next day's file; replay still equal, *Re-read* shows drift | DR-S1, DR-T8 |
-| 3 | `fm.analyst` | Value Measures pass-through: 5 entities breach (`SHELL-A` 1.08 … `MULE-HUB-01` 0.980) | DR-D4, DR-T6 |
+| 3 | `fm.analyst` | Value Measures pass-through: 13 accounts flagged on the shipped la-showcase data at default thresholds (`SHELL-A` 1.08, the two relays 0.985, `MULE-HUB-01` 0.979; the DR-T6 test pins these) | DR-D4, DR-T6 |
 | 4 | `fm.analyst` | Masking: Working Set shows tokens; `admin` Reveal is audited | DR-D2 |
 | 5 | `fm.analyst` + second approver | Expand the hub → pending; requester cannot approve; approver does | DR-S2, DR-S6 |
 | 6 | any | Dossier build/verify; tamper one hash → verify fails | ready |
