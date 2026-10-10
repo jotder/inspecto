@@ -211,6 +211,8 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    held — nothing surfaces "lease held by an owner that has stopped renewing", so an operator watching only
    `/health/details` sees no takeover wait.
 
+Filed as backlog rows (2026-10-10): finding 1 `HA-RUNLEASE-DB-CREDENTIALS-1`, finding 2 `HA-GRACEFUL-STOP-LEASE-RELEASE-1`, finding 3 `HA-KILL9-DOUBLE-INGEST-1`, finding 4 `HA-LEASE-HOLDER-HEALTH-1`.
+
 ## Postgres backup and WAL runbook
 
 1. **Base backup** (nightly, on the primary or a replica):
