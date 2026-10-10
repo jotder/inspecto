@@ -178,6 +178,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         }
         if (!rec.id) continue;
         records++;
+        // OSV `withdrawn` (RFC 3339): the advisory was retracted (typically a duplicate). Only a parseable date that is not in
+        // the future retires it; anything else still scans - an unreadable retraction must never read as "safe".
+        if (rec.withdrawn && Date.parse(rec.withdrawn) <= Date.parse(today)) continue;
         for (const a of rec.affected || []) {
             const versions = byPkg.get(a.package?.name);
             if (!versions) continue;

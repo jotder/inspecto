@@ -121,3 +121,25 @@ test('unparseable record files are counted, warned, and exit 2', () => {
         const r = run(f.args); assert.equal(r.status, 2, r.output); assert.match(r.output, /1 unparseable/);
     } finally { rmSync(f.dir, { recursive: true, force: true }); }
 });
+
+test('a withdrawn record is retired only by a parseable, non-future date; a live one beside it still fails', () => {
+    const ev = [{ introduced: '1.0.0' }, { fixed: '1.3.0' }];
+    const f = fixture({ records: [
+        osv('GHSA-withdrawn', 'HIGH', ev, { withdrawn: '2026-09-01T00:00:00Z' }),
+        osv('GHSA-garbled', 'HIGH', ev, { withdrawn: 'someday' }),
+        osv('GHSA-future', 'HIGH', ev, { withdrawn: '2027-01-01T00:00:00Z' }),
+        osv('GHSA-live', 'HIGH', ev),
+    ] });
+    try {
+        const r = run(f.args);
+        assert.equal(r.status, 1, r.output);
+        assert.doesNotMatch(r.output, /GHSA-withdrawn/);
+        for (const id of ['GHSA-garbled', 'GHSA-future', 'GHSA-live']) assert.match(r.output, new RegExp(id));
+    } finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test('a snapshot whose only finding is withdrawn passes, and the record still counts as read', () => {
+    const f = fixture({ records: [osv('GHSA-withdrawn', 'HIGH', [{ introduced: '1.0.0' }, { fixed: '1.3.0' }], { withdrawn: '2026-09-01T00:00:00Z' })] });
+    try { const r = run(f.args); assert.equal(r.status, 0, r.output); assert.match(r.output, /vs 1 OSV records/); }
+    finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
