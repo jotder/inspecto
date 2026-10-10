@@ -143,7 +143,7 @@ class TelcoFraudTemplateGoldenTest {
         Path space = createSpace(root);
         com.gamma.pipeline.ComponentStore store = new com.gamma.pipeline.ComponentStore(space.resolve("config").resolve("registry"));
         List<com.gamma.pipeline.ComponentRegistry.Component> rules = store.list("alert-rule");
-        assertEquals(13, rules.size());
+        assertEquals(14, rules.size());
         for (com.gamma.pipeline.ComponentRegistry.Component r : rules) {
             assertEquals(r.name(), r.content().get("runbook"), r.name() + " links its own typology's Runbook");
             com.gamma.alert.Runbook rb = com.gamma.alert.Runbook.fromMap(r.name(),

@@ -1,0 +1,13 @@
+name: fraud_adjustment
+title: "Manual adjustment fraud runbook"
+summary: "Detects: manual ADJUSTMENT credits summed per staff `agent_id` in the window, above `threshold` (default 500), outside the billing-correction desks in `exempt_agents`."
+steps[4]:
+  - text: "Detects: manual ADJUSTMENT credits summed per staff `agent_id` in the window, above `threshold` (default 500), outside the billing-correction desks in `exempt_agents`."
+    link:
+      kind: dataset
+      id: fraud_adjustment
+  - text: "Check: each credited line against a complaint or billing-dispute ticket; whether the credited lines belong to the agent, relatives or a reseller; whether the credit was then spent or transferred out."
+  - text: "Act: suspend the agent's adjustment right pending review; reverse unsupported credits; refer to HR and internal audit."
+  - text: "Silent by design: an agent with a few small goodwill credits, and the exempt desks (`exempt_agents`, default `BILLING-DESK`, filled only from the verified register)."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

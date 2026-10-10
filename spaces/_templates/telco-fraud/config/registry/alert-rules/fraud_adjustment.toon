@@ -7,3 +7,4 @@ threshold: 500
 stormCap: 500
 severity: CRITICAL
 description: "Manual adjustment fraud"
+runbook: fraud_adjustment
