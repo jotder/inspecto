@@ -309,10 +309,13 @@ writing under one root concurrently**. That protection has to come from the leas
 
 ### 3.10 The container image is one process, one volume
 
-`inspecto/package.ps1:1052-1067`: `FROM eclipse-temurin:24-jre`, `COPY . /app`, `EXPOSE 8080`, a
-`/dev/tcp` health probe, `ENTRYPOINT ["./serve.sh"]`; the comment at `:1056-1057` says *"Persist data
-by mounting the spaces root: `-v /srv/inspecto/spaces:/app/spaces`"*; `.dockerignore` strips the
-jlink `runtime/` so the container uses the base JVM. It packages exactly one `ControlApi` process and
+`inspecto/package.ps1` step 6b-2 (the Dockerfile writer): a digest-pinned `debian:stable-slim` base
+(`FROM debian@sha256:...`), `COPY . /app`, a non-root uid/gid 10001, `EXPOSE 8080`, a `/dev/tcp` health
+probe, `ENTRYPOINT ["./serve.sh"]`; its header comment says *"Persist data by mounting the spaces root:
+`-v /srv/inspecto/spaces:/app/spaces`"*. The JVM is the bundle's own jlinked `runtime/` (`.dockerignore`
+keeps it; no vendor JRE image exists at release=27), so the Dockerfile is valid only in the linux_amd64
+bundle. (It was `FROM eclipse-temurin:24-jre` with `runtime/` excluded until `ASSURE-OPERABILITY-1`,
+2026-09-29.) It packages exactly one `ControlApi` process and
 knows nothing of replicas, shared storage or coordination. It is the right **unit**; it is not yet a
 **member**.
 
