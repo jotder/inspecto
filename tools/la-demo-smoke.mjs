@@ -39,16 +39,20 @@ export function countLaRoutes(inventory) {
   return rows.filter((r) => /^\/?(api\/v1\/)?(inv|geo)(\/|$)/.test(String(r.pattern))).length;
 }
 
-/** A manifest that no longer matches the store: every string hash/root field gets its first hex digit flipped. */
+/** A manifest that no longer matches the store: every string hash/root field (the server writes `sha256:<64hex>`; a
+ *  bare 64-hex is accepted too) gets its first hex digit flipped. Throws if nothing changed - a no-op tamper would make
+ *  the verify probe pass vacuously. */
 export function tamperManifest(manifest) {
-  const flip = (s) => (s.length ? (s[0] === '0' ? '1' : '0') + s.slice(1) : s);
+  const flip = (s) => s.replace(/^(sha256:)?([0-9a-f])/, (_, p = '', c) => p + (c === '0' ? '1' : '0'));
   const walk = (v) => {
     if (Array.isArray(v)) return v.map(walk);
     if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k,
-      typeof x === 'string' && /^[0-9a-f]{64}$/.test(x) ? flip(x) : walk(x)]));
+      typeof x === 'string' && /^(sha256:)?[0-9a-f]{64}$/.test(x) ? flip(x) : walk(x)]));
     return v;
   };
-  return walk(manifest);
+  const out = walk(manifest);
+  if (JSON.stringify(out) === JSON.stringify(manifest)) throw new Error('tamperManifest: no hash field found to tamper');
+  return out;
 }
 
 /** Burst verdicts: 429 present and the allowed requests did not exceed the bucket (20) by more than the refill slack. */
