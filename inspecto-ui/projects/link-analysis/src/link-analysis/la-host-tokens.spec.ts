@@ -128,7 +128,7 @@ describe('Link Analysis host-service tokens', () => {
                 provideRouter([]),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: { list: () => of([]) } },
-                { provide: InvService, useValue: {} },
+                { provide: InvService, useValue: { masking: signal(null) } },
                 { provide: LinkAnalysisService, useValue: { list: () => of([]) } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
                 {
@@ -161,7 +161,7 @@ describe('Link Analysis host-service tokens', () => {
                 provideRouter([]),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: { list: () => of([]) } },
-                { provide: InvService, useValue: {} },
+                { provide: InvService, useValue: { masking: signal(null) } },
                 { provide: LinkAnalysisService, useValue: { list } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
                 {
@@ -231,7 +231,7 @@ describe('Link Analysis host-service tokens', () => {
                 ...fakeHost(),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: {} },
-                { provide: InvService, useValue: {} },
+                { provide: InvService, useValue: { masking: signal(null) } },
             ],
         });
         const g = await TestBed.inject(GraphSourcesService).byId('component-registry')!.query({});
@@ -245,7 +245,7 @@ describe('Link Analysis host-service tokens', () => {
                 ...fakeHost(),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: {} },
-                { provide: InvService, useValue: {} },
+                { provide: InvService, useValue: { masking: signal(null) } },
                 {
                     provide: LinkAnalysisService,
                     useValue: { get: () => of({ id: 'v', description: 'About this view' }) },

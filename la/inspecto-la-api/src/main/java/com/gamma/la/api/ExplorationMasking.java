@@ -122,8 +122,7 @@ final class ExplorationMasking {
 
     private static byte[] spaceKey(Path writeRoot) {
         try {
-            Path dir = new EntityFactLog(writeRoot).directory();
-            java.nio.file.Files.createDirectories(dir);
+            Path dir = writeRoot.resolve("audit").resolve(EntityFactLog.DIR);
             return MaskTokens.key(dir);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
