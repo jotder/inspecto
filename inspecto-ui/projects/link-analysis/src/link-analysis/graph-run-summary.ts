@@ -107,7 +107,7 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
         case 'FLOW': {
             const cut = r.minCut;
             return out(
-                `Maximum flow ${r.value ?? 0}.`,
+                `Maximum capacity between the two nodes: ${r.value ?? 0}.`,
                 cut ? [`Minimum cut: ${plural(cut.edgeIds.length, 'link')}.`] : [],
                 cut ? nodeOf(cut.nodeIds) : [],
                 cut ? edgeOf(cut.edgeIds) : [],

@@ -868,7 +868,8 @@
                             @if (lodLabelsOff()) {
                                 <span>labels off above {{ lodLabelCap }} nodes (level of detail)</span>
                             }
-                            <span class="ml-auto">
+                            <inspecto-link-analysis-modules class="ml-auto" />
+                            <span>
                                 caps: projection {{ caps.projection }} nodes (server) · analysis
                                 {{ caps.analysis }} nodes (browser)
                                 @if (serverRunCeiling(); as ceiling) {

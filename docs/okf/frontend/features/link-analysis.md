@@ -281,7 +281,12 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 * **An edge is a folded aggregate** (`GROUP BY`, carrying `count`), nodes are implied endpoints with no
   identity service, and **nothing is persisted server-side** — every call re-runs the aggregation. So
   🔴 **a saved view is not evidence**: reopened after the Dataset changed it silently shows a different graph.
-* **All 27 algorithms run in the browser, on the main thread.** The backend does SQL fold and filter only
+* **Every algorithm of the 28-entry server catalogue is reachable from the toolbox** (`LA-ALGO-UI-PARITY-1`, DR-U11/U12):
+  the *All algorithms (server)* group (`link-analysis-server-algorithms.component.ts`) builds its form from the
+  catalogue's parameter descriptors, reuses `LinkAnalysisServerRunComponent` and reads any answer by its result kind
+  (`graph-run-summary.ts`) - no per-algorithm panel. The footer's `link-analysis-modules.component.ts` filters
+  `GET /modules` to `geo-link` + `la-*`. The browser still runs the 21 with local code (the earlier "27" count was stale).
+  Older line follows: the algorithms run in the browser, on the main thread. The backend does SQL fold and filter only
   (`InvRoutes.java:36-39`, deliberate). Supported graph size is therefore bounded by one tab.
 * **Safety is narrowness:** identifiers must match `SAFE_IDENT` (`InvRoutes.java:61`), values bind as JDBC
   `?`; 503 without a write root, 404 unknown Dataset, 422 bad identifier.
