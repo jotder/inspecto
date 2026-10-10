@@ -137,6 +137,22 @@ class TelcoFraudTemplateGoldenTest {
         }
     }
 
+    /** Runbook (operator 2026-10-10): every typology's Alert Rule links its own Runbook, and each one is valid. */
+    @Test
+    void everyAlertRuleLinksAValidRunbookOfItsOwnTypology(@TempDir Path root) throws Exception {
+        Path space = createSpace(root);
+        com.gamma.pipeline.ComponentStore store = new com.gamma.pipeline.ComponentStore(space.resolve("config").resolve("registry"));
+        List<com.gamma.pipeline.ComponentRegistry.Component> rules = store.list("alert-rule");
+        assertEquals(13, rules.size());
+        for (com.gamma.pipeline.ComponentRegistry.Component r : rules) {
+            assertEquals(r.name(), r.content().get("runbook"), r.name() + " links its own typology's Runbook");
+            com.gamma.alert.Runbook rb = com.gamma.alert.Runbook.fromMap(r.name(),
+                    store.get("runbook", r.name()).orElseThrow(() -> new AssertionError(r.name() + " runbook missing")).content());
+            assertTrue(rb.steps().size() >= 3, r.name() + " has Detects/Check/Act steps");
+            assertEquals(r.name(), rb.steps().get(0).linkId(), "the first step opens the typology's evidence Dataset");
+        }
+    }
+
     @Test
     void theCommittedCorpusIsTheSeededGeneratorsOutput() throws Exception {
         Map<String, String> files = new TelcoFraudCorpus().generate().files();

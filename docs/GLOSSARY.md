@@ -746,6 +746,13 @@ on Resolve. One **Incident Commander** (`assignee`). Priority ladder **Critical 
 Low**. ⛔ never "Issue". *(Lifecycle renamed from open → in-progress → resolved with the mail-like
 Incidents UI, 2026-07-12 — see §13.)*
 
+**Runbook** — Linked **guidance** for the person working an Incident or Case: a title, a summary, ordered
+steps (each optionally linking a Dataset, Query, Dashboard or Case), an owner role and tags. A component kind
+(`runbook`, operator 2026-10-10); an **Alert Rule** names one with `runbook: <id>`, and the Incident or Case it
+raises shows it. It **automates nothing**. ⛔ Distinct from the assistant's **agent runbook** (the
+`runbook_operator` tool, AGT-5): a code-defined sequence of gated act tools the agent executes — always say
+*agent runbook* for that one, never bare *Runbook*. ⛔ never "playbook" or "SOP" for the component.
+
 **Annotation** — The umbrella term for **user-authored metadata hung off some other entity**: today a
 **Note**/attachment (D10) or a **Tag** assignment (D7). Every Annotation addresses its subject as an
 **Annotation Target** — a `(targetKind, targetId)` pair — and the valid `targetKind` set is one shared

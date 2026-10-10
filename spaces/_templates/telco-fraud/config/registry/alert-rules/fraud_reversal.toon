@@ -7,3 +7,4 @@ threshold: 3
 stormCap: 500
 severity: WARNING
 description: "Payment reversal"
+runbook: fraud_reversal

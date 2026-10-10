@@ -1,6 +1,6 @@
 # Telecom fraud runbooks
 
-One runbook per typology in this Space Template. Each Alert Rule `fraud_<typology>` is per-entity: it
+One runbook per typology in this Space Template. Each typology section below is also a Runbook component (`config/registry/runbooks/fraud_<typology>.toon`), linked from its Alert Rule by `runbook:`, so the Incident page shows it; edit the component, and keep this file for the shared guidance. Each Alert Rule `fraud_<typology>` is per-entity: it
 raises one Alert and one Incident per offender (`by` = the offender key), with the Measure taken as the
 `max` over every retained window. An offender seen on several days is one Alert. A key heals only when all its
 evidence ages out of retention; that resolves its Alert but never its Incident. A person records the

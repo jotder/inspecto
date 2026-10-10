@@ -7,3 +7,4 @@ threshold: 3600
 stormCap: 500
 severity: CRITICAL
 description: "IRSF"
+runbook: fraud_irsf

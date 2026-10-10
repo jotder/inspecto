@@ -7,3 +7,4 @@ threshold: 50
 stormCap: 500
 severity: CRITICAL
 description: "SIM-box"
+runbook: fraud_simbox

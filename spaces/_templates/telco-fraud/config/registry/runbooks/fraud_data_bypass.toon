@@ -1,0 +1,13 @@
+name: fraud_data_bypass
+title: "Data-charging bypass runbook"
+summary: "Detects: seconds of originated DATA sessions rated at zero (`charge = 0`) per line in the window, above `threshold` (default 7200), outside the APNs in `zero_rated_apns`. In the CDR feed a DATA record carries the session seconds in `duration_s` and the APN in `b_number`. Only lines with at least `min_candidate_seconds` (default 600) unrated seconds are kept."
+steps[4]:
+  - text: "Detects: seconds of originated DATA sessions rated at zero (`charge = 0`) per line in the window, above `threshold` (default 7200), outside the APNs in `zero_rated_apns`. In the CDR feed a DATA record carries the session seconds in `duration_s` and the APN in `b_number`. Only lines with at least `min_candidate_seconds` (default 600) unrated seconds are kept."
+    link:
+      kind: dataset
+      id: fraud_data_bypass
+  - text: "Check: the APN and the rating plan of the line; whether the session was tethered or tunnelled through a zero-rated service."
+  - text: "Act: fix the rating or charging-policy gap; bill back where the contract allows; suspend the line."
+  - text: "Silent by design: properly charged data however long, and sessions on a zero-rated APN. **Exemption lists are a trust decision:** fill `zero_rated_apns` (comma-separated; `none` exempts nothing) from the operator's own product catalogue, never from a value a subscriber controls."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

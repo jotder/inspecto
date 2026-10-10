@@ -1,0 +1,14 @@
+name: fraud_irsf
+title: "IRSF (International Revenue Share Fraud) runbook"
+summary: "Detects: originated voice seconds to the ranges in `irsf_prefixes`, per caller, above `threshold` (default 3600 s)."
+steps[5]:
+  - text: "Detects: originated voice seconds to the ranges in `irsf_prefixes`, per caller, above `threshold` (default 3600 s)."
+    link:
+      kind: dataset
+      id: fraud_irsf
+  - text: "Check: is the line new or recently swapped? Are the calls long and back-to-back, at night, from one cell?"
+  - text: "Act: bar international calls on the line; ask the interconnect partner to withhold settlement for the ranges hit."
+  - text: "Silent by design: heavy calls to unlisted ranges; national numbers that happen to start with a listed prefix."
+  - text: "Known false-positive source (no defence here): a legitimate satellite-phone user calling a listed range heavily."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

@@ -112,7 +112,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String dataset, String measure, Object when, String maximumAge,
                         String investigation, String relation, String description,
                         List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
-                        int healAfterSweeps, Map<String, Object> extra) {
+                        int healAfterSweeps, Map<String, Object> extra, String runbook) {
 
     /**
      * Every key {@link #fromMap} models (and the R3 {@code shares} envelope key, which the save routes carry
@@ -120,7 +120,7 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
             "onPipeline", "dataset", "measure", "when", "maximumAge", "investigation", "relation", "description",
-            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares");
+            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook");
     /** The prefix of an author-owned annotation key: kept through every save, never refused. */
     public static final String AUTHOR_PREFIX = "x-";
 
@@ -158,6 +158,17 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     public static final Set<String> VALUE_MEASURES = Set.of("passThrough", "velocity", "timeToCashOut",
             "cashOutConcentration", "structuring", "benefitTransfer");
+
+    /** Every pre-{@code runbook} caller of the full shape (no linked Runbook). */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description,
+                     List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
+                     int healAfterSweeps, Map<String, Object> extra) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, by, stormCap, owner, valueMeasure, healAfterSweeps, extra, null);
+    }
 
     /** Every pre-{@code extra} caller of the full shape (no unmodelled keys). */
     public AlertRule(String name, String metric, String comparator, double threshold,
@@ -241,6 +252,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         extra = (extra == null || extra.isEmpty()) ? Map.of()
                 : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(extra));
         description = (description == null || description.isBlank()) ? null : description.trim();
+        runbook = (runbook == null || runbook.isBlank()) ? null : runbook.trim();   // the Runbook component it links
         owner = (owner == null || owner.isBlank()) ? UNOWNED : owner.trim();
         metric = lower(metric);
         comparator = lower(comparator);
@@ -441,7 +453,8 @@ public record AlertRule(String name, String metric, String comparator, double th
                 valueMeasureBlock(alert.get("valueMeasure")),
                 alert.get("healAfterSweeps") == null ? 0
                         : wholeNumber(alert.get("healAfterSweeps"), "alert.healAfterSweeps"),
-                unmodelled(alert));
+                unmodelled(alert),
+                str(alert.get("runbook")));
     }
 
     /** The keys of {@code alert} this record does not model, in authored order (MODULE-REORG-P4-2). */
@@ -504,6 +517,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         Map<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("name", name);
         if (description != null) m.put("description", description);
+        if (runbook != null) m.put("runbook", runbook);
         if (metric != null) m.put("metric", metric);
         if (dataset != null) m.put("dataset", dataset);
         if (investigation != null) m.put("investigation", investigation);

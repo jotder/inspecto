@@ -871,6 +871,8 @@ final class ComponentRoutes implements RouteModule {
         // ASSURE-KPI-DEFINITIONS-1: the structural half of a KPI (grain, ordered bands, known keys) — every door,
         // bulk writers included. Whether its Dataset exists is KpiRoutes.requireMeasure, which needs the caller.
         if ("kpi".equals(type)) com.gamma.query.KpiDefinition.fromMap(id, content);
+        // Runbook (operator 2026-10-10): title, ordered steps, step links of a known kind, no unmodelled key.
+        if ("runbook".equals(type)) com.gamma.alert.Runbook.fromMap(id, content);
 
         // ASSURE-WORKFLOW-SLA-1: reachability, one initial state, declared terminals, no path around the resolution
         // gate (Workflow.problems); an explicit IANA zone and sane targets; an Escalation Rule that does something.

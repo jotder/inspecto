@@ -7,3 +7,4 @@ threshold: 3
 stormCap: 500
 severity: WARNING
 description: "Wangiri"
+runbook: fraud_wangiri

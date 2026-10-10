@@ -1,0 +1,13 @@
+name: fraud_premium_rate
+title: "Premium-rate runbook"
+summary: "Detects: charge to the ranges in `premium_prefixes` (E.164, so `999900` is national `0900`), per caller, above `threshold` (default 100)."
+steps[4]:
+  - text: "Detects: charge to the ranges in `premium_prefixes` (E.164, so `999900` is national `0900`), per caller, above `threshold` (default 100)."
+    link:
+      kind: dataset
+      id: fraud_premium_rate
+  - text: "Check: is the premium-rate number owned by a known content partner? Is the traffic machine-regular?"
+  - text: "Act: bar premium-rate access on the line; hold the partner's revenue share."
+  - text: "Silent by design: an occasional premium-rate user."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

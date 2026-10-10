@@ -83,6 +83,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 link: '/diagnoses',
             },
             { id: 'alerts', title: 'Alerts', type: 'basic', icon: 'heroicons_outline:bell-alert', link: '/alerts' },
+            { id: 'runbooks', title: 'Runbooks', type: 'basic', icon: 'heroicons_outline:book-open', link: '/runbooks' },
             {
                 id: 'risk-scores',
                 navFeature: 'scoring',

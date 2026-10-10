@@ -7,3 +7,4 @@ threshold: 20
 stormCap: 500
 severity: WARNING
 description: "Dealer activations"
+runbook: fraud_dealer

@@ -1,0 +1,13 @@
+name: fraud_voucher
+title: "Voucher / EVD runbook"
+summary: "Detects: redemptions of one voucher serial, above `threshold` (default 1: a serial redeems once)."
+steps[4]:
+  - text: "Detects: redemptions of one voucher serial, above `threshold` (default 1: a serial redeems once)."
+    link:
+      kind: dataset
+      id: fraud_voucher
+  - text: "Check: the voucher platform's log for the serial; the channel that sold it."
+  - text: "Act: block the serial and the batch it came from; claw back the credit."
+  - text: "Silent by design: a heavy top-up user redeeming many different vouchers."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

@@ -17,7 +17,11 @@ import { AlertRule, AlertRuleUpsert, AlertsService, apiErrorMessage } from 'app/
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { datasetOptionLoader, pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import {
+    datasetOptionLoader,
+    pipelineOptionLoader,
+    runbookOptionLoader,
+} from 'app/inspecto/components/entity-option-loaders';
 import { datasetColumnOptionLoader } from 'app/modules/admin/studio/datasets/dataset-column-option-loader';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { firstValueFrom } from 'rxjs';
@@ -265,6 +269,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
         },
         onPipeline: pipelineOptionLoader(),
         dataset: datasetOptionLoader(),
+        runbook: runbookOptionLoader(),
         by: datasetColumnOptionLoader('dataset'),
     };
 
@@ -379,6 +384,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
         const v = this.schemaForm.value() as Partial<AlertRule>;
         const onPipeline = String(v.onPipeline ?? '').trim();
         const description = String(v.description ?? '').trim();
+        const runbook = String(v.runbook ?? '').trim();
         const kind = this.kind();
         // A PUT replaces the whole rule, so every stored key this form does not edit (a freshness rule's
         // dataset/maximumAge, anything newer than this form) is carried over from the loaded rule. The keys
@@ -410,6 +416,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
             severity: String(v.severity ?? 'WARNING'),
             ...(onPipeline ? { onPipeline } : {}),
             ...(description ? { description } : {}),
+            ...(runbook ? { runbook } : {}),
             ...(kind === 'metric' && !this.whenEmpty() ? { when: this.when } : {}),
         };
         this.saveError.set('');

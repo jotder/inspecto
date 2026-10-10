@@ -7,3 +7,4 @@ threshold: 100
 stormCap: 500
 severity: WARNING
 description: "Premium-rate"
+runbook: fraud_premium_rate

@@ -7,3 +7,4 @@ threshold: 1
 stormCap: 500
 severity: CRITICAL
 description: "Voucher / EVD"
+runbook: fraud_voucher

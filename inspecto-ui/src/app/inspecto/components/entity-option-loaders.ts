@@ -42,6 +42,12 @@ export function datasetOptionLoader(): AttributeOptionLoader {
     return async () => toOptions((await firstValueFrom(components.list('dataset'))).map((d) => d.name));
 }
 
+/** Saved Runbooks (`/components/runbook`) — the Alert Rule's `runbook` link. */
+export function runbookOptionLoader(): AttributeOptionLoader {
+    const components = inject(ComponentsService);
+    return async () => toOptions((await firstValueFrom(components.list('runbook'))).map((d) => d.name));
+}
+
 /** Saved Risk Score models (`/components/risk-score`) — the `risk.score` Job's `model` parameter. */
 export function riskScoreModelOptionLoader(): AttributeOptionLoader {
     const components = inject(ComponentsService);

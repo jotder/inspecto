@@ -28,6 +28,8 @@ export type ComponentType =
     | 'pattern-pack'
     // A KPI definition (ASSURE-KPI-DEFINITIONS-1) — the KPI tile binds to one by `kpiId`.
     | 'kpi'
+    // A Runbook (operator 2026-10-10): linked guidance an Alert Rule names by `runbook:`; its Incident or Case page shows it.
+    | 'runbook'
     // A Risk Score model (ASSURE-RISK-SCORE-1) — the `risk.score` Job's `model` names one.
     | 'risk-score'
     // The Case desk's Findings fields (one per ObjectType, id = the lowercased type). Authored ONLY from the

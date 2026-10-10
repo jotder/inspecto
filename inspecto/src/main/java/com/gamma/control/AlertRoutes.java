@@ -258,7 +258,30 @@ final class AlertRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an Alert Rule over an Investigation (investigation:) is authored through "
                     + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
         requireGroupingColumns(writeRoot, dataRoot, rule);
+        requireRunbook(writeRoot, rule);
         return rule;
+    }
+
+    /**
+     * A rule's {@code runbook:} must name a Runbook component that exists in this Space (operator 2026-10-10): a
+     * dangling link is refused at save rather than leaving an Incident page pointing at nothing. Fail closed: no
+     * write root means the registry cannot be read, so a linked rule is refused as every write is. Runs inside
+     * {@link #parse}, so every door that writes an Alert Rule checks it.
+     */
+    static void requireRunbook(java.nio.file.Path writeRoot, AlertRule rule) {
+        if (rule.runbook() == null) return;
+        if (writeRoot == null)
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
+                    "alert rule write disabled: set -Dassist.write.root to enable");
+        boolean exists;
+        try {
+            exists = new ComponentStore(writeRoot.resolve("registry")).exists("runbook", rule.runbook());
+        } catch (IllegalArgumentException e) {
+            exists = false;   // not a valid id, so nothing it names exists
+        }
+        if (!exists)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "alert.runbook '" + rule.runbook()
+                    + "' is not a Runbook in this Space; create it first (POST /components/runbook/{id})");
     }
 
     /**

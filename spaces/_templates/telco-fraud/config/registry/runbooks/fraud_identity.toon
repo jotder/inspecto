@@ -1,0 +1,13 @@
+name: fraud_identity
+title: "Subscription / identity runbook"
+summary: "Detects: lines activated on one identity document in the window, above `threshold` (default 5)."
+steps[4]:
+  - text: "Detects: lines activated on one identity document in the window, above `threshold` (default 5)."
+    link:
+      kind: dataset
+      id: fraud_identity
+  - text: "Check: the document's validity; whether the lines share a dealer, device or address."
+  - text: "Act: suspend the extra lines pending identity checks; report the document."
+  - text: "Silent by design: a family with a few lines on one document; a corporate account whose document starts with one of `exempt_doc_prefixes` (default `CORP-`)."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

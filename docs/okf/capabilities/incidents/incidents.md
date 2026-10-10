@@ -260,6 +260,28 @@ the registry**: `POST/PUT/DELETE /alerts/rules[/{name}]` (`AlertRoutes.java:44-4
 `AlertService` in-process; a restart re-arms from the files. Since 2026-08-10 an `alerts` Platform Service
 exists so `alert.evaluate` holds a real grant, and its dry-run stand-in must report "nothing was evaluated".
 
+**Runbooks (operator, 2026-10-10).** A **Runbook** is the `runbook` component kind
+(`registry/runbooks/<id>.toon`, `com.gamma.alert.Runbook`): linked guidance with no automation — `title`
+(required), `summary`, ordered `steps` (each `text` plus an optional `link: {kind, id}`, kind one of
+`dataset | query | dashboard | case`), `ownerRole` and `tags`. ⚠ `ownerRole`, not `owner`: `owner` is the R3
+author stamp `ComponentAccess.onCreate` writes on every component. Any other key is refused unless it is an
+`x-` annotation. It is authored through the generic `/components/runbook` door, so CRUD, history and restore are
+`ComponentStore`'s and the gate is **`canAuthorWorkbench`** (operator, 2026-10-10: guidance is authored content
+like a KPI or Dashboard, and a separate capability would need a literal route for no gain). No new route.
+An Alert Rule names one with `runbook: <id>`; `AlertRoutes.requireRunbook` (inside `parse`, so every Alert Rule
+door) refuses the save **422** when that Runbook does not exist in the Space, and fails closed (503) with no write
+root. A step link is checked for shape only, not existence (a Case is a runtime object, not a component) —
+a deliberate deferral. When the rule fires, `AlertService` stamps `runbook` into the Alert and Incident
+attributes (both the scalar and the per-entity paths), and the Incident/Case page (`ObjectDetailComponent`)
+mounts `<inspecto-runbook-panel>` for any object carrying that attribute — so a Case shows it when it carries
+the attribute. The panel reads the Runbook live, so an edit shows at once; a deleted Runbook renders an
+explained "not found" warning, and deleting a Runbook does NOT refuse while a rule still names it (deferral).
+Authoring pane: `/runbooks` (`modules/admin/runbooks/`); the Alert Rule form offers the id as an autocomplete.
+Masking: N/A — a Runbook holds authored guidance, never data values, so there is no field to mask.
+The telco-fraud template ships 13 (`fraud_<typology>`), one per Alert Rule, generated from the per-typology
+sections of `config/runbooks/telco-fraud-runbooks.md`, which stays for the shared guidance (windows, thresholds,
+exemptions, sizing). ⛔ Not the assistant's `runbook_operator` agent runbook (§ GLOSSARY *Runbook*).
+
 ### 3.3 From an Alert to an Incident — five promotion paths, one seam
 
 Every path that opens an Incident automatically does so through **`IncidentAccess`**
@@ -747,6 +769,7 @@ earlier one, both appear.
 | 2026-06-29 | Notifications ship as an **in-process MVP** — virtual-thread executor + append-only `EventStore`, **no broker** | A broker is a deployment dependency the target user counts do not justify; the idiom is the same one the run-claim seam uses |
 | 2026-06-29 | The SaaS-shaped requirement was cut to fit: **one global preference set**, IP + UA not GeoIP, login/MFA events deferred, 401/403 audited as `ACCESS_DENIED` | The core is auth-free; there is no user to prefer per |
 | 2026-07-06 (product) | R5 Decision Network: Alert-Rule and Expectation consequences mapped into the **`Consequence`** vocabulary; full kind promotion deferred | One word for "what a decision engine produces" across three rule engines |
+| 2026-10-10 (operator) | **Runbook** = a first-class `runbook` component kind, linked guidance with no automation; an Alert Rule links one by `runbook:` (dangling link refused at save) and its Incident/Case page shows it; authored through `/components/runbook` under `canAuthorWorkbench` | Turns the packs' Markdown runbooks into guidance a responder sees on the object, with history, without new routes |
 | 2026-07-07 (product) | **Build the Alert-Rule authoring pane**; new capability `canAuthorAlertRules` | Of the three rule engines Alert Rules alone had no UI authoring |
 | 2026-07-09 | Alert-rule writes **arm in-process**; the engine never hot-loads `*_alert.toon` | One arming path; a file watcher would be a second one the write route has to agree with |
 | 2026-07-12 (product) | `/incidents` + `/cases` become a **mail-like 3-pane UI**; lifecycle renamed **`IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**; priority `Critical · Major · Minor · Low` | Triage is an inbox; the old `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED` encoded assignment as a state |

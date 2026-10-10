@@ -1,0 +1,13 @@
+name: fraud_roaming
+title: "Roaming high usage runbook"
+summary: "Detects: roaming charge per subscriber in the window, above `threshold` (default 500)."
+steps[4]:
+  - text: "Detects: roaming charge per subscriber in the window, above `threshold` (default 500)."
+    link:
+      kind: dataset
+      id: fraud_roaming
+  - text: "Check: the visited network, and whether the usage fits the subscriber's history and credit limit."
+  - text: "Act: apply the roaming spending cap; contact the subscriber."
+  - text: "Known false-positive source (no defence here): a business traveller whose legitimate spend passes the threshold. The pack has no subscriber tier to tell them apart."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

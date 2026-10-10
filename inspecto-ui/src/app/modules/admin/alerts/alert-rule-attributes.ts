@@ -144,4 +144,12 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         placeholder: 'e.g. Open fraud exposure is too high',
         help: 'The human title for the Alerts and Incidents this rule raises; leave blank to generate one.',
     },
+    {
+        key: 'runbook',
+        label: 'Runbook',
+        type: 'autocomplete',
+        tier: 'optional',
+        placeholder: 'e.g. fraud_irsf',
+        help: 'The Runbook shown on the Incident or Case this rule raises. It must already exist.',
+    },
 ];

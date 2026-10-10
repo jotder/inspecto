@@ -43,6 +43,8 @@ export interface AlertRule {
     name: string;
     /** Optional human title (`alert.description`) — titles the rule's fired Alerts and Incidents. */
     description?: string | null;
+    /** The Runbook component the rule links (`alert.runbook`); its Incident or Case page shows it. */
+    runbook?: string | null;
     /** Ledger-metric rules only — a measure / freshness rule has none (GET omits it). */
     metric?: string;
     comparator: string;

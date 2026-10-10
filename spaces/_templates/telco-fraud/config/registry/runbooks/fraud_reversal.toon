@@ -1,0 +1,13 @@
+name: fraud_reversal
+title: "Payment reversal runbook"
+summary: "Detects: reversals per subscriber in the window, above `threshold` (default 3)."
+steps[4]:
+  - text: "Detects: reversals per subscriber in the window, above `threshold` (default 3)."
+    link:
+      kind: dataset
+      id: fraud_reversal
+  - text: "Check: what was bought with each payment before it was reversed; the payment instrument."
+  - text: "Act: block the instrument; limit payments on the line."
+  - text: "Silent by design: a subscriber with a few reversals, or many payments with none reversed."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

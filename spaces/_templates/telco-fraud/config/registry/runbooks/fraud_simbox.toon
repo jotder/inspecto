@@ -1,0 +1,14 @@
+name: fraud_simbox
+title: "SIM-box runbook"
+summary: "Detects: distinct voice targets of a line that receives no calls, sends no SMS and uses at most `max_cells` cells, above `threshold` (default 50)."
+steps[5]:
+  - text: "Detects: distinct voice targets of a line that receives no calls, sends no SMS and uses at most `max_cells` cells, above `threshold` (default 50)."
+    link:
+      kind: dataset
+      id: fraud_simbox
+  - text: "Check: IMEI and cell history; the share of on-net targets; the activation dealer."
+  - text: "Act: suspend the line; check other lines activated by the same dealer or identity document."
+  - text: "Silent by design: a busy line that also receives calls or moves between cells; a registered PBX or outbound-dialler line listed in `exempt_msisdns`."
+  - text: "Known false-positive source (no defence here): an unregistered PBX or dialler SIM looks exactly like a SIM-box. Register it in `exempt_msisdns`."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

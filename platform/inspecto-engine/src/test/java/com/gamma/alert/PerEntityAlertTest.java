@@ -127,6 +127,24 @@ class PerEntityAlertTest {
         assertTrue(objects.linked.isEmpty(), "never an object-to-object link: the Alert is not an object");
     }
 
+    /** Runbook (operator 2026-10-10): the Incident a linked rule raises names the Runbook its page shows. */
+    @Test
+    void theIncidentOfALinkedRuleNamesItsRunbookAndAnUnlinkedOneDoesNot(@TempDir Path root) throws Exception {
+        plantUsage(root, 2, Set.of());
+        Map<String, Object> body = new java.util.LinkedHashMap<>(byRule(100).toMap());
+        body.put("runbook", "spend_runbook");
+        FakeObjectAccess objects = new FakeObjectAccess();
+        service(root, AlertRule.fromMap(body), objects).evaluateRules();
+        List<FakeObjectAccess.Opened> incidents = opened(objects, ObjectType.INCIDENT);
+        assertEquals(2, incidents.size());
+        assertTrue(incidents.stream().allMatch(o -> "spend_runbook".equals(o.attributes().get("runbook"))));
+        assertTrue(alerts.opened.stream().allMatch(o -> "spend_runbook".equals(o.attributes().get("runbook"))));
+
+        FakeObjectAccess plain = new FakeObjectAccess();
+        service(root, byRule(100), plain).evaluateRules();
+        assertTrue(opened(plain, ObjectType.INCIDENT).stream().noneMatch(o -> o.attributes().containsKey("runbook")));
+    }
+
     @Test
     void anImmediateReEvaluationRaisesNothingNew(@TempDir Path root) throws Exception {
         plantUsage(root, OFFENDERS, Set.of());

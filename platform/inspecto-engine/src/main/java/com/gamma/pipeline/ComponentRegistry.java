@@ -79,6 +79,7 @@ public final class ComponentRegistry {
             Map.entry("pattern-packs", "pattern-pack"),               // V2 (c)/D16: Link-Analysis pattern packs
             Map.entry("rule-templates", "rule-template"),             // Pro Max saved query templates — RulesService
             Map.entry("kpis", "kpi"),                                 // ASSURE-KPI-DEFINITIONS-1: KPI definitions — KpiRoutes
+            Map.entry("runbooks", "runbook"),                         // Runbooks: guidance an Alert Rule links (operator 2026-10-10)
             // ASSURE-WORKFLOW-SLA-1: governance kinds, hot-reloaded by inspecto-ops (canAdminister, never importable)
             Map.entry("workflows", "workflow"),
             Map.entry("sla-policies", "sla-policy"),

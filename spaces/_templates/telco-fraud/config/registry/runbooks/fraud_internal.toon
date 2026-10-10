@@ -1,0 +1,13 @@
+name: fraud_internal
+title: "Internal fraud runbook"
+summary: "Detects: SIM swaps performed per staff user in the window (`dealer_id` of a SIM_SWAP event is the staff user), above `threshold` (default 5), outside the registered swap desks in `exempt_staff`."
+steps[4]:
+  - text: "Detects: SIM swaps performed per staff user in the window (`dealer_id` of a SIM_SWAP event is the staff user), above `threshold` (default 5), outside the registered swap desks in `exempt_staff`."
+    link:
+      kind: dataset
+      id: fraud_internal
+  - text: "Check: the swapped lines against the owners' requests and the customer-care tickets; whether the staff user's own lines or relatives' lines are among them; the payments out of the swapped lines (`fraud_sim_swap`)."
+  - text: "Act: suspend the staff user's swap right pending review; refer to HR and internal audit."
+  - text: "Silent by design: a staff user with a few swaps, and the exempt desks. `exempt_staff` (default `HELPDESK`) silences whatever it names: fill it only from the operator's verified register of back-office desks."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

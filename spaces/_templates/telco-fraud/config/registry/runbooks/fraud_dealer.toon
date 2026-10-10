@@ -1,0 +1,14 @@
+name: fraud_dealer
+title: "Dealer activations runbook"
+summary: "Detects: activations by one dealer with no originated traffic up to `traffic_grace_hours` (default 48) after the window, above `threshold` (default 20)."
+steps[5]:
+  - text: "Detects: activations by one dealer with no originated traffic up to `traffic_grace_hours` (default 48) after the window, above `threshold` (default 20)."
+    link:
+      kind: dataset
+      id: fraud_dealer
+  - text: "Check: the dealer's commission claims against those lines; the identity documents used."
+  - text: "Act: hold the dealer's commission; audit the dealer."
+  - text: "Silent by design: a busy dealer whose lines are used; late-day activations whose lines are first used the next morning."
+  - text: "Known false-positive source (no defence here): a dealer selling prepaid stock that buyers activate but use later than the grace period."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

@@ -106,6 +106,9 @@ public final class ComponentStore {
                     // bands + period grain + comparison period, which the KPI tile reads instead of hand-set Widget
                     // inputs. Validated by com.gamma.query.KpiDefinition; evaluated by GET /kpis/{id}/value.
                     "kpi",
+                    // Runbook (operator 2026-10-10): linked guidance an Alert Rule names (`runbook: <id>`) and its
+                    // Incident or Case page shows. No automation. Validated by com.gamma.alert.Runbook.
+                    "runbook",
                     // ASSURE-WORKFLOW-SLA-1: the object lifecycle, its SLA policy and its Escalation Rules — governance
                     // changes, so written only through their canAdminister literal routes (ComponentRoutes) and refused
                     // by every import (ImportPaths.REGISTRY_DIRS / ImportCapabilityGuard.DEDICATED_ONLY). inspecto-ops

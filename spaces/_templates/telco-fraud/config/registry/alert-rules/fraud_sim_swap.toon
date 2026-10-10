@@ -7,3 +7,4 @@ threshold: 200
 stormCap: 500
 severity: CRITICAL
 description: "SIM-swap"
+runbook: fraud_sim_swap

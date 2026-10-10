@@ -843,7 +843,11 @@ public final class ConfigSpecs {
                 FieldSpec.of("alert.healAfterSweeps", "Heal after sweeps", FieldType.INT,
                         "A Dataset measure rule only: how many consecutive healthy sweeps before its Alert is "
                                 + "cleared (the all-clear). Until then a relapse raises nothing new. Default 1 "
-                                + "(clear on the first healthy sweep); at most 1000.")
+                                + "(clear on the first healthy sweep); at most 1000."),
+                // Runbook link (operator 2026-10-10): the guidance its Incident or Case page shows.
+                FieldSpec.of("alert.runbook", "Runbook", FieldType.STRING,
+                        "The id of a Runbook component. The Incident or Case this rule raises shows that Runbook. "
+                                + "A save naming a Runbook that does not exist is refused.")
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(

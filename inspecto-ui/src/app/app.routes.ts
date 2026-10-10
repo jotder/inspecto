@@ -110,6 +110,7 @@ export const appRoutes: Route[] = [
             { path: 'events', loadChildren: () => import('app/modules/admin/events/events.routes') },
             { path: 'audit', loadChildren: () => import('app/modules/admin/audit-logs/audit-logs.routes') },
             { path: 'alerts', loadChildren: () => import('app/modules/admin/alerts/alerts.routes') },
+            { path: 'runbooks', loadChildren: () => import('app/modules/admin/runbooks/runbooks.routes') },
             { path: 'risk-scores', loadChildren: () => import('app/modules/admin/risk-scores/risk-scores.routes') },
             { path: 'cases', loadChildren: () => import('app/modules/admin/objects/cases.routes') },
             { path: 'incidents', loadChildren: () => import('app/modules/admin/objects/incidents.routes') },

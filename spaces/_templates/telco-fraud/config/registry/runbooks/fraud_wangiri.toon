@@ -1,0 +1,13 @@
+name: fraud_wangiri
+title: "Wangiri runbook"
+summary: "Detects: subscribers rung for at most `max_ring_seconds` who then call the ringing number back within `callback_hours`, per ringing number, above `threshold` (default 3)."
+steps[4]:
+  - text: "Detects: subscribers rung for at most `max_ring_seconds` who then call the ringing number back within `callback_hours`, per ringing number, above `threshold` (default 3)."
+    link:
+      kind: dataset
+      id: fraud_wangiri
+  - text: "Check: is the ringing number foreign? What did the callbacks cost?"
+  - text: "Act: block the ringing number at the gateway; warn the subscribers who called back."
+  - text: "Silent by design: a flash-call OTP sender (rings, nobody calls back); a call centre (real conversations); calls to the number made before the ring."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

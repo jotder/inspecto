@@ -145,6 +145,10 @@
                                 />
                             }
                         }
+                        <!-- Runbook (operator 2026-10-10): the guidance the raising Alert Rule links -->
+                        @if (obj().attributes?.['runbook']) {
+                            <inspecto-runbook-panel class="mt-6 block" [runbookId]="obj().attributes!['runbook']" />
+                        }
                         <!-- ASSURE-RISK-SCORE-1: an Incident raised by a Risk Score Alert Rule (by: [model, entity_key]) -->
                         @if (obj().attributes?.['key.model'] && obj().attributes?.['key.entity_key']) {
                             <inspecto-risk-score-panel

@@ -1,0 +1,14 @@
+name: fraud_sim_swap
+title: "SIM-swap runbook"
+summary: "Detects: payments out of a line within `window_hours` after its latest SIM swap, each payment counted once, above `threshold` (default 200)."
+steps[5]:
+  - text: "Detects: payments out of a line within `window_hours` after its latest SIM swap, each payment counted once, above `threshold` (default 200)."
+    link:
+      kind: dataset
+      id: fraud_sim_swap
+  - text: "Check: how the swap was authorised (channel, agent, identity check), and whether the subscriber confirms it."
+  - text: "Act: freeze outgoing payments on the line; reverse the swap if the subscriber did not ask for it."
+  - text: "Silent by design: a swap with no payment, a payment with no swap, a payment outside the window or before the swap, several swaps before one small payment."
+  - text: "Known false-positive source (no defence here): a genuine lost-phone swap followed by a large genuine payment."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

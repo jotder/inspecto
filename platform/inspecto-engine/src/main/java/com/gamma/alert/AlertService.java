@@ -945,6 +945,7 @@ public final class AlertService {
             boolean storm = STORM_KEY.equals(key);
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put("rule", rule.name());
+            if (rule.runbook() != null) attrs.put("runbook", rule.runbook());   // the page shows the linked Runbook
             attrs.put("dataset", rule.dataset());
             attrs.put("measure", rule.measure());
             attrs.put("comparator", rule.comparator());
@@ -1151,6 +1152,7 @@ public final class AlertService {
             if (records.hasActiveAlert(pipeline, rule.name())) return;
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put("rule", rule.name());
+            if (rule.runbook() != null) attrs.put("runbook", rule.runbook());   // the page shows the linked Runbook
             if (rule.metric() != null) attrs.put("metric", rule.metric());
             if (rule.dataset() != null) attrs.put("dataset", rule.dataset());
             if (rule.investigation() != null) attrs.put("investigation", rule.investigation());

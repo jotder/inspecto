@@ -7,3 +7,4 @@ threshold: 5
 stormCap: 500
 severity: CRITICAL
 description: "Internal fraud"
+runbook: fraud_internal
