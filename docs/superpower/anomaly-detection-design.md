@@ -463,9 +463,13 @@ exclusion run AROUND `AnomalyScoreEvaluator.evaluate`, never inside it.
   (`WATCH` | `EXCLUSION`) and RETURNS the live-membership predicate — the one Identity-Fact-log read site stays
   `RiskWatchListFeed#check`, so no writer-inventory entry was needed. The module now depends on `inspecto-entity-list`
   (`requires.modules: entity-list`).
-  ⚠ **Exclusion vs peers (for the S3 merge):** exclusion runs on the scored list, AFTER the baselines. With peer groups
-  an excluded heavy user would still sit in its cohort's median; if that matters, move the filter into `evaluate`
-  before the peer medians. The entity cap also still counts excluded entities.
+  **Exclusion before peers — decided for the operator at the S3+S4 merge (integ17, 2026-10-10).** The exclusion
+  predicate (`AnomalyScoreJobType#exclusion`) is passed INTO `AnomalyScoreEvaluator.evaluate`, which drops excluded
+  entities as the bucket rows are read — before the entity cap, the self baselines and the peer-cohort medians — so an
+  excluded entity never shapes its cohort's baseline; `Run.excluded()` carries the count. Proven by
+  `AnomalyPeerGoldenCorpusTest#anExcludedHeavyEntityDoesNotShapeItsCohortMedian` (excluding PRE's heavier half and
+  `adjuster` shrinks both cohorts by exactly those members and lowers PRE's median). Residual: the per-feature SQL
+  `LIMIT maxEntities` still reads excluded keys, so a source within the cap only by its excluded keys still fails.
 - **Alert Rule flow** (`AnomalyScoreAlertTest`): the documented per-entity rule over `anomaly_scores_usage_latest`
   raises exactly the planted `spike` + `masked` Incidents (`key.model`, `key.entity_key`) and both heal when the next
   run's `_latest` scores an ordinary day — the production `DatasetMeasureProbe` + `AlertService`, no new path.

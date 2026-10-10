@@ -99,16 +99,15 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
             AnomalyModel model = AnomalyModel.fromMap(modelId, content);
             ViewStore views = new ViewStore(writeRoot.resolve("views"));
 
+            AnomalyLists lists = AnomalyLists.of(content);
+            Predicate<String> exclusion = exclusion(WatchListFeed.installed(), writeRoot, model, lists);
             AnomalyScoreEvaluator.Run run = AnomalyScoreEvaluator.evaluate(model, asOf, datasetId -> {
                 Map<String, Object> ds = store.get("dataset", datasetId).map(ComponentRegistry.Component::content)
                         .orElseThrow(() -> new IllegalArgumentException("anomaly-model '" + modelId
                                 + "' names unknown dataset '" + datasetId + "'"));
                 return DatasetRelation.relationSql(ds, data, views);
-            });
-            AnomalyLists lists = AnomalyLists.of(content);
-            int scoredBefore = run.scored().size();
-            run = exclude(WatchListFeed.installed(), writeRoot, model, lists, run);
-            int excluded = scoredBefore - run.scored().size();
+            }, exclusion);
+            int excluded = run.excluded();
             String version = AnomalyScoreEvaluator.version(content);
             AnomalyScoreEvaluator.write(data, model, version, ctx.runId(), now, run);
             int fed = feedWatchList(WatchListFeed.installed(), writeRoot, data, model, lists, ctx.runId(), now, run.scored());
@@ -133,19 +132,18 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
     }
 
     /**
-     * Design §9: drop every entity that is a live member of the model's {@code exclusion} Entity List, before the
-     * scores are written (the caller logs the count as {@code excluded} — never silent). No {@code exclusionList} is
-     * a no-op; one with no installed provider (Personal) or naming a list that is not a live exclusion list fails the
-     * run, before anything is written.
+     * Design §9: the live-membership test of the model's {@code exclusion} Entity List, which
+     * {@link AnomalyScoreEvaluator#evaluate} applies BEFORE the entity cap, the baselines and the peer-cohort medians
+     * (the caller logs the count as {@code excluded} — never silent). No {@code exclusionList} excludes nothing; one
+     * with no installed provider (Personal) or naming a list that is not a live exclusion list fails the run, before
+     * anything is read or written.
      */
-    static AnomalyScoreEvaluator.Run exclude(Optional<WatchListFeed> provider, Path writeRoot, AnomalyModel model,
-                                             AnomalyLists lists, AnomalyScoreEvaluator.Run run) throws IOException {
-        if (lists.exclusionList() == null) return run;
+    static Predicate<String> exclusion(Optional<WatchListFeed> provider, Path writeRoot, AnomalyModel model,
+                                       AnomalyLists lists) throws IOException {
+        if (lists.exclusionList() == null) return k -> false;
         WatchListFeed feed = provider.orElseThrow(() -> new IllegalStateException("anomaly-model '" + model.id()
                 + "' excludes through list '" + lists.exclusionList() + "', but Entity Lists are not installed in this edition"));
-        Predicate<String> excluded = feed.check(writeRoot, lists.exclusionList(), WatchListFeed.EXCLUSION);
-        return new AnomalyScoreEvaluator.Run(run.period(),
-                run.scored().stream().filter(s -> !excluded.test(s.entityKey())).toList());
+        return feed.check(writeRoot, lists.exclusionList(), WatchListFeed.EXCLUSION);
     }
 
     /**

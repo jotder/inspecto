@@ -51,17 +51,18 @@ class AnomalyListsFeedTest {
     }
 
     @Test
-    void liveExclusionMembersAreRemovedBeforeWriting(@TempDir Path root) throws Exception {
+    void liveExclusionMembersAreExcluded(@TempDir Path root) throws Exception {
         EntityFactsForTest.create(root, "test-sims", "exclusion");
         EntityFactsForTest.append(root, "analyst-1", "list.member.added", "test-sims",
                 Map.of("keys", List.of("+447700900001", "+447700900004")));
         EntityFactsForTest.append(root, "analyst-1", "list.member.added", "test-sims",
                 Map.of("keys", List.of("+447700900002"), "expiresAt", Instant.now().minusSeconds(60).toString()));
         AnomalyLists lists = AnomalyLists.of(Map.of("exclusionList", "test-sims"));
-        AnomalyScoreEvaluator.Run kept = AnomalyScoreJobType.exclude(FEED, root, model(), lists, RUN);
-        assertEquals(List.of("+447700900002", "+447700900003"),
-                kept.scored().stream().map(AnomalyScorer.Scored::entityKey).toList(), "an expired member is scored again");
-        assertSame(RUN, AnomalyScoreJobType.exclude(FEED, root, model(), AnomalyLists.of(Map.of()), RUN));
+        java.util.function.Predicate<String> excluded = AnomalyScoreJobType.exclusion(FEED, root, model(), lists);
+        assertEquals(List.of("+447700900002", "+447700900003"), RUN.scored().stream().map(AnomalyScorer.Scored::entityKey)
+                .filter(excluded.negate()).toList(), "an expired member is scored again");
+        assertFalse(AnomalyScoreJobType.exclusion(FEED, root, model(), AnomalyLists.of(Map.of())).test("+447700900001"),
+                "no exclusionList excludes nothing");
     }
 
     @Test
@@ -83,7 +84,7 @@ class AnomalyListsFeedTest {
         assertTrue(assertThrows(IllegalArgumentException.class,
                 () -> AnomalyKindValidator.requireLists(Optional.empty(), root, ok)).getMessage()
                 .contains("needs Entity Lists, which this edition does not carry"));
-        assertThrows(IllegalStateException.class, () -> AnomalyScoreJobType.exclude(Optional.empty(), root, model(), ok, RUN));
+        assertThrows(IllegalStateException.class, () -> AnomalyScoreJobType.exclusion(Optional.empty(), root, model(), ok));
         assertThrows(IllegalStateException.class, () -> AnomalyScoreJobType.feedWatchList(Optional.empty(), root, data,
                 model(), ok, "r1", Instant.now(), RUN.scored()));
     }

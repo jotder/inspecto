@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Evaluates an {@link AnomalyModel} over its Datasets and writes {@code anomaly_scores_<id>} (history) and
@@ -78,16 +79,35 @@ public final class AnomalyScoreEvaluator {
     }
 
     /** The outcome of a run: the scored day and one score per entity. */
-    public record Run(LocalDate period, List<AnomalyScorer.Scored> scored) {}
+    public record Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded) {
+        public Run(LocalDate period, List<AnomalyScorer.Scored> scored) { this(period, scored, 0); }
+    }
 
     /** Score every entity any feature names, for the day before {@code asOf} (a day boundary, UTC). */
     public static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql)
             throws SQLException, IOException {
-        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, SqlSandboxPolicy.defaultPolicy());
+        return evaluate(model, asOf, relationSql, k -> false);
+    }
+
+    /**
+     * As {@link #evaluate(AnomalyModel, LocalDate, Function)}, dropping every entity {@code excluded} accepts (the
+     * model's exclusion Entity List, design §9) BEFORE the entity cap, the baselines and the peer-cohort medians: an
+     * excluded entity never shapes its cohort's baseline. The count is {@link Run#excluded()}.
+     */
+    public static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql,
+                               Predicate<String> excluded) throws SQLException, IOException {
+        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, SqlSandboxPolicy.defaultPolicy(), excluded);
     }
 
     static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
                         int maxBucketRows, SqlSandboxPolicy policy) throws SQLException, IOException {
+        return evaluate(model, asOf, relationSql, maxEntities, maxBucketRows, policy, k -> false);
+    }
+
+    static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
+                        int maxBucketRows, SqlSandboxPolicy policy, Predicate<String> excluded)
+            throws SQLException, IOException {
+        java.util.Set<String> dropped = new java.util.HashSet<>();
         LocalDate period = asOf.minusDays(1);
         LocalDate from = period.minusDays(model.window());
         BaselineStatistic statistic = BaselineStatistics.forModel(model.seasonality(), model.minBaselinePoints());
@@ -107,7 +127,9 @@ public final class AnomalyScoreEvaluator {
                         int eq = p.indexOf('=');
                         days.put(LocalDate.parse(p.substring(0, eq)).atStartOfDay(), Double.parseDouble(p.substring(eq + 1)));
                     }
-                series.computeIfAbsent(String.valueOf(row.get("entity_key")), k -> new LinkedHashMap<>()).put(f.id(), days);
+                String entityKey = String.valueOf(row.get("entity_key"));
+                if (excluded.test(entityKey)) { dropped.add(entityKey); continue; }
+                series.computeIfAbsent(entityKey, k -> new LinkedHashMap<>()).put(f.id(), days);
             }
             if (series.size() > maxEntities)
                 throw new IllegalStateException(capMessage(model, f, maxEntities));
@@ -150,7 +172,7 @@ public final class AnomalyScoreEvaluator {
             }
             scored.add(AnomalyScorer.score(model, e.getKey(), period.toString(), inputs));
         }
-        return new Run(period, List.copyOf(scored));
+        return new Run(period, List.copyOf(scored), dropped.size());
     }
 
     /**

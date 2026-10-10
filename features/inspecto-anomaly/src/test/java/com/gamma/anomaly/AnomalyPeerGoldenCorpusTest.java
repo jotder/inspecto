@@ -48,6 +48,36 @@ class AnomalyPeerGoldenCorpusTest {
         return s.features().stream().filter(f -> f.feature().equals(id)).findFirst().orElseThrow();
     }
 
+    /**
+     * Design §16.3 (exclusion before peers): excluded entities are dropped BEFORE the cohort medians, so they cannot
+     * shape their cohort's baseline. Excluding the heavier half of PRE (60 members at 150..190) and the heavy
+     * {@code adjuster} (POST, 10x) shrinks both cohorts by exactly those members and lowers PRE's peer median.
+     */
+    @Test
+    void anExcludedHeavyEntityDoesNotShapeItsCohortMedian(@TempDir Path dir) throws Exception {
+        Path cfg = dir.resolve("config"), data = dir.resolve("data");
+        AnomalyPeerCorpus.plant(cfg, data);
+        ComponentStore store = new ComponentStore(cfg.resolve("registry"));
+        ViewStore views = new ViewStore(cfg.resolve("views"));
+        java.util.function.Predicate<String> heavy = k -> k.equals("adjuster")
+                || (k.matches("p\\d{3}") && Integer.parseInt(k.substring(1)) % 10 >= 5);
+        AnomalyScoreEvaluator.Run ex = AnomalyScoreEvaluator.evaluate(model, AnomalyPeerCorpus.AS_OF, id ->
+                DatasetRelation.relationSql(store.get("dataset", id).orElseThrow().content(), data, views), heavy);
+        assertEquals(61, ex.excluded());
+        assertEquals(345 - 61, ex.scored().size());
+        assertTrue(ex.scored().stream().noneMatch(s -> heavy.test(s.entityKey())), "excluded entities are not scored");
+        Map<String, AnomalyScorer.Scored> exByKey = ex.scored().stream()
+                .collect(Collectors.toMap(AnomalyScorer.Scored::entityKey, s -> s));
+        var preBefore = feature(byKey().get("simbox"), "data_mb").peerBaseline();
+        var preAfter = feature(exByKey.get("simbox"), "data_mb").peerBaseline();
+        assertEquals(preBefore.points() - 60, preAfter.points(), "the excluded PRE members left the cohort");
+        assertTrue(preAfter.median() < preBefore.median(),
+                "PRE median " + preBefore.median() + " -> " + preAfter.median() + ": the excluded heavy half no longer lifts it");
+        var postBefore = feature(byKey().get("q000"), "data_mb").peerBaseline();
+        var postAfter = feature(exByKey.get("q000"), "data_mb").peerBaseline();
+        assertEquals(postBefore.points() - 1, postAfter.points(), "adjuster left the POST cohort");
+    }
+
     @Test
     void highIsExactlyThePlantedPeerAnomalies() {
         assertEquals(345, run.scored().size(), "340 background + 5 planted subscribers");
