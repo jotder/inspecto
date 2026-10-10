@@ -81,6 +81,8 @@ public final class StoreHealth {
      */
     public static void record(String spaceId, String family, Status status, String target, String detail) {
         if (spaceId == null || family == null || status == null) return;
+        target = mask(target);
+        detail = mask(detail);
         SPACES.computeIfAbsent(spaceId, k -> new ConcurrentHashMap<>())
               .put(family, new Resolved(family, status, target, detail));
         // ⛔ Phase A's invariant, enforced HERE and nowhere else: in a partitioned topology no operational
@@ -95,6 +97,23 @@ public final class StoreHealth {
                     + "holding its own in-memory copy is split-brain, not degraded service. Fix the backend, "
                     + "or run this node with -D" + Topology.PROPERTY + "=single if it genuinely owns its "
                     + "state alone.");
+    }
+
+    private static final java.util.regex.Pattern USERINFO_PASSWORD =
+            java.util.regex.Pattern.compile("(//[^/\s:@?]+):[^@/\s]+@");
+    private static final java.util.regex.Pattern PASSWORD_PARAM = java.util.regex.Pattern.compile(
+            "(?i)(password|passwd|pwd|secret|token)=[^&;\s]+");
+
+    /**
+     * Strip credentials from a JDBC URL or an error message that quotes one: the password in
+     * {@code //user:password@host} and the value of any {@code password=}/{@code passwd=}/{@code pwd=}/
+     * {@code secret=}/{@code token=} parameter. Applied to every target and detail this registry stores, because
+     * both are served by {@code /health/details}; {@code null} passes through.
+     */
+    public static String mask(String text) {
+        if (text == null) return null;
+        String out = USERINFO_PASSWORD.matcher(text).replaceAll("$1:***@");
+        return PASSWORD_PARAM.matcher(out).replaceAll("$1=***");
     }
 
     /** Shorthand for the failure path: a durable backend was asked for and could not be opened. */
@@ -136,7 +155,7 @@ public final class StoreHealth {
     public static void live(String spaceId, String family, boolean reachable, String target, String detail) {
         if (spaceId == null || family == null) return;
         LIVE.computeIfAbsent(spaceId, k -> new ConcurrentHashMap<>())
-            .put(family, new Resolved(family, reachable ? Status.UP : Status.DEGRADED, target, detail));
+            .put(family, new Resolved(family, reachable ? Status.UP : Status.DEGRADED, mask(target), mask(detail)));
     }
 
     /** Drop one live entry — when the store that probes it closes, so a stale verdict never outlives it. */

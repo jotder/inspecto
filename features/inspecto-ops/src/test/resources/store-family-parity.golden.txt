@@ -11,7 +11,7 @@ META|LINKS|Links|objects.backend|db|DB_FLAG|objects.links.db.url|objects.db.user
 META|NOTES|Notes|objects.backend|db|DB_FLAG|objects.notes.db.url|objects.db.user|objects.db.password
 META|OBJECTS|Objects|objects.backend|db|DB_FLAG|objects.db.url|objects.db.user|objects.db.password
 META|PROVENANCE|Provenance|provenance.backend|none|URL_OR_ENGINE|provenance.db.url|null|null
-META|RUN_LEASE|Run lease|run.lease.backend|heap|URL_OR_ENGINE|run.lease.db.url|null|null
+META|RUN_LEASE|Run lease|run.lease.backend|heap|URL_OR_ENGINE|run.lease.db.url|run.lease.db.user|run.lease.db.password
 META|STATUS|Status|status.backend|db|DB_FLAG|status.db.url|status.db.user|status.db.password
 META|TAGS|Tag assignments|objects.backend|db|DB_FLAG|objects.tags.db.url|objects.db.user|objects.db.password
 DEFAULT|space|ACQUISITION_LEDGER|DISABLED|null|null|null|null|jdbc:duckdb:default.db
@@ -91,7 +91,7 @@ ENABLED-SHARED-POSTGRES|space|LINKS|SHARED_PROPERTY|jdbc:postgresql://db:5432/in
 ENABLED-SHARED-POSTGRES|space|NOTES|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 ENABLED-SHARED-POSTGRES|space|OBJECTS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 ENABLED-SHARED-POSTGRES|space|PROVENANCE|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|svc|s3cret|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
-ENABLED-SHARED-POSTGRES|space|RUN_LEASE|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|svc|s3cret|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
+ENABLED-SHARED-POSTGRES|space|RUN_LEASE|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 ENABLED-SHARED-POSTGRES|space|STATUS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 ENABLED-SHARED-POSTGRES|space|TAGS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 ENABLED-SHARED-POSTGRES|legacy|ACQUISITION_LEDGER|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|svc|s3cret|jdbc:postgresql://db:5432/inspecto
@@ -107,7 +107,7 @@ ENABLED-SHARED-POSTGRES|legacy|LINKS|SHARED_PROPERTY|jdbc:postgresql://db:5432/i
 ENABLED-SHARED-POSTGRES|legacy|NOTES|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto
 ENABLED-SHARED-POSTGRES|legacy|OBJECTS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto
 ENABLED-SHARED-POSTGRES|legacy|PROVENANCE|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|svc|s3cret|jdbc:postgresql://db:5432/inspecto
-ENABLED-SHARED-POSTGRES|legacy|RUN_LEASE|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|svc|s3cret|jdbc:postgresql://db:5432/inspecto
+ENABLED-SHARED-POSTGRES|legacy|RUN_LEASE|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto
 ENABLED-SHARED-POSTGRES|legacy|STATUS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto
 ENABLED-SHARED-POSTGRES|legacy|TAGS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|svc|svc|s3cret|jdbc:postgresql://db:5432/inspecto
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|ACQUISITION_LEDGER|FAMILY_PROPERTY|jdbc:postgresql://own-acquisition_ledger/db|null|svc|s3cret|jdbc:postgresql://own-acquisition_ledger/db?currentSchema=space_north_east
@@ -123,7 +123,7 @@ ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|LINKS|FAMILY_PROPERTY|jdbc:postgres
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|NOTES|FAMILY_PROPERTY|jdbc:postgresql://own-notes/db|u-objects.db.user|u-objects.db.user|p-objects.db.password|jdbc:postgresql://own-notes/db?currentSchema=space_north_east
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|OBJECTS|FAMILY_PROPERTY|jdbc:postgresql://own-objects/db|u-objects.db.user|u-objects.db.user|p-objects.db.password|jdbc:postgresql://own-objects/db?currentSchema=space_north_east
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|PROVENANCE|FAMILY_PROPERTY|jdbc:postgresql://own-provenance/db|null|svc|s3cret|jdbc:postgresql://own-provenance/db?currentSchema=space_north_east
-ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|RUN_LEASE|FAMILY_PROPERTY|jdbc:postgresql://own-run_lease/db|null|svc|s3cret|jdbc:postgresql://own-run_lease/db?currentSchema=space_north_east
+ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|RUN_LEASE|FAMILY_PROPERTY|jdbc:postgresql://own-run_lease/db|u-run.lease.db.user|u-run.lease.db.user|p-run.lease.db.password|jdbc:postgresql://own-run_lease/db?currentSchema=space_north_east
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|STATUS|FAMILY_PROPERTY|jdbc:postgresql://own-status/db|u-status.db.user|u-status.db.user|p-status.db.password|jdbc:postgresql://own-status/db?currentSchema=space_north_east
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|space|TAGS|FAMILY_PROPERTY|jdbc:postgresql://own-tags/db|u-objects.db.user|u-objects.db.user|p-objects.db.password|jdbc:postgresql://own-tags/db?currentSchema=space_north_east
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|ACQUISITION_LEDGER|FAMILY_PROPERTY|jdbc:postgresql://own-acquisition_ledger/db|null|svc|s3cret|jdbc:postgresql://own-acquisition_ledger/db
@@ -139,7 +139,7 @@ ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|LINKS|FAMILY_PROPERTY|jdbc:postgre
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|NOTES|FAMILY_PROPERTY|jdbc:postgresql://own-notes/db|u-objects.db.user|u-objects.db.user|p-objects.db.password|jdbc:postgresql://own-notes/db
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|OBJECTS|FAMILY_PROPERTY|jdbc:postgresql://own-objects/db|u-objects.db.user|u-objects.db.user|p-objects.db.password|jdbc:postgresql://own-objects/db
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|PROVENANCE|FAMILY_PROPERTY|jdbc:postgresql://own-provenance/db|null|svc|s3cret|jdbc:postgresql://own-provenance/db
-ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|RUN_LEASE|FAMILY_PROPERTY|jdbc:postgresql://own-run_lease/db|null|svc|s3cret|jdbc:postgresql://own-run_lease/db
+ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|RUN_LEASE|FAMILY_PROPERTY|jdbc:postgresql://own-run_lease/db|u-run.lease.db.user|u-run.lease.db.user|p-run.lease.db.password|jdbc:postgresql://own-run_lease/db
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|STATUS|FAMILY_PROPERTY|jdbc:postgresql://own-status/db|u-status.db.user|u-status.db.user|p-status.db.password|jdbc:postgresql://own-status/db
 ENABLED-PER-FAMILY-URL-AND-CREDENTIALS|legacy|TAGS|FAMILY_PROPERTY|jdbc:postgresql://own-tags/db|u-objects.db.user|u-objects.db.user|p-objects.db.password|jdbc:postgresql://own-tags/db
 RAW-JDBC-BACKEND-VALUES|space|ACQUISITION_LEDGER|SPACE_DEFAULT|jdbc:duckdb:<space>/duckdb/inspecto-acquisition.db|null|null|null|jdbc:duckdb:default.db

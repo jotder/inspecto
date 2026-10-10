@@ -64,6 +64,18 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   Consignment leaves no "already processed" record and its files are rediscovered next poll (retry is
   implicit); what is recorded about a Consignment either way — ledgers, provenance, live gauges, and how
   an operator audits a failed file or record — is [consignment status flow](consignment-status-flow.md).
+
 * `MultiCollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/MultiCollectorProcessor.java`) — the outer
   orchestrator running many `.toon` sources concurrently in one JVM, bounded by `Semaphore(sources.max)`.
   Total worker pressure = `sources.max × processing.threads × duckdb_threads`.
+
+### Failover is at-least-once unless the output tree is shared (`HA-KILL9-DOUBLE-INGEST-1`, closed 2026-10-10; residual `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1`)
+
+The acknowledgement (backup move, then the node-local processed marker) is written AFTER the output on purpose,
+so a node killed between the two leaves a durable output and an un-acked file; a survivor re-ingests it.
+A single-file batch writes `<stem>_out.<ext>` to the same partition path, so on a shared or synced output tree the
+second write overwrites the first; on node-local trees (the 2026-10-10 drill) both copies exist. A multi-file batch is
+named by its batch id (hash of its member set), so a re-planned member set writes a second file even on shared
+storage. `CommitFence` stops a lease-lost holder committing but not writing outputs first. `DbDedupLedger` is not
+involved (it serves `transform.dedup` only). Pinned by `KillBeforeAckDuplicateTest`; options and status in
+BACKLOG; the operator-facing contract is in the [HA/DR drill runbook](../../../ops/ha-dr-drill-runbook.md).

@@ -168,4 +168,25 @@ class OperationalDbTest {
             org.junit.jupiter.api.Assumptions.assumeTrue(false, "no PG driver on this test classpath");
         }
     }
+
+    /**
+     * HA-RUNLEASE-DB-CREDENTIALS-1: the run lease's own {@code -Drun.lease.db.user/password} must reach BOTH the
+     * lease connection and the per-Space schema creation (which resolves through userFor/passwordFor), falling
+     * back to the shared {@code -Dinspecto.db.*} only when the family sets none.
+     */
+    @Test
+    void runLeaseCredentialsResolveFamilyFirstThenShared() {
+        withProps(Map.of("inspecto.db.user", "shared-u", "inspecto.db.password", "shared-p"), () -> {
+            assertEquals("shared-u", OperationalDb.userFor(OperationalDb.Family.RUN_LEASE));
+            assertEquals("shared-p", OperationalDb.passwordFor(OperationalDb.Family.RUN_LEASE));
+            withProps(Map.of("run.lease.db.user", "lease-u", "run.lease.db.password", "lease-p"), () -> {
+                assertEquals("lease-u", OperationalDb.userFor(OperationalDb.Family.RUN_LEASE));
+                assertEquals("lease-p", OperationalDb.passwordFor(OperationalDb.Family.RUN_LEASE));
+                assertEquals("shared-u", OperationalDb.userFor(OperationalDb.Family.ALERTS), "another family is unaffected");
+            });
+        });
+        withProps(Map.of("run.lease.backend", "postgres", "run.lease.db.user", "lease-u", "run.lease.db.password", "lease-p"), () ->
+                assertEquals("lease-u", OperationalDb.resolve(OperationalDb.Family.RUN_LEASE, SpaceRoot.legacy()).user(),
+                        "the diagnostic reports the user the lease actually connects as"));
+    }
 }

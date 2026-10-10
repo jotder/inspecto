@@ -296,7 +296,7 @@ are written before the fence (batch-derived names, so the new holder overwrites 
 its claim for one operator act, to exclude a running cycle, and commits no run output.
 
 **Selected by `-Drun.lease.backend`** (`heap` default · `db` · `postgres` · a raw `jdbc:` URL), with
-`-Drun.lease.db.url` / `.user` / `.password` and `-Drun.lease.owner`. ⛔ The default is `heap`, never a
+`-Drun.lease.db.url` / `.user` / `.password` and `-Drun.lease.owner`. The credentials are a family property like the others (`OperationalDb.Family.RUN_LEASE`): `userFor`/`passwordFor` resolve `-Drun.lease.db.*` first, then the shared `-Dinspecto.db.*`, for the lease connection AND the per-Space `CREATE SCHEMA` (`HA-RUNLEASE-DB-CREDENTIALS-1`, 2026-10-10 — before it the schema step read only the shared pair and skipped the Space). A Space that fails to boot is kept in `SpaceManager.skipped()` (code `SPACE_SCHEMA_CREATE_FAILED` / `SPACE_BOOT_FAILED`, no exception text): `/health/details` `spaces.skipped[]`, `/health` `DEGRADED` (count only, public), and `/ready` 503 only when ≥1 Space is configured and 0 booted (zero configured stays READY; a lease-DB outage still does not drain). `StoreHealth.mask` strips URL userinfo and `password=`/`token=` values from every stored target/detail. Known gap: the five credential-less families (jobs, events, provenance, file stages, …) still open with the URL alone. ⛔ The default is `heap`, never a
 database: a lease is exclusion *across processes*, and on one node the in-heap guard is both correct and
 free — defaulting to a DB would create a file for every Personal install to coordinate a fleet of one.
 
