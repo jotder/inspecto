@@ -64,6 +64,7 @@ class GraphResultJsonTest {
         if (a.needsSource()) p.put(Algorithm.FROM, "alice");
         if (a.needsTarget()) p.put(Algorithm.TO, "erin");
         if (a.needsNode()) p.put(Algorithm.NODE, "carol");
+        if (a == Algorithm.PROPAGATED_RISK) p.put("nodeScores", Map.of("alice", 70, "dave", 20));   // origins land in factors
         return p;
     }
 

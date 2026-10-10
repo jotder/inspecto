@@ -23,12 +23,12 @@ class GraphEngineRequestTest {
 
     private static final InMemoryGraphEngine ENGINE = new InMemoryGraphEngine();
 
-    /** The 28 ported functions (design §2.2 / feasibility §7.13), by their TypeScript export names. */
-    private static final Set<String> THE_28 = Set.of("shortestPath", "neighborhood", "egoNetwork", "degreeCentrality",
+    /** The 28 ported functions (design §2.2 / feasibility §7.13), by their TypeScript export names, plus server-only propagatedRisk. */
+    private static final Set<String> THE_29 = Set.of("shortestPath", "neighborhood", "egoNetwork", "degreeCentrality",
             "connectedComponents", "kCore", "triangleCount", "articulationPoints", "bridges", "isForest", "descendants",
             "weightedShortestPath", "maximumSpanningForest", "jaccardSimilarity", "pageRank", "betweennessCentrality",
             "closenessCentrality", "suspicionScore", "louvainCommunities", "detectCommunities", "cliques", "findCycles",
-            "allPaths", "maxFlow", "linkPrediction", "eigenvectorCentrality", "katzCentrality", "hits");
+            "allPaths", "maxFlow", "linkPrediction", "eigenvectorCentrality", "katzCentrality", "hits", "propagatedRisk");
 
     /** A directed ring a→b→c→d→a plus a chord a→c: small, but every algorithm has something to do. */
     private static GraphInput ring() {
@@ -57,13 +57,13 @@ class GraphEngineRequestTest {
     // ── the catalogue ───────────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
-    void theCatalogueIsExactlyThe28PortedAlgorithms() {
+    void theCatalogueIsExactlyThe28PortedAlgorithmsAndPropagatedRisk() {
         Set<String> ids = new java.util.HashSet<>();
         for (Algorithm a : Algorithm.values()) assertTrue(ids.add(a.id()), "duplicate id " + a.id());
-        assertEquals(THE_28, ids);
-        assertEquals(28, Algorithm.values().length);
+        assertEquals(THE_29, ids);
+        assertEquals(29, Algorithm.values().length);
         assertEquals(15, java.util.Arrays.stream(Algorithm.values()).filter(a -> a.cost() == Algorithm.Cost.SYNC).count());
-        assertEquals(13, java.util.Arrays.stream(Algorithm.values()).filter(a -> a.cost() == Algorithm.Cost.JOB).count());
+        assertEquals(14, java.util.Arrays.stream(Algorithm.values()).filter(a -> a.cost() == Algorithm.Cost.JOB).count(), "13 ported + propagatedRisk");
         for (Algorithm a : Algorithm.values()) {
             assertEquals(a, Algorithm.byId(a.id()));
             assertTrue(a.inlineNodeCeiling() > 0, a.id());
@@ -140,6 +140,49 @@ class GraphEngineRequestTest {
         assertEquals(Reason.BAD_TYPE, refused(Algorithm.PAGE_RANK, Map.of("iterations", "60")).reason());
         assertEquals(Reason.BAD_TYPE, refused(Algorithm.PAGE_RANK, Map.of("damping", Double.NaN)).reason());
         assertEquals(Reason.BAD_TYPE, refused(Algorithm.SHORTEST_PATH, Map.of("from", "a", "to", "c", "direction", 3)).reason());
+    }
+
+    @Test
+    void propagatedRiskRefusesBadWeightsScoresAndSeedsBeforeAnyWork() {
+        Algorithm a = Algorithm.PROPAGATED_RISK;
+        InvalidGraphRequest neg = refused(a, Map.of("weights", List.of(1.0, -0.1)));
+        assertEquals(Reason.OUT_OF_RANGE, neg.reason());
+        assertEquals("weights", neg.param());
+        assertEquals(Reason.OUT_OF_RANGE, refused(a, Map.of("weights", List.of(1.5))).reason(), "a weight above 1");
+        assertEquals(Reason.OUT_OF_RANGE, refused(a, Map.of("weights", List.of())).reason(), "no weight = no depth");
+        assertEquals(Reason.OUT_OF_RANGE, refused(a, Map.of("weights", List.of(1, 1, 1, 1, 1, 1, 1))).reason(), "deeper than 6");
+        assertEquals(Reason.BAD_TYPE, refused(a, Map.of("weights", 0.5)).reason());
+        assertEquals(Reason.BAD_TYPE, refused(a, Map.of("weights", List.of("0.5"))).reason());
+        assertEquals(Reason.OUT_OF_RANGE, refused(a, Map.of("nodeScores", Map.of("a", 101))).reason());
+        assertEquals(Reason.OUT_OF_RANGE, refused(a, Map.of("nodeScores", Map.of("a", -1))).reason());
+        assertEquals(Reason.BAD_TYPE, refused(a, Map.of("nodeScores", Map.of("a", "high"))).reason());
+        assertEquals(Reason.BAD_TYPE, refused(a, Map.of("nodeScores", List.of("a"))).reason());
+        assertEquals(Reason.BAD_TYPE, refused(a, Map.of("nodeScores", Map.of(" ", 5))).reason());
+        assertEquals(Reason.BAD_TYPE, refused(a, Map.of("seeds", "a")).reason());
+        assertEquals(Reason.BAD_TYPE, refused(a, Map.of("seeds", List.of("a", 7))).reason());
+        assertEquals(Reason.OUT_OF_RANGE, refused(a, Map.of("direction", "up")).reason());
+    }
+
+    @Test
+    void propagatedRiskResolvesItsCollectionsCanonicallyAndRunsThroughTheEngine() {
+        Map<String, Object> r = Algorithm.PROPAGATED_RISK.resolve(Map.of("nodeScores", Map.of("c", 10, "a", 50.5),
+                "seeds", List.of("c", "a", "c"), "weights", List.of(1, 0.5)));
+        assertEquals("{a=50.5, c=10.0}", r.get("nodeScores").toString(), "sorted by id, numbers as doubles: one cache key");
+        assertEquals(List.of("a", "c"), r.get("seeds"), "sorted, de-duplicated");
+        assertEquals(List.of(1.0, 0.5), r.get("weights"));
+        assertEquals("both", r.get("direction"));
+        Map<String, Object> dflt = Algorithm.PROPAGATED_RISK.resolve(Map.of());
+        assertEquals(List.of(1.0, 0.6, 0.35, 0.15), dflt.get("weights"));
+        assertEquals(Map.of(), dflt.get("nodeScores"));
+        assertEquals(List.of(), dflt.get("seeds"));
+
+        // the ring a→b→c→d→a + a→c, a flagged, walked undirected: b, c, d are all one hop from a
+        RunControl ctl = RunControl.create();
+        var risks = ((GraphResult.PropagatedRisks) ENGINE.run(Algorithm.PROPAGATED_RISK,
+                Map.of("nodeScores", Map.of("a", 40), "weights", List.of(0.5)), ring(), ctl).payload()).risks();
+        assertEquals(List.of("a", "b", "c", "d"), risks.stream().map(x -> x.id()).toList());
+        assertEquals(List.of(40.0, 20.0, 20.0, 20.0), risks.stream().map(x -> x.score()).toList());
+        assertTrue(ctl.work() > 0, "a checkpoint per origin");
     }
 
     @Test

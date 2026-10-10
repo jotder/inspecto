@@ -30,7 +30,8 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
     });
     switch (r.kind) {
         case 'SCORES':
-        case 'SUSPICION': {
+        case 'SUSPICION':
+        case 'PROPAGATED_RISK': {
             const s = (r.scores ?? []) as GraphScoreView[];
             return out(
                 `${plural(s.length, 'node')} scored.`,
