@@ -128,4 +128,47 @@ class ControlApiInvestigationSetLimitTest {
             EventLog.current().removeSubscriber(sub);
         }
     }
+
+    /**
+     * The per-Investigation total ({@code max_investigation_bytes}, D-IS12 b): written straight into the Space's file (the route's floor is
+     * 1 MiB, too big to fill with a few steps), a step that would take the Investigation's sets over it is 413 naming the Investigation,
+     * its total, the budget and how to raise it; nothing is stored; it is audited as {@code LINK_INVESTIGATION_TOO_LARGE}; and raising the
+     * budget lets the same step through with no restart.
+     */
+    @Test
+    void aStepThatWouldTakeTheInvestigationOverItsTotalBudgetIs413AndAuditedAndRaisingItLetsItThrough(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        Consumer<Event> sub = seen::add;
+        EventLog.current().addSubscriber(sub);
+        try (Ctx c = open(cfg, root)) {
+            create(c, "case-b", false);
+            String ops = "/inv/investigations/case-b/ops";
+            post(c, ops, "{\"op\":\"seed\",\"ids\":[\"a\"]}");
+            post(c, ops, "{\"op\":\"expand\"}");
+            Path dir = root.resolve("audit/snapshots/investigations/case-b");
+            long held;
+            try (var files = Files.list(dir.resolve("sets"))) {
+                held = files.mapToLong(f -> f.toFile().length()).sum();
+            }
+            assertEquals(Long.toString(held), Files.readString(dir.resolve("sets.bytes")), "the counter tracks the stored sets");
+            Files.writeString(root.resolve("link-analysis.toon"), "max_investigation_bytes: " + (held + 1000) + "\n");
+            Path log = dir.resolve("log.jsonl");
+            int before = Files.readAllLines(log).size();
+            String big = "{\"op\":\"annotate\",\"ids\":[\"b\"],\"note\":\"" + "n".repeat(1200) + "\"}";
+            HttpResponse<String> refused = send(c.port, "POST", ops, big, null);
+            assertEquals(413, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("PAYLOAD_TOO_LARGE") && refused.body().contains("case-b")
+                    && refused.body().contains("holds " + held + " bytes") && refused.body().contains("max_investigation_bytes"), refused.body());
+            assertEquals(before, Files.readAllLines(log).size(), "nothing was stored");
+            assertEquals(Long.toString(held), Files.readString(dir.resolve("sets.bytes")), "and the total is unchanged");
+            assertEquals(1, seen.stream().filter(e -> LinkEventTypes.LINK_INVESTIGATION_TOO_LARGE.equals(e.type())).count(), "audited");
+            assertFalse(seen.stream().anyMatch(e -> String.valueOf(e.attributes()).contains("nnnnnnnn")), "never the content");
+
+            Files.writeString(root.resolve("link-analysis.toon"), "max_investigation_bytes: 1048576\n");
+            assertEquals(200, send(c.port, "POST", ops, big, null).statusCode(), "the same step passes once the budget is raised, no restart");
+            assertEquals(before + 1, Files.readAllLines(log).size());
+        } finally {
+            EventLog.current().removeSubscriber(sub);
+        }
+    }
 }

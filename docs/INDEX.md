@@ -95,7 +95,7 @@ paid for violating them.
 
 - [`api/`](api/README.md) — **machine-readable v1 HTTP contract**: `openapi-v1.json` + canonical `examples/`,
   enforced by `ApiContractTest`; `schemas/` (metadata-bundle JSON Schema + samples).
-- [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance, secret rotation, and the T4 [HA/DR drill runbook](ops/ha-dr-drill-runbook.md) (runbook; drill NOT yet run).
+- [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance, secret rotation, and the T4 [HA/DR drill runbook](ops/ha-dr-drill-runbook.md) (runbook; a laptop-scale local drill was run 2026-10-10, the two-host drill is NOT yet run).
 - [`ui/accessibility-audit.md`](ui/accessibility-audit.md) — the **living** inspecto-ui WCAG/a11y findings
   register (referenced by `okf/frontend/conventions/accessibility.md`).
 - [`ui/link-analysis-user-manual.md`](ui/link-analysis-user-manual.md) — the **Link Analysis user manual** (2026-09-30): what the studio is, the screen, building and exploring a graph, the analysis and pattern tools, Investigations (op log, Working Set, identity resolution, value Measures, Dossier, templates, Widgets, Case link), who can do what, worked examples on the demo data

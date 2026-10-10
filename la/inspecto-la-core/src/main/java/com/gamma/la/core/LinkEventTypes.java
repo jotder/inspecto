@@ -188,6 +188,11 @@ public final class LinkEventTypes {
      *  {@code step}, {@code limitBytes}; never the set or an entity id. Emitted by the store seam, so every route that seals a set audits it. */
     public static final String LINK_WORKING_SET_TOO_LARGE = "LINK_WORKING_SET_TOO_LARGE";
 
+    /** A write of a Working Set was REFUSED because it would take the Investigation's total of sealed sets over the Space's
+     *  {@code max_investigation_bytes}. {@code investigationId}, {@code totalBytes} (stored now), {@code addBytes} (net of the write),
+     *  {@code limitBytes}; never a set or an entity id. Emitted by the store seam, like {@link #LINK_WORKING_SET_TOO_LARGE}. */
+    public static final String LINK_INVESTIGATION_TOO_LARGE = "LINK_INVESTIGATION_TOO_LARGE";
+
     /** A standing-detection sweep REFUSED to read: nothing was evaluated. {@code rule}, {@code investigationId},
      *  {@code principal}, and the stable reason {@code code}. */
     public static final String LINK_STANDING_DETECTION_REFUSED = "LINK_STANDING_DETECTION_REFUSED";

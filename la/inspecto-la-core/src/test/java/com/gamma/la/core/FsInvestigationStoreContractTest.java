@@ -31,6 +31,84 @@ class FsInvestigationStoreContractTest extends InvestigationStoreContract {
         return new FsInvestigationStore(root);
     }
 
+    @Override
+    InvestigationStore freshWithInvestigationBudget(long bytes) throws Exception {
+        Files.writeString(root.resolve(com.gamma.entitystore.LinkAnalysisSettings.FILE), "max_investigation_bytes: " + bytes + "\n", StandardCharsets.UTF_8);
+        return new FsInvestigationStore(root);
+    }
+
+    private static InvestigationStore.Scope main(String id) {
+        return InvestigationStore.Scope.main(id);
+    }
+
+    private static void budget(Path root, long bytes) throws Exception {
+        Files.writeString(root.resolve(com.gamma.entitystore.LinkAnalysisSettings.FILE), "max_investigation_bytes: " + bytes + "\n", StandardCharsets.UTF_8);
+    }
+
+    private static void assertRefused(org.junit.jupiter.api.function.Executable write) {
+        assertEquals(413, assertThrows(com.gamma.spi.auth.ApiException.class, write).status);
+    }
+
+    @Test
+    void theCounterFileHoldsTheTotalAfterEveryWriteAndAChangedBudgetAppliesAtOnce() throws Exception {
+        budget(root, 3000);
+        InvestigationStore s = new FsInvestigationStore(root);
+        s.create("a", "{}");
+        s.append(main("a"), 0, 1, "{\"step\":1}", "x".repeat(1000));
+        assertEquals("1000", Files.readString(invDir("a").resolve("sets.bytes")));
+        s.append(main("a"), 1, 2, "{\"step\":2}", "x".repeat(2000));
+        assertEquals("3000", Files.readString(invDir("a").resolve("sets.bytes")));
+        assertRefused(() -> s.append(main("a"), 2, 3, "{\"step\":3}", "x"));
+        assertEquals("3000", Files.readString(invDir("a").resolve("sets.bytes")), "a refusal leaves the counter as it was");
+        budget(root, 5000);   // the same store instance, no restart
+        s.append(main("a"), 2, 3, "{\"step\":3}", "x".repeat(2000));
+        budget(root, 4000);
+        assertRefused(() -> s.append(main("a"), 3, 4, "{\"step\":4}", "x"));
+        assertEquals(3, s.version(main("a")));
+    }
+
+    @Test
+    void anInvestigationWithNoCounterIsCountedOnceFromItsDirectoriesAndGetsOne() throws Exception {
+        budget(root, 3000);
+        InvestigationStore s = new FsInvestigationStore(root);
+        Files.createDirectories(invDir("old").resolve("sets"));   // written by a build that had no counter
+        Files.writeString(invDir("old").resolve("header.json"), "{}", StandardCharsets.UTF_8);
+        Files.writeString(invDir("old").resolve("log.jsonl"), "{\"step\":1}\n{\"step\":2}\n", StandardCharsets.UTF_8);
+        Files.writeString(invDir("old").resolve("sets").resolve("1.json"), "x".repeat(1500), StandardCharsets.UTF_8);
+        Files.writeString(invDir("old").resolve("sets").resolve("2.json"), "x".repeat(1500), StandardCharsets.UTF_8);
+        assertFalse(Files.exists(invDir("old").resolve("sets.bytes")));
+        assertRefused(() -> s.append(main("old"), 2, 3, "{\"step\":3}", "x"));
+        assertFalse(Files.exists(invDir("old").resolve("sets.bytes")), "a refusal writes nothing, not even the counter");
+        budget(root, 3001);
+        s.append(main("old"), 2, 3, "{\"step\":3}", "x");
+        assertEquals("3001", Files.readString(invDir("old").resolve("sets.bytes")));
+    }
+
+    @Test
+    void anUnreadableCounterHealsFromTheDirectoriesInsteadOfBeingTrusted() throws Exception {
+        budget(root, 3000);
+        InvestigationStore s = new FsInvestigationStore(root);
+        s.create("a", "{}");
+        s.append(main("a"), 0, 1, "{\"step\":1}", "x".repeat(3000));
+        for (String junk : new String[] {"not a number", "-5", ""}) {
+            Files.writeString(invDir("a").resolve("sets.bytes"), junk, StandardCharsets.UTF_8);
+            assertRefused(() -> s.append(main("a"), 1, 2, "{\"step\":2}", "x"));
+        }
+        Files.delete(invDir("a").resolve("sets.bytes"));   // what a crash between the delete and the rewrite leaves
+        assertRefused(() -> s.append(main("a"), 1, 2, "{\"step\":2}", "x"));
+    }
+
+    @Test
+    void theHotPathReadsTheCounterAndNeverWalksTheDirectories() throws Exception {
+        budget(root, 3000);
+        InvestigationStore s = new FsInvestigationStore(root);
+        s.create("a", "{}");
+        s.append(main("a"), 0, 1, "{\"step\":1}", "x".repeat(3000));
+        Files.writeString(invDir("a").resolve("sets.bytes"), "0", StandardCharsets.UTF_8);   // a deliberately wrong counter: it is the source
+        s.append(main("a"), 1, 2, "{\"step\":2}", "x".repeat(3000));   // a walk would have refused this
+        assertEquals("3000", Files.readString(invDir("a").resolve("sets.bytes")));
+    }
+
     private Path invDir(String id) {
         return root.resolve("audit").resolve("snapshots").resolve("investigations").resolve(id);
     }

@@ -54,6 +54,10 @@ export interface LinkAnalysisLimits {
     maxSetBytes?: number | null;
     /** The size limit actually in force (bytes) - server-computed, read-only. */
     maxSetBytesInForce?: number;
+    /** Per-Investigation TOTAL of sealed Working Sets in bytes (1048576..1099511627776); `null` = 4 GiB. A write over it is refused 413. */
+    maxInvestigationBytes?: number | null;
+    /** The total budget actually in force (bytes) - server-computed, read-only. */
+    maxInvestigationBytesInForce?: number;
     /** D7-6: the stated Draft settings; `null`/absent = every key inherits. */
     drafts?: Partial<DraftSettings> | null;
     /** D7-6: the Draft settings actually in force - server-computed, read-only. */

@@ -83,6 +83,7 @@ public final class PgInvestigationStore implements InvestigationStore {
     private final Borrow borrow;
     private final String schema;
     private final java.util.function.LongSupplier maxSetBytes;
+    private final java.util.function.LongSupplier maxInvestigationBytes;
 
     /** A connection per call from {@code connections} (tests, {@code DriverManager}). */
     public PgInvestigationStore(ConnectionSource connections, String schema) throws IOException {
@@ -93,25 +94,31 @@ public final class PgInvestigationStore implements InvestigationStore {
                     return body.apply(c);
                 }
             }
-        }, com.gamma.la.core.WorkingSetSizeLimit.DEFAULT);
+        }, com.gamma.la.core.WorkingSetSizeLimit.DEFAULT, com.gamma.la.core.InvestigationSetBudget.DEFAULT);
     }
 
     /** Connections borrowed from a pool (reentrant: a nested borrow on one thread reuses its connection, so one operation is one connection). */
     public PgInvestigationStore(com.gamma.util.ConnectionSource pool, String schema) throws IOException {
-        this(schema, pool::with, com.gamma.la.core.WorkingSetSizeLimit.DEFAULT);
+        this(schema, pool::with, com.gamma.la.core.WorkingSetSizeLimit.DEFAULT, com.gamma.la.core.InvestigationSetBudget.DEFAULT);
     }
 
-    /** As above, with the Space's per-set size limit ({@link com.gamma.la.core.WorkingSetSizeLimit}) read per write. */
-    public PgInvestigationStore(com.gamma.util.ConnectionSource pool, String schema, java.util.function.LongSupplier maxSetBytes) throws IOException {
-        this(schema, pool::with, maxSetBytes);
+    /**
+     * As above, with the Space's per-set size limit ({@link com.gamma.la.core.WorkingSetSizeLimit}) and per-Investigation total set budget
+     * ({@link com.gamma.la.core.InvestigationSetBudget}), each read per write.
+     */
+    public PgInvestigationStore(com.gamma.util.ConnectionSource pool, String schema, java.util.function.LongSupplier maxSetBytes,
+                                java.util.function.LongSupplier maxInvestigationBytes) throws IOException {
+        this(schema, pool::with, maxSetBytes, maxInvestigationBytes);
     }
 
-    private PgInvestigationStore(String schema, Borrow borrow, java.util.function.LongSupplier maxSetBytes) throws IOException {
+    private PgInvestigationStore(String schema, Borrow borrow, java.util.function.LongSupplier maxSetBytes,
+                                 java.util.function.LongSupplier maxInvestigationBytes) throws IOException {
         if (schema == null || !SCHEMA.matcher(schema).matches())
             throw new IllegalArgumentException("schema must match " + SCHEMA.pattern());
         this.borrow = borrow;
         this.schema = schema;
         this.maxSetBytes = maxSetBytes;
+        this.maxInvestigationBytes = maxInvestigationBytes;
         bootstrap();
     }
 
@@ -217,6 +224,9 @@ public final class PgInvestigationStore implements InvestigationStore {
             "CREATE TABLE IF NOT EXISTS " + t("la_space") + " (one boolean PRIMARY KEY DEFAULT true CHECK (one))",
             "INSERT INTO " + t("la_space") + " (one) VALUES (true) ON CONFLICT DO NOTHING",
             "CREATE TABLE IF NOT EXISTS " + t("la_investigation") + " (id text PRIMARY KEY, header text NOT NULL, mask_key bytea, case_link text)",
+            // set_bytes: the running total of this Investigation's sets (main + live Drafts); NULL = not counted yet (a table made before the
+            // counter existed): computed once, lazily, under the row lock, then kept in the SAME transaction as every write that changes a set.
+            "ALTER TABLE " + t("la_investigation") + " ADD COLUMN IF NOT EXISTS set_bytes bigint",
             "CREATE TABLE IF NOT EXISTS " + t("la_log") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), draft text NOT NULL DEFAULT '', "
                     + "seq int NOT NULL, line text NOT NULL, PRIMARY KEY (inv, draft, seq))",
             "CREATE TABLE IF NOT EXISTS " + t("la_set") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), draft text NOT NULL DEFAULT '', "
@@ -276,6 +286,31 @@ public final class PgInvestigationStore implements InvestigationStore {
         return one(c, "SELECT state FROM " + t("la_draft") + " WHERE inv = ? AND id = ? FOR NO KEY UPDATE", inv, draft);
     }
 
+    /**
+     * The total bytes of this Investigation's sets: the counter, else (once) the sum, stored. The caller holds the Investigation's row
+     * lock ({@link #lockInvestigation}), so the counter and the rows change together or not at all.
+     */
+    private long setTotal(Connection c, String inv) throws SQLException {
+        try (PreparedStatement ps = bind(c, "SELECT set_bytes FROM " + t("la_investigation") + " WHERE id = ?", inv); ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                long v = rs.getLong(1);
+                if (!rs.wasNull()) return v;
+            }
+        }
+        long sum = number(c, "SELECT COALESCE(SUM(octet_length(body)), 0) FROM " + t("la_set") + " WHERE inv = ?", inv);
+        update(c, "UPDATE " + t("la_investigation") + " SET set_bytes = ? WHERE id = ?", sum, inv);
+        return sum;
+    }
+
+    /** Move the counter by {@code delta} (call {@link #setTotal} first in the transaction so it is not NULL). */
+    private void adjustSetTotal(Connection c, String inv, long delta) throws SQLException {
+        if (delta != 0) update(c, "UPDATE " + t("la_investigation") + " SET set_bytes = set_bytes + ? WHERE id = ? AND set_bytes IS NOT NULL", delta, inv);
+    }
+
+    private long draftSetBytes(Connection c, String inv, String draft) throws SQLException {
+        return number(c, "SELECT COALESCE(SUM(octet_length(body)), 0) FROM " + t("la_set") + " WHERE inv = ? AND draft = ?", inv, draft);
+    }
+
     private static String draftOf(Scope scope) {
         return scope.isDraft() ? scope.draftId() : "";
     }
@@ -304,8 +339,10 @@ public final class PgInvestigationStore implements InvestigationStore {
     @Override
     public boolean createFork(String id, String headerJson, List<String> lines, List<String> sets) throws IOException {
         com.gamma.la.core.WorkingSetSizeLimit.enforceAll(maxSetBytes, id, 1, sets);
+        long forkBytes = com.gamma.la.core.InvestigationSetBudget.bytes(sets);
+        com.gamma.la.core.InvestigationSetBudget.enforce(maxInvestigationBytes, id, 0, forkBytes);   // a new Investigation: nothing stored, nothing to race
         return tx(c -> {
-            if (update(c, "INSERT INTO " + t("la_investigation") + " (id, header) VALUES (?, ?) ON CONFLICT DO NOTHING", id, headerJson) != 1) return false;
+            if (update(c, "INSERT INTO " + t("la_investigation") + " (id, header, set_bytes) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", id, headerJson, forkBytes) != 1) return false;
             insertLines(c, id, "", 0, lines);
             for (int i = 0; i < sets.size(); i++)
                 update(c, "INSERT INTO " + t("la_set") + " (inv, draft, step, body) VALUES (?, '', ?, ?)", id, i + 1, sets.get(i));
@@ -356,17 +393,19 @@ public final class PgInvestigationStore implements InvestigationStore {
         com.gamma.la.core.WorkingSetSizeLimit.enforce(maxSetBytes, scope.investigationId(), step, setJson);
         String inv = scope.investigationId(), draft = draftOf(scope);
         tx(c -> {
+            lockInvestigation(c, inv);   // the Investigation first (its set counter), THEN the Draft: the one order everywhere
             if (scope.isDraft()) {
                 String state = lockDraft(c, inv, draft);
                 if (state == null) throw new IOException("no such draft '" + draft + "'");
                 if (closed(state)) throw new DraftClosedException(draft);
-            } else {
-                lockInvestigation(c, inv);
             }
             long actual = count(c, inv, draft);
             if (actual != expectedVersion) throw new InvestigationVersionConflictException(inv, expectedVersion, actual);
+            long total = setTotal(c, inv), added = com.gamma.la.core.InvestigationSetBudget.bytes(setJson);
+            com.gamma.la.core.InvestigationSetBudget.enforce(maxInvestigationBytes, inv, total, total + added);   // before any row is written
             insertLines(c, inv, draft, (int) actual, List.of(lineJson));   // the log line and its set are ONE commit
             update(c, "INSERT INTO " + t("la_set") + " (inv, draft, step, body) VALUES (?, ?, ?, ?)", inv, draft, step, setJson);
+            adjustSetTotal(c, inv, added);
             if (scope.isDraft()) update(c, "UPDATE " + t("la_draft") + " SET version = version + 1 WHERE inv = ? AND id = ?", inv, draft);
             return null;
         });
@@ -648,20 +687,25 @@ public final class PgInvestigationStore implements InvestigationStore {
     @Override
     public Optional<Boolean> closeDraft(String investigationId, String draftId, Duration idleAtLeast, Function<List<String>, String> marker) throws IOException {
         return tx(c -> {
+            one(c, "SELECT id FROM " + t("la_investigation") + " WHERE id = ? FOR NO KEY UPDATE", investigationId);   // the counter's lock first (promote's order)
             String state = lockDraft(c, investigationId, draftId);
             if (state == null || "promoted".equals(state)) return Optional.empty();
             if (idleAtLeast != null && (closed(state) || draftIdle(c, investigationId, draftId).compareTo(idleAtLeast) < 0)) return Optional.empty();
             if ("discarded".equals(state)) return Optional.of(false);   // already discarded: idempotent
             String text = marker.apply(lines(c, investigationId, draftId));
             update(c, "UPDATE " + t("la_draft") + " SET state = 'discarded', marker = ?, version = version + 1 WHERE inv = ? AND id = ?", text, investigationId, draftId);
+            setTotal(c, investigationId);
             deleteEvidence(c, investigationId, draftId);   // the marker first, then the sealed rows go: one transaction
             return Optional.of(true);
         });
     }
 
+    /** Delete a Draft's rows and take their bytes off the Investigation's set counter (the caller has called {@link #setTotal} in this transaction). */
     private void deleteEvidence(Connection c, String inv, String draft) throws SQLException {
+        long freed = draftSetBytes(c, inv, draft);
         update(c, "DELETE FROM " + t("la_log") + " WHERE inv = ? AND draft = ?", inv, draft);
         update(c, "DELETE FROM " + t("la_set") + " WHERE inv = ? AND draft = ?", inv, draft);
+        adjustSetTotal(c, inv, -freed);
     }
 
     /** Both logs still hold what the caller computed over (the same two checks the filesystem store makes under its two monitors). */
@@ -686,6 +730,13 @@ public final class PgInvestigationStore implements InvestigationStore {
             if (closed(state)) throw new DraftClosedException(draftId);
             verifyPreconditions(c, investigationId, draftId, expectedMainVersion, expectedMainHash, expectedDraftLogHash);
             int from = (int) expectedMainVersion;
+            long total = setTotal(c, investigationId), freed = draftSetBytes(c, investigationId, draftId), added = 0;
+            for (int i = 0; i < lines.size(); i++)   // a null entry seals the Draft's own set as it is: same bytes, main's now
+                added += sets.get(i) != null ? com.gamma.la.core.InvestigationSetBudget.bytes(sets.get(i))
+                        : number(c, "SELECT COALESCE(SUM(octet_length(body)), 0) FROM " + t("la_set") + " WHERE inv = ? AND draft = ? AND step = ?",
+                                investigationId, draftId, from + i + 1);
+            // the Draft's sets are removed by this same promote, so the total it leaves is net of them
+            com.gamma.la.core.InvestigationSetBudget.enforce(maxInvestigationBytes, investigationId, total, total - freed + added);
             insertLines(c, investigationId, "", from, lines);
             for (int i = 0; i < lines.size(); i++) {
                 int step = from + i + 1;
@@ -697,6 +748,7 @@ public final class PgInvestigationStore implements InvestigationStore {
                     update(c, "INSERT INTO " + t("la_set") + " (inv, draft, step, body) VALUES (?, '', ?, ?)", investigationId, step, sets.get(i));
                 }
             }
+            adjustSetTotal(c, investigationId, added);
             update(c, "UPDATE " + t("la_draft") + " SET state = 'promoted', marker = ?, version = version + 1 WHERE inv = ? AND id = ?", markerJson, investigationId, draftId);
             deleteEvidence(c, investigationId, draftId);
             return null;   // one commit: the main log never holds a part of a promote
@@ -714,10 +766,14 @@ public final class PgInvestigationStore implements InvestigationStore {
             if (state == null) throw new IOException("no such draft '" + draftId + "'");
             if (closed(state)) throw new DraftClosedException(draftId);
             verifyPreconditions(c, investigationId, draftId, expectedMainVersion, expectedMainHash, expectedDraftLogHash);
+            long total = setTotal(c, investigationId), added = com.gamma.la.core.InvestigationSetBudget.bytes(sets);
+            // the old Draft sets are replaced, not added to: the total it leaves is net of them
+            com.gamma.la.core.InvestigationSetBudget.enforce(maxInvestigationBytes, investigationId, total, total - draftSetBytes(c, investigationId, draftId) + added);
             deleteEvidence(c, investigationId, draftId);
             insertLines(c, investigationId, draftId, 0, lines);
             for (int i = 0; i < sets.size(); i++)
                 update(c, "INSERT INTO " + t("la_set") + " (inv, draft, step, body) VALUES (?, ?, ?, ?)", investigationId, draftId, setSteps.get(i), sets.get(i));
+            adjustSetTotal(c, investigationId, added);
             update(c, "UPDATE " + t("la_draft") + " SET header = ?, version = version + 1 WHERE inv = ? AND id = ?", headerJson, investigationId, draftId);
             return null;
         });

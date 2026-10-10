@@ -22,7 +22,7 @@ import com.gamma.access.WriteGates;
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
- *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems},
+ *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, maxInvestigationBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems},
  *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue},
  *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
@@ -170,7 +170,7 @@ final class SettingsRoutes implements RouteModule {
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
                 nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body),
-                setBytes(body));
+                setBytes(body), investigationBytes(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -192,6 +192,8 @@ final class SettingsRoutes implements RouteModule {
         m.put("seedByDistinctCapInForce", s.effectiveSeedByDistinctCap());
         m.put("maxSetBytes", s.maxSetBytes());
         m.put("maxSetBytesInForce", s.effectiveMaxSetBytes());
+        m.put("maxInvestigationBytes", s.maxInvestigationBytes());
+        m.put("maxInvestigationBytesInForce", s.effectiveMaxInvestigationBytes());
         LinkAnalysisSettings.GraphRun g = s.graphRun();
         Map<String, Object> run = null;   // D-4: null = every knob inherits the service's shipped default
         if (g != null) {
@@ -372,6 +374,22 @@ final class SettingsRoutes implements RouteModule {
         if (v < 1024 || v > 1_073_741_824L)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maxSetBytes must be 1024..1073741824 (1 KiB..1 GiB), got " + v);
         return (int) v;
+    }
+
+    /** {@code maxInvestigationBytes}: the per-Investigation total set budget, 1 MiB..1 TiB; null inherits 4 GiB. */
+    private static Long investigationBytes(Map<String, Object> body) {
+        Object raw = body.get("maxInvestigationBytes");
+        if (raw == null) return null;
+        long v;
+        try {
+            v = Long.parseLong(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maxInvestigationBytes must be an integer, got '" + raw + "'");
+        }
+        if (v < 1_048_576L || v > 1_099_511_627_776L)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "maxInvestigationBytes must be 1048576..1099511627776 (1 MiB..1 TiB), got " + v);
+        return v;
     }
 
     private static Integer nodeCap(Map<String, Object> body, String key) {

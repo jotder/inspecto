@@ -251,6 +251,56 @@ describe('LinkAnalysisSettingsComponent', () => {
         });
     });
 
+    describe('Investigation total size budget (maxInvestigationBytes)', () => {
+        const INV = { maxInvestigationBytes: null, maxInvestigationBytesInForce: 4294967296 };
+
+        it('is hidden when the server does not report the key', () => {
+            expect(setup().el.textContent).not.toContain('Investigation total size budget');
+        });
+
+        it('shows the value in force in GiB with the 413 hint (a11y)', async () => {
+            const { el } = setup({ served: INV });
+            expect(el.textContent).toContain('Investigation total size budget (bytes)');
+            expect(el.textContent).toContain('In force: 4 GiB (4294967296 bytes)');
+            expect(el.textContent).toContain('refused with 413');
+            await expectNoA11yViolations(el);
+        });
+
+        it('saves an edited budget and a blank one (null = inherit), and a save never erases a stated one', () => {
+            const { c, api, submit } = setup({ served: { maxInvestigationBytes: 8589934592, maxInvestigationBytesInForce: 8589934592 } });
+            expect(c.form.controls.maxInvestigationBytes.value).toBe(8589934592);
+            submit();
+            expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ maxInvestigationBytes: 8589934592 }));
+            c.form.controls.maxInvestigationBytes.setValue(null);
+            submit();
+            expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ maxInvestigationBytes: null }));
+        });
+
+        it('does not send the key when the server did not report it', () => {
+            const { api, submit } = setup();
+            submit();
+            expect(api.save.mock.calls[0][0]).not.toHaveProperty('maxInvestigationBytes');
+        });
+
+        it.each([1048575, 1099511627777, 1.5])('refuses %s client-side and does not save', (bad) => {
+            const { c, el, api, fixture, submit } = setup({ served: INV });
+            c.form.controls.maxInvestigationBytes.setValue(bad);
+            submit();
+            fixture.detectChanges();
+            expect(api.save).not.toHaveBeenCalled();
+            expect(el.querySelector('mat-error')?.textContent).toContain('from 1048576 (1 MiB) to 1099511627776 (1 TiB)');
+        });
+
+        it('accepts the bounds 1048576 and 1099511627776', () => {
+            const { c, api, submit } = setup({ served: INV });
+            c.form.controls.maxInvestigationBytes.setValue(1048576);
+            submit();
+            c.form.controls.maxInvestigationBytes.setValue(1099511627776);
+            submit();
+            expect(api.save).toHaveBeenCalledTimes(2);
+        });
+    });
+
     it('is read only without the authoring capability', () => {
         const { el } = setup({ canEdit: false });
         expect(el.querySelector('button[type="submit"]')).toBeNull();

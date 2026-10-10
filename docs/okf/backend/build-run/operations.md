@@ -57,14 +57,28 @@ and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_
   release when `VULN_DB_DIR` is unset or the scan exits non-zero. A dispatch dry run warns instead. ⚠ Until
   a snapshot is configured, no tag can be released from a hosted runner.
 
-**Snapshot refresh procedure (on a connected host, then carry the directory in):**
+**Snapshot refresh (scripted, operator-approved per run - decision 2026-10-10):** `tools/vuln-db-refresh.mjs`
+(Node built-ins only) fetches the OSV `Maven` export into `$VULN_DB_DIR` in the layout `tools/vuln-scan.mjs` reads.
+It **never touches the network without `--confirm`**.
 
-1. Download the OSV Maven ecosystem export: `https://osv-vulnerabilities.storage.googleapis.com/Maven/all.zip`
-   (one JSON record per advisory; size not measured here).
-2. `mkdir -p osv-maven && unzip -q all.zip -d osv-maven`
-3. Write `osv-maven/snapshot.json`: `{"taken":"YYYY-MM-DD","source":"osv.dev Maven all.zip"}`.
-4. Record `sha256sum all.zip` with the transfer, carry `osv-maven/` across the air gap, and verify the hash.
-5. Point `VULN_DB_DIR` at it and run `node tools/vuln-scan.mjs`. Refresh at least every 30 days — older
+1. Dry run (default; prints the URL it would GET and where it would write, fetches nothing):
+   `node tools/vuln-db-refresh.mjs --db <dir>`
+2. Approve, then fetch: `node tools/vuln-db-refresh.mjs --db <dir> --confirm`
+   (`https://osv-vulnerabilities.storage.googleapis.com/Maven/all.zip`; size is not queried by the dry run and
+   not measured here). `--ecosystems Maven,npm` also fetches npm records, but `vuln-scan` matches Maven only.
+3. Air-gapped path: fetch on a connected host, carry `all.zip` across as `<dir>/Maven/all.zip`, then
+   `node tools/vuln-db-refresh.mjs --db <target> --source <dir>` (also `file://`) - no network, same verification.
+4. It writes `snapshot.json` (`taken`, `source`, `fetchedAt`, and per file: URL, ETag, bytes, `sha256` of the
+   archive, a `treeSha256` over the extracted records, record count), keeps the archive under `_archives/`, and
+   builds everything in a sibling temp dir renamed over `<db>` - a failed or corrupt fetch leaves the previous
+   snapshot untouched. A zero-record archive or an unparseable record fails the refresh.
+5. Freshness / integrity gate, no network: `node tools/vuln-db-refresh.mjs --check --db <dir> --max-age-days 30`
+   exits 0 when `snapshot.json` is present, every hash matches and the snapshot is not older than N days (or
+   future-dated), else 1. It is NOT wired into any workflow yet; to wire it, add the line before
+   `node tools/vuln-scan.mjs` in the `release.yml` gate (and `ci.yml` if wanted), inside the
+   `if [ -n "$VULN_DB_DIR" ]` branch. `vuln-scan` itself does not re-verify the hashes; `--check` does.
+   Tests: `node --test tools/vuln-db-refresh.test.mjs`.
+6. Point `VULN_DB_DIR` at it and run `node tools/vuln-scan.mjs`. Refresh at least every 30 days - older
    snapshots are refused.
 
 ## Run-lease database reachability (ASSURE-OPERABILITY-1, 2026-10-03)

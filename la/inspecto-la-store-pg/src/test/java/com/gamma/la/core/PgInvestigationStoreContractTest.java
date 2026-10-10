@@ -86,7 +86,33 @@ class PgInvestigationStoreContractTest extends InvestigationStoreContract {
         assumeTrue(url != null, "no Postgres: set INSPECTO_TEST_PG_URL (jdbc:postgresql://host:5432/db?user=..&password=..) to run this");
         String schema = "la_t_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         schemas.add(schema);
-        return new PgInvestigationStore(pool(url), schema, () -> bytes);
+        return new PgInvestigationStore(pool(url), schema, () -> bytes, com.gamma.la.core.InvestigationSetBudget.DEFAULT);
+    }
+
+    @Override
+    InvestigationStore freshWithInvestigationBudget(long bytes) throws Exception {
+        String url = url();
+        assumeTrue(url != null, "no Postgres: set INSPECTO_TEST_PG_URL (jdbc:postgresql://host:5432/db?user=..&password=..) to run this");
+        String schema = "la_t_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        schemas.add(schema);
+        lastSchema = schema;
+        return new PgInvestigationStore(pool(url), schema, com.gamma.la.core.WorkingSetSizeLimit.DEFAULT, () -> bytes);
+    }
+
+    private String lastSchema;
+
+    @Test
+    void aTableMadeBeforeTheCounterExistedIsCountedOnceLazilyAndStillEnforced() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(3000);
+        s.create("a", "{}");
+        for (int i = 1; i <= 3; i++) s.append(InvestigationStore.Scope.main("a"), i - 1, i, "{\"step\":" + i + "}", "x".repeat(1000));
+        try (java.sql.Connection c = DriverManager.getConnection(url()); java.sql.Statement st = c.createStatement()) {
+            st.execute("UPDATE " + lastSchema + ".la_investigation SET set_bytes = NULL");   // what an older table looks like
+        }
+        com.gamma.spi.auth.ApiException e = assertThrows(com.gamma.spi.auth.ApiException.class,
+                () -> s.append(InvestigationStore.Scope.main("a"), 3, 4, "{\"step\":4}", "x"));
+        assertEquals(413, e.status);
+        assertTrue(e.getMessage().contains("holds 3000 bytes"), e.getMessage());
     }
 
     @Test
