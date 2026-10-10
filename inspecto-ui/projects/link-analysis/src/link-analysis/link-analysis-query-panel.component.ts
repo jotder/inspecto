@@ -4,10 +4,13 @@ import {
     OnInit,
     WritableSignal,
     computed,
+    effect,
     inject,
     input,
     output,
     signal,
+    untracked,
+    viewChild,
 } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -26,6 +29,7 @@ import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import type { LaAiDraft, LaDataset } from '@inspecto/link-analysis/la-host';
 import { LA_AI_ASSIST, LaHostSlotComponent } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisView } from './link-analysis.service';
+import { ColumnLike, LinkShape, rankDatasets, suggestLinkColumns } from './la-starter';
 
 /** `InvRoutes.MAX_MAPPINGS` — the server 422s above it; the form says so first. */
 const MAX_MULTI_MAPPINGS = 16;
@@ -137,9 +141,22 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     readonly sourceOptions = computed<PickerOption[]>(() =>
         this.sources().map((s) => ({ value: s.id, label: s.label })),
     );
+    /**
+     * Columns read off the store of a Dataset that declares none, by Dataset id - so the ranking below can
+     * judge it too. Filled in the background (one 1-row read each, through the existing rows seam).
+     */
+    private readonly probedColumns = signal<ReadonlyMap<string, readonly ColumnLike[]>>(new Map());
+    /** Every Dataset, those that look link-shaped first, each with a one-line reason (operator 2026-10-10). */
+    readonly rankedDatasets = computed(() => rankDatasets(this.datasets(), this.probedColumns()));
     readonly datasetOptions = computed<PickerOption[]>(() =>
-        this.datasets().map((d) => ({ value: d.id, label: d.name })),
+        this.rankedDatasets().map((d) => ({ value: d.id, label: d.name, hint: d.hint })),
     );
+    /** The Source/Target pair filled in for the picked Dataset, while the form still holds it (editable). */
+    readonly prefilled = signal<LinkShape | null>(null);
+    /** The primary Dataset picker - the starter card's "Explore a Dataset" opens it. */
+    private readonly datasetPicker = viewChild<InspectoOptionPickerComponent>('datasetPicker');
+    /** Set by {@link startExplore}: the next Dataset pick that yields a full mapping also runs the query. */
+    private runAfterPick = false;
     readonly pipelineOptions = computed<PickerOption[]>(() =>
         this.pipelines().map((p) => ({ value: p.name, label: p.name })),
     );
@@ -158,8 +175,49 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         { value: 'in', label: 'Upstream' },
     ];
 
+    constructor() {
+        effect(() => {
+            const datasets = this.datasets();
+            untracked(() => void this.probeUndeclared(datasets));
+        });
+    }
+
     ngOnInit(): void {
         this.queryForm.controls.datasetId.valueChanges.subscribe((id) => this.onDatasetPicked(id));
+        // Editing either end of the suggested pair makes it the analyst's own: the "suggested" note goes.
+        const stillSuggested = () => {
+            const p = this.prefilled();
+            const f = this.queryForm.controls;
+            if (p && (f.sourceCol.value !== p.source || f.targetCol.value !== p.target)) this.prefilled.set(null);
+        };
+        this.queryForm.controls.sourceCol.valueChanges.subscribe(stillSuggested);
+        this.queryForm.controls.targetCol.valueChanges.subscribe(stillSuggested);
+    }
+
+    /** At most this many Datasets are probed in the background - the picker ranks the rest by name. */
+    private static readonly PROBE_LIMIT = 12;
+
+    private async probeUndeclared(datasets: readonly LaDataset[]): Promise<void> {
+        const todo = datasets
+            .filter((d) => !d.columns?.length && d.sourceName && !this.probedColumns().has(d.id))
+            .slice(0, LinkAnalysisQueryPanelComponent.PROBE_LIMIT);
+        for (const ds of todo) {
+            try {
+                const cols = await this.datasetRows.columns(ds);
+                this.probedColumns.update((m) => new Map(m).set(ds.id, cols));
+            } catch {
+                // An unreadable store just stays unranked - the picker still lists it.
+            }
+        }
+    }
+
+    /**
+     * The starter card "Explore a Dataset": open the guided Dataset picker (ranked, with reasons). Once a Dataset
+     * is picked and its Source/Target could be suggested, the query runs - one click from the card to a graph.
+     */
+    startExplore(): void {
+        this.runAfterPick = true;
+        this.datasetPicker()?.open();
     }
 
     private newMappingGroup() {
@@ -249,7 +307,20 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     }
 
     private async onDatasetPicked(id: string): Promise<void> {
-        this.datasetColumns.set(await this.columnsForDataset(id));
+        const meta = await this.columnMetaForDataset(id);
+        this.datasetColumns.set(meta.map((c) => c.name));
+        const f = this.queryForm.controls;
+        // Pre-fill only a blank mapping: a loaded saved view, or the analyst's own pick, is never overwritten.
+        const guess = !f.sourceCol.value && !f.targetCol.value ? suggestLinkColumns(meta) : null;
+        if (guess) {
+            this.queryForm.patchValue({ sourceCol: guess.source, targetCol: guess.target });
+            this.prefilled.set(guess);
+        } else {
+            this.prefilled.set(null);
+        }
+        const run = this.runAfterPick;
+        this.runAfterPick = false;
+        if (run && f.datasetId.value === id && f.sourceCol.value && f.targetCol.value) this.run.emit();
     }
 
     /** The columns a mapping row's Dataset select should offer — declared, else probed from the store. */

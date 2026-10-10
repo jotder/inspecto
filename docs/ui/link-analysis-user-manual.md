@@ -40,6 +40,12 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 
 ## 2. Quick start (five minutes)
 
+**Fastest start:** the first screen offers three starter cards. **Follow the money (example)** opens a ready-made
+saved view of your Space and draws it at once (shown only when your Space has one). **Explore a Dataset** opens the
+Dataset picker — the Datasets that look like links are listed first, each with a one-line reason — and when you
+pick one its from and to columns are filled in for you and the graph is drawn. **Open a saved view** opens
+your saved views. The steps below are the same thing done by hand.
+
 1. Open *Studio → Link Analysis*. Choose a **Domain profile** (for example *Financial crime — transactions* or
    *Telecom — call detail records*): it pre-selects the most useful tools.
 2. In the **Query** panel pick the graph type **Entity/Link (from a Dataset)**, then the **Dataset**, the
@@ -59,15 +65,20 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 ## 3. The screen
 
 ```
-┌ header: title · About · Attach to Case · saved views · save · search · filter · export ┐
-│ QUERY dock (left)        │  CANVAS (the graph)            │ TOOLBOX dock (right)      │
-│  graph type, Dataset,    │  pan · zoom · drag · click     │  Analysis | View |        │
-│  columns, filter         │  legend + Working-set overlays │  Investigation            │
-├──────────────────────────┴────────────────────────────────┴───────────────────────────┤
+┌ title row: Link Analysis · About · Hide the side panels ───────────────────────────────┐
+│ TOOLS │ QUERY dock (left)    │  CANVAS (the graph)        │ TOOLBOX dock (right)      │
+│ rail  │  graph type, Dataset,│  pan · zoom · drag · click │  Analysis | View |        │
+│ (left │  columns, filter     │  legend + Working-set      │  Investigation            │
+│ edge) │                      │  overlays                  │                           │
+├───────┴──────────────────────┴────────────────────────────┴───────────────────────────┤
 │ footer: nodes · links drawn · caps · Data strip (the rows behind the graph)            │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+* **Tool rail** (far left, full canvas height): search, filter, layout, save this analysis, Attach to Case, the
+  algorithms and Investigation shortcuts, saved views, display options, Undo / Redo, Fit, Show as list, Full screen
+  and one **Export** menu (PNG, JSON, SVG, GraphML). The rail scrolls when the window is short; on a narrow screen it
+  wraps back into a row above the stacked panels. The page does not scroll on a normal window: the Link Analysis page is as tall as the window below the application header (it hides the page footer, which every other page keeps), the active-query chips sit in the title row, and the panels scroll inside themselves (measured 1440x900: canvas 506 x 708 px with both panels open; 1280x720: 652 x 528 with the Toolbox collapsed; 1000x700: 372 x 508). The canvas never drops below about 420 px high: in a shorter window the page scrolls instead (1280x500: canvas 637 x 432). In the standalone Link Analysis app the areas (Link Analysis, Geo, Entity Lists), the Space switcher and your user menu sit in a slim menu down the left edge, so the page gets the whole window height; the arrows at its foot expand it to show labels, and the choice is remembered. On a narrow screen that menu becomes a slim bar across the top. The Query panel starts 220 px wide (it stays resizable, 200 to 560) and below 1300 px of window width the Toolbox starts collapsed to its icon rail; open it from the rail when you need it. Your explicit open or close is remembered for the rest of the browser session. On a narrow screen (under 960 px) the panels stack and the page scrolls.
 * **Docks** are resizable (drag or arrow keys) and collapse to a rail (*Hide the query panel*, *Hide the
   toolbox*); **Hide the side panels** gives the canvas the whole width.
 * **Canvas:** drag to pan, scroll to zoom, drag a node to move it, click a node for its details, click a branch
@@ -91,6 +102,11 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 ### 4.2 Map the columns
 
 * **Source entity column → Target entity column** define a link (who → whom). <!-- vocab-allow: exact on-screen label -->
+  When you pick a Dataset these are **filled in for you** if two columns look like the two ends of a link (payer /
+  payee, sender / receiver, caller / callee, src / dst, from / to, …); a note says so and you can change either one.
+  The Dataset picker lists such Datasets first and says why under each name. **Derive mapping** is a different,
+  optional helper: it asks the assistant to draft the columns and needs permission to author configuration, so it
+  stays greyed out for an analyst — the filled-in columns work without it.
 * **Link type column** (optional) gives each link a kind (wire, card, cash_out, SMS, …). Kinds get colours and can be
   filtered.
 * **Attribute columns** (optional) carry amounts, times or anything else onto the links; they feed the timeline,
@@ -176,6 +192,12 @@ loaded (cap 2 000 nodes; the heavier scores are capped lower and say so).
 | **Flow & backbone** | Maximum throughput and minimum cut between two nodes; the spanning backbone. | <!-- vocab-allow: exact on-screen label -->
 | **Suspicion score** | An explainable 0–100 composite with a per-node breakdown; the top decile is highlighted. |
 | **Pattern match** | Find a shape (see §7). |
+
+**What to do with a ranking.** In *Centrality*, *Suspicion score* and *Similarity & prediction*, click a row to
+select that node and centre the canvas on it. Under the table, **Start an Investigation from the top results**
+carries the top five nodes to the **Investigation** tab as *queued seed entities*; nothing is created. You fill in the
+title and purpose and press **Start Investigation with 5 queued seeds** — only then is the Investigation created
+and the queued entities seeded as its first step. You can remove one from the queue or clear it first.
 
 ---
 

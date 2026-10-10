@@ -4,8 +4,9 @@ import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { of } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
 import { InvService, RecursivePathsRequest } from '@inspecto/link-analysis/api/inv.service';
@@ -60,6 +61,9 @@ class StubGraphView {
     @Input() layout: unknown;
     @Input() plugins: unknown;
 }
+
+// The Toolbox dock remembers an explicit open/close in sessionStorage; no test may inherit another's.
+beforeEach(() => sessionStorage.clear());
 
 function create(
     opts: {
@@ -1143,6 +1147,82 @@ describe('LinkAnalysisComponent', () => {
         });
     });
 
+    describe('tool rail (the former top toolbar, docked on the LEFT for canvas height)', () => {
+        const ready = async () => {
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            await runQuery(fixture);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            return { fixture, el, rail: el.querySelector('nav[data-testid="la-tool-rail"]') as HTMLElement };
+        };
+
+        it('is a labelled nav that sits BEFORE the workspace in the same row, so the canvas starts at the title row', async () => {
+            const { el, rail } = await ready();
+            expect(rail.getAttribute('aria-label')).toBe('Link Analysis tools');
+            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            expect(rail.parentElement).toBe(workspace.parentElement); // one row: [rail | workspace]
+            expect(rail.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            expect(rail.classList).toContain('flex-col');
+            expect(rail.classList).toContain('max-md:flex-row'); // stacked layout keeps a wrapped row
+        });
+
+        it('keeps every action reachable by its accessible name', async () => {
+            const { rail } = await ready();
+            const names = Array.from(rail.querySelectorAll('button')).map((b) => b.getAttribute('aria-label') ?? '');
+            for (const name of [
+                'Search nodes',
+                'Filter node types',
+                'Graph layout',
+                'Save this analysis',
+                'Attach to Case',
+                'Open the graph-algorithms toolbox',
+                'Open the Investigation',
+                'Open saved views',
+                'Save the current view',
+                'Undo the last display/filter change',
+                'Redo the last undone display/filter change',
+                'Fit the graph to the screen',
+                'Show as list',
+                'View the graph in full screen',
+                'Export the graph',
+            ]) {
+                expect(
+                    names.some((n) => n.startsWith(name)),
+                    name,
+                ).toBe(true);
+            }
+            expect(names.every((n) => n.length > 0)).toBe(true); // an icon-only button without a name is an axe failure
+        });
+
+        it('groups the four exports behind one Export menu whose items keep their names', async () => {
+            const { fixture, rail } = await ready();
+            expect(rail.querySelector('[aria-label="Export as PNG"]')).toBeNull(); // not loose in the rail
+            (rail.querySelector('button[aria-label="Export the graph"]') as HTMLElement).click();
+            fixture.detectChanges();
+            const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
+            for (const f of ['PNG', 'JSON', 'SVG', 'GraphML']) {
+                expect(panel.querySelector(`[aria-label="Export as ${f}"]`), f).not.toBeNull();
+            }
+        });
+
+        it('Hide the side panels still collapses both docks and the rail stays', async () => {
+            const { fixture, el, rail } = await ready();
+            (el.querySelector('button[aria-label="Hide the side panels"]') as HTMLElement).click();
+            fixture.detectChanges();
+            expect(el.querySelector('inspecto-link-analysis-query-panel')).toBeNull();
+            expect(el.querySelector('button[aria-label="Show the side panels"]')).not.toBeNull();
+            expect(el.querySelector('nav[data-testid="la-tool-rail"]')).toBe(rail);
+        });
+
+        it('the workspace fills the remaining height instead of a fixed calc()', async () => {
+            const { el } = await ready();
+            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            expect(workspace.classList).toContain('flex-auto');
+            expect(workspace.style.height).toBe('');
+        });
+    });
+
     describe('graph as a list (LA-A11Y-AUDIT-1: the canvas text alternative)', () => {
         const ready = async () => {
             const { fixture } = create({ stubGraph: true });
@@ -1292,5 +1372,266 @@ describe('LinkAnalysisComponent', () => {
             await fixture.componentInstance.sealTemporal();
             expect(apply).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe('LinkAnalysisComponent - starter cards and result actions (operator 2026-10-10)', () => {
+    const MONEY: LinkAnalysisView = {
+        id: 'mule_layering_ring',
+        name: 'mule_layering_ring',
+        description: 'Money-mule layering ring. Planted inside ordinary transfers.',
+        sourceId: 'entity-projection',
+        query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
+    };
+    const OTHER: LinkAnalysisView = {
+        id: 'roaming',
+        name: 'roaming',
+        description: 'Roaming footprint',
+        sourceId: 'entity-projection',
+        query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
+    };
+    const card = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null;
+
+    it('replaces the empty canvas with starter cards; the Explore card is always there', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain('No graph yet');
+        expect(card(el, 'starter-explore')).toBeTruthy();
+        // nothing saved in this Space: the cards that need a saved view are hidden, not dead
+        expect(card(el, 'starter-follow')).toBeNull();
+        expect(card(el, 'starter-views')).toBeNull();
+    });
+
+    it('Follow the money loads the ready-made saved view and puts its graph on screen in one click', async () => {
+        const { fixture, queried } = create({ views: [OTHER, MONEY] });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(card(el, 'starter-follow')?.textContent).toContain('mule_layering_ring');
+        card(el, 'starter-follow')!.click();
+        await fixture.whenStable();
+        expect(queried).toEqual([MONEY.query]);
+        expect(fixture.componentInstance.graph()).not.toBeNull();
+    });
+
+    it('the follow-the-money card is hidden when the saved views are not money-themed', () => {
+        const { fixture } = create({ views: [OTHER] });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(card(el, 'starter-follow')).toBeNull();
+        expect(card(el, 'starter-views')?.textContent).toContain('1 saved view');
+    });
+
+    it('Open a saved view opens the same menu as the rail button', () => {
+        const { fixture } = create({ views: [OTHER] });
+        fixture.detectChanges();
+        const open = vi.spyOn(MatMenuTrigger.prototype, 'openMenu').mockImplementation(() => undefined);
+        card(fixture.nativeElement, 'starter-views')!.click();
+        expect(open).toHaveBeenCalledTimes(1);
+        open.mockRestore();
+    });
+
+    it('Explore a Dataset shows the Query panel and hands over to its guided picker', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.queryDockOpen.set(false);
+        const panel = fixture.debugElement.query(By.directive(LinkAnalysisQueryPanelComponent))
+            ?.componentInstance as LinkAnalysisQueryPanelComponent;
+        const explore = vi
+            .spyOn(LinkAnalysisQueryPanelComponent.prototype, 'startExplore')
+            .mockImplementation(() => undefined);
+        fixture.detectChanges();
+        card(fixture.nativeElement, 'starter-explore')!.click();
+        expect(c.queryDockOpen()).toBe(true);
+        expect(explore).toHaveBeenCalledTimes(1);
+        explore.mockRestore();
+        expect(panel === undefined || panel instanceof LinkAnalysisQueryPanelComponent).toBe(true);
+    });
+
+    it('a picked ranking row highlights the node and centres the canvas on it', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const centerOn = vi.fn();
+        (c as unknown as { graphView: unknown }).graphView = { centerOn };
+        c.onNodePick('b');
+        expect(c.emphasis()).toEqual({ nodeIds: ['b'], edgeIds: [] });
+        expect(centerOn).toHaveBeenCalledWith(['b']);
+    });
+
+    it('"Start an Investigation from the top results" queues the seeds and opens the Investigation tab - creating nothing', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.toolboxTab.set('analysis');
+        c.queueSeedsAndOpen([{ id: 'a', label: 'A', ids: ['a'] }]);
+        expect(c.investigation.queuedSeeds()).toEqual([{ id: 'a', label: 'A', ids: ['a'] }]);
+        expect(c.toolboxTab()).toBe('investigation');
+        expect(c.investigation.active()).toBe(false); // the analyst confirms title/purpose first
+    });
+
+    it('queues nothing when no top result can seed (all masked)', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.queueSeedsAndOpen([]);
+        expect(c.investigation.queuedSeeds()).toEqual([]);
+    });
+
+    /**
+     * Measured in the real shell 2026-10-10: the fill-mode graph view is `flex-auto`, which does nothing in a block
+     * parent, so G6 kept its 480px default inside a 1012px zone. Its wrapper must be a flex column.
+     */
+    it('the canvas wrapper is a flex column, so the fill-mode graph view grows into the zone', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const wrapper = (fixture.nativeElement as HTMLElement).querySelector('inspecto-graph-view')!
+            .parentElement as HTMLElement;
+        expect(wrapper.classList).toContain('flex');
+        expect(wrapper.classList).toContain('flex-col');
+        expect(wrapper.classList).toContain('max-md:min-h-[480px]'); // stacked layout keeps the old canvas height
+    });
+
+    it('bounds the page to the viewport at md+ (no page scroll): root height, row min-h-0, strip shrink-0; stacked keeps page scroll', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const root = el.firstElementChild as HTMLElement;
+        // header 4rem + footer 3.5rem; floored at 35rem so a short window scrolls the PAGE instead of crushing the canvas
+        expect(root.classList).toContain('h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)]');
+        expect(root.classList).toContain('max-md:h-auto');
+        expect(root.classList).not.toContain('h-full');
+        const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+        for (const c of ['min-h-[26.25rem]', 'flex-auto', 'overflow-hidden', 'max-md:min-h-[28rem]']) {
+            expect(workspace.classList).toContain(c);
+        }
+        for (const dock of ['Query', 'Toolbox']) {
+            const aside = el.querySelector(`aside[aria-label="${dock}"]`)!;
+            expect(aside.classList).toContain('overflow-hidden');
+            expect(aside.querySelector('.overflow-y-auto')).toBeTruthy(); // the dock body scrolls inside
+        }
+        expect(el.querySelector('nav[data-testid="la-tool-rail"]')!.classList).toContain('overflow-y-auto');
+        const strip = Array.from(el.querySelectorAll<HTMLElement>('div.shrink-0.rounded-lg.border')).find((d) =>
+            d.textContent?.includes('Data'),
+        );
+        expect(strip).toBeTruthy();
+    });
+
+    it('keeps the canvas row at least 420px high (short windows scroll the page) and the page header floor holds it', () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+        expect(workspace.classList).toContain('min-h-[26.25rem]'); // 26.25rem = 420px
+        expect(workspace.classList).not.toContain('min-h-0');
+        // the root floor (35rem) leaves room for the chrome above the row plus that 420px
+        expect((el.firstElementChild as HTMLElement).className).toContain(',35rem)]');
+    });
+
+    it('puts the active-query status chips in the page-header title row, not in a row above the canvas', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
+        expect(status).toBeTruthy();
+        expect(status.closest('inspecto-page-header header')).toBeTruthy();
+        expect(status.textContent).toContain('nodes');
+        expect(status.querySelector('button[aria-label="Change the query"]')).toBeTruthy();
+        expect(el.querySelectorAll('[aria-label="Active query"]').length).toBe(1); // no second, separate panel
+    });
+
+    describe('Toolbox dock start state (width)', () => {
+        const media = (narrow: boolean): void => {
+            const noop = (): void => undefined;
+            vi.stubGlobal('matchMedia', (q: string) => ({
+                matches: narrow && q.includes('1299px'),
+                media: q,
+                addListener: noop,
+                removeListener: noop,
+                addEventListener: noop,
+                removeEventListener: noop,
+            }));
+        };
+        const toolboxRail = (el: HTMLElement): HTMLElement | null =>
+            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the view tools"]');
+
+        afterEach(() => {
+            vi.unstubAllGlobals();
+            sessionStorage.clear();
+        });
+
+        it('starts collapsed to its rail below 1300px and the Query dock stays open', () => {
+            sessionStorage.clear();
+            media(true);
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            expect(c.toolboxDockOpen()).toBe(false);
+            expect(c.queryDockOpen()).toBe(true);
+            expect(c.canvasMaximized()).toBe(false); // "Hide the side panels" is untouched
+            expect(toolboxRail(fixture.nativeElement)).toBeTruthy();
+        });
+
+        it('starts open at 1300px and wider', () => {
+            sessionStorage.clear();
+            media(false);
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            expect(fixture.componentInstance.toolboxDockOpen()).toBe(true);
+        });
+
+        it('remembers an explicit open (narrow) and an explicit close (wide) for the session', () => {
+            sessionStorage.clear();
+            media(true);
+            const a = create({ stubGraph: true });
+            a.fixture.detectChanges();
+            a.fixture.componentInstance.openAnalysis(); // the user opens it on demand
+            a.fixture.detectChanges();
+            expect(sessionStorage.getItem('inspecto.la.toolboxOpen')).toBe('true');
+            TestBed.resetTestingModule();
+            const b = create({ stubGraph: true }); // a fresh visit, still narrow
+            b.fixture.detectChanges();
+            expect(b.fixture.componentInstance.toolboxDockOpen()).toBe(true);
+
+            sessionStorage.clear();
+            media(false);
+            TestBed.resetTestingModule();
+            const c = create({ stubGraph: true });
+            c.fixture.detectChanges();
+            c.fixture.componentInstance.toolboxDockOpen.set(false);
+            c.fixture.detectChanges();
+            TestBed.resetTestingModule();
+            const d = create({ stubGraph: true });
+            d.fixture.detectChanges();
+            expect(d.fixture.componentInstance.toolboxDockOpen()).toBe(false);
+        });
+
+        it('writes nothing until the user acts (the viewport default is not a choice)', () => {
+            sessionStorage.clear();
+            media(true);
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            expect(sessionStorage.getItem('inspecto.la.toolboxOpen')).toBeNull();
+        });
+    });
+
+    it('docks are narrower by default: Query 220px (min 200), Toolbox 340px', () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        const q = fixture.debugElement.query(By.css('[inspectoSplit="link-analysis.query"]'));
+        const t = fixture.debugElement.query(By.css('[inspectoSplit="link-analysis.toolbox"]'));
+        expect(q.nativeElement.getAttribute('aria-valuemin')).toBe('200');
+        expect(q.nativeElement.getAttribute('aria-valuenow')).toBe('220');
+        expect(t.nativeElement.getAttribute('aria-valuenow')).toBe('340');
+    });
+
+    it('the starter cards are a11y-clean', async () => {
+        const { fixture } = create({ views: [OTHER, MONEY] });
+        fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

@@ -18,6 +18,7 @@ import {
     workingSetToGraph,
 } from './investigation-state';
 import { ProjectedGraph } from './entity-projection';
+import { QueuedSeed } from './la-starter';
 
 const EMPTY_SET: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
 
@@ -48,6 +49,12 @@ export class InvestigationSessionStore {
     /** Draw the Working Set (true) or the query graph — seeds are picked from the latter. */
     readonly showWorkingSet = signal(true);
 
+    /**
+     * Ranked nodes carried over from an analysis result ("Start an Investigation from the top results"), waiting for
+     * the analyst to confirm: nothing is created or seeded until they press Start (or Seed) in the Investigation tab.
+     */
+    readonly queuedSeeds = signal<QueuedSeed[]>([]);
+
     readonly active = computed(() => this.activeId() !== null);
     readonly activeRef = computed(() => this.refs().find((r) => r.id === this.activeId()) ?? null);
     readonly header = computed(() => this.log()?.header ?? null);
@@ -77,6 +84,19 @@ export class InvestigationSessionStore {
     readonly canvas = computed<ProjectedGraph | null>(() =>
         this.active() && this.showWorkingSet() ? this.workingSetGraph() : null,
     );
+
+    /** Replace the queue with these ranked nodes. */
+    queueSeeds(seeds: QueuedSeed[]): void {
+        this.queuedSeeds.set([...seeds]);
+    }
+
+    unqueueSeed(id: string): void {
+        this.queuedSeeds.update((all) => all.filter((s) => s.id !== id));
+    }
+
+    clearQueuedSeeds(): void {
+        this.queuedSeeds.set([]);
+    }
 
     /** A saved view brought its Investigations back — remember them; open none (opening replays). */
     restore(refs: InvestigationRef[]): void {

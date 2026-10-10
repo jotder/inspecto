@@ -65,6 +65,8 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { ServerPathsState, ServerPatternState } from './entity-projection';
 import { LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
+import { LinkAnalysisResultNextComponent } from './link-analysis-result-next.component';
+import { QueuedSeed, TOP_SEED_COUNT, topSeeds } from './la-starter';
 import {
     ServerIdMap,
     countDropped,
@@ -170,6 +172,7 @@ type CentralityMetric =
         MatSelectModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        LinkAnalysisResultNextComponent,
         FormsModule,
         RiskScorePanelComponent,
         LinkAnalysisServerRunComponent,
@@ -292,6 +295,10 @@ export class LinkAnalysisToolboxComponent {
 
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();
+    /** A ranking row was picked: the host selects that node and centres the canvas on it. */
+    readonly nodePick = output<string>();
+    /** "Start an Investigation from the top results": the top-ranked nodes, to queue as seed entities. */
+    readonly seedFromResults = output<QueuedSeed[]>();
     /** LA-11: run a server-side multi-hop traversal — the host owns the call (this panel has no HTTP). */
     readonly findPaths = output<FindPathsRequest>();
     /** LA-14b: run the branching motif server-side over the whole Dataset. */
@@ -751,6 +758,19 @@ export class LinkAnalysisToolboxComponent {
 
     focusNode(id: string): void {
         this.emphasisChange.emit({ nodeIds: [id], edgeIds: [] });
+    }
+
+    /** A ranking row: highlight the node and ask the host to select and centre it. */
+    pickNode(id: string): void {
+        this.focusNode(id);
+        this.nodePick.emit(id);
+    }
+
+    /** How many top results {@link startInvestigationFrom} carries over. */
+    readonly seedCount = TOP_SEED_COUNT;
+
+    startInvestigationFrom(ranked: readonly { id: string; label: string }[]): void {
+        this.seedFromResults.emit(topSeeds(ranked, this.graph()));
     }
 
     runCommunities(): void {

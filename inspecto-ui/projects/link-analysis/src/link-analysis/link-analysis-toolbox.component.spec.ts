@@ -520,3 +520,62 @@ describe('LinkAnalysisToolboxComponent', () => {
         }
     });
 });
+
+describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', () => {
+    function ranked() {
+        const m = make();
+        m.c.tab.set('centrality');
+        m.c.runCentrality();
+        m.fixture.detectChanges();
+        return m;
+    }
+
+    it('clicking anywhere on a ranking row selects that node: highlight plus a centre request', () => {
+        const { c, fixture, last } = ranked();
+        const picked: string[] = [];
+        c.nodePick.subscribe((id) => picked.push(id));
+        const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
+        (row.querySelectorAll('td')[1] as HTMLElement).click(); // the score cell, not the name button
+        expect(picked).toEqual(['b']); // the a-b-c middle ranks first
+        expect(last()?.nodeIds).toEqual(['b']);
+    });
+
+    it('the name button picks once, not twice (the row handler must not fire on the same click)', () => {
+        const { c, fixture } = ranked();
+        const picked: string[] = [];
+        c.nodePick.subscribe((id) => picked.push(id));
+        (fixture.nativeElement.querySelector('tbody tr button') as HTMLButtonElement).click();
+        expect(picked).toHaveLength(1);
+    });
+
+    it('says what to do next under the ranking, and offers to start an Investigation from the top results', async () => {
+        const { c, fixture } = ranked();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="result-next-hint"]')?.textContent).toContain('click a row');
+        const seeds: unknown[][] = [];
+        c.seedFromResults.subscribe((s) => seeds.push(s));
+        const action = Array.from(el.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('Start an Investigation from the top results'),
+        ) as HTMLButtonElement;
+        action.click();
+        expect(seeds).toHaveLength(1);
+        // top 5 of the 5-node graph, rank order, raw ids = labels here (no spellings)
+        expect((seeds[0] as { id: string }[])[0].id).toBe('b');
+        expect(seeds[0]).toHaveLength(5);
+        expect(seeds[0][0]).toMatchObject({ ids: ['B'] });
+        await expectNoA11yViolations(el);
+    });
+
+    it('the Suspicion score table carries the same row pick and action', () => {
+        const { c, fixture } = make();
+        c.tab.set('scoring');
+        c.runScoring();
+        fixture.detectChanges();
+        const picked: string[] = [];
+        c.nodePick.subscribe((id) => picked.push(id));
+        const el = fixture.nativeElement as HTMLElement;
+        (el.querySelector('tbody tr') as HTMLElement).click();
+        expect(picked).toHaveLength(1);
+        expect(el.querySelector('[data-testid="result-next-hint"]')).toBeTruthy();
+    });
+});

@@ -57,6 +57,52 @@
         }
     </section>
 
+    @if (store.queuedSeeds().length) {
+        <!-- ── ranked nodes carried over from an analysis result; nothing is created until Start / Seed ── -->
+        <section
+            class="flex flex-col gap-1 rounded-md border p-2"
+            style="border-color: var(--gamma-border)"
+            aria-label="Queued seed entities"
+            data-testid="queued-seeds"
+        >
+            <div class="text-xs font-semibold">Queued seed entities ({{ store.queuedSeeds().length }})</div>
+            <ul class="m-0 flex list-none flex-wrap gap-1 p-0 text-xs">
+                @for (q of store.queuedSeeds(); track q.id) {
+                    <li
+                        class="flex items-center gap-0.5 rounded border px-1.5 py-0.5"
+                        style="border-color: var(--gamma-border)"
+                    >
+                        <span>{{ q.label }}</span>
+                        <button
+                            type="button"
+                            class="flex items-center"
+                            (click)="store.unqueueSeed(q.id)"
+                            [attr.aria-label]="'Remove ' + q.label + ' from the queued seeds'"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        </button>
+                    </li>
+                }
+            </ul>
+            <p class="text-secondary m-0 text-xs">
+                @if (store.active()) {
+                    These are not in the Working Set yet. Seed them to add them as one recorded step.
+                } @else {
+                    They become the first seed step once you fill in the title and purpose below and press Start.
+                    Nothing is created until then.
+                }
+            </p>
+            <div class="flex flex-wrap gap-1">
+                @if (store.active()) {
+                    <button mat-flat-button color="primary" [disabled]="store.busy()" (click)="seedQueued()">
+                        Seed the queued entities
+                    </button>
+                }
+                <button mat-button type="button" (click)="store.clearQueuedSeeds()">Clear the queue</button>
+            </div>
+        </section>
+    }
+
     @if (!store.active()) {
         <!-- ── start ── -->
         @if (projection(); as p) {
@@ -103,7 +149,9 @@
                 [disabled]="store.busy() || title.invalid || purpose.invalid"
                 (click)="start()"
             >
-                Start Investigation
+                Start Investigation{{
+                    store.queuedSeeds().length ? ' with ' + store.queuedSeeds().length + ' queued seeds' : ''
+                }}
             </button>
         } @else {
             <inspecto-alert variant="info" title="Nothing to investigate yet">{{ projectionIssue() }}</inspecto-alert>

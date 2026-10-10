@@ -393,11 +393,11 @@
                                     </thead>
                                     <tbody>
                                         @for (r of ranking(); track r.id) {
-                                            <tr>
+                                            <tr class="hover:bg-hover cursor-pointer" (click)="pickNode(r.id)">
                                                 <td class="py-0.5">
                                                     <button
                                                         class="underline-offset-2 hover:underline"
-                                                        (click)="focusNode(r.id)"
+                                                        (click)="pickNode(r.id); $event.stopPropagation()"
                                                     >
                                                         {{ r.label }}
                                                     </button>
@@ -409,6 +409,10 @@
                                         }
                                     </tbody>
                                 </table>
+                                <inspecto-link-analysis-result-next
+                                    [count]="seedCount"
+                                    (start)="startInvestigationFrom(ranking())"
+                                />
                             }
                         }
                         @case ('communities') {
@@ -681,11 +685,11 @@
                                     </thead>
                                     <tbody>
                                         @for (r of similarityResult(); track r.id) {
-                                            <tr>
+                                            <tr class="hover:bg-hover cursor-pointer" (click)="pickNode(r.id)">
                                                 <td class="py-0.5">
                                                     <button
                                                         class="underline-offset-2 hover:underline"
-                                                        (click)="focusNode(r.id)"
+                                                        (click)="pickNode(r.id); $event.stopPropagation()"
                                                     >
                                                         {{ r.label }}
                                                     </button>
@@ -697,6 +701,10 @@
                                         }
                                     </tbody>
                                 </table>
+                                <inspecto-link-analysis-result-next
+                                    [count]="seedCount"
+                                    (start)="startInvestigationFrom(similarityResult())"
+                                />
                             }
                             @if (predictions().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Predicted links">
@@ -837,11 +845,11 @@
                                     </thead>
                                     <tbody>
                                         @for (r of suspicion(); track r.id) {
-                                            <tr>
+                                            <tr class="hover:bg-hover cursor-pointer" (click)="pickNode(r.id)">
                                                 <td class="py-0.5">
                                                     <button
                                                         class="underline-offset-2 hover:underline"
-                                                        (click)="focusNode(r.id)"
+                                                        (click)="pickNode(r.id); $event.stopPropagation()"
                                                     >
                                                         {{ r.label }}
                                                     </button>
@@ -864,6 +872,10 @@
                                         }
                                     </tbody>
                                 </table>
+                                <inspecto-link-analysis-result-next
+                                    [count]="seedCount"
+                                    (start)="startInvestigationFrom(suspicion())"
+                                />
                             }
                         }
                         @case ('pattern') {

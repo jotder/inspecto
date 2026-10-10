@@ -33,6 +33,8 @@ function hostToken<T>(name: string, what: string): InjectionToken<T> {
 export interface LaDataset extends RowSourceRef {
     id: string;
     name: string;
+    /** The stored business description, when the Dataset has one - the Dataset picker shows its first sentence. */
+    description?: string;
 }
 
 export interface LaDatasets {
