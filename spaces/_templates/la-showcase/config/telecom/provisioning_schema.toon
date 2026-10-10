@@ -1,0 +1,28 @@
+raw:
+  name: PROVISIONING
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    msisdn,"0",VARCHAR,"MSISDN","","CONFIDENTIAL"
+    old_subscriber,"1",VARCHAR,"Customer id before the event, else empty","","CONFIDENTIAL"
+    new_subscriber,"2",VARCHAR,"Customer id after the event","","CONFIDENTIAL"
+    event,"3",VARCHAR,"activation, sim_swap or ownership_transfer","","INTERNAL"
+    ts,"4",TIMESTAMP,"Event time","","INTERNAL"
+mapping:
+  canonicalName: provisioning
+  rawName: PROVISIONING
+  fields[5]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: old_subscriber
+      from: old_subscriber
+      fn: keep
+    - name: new_subscriber
+      from: new_subscriber
+      fn: keep
+    - name: event
+      from: event
+      fn: keep
+    - name: ts
+      from: ts
+      fn: keep

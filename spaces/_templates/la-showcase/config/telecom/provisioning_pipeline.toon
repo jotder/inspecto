@@ -1,0 +1,36 @@
+name: provisioning
+active: true
+description: "Telecom Link Analysis showcase - SIM lifecycle events - the line passes from old_subscriber to new_subscriber. One 60-day extract (PROVISIONING_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/provisioning
+  database:   data/provisioning/database
+  backup:     data/provisioning/backup
+  temp:       data/provisioning/temp
+  errors:     data/provisioning/errors
+  quarantine: data/provisioning/quarantine
+  markers:    data/provisioning/markers
+  status_dir: data/provisioning/status
+  log_dir:    data/provisioning/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: provisioning_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,36 @@
+name: sms_cdr
+active: true
+description: "Telecom Link Analysis showcase - SMS detail records. One 60-day extract (SMS_CDR_20260929.csv). Synthetic; regenerate with tools/gen-la-telecom-data.py."
+
+dirs:
+  poll:       data/inbox/sms_cdr
+  database:   data/sms_cdr/database
+  backup:     data/sms_cdr/backup
+  temp:       data/sms_cdr/temp
+  errors:     data/sms_cdr/errors
+  quarantine: data/sms_cdr/quarantine
+  markers:    data/sms_cdr/markers
+  status_dir: data/sms_cdr/status
+  log_dir:    data/sms_cdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: sms_cdr_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

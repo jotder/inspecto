@@ -1,0 +1,13 @@
+physicalRef: telecom_links
+description: "Telecom Link Analysis showcase - ONE MSISDN-to-MSISDN link Dataset built by the telecom_links Job from voice_cdr, sms_cdr, hlr_eir, crm_kyc, recharge and provisioning. link_kind is one of voice, sms, forwarding, shared_device, shared_identity, sim_history, shared_payment; via names the shared key (imei:, id_doc:, address:, voucher:, agent:, card:, subscriber:) or the forwarding evidence (cdr, hlr). Planted rings: docs/superpower/la-telecom-demo-data.md. Synthetic."
+columns[3]{name,type,classification}:
+  a_msisdn,string,MSISDN
+  b_msisdn,string,MSISDN
+  via,string,PII
+owner: fm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,fm.analyst,view
+  user,fm.manager,view
+  user,ra.analyst,view
+  user,demo.manager,view

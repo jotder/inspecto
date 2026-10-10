@@ -1,0 +1,11 @@
+physicalRef: telecom_msisdn_indicators
+description: "Telecom Link Analysis showcase - one row per home-network MSISDN with a transparent 0-100 indicator_score, its seven factor columns and the typology columns (fan-out, inbound, average duration, out/in ratio, premium share, IMEI sharing, activation). Built by the telecom_msisdn_indicators Job; formula in docs/superpower/la-telecom-demo-data.md. Synthetic."
+columns[1]{name,type,classification}:
+  msisdn,string,MSISDN
+owner: fm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,fm.analyst,view
+  user,fm.manager,view
+  user,ra.analyst,view
+  user,demo.manager,view
