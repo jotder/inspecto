@@ -141,8 +141,7 @@ Design rules visible in the dependency graph:
   (`sets/<step>.json`, the audit/replay record, not the evaluation input).
 * `InvestigationEvaluator` is a **pure fold** of the log. The apply switch handles 14 labels: `seed`, `seedBy`,
   `expand`, `exclude`, `excludeBy`, `hide`, `keep`, `threshold`, `annotate`, `window`, `resolve`, and the markers
-  `snapshot`, `compare`, `temporal`. An unknown op throws "not evaluable" (fail closed). ⚠ Its Javadoc still says
-  "twelve ops".
+  `snapshot`, `compare`, `temporal`. An unknown op throws "not evaluable" (fail closed).
 * **Sealed reads (D-E3).** `expand` stores the rows it read, `compare`/`temporal` store their findings with a
   fingerprint, so replay needs no Dataset and a Dataset change cannot rewrite history.
 * **Hashing.** State hash = `sha256(canonical(workingSet))`, recorded per log entry; the prefix hash
@@ -368,6 +367,5 @@ Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Pe
 * Per-key index lookup cost is linear in the key's degree; the frontier cap bounds key count, not hub cost.
 * `FsInvestigationStore` carries a self-declared TRANSITIONAL note: path-keyed Draft code still reaches into the
   directory; legacy `SnapshotStore` still exists in la-core.
-* Stale comments: evaluator "twelve ops"; FS layout path in Javadoc.
 * Entity List purposes (`allow | block | watch | exclusion`) are a free string in the fold; no enum enforces them
   in entity-store.
