@@ -42,6 +42,26 @@
       "port": 8096
     },
     {
+      "name": "inspecto-la-app",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "node tools\\seed-la-showcase.mjs --scaffold inspecto-demo\\spaces-la-showcase && cd inspecto-demo && set PORT=%PORT% && set SPACES_ROOT=spaces-la-showcase && call .\\serve-demo.bat"
+      ],
+      "autoPort": true,
+      "port": 8097
+    },
+    {
+      "name": "inspecto-personal",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd inspecto-deploy && set PORT=%PORT% && set CONTROL_TOKEN=devtoken && call .\\serve.bat"
+      ],
+      "autoPort": true,
+      "port": 8098
+    },
+    {
       "name": "inspecto-backend",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

@@ -1,0 +1,1 @@
+STAGED files - NOT ingested. Copy TRANSFERS_20260904.csv (the clean next day) OR TRANSFERS_20260906.csv (a gap day: 20260905 is missing) from data/staged/mule_transfers into data/inbox/mule_transfers; the next poll ingests it, pipeline.commit fires la_index_build and a new index version appears.

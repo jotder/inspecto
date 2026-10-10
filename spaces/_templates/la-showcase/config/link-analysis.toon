@@ -1,0 +1,8 @@
+masking_mode: typed
+four_eyes_fan_out_above: 5
+index:
+  enabled: true
+drafts:
+  max_open: 10
+  hibernate_after_minutes: 60
+  expire_after_days: 14

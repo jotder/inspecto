@@ -1,0 +1,15 @@
+{
+  "_note": "Expectations over the SHIPPED la-showcase corpus (spaces/_templates/la-showcase/data). Regenerate the corpus with tools/gen-la-showcase-data.py; change these only when the demo story changes.",
+  "landed": {
+    "files": ["TRANSFERS_20260901.csv", "TRANSFERS_20260902.csv", "TRANSFERS_20260903.csv"],
+    "nodes": 112,
+    "links": 224,
+    "hub": "MULE-HUB-01",
+    "hubMaxRank": 3,
+    "ringOnlyCycle": ["SHELL-A", "SHELL-B", "SHELL-C", "SHELL-D"],
+    "inBandSmurfLegs": 96,
+    "tillShareMin": 0.7
+  },
+  "afterNextDay": { "extraFile": "TRANSFERS_20260904.csv", "hubMaxRank": 3 },
+  "afterGapDay": { "extraFile": "TRANSFERS_20260906.csv", "hubMaxRank": 3 }
+}
