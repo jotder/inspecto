@@ -1,9 +1,10 @@
 physicalRef: mule_transfers/database
 description: "Account-to-account transfers carrying a planted money-mule layering ring - the Link Analysis showcase. Synthetic."
 eventDate: BOOKED_DATE
-columns[2]{name,classification}:
-  PAYER_ACCOUNT,ACCOUNT
-  PAYEE_ACCOUNT,ACCOUNT
+columns[3]{name,type,classification}:
+  PAYER_ACCOUNT,string,ACCOUNT
+  PAYEE_ACCOUNT,string,ACCOUNT
+  BOOKED_DATE,date,
 owner: fm.analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
