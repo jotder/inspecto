@@ -53,7 +53,7 @@ Incident or Case page offers as **Investigate … in Link Analysis** when a keye
 kind `link_kind`, time `last_seen`); `dataset=` names another one. The Investigation tab asks only the purpose (the
 title is pre-filled *Suspect &lt;id&gt;*); **Investigate** then creates the Investigation, seeds the number and expands
 two degrees. **Expand next degree** goes one hop further from the outermost entities, up to degree 4, with the
-profile's presets (last 30 days, at least 1 event per link, at most 50 links per entity, 2 000 rows per degree);
+profile's presets (the 30 days up to the Dataset's latest event — "all available data" when that cannot be read — at least 1 event per link, at most 50 links per entity, 2 000 rows per degree);
 each degree's result, any budget cut or fan-out cap, and a degree held for four-eyes approval ("waiting for approval") is stated under the button. If the Space has no such
 Dataset the screen says so, keeps the number queued as a seed and offers the Dataset picker. The legend's link-kind
 chips hide or show each kind of link on the canvas.

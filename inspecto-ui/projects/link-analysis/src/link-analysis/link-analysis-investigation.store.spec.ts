@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import {
     InvService,
@@ -428,6 +428,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
             presets: { windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 },
             maxDegree: 4,
             degrees: 2,
+            windowEnd: '2026-09-29T18:30:00.000Z',
         });
         expect(ok).toBe(true);
         expect(inv.createInvestigation).toHaveBeenCalledWith(
@@ -441,7 +442,9 @@ describe('InvestigationSessionStore (LA-10)', () => {
         ]);
         expect(ops[0]).toMatchObject({ entityType: 'msisdn' });
         expect(ops[1]).toMatchObject({ budget: 2000, minEvents: 2, maxFanOut: 50 });
-        expect(ops[1]['window']).toEqual({ from: expect.any(String), to: expect.any(String) });
+        // the window ends at the Dataset's latest event time, not today
+        expect(ops[1]['window']).toEqual({ from: '2026-08-30T18:30:00.000Z', to: '2026-09-29T18:30:01.000Z' });
+        expect(store.degreeOutcomes()[0].range).toBe('30 days to 29 Sep 2026');
         expect(store.degreeOutcomes().map((o) => [o.degree, o.admitted, o.truncated, o.fanOutCapped])).toEqual([
             [1, 2, false, 0],
             [2, 2, true, 4],
@@ -515,5 +518,42 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(degreeState(store.workingSet(), 4, store.degreeOutcomes()).blocked).toContain(
             'waiting for approval (request p1)',
         );
+    });
+
+    it('in-flight guard: a second chain or expand while one runs is ignored; closing mid-chain stops it', async () => {
+        const { store, inv, sets } = setup();
+        let release!: () => void;
+        const gate = new Promise<void>((r) => (release = r));
+        let n = 0;
+        inv.appendInvestigationOp.mockImplementation(((_id: string, op: { op: string }) => {
+            n++;
+            if (op.op === 'seed') {
+                sets['inv-1'] = ws(['s']);
+                return of({ ...step(n, 'seed'), delta: { ...step(n, 'seed').delta, admitted: ['s'] } });
+            }
+            // the first expand hangs until released; the Investigation is closed meanwhile
+            return new Observable((sub) => {
+                void gate.then(() => {
+                    sets['inv-1'] = {
+                        ...ws(['s', 'a']),
+                        entities: [...ws(['s']).entities, { ...ws(['a']).entities[0], hop: 1 }],
+                    };
+                    sub.next({ ...step(n, 'expand'), delta: { ...step(n, 'expand').delta, admitted: ['a'] } });
+                    sub.complete();
+                });
+            });
+        }) as never);
+        const req = { projection: P, purpose: 'p', title: 't', seed: 's', presets: {}, maxDegree: 4, degrees: 2 };
+        const first = store.investigateNumber(req);
+        await new Promise((r) => setTimeout(r));
+        expect(store.chainRunning()).toBe(true);
+        expect(await store.investigateNumber(req)).toBe(false); // the chain is already running
+        expect(await store.expandNextDegree({}, 4)).toBe(false); // a degree is already in flight
+        store.close();
+        release();
+        expect(await first).toBe(false);
+        expect(store.chainRunning()).toBe(false);
+        expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(2); // seed + ONE expand: no second degree after close
+        expect(store.degreeOutcomes()).toEqual([]);
     });
 });

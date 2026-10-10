@@ -90,6 +90,8 @@ export interface PendingInvestigation {
     timeCol?: string;
     presets: DegreePresets;
     maxDegree: number;
+    /** The Dataset's latest event time (ISO) — the preset window ends there, not today; absent = no window is sent. */
+    windowEnd?: string;
 }
 
 /**
@@ -117,14 +119,65 @@ export function investigateBinding(req: InvestigateRequest): PendingInvestigatio
     };
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A day as the analyst reads it, in UTC: `29 Sep 2026`. */
+export function dayLabel(iso: string | number): string {
+    const d = new Date(iso); // fixed month names: locale data spells September `Sep` or `Sept`
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+/** What the window covers, in words: `30 days to 29 Sep 2026`, or `all available data` when no end is known. */
+export function windowLabel(p: DegreePresets, windowEnd?: string | null): string | null {
+    if (p.windowDays == null) return null;
+    return windowEnd ? `${p.windowDays} days to ${dayLabel(windowEnd)}` : 'all available data';
+}
+
+/**
+ * The SQL reading a Dataset's latest event time over `/db/query` (the guarded read-only route Advanced search already
+ * runs for analysts). Identifiers are double-quoted with embedded quotes doubled.
+ */
+export function latestTimeSql(sourceName: string, timeCol: string): string {
+    const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
+    return `SELECT MAX(${q(timeCol)}) AS latest FROM ${q(sourceName)}`;
+}
+
+/** A zone-less timestamp (a naive DuckDB TIMESTAMP) read as UTC, the Investigation's default zone. */
+const asUtc = (v: string): string => {
+    const iso = v.trim().replace(' ', 'T');
+    return /^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(iso) ? iso + 'Z' : iso;
+};
+
+/** The ISO instant of a `latestTimeSql` answer's value, or null when it is empty or not a time. */
+export function latestTimeOf(value: unknown): string | null {
+    if (value == null || value === '') return null;
+    const t = typeof value === 'number' ? value : Date.parse(asUtc(String(value)));
+    return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
 /** The presets in words, for the line that says what Start will do. */
-export function presetsSummary(p: DegreePresets): string {
+export function presetsSummary(p: DegreePresets, windowEnd?: string | null): string {
     const parts: string[] = [];
-    if (p.windowDays != null) parts.push(`the last ${p.windowDays} days`);
+    const w = windowLabel(p, windowEnd);
+    if (w) parts.push(w);
     if (p.minEvents != null) parts.push(`at least ${p.minEvents} events per link`);
     if (p.maxFanOut != null) parts.push(`at most ${p.maxFanOut} links per entity`);
     if (p.budget != null) parts.push(`${p.budget.toLocaleString('en')} rows per degree`);
     return parts.length ? parts.join(', ') : 'the server defaults';
+}
+
+/** The mapped columns a Dataset lacks (case-insensitive, as the server matches them); empty = it can be bound. */
+export function missingMappedColumns(b: PendingInvestigation, columns: readonly string[]): string[] {
+    const have = new Set(columns.map((c) => c.toLowerCase()));
+    const p = b.projection;
+    return [p.sourceCol, p.targetCol, p.linkKindCol, b.timeCol].filter(
+        (c): c is string => !!c && !have.has(c.toLowerCase()),
+    );
+}
+
+/** Why a deep link's seed is not an id of its entity type, or null. Only `msisdn` has a shape to check. */
+export function seedError(req: InvestigateRequest): string | null {
+    return req.entityType.toLowerCase() === 'msisdn' ? msisdnError(req.seed) : null;
 }
 
 /** The Investigation's title for a suspect id. */
@@ -152,6 +205,11 @@ export interface DegreeOutcome {
     fanOutCapped: number;
     budget?: number;
     maxFanOut?: number;
+    /** What the window covered, in words (`30 days to 29 Sep 2026` / `all available data`); absent = no window preset. */
+    range?: string;
+    /** Hub suppression: high-connectivity entities admitted but not expanded further, and frontier hubs held back. */
+    hubsFlagged?: number;
+    hubsHeld?: number;
     /** D-U7: the expand was held for four-eyes approval — the pending request's id; nothing was read. */
     awaitingApproval?: string;
 }
@@ -187,24 +245,31 @@ export function degreeState(
 const DAY_MS = 86_400_000;
 
 /**
- * The rung a profile's presets send. The window (days back from `now`) only when the Investigation has a time
- * column — without one the server refuses any window.
+ * The rung a profile's presets send. The window (`windowDays` back from `windowEnd`, the Dataset's latest event time —
+ * never today, which would cut off seed data) only when the Investigation has a time column AND that end is known;
+ * otherwise no window (all available data). `to` is exclusive, so it sits one second after the latest event.
  */
-export function presetRung(presets: DegreePresets, hasTimeColumn: boolean, now = Date.now()): ExpandRung {
+export function presetRung(presets: DegreePresets, hasTimeColumn: boolean, windowEnd?: string | null): ExpandRung {
+    const end = windowEnd ? Date.parse(windowEnd) : NaN;
     const rung: ExpandRung = {};
     if (presets.budget != null) rung.budget = presets.budget;
     if (presets.minEvents != null) rung.minEvents = presets.minEvents;
     if (presets.maxFanOut != null) rung.maxFanOut = presets.maxFanOut;
-    if (presets.windowDays != null && hasTimeColumn)
+    if (presets.windowDays != null && hasTimeColumn && Number.isFinite(end))
         rung.window = {
-            from: new Date(now - presets.windowDays * DAY_MS).toISOString(),
-            to: new Date(now).toISOString(),
+            from: new Date(end - presets.windowDays * DAY_MS).toISOString(),
+            to: new Date(end + 1000).toISOString(),
         };
     return rung;
 }
 
 /** What a step at `degree` did, from the `/ops` answer and the rung it sent. */
-export function degreeOutcome(degree: number, step: InvestigationStepResult, rung: ExpandRung): DegreeOutcome {
+export function degreeOutcome(
+    degree: number,
+    step: InvestigationStepResult,
+    rung: ExpandRung,
+    range?: string | null,
+): DegreeOutcome {
     if (step.status === 'pending')
         return {
             degree,
@@ -224,6 +289,9 @@ export function degreeOutcome(degree: number, step: InvestigationStepResult, run
         fanOutCapped: step.read?.fanOutCapped ?? 0,
         budget: rung.budget,
         maxFanOut: rung.maxFanOut ?? undefined,
+        ...(range ? { range } : {}),
+        hubsFlagged: step.read?.hubsFlagged ?? 0,
+        hubsHeld: step.read?.rung?.hubsHeld?.length ?? 0,
     };
 }
 
@@ -235,7 +303,7 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
     if (o.awaitingApproval)
         return `Degree ${o.degree}: waiting for approval — this expand exceeds the Space's four-eyes limit, so it runs once a second person approves request ${o.awaitingApproval}.`;
     const parts = [
-        `Degree ${o.degree}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
+        `Degree ${o.degree}${o.range ? ` (${o.range})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
     ];
     if (o.truncated)
         parts.push(
@@ -246,5 +314,7 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
             `${plural(o.fanOutCapped, 'weaker link was', 'weaker links were')} left out: each entity keeps its ` +
                 `${o.maxFanOut ? `${o.maxFanOut} ` : ''}strongest links.`,
         );
+    if (o.hubsFlagged) parts.push(`${plural(o.hubsFlagged, 'high-connectivity number')} shown but not expanded.`);
+    if (o.hubsHeld) parts.push(`${plural(o.hubsHeld, 'high-connectivity number')} of the frontier not expanded from.`);
     return parts.join(' ');
 }

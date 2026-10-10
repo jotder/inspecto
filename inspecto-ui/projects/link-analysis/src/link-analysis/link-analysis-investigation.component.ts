@@ -158,7 +158,7 @@ export class LinkAnalysisInvestigationComponent {
     /** What the pending investigation's Start will do, in words. */
     readonly pendingSummary = computed(() => {
         const p = this.pending();
-        return p ? presetsSummary(p.presets) : '';
+        return p ? presetsSummary(p.presets, p.windowEnd) : '';
     });
 
     /** "Investigate <id>": create, seed, then expand two degrees. Asks for the purpose like every Investigation. */
@@ -179,6 +179,7 @@ export class LinkAnalysisInvestigationComponent {
             presets: p.presets,
             maxDegree: p.maxDegree,
             degrees: 2,
+            windowEnd: p.windowEnd,
         });
         // Once created the Investigation is open — the pending form is done even when a later expand was refused.
         if (ok || this.store.active()) {

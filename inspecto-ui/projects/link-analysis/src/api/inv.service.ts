@@ -439,6 +439,10 @@ export interface InvestigationStepResult {
         readAt: string;
         /** `expand`: candidate links the rung's `maxFanOut` left out (the strongest per entity were kept). Not a truncation. */
         fanOutCapped?: number;
+        /** Hub suppression: high-connectivity entities this step admitted flagged (shown, not expanded further). */
+        hubsFlagged?: number;
+        /** The rung as read; `hubsHeld` = frontier hubs the server did not expand from. */
+        rung?: { hubsHeld?: string[] } & Record<string, unknown>;
         /** Only when an expand was answered by the link index: the version it read (never part of the fingerprint). */
         index?: { version: number; stale: boolean; fingerprint?: string };
         /** Only when an expand was answered by the flat Dataset: the closed reason (never part of the fingerprint). */

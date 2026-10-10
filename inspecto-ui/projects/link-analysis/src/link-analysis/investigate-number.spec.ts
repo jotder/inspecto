@@ -14,8 +14,14 @@ import {
     msisdnError,
     normaliseMsisdn,
     parseInvestigateParams,
+    latestTimeOf,
+    latestTimeSql,
+    missingMappedColumns,
     presetRung,
+    presetsSummary,
     sameInvestigateRequest,
+    seedError,
+    windowLabel,
 } from './investigate-number';
 
 const entity = (id: string, hop: number, hidden = false): WorkingSetEntity => ({
@@ -154,17 +160,61 @@ describe('investigate-number - next degree', () => {
         expect(degreeState(ws(entity('s', 0), ...many), 4).blocked).toContain('one expand names at most 1,000');
     });
 
-    it('sends the presets; the window only when the Investigation has a time column', () => {
-        const now = Date.parse('2026-10-11T00:00:00Z');
+    it('anchors the window at the Dataset latest event time, never today; no end = no window', () => {
         const p = domainProfile('telecom').investigate!.expand;
-        expect(presetRung(p, true, now)).toEqual({
+        expect(presetRung(p, true, '2026-09-29T18:30:00.000Z')).toEqual({
             budget: 2000,
             minEvents: 1,
             maxFanOut: 50,
-            window: { from: '2026-09-11T00:00:00.000Z', to: '2026-10-11T00:00:00.000Z' },
+            window: { from: '2026-08-30T18:30:00.000Z', to: '2026-09-29T18:30:01.000Z' },
         });
-        expect(presetRung(p, false, now)).not.toHaveProperty('window');
-        expect(presetRung({}, true, now)).toEqual({});
+        expect(presetRung(p, false, '2026-09-29T18:30:00.000Z')).not.toHaveProperty('window');
+        expect(presetRung(p, true, null)).not.toHaveProperty('window');
+        expect(presetRung({}, true, '2026-09-29T18:30:00.000Z')).toEqual({});
+    });
+
+    it('says what the window covers honestly', () => {
+        const p = { windowDays: 30 };
+        expect(windowLabel(p, '2026-09-29T18:30:00.000Z')).toBe('30 days to 29 Sep 2026');
+        expect(windowLabel(p, null)).toBe('all available data');
+        expect(windowLabel({}, '2026-09-29T18:30:00.000Z')).toBeNull();
+        expect(presetsSummary({ windowDays: 30, budget: 2000 }, null)).toBe(
+            'all available data, 2,000 rows per degree',
+        );
+    });
+
+    it('reads the latest event time with quoted identifiers and parses DuckDB timestamps', () => {
+        expect(latestTimeSql('tele"links', 'last_seen')).toBe('SELECT MAX("last_seen") AS latest FROM "tele""links"');
+        expect(latestTimeOf('2026-09-29 18:30:00')).toBe('2026-09-29T18:30:00.000Z');
+        expect(latestTimeOf(Date.parse('2026-09-29T00:00:00Z'))).toBe('2026-09-29T00:00:00.000Z');
+        expect(latestTimeOf(null)).toBeNull();
+        expect(latestTimeOf('not a time')).toBeNull();
+    });
+
+    it('checks a named Dataset for the mapped columns and a deep-link seed for the MSISDN shape', () => {
+        const b = investigateBinding({ seed: '966501', entityType: 'msisdn', dataset: 'x' })!;
+        expect(missingMappedColumns(b, ['A_MSISDN', 'b_msisdn', 'link_kind', 'last_seen'])).toEqual([]);
+        expect(missingMappedColumns(b, ['a_msisdn', 'b_msisdn'])).toEqual(['link_kind', 'last_seen']);
+        expect(seedError({ seed: '12ab', entityType: 'msisdn' })).toBe(
+            'A number is 6 to 15 digits, optionally starting with +.',
+        );
+        expect(seedError({ seed: '+966 50 123 4567', entityType: 'msisdn' })).toBeNull();
+        expect(seedError({ seed: 'ACC-1', entityType: 'account' })).toBeNull();
+    });
+
+    it('notes hub suppression and the anchored range on the degree line', () => {
+        const step = {
+            step: 2,
+            op: 'expand',
+            delta: { admitted: ['a'], removed: [], linksAdded: 1, linksRemoved: 0, hidden: [], kept: [], excluded: [] },
+            truncated: false,
+            read: { rowCount: 1, fingerprint: '', readAt: '', hubsFlagged: 1, rung: { hubsHeld: ['h1', 'h2'] } },
+            workingSet: { entities: 2, links: 1, excluded: 0, hash: '' },
+        } as InvestigationStepResult;
+        expect(degreeOutcomeMessage(degreeOutcome(1, step, {}, '30 days to 29 Sep 2026'))).toBe(
+            'Degree 1 (30 days to 29 Sep 2026): 1 new entity, 1 link added. 1 high-connectivity number shown but not ' +
+                'expanded. 2 high-connectivity numbers of the frontier not expanded from.',
+        );
     });
 
     it('states a degree in plain words, truncation and the fan-out cap included', () => {
@@ -193,6 +243,8 @@ describe('investigate-number - next degree', () => {
             fanOutCapped: 12,
             budget: 2000,
             maxFanOut: 50,
+            hubsFlagged: 0,
+            hubsHeld: 0,
         });
         expect(degreeOutcomeMessage(o)).toBe(
             'Degree 2: 2 new entities, 5 links added. The read stopped at its budget of 2,000 rows — some ' +

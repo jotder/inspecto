@@ -53,12 +53,18 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
 import { LinkAnalysisStarterCardsComponent } from './link-analysis-starter-cards.component';
 import { QueuedSeed, pickFollowTheMoney } from './la-starter';
+import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
 import {
     InvestigateRequest,
     PendingInvestigation,
     investigateBinding,
     investigateQueryParams,
+    latestTimeOf,
+    latestTimeSql,
+    missingMappedColumns,
+    normaliseMsisdn,
+    seedError,
     parseInvestigateParams,
     sameInvestigateRequest,
 } from './investigate-number';
@@ -328,6 +334,7 @@ export class LinkAnalysisComponent implements OnInit {
     private router = inject(Router);
     private route = inject(ActivatedRoute);
     private destroyRef = inject(DestroyRef);
+    private datasetRows = inject(DatasetRowsService);
     /**
      * The Case this analysis was opened from (`/studio/link-analysis?case=<id>`, the link on a Case page),
      * pre-selected in the save dialog. ⚠ Deliberately NOT stripped after use: unlike the `?create=1`
@@ -1079,7 +1086,17 @@ export class LinkAnalysisComponent implements OnInit {
                 distinctUntilChanged(sameInvestigateRequest),
                 takeUntilDestroyed(this.destroyRef),
             )
-            .subscribe((req) => req && void this.prepareInvestigation(req));
+            .subscribe((req) => {
+                if (!req) return;
+                void this.prepareInvestigation(req);
+                // Consumed: drop the params, so a reload does not start over and close the open Investigation.
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { seed: null, entityType: null, dataset: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true,
+                });
+            });
     }
 
     /** The Datasets of this Space, once listed (empty when the list failed). */
@@ -1095,27 +1112,58 @@ export class LinkAnalysisComponent implements OnInit {
      * open the Dataset picker — the regular start then seeds it.
      */
     async prepareInvestigation(req: InvestigateRequest): Promise<void> {
-        const binding = investigateBinding(req);
+        const badSeed = seedError(req);
+        if (badSeed) {
+            // The same rule as the starter card: a malformed number is refused, never queued.
+            this.pendingInvestigation.set(null);
+            this.investigateIssue.set(`${req.seed} cannot be investigated: ${badSeed}`);
+            return;
+        }
+        const seed = req.entityType.toLowerCase() === 'msisdn' ? normaliseMsisdn(req.seed) : req.seed;
+        const binding = investigateBinding({ ...req, seed });
         const datasets = await this.datasetsLoaded;
         const wanted = binding?.projection.datasetId ?? req.dataset;
-        const found = !!wanted && datasets.some((d) => d.id === wanted);
-        if (binding && found) {
+        const ds = wanted ? datasets.find((d) => d.id === wanted) : undefined;
+        let reason = !binding
+            ? `No domain profile investigates entities of type ${req.entityType}.`
+            : !ds
+              ? `The Dataset ${wanted} is not in this Space, so ${seed} cannot be investigated over it.`
+              : '';
+        // A Dataset named by the link must carry the profile's mapped columns, or every expand would be refused.
+        if (binding && ds && req.dataset) {
+            const missing = missingMappedColumns(
+                binding,
+                (await this.datasetRows.columns(ds)).map((c) => c.name),
+            );
+            if (missing.length)
+                reason = `The Dataset ${wanted} has no column ${missing.join(', ')}, which the ${binding.profileId} profile binds.`;
+        }
+        if (binding && ds && !reason) {
             this.investigateIssue.set('');
             this.investigation.close(); // the pending form shows only while no Investigation is open (it stays remembered)
             this.profileControl.setValue(binding.profileId);
-            this.pendingInvestigation.set(binding);
+            const windowEnd = await this.latestEventTime(ds, binding.timeCol);
+            this.pendingInvestigation.set(windowEnd ? { ...binding, windowEnd } : binding);
             this.openInvestigation();
             return;
         }
         this.pendingInvestigation.set(null);
         this.investigateIssue.set(
-            (binding
-                ? `The Dataset ${wanted} is not in this Space, so ${req.seed} cannot be investigated over it. `
-                : `No domain profile investigates entities of type ${req.entityType}. `) +
-                `Choose the Dataset holding ${req.seed}'s links and run it; ${req.seed} is queued as the first seed of ` +
+            `${reason} Choose the Dataset holding ${seed}'s links and run it; ${seed} is queued as the first seed of ` +
                 'the Investigation you start from it.',
         );
-        this.investigation.queueSeeds([{ id: req.seed, label: req.seed, ids: [req.seed] }]);
+        this.investigation.queueSeeds([{ id: seed, label: seed, ids: [seed] }]);
+    }
+
+    /**
+     * The Dataset's latest event time — where the preset window ends (seed data ends before today). Read over
+     * `/db/query`, the guarded read-only route Advanced search runs for analysts; null when it cannot be read, and
+     * then no window is sent.
+     */
+    private async latestEventTime(ds: LaDataset, timeCol: string | undefined): Promise<string | null> {
+        if (!timeCol || !ds.sourceName) return null;
+        const res = await this.datasetRows.sql(ds.sourceName, latestTimeSql(ds.sourceName, timeCol), 1);
+        return res.error ? null : latestTimeOf(res.rows[0]?.['latest']);
     }
 
     /** Starter card "Investigate a number": the same flow as the deep link — navigate with `?seed=`. */
