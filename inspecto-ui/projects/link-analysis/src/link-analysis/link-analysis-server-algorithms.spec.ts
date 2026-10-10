@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import {
     GraphAlgorithm,
     GraphAlgorithmCatalogue,
@@ -55,6 +56,18 @@ const CATALOGUE = {
             resultKind: 'GRAPH',
             needsNode: true,
             params: [{ name: 'direction', type: 'ENUM', default: 'both', allowed: ['out', 'in', 'both'] }],
+        }),
+        // a list/map parameter the panel has no control for: API only
+        alg('propagatedRisk', {
+            label: 'Propagated risk',
+            cost: 'JOB',
+            resultKind: 'PROPAGATED_RISK',
+            params: [
+                { name: 'nodeScores', type: 'SCORE_MAP', default: {}, min: 0, max: 100, maxSize: 500000 },
+                { name: 'seeds', type: 'ID_LIST', default: [], maxSize: 500000 },
+                { name: 'weights', type: 'DOUBLE_LIST', default: [1, 0.6, 0.35, 0.15], min: 0, max: 1, maxSize: 6 },
+                { name: 'direction', type: 'ENUM', default: 'both', allowed: ['out', 'in', 'both'] },
+            ],
         }),
     ],
     ceilings: { maxNodes: 1, maxEdges: 1, timeoutMs: 1 },
@@ -125,7 +138,28 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
             'pageRank',
         ])
             expect(c.algorithmOptions().some((o) => o.value === id)).toBe(true);
-        expect(el.querySelector('[data-testid=algo-count]')!.textContent).toContain('8 algorithms');
+        expect(el.querySelector('[data-testid=algo-count]')!.textContent).toContain('9 algorithms');
+    });
+
+    it('marks an algorithm with a list or map parameter API only: no number field for it, Run held and said why', async () => {
+        const { fixture, c, el, run } = make();
+        expect(c.algorithmOptions().find((o) => o.value === 'propagatedRisk')!.label).toBe(
+            'Propagated risk (API only)',
+        );
+        expect(c.algorithmOptions().find((o) => o.value === 'pageRank')!.label).toBe('pageRank');
+        c.pick('propagatedRisk');
+        fixture.detectChanges();
+        for (const name of ['nodeScores', 'seeds', 'weights'])
+            expect(el.querySelector(`[data-testid=param-${name}]`)).toBeNull();
+        expect(el.querySelector('[data-testid=param-direction]')).not.toBeNull();
+        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain(
+            'API only: this panel cannot edit nodeScores, seeds, weights yet',
+        );
+        const button = el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!;
+        expect(button.disabled).toBe(true);
+        button.click();
+        expect(run).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
     });
 
     it('builds the parameter form from the descriptors and sends what was edited', () => {

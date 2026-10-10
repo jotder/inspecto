@@ -268,7 +268,9 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
   `SqlGraphEngine` (neighbourhood, ego network, seeds-only degree; caps throw `IndexCapExceeded`, no reroute).
 * **29 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB, a hint) and a node ceiling (e.g. 500 for
   betweenness, 100,000 for shortest path) that is the inline-versus-job threshold, not a limit — the budget refuses.
-  The toolbox exposes 18 with *Run on server* and 3 with *Run on index*; the other 8 are API-only.
+  The toolbox has dedicated controls for 18 (*Run on server*) and 3 (*Run on index*); its catalogue-driven *All
+  algorithms (server)* panel runs every other one, EXCEPT an algorithm with a list/map parameter it has no control for
+  (today only `propagatedRisk`), which it labels *API only* with Run held and the reason stated.
 * **`propagatedRisk`** (server-only, `GraphPropagation`, no TS twin; JOB, ceiling 1,000): `raw(n) = own(n) + Σ own(o) ×
   weights[d(o,n)]` over origins `o ≠ n` within `weights.size()` (≤ 6) shortest hops; `score = min(raw, 100)`. Params:
   `nodeScores` (id → 0-100, request-only — nodes carry no attributes, so no `scoreAttribute`; no Space default yet),
