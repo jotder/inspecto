@@ -603,6 +603,17 @@ export interface InvestigationReplayResult {
     diverged: boolean;
 }
 
+/** `GET …/drafts/{draftId}/replay` (DraftRoutes#replay). */
+export interface DraftReplayResult {
+    /** The main-log step the Draft forked at; its own steps are numbered after it. */
+    baseStep: number;
+    at: number;
+    workingSet: WorkingSet;
+    equivalent: boolean;
+    mismatches: number[];
+    setMismatches: number[];
+}
+
 export interface InvestigationLogEntry {
     step: number;
     kind: 'op' | 'undo';
@@ -1563,9 +1574,10 @@ export class InvService {
         return this.http.get<InvestigationLog>(invPath(id, `drafts/${encodeURIComponent(draftId)}/log`));
     }
 
-    /** A Draft's full Working Set (entities + links + exclusions), evaluated from its log. */
-    draftReplay(id: string, draftId: string): Observable<{ workingSet: WorkingSet }> {
-        return this.http.get<{ workingSet: WorkingSet }>(invPath(id, `drafts/${encodeURIComponent(draftId)}/replay`));
+    /** A Draft's full Working Set (entities + links + exclusions) re-folded from its log, plus the equivalence check
+     *  (`mismatches` = log positions, `setMismatches` = own steps whose persisted set disagrees). No `reread` (drift). */
+    draftReplay(id: string, draftId: string): Observable<DraftReplayResult> {
+        return this.http.get<DraftReplayResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/replay`));
     }
 
     /** Append one op to a Draft — the actor only; the SAME validation as the main log. */

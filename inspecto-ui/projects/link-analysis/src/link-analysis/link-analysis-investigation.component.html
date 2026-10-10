@@ -199,6 +199,7 @@
             <inspecto-link-analysis-drafts
                 [investigationId]="h.id"
                 [activeDraftId]="store.activeDraftId()"
+                [refreshOn]="store.lastStep()"
                 (scope)="store.useDraft($event)"
                 (promoted)="store.open(h.id)"
             ></inspecto-link-analysis-drafts>
@@ -549,24 +550,44 @@
             } @else {
                 <button
                     mat-button
-                    [disabled]="store.busy() || store.effectiveSteps().length < 2"
+                    [disabled]="store.busy() || store.effectiveSteps().length < 2 || !!store.activeDraftId()"
                     (click)="beginReorder()"
                 >
                     Re-order steps (creates a fork)…
                 </button>
+                @if (store.activeDraftId()) {
+                    <p class="text-secondary m-0 text-xs">
+                        Re-ordering forks the Investigation's main log, not a Draft — go back to the Investigation to
+                        re-order.
+                    </p>
+                }
             }
         </section>
 
         <!-- ── replay + drift ── -->
         <section class="flex flex-col gap-1" aria-label="Replay">
             <div class="flex items-center gap-2">
-                <mat-checkbox [ngModel]="reread()" (ngModelChange)="reread.set($event)">
+                <mat-checkbox
+                    [ngModel]="reread() && !store.activeDraftId()"
+                    [disabled]="!!store.activeDraftId()"
+                    (ngModelChange)="reread.set($event)"
+                >
                     Re-read current data (drift check)
                 </mat-checkbox>
-                <button mat-stroked-button class="ml-auto" [disabled]="store.busy()" (click)="store.replay(reread())">
+                <button
+                    mat-stroked-button
+                    class="ml-auto"
+                    [disabled]="store.busy()"
+                    (click)="store.replay(reread() && !store.activeDraftId())"
+                >
                     Replay
                 </button>
             </div>
+            @if (store.activeDraftId()) {
+                <p class="text-secondary m-0 text-xs">
+                    Replay checks the Draft's log; a Draft has no re-read of current data (drift check).
+                </p>
+            }
             @if (store.replayResult(); as r) {
                 @if (r.equivalent) {
                     <inspecto-alert variant="success" title="Replay is equivalent">

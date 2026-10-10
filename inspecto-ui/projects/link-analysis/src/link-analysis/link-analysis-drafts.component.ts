@@ -167,6 +167,8 @@ export class LinkAnalysisDraftsComponent {
     readonly activeDraftId = input<string | null>(null);
     /** Asks the host to make this Draft (or, with null, the main log) the working scope. */
     readonly scope = output<string | null>();
+    /** Changes whenever the host applies a step or Undo — the list (own-step counts) is re-read then. */
+    readonly refreshOn = input<unknown>(null);
 
     private readonly inv = inject(InvService);
 
@@ -181,6 +183,7 @@ export class LinkAnalysisDraftsComponent {
     constructor() {
         effect(() => {
             const id = this.investigationId();
+            this.refreshOn();
             untracked(() => this.reload(id));
         });
     }

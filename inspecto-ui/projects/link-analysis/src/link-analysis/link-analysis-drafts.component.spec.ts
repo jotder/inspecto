@@ -15,6 +15,7 @@ import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
     template: `<inspecto-link-analysis-drafts
         investigationId="inv-1"
         [activeDraftId]="active"
+        [refreshOn]="tick"
         (scope)="active = $event"
         (promoted)="promoted = promoted + 1"
     ></inspecto-link-analysis-drafts>`,
@@ -22,6 +23,7 @@ import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
 class Host {
     promoted = 0;
     active: string | null = null;
+    tick: unknown = null;
 }
 
 const DRAFT: InvestigationDraft = {
@@ -110,6 +112,19 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         await click(f, button(el, 'Work on this Draft'));
         await click(f, button(el, 'Discard'));
         expect(f.componentInstance.active).toBeNull();
+    });
+
+    it('LA-UI-DRAFT-FIX-1: re-reads the Drafts (own-step count) after each step or undo on the scope', async () => {
+        const list = (steps: number) => of({ investigationId: 'inv-1', items: [{ ...DRAFT, steps }], total: 1 });
+        const investigationDrafts = vi.fn(() => list(3)).mockReturnValueOnce(list(2));
+        const { f, el, inv } = await create({ investigationDrafts });
+        expect(el.textContent).toContain('2 own step(s)');
+        f.componentInstance.tick = { step: 6 };
+        f.detectChanges();
+        await f.whenStable();
+        f.detectChanges();
+        expect(inv.investigationDrafts).toHaveBeenCalledTimes(2);
+        expect(el.textContent).toContain('3 own step(s)');
     });
 
     it('forks a Draft', async () => {

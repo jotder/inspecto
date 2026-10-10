@@ -262,6 +262,20 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         expect(inv.reorderInvestigation).toHaveBeenCalledWith('inv-1', { order: [2, 1] });
     });
 
+    it('LA-UI-DRAFT-FIX-1: with a Draft as the scope, re-order and re-read are not offered, and say why', async () => {
+        const { fixture, store, el, button } = create();
+        await openInv(store);
+        store.activeDraftId.set('d-1');
+        fixture.detectChanges();
+        expect(button('Re-order steps').disabled).toBe(true);
+        expect(el.textContent).toContain('go back to the Investigation to re-order');
+        await fixture.whenStable(); // ngModel applies [disabled] asynchronously
+        fixture.detectChanges();
+        const reread = el.querySelector('[aria-label="Replay"] input[type="checkbox"]') as HTMLInputElement;
+        expect(reread.disabled).toBe(true);
+        expect(el.textContent).toContain('a Draft has no re-read of current data');
+    });
+
     it('does not offer Pin to a Widget when the shell has no Widget library (LA_WIDGETS.available false)', async () => {
         const { fixture, store, el } = create({ noWidgetLibrary: true });
         await openInv(store);

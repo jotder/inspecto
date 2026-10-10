@@ -956,9 +956,14 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   **Draft as the working scope** (`LA-UI-DRAFT-OPS-1`, 2026-10-10): "Work on this Draft" emits `(scope)`; the host calls
   `InvestigationSessionStore.useDraft(draftId)`, after which `apply` / `undo` post to `…/drafts/{draftId}/ops` · `/undo` and
   the log and canvas come from the Draft's `GET /log` · `GET /replay`; an info alert says steps go to the Draft. "Back to
-  the Investigation" (or discarding that Draft, or `close()` / re-open after promote) returns to the main log. ⚠ Replay
-  (`reread`) and re-order (fork) still act on the MAIN log while a Draft is the scope; the panel's own-step count refreshes
-  only on its next action.
+  the Investigation" (or discarding that Draft, or `close()` / re-open after promote) returns to the main log. Rough
+  edges fixed 2026-10-11 (`LA-UI-DRAFT-FIX-1`): `useDraft` loads the Draft's log + `/replay` FIRST and only then switches the
+  scope — a Draft discarded elsewhere (404) leaves the scope unchanged with the error shown; Replay uses the Draft's
+  `GET /replay` (equivalence only — its `setMismatches` merge into `mismatches`; the Draft route has no `reread`, so the
+  drift checkbox is disabled with a reason); re-order (fork) is disabled with a reason, since a fork re-orders the MAIN log
+  and there is no Draft equivalent; Undo is enabled only by effective steps after the Draft's `baseStep` (from `/replay`),
+  never by the main-log prefix; the Drafts panel re-reads its list (own-step counts) on every `lastStep` change via its
+  `refreshOn` input.
   **Oversight surface** (`link-analysis-oversight.component`, 2026-10-03, `LA-SPA-OWED-SURFACES-1` slice): lists
   `GET …/log`'s `pending[]` — each request's requester, the thresholds it crossed (`sensitivity.exceeded` and the
   Space's `fourEyes*Above`) and its status; a holder of `canApproveLinkExpansions` gets **Approve / Deny** (optional
