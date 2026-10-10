@@ -24,6 +24,16 @@ public interface TokenRelay {
      *  verifier/redirect) — the caller gets {@code 401}, never the IAM's error detail. */
     Optional<Tokens> exchangeCode(String code, String codeVerifier, String redirectUri);
 
+    /**
+     * As {@link #exchangeCode(String, String, String)}, binding the exchange to the OIDC {@code nonce} the SPA sent on
+     * its authorize request. A relay that validates ID tokens must refuse (empty) when {@code nonce} is non-null and
+     * the ID token's {@code nonce} claim is absent or different. The default ignores the nonce - right for a relay
+     * that never sees a real ID token (the demo relay).
+     */
+    default Optional<Tokens> exchangeCode(String code, String codeVerifier, String redirectUri, String nonce) {
+        return exchangeCode(code, codeVerifier, redirectUri);
+    }
+
     /** Mint a fresh access token from a refresh token. Empty ⇒ rejected (expired/revoked) — 401. */
     Optional<Tokens> refresh(String refreshToken);
 

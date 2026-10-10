@@ -50,6 +50,10 @@ export interface LinkAnalysisLimits {
     /** Parallel backend lane (may be absent): the `seedBy` distinct cap stated, and the one in force. */
     seedByDistinctCap?: number | null;
     seedByDistinctCapInForce?: number;
+    /** Per-set size limit of a sealed Working Set in bytes (1024..1073741824); `null` = 64 MiB. A larger set is refused 413. */
+    maxSetBytes?: number | null;
+    /** The size limit actually in force (bytes) - server-computed, read-only. */
+    maxSetBytesInForce?: number;
     /** D7-6: the stated Draft settings; `null`/absent = every key inherits. */
     drafts?: Partial<DraftSettings> | null;
     /** D7-6: the Draft settings actually in force - server-computed, read-only. */

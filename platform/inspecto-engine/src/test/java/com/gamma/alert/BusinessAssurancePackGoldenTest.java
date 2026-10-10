@@ -220,6 +220,25 @@ class BusinessAssurancePackGoldenTest {
     }
 
     /**
+     * The regime / drift constants (K = 3, k = 0.25 sigma, h = 8 sigma, 4-sigma band) were tuned on one corpus
+     * (`ASSURE-PACK-BUSINESS-ASSURANCE-1` f). They are sigma-relative, so a second synthetic corpus must give the
+     * same verdict: (1) the whole series scaled x7 and lifted by 3000 (the planted spike scales with it), and
+     * (2) a different noise realization (a deterministic sine-hash term of sigma ~14 added to the shipped noise).
+     * Both must flag exactly the planted spike - no regime change, no drift, no extra band breach.
+     */
+    @Test
+    void theConstantsHoldOnASecondSyntheticCorpus(@TempDir Path dir) throws Exception {
+        Path scaled = variant(dir.resolve("scaled"), "ba_revenue_forecast", "daily_revenue",
+                "SELECT ds, revenue * 7 + 3000 AS revenue FROM __base");
+        assertEquals(List.of("150:band"), flags(scaled), "scale and offset invariance");
+        Path renoised = variant(dir.resolve("renoised"), "ba_revenue_forecast", "daily_revenue",
+                revenue("20 * sin(t * 12.9898 + 78.233) * 0.7"));
+        assertEquals(List.of("150:band"), flags(renoised), "a different noise realization");
+        assertEquals(1, sweep(renoised).count("ba_revenue_outside_band"));
+        assertEquals(0, sweep(renoised).count("ba_revenue_regime_change") + sweep(renoised).count("ba_revenue_drift"));
+    }
+
+    /**
      * The CUSUM state is typed DOUBLE in the recursion's anchor: a {@code 0.0} literal types it DECIMAL(2,1), which
      * the default {@code cusum_h} 8 never overflows (the sum resets first) but a raised limit does.
      */

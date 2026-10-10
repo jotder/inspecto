@@ -49,6 +49,11 @@ const DRAFT_FIELDS: { key: DraftKey; label: string; max: number; def: number; hi
         hint: 'An idle Draft is discarded after this long; must be longer than the hibernation.',
     },
 ];
+/** `SettingsRoutes` `maxSetBytes`: 1 KiB..1 GiB (the PostgreSQL `text` ceiling), refused 422 outside; blank = 64 MiB. */
+const SET_BYTES_MIN = 1024;
+const SET_BYTES_MAX = 1_073_741_824;
+const SET_BYTES_DEFAULT = 64 * 1024 * 1024;
+const setBytesValidators = [Validators.min(SET_BYTES_MIN), Validators.max(SET_BYTES_MAX), Validators.pattern('\\d*')];
 const draftValidators = (max: number) => [Validators.min(1), Validators.max(max), Validators.pattern('\\d*')];
 
 type Key = 'fourEyesBudgetAbove' | 'fourEyesFanOutAbove' | 'mergedDistinctCap' | 'seedByDistinctCap';
@@ -117,6 +122,31 @@ function expiryAfterHibernation(
                             }
                         </mat-form-field>
                     }
+                    @if (hasSetLimit()) {
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Working Set size limit (bytes)</mat-label>
+                            <input
+                                matInput
+                                type="number"
+                                [min]="setBytesMin"
+                                [max]="setBytesMax"
+                                formControlName="maxSetBytes"
+                                [readonly]="!canEdit()"
+                                [placeholder]="'default ' + setBytesInForce()"
+                            />
+                            <mat-hint
+                                >In force: {{ setBytesInForce() / 1048576 }} MiB ({{ setBytesInForce() }} bytes). A
+                                Working Set over the limit is refused with 413, so one step cannot grow an
+                                Investigation's storage without bound; narrow the step or raise the limit.</mat-hint
+                            >
+                            @if (form.controls.maxSetBytes.invalid) {
+                                <mat-error
+                                    >A whole number of bytes from {{ setBytesMin }} (1 KiB) to {{ setBytesMax }} (1
+                                    GiB), or blank for the default (64 MiB).</mat-error
+                                >
+                            }
+                        </mat-form-field>
+                    }
                     <fieldset formGroupName="drafts" class="flex flex-col gap-3">
                         <legend class="text-sm font-semibold">Drafts</legend>
                         @for (d of draftFields; track d.key) {
@@ -175,6 +205,8 @@ export class LinkAnalysisSettingsComponent implements OnInit {
 
     readonly max = MAX;
     readonly draftFields = DRAFT_FIELDS;
+    readonly setBytesMin = SET_BYTES_MIN;
+    readonly setBytesMax = SET_BYTES_MAX;
     readonly canEdit = computed(() => this.lens.canAuthorWorkbench());
     readonly loading = signal(true);
     readonly saving = signal(false);
@@ -182,12 +214,16 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly saveError = signal<string | null>(null);
     readonly writesDisabled = signal<string | null>(null);
     private readonly served = signal<LinkAnalysisLimits | null>(null);
+    /** Shown only when the server reports the key (it always does since 2026-10-10). */
+    readonly hasSetLimit = computed(() => this.served() !== null && 'maxSetBytes' in this.served()!);
+    readonly setBytesInForce = computed(() => this.served()?.maxSetBytesInForce ?? SET_BYTES_DEFAULT);
 
     readonly form = new FormGroup({
         fourEyesBudgetAbove: new FormControl<number | null>(null, intOrBlank),
         fourEyesFanOutAbove: new FormControl<number | null>(null, intOrBlank),
         mergedDistinctCap: new FormControl<number | null>(null, intOrBlank),
         seedByDistinctCap: new FormControl<number | null>(null, intOrBlank),
+        maxSetBytes: new FormControl<number | null>(null, setBytesValidators),
         drafts: new FormGroup(
             {
                 maxOpen: new FormControl<number | null>(null, draftValidators(1000)),
@@ -265,6 +301,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         body['mergedDistinctCap'] = num(v.mergedDistinctCap);
         if ('seedByDistinctCap' in served) body['seedByDistinctCap'] = num(v.seedByDistinctCap);
         else delete body['seedByDistinctCap'];
+        if ('maxSetBytes' in served) body['maxSetBytes'] = num(v.maxSetBytes);
         // Blank keys are omitted (inherit); no stated key at all = no block.
         const drafts: Record<string, number> = {};
         for (const d of DRAFT_FIELDS) {
@@ -301,6 +338,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             fourEyesFanOutAbove: s.fourEyesFanOutAbove ?? null,
             mergedDistinctCap: s.mergedDistinctCap ?? null,
             seedByDistinctCap: s.seedByDistinctCap ?? null,
+            maxSetBytes: s.maxSetBytes ?? null,
             drafts: {
                 maxOpen: s.drafts?.maxOpen ?? null,
                 hibernateAfterMinutes: s.drafts?.hibernateAfterMinutes ?? null,

@@ -32,7 +32,7 @@ import com.gamma.access.AuditTrail;
  * Bearer token yet; the cookie itself is the credential for {@code /auth/refresh}.
  *
  * <pre>
- *   POST /auth/exchange  {code, codeVerifier, redirectUri} → 200 {accessToken, expiresIn} + Set-Cookie
+ *   POST /auth/exchange  {code, codeVerifier, redirectUri[, nonce]} → 200 {accessToken, expiresIn} + Set-Cookie
  *   POST /auth/refresh   (cookie)                          → 200 {accessToken, expiresIn} + rotated cookie
  *   POST /auth/logout    (cookie)                          → 200 {loggedOut} + cleared cookie; best-effort revoke
  * </pre>
@@ -57,7 +57,8 @@ final class AuthRoutes implements RouteModule {
         String redirectUri = ApiContext.str(body, "redirectUri");
         if (code == null || verifier == null || redirectUri == null)
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'code', 'codeVerifier' and 'redirectUri'");
-        TokenRelay.Tokens t = relay.exchangeCode(code, verifier, redirectUri).orElseThrow(() -> {
+        String nonce = ApiContext.str(body, "nonce");   // optional: sent only by an SPA that put one on the authorize request
+        TokenRelay.Tokens t = relay.exchangeCode(code, verifier, redirectUri, nonce).orElseThrow(() -> {
             AuditTrail.authentication(ex, "auth.exchange", false, 401);
             return new ApiException(401, ErrorCodes.UNAUTHENTICATED, "code exchange failed");
         });

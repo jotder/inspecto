@@ -705,7 +705,7 @@ DuckDB holds a single-writer lock. The engine is chosen per store by process-glo
 | Operational objects | `-Dobjects.backend=db` | `-Dobjects.db.url` | mutable alerts/incidents/cases |
 | Object links | `-Dobjects.backend=db` | `-Dobjects.links.db.url` | correlation graph (append-only) |
 | Object notes | `-Dobjects.backend=db` | `-Dobjects.notes.db.url` | evidence / comments (append-only) |
-| Link Analysis Investigations | `-Dinvestigations.backend=db` (default `fs`; Enterprise bundles carry the module) | `-Dinvestigations.db.url` / `.user` / `.password`, else `-Dinspecto.db.url` / `.user` / `.password` | sealed Investigation log, Working Set sets, members, Drafts (one `space_<id>` schema per Space). PostgreSQL only; selected-but-unusable is `503`, never a filesystem fall-back |
+| Link Analysis Investigations | `-Dinvestigations.backend=db` (default `fs`; Enterprise bundles carry the module) | `-Dinvestigations.db.url` / `.user` / `.password`, else `-Dinspecto.db.url` / `.user` / `.password` | sealed Investigation log, Working Set sets, members, Drafts (one `space_<id>` schema per Space). PostgreSQL only; selected-but-unusable is `503`, never a filesystem fall-back, and never a boot refusal: WARN + `live.investigations` DOWN on `/health/details`; the connection properties need a restart to change. A sealed Working Set over the Space's `max_set_bytes` (`link-analysis.toon`, default 64 MiB, 1 KiB..1 GiB) is refused `413 PAYLOAD_TOO_LARGE` on both stores and audited as `LINK_WORKING_SET_TOO_LARGE` |
 | Job runs | `-Djobs.backend=postgres` (or `duckdb`) | `-Djobs.db.url` | job-execution reporting (success rate, p50/p95) |
 | Pipeline provenance | `-Dprovenance.backend=postgres` (or `duckdb`) | `-Dprovenance.db.url` | per-edge record counts (T21) |
 

@@ -23,6 +23,7 @@ class InvestigationStoresTest {
 
     @AfterEach
     void clean() {
+        com.gamma.util.StoreHealth.clearAll();
         KEYS.forEach(System::clearProperty);
         InvestigationStores.forTest(null);
     }
@@ -36,7 +37,7 @@ class InvestigationStoresTest {
         @Override public String backend() { return "db"; }
 
         @Override
-        public InvestigationStore open(String spaceId, Connection c) throws IOException {
+        public InvestigationStore open(String spaceId, Connection c, java.util.function.LongSupplier maxSetBytes) throws IOException {
             if (failWith != null) throw failWith;
             space = spaceId;
             connection = c;
@@ -109,6 +110,35 @@ class InvestigationStoresTest {
         assertEquals("jdbc:postgresql://own/d", p.connection.url(), "the family key wins");
         assertEquals("own-user", p.connection.user());
         assertEquals("platform-secret", p.connection.password(), "an unset family key falls back per field");
+    }
+
+    @Test
+    void anUnusableDatabaseIsShownOnHealthDetailsAndWarnedNotRefusedAtBootAndRecoversWithoutARestart() {
+        Recording p = new Recording();
+        p.failWith = new IOException("connection refused");
+        InvestigationStores.forTest(p);
+        System.setProperty(InvestigationStores.BACKEND_PROPERTY, "db");
+        System.setProperty(InvestigationStores.URL_PROPERTY, "jdbc:postgresql://h/d");
+        Path spaceRoot = root.resolve("spaces").resolve("north").resolve("config");
+
+        InvestigationStores.probeAtBoot(spaceRoot);   // returns: the boot is not refused
+        var down = com.gamma.util.StoreHealth.liveOf("north").get(InvestigationStores.HEALTH_FAMILY);
+        assertNotNull(down, "boot recorded a live.investigations entry for the Space");
+        assertEquals(com.gamma.util.StoreHealth.Status.DEGRADED, down.status());
+        assertTrue(down.detail().contains("connection refused") && down.detail().contains("503"), down.detail());
+        assertFalse(down.detail().contains("hunter2"));
+        refused(() -> InvestigationStores.of(spaceRoot), "connection refused");   // and every request keeps the fail-closed 503
+
+        p.failWith = null;   // the database came back: nothing was cached, so the next request works with no restart
+        assertInstanceOf(FsInvestigationStore.class, InvestigationStores.of(spaceRoot));
+        assertEquals(com.gamma.util.StoreHealth.Status.UP, com.gamma.util.StoreHealth.liveOf("north").get(InvestigationStores.HEALTH_FAMILY).status());
+    }
+
+    @Test
+    void theFilesystemBackendRecordsNoHealthEntryAndTheBootProbeIsANoOp() {
+        InvestigationStores.probeAtBoot(root);
+        InvestigationStores.of(root);
+        assertTrue(com.gamma.util.StoreHealth.liveOf("default").isEmpty());
     }
 
     @Test

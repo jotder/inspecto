@@ -22,7 +22,7 @@ import com.gamma.access.WriteGates;
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
- *                                 mergedDistinctCap, seedByDistinctCap, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems},
+ *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems},
  *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue},
  *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
@@ -169,7 +169,8 @@ final class SettingsRoutes implements RouteModule {
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
-                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body));
+                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body),
+                setBytes(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -189,6 +190,8 @@ final class SettingsRoutes implements RouteModule {
         m.put("mergedDistinctCapInForce", s.effectiveMergedDistinctCap());
         m.put("seedByDistinctCap", s.seedByDistinctCap());
         m.put("seedByDistinctCapInForce", s.effectiveSeedByDistinctCap());
+        m.put("maxSetBytes", s.maxSetBytes());
+        m.put("maxSetBytesInForce", s.effectiveMaxSetBytes());
         LinkAnalysisSettings.GraphRun g = s.graphRun();
         Map<String, Object> run = null;   // D-4: null = every knob inherits the service's shipped default
         if (g != null) {
@@ -356,6 +359,21 @@ final class SettingsRoutes implements RouteModule {
 
     /** A stated node cap: {@code null}/absent = inherit the shipped default; otherwise an int in
      *  {@code 1..MAX_NODE_CAP} or the write is refused (422), never silently clamped. */
+    /** {@code maxSetBytes}: the per-set size limit, 1 KiB..1 GiB (the PostgreSQL {@code text} ceiling); null inherits 64 MiB. */
+    private static Integer setBytes(Map<String, Object> body) {
+        Object raw = body.get("maxSetBytes");
+        if (raw == null) return null;
+        long v;
+        try {
+            v = Long.parseLong(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maxSetBytes must be an integer, got '" + raw + "'");
+        }
+        if (v < 1024 || v > 1_073_741_824L)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maxSetBytes must be 1024..1073741824 (1 KiB..1 GiB), got " + v);
+        return (int) v;
+    }
+
     private static Integer nodeCap(Map<String, Object> body, String key) {
         Object raw = body.get(key);
         if (raw == null) return null;

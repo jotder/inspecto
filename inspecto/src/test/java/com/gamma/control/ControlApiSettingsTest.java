@@ -327,6 +327,26 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** The per-set size limit: a per-Space setting, 1 KiB..1 GiB, default 64 MiB (operator 2026-10-10). */
+    @Test
+    void linkAnalysisMaxSetBytesRoundTripsAndDefaults(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertTrue(def.get("maxSetBytes").isNull(), "absent => inherit");
+            assertEquals(67_108_864, def.get("maxSetBytesInForce").asInt(), "the shipped default is 64 MiB");
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"maxSetBytes\":1048576}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("max_set_bytes: 1048576"), toon);
+            assertEquals(1_048_576, json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("maxSetBytesInForce").asInt());
+            assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"maxSetBytes\":1024}").statusCode(), "the floor passes");
+            assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"maxSetBytes\":1073741824}").statusCode(), "the ceiling passes");
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"maxSetBytes\":1023}").statusCode(), "below 1 KiB");
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"maxSetBytes\":1073741825}").statusCode(), "above 1 GiB");
+        }
+    }
+
     /** D-4 step 6: the graph-run knobs are a nested block; absent = inherit, a stated block round-trips and a bad one is 422. */
     @Test
     void linkAnalysisGraphRunRoundTripsAndRefusesBadValues(@TempDir Path root) throws Exception {

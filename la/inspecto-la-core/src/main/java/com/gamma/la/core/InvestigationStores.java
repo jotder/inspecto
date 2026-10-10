@@ -4,6 +4,9 @@ import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.SpiSlot;
+import com.gamma.util.StoreHealth;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,6 +33,11 @@ public final class InvestigationStores {
     public static final String USER_PROPERTY = "investigations.db.user";
     public static final String PASSWORD_PROPERTY = "investigations.db.password";   // secret-allow: the NAME of a property, never its value
 
+    /** The {@code /health/details} family of the selected database store: {@code live.investigations} (UP / DOWN, per Space). */
+    public static final String HEALTH_FAMILY = "investigations";
+
+    private static final Logger LOG = LoggerFactory.getLogger(InvestigationStores.class);
+
     private static final SpiSlot<InvestigationStoreProvider> SLOT = new SpiSlot<>(InvestigationStoreProvider.class, true);
 
     private InvestigationStores() {}
@@ -41,9 +49,49 @@ public final class InvestigationStores {
             case "fs":
                 return new FsInvestigationStore(writeRoot);
             case "db":
-                return database(writeRoot);
+                return reported(writeRoot);
             default:
                 throw unavailable("-D" + BACKEND_PROPERTY + "=" + backend + " is not a backend (fs or db)");
+        }
+    }
+
+    /**
+     * The database store of the Space, with the outcome published as {@code live.investigations} on {@code /health/details}
+     * (operator decision 2026-10-10: a selected-but-unusable database does NOT stop the boot; it WARNs, shows DOWN, and every request
+     * keeps the fail-closed 503). {@link StoreHealth#live} (not {@code record}) because it never throws under a partitioned topology and
+     * recovers on the next successful open; the WARN is logged only when the verdict flips, not once per request.
+     */
+    private static InvestigationStore reported(Path writeRoot) {
+        String space = spaceId(writeRoot);
+        try {
+            InvestigationStore opened = database(writeRoot);
+            StoreHealth.Resolved before = StoreHealth.liveOf(space).get(HEALTH_FAMILY);
+            StoreHealth.live(space, HEALTH_FAMILY, true, null, "the Investigation database store opened");
+            if (before != null && before.status() == StoreHealth.Status.DEGRADED)
+                LOG.info("Investigation database store of Space '{}' is usable again", space);
+            return opened;
+        } catch (ApiException refused) {
+            StoreHealth.Resolved before = StoreHealth.liveOf(space).get(HEALTH_FAMILY);
+            StoreHealth.live(space, HEALTH_FAMILY, false, null, refused.getMessage()
+                    + " - every Investigation request of this Space answers 503 until this is fixed (the connection is the JVM properties -D"
+                    + URL_PROPERTY + " / " + USER_PROPERTY + " / " + PASSWORD_PROPERTY + " or -Dinspecto.db.*, which need a restart to change)");
+            if (before == null || before.status() != StoreHealth.Status.DEGRADED)
+                LOG.warn("Investigation database store of Space '{}' is unusable, serving 503 until fixed: {}", space, refused.getMessage());
+            throw refused;
+        }
+    }
+
+    /**
+     * Boot-time check (operator 2026-10-10): when {@code -Dinvestigations.backend=db}, try the store of {@code writeRoot}'s Space once,
+     * so an unusable database is WARNed and shown on {@code /health/details} from the start instead of at the first analyst request.
+     * Never throws and never stops the boot; a no-op on the filesystem backend.
+     */
+    public static void probeAtBoot(Path writeRoot) {
+        if (writeRoot == null || !"db".equals(System.getProperty(BACKEND_PROPERTY, "fs").trim().toLowerCase(Locale.ROOT))) return;
+        try {
+            of(writeRoot);
+        } catch (RuntimeException refused) {
+            // already WARNed and recorded by reported(); the boot goes on
         }
     }
 
@@ -64,7 +112,8 @@ public final class InvestigationStores {
         String user = first(System.getProperty(USER_PROPERTY), System.getProperty("inspecto.db.user"));
         String password = SecretResolver.resolve(first(System.getProperty(PASSWORD_PROPERTY), System.getProperty("inspecto.db.password")));
         try {
-            return provider.open(spaceId(writeRoot), new InvestigationStoreProvider.Connection(url, user, password));
+            return provider.open(spaceId(writeRoot), new InvestigationStoreProvider.Connection(url, user, password),
+                    WorkingSetSizeLimit.forRoot(writeRoot));
         } catch (IOException e) {
             throw unavailable("the Investigation database cannot be used: " + e.getMessage());
         }

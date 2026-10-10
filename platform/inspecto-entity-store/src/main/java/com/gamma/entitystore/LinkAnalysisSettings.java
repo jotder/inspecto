@@ -46,7 +46,8 @@ import java.util.Map;
 public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
-                                   Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts) {
+                                   Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
+                                   Integer maxSetBytes) {
 
     /**
      * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
@@ -140,7 +141,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     public static final String FILE = "link-analysis.toon";
-    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null);
+    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -156,6 +157,14 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     /** The seedBy distinct-value cap in force: the stated one, else {@link #DEFAULT_SEED_BY_DISTINCT_CAP}. */
     public int effectiveSeedByDistinctCap() {
         return seedByDistinctCap != null ? seedByDistinctCap : DEFAULT_SEED_BY_DISTINCT_CAP;
+    }
+
+    /** The shipped default of {@code max_set_bytes}: 64 MiB of sealed Working Set text per step. */
+    public static final int DEFAULT_MAX_SET_BYTES = 64 * 1024 * 1024;
+
+    /** The per-set size limit in force, in bytes: the stated one, else {@link #DEFAULT_MAX_SET_BYTES}. */
+    public int effectiveMaxSetBytes() {
+        return maxSetBytes != null ? maxSetBytes : DEFAULT_MAX_SET_BYTES;
     }
 
     /** The graph-run knobs in force: the stated ones; a field never stated is {@code null} inside (the service's default). */
@@ -195,6 +204,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (entityTypes != null) m.put("entity_types", EntityTypes.shape(entityTypes));
         if (mergedDistinctCap != null) m.put("merged_distinct_cap", mergedDistinctCap);
         if (seedByDistinctCap != null) m.put("seed_by_distinct_cap", seedByDistinctCap);
+        if (maxSetBytes != null) m.put("max_set_bytes", maxSetBytes);
         if (graphRun != null && !graphRun.isNone()) {
             Map<String, Object> g = new LinkedHashMap<>();
             if (graphRun.maxNodes() != null) g.put("max_nodes", graphRun.maxNodes());
@@ -238,7 +248,8 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "suspicion_node_cap"), maskingMode(ToonHelper.opt(m, "masking_mode", "")),
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
                     entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
-                    optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")));
+                    optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")),
+                    optInt(m, "max_set_bytes"));
         } catch (Exception e) {
             return EMPTY;
         }

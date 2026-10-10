@@ -78,6 +78,41 @@ public final class OidcTokenRelay implements TokenRelay {
         return post(form);
     }
 
+    /**
+     * Redeem the code and, when the SPA sent a {@code nonce}, require the ID token the IAM returned to carry exactly
+     * that {@code nonce} claim (OIDC Core 3.1.3.7): absent ID token, absent claim or a different value is refused, so
+     * a response replayed from another sign-in cannot mint a session. The ID token arrives straight from the token
+     * endpoint over TLS, which Core 3.1.3.7 accepts in place of a signature check; only the claim is read here.
+     */
+    @Override
+    public Optional<Tokens> exchangeCode(String code, String codeVerifier, String redirectUri, String nonce) {
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("grant_type", "authorization_code");
+        form.put("code", code);
+        form.put("code_verifier", codeVerifier);
+        form.put("redirect_uri", redirectUri);
+        return post(form, nonce == null || nonce.isBlank() ? null : nonce);
+    }
+
+    /**
+     * What an anonymous {@code GET /bootstrap} publishes so the SPA needs no build-time bake-in: the PUBLIC OIDC
+     * client config only ({@code authorizeUrl}, {@code clientId}, {@code scopes}, {@code endSessionUrl} - the browser
+     * sees all of them in the redirect anyway; never the secret). Empty unless {@code -Dauth.oidc.authorizeUrl} is set.
+     */
+    @Override
+    public Map<String, Object> bootstrapAuth() {
+        String authorize = System.getProperty("auth.oidc.authorizeUrl");
+        if (authorize == null || authorize.isBlank()) return Map.of();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("authorizeUrl", authorize.trim());
+        out.put("clientId", clientId);
+        String scopes = System.getProperty("auth.oidc.scopes");
+        if (scopes != null && !scopes.isBlank()) out.put("scopes", scopes.trim());
+        String endSession = System.getProperty("auth.oidc.endSessionUrl");
+        if (endSession != null && !endSession.isBlank()) out.put("endSessionUrl", endSession.trim());
+        return out;
+    }
+
     @Override
     public Optional<Tokens> refresh(String refreshToken) {
         Map<String, String> form = new LinkedHashMap<>();
@@ -87,6 +122,10 @@ public final class OidcTokenRelay implements TokenRelay {
     }
 
     private Optional<Tokens> post(Map<String, String> form) {
+        return post(form, null);
+    }
+
+    private Optional<Tokens> post(Map<String, String> form, String expectedNonce) {
         form.put("client_id", clientId);
         if (clientSecret != null && !clientSecret.isBlank()) form.put("client_secret", clientSecret);
         try {
@@ -101,10 +140,25 @@ public final class OidcTokenRelay implements TokenRelay {
             String access = body.path("access_token").asText(null);
             String refresh = body.path("refresh_token").asText(null);
             if (access == null || refresh == null) return Optional.empty();
+            if (expectedNonce != null && !nonceMatches(body.path("id_token").asText(null), expectedNonce))
+                return Optional.empty();
             return Optional.of(new Tokens(access, body.path("expires_in").asLong(300),
                     refresh, body.hasNonNull("refresh_expires_in") ? body.get("refresh_expires_in").asLong() : null));
         } catch (Exception e) {
             return Optional.empty();   // IAM unreachable / timeout / malformed — the caller just gets 401
+        }
+    }
+
+    /** True when the ID token's {@code nonce} claim equals {@code expected} (constant-time); false for no token, a
+     *  malformed one, or an absent / non-string / different claim. */
+    static boolean nonceMatches(String idToken, String expected) {
+        if (idToken == null || idToken.isBlank()) return false;
+        try {
+            Object claim = com.nimbusds.jwt.JWTParser.parse(idToken).getJWTClaimsSet().getClaim("nonce");
+            return claim instanceof String s && java.security.MessageDigest.isEqual(
+                    s.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return false;
         }
     }
 

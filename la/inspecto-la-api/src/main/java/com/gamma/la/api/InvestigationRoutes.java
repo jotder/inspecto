@@ -157,6 +157,11 @@ public final class InvestigationRoutes implements RouteModule {
                 (e, m) -> decide(api, e, m.group(1), m.group(2), true, api.body(e))));
         api.post("/inv/investigations/([^/]+)/pending/([^/]+)/deny", ApiContext.withCapability("canApproveLinkExpansions",
                 (e, m) -> decide(api, e, m.group(1), m.group(2), false, api.body(e))));
+        try {
+            InvestigationStores.probeAtBoot(api.writeRoot());   // -Dinvestigations.backend=db: WARN + health now, never refuse the boot
+        } catch (RuntimeException noBootSpace) {
+            // no Space is bound yet; each Space is checked on its first request and reported the same way
+        }
     }
 
     /** One opened Investigation: its store, write root and parsed header. Package-private for {@link WorkingSetRoutes}. */

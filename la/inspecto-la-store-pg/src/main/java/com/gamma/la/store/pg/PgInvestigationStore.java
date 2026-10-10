@@ -82,6 +82,7 @@ public final class PgInvestigationStore implements InvestigationStore {
 
     private final Borrow borrow;
     private final String schema;
+    private final java.util.function.LongSupplier maxSetBytes;
 
     /** A connection per call from {@code connections} (tests, {@code DriverManager}). */
     public PgInvestigationStore(ConnectionSource connections, String schema) throws IOException {
@@ -92,19 +93,25 @@ public final class PgInvestigationStore implements InvestigationStore {
                     return body.apply(c);
                 }
             }
-        });
+        }, com.gamma.la.core.WorkingSetSizeLimit.DEFAULT);
     }
 
     /** Connections borrowed from a pool (reentrant: a nested borrow on one thread reuses its connection, so one operation is one connection). */
     public PgInvestigationStore(com.gamma.util.ConnectionSource pool, String schema) throws IOException {
-        this(schema, pool::with);
+        this(schema, pool::with, com.gamma.la.core.WorkingSetSizeLimit.DEFAULT);
     }
 
-    private PgInvestigationStore(String schema, Borrow borrow) throws IOException {
+    /** As above, with the Space's per-set size limit ({@link com.gamma.la.core.WorkingSetSizeLimit}) read per write. */
+    public PgInvestigationStore(com.gamma.util.ConnectionSource pool, String schema, java.util.function.LongSupplier maxSetBytes) throws IOException {
+        this(schema, pool::with, maxSetBytes);
+    }
+
+    private PgInvestigationStore(String schema, Borrow borrow, java.util.function.LongSupplier maxSetBytes) throws IOException {
         if (schema == null || !SCHEMA.matcher(schema).matches())
             throw new IllegalArgumentException("schema must match " + SCHEMA.pattern());
         this.borrow = borrow;
         this.schema = schema;
+        this.maxSetBytes = maxSetBytes;
         bootstrap();
     }
 
@@ -296,6 +303,7 @@ public final class PgInvestigationStore implements InvestigationStore {
 
     @Override
     public boolean createFork(String id, String headerJson, List<String> lines, List<String> sets) throws IOException {
+        com.gamma.la.core.WorkingSetSizeLimit.enforceAll(maxSetBytes, id, 1, sets);
         return tx(c -> {
             if (update(c, "INSERT INTO " + t("la_investigation") + " (id, header) VALUES (?, ?) ON CONFLICT DO NOTHING", id, headerJson) != 1) return false;
             insertLines(c, id, "", 0, lines);
@@ -345,6 +353,7 @@ public final class PgInvestigationStore implements InvestigationStore {
 
     @Override
     public void append(Scope scope, long expectedVersion, int step, String lineJson, String setJson) throws IOException {
+        com.gamma.la.core.WorkingSetSizeLimit.enforce(maxSetBytes, scope.investigationId(), step, setJson);
         String inv = scope.investigationId(), draft = draftOf(scope);
         tx(c -> {
             if (scope.isDraft()) {
@@ -669,6 +678,7 @@ public final class PgInvestigationStore implements InvestigationStore {
     @Override
     public void promoteDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash, String expectedDraftLogHash,
                              List<String> lines, List<String> sets, String markerJson) throws IOException {
+        com.gamma.la.core.WorkingSetSizeLimit.enforceAll(maxSetBytes, investigationId, (int) expectedMainVersion + 1, sets);
         tx(c -> {
             lockInvestigation(c, investigationId);   // the main log, THEN the Draft: the one order everywhere
             String state = lockDraft(c, investigationId, draftId);
@@ -696,6 +706,8 @@ public final class PgInvestigationStore implements InvestigationStore {
     @Override
     public void replaceDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash, String expectedDraftLogHash,
                              String headerJson, List<String> lines, List<String> sets, List<Integer> setSteps) throws IOException {
+        for (int i = 0; i < sets.size(); i++)
+            com.gamma.la.core.WorkingSetSizeLimit.enforce(maxSetBytes, investigationId, setSteps.get(i), sets.get(i));
         tx(c -> {
             lockInvestigation(c, investigationId);
             String state = lockDraft(c, investigationId, draftId);

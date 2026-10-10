@@ -109,6 +109,28 @@ class ControlApiAuthSessionV1Test {
         }
     }
 
+    /** The exchange body's optional {@code nonce} reaches the relay verbatim; a relay that refuses it makes the route 401. */
+    @Test
+    void exchangeForwardsTheNonceToTheRelayAndItsRefusalIs401(@TempDir Path cfg) throws Exception {
+        java.util.concurrent.atomic.AtomicReference<String> seen = new java.util.concurrent.atomic.AtomicReference<>("unset");
+        TokenRelays.forTest(new TokenRelay() {
+            @Override public Optional<Tokens> exchangeCode(String c, String v, String r) { return Optional.empty(); }
+            @Override public Optional<Tokens> exchangeCode(String c, String v, String r, String nonce) {
+                seen.set(nonce);
+                return "n-ok".equals(nonce) ? Optional.of(new Tokens("at-1", 300, "rt-1", 1800L)) : Optional.empty();
+            }
+            @Override public Optional<Tokens> refresh(String rt) { return Optional.empty(); }
+        });
+        try (Ctx c = open(cfg)) {
+            String base = "\"code\":\"x\",\"codeVerifier\":\"v\",\"redirectUri\":\"r\"";
+            assertEquals(200, post(c.port, "/auth/exchange", "{" + base + ",\"nonce\":\"n-ok\"}").statusCode());
+            assertEquals("n-ok", seen.get());
+            assertEquals(401, post(c.port, "/auth/exchange", "{" + base + ",\"nonce\":\"other\"}").statusCode());
+            assertEquals(401, post(c.port, "/auth/exchange", "{" + base + "}").statusCode());
+            assertNull(seen.get(), "no nonce in the body means the relay sees null");
+        }
+    }
+
     @Test
     void badCodeIs401AndMissingFieldsAre400(@TempDir Path cfg) throws Exception {
         TokenRelays.forTest(FAKE);
