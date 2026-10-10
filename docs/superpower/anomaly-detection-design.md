@@ -373,6 +373,31 @@ lane **S2** (another worktree, in parallel) = the pure peer / seasonal statistic
 - **Not built in lane S1** (to BACKLOG via the row): evidence rows, ratio features, hour buckets, routes, watch /
   exclusion lists, Alert Rule flow + D-AD7 seed, performance measurement, UI.
 
+### 16.1 S2 as-built: baseline statistics (lane anomalys2, operator, 2026-10-10)
+
+Built in parallel with S1, so only the **pure statistics** landed; the Job, kind, helpers, module registration and
+BACKLOG are S1's. Package `com.gamma.anomaly.baseline` in `features/inspecto-anomaly` (a temporary, UNREGISTERED pom
+carrying only JUnit; it yields to S1's pom at merge). No DuckDB, no Space access: inputs are in-memory maps.
+
+- `RobustStats`: `median`, `scaledMad` (x 1.4826), `floor(median, unit) = max(unit, 5 % of |median|)`, `z`.
+- `Seasonality` (`NONE | WEEKDAY | HOUR | WEEKDAY_HOUR`): `sameSlot`, `label`, `fallbackChain()` =
+  `weekday_hour -> weekday -> none`, `hour -> none`, `weekday -> none`.
+- `SeasonalBaseline(seasonality, minBaselinePoints)`.`compute(Map<LocalDateTime,Double> history, scored)`: excludes
+  the scored bucket, walks the chain until a slot has `minBaselinePoints`; the result records `requested`, `basis`
+  (the slot actually used) and `fellBack`, so the fallback is visible in the explanation (§15).
+- `PeerBaseline(minGroupSize, populationFallback)`.`compute(observed, cohortOf, cohort)`: cohort below
+  `minGroupSize` is `insufficient` (D-AD11 a); opt-in population fallback is flagged `fellBack`, basis `population`.
+- `Baseline` record (`kind, median, scaledMad, points, basis, requested, fellBack, insufficient, reason`) with
+  `z(observed, unit)` (NaN when insufficient).
+- `BaselineScore.of(observed, self, peer, unit)`: `zSelf`, `zPeer`, `peersOnly` (D-AD12: no self history, peers
+  exist), `insufficient` (neither).
+- The two baselines do **not** implement an interface here: S1 owns `BaselineStatistic`, and adopts them at merge.
+- Tests: `BaselineStatisticsTest` (11) — planted Monday spike normal under `weekday`, high under `none`; fallback
+  chain; small-cohort refusal + opt-in fallback; peers-only flag. Mutants run and all red: seasonality off (2
+  fail), median -> mean (5), MAD floor removed (1), small cohort allowed (2).
+- Not done here (S2's Job half, after merge): zero-inflation of missing buckets (caller's choice), SQL-side
+  median/MAD, performance measurement (D-AD9).
+
 ## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 
 Every recommendation below was approved as written; the *Decided* column is binding.
