@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **61<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 40<!--count:backlog-p3--> × P3** —
+> **62<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 41<!--count:backlog-p3--> × P3** —
+> ⬆ **61 → 62 (P3 40 → 41) on 2026-10-10**: filed P3 `LA-DETECT-ALERT-AGGREGATE-1` — the operator kept "aggregate output only" for a fired standing-detection Alert (breach count and worst value on the Alert, entities named only inside the Investigation).
 > ⬆ **59 → 61 (P2 20 → 21, P3 39 → 40) on 2026-10-10**: waves 3-4 of the demo-readiness build landed (Members/Drafts, evidence, algorithm and guard lanes - status notes on `LA-UI-MEMBERS-DRAFTS-1`, `LA-UI-EVIDENCE-1`, `LA-ALGO-UI-PARITY-1`, `LA-DEMO-GUARDS-1`); filed P2 `LA-UI-DRAFT-OPS-1` and P3 `LA-INDEX-STATS-1`.
 > ⇄ **51 rows on 2026-10-10 after merging origin/master (HA run-lease + kill-9 closures) into integ16**: integ16's three 2026-10-10 closures plus origin's HA/DR rows; per-side counts in the entries below are each side's own.
 > ⬆ **51 → 59 (P2 15 → 20, P3 36 → 39) on 2026-10-10**: filed eight Link Analysis demo-readiness rows from the five-way audit of `okf/backend/modules/link-analysis.md` against the live application — P2 `LA-DEMO-SEED-1`, `LA-DEMO-DEFECTS-1`, `LA-DEMO-INDEX-1`, `LA-UI-MEMBERS-DRAFTS-1`, `LA-UI-SETTINGS-MASKING-1`; P3 `LA-UI-EVIDENCE-1`, `LA-ALGO-UI-PARITY-1`, `LA-DEMO-GUARDS-1` (plan: `superpower/la-demo-readiness-plan.md`).
@@ -186,10 +187,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 41<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 61<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 41<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 62<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -484,6 +485,7 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 - **P3** · `LA-DEMO-GUARDS-1` — **Guards and scripts that keep the Link Analysis defence true.** A test pinning the route count and operations to the manifests (75; DR-T2); a guard that `inspecto/src/main` imports no `com.gamma.la.*` or `com.gamma.geolink.*` class (DR-T3); a test scanning every `/inv` response on a masked Space for raw ids (DR-T4); a demo smoke runner asserting each scripted probe's status (DR-T5); the manual §10 figures reproduced (DR-T6); burst scripts for the 429/503 limits (DR-T7); a replay-versus-drift script (DR-T8); index size/file-count/dropped-NULL exposure (DR-T9); a fact-log tamper script (DR-T10); and the stale code comments (`JobService` / `LaIndexBuildJob` trigger, evaluator "twelve ops", FS layout Javadoc, `graph-analysis.ts` "25 of the 27"). → [`superpower/la-demo-readiness-plan.md`](superpower/la-demo-readiness-plan.md) **BUILT 2026-10-10:** route-count markers (75 = 69 + 6) in `check-doc-counts`, `check-engine-names-no-la.mjs` (wired into ci.yml), the masked-Space raw-id sweep of 16 `/inv` reads, the mule-data figures test (the manual's section 10 was WRONG and is corrected: TILL-06 holds 97 %, 112 accounts), replay-versus-drift on a landed file, `tools/la-demo-smoke.mjs` (+ tests), stale comments fixed. STILL OPEN: the smoke runner has not run against a seeded la-showcase demo; the 6th-concurrent-build 503 is not scripted; `/inv/index` size fields (`LA-INDEX-STATS-1`).
 - **P2** · `LA-UI-DRAFT-OPS-1` — **A Draft cannot be worked from the UI, so fork-then-promote cannot be demonstrated (filed 2026-10-10 by the Members/Drafts lane).** The Drafts panel forks, lists, rebases, promotes and discards, but `POST /inv/investigations/{id}/drafts/{draftId}/ops` and `/undo` are not surfaced and no Draft can be chosen as the Investigation's active scope; the server refuses to promote an empty Draft (422 *no ops to promote*). Done = pick a Draft as the working scope, add and undo steps in it, promote it. From: `LA-UI-MEMBERS-DRAFTS-1`.
 - **P3** · `LA-INDEX-STATS-1` — **`/inv/index` does not expose index size (DR-T9, COULD).** Bytes, per-table file counts and the dropped-NULL count are not in the response, so the build-size claims cannot be shown. A new response field needs its `openapi-v1.json` entry. From: `docs/superpower/la-demo-readiness-plan.md`.
+- **P3** · `LA-DETECT-ALERT-AGGREGATE-1` — **A fired standing-detection Alert should carry the aggregate breach facts (decided 2026-10-10, operator: keep "aggregate output only").** Today the Alert links to its Investigation (*Open Investigation*) but states only that the rule fired. Add the Measure, the threshold, the number of breaching entities and the worst value to the Alert payload (aggregate output, so inside `la-live-detection-design` invariant 2), with `ControlApiStandingDetectionTest` still asserting that no entity is named. Alternatives declined: masked aliases on the Alert (an alias is linkable across Alerts, so it undoes per-Investigation unlinkability) and raw names (an Alert is readable beyond the Investigation's members). Reverse only if a real user must triage Alerts without opening Investigations, and then through a per-viewer gate designed first. From: `LA-UI-EVIDENCE-1`.
 
 
 ## 4. Engineering platform — build, test, CI & tooling

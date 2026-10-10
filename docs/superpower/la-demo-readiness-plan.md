@@ -17,6 +17,7 @@ This page lives in `docs/superpower/` while the work is in flight; when it ships
 | Where the seeded demo lives | **A new `la-showcase` Space Template** (the tracked `demo` Space is not edited); runtime state (Investigation, members, lists, Case, bound rule) comes from an idempotent seed script if no template mechanism exists |
 | Second approver | **`fm.manager`** holds Approve link expansions and is a reviewer on the seeded Investigation; `admin` keeps Reveal |
 | Alert authoring | **`fm.analyst` also holds Author Alert Rules** in the showcase (one persona can run the whole story) |
+| Alert content | **A fired standing-detection Alert stays aggregate-only** (rule, Measure, threshold, breach count, worst value) and links to its Investigation; entities are named only inside the Investigation under its own gates (operator 2026-10-10; row `LA-DETECT-ALERT-AGGREGATE-1`) |
 | Link index default | **ON by default, product-wide** (a Space with a fresh published index serves reads from it; otherwise the flat read with a closed `Reason`; explicit `false` still disables). Not the recommended option (the alternative was showcase-only); it needs the full reactor gate and a staleness review |
 | Demo variants | **la-app and Personal as launch configurations**; the Postgres store as a documented runbook step (no Docker automation) |
 
