@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { G6GraphData } from '@inspecto/core/graph/graph-types';
 import {
     allPaths,
+    distinctPaths,
+    findCyclesShortestFirst,
     articulationPoints,
     betweennessCentrality,
     bridges,
@@ -873,5 +875,53 @@ describe('graph limits are configurable (D-S3)', () => {
         configureGraphLimits({ analysisNodeCap: 7 });
         resetGraphLimits();
         expect(analysisNodeCapValue()).toBe(ANALYSIS_NODE_CAP_DEFAULT);
+    });
+});
+
+describe('distinctPaths / findCyclesShortestFirst (DR-D5)', () => {
+    const edge = (id: string, source: string, target: string, kind: string) => ({
+        id,
+        source,
+        target,
+        data: { kind },
+    });
+    it('collapses parallel-link paths into one per node sequence, keeping count and kinds', () => {
+        const gr: G6GraphData = {
+            nodes: ['a', 'b', 'c'].map((id) => ({ id, data: { label: id, kind: 'entity' } })),
+            edges: [
+                edge('ab1', 'a', 'b', 'wire'),
+                edge('ab2', 'a', 'b', 'cash'),
+                edge('ab3', 'a', 'b', 'wire'),
+                edge('bc1', 'b', 'c', 'wire'),
+                edge('bc2', 'b', 'c', 'wire'),
+            ],
+        };
+        const raw = allPaths(gr, 'a', 'c', { direction: 'out' });
+        expect(raw).toHaveLength(6); // 3 x 2 parallel combinations: the defect
+        const d = distinctPaths(gr, raw);
+        expect(d).toHaveLength(1);
+        expect(d[0]).toMatchObject({ nodeIds: ['a', 'b', 'c'], count: 6, kinds: ['wire', 'cash'] });
+        expect(d[0].edgeIds.sort()).toEqual(['ab1', 'ab2', 'ab3', 'bc1', 'bc2']);
+    });
+
+    it('finds a short planted ring that findCycles buries behind its limit, shortest first', () => {
+        // 60 disjoint 6-cycles flood findCycles (it starts at the smallest id) ...
+        const ids: string[] = [];
+        const edges: ReturnType<typeof edge>[] = [];
+        for (let k = 0; k < 60; k++) {
+            const ring = Array.from({ length: 6 }, (_, i) => `c${String(k).padStart(2, '0')}_${i}`);
+            ids.push(...ring);
+            ring.forEach((s, i) => edges.push(edge(`${s}>`, s, ring[(i + 1) % 6], 'k')));
+        }
+        // ... and the planted 4-ring sorts after all of them.
+        const planted = ['z1', 'z2', 'z3', 'z4'];
+        ids.push(...planted);
+        planted.forEach((s, i) => edges.push(edge(`${s}>`, s, planted[(i + 1) % 4], 'k')));
+        const gr: G6GraphData = { nodes: ids.map((id) => ({ id, data: { label: id, kind: 'entity' } })), edges };
+        expect(findCycles(gr, { limit: 50 }).some((c) => c.nodeIds.includes('z1'))).toBe(false);
+        const sorted = findCyclesShortestFirst(gr, { limit: 50 });
+        const lens = sorted.map((c) => c.nodeIds.length);
+        expect(lens).toEqual([...lens].sort((x, y) => x - y));
+        expect(sorted[0].nodeIds).toEqual(planted);
     });
 });

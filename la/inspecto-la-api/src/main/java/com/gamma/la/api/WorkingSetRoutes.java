@@ -157,8 +157,16 @@ public final class WorkingSetRoutes implements RouteModule {
         if (!rel.tables().get("groups").isEmpty()) out.put("groups", rel.tables().get("groups"));
         // D-U6: masked on the way out, AFTER the cache — the cached relation holds raw ids, the answer never does.
         EntityMasking mask = EntityMasking.of(inv, List.of());
+        // DR-D2: the same entity is a different alias here (this Investigation's key) than on the query graph (the Space's
+        // key); each masked entity of the page names its exploration alias so the UI keeps them one entity. Aliases only.
+        Map<String, String> exploreAliases = new LinkedHashMap<>();
+        if (of.equals("entities") && mask.masking())
+            for (Map<String, Object> row : rows)
+                if (row.get("entityId") instanceof String raw && mask.hidesRaw(raw))
+                    exploreAliases.put(mask.tokenOf(raw), ExplorationMasking.alias(inv.writeRoot(), raw));
         @SuppressWarnings("unchecked") Map<String, Object> masked = (Map<String, Object>) mask.apply(out);
         masked.put("masking", mask.describe());
+        if (!exploreAliases.isEmpty()) masked.put("exploreAliases", exploreAliases);
         if (of.equals("links")) {   // D-U9: each link's wire id, minted from the MASKED values — on copies, never the cache
             List<Map<String, Object>> stamped = new ArrayList<>();
             for (Object o : (List<?>) masked.get("rows")) {

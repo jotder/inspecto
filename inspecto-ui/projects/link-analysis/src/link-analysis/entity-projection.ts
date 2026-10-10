@@ -15,8 +15,9 @@ import {
     resolveEntityId,
     typedOrEntityId,
 } from '@inspecto/core/graph';
-import { GraphSelection, mergeGraphs } from '@inspecto/link-analysis/graph/graph-analysis';
+import { DistinctPath, GraphSelection, distinctPaths, mergeGraphs } from '@inspecto/link-analysis/graph/graph-analysis';
 import {
+    IndexSource,
     InvService,
     MultiProjectionMappingSummary,
     MultiProjectionResult,
@@ -25,10 +26,12 @@ import {
     RecursivePathsResult,
 } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
+import { limitRefusalMessage } from './limit-refusal';
 import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { firstValueFrom } from 'rxjs';
 import { CHART_CATEGORICAL_NEUTRAL } from '@inspecto/core/theme/chart-tokens';
 import type { LaDatasets } from '@inspecto/link-analysis/la-host';
+import { combineSources } from './index-source';
 
 /**
  * The P3 **entity-projection** GraphSource (GLOSSARY §11): fold a Dataset's rows into a business
@@ -140,6 +143,8 @@ export interface ProjectionError {
 export interface ProjectedGraph extends G6GraphData {
     /** True when the node cap cut the projection short — surfaced as a banner. */
     truncated: boolean;
+    /** An incremental expand only (DR-U4): where the neighbours were read from - the link index or the Dataset. */
+    source?: IndexSource;
     /**
      * Links the Working Set canvas left off because it holds more than the render ceiling
      * ({@code WORKING_SET_LINK_RENDER_CEILING}); absent or 0 = every link is drawn. Never a silent cut.
@@ -338,7 +343,7 @@ export class EntityProjectionGraphSource implements GraphSource {
             }),
         );
         const typed = withColumnTypes(p, res.columnTypes);
-        return { ...projectTriples(res.rows, res.truncated, typed), idMappings: [typed] };
+        return { ...projectTriples(res.rows, res.truncated, typed), idMappings: [typed], source: res.source };
     }
 }
 
@@ -348,6 +353,8 @@ export class EntityProjectionGraphSource implements GraphSource {
  * the WHOLE call, so the message says no partial graph was drawn. A 422 carries the server's own reason.
  */
 export function invErrorMessage(err: unknown, fallback: string): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     if (err instanceof HttpErrorResponse && err.status === 404) {
         return (
             'A Dataset in this query is not available to you (unknown, or not shared with you) — ' +
@@ -522,7 +529,7 @@ export class MultiProjectionGraphSource implements GraphSource {
                     ),
                 ),
             );
-            return projectMultiResult({
+            const merged = projectMultiResult({
                 nodes: [],
                 edges: answers.flatMap((a, i) => {
                     const m = calls[i].m;
@@ -542,6 +549,7 @@ export class MultiProjectionGraphSource implements GraphSource {
                 })),
                 truncated: answers.some((a) => a.truncated),
             });
+            return { ...merged, source: combineSources(answers.map((a) => a.source)) };
         } catch (err) {
             throw new Error(invErrorMessage(err, 'The multi-Dataset expand failed.'), { cause: err });
         }
@@ -550,7 +558,8 @@ export class MultiProjectionGraphSource implements GraphSource {
 
 /** What an LA-11 traversal found, in graph ids, with the server's fences stated rather than implied. */
 export interface ServerPathsState {
-    paths: GraphSelection[];
+    /** One entry per distinct node sequence — parallel links are collapsed (see {@link DistinctPath}). */
+    paths: DistinctPath[];
     /** The path limit or the edge-yield fence cut the answer short. */
     truncated: boolean;
     /** A recursion level hit `maxEdgeYield`: longer paths may exist that were never walked. */
@@ -559,6 +568,8 @@ export interface ServerPathsState {
     depthLimit: number;
     /** The longest path returned, in hops (0 when none). */
     deepest: number;
+    /** DR-U4: where the walk was answered from - the link index (a version) or the Dataset (a closed reason). */
+    source?: IndexSource;
 }
 
 /**
@@ -575,8 +586,11 @@ export function recursivePathsToGraph(
 ): { graph: G6GraphData; state: ServerPathsState } {
     const nodes = new Map(base.nodes.map((n) => [n.id, n]));
     const edges = new Map(base.edges.map((e) => [e.id, e]));
-    const linkBetween = (a: string, b: string): string | undefined =>
-        [...edges.values()].find((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))?.id;
+    // Every working-set link between two nodes (either direction): parallel links all ride the same node path.
+    const linksBetween = (a: string, b: string): string[] =>
+        [...edges.values()]
+            .filter((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))
+            .map((e) => e.id);
 
     // A hop with no mintable id (an empty typed key -- the server refuses those) drops its whole path.
     const mintable = res.paths.filter((p) =>
@@ -592,23 +606,27 @@ export function recursivePathsToGraph(
         const edgeIds: string[] = [];
         for (let i = 1; i < nodeIds.length; i++) {
             const [a, b] = [nodeIds[i - 1], nodeIds[i]];
-            let id = linkBetween(a, b);
-            if (!id) {
-                id = `path:${a}->${b}`;
+            const ids = linksBetween(a, b);
+            if (!ids.length) {
+                const id = `path:${a}->${b}`;
                 edges.set(id, { id, source: a, target: b, data: { kind: 'path' } });
+                ids.push(id);
             }
-            edgeIds.push(id);
+            edgeIds.push(...ids);
         }
         return { nodeIds, edgeIds };
     });
+    const graph: G6GraphData = { nodes: [...nodes.values()], edges: [...edges.values()] };
     return {
-        graph: { nodes: [...nodes.values()], edges: [...edges.values()] },
+        graph,
         state: {
-            paths,
+            // The server returns one row per parallel link; show each node sequence once, with its count and kinds.
+            paths: distinctPaths(graph, paths),
             truncated: res.truncated,
             edgeYieldCapped: res.edgeYieldCapped,
             depthLimit: res.fences.maxDepth,
             deepest: res.paths.reduce((m, p) => Math.max(m, p.hops), 0),
+            source: res.source,
         },
     };
 }

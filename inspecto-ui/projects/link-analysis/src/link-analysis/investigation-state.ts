@@ -4,6 +4,8 @@ import { InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/i
 import { apiErrorMessage } from '@inspecto/core/api';
 import { resolveEntityId } from '@inspecto/core/graph';
 import { ProjectedGraph, projectTriples } from './entity-projection';
+import { readSourceNote } from './index-source';
+import { limitRefusalMessage } from './limit-refusal';
 
 /**
  * LA-10 — the pure half of the Investigation panel: how a server Working Set becomes the canvas graph, which
@@ -39,7 +41,9 @@ export function rawIdsOf(node: G6Node): string[] {
 export function idsInWorkingSet(node: G6Node, ws: WorkingSet | null): string[] {
     if (!ws) return [];
     const members = new Set(ws.entities.map((e) => e.id));
-    return rawIdsOf(node).filter((id) => members.has(id));
+    // DR-D2: the query graph shows the Space's alias, the Working Set this Investigation's own - `exploreAliases` pairs them.
+    const viaExploration = new Map(Object.entries(ws.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
+    return rawIdsOf(node).map((id) => (members.has(id) ? id : (viaExploration.get(id) ?? id))).filter((id) => members.has(id));
 }
 
 /**
@@ -132,6 +136,8 @@ export function moveStep(order: number[], index: number, delta: number): number[
  * no longer view. 403 is the capability gate (`canManageIncidents`). 409 and 422 carry the server's own reason.
  */
 export function investigationErrorMessage(err: unknown, fallback: string): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
@@ -172,6 +178,8 @@ export function entityListErrorMessage(
     onInvestigation = false,
     forbidden = 'You are not allowed to change Entity Lists (it needs the Incident-management capability).',
 ): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
@@ -211,6 +219,8 @@ export function identityKeyOf(type: EntityTypeRef | undefined, value: string): s
  * retract of an unknown or already-retracted assertion; 422 carries the server's reason. 503 is a deployment state.
  */
 export function identityErrorMessage(err: unknown, fallback: string): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
@@ -242,26 +252,9 @@ export function listableIds(node: G6Node | null): { ids: string[]; masked: numbe
     return { ids, masked: raw.length - ids.length };
 }
 
-const FALLBACK_TEXT: Record<string, string> = {
-    index_disabled: 'the edge index is switched off',
-    no_index: 'this Dataset has no edge index yet',
-    mapping_not_indexed: 'the index was built for different columns',
-    column_not_indexed: 'the index was not built with a column this read needs',
-    time_zone_not_servable: 'the index cannot answer in this time zone',
-    filter_not_indexed: 'the index cannot apply this filter',
-    index_stale_refused: 'the index is out of date for this Dataset',
-    depth_over_index_cap: 'the read is deeper than the index serves',
-    frontier_over_index_cap: 'too many entities were expanded at once for the index',
-    index_read_failed: 'the index could not be read',
-    rung_not_indexable: 'this kind of expand is not answered by the index',
-};
-
-/** One sentence for an expand the flat Dataset answered instead of the edge index, or null when there is nothing to say. */
-export function expandFallbackNote(
-    read: { fallback?: { reason: string; details?: string } } | undefined,
+/** One sentence for a sealed expand's source: `Answered from the link index vN` or `Answered from the Dataset because ...`; null when the server said nothing. */
+export function expandSourceNote(
+    read: { index?: { version: number; stale: boolean }; fallback?: { reason: string; details?: string } } | undefined,
 ): string | null {
-    const f = read?.fallback;
-    if (!f) return null;
-    const why = FALLBACK_TEXT[f.reason] ?? f.reason;
-    return `Answered from the Dataset, not the edge index: ${why}${f.details ? ` (${f.details})` : ''}. The result is the same, only slower.`;
+    return readSourceNote(read);
 }

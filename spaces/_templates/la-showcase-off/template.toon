@@ -1,0 +1,5 @@
+name: Link Analysis showcase (feature off)
+tagline: "An empty companion Space with the Link Analysis feature switched OFF - /inv/* answers 404 MODULE_DISABLED while every other route works"
+description: "The companion of the la-showcase template (LA-DEMO-SEED-1, DR-S7): a Space whose modules.toon disables the geoLink feature, so every /inv/* and /geo/* route answers 404 MODULE_DISABLED there while the Space's other routes (for example GET /pipelines) keep working. It carries the same Demo Users and role table as la-showcase, so the same personas sign in. No feeds, no data."
+icon: heroicons_outline:no-symbol
+contents[2]: "modules.toon (geoLink disabled)", "5 Demo Users + role table"

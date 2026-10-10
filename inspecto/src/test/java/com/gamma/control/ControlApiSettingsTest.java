@@ -327,6 +327,47 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** DR-U3: the read-only echoes the Settings pane shows (masking, index, store backend) and a full-document round trip of the keys it edits. */
+    @Test
+    void linkAnalysisInForceEchoesAndFullDocumentRoundTrip(@TempDir Path root) throws Exception {
+        String prior = System.getProperty("investigations.backend");
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String url = "/spaces/acme/settings/link-analysis";
+            System.clearProperty("investigations.backend");
+            JsonNode def = json(send(c.port, "GET", url, null));
+            assertEquals("typed", def.get("maskingModeInForce").asText());
+            assertEquals("fs", def.get("investigationStoreInForce").asText(), "default backend is the filesystem");
+            assertEquals(1, def.get("indexInForce").get("threads").asInt());
+            assertEquals(4, def.get("indexInForce").get("queue").asInt());
+            System.setProperty("investigations.backend", "db");
+            assertEquals("db", json(send(c.port, "GET", url, null)).get("investigationStoreInForce").asText());
+            System.setProperty("investigations.backend", "bogus");
+            assertEquals("fs", json(send(c.port, "GET", url, null)).get("investigationStoreInForce").asText(), "anything but db reads as fs");
+
+            String doc = "{\"maskingMode\":\"none\",\"graphRun\":{\"maxNodes\":1000,\"maxEdges\":2000,\"timeoutMs\":5000},"
+                    + "\"index\":{\"enabled\":true,\"threads\":2,\"queue\":8,\"maxDiskBytes\":1048576}}";
+            assertEquals(200, send(c.port, "PUT", url, doc).statusCode());
+            JsonNode got = json(send(c.port, "GET", url, null));
+            assertEquals("none", got.get("maskingModeInForce").asText());
+            assertTrue(got.get("indexInForce").get("enabled").asBoolean());
+            assertEquals(8, got.get("indexInForce").get("queue").asInt());
+            // The SPA's save: the whole document as read (echo keys included) with one unrelated key edited keeps every other key.
+            com.fasterxml.jackson.databind.node.ObjectNode back = (com.fasterxml.jackson.databind.node.ObjectNode) got.deepCopy();
+            back.put("fourEyesBudgetAbove", 77);
+            assertEquals(200, send(c.port, "PUT", url, back.toString()).statusCode());
+            JsonNode after = json(send(c.port, "GET", url, null));
+            assertEquals("none", after.get("maskingMode").asText());
+            assertEquals(1000, after.get("graphRun").get("maxNodes").asInt());
+            assertEquals(5000, after.get("graphRun").get("timeoutMs").asInt());
+            assertEquals(2, after.get("index").get("threads").asInt());
+            assertEquals(1048576, after.get("index").get("maxDiskBytes").asLong());
+            assertEquals(77, after.get("fourEyesBudgetAbove").asInt());
+        } finally {
+            if (prior == null) System.clearProperty("investigations.backend"); else System.setProperty("investigations.backend", prior);
+        }
+    }
+
     /** The per-set size limit: a per-Space setting, 1 KiB..1 GiB, default 64 MiB (operator 2026-10-10). */
     @Test
     void linkAnalysisMaxSetBytesRoundTripsAndDefaults(@TempDir Path root) throws Exception {

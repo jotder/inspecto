@@ -237,6 +237,9 @@
             @if (store.selected(); as n) {
                 <div class="text-xs">
                     Selected: <strong>{{ n.data.label }}</strong>
+                    @if (n.data.label.startsWith('masked:')) {
+                        <span class="text-secondary">(masked)</span>
+                    }
                     @if (!selectedInSet().length) {
                         <span class="text-secondary">(not in the Working Set)</span>
                     }
@@ -346,6 +349,9 @@
                                     <span class="text-secondary ml-auto text-[11px]">{{ time(e.at) }}</span>
                                 </div>
                                 <div class="text-xs" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
+                                @if (readSuffix(e); as how) {
+                                    <div class="text-secondary text-[11px]" data-testid="step-read-source">{{ how }}</div>
+                                }
                                 @if (e.params?.reason) {
                                     <div class="text-secondary text-xs">Reason: {{ e.params!.reason }}</div>
                                 }
@@ -531,7 +537,7 @@
                     [disabled]="store.busy() || store.effectiveSteps().length < 2"
                     (click)="beginReorder()"
                 >
-                    Re-order steps…
+                    Re-order steps (creates a fork)…
                 </button>
             }
         </section>
@@ -663,7 +669,10 @@
         }
 
         <!-- ── LA-18 value Measures over the whole Dataset; Watch binds to the open Investigation ── -->
-        <inspecto-link-analysis-value-measures [investigation]="store.header()"></inspecto-link-analysis-value-measures>
+        <inspecto-link-analysis-value-measures
+            [investigation]="store.header()"
+            [timeCol]="timeCol()"
+        ></inspecto-link-analysis-value-measures>
 
         @if (store.workingSet()?.excluded?.length) {
             <section aria-label="Excluded entities">

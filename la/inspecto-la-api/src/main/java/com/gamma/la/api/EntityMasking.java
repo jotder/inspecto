@@ -234,24 +234,30 @@ final class EntityMasking {
     /** The Investigation's bound source/target columns whose registry {@code columns[]} {@code classification} is
      *  claimed by a MASKED in-force Entity Type — column name → type id. A classification no type claims is untyped. */
     static Map<String, String> maskedColumns(InvestigationRoutes.Inv inv, List<EntityTypes.EntityType> types) {
+        return maskedColumns(inv.writeRoot(), inv.dataset(), inv.header(), types);
+    }
+
+    /** The same rule for a stateless read that has no Investigation: {@code roles} carries {@code sourceCol}/{@code targetCol}. */
+    static Map<String, String> maskedColumns(Path writeRoot, String dataset, Map<String, ?> roles,
+                                             List<EntityTypes.EntityType> types) {
         DatasetProvider provider = DatasetProviders.require();
-        Map<String, Object> ds = provider.dataset(inv.writeRoot(), inv.dataset()).orElse(Map.of());
+        Map<String, Object> ds = provider.dataset(writeRoot, dataset).orElse(Map.of());
         Map<String, String> out = new LinkedHashMap<>();
         // The pipeline-schema lineage (the platform's one resolver; a class is "masked" when a masked type claims it,
         // so several classes on one column resolve strictest-wins = masked if any input is masked).
-        Map<String, String> lineage = provider.schemaClassification(inv.writeRoot(), ds,
+        Map<String, String> lineage = provider.schemaClassification(writeRoot, ds,
                 cls -> typeOf(types, cls).map(EntityTypes.EntityType::masked).orElse(false));
         if (lineage.containsKey(DatasetProvider.UNKNOWN_LINEAGE))
             out.put("(untraceable lineage)", "unknown");   // fail closed: mask every entity id
         for (String bound : List.of("sourceCol", "targetCol")) {
-            Object name = inv.header().get(bound);
+            Object name = roles.get(bound);
             String cls = name == null ? null : lineage.get(String.valueOf(name).trim().toLowerCase(Locale.ROOT));
             if (cls != null) typeOf(types, cls).filter(EntityTypes.EntityType::masked)
                     .ifPresent(t -> out.put(String.valueOf(name), t.id()));
         }
         if (!(ds.get("columns") instanceof List<?> cols)) return out;
         for (String bound : List.of("sourceCol", "targetCol")) {
-            Object name = inv.header().get(bound);
+            Object name = roles.get(bound);
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && name != null && String.valueOf(name).equalsIgnoreCase(String.valueOf(c.get("name")))
                         && c.get("classification") != null) {
@@ -330,6 +336,11 @@ final class EntityMasking {
     /** The raw id behind a pseudonym this Investigation issued, or null. */
     String reveal(String token) {
         return rawOf.get(token);
+    }
+
+    /** The pseudonym this Investigation issues for a RAW id it masks, or null. */
+    String tokenOf(String raw) {
+        return tokenOf.get(raw);
     }
 
     /** True when {@code id} is a RAW id this masking hides (a pseudonym is not; nor is an id masking leaves in the clear). */

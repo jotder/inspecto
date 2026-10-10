@@ -39,7 +39,10 @@ import {
     detectCommunities,
     eigenvectorCentrality,
     explainNode,
-    findCycles,
+    DistinctPath,
+    distinctPaths,
+    findCyclesShortestFirst,
+    sortCyclesShortestFirst,
     hits,
     jaccardSimilarity,
     kCore,
@@ -64,7 +67,8 @@ import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { ServerPathsState, ServerPatternState } from './entity-projection';
-import { LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
+import { indexSourceNote } from './index-source';
+import { IndexMappingTarget, LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
 import { LinkAnalysisResultNextComponent } from './link-analysis-result-next.component';
 import { QueuedSeed, TOP_SEED_COUNT, topSeeds } from './la-starter';
@@ -188,6 +192,8 @@ export class LinkAnalysisToolboxComponent {
     private componentsApi = inject(ComponentsService);
 
     constructor() {
+        // Never open the Pattern tool on a blank motif — that matches every link. Start from the first pack.
+        if (PATTERN_PACKS.length) this.loadPatternPack(PATTERN_PACKS[0].id);
         // This Space's authored pattern packs, if it has any — merged over the shipped built-ins. Degrades
         // silently: an error (no write root, intelligence-free edition, offline) leaves the shipped built-ins
         // in place, which is the whole point of seeding the signal with them — there is no error surface to
@@ -262,6 +268,8 @@ export class LinkAnalysisToolboxComponent {
     /** LA-11: the last server traversal's answer, mapped onto the graph by the host (null = none yet). */
     readonly serverPaths = input<ServerPathsState | null>(null);
     readonly serverPathsBusy = input(false);
+    /** DR-U4: where the server path search was answered from, in words. */
+    readonly serverPathsSourceNote = computed(() => indexSourceNote(this.serverPaths()?.source));
     /**
      * LA-14b: the projection behind the graph was cut by the server's link cap. A branching motif's legs are small
      * one-off amounts that sort LAST and are cut FIRST, so on a truncated graph the browser matcher may be looking
@@ -278,6 +286,8 @@ export class LinkAnalysisToolboxComponent {
      * Subject holds `canRunLinkGraphAnalysis`.
      */
     readonly investigationId = input<string | null>(null);
+    /** DR-D3: an Investigation is open (even when the canvas draws the query graph and no id is passed). */
+    readonly investigationOpen = input(false);
     /**
      * How many nodes the open Investigation's Working Set has (hidden ones left out), or null when the canvas shows a
      * query graph. A server run reads the Working Set, so when one is open THAT is the size the browser-or-server
@@ -294,6 +304,8 @@ export class LinkAnalysisToolboxComponent {
     readonly canRunOnServer = input(true);
     /** Does the Subject hold `canBuildLinkIndex`? */
     readonly canBuildIndex = input(true);
+    /** DR-U5: the loaded query's edge mappings, for the Edge index tool's "Index / Flat" line and first-build prefill. */
+    readonly indexMappings = input<IndexMappingTarget[]>([]);
 
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();
@@ -404,6 +416,8 @@ export class LinkAnalysisToolboxComponent {
     readonly thresholdLabel = thresholdLabel;
     // ── V2 result state (each group keeps its own so results survive tab switches) ──
     readonly cycles = signal<GraphSelection[]>([]);
+    /** Index of the cycle drawn on the canvas (-1 = none). */
+    readonly selectedCycle = signal(-1);
     readonly cutNodes = signal<string[]>([]);
     readonly cutEdges = signal<string[]>([]);
     /** The id map (= Working Set) each server cut-points half was computed for; null = none, or a local run. */
@@ -603,6 +617,7 @@ export class LinkAnalysisToolboxComponent {
         this.components.set([]);
         this.patternMatches.set([]);
         this.cycles.set([]);
+        this.selectedCycle.set(-1);
         this.cutNodes.set([]);
         this.cutEdges.set([]);
         this.cutNodesMap = null;
@@ -814,7 +829,8 @@ export class LinkAnalysisToolboxComponent {
         if (!g || !this.pathFrom() || !this.pathTo()) return;
         this.analysisError.set('');
         this.clearServerNotices();
-        this.applyAllPaths(allPaths(g, this.pathFrom(), this.pathTo()));
+        // Over-fetch, then collapse parallel links: one node path must not spend the whole limit on its twins.
+        this.applyAllPaths(distinctPaths(g, allPaths(g, this.pathFrom(), this.pathTo(), { limit: 500 })).slice(0, 10));
     }
 
     private applyAllPaths(paths: GraphSelection[]): void {
@@ -1003,29 +1019,39 @@ export class LinkAnalysisToolboxComponent {
         if (!g) return;
         this.analysisError.set('');
         this.clearServerNotices();
-        this.applyCycles(findCycles(g));
+        this.applyCycles(findCyclesShortestFirst(g));
     }
 
     private applyCycles(found: GraphSelection[]): void {
-        this.cycles.set(found);
-        if (!found.length) {
+        const sorted = sortCyclesShortestFirst(found);
+        this.cycles.set(sorted);
+        if (!sorted.length) {
+            this.selectedCycle.set(-1);
             this.emphasisChange.emit(null);
             this.analysisError.set('No cycles in this graph.');
             return;
         }
-        this.emphasisChange.emit({
-            nodeIds: [...new Set(found.flatMap((c) => c.nodeIds))],
-            edgeIds: [...new Set(found.flatMap((c) => c.edgeIds))],
-        });
+        // Draw the shortest cycle, not the union of all of them (which paints the whole core).
+        this.focusCycle(sorted[0], 0);
     }
 
-    focusCycle(c: GraphSelection): void {
+    focusCycle(c: GraphSelection, index: number): void {
+        this.selectedCycle.set(index);
         this.emphasisChange.emit({ nodeIds: c.nodeIds, edgeIds: c.edgeIds });
     }
 
     /** A cycle rendered as a closed chain (`A → B → C → A`). */
     cycleLabel(c: GraphSelection): string {
-        return [...c.nodeIds, c.nodeIds[0]].map((id) => this.label(id)).join(' → ');
+        const chain = [...c.nodeIds, c.nodeIds[0]].map((id) => this.label(id)).join(' → ');
+        return `${chain} (${c.nodeIds.length} ${c.nodeIds.length === 1 ? 'hop' : 'hops'})`;
+    }
+
+    /** A path row: the node chain, plus how many parallel-link paths it stands for and their link kinds. */
+    pathLabel(p: GraphSelection): string {
+        const d = p as Partial<DistinctPath>;
+        const extra = d.count && d.count > 1 ? ` · ${d.count} parallel links` : '';
+        const kinds = d.kinds?.length ? ` · ${d.kinds.join(', ')}` : '';
+        return `${this.patternMatchLabel(p)}${extra}${kinds}`;
     }
 
     runCutPoints(): void {

@@ -10,6 +10,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 
 import { LensService, apiErrorMessage } from 'app/inspecto/api';
@@ -17,6 +18,7 @@ import {
     LinkAnalysisLimits,
     LinkAnalysisSettingsService,
 } from '@inspecto/link-analysis/link-analysis/link-analysis-settings.service';
+import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -59,8 +61,22 @@ const INV_BYTES_MAX = 1_099_511_627_776;
 const INV_BYTES_DEFAULT = 4 * 1024 * 1024 * 1024;
 const invBytesValidators = [Validators.min(INV_BYTES_MIN), Validators.max(INV_BYTES_MAX), Validators.pattern('\\d*')];
 const setBytesValidators = [Validators.min(SET_BYTES_MIN), Validators.max(SET_BYTES_MAX), Validators.pattern('\\d*')];
+/** `ConfigSpecs.LINK_ANALYSIS_MASKING_MODES`; blank = inherit (`typed`). */
+const MASKING_MODES: { value: string; label: string; hint: string }[] = [
+    { value: 'typed', label: 'typed', hint: 'Only values of Entity Types marked masked are shown as tokens; the rest are shown as they are.' },
+    { value: 'all', label: 'all', hint: 'Every entity value is shown as a token; the raw value stays on the server.' },
+    { value: 'none', label: 'none', hint: 'No entity value is masked; every value is shown as it is.' },
+];
+/** `SettingsRoutes` `graphRun.*`: 1..10 000 000 each, refused 422 outside (the service's own ceilings clamp a larger default). */
+const RUN_MAX = 10_000_000;
+const runValidators = [Validators.min(1), Validators.max(RUN_MAX), Validators.pattern('\\d*')];
+/** `SettingsRoutes` `index.*`: threads 1..64, queue 1..1000, maxDiskBytes 0..10^15 (0 = no limit). */
+const IDX_THREADS_MAX = 64;
+const IDX_QUEUE_MAX = 1000;
+const IDX_DISK_MAX = 1_000_000_000_000_000;
 const draftValidators = (max: number) => [Validators.min(1), Validators.max(max), Validators.pattern('\\d*')];
 
+type RunKey = 'maxNodes' | 'maxEdges' | 'timeoutMs';
 type Key = 'fourEyesBudgetAbove' | 'fourEyesFanOutAbove' | 'mergedDistinctCap' | 'seedByDistinctCap';
 
 /** Expiry must outlast hibernation (server 422 otherwise); a blank key counts as its value in force, else default. */
@@ -94,6 +110,7 @@ function expiryAfterHibernation(
         MatButtonModule,
         MatFormFieldModule,
         MatInputModule,
+        MatSelectModule,
         InspectoAlertComponent,
         InspectoPageHeaderComponent,
     ],
@@ -101,7 +118,7 @@ function expiryAfterHibernation(
         <div class="flex flex-col gap-6 p-6">
             <inspecto-page-header
                 title="Link Analysis"
-                subtitle="Four-eyes thresholds, traversal caps and Draft limits for Investigations in this space."
+                subtitle="Masking, four-eyes thresholds, traversal caps, link index, graph-run budgets and Draft limits for Investigations in this space."
                 [inset]="false"
             />
             @if (loading()) {
@@ -177,6 +194,100 @@ function expiryAfterHibernation(
                             }
                         </mat-form-field>
                     }
+                    <fieldset class="flex flex-col gap-3">
+                        <legend class="text-sm font-semibold">Masking</legend>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Masking mode</mat-label>
+                            <mat-select formControlName="maskingMode">
+                                <mat-option [value]="null">Inherit the default (typed)</mat-option>
+                                @for (m of maskingModes; track m.value) {
+                                    <mat-option [value]="m.value">{{ m.label }}</mat-option>
+                                }
+                            </mat-select>
+                            <mat-hint>In force: {{ maskingInForce() }}.</mat-hint>
+                        </mat-form-field>
+                        <ul class="text-secondary list-disc pl-5 text-sm">
+                            @for (m of maskingModes; track m.value) {
+                                <li>
+                                    <strong>{{ m.label }}</strong> - {{ m.hint }}
+                                </li>
+                            }
+                        </ul>
+                    </fieldset>
+                    <fieldset class="flex flex-col gap-2">
+                        <legend class="text-sm font-semibold">Entity Types in force</legend>
+                        @if (entityTypes().length) {
+                            <ul class="text-sm" aria-label="Entity Types in force">
+                                @for (t of entityTypes(); track t.id) {
+                                    <li>
+                                        <strong>{{ t.label }}</strong> ({{ t.id }}) - {{ t.normaliser }} normaliser,
+                                        {{ t.masked ? 'masked' : 'not masked' }}; claims
+                                        {{ t.classifications.length ? t.classifications.join(', ') : 'no classification' }}
+                                    </li>
+                                }
+                            </ul>
+                        } @else {
+                            <p class="text-secondary text-sm">None reported.</p>
+                        }
+                        <p class="text-secondary text-sm">Read only here; Entity Types are changed through the settings document.</p>
+                    </fieldset>
+                    <fieldset formGroupName="index" class="flex flex-col gap-3">
+                        <legend class="text-sm font-semibold">Link index</legend>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Serve reads from the link index when a fresh one exists</mat-label>
+                            <mat-select formControlName="enabled">
+                                <mat-option [value]="null">Inherit the default</mat-option>
+                                <mat-option [value]="true">On</mat-option>
+                                <mat-option [value]="false">Off</mat-option>
+                            </mat-select>
+                            <mat-hint>In force: {{ indexInForce()?.enabled ? 'on' : 'off' }}.</mat-hint>
+                        </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Index build workers</mat-label>
+                            <input matInput type="number" min="1" [max]="idxThreadsMax" formControlName="threads"
+                                [readonly]="!canEdit()" [placeholder]="'default ' + (indexInForce()?.threads ?? '')" />
+                            <mat-hint>In force: {{ indexInForce()?.threads ?? '-' }}.</mat-hint>
+                            @if (form.controls.index.controls.threads.invalid) {
+                                <mat-error>A whole number from 1 to {{ idxThreadsMax }}, or blank for the default.</mat-error>
+                            }
+                        </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Index build waiting line</mat-label>
+                            <input matInput type="number" min="1" [max]="idxQueueMax" formControlName="queue"
+                                [readonly]="!canEdit()" [placeholder]="'default ' + (indexInForce()?.queue ?? '')" />
+                            <mat-hint>In force: {{ indexInForce()?.queue ?? '-' }}.</mat-hint>
+                            @if (form.controls.index.controls.queue.invalid) {
+                                <mat-error>A whole number from 1 to {{ idxQueueMax }}, or blank for the default.</mat-error>
+                            }
+                        </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Index disk budget (bytes)</mat-label>
+                            <input matInput type="number" min="0" [max]="idxDiskMax" formControlName="maxDiskBytes"
+                                [readonly]="!canEdit()" placeholder="no limit" />
+                            <mat-hint>In force: {{ indexInForce()?.maxDiskBytes ? indexInForce()?.maxDiskBytes + ' bytes' : 'no limit' }}. A build whose estimate is above it is refused; 0 or blank = no limit.</mat-hint>
+                            @if (form.controls.index.controls.maxDiskBytes.invalid) {
+                                <mat-error>A whole number of bytes from 0 to {{ idxDiskMax }}, or blank for no limit.</mat-error>
+                            }
+                        </mat-form-field>
+                    </fieldset>
+                    <fieldset formGroupName="graphRun" class="flex flex-col gap-3">
+                        <legend class="text-sm font-semibold">Server graph run - default budget</legend>
+                        @for (r of runFields; track r.key) {
+                            <mat-form-field subscriptSizing="dynamic">
+                                <mat-label>{{ r.label }}</mat-label>
+                                <input matInput type="number" min="1" [formControlName]="r.key" [readonly]="!canEdit()"
+                                    [placeholder]="'default ' + runInForce(r.key)" />
+                                <mat-hint>In force: {{ runInForce(r.key) }}; server ceiling: {{ runCeiling(r.key) }}. A larger value is clamped to the ceiling.</mat-hint>
+                                @if (form.controls.graphRun.controls[r.key].invalid) {
+                                    <mat-error>A whole number from 1 to {{ runMax }}, or blank for the default.</mat-error>
+                                }
+                            </mat-form-field>
+                        }
+                    </fieldset>
+                    <p class="text-sm">
+                        <strong>Investigation store:</strong> {{ storeLabel() }}
+                        <span class="text-secondary">(chosen when the server starts; not a setting)</span>
+                    </p>
                     <fieldset formGroupName="drafts" class="flex flex-col gap-3">
                         <legend class="text-sm font-semibold">Drafts</legend>
                         @for (d of draftFields; track d.key) {
@@ -230,10 +341,23 @@ function expiryAfterHibernation(
 })
 export class LinkAnalysisSettingsComponent implements OnInit {
     private api = inject(LinkAnalysisSettingsService);
+    private runs = inject(GraphRunsService);
     private lens = inject(LensService);
     private toastr = inject(ToastrService);
 
     readonly max = MAX;
+    readonly maskingModes = MASKING_MODES;
+    readonly runMax = RUN_MAX;
+    readonly idxThreadsMax = IDX_THREADS_MAX;
+    readonly idxQueueMax = IDX_QUEUE_MAX;
+    readonly idxDiskMax = IDX_DISK_MAX;
+    readonly runFields: { key: RunKey; label: string }[] = [
+        { key: 'maxNodes', label: 'Graph run: default node budget' },
+        { key: 'maxEdges', label: 'Graph run: default edge budget' },
+        { key: 'timeoutMs', label: 'Graph run: default time budget (ms)' },
+    ];
+    /** `GET /inv/graph/algorithms`: the budget in force and the server's hard ceilings; null if that route did not answer. */
+    private readonly catalogue = signal<{ defaults: Record<RunKey, number>; ceilings: Record<RunKey, number> } | null>(null);
     readonly draftFields = DRAFT_FIELDS;
     readonly setBytesMin = SET_BYTES_MIN;
     readonly setBytesMax = SET_BYTES_MAX;
@@ -250,6 +374,19 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly hasSetLimit = computed(() => this.served() !== null && 'maxSetBytes' in this.served()!);
     readonly setBytesInForce = computed(() => this.served()?.maxSetBytesInForce ?? SET_BYTES_DEFAULT);
     readonly hasInvestigationBudget = computed(() => this.served() !== null && 'maxInvestigationBytes' in this.served()!);
+    readonly maskingInForce = computed(() => this.served()?.maskingModeInForce ?? 'typed');
+    readonly entityTypes = computed(() => this.served()?.entityTypesInForce ?? []);
+    readonly indexInForce = computed(() => this.served()?.indexInForce ?? null);
+    readonly storeLabel = computed(() => {
+        const b = this.served()?.investigationStoreInForce;
+        return b === 'db' ? 'PostgreSQL' : b === 'fs' ? 'filesystem' : 'not reported';
+    });
+    runInForce(k: RunKey): string | number {
+        return this.catalogue()?.defaults[k] ?? '-';
+    }
+    runCeiling(k: RunKey): string | number {
+        return this.catalogue()?.ceilings[k] ?? '-';
+    }
     readonly invBytesInForce = computed(() => this.served()?.maxInvestigationBytesInForce ?? INV_BYTES_DEFAULT);
 
     readonly form = new FormGroup({
@@ -259,6 +396,18 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         seedByDistinctCap: new FormControl<number | null>(null, intOrBlank),
         maxSetBytes: new FormControl<number | null>(null, setBytesValidators),
         maxInvestigationBytes: new FormControl<number | null>(null, invBytesValidators),
+        maskingMode: new FormControl<string | null>(null),
+        index: new FormGroup({
+            enabled: new FormControl<boolean | null>(null),
+            threads: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_THREADS_MAX), Validators.pattern('\\d*')]),
+            queue: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_QUEUE_MAX), Validators.pattern('\\d*')]),
+            maxDiskBytes: new FormControl<number | null>(null, [Validators.min(0), Validators.max(IDX_DISK_MAX), Validators.pattern('\\d*')]),
+        }),
+        graphRun: new FormGroup({
+            maxNodes: new FormControl<number | null>(null, runValidators),
+            maxEdges: new FormControl<number | null>(null, runValidators),
+            timeoutMs: new FormControl<number | null>(null, runValidators),
+        }),
         drafts: new FormGroup(
             {
                 maxOpen: new FormControl<number | null>(null, draftValidators(1000)),
@@ -307,6 +456,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     });
 
     ngOnInit(): void {
+        this.loadCatalogue();
         this.api.get().subscribe({
             next: (s) => {
                 this.loading.set(false);
@@ -316,6 +466,13 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 this.loading.set(false);
                 this.loadError.set(apiErrorMessage(err, 'The Link Analysis settings route did not answer.'));
             },
+        });
+    }
+
+    private loadCatalogue(): void {
+        this.runs.algorithms().subscribe({
+            next: (c) => this.catalogue.set({ defaults: c.defaults, ceilings: c.ceilings }),
+            error: () => this.catalogue.set(null), // the hints then show "-"; the settings stay editable
         });
     }
 
@@ -338,6 +495,19 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         else delete body['seedByDistinctCap'];
         if ('maxSetBytes' in served) body['maxSetBytes'] = num(v.maxSetBytes);
         if ('maxInvestigationBytes' in served) body['maxInvestigationBytes'] = num(v.maxInvestigationBytes);
+        body['maskingMode'] = v.maskingMode || null;
+        // Edited keys replace; keys the form does not show (keepVersions, threads, queue, maxResultItems) stay as read.
+        const idx: Record<string, unknown> = { ...(served.index ?? {}) };
+        idx['enabled'] = v.index.enabled;
+        idx['threads'] = num(v.index.threads);
+        idx['queue'] = num(v.index.queue);
+        idx['maxDiskBytes'] = num(v.index.maxDiskBytes);
+        if (Object.values(idx).some((x) => x !== null && x !== undefined)) body['index'] = idx;
+        else delete body['index'];
+        const run: Record<string, unknown> = { ...(served.graphRun ?? {}) };
+        for (const r of this.runFields) run[r.key] = num(v.graphRun[r.key]);
+        if (Object.values(run).some((x) => x !== null && x !== undefined)) body['graphRun'] = run;
+        else delete body['graphRun'];
         // Blank keys are omitted (inherit); no stated key at all = no block.
         const drafts: Record<string, number> = {};
         for (const d of DRAFT_FIELDS) {
@@ -353,6 +523,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 this.saving.set(false);
                 this.writesDisabled.set(null);
                 this.apply(s);
+                this.loadCatalogue(); // the budget in force follows the saved defaults
                 this.toastr.success('Link Analysis settings saved.');
             },
             error: (err) => {
@@ -376,12 +547,28 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             seedByDistinctCap: s.seedByDistinctCap ?? null,
             maxSetBytes: s.maxSetBytes ?? null,
             maxInvestigationBytes: s.maxInvestigationBytes ?? null,
+            maskingMode: s.maskingMode ?? null,
+            index: {
+                enabled: s.index?.enabled ?? null,
+                threads: s.index?.threads ?? null,
+                queue: s.index?.queue ?? null,
+                maxDiskBytes: s.index?.maxDiskBytes ?? null,
+            },
+            graphRun: {
+                maxNodes: s.graphRun?.maxNodes ?? null,
+                maxEdges: s.graphRun?.maxEdges ?? null,
+                timeoutMs: s.graphRun?.timeoutMs ?? null,
+            },
             drafts: {
                 maxOpen: s.drafts?.maxOpen ?? null,
                 hibernateAfterMinutes: s.drafts?.hibernateAfterMinutes ?? null,
                 expireAfterDays: s.drafts?.expireAfterDays ?? null,
             },
         });
+        // mat-select has no readonly: a viewer without the authoring capability gets disabled selects.
+        for (const c of [this.form.controls.maskingMode, this.form.controls.index.controls.enabled])
+            if (this.canEdit()) c.enable({ emitEvent: false });
+            else c.disable({ emitEvent: false });
         this.form.controls.drafts.setValidators(expiryAfterHibernation(s.draftsInForce));
         this.form.controls.drafts.updateValueAndValidity();
     }

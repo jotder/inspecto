@@ -46,3 +46,14 @@ describe('typedEntityKey', () => {
         );
     });
 });
+
+describe('a masked alias is an opaque identity (DR-D2)', () => {
+    it('no normaliser touches it - digits would otherwise strip it to a few digits', () => {
+        expect(normalizeTypedKey('masked:0a1b2c3d4e5f6071', 'digits')).toBe('masked:0a1b2c3d4e5f6071');
+        expect(normalizeTypedKey('masked:0a1b2c3d4e5f6071', 'upper-trim')).toBe('masked:0a1b2c3d4e5f6071');
+        expect(normalizeEntityKey('masked:0a1b2c3d4e5f6071')).toBe('masked:0a1b2c3d4e5f6071');
+        expect(typedEntityKey('msisdn', 'masked:0a1b2c3d4e5f6071', 'digits')).toBe('msisdn:masked:0a1b2c3d4e5f6071');
+        // positive twin: a raw value still normalises
+        expect(normalizeTypedKey('+44 7700', 'digits')).toBe('447700');
+    });
+});

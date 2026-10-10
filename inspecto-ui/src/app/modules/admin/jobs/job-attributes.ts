@@ -26,6 +26,9 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
             { value: 'pipeline', label: 'pipeline' },
             { value: 'sql.template', label: 'sql.template' },
             { value: 'risk.score', label: 'risk.score' },
+            // Link Analysis (DR-U10): the host registers both; the server catalog replaces this list when it answers.
+            { value: 'la.index.build', label: 'la.index.build' },
+            { value: 'la.detect', label: 'la.detect' },
         ],
     },
     {
@@ -83,10 +86,10 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
         type: 'string',
         tier: 'required',
         dependsOn: { key: 'scheduleMode', equals: 'signal' },
-        placeholder: 'e.g. dataset.write',
+        placeholder: 'e.g. pipeline.commit',
         // `Signals.matchesType`: exact (case-insensitive) or a `prefix.*` glob. Free text on purpose —
         // there is no signal-type catalog endpoint, and a job may be armed for a signal not yet emitted.
-        help: 'The signal type to fire on — exact (dataset.write) or a prefix glob (dataset.*).',
+        help: 'The signal type to fire on — exact (pipeline.commit, dataset.write) or a prefix glob (dataset.*). A file landing in a Pipeline emits pipeline.commit.',
     },
     {
         key: 'when',
@@ -94,8 +97,8 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
         type: 'string',
         tier: 'optional',
         dependsOn: { key: 'scheduleMode', equals: 'signal' },
-        placeholder: "e.g. $signal.dataset == 'premium_cdr_view'",
-        help: "Optional guard over the firing signal's payload; the job runs only when it holds. Leave blank to run on every match.",
+        placeholder: "e.g. $signal.pipeline == 'mule_transfers'",
+        help: "Optional guard over the firing signal's payload; the job runs only when it holds. Leave blank to run on every match. On pipeline.commit, guard on the Pipeline with $signal.pipeline (also $signal.status, $signal.rows).",
     },
     { key: 'enabled', label: 'Enabled (armed)', type: 'boolean', tier: 'optional', default: true },
     {

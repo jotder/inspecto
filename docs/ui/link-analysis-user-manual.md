@@ -179,13 +179,13 @@ loaded (cap 2 000 nodes; the heavier scores are capped lower and say so).
 | Group | Answers |
 |---|---|
 | **Shortest path** | How are A and B connected? *Fewest hops*, or weighted by tie strength. |
-| **All paths** | Every route between A and B up to a length. |
-| **Find paths (server)** | The same across the **whole Dataset** in the database — for graphs too big to load. Shows depth searched, and warns if capped. |
+| **All paths** | Every route between A and B up to a length. Parallel links between the same nodes count as ONE route, shown with how many links it stands for and their kinds. |
+| **Find paths (server)** | The same across the **whole Dataset** in the database — for graphs too big to load. Shows depth searched, and warns if capped. One row per route (parallel links collapsed, as in All paths). |
 | **Explain node** | A node's neighbourhood, degree and role in plain words. |
 | **Centrality** | Who is most important: degree, betweenness (brokers), closeness, eigenvector, Katz, PageRank, HITS. |
 | **Communities** | Natural clusters: label propagation or Louvain. |
 | **Connected components** | Separate islands. |
-| **Cycles** | Money or calls that return to where they started. |
+| **Cycles** | Money or calls that return to where they started. Listed shortest first with the hop count; the selected cycle is the one drawn on the canvas (the shortest is drawn first). |
 | **Cut points** | Nodes/links whose removal splits the network — single points of dependence. |
 | **Cohesive groups** | k-core, triangles, cliques — tightly knit cells. |
 | **Similarity & prediction** | Who looks alike; which links are likely missing. |
@@ -203,7 +203,7 @@ and the queued entities seeded as its first step. You can remove one from the qu
 
 ## 7. Pattern matching
 
-Pick a **pattern pack** to pre-fill the motif, edit the thresholds (they are always visible), run it.
+Pattern match opens on the first pack (its description is shown); *Custom motif* with no kinds set matches every link and says *Choose a pattern*. Pick a **pattern pack** to pre-fill the motif, edit the thresholds (they are always visible), run it.
 
 | Pack | Looks for |
 |---|---|
@@ -262,7 +262,8 @@ A Space may require a stated **purpose** for sensitive steps; when asked, it is 
 | **undo** | A recorded step that reverts the previous one. |
 
 Clicking a node while an Investigation is open **selects** it for the next op. Switch *Show the query graph* to pick
-seeds from the wider picture.
+seeds from the wider picture. Pressing *Seed* returns the canvas to the Working Set, so *Expand one hop*, *Keep*,
+*Hide* and *Exclude* act on the entity you just seeded.
 
 ### 9.3 Replay, drift and fork
 
@@ -293,7 +294,10 @@ is conservative: if more than one type could claim a value, it stays unmatched a
 
 ### 9.8 Value Measures (whole-Dataset behaviour detectors)
 Choose a Dataset and column roles (value, time, link kind), a window (from/to, or **last N hours/days**, at most 31
-days, evaluated in UTC) and a Measure. Thresholds are shown and editable.
+days, evaluated in UTC) and a Measure. The Dataset, the link columns and the bound time column are prefilled from the open
+Investigation; From and To are date pickers; **Run Measure** stays disabled, with the reason beside it, until the form is
+valid. **Watch** is shown only to users who can author Alert Rules. Refusals for size (413) and the per-user rate limit
+(a burst of 20, then one request every 3 seconds, 429) are explained in plain sentences.
 
 | Measure | Flags |
 |---|---|
@@ -316,7 +320,7 @@ reports anything **changed, missing or added**. Tampering is detectable.
 ### 9.10 Templates
 **Save as template** turns an Investigation's method into a reusable recipe: seeds become parameters; your ad-hoc
 exclusions are **dropped** (they name specific entities) and the preview tells you what was dropped or generalised.
-**Instantiate** builds a new Investigation over the same or another Dataset.
+**Instantiate** builds a new Investigation over the same or another Dataset; you pick the template from a list of your own.
 
 ### 9.11 Widgets
 **Pin to a Widget** puts a Working Set on a Dashboard. **Frozen** (default) shows the Working Set as of a pinned step;
@@ -366,9 +370,18 @@ its Dataset is no longer shared with you — the system answers the same for all
 
 **Masking.** Per Space, entity keys are shown *typed* (only sensitive types masked), *all* masked, or *none*.
 Masked values appear as stable tokens you can still group and count by.
+The same rule applies on the query graph, the node list, paths, patterns and Value Measures as in the Working Set: a *Masking: typed|all|none*
+badge in the query panel says which applies. A masked entity shows as an alias (`masked:...`); pick, seed and expand it as you
+would a name. The Investigation gives the seeded entity its own alias, so the Working Set row differs from the query graph's;
+the Selected line keeps them one entity and marks it *(masked)*. After a server restart an old alias is refused: run the query again.
 
 **Settings → Link Analysis** sets per-Space limits: the four-eyes thresholds (large expands wait for a second
-person), the merged-traversal cap and the `seedBy` cap.
+person), the merged-traversal cap and the `seedBy` cap. It also shows and, with the authoring capability, changes the
+**masking mode** (`typed`, `all` or `none`, each explained beside the field, with the mode in force), the **link index**
+(whether reads are served from a fresh index, plus its build workers, waiting line and disk budget), the default
+**server graph-run budget** (nodes, edges, time, shown with the server's ceilings) and the Draft limits. It lists the
+Entity Types in force and names the active Investigation store (filesystem or PostgreSQL) read only. Without the
+capability every field is read only.
 
 ---
 
@@ -378,7 +391,7 @@ person), the merged-traversal cap and the `seedBy` cap.
 * Nothing is silently dropped: truncation, unmatched values, unvalued rows and refusals are all stated.
 * Time-based tools read times in a stated zone (UTC for Measures); naive timestamps are assumed UTC.
 * The server-side path search works directly over a Dataset and is certified at about one million links (5-hop walk, warm p95 under
-  350 ms); above that a Space can switch on the edge index (Space setting `index.enabled`, off by default), measured to 100 million links.
+  350 ms); above that a Space can switch on the edge index (Space setting `index.enabled`, on by default since 2026-10-10; set it false to switch it off), measured to 100 million links.
 * An Alert on an Investigation watches its **sealed** Working Set, not live data.
 
 ## 13. Troubleshooting

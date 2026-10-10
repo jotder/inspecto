@@ -86,6 +86,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -136,6 +137,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -148,7 +150,7 @@
                                                 class="underline-offset-2 hover:underline"
                                                 (click)="focusAllPath(p)"
                                             >
-                                                {{ patternMatchLabel(p) }}
+                                                {{ pathLabel(p) }}
                                             </button>
                                         </li>
                                     }
@@ -227,6 +229,11 @@
                                         }
                                         · searched up to {{ sp.depthLimit }} hops
                                     </p>
+                                    @if (serverPathsSourceNote(); as note) {
+                                        <p class="text-secondary m-0 text-xs" role="status" data-testid="paths-source">
+                                            {{ note }}
+                                        </p>
+                                    }
                                     @if (sp.edgeYieldCapped) {
                                         <inspecto-alert variant="warning" title="Edge-yield cap reached">
                                             A hop level hit the server's edge-yield fence, so part of the graph was not
@@ -245,7 +252,7 @@
                                                         class="underline-offset-2 hover:underline"
                                                         (click)="focusAllPath(p)"
                                                     >
-                                                        {{ patternMatchLabel(p) }}
+                                                        {{ pathLabel(p) }}
                                                     </button>
                                                 </li>
                                             }
@@ -288,6 +295,7 @@
                                 [params]="explainIndexParams()"
                                 [hold]="explainIndexHold()"
                                 [investigationId]="investigationId()"
+                                [investigationOpen]="investigationOpen()"
                                 [allowed]="canRunOnServer()"
                             />
                             <h4 class="mt-2 text-sm font-medium">Ego network from the index</h4>
@@ -297,6 +305,7 @@
                                 [params]="egoIndexParams()"
                                 [hold]="explainIndexHold()"
                                 [investigationId]="investigationId()"
+                                [investigationOpen]="investigationOpen()"
                                 [allowed]="canRunOnServer()"
                             />
                             <h4 class="mt-2 text-sm font-medium">Degree of chosen nodes from the index</h4>
@@ -343,11 +352,12 @@
                                 [indexOnly]="true"
                                 [seeds]="scoreSeedIds()"
                                 [investigationId]="investigationId()"
+                                [investigationOpen]="investigationOpen()"
                                 [allowed]="canRunOnServer()"
                             />
                         }
                         @case ('index-build') {
-                            <inspecto-link-analysis-index-build [allowed]="canBuildIndex()" />
+                            <inspecto-link-analysis-index-build [allowed]="canBuildIndex()" [mappings]="indexMappings()" />
                         }
                         @case ('centrality') {
                             <div class="flex flex-wrap items-center gap-2">
@@ -372,6 +382,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -439,6 +450,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -499,15 +511,21 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
                             }
                             @if (cycles().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Cycles">
-                                    @for (c of cycles(); track $index) {
+                                    @for (c of cycles(); track $index; let i = $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusCycle(c)">
+                                            <button
+                                                class="underline-offset-2 hover:underline"
+                                                [class.font-semibold]="selectedCycle() === i"
+                                                [attr.aria-pressed]="selectedCycle() === i"
+                                                (click)="focusCycle(c, i)"
+                                            >
                                                 {{ cycleLabel(c) }}
                                             </button>
                                         </li>
@@ -534,6 +552,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -545,6 +564,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -589,6 +609,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -668,6 +689,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -763,6 +785,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -774,6 +797,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -810,6 +834,7 @@
                                     [note]="srv.note"
                                     [hold]="srv.hold"
                                     [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
@@ -892,6 +917,11 @@
                                     (ngModelChange)="loadPatternPack($event)"
                                 />
                             </div>
+                            @if (!loadedPack()) {
+                                <p class="text-sm text-secondary" role="status">
+                                    Choose a pattern — a custom motif with no link kinds set matches every link.
+                                </p>
+                            }
                             @if (loadedPack(); as pack) {
                                 <p class="text-sm text-secondary" role="status">
                                     {{ pack.description }}

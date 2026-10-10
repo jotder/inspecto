@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -16,6 +16,7 @@ import {
     InvestigationLogEntry,
     InvestigationMeasure,
     InvestigationTemplate,
+    InvestigationTemplateSummary,
 } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { AttributeSpec } from '@inspecto/core/component-model';
@@ -29,6 +30,7 @@ import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
 import { investigationErrorMessage } from './investigation-state';
+import { limitRefusalMessage } from './limit-refusal';
 import { SAFE_ID_PATTERN, templatePreview } from './investigation-template';
 
 const SAFE_ID_HINT = "Letters, digits, '.', '_' or '-', starting with a letter or digit (at most 128).";
@@ -283,6 +285,7 @@ export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        FormsModule, // NgForm on the plain `<form>` cancels the native submit (DR-D1)
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
@@ -291,6 +294,7 @@ export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
         MatInputModule,
         InspectoAlertComponent,
         InspectoDialogResizeDirective,
+        InspectoOptionPickerComponent,
         InspectoSchemaFormComponent,
     ],
     template: `
@@ -312,17 +316,24 @@ export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
         </div>
         <mat-dialog-content class="flex flex-col gap-3 text-sm">
             <form class="flex items-start gap-2" (ngSubmit)="loadTemplate()">
-                <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                    <mat-label>Template id</mat-label>
-                    <input matInput [formControl]="templateId" />
-                    @if (templateId.hasError('required')) {
-                        <mat-error>Name the template to instantiate.</mat-error>
-                    } @else if (templateId.hasError('pattern')) {
-                        <mat-error>{{ idHint }}</mat-error>
-                    }
-                </mat-form-field>
-                <button mat-stroked-button type="submit" class="mt-2" [disabled]="busy()">Load</button>
+                <inspecto-option-picker
+                    class="flex-auto"
+                    label="Investigation Template"
+                    placeholder="Choose a template"
+                    [formControl]="templateId"
+                    [options]="templateOptions()"
+                ></inspecto-option-picker>
+                <button mat-stroked-button type="submit" class="mt-2" [disabled]="busy() || !templateId.value">
+                    Load
+                </button>
             </form>
+            @if (templates() && !templates()!.length) {
+                <p class="text-secondary m-0 text-xs" data-test="no-templates">
+                    This Space has no Investigation Templates of yours yet. Save one from an Investigation first (<em
+                        >Save as template</em
+                    >).
+                </p>
+            }
             @if (template(); as t) {
                 <p class="text-secondary m-0 text-xs">
                     <strong>{{ t.title || t.id }}</strong> — {{ t.ops.length }} step(s) from Investigation
@@ -354,11 +365,16 @@ export class InstantiateTemplateDialog {
     private confirm = inject(InspectoConfirmService);
     private readonly schemaForm = viewChild(InspectoSchemaFormComponent);
 
-    readonly idHint = SAFE_ID_HINT;
-    readonly templateId = new FormControl('', {
-        nonNullable: true,
-        validators: [Validators.required, Validators.pattern(SAFE_ID_PATTERN)],
-    });
+    /** The caller's own templates (`GET /inv/investigation-templates`) — the picker's choices; null until read. */
+    readonly templates = signal<InvestigationTemplateSummary[] | null>(null);
+    readonly templateOptions = computed<PickerOption[]>(() =>
+        (this.templates() ?? []).map((t) => ({
+            value: t.id,
+            label: t.title || t.id,
+            hint: `${t.id} · ${t.ops} step(s) · over ${t.dataset ?? 'unknown Dataset'}`,
+        })),
+    );
+    readonly templateId = new FormControl('', { nonNullable: true, validators: [Validators.required] });
     readonly template = signal<InvestigationTemplate | null>(null);
     readonly specs = computed(() => {
         const t = this.template();
@@ -378,6 +394,19 @@ export class InstantiateTemplateDialog {
         () => this.templateId.dirty || (this.schemaForm()?.isDirty() ?? false),
         this.confirm,
     );
+
+    constructor() {
+        void this.listTemplates();
+    }
+
+    private async listTemplates(): Promise<void> {
+        try {
+            this.templates.set((await firstValueFrom(this.inv.investigationTemplates())).templates);
+        } catch (err) {
+            this.unavailable.set(isUnavailable(err));
+            this.error.set(investigationErrorMessage(err, 'Could not list your Investigation Templates.'));
+        }
+    }
 
     async loadTemplate(): Promise<void> {
         if (this.templateId.invalid) {
@@ -462,6 +491,8 @@ export const SEVERITY_OPTIONS: PickerOption[] = [
 
 /** The message for a failed binding: the capability here is Alert-Rule authoring, not Incident management. */
 export function alertRuleErrorMessage(err: unknown): string {
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const status = (err as { status?: number })?.status;
     const server = apiErrorMessage(err, 'Could not create the Alert Rule.');
     if (status === 403)

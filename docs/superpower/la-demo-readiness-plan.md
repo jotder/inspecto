@@ -147,10 +147,16 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 | 4 | `fm.analyst` | Masking: Working Set shows tokens; `admin` Reveal is audited | DR-D2 |
 | 5 | `fm.analyst` + second approver | Expand the hub → pending; requester cannot approve; approver does | DR-S2, DR-S6 |
 | 6 | any | Dossier build/verify; tamper one hash → verify fails | ready |
-| 7 | `curl` | 401 no token; 403 `fm.manager` on identities; 404 non-member; 404 `MODULE_DISABLED` on the switched-off Space; 422 bad id | DR-S7, DR-S1 |
+| 7 | `curl` | 401 no token; 403 `ra.analyst` on identities (`fm.manager` holds Manage Incidents, so it reads them); 404 non-member; 404 `MODULE_DISABLED` on the switched-off Space; 422 bad id | DR-S7, DR-S1 |
 | 8 | `admin` | Watch the measure, enable standing detection, run `la.detect`; Alert fires; edit the rule → `NOT_ENABLED` | DR-S3, DR-S5, DR-U9 |
 | 9 | `admin` | A new day lands → `pipeline.commit` → index version N+1 → *Edge index* shows it; a path answer says "from index vN" | DR-T1, DR-U4, DR-U5 |
 | 10 | slides | 10^8: full build 852 s, append 31 s (synthetic corpus, 1.8 M nodes); 10^9 is an extrapolation | evidence |
+
+**Seed status (2026-10-10, the `la-showcase` template + `tools/seed-la-showcase.mjs`; see `docs/okf/capabilities/spaces/spaces.md` 3.5.6).** DR-S1..S6, S7 (`la-showcase-off`),
+S8 (inert sample policy), S9 (launch configs `inspecto-la-app`, `inspecto-personal`; Postgres runbook step) and S10 (`LaShowcaseGoldenTest`) are built; the seed script is unit-tested
+against a mocked `fetch` and not yet run live. Steps that now have their data: 2 (the seeded Investigation; the staged next-day file), 5 (`fm.manager` is the second approver), 7
+(`la-showcase-off`), 8 (bound rule + `la_detect`), 9 (`la_index_build` on `pipeline.commit`). Steps still waiting on UI or behaviour lanes: 3 (DR-D4), 4 (DR-D2), 8 (DR-U9), 9 (DR-U4, DR-U5). The
+showcase corpus is smaller than the `demo` Space's: step 1's figures (170 nodes, 1,803 links, centrality `ACC-1008`) are for `demo`; on the showcase the hub ranks first.
 
 ## 5. Corrections already applied to the page (2026-10-10, verified in code)
 Trigger signal is `pipeline.commit` for file ingest (also fixed in `ingestion.md` and the frontend concept); 75 routes

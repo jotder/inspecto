@@ -1,0 +1,15 @@
+job:
+  name: la_index_build
+  type: la.index.build
+  description: "Builds or appends the Link Analysis Index of the mule transfers after each committed ingest batch. The first build is a full build (allow_full), every later one is the append the server itself advises. The owner is stamped with whoever creates the Space."
+  on_signal: pipeline.commit
+  when: "$signal.pipeline == mule_transfers && $signal.status == SUCCESS"
+  dataset: mule_transfers_dataset
+  source_col: PAYER_ACCOUNT
+  target_col: PAYEE_ACCOUNT
+  kind_col: CHANNEL
+  time_col: BOOKED_AT
+  owner: admin
+  allow_full: "true"
+  timeout_seconds: "600"
+  wait_seconds: "300"

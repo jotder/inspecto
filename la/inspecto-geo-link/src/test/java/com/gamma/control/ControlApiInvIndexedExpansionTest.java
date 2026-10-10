@@ -266,7 +266,7 @@ class ControlApiInvIndexedExpansionTest {
             String body = nbody("n_ds", "A", "\"linkKindCol\":\"kind\"");
             JsonNode off = neighbors(c, body);
             assertEquals("index_disabled", off.at("/source/reason").asText(), "an index exists but index.enabled is off (the default)");
-            assertEquals(List.of("rows", "truncated", "columnTypes", "source"), fieldNames(off), "today's body plus source, nothing else");
+            assertEquals(List.of("masking", "rows", "truncated", "columnTypes", "source"), fieldNames(off), "today's body plus masking (DR-D2) and source, nothing else");
             settings(c, ENABLED);
             assertEquals("index", neighbors(c, body).at("/source/kind").asText(), "the twin: enabled");
 
@@ -521,6 +521,10 @@ class ControlApiInvIndexedExpansionTest {
             assertEquals(viaIndex.at("/read/fingerprint").asText(), viaFlat.at("/read/fingerprint").asText());
             JsonNode a = data(send(c, "GET", "/inv/investigations/" + idx + "/log", null, OWNER), 200).get("entries");
             JsonNode b = data(send(c, "GET", "/inv/investigations/" + flat + "/log", null, OWNER), 200).get("entries");
+            assertEquals("index_disabled", b.at("/1/read/fallback/reason").asText(), "the log view says why the flat Dataset answered");
+            assertEquals(1, a.at("/1/read/index/version").asInt());
+            assertEquals("index_disabled", data(send(c, "GET", "/inv/investigations/" + flat + "/dossier", null, OWNER), 200)
+                    .at("/renderings/json/log/1/read/fallback/reason").asText());
             for (int i = 0; i < a.size(); i++)
                 assertEquals(a.get(i).get("workingSetHash"), b.get(i).get("workingSetHash"), "step " + (i + 1));
             // a log sealed before this change has no read.fallback: a sealed index-served step has none either, and replay is equivalent
@@ -542,6 +546,10 @@ class ControlApiInvIndexedExpansionTest {
             // the sealed log line carries read.index beside - never inside - the fingerprint
             JsonNode log = data(send(c, "GET", "/inv/investigations/" + id + "/log", null, OWNER), 200);
             assertEquals(2, log.at("/entries").size(), log.toString());
+            assertEquals(1, log.at("/entries/1/read/index/version").asInt(), "the log view names the index version that answered: " + log);
+            assertTrue(log.at("/entries/1/read").path("fallback").isMissingNode());
+            JsonNode dossier = data(send(c, "GET", "/inv/investigations/" + id + "/dossier", null, OWNER), 200);
+            assertEquals(1, dossier.at("/renderings/json/log/1/read/index/version").asInt(), "the Dossier's json rendering says so too");
             String plain = replayData(c, id);
             String reread1 = send(c, "POST", "/inv/investigations/" + id + "/replay", "{\"reread\":true}", OWNER).body();
             JsonNode r1 = JSON.readTree(reread1).get("data");

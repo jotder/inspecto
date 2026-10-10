@@ -680,7 +680,8 @@ public final class JobService implements AutoCloseable {
                 List.of(), List.of("la.detect.completed"), List.of(), List.of("alerts")),
                 c -> new LaDetectJob(c)));
         // la.index.build (LA-DAILY-INGEST-1, T5) - refreshes the Link Analysis Index of one configured Dataset
-        // mapping after a daily partition lands (on_signal job.dataset.produced). Runs as a delegated service
+        // mapping after a daily partition lands (on_signal pipeline.commit, guarded on $signal.pipeline; job.dataset.produced
+        // is emitted ONLY by the sql.template Job, never by a file commit). Runs as a delegated service
         // principal re-decided every run; the Link Analysis module lives behind the link-index grant.
         registry.register(JobTypeProvider.of(new JobTypeDescriptor(LaIndexBuildJob.TYPE, "Link Analysis index build",
                 "Builds or refreshes the Link Analysis Index of one Dataset mapping, running ONLY the mode the "

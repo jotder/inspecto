@@ -39,6 +39,8 @@ export interface LinkAnalysisLimits {
     entityTypesInForce: EntityTypeConfig[];
     /** LA-19 (D-U7): the masking mode stated; `null` = the default (`typed`). Round-tripped by a save. */
     maskingMode?: string | null;
+    /** The masking mode actually in force (stated, else `typed`) - server-computed, read-only. */
+    maskingModeInForce?: string;
     /** LA-19 (D-U7): an expand whose budget is above this needs a second pair of eyes; `null` = no threshold. */
     fourEyesBudgetAbove?: number | null;
     /** LA-19 (D-U7): an expand whose fan-out is above this needs a second pair of eyes; `null` = no threshold. */
@@ -64,7 +66,7 @@ export interface LinkAnalysisLimits {
     draftsInForce?: DraftSettings;
     /**
      * D-4: the server-side graph-run knobs stated (default budget, workers, waiting line); `null` = every one inherits.
-     * No form field yet - it is only round-tripped by a save, because the PUT replaces the whole document.
+     * The form edits `maxNodes`, `maxEdges` and `timeoutMs`; the rest is round-tripped by a save (the PUT replaces).
      */
     graphRun?: {
         maxNodes: number | null;
@@ -77,7 +79,8 @@ export interface LinkAnalysisLimits {
     } | null;
     /**
      * D-3: the edge/node index knobs stated (`enabled` default false, `maxDiskBytes` 0 = no limit, versions kept, build
-     * workers, waiting line); `null` = every one inherits. No form field yet - round-tripped by a save, the PUT replaces.
+     * workers, waiting line); `null` = every one inherits. The form edits `enabled`, `threads`, `queue` and
+     * `maxDiskBytes`; `keepVersions` is round-tripped by a save (the PUT replaces).
      */
     index?: {
         enabled: boolean | null;
@@ -86,6 +89,10 @@ export interface LinkAnalysisLimits {
         threads: number | null;
         queue: number | null;
     } | null;
+    /** The index knobs actually in force (shipped default or stated) - server-computed, read-only. `maxDiskBytes` 0 = no limit. */
+    indexInForce?: { enabled: boolean; maxDiskBytes: number; keepVersions: number; threads: number; queue: number };
+    /** The active InvestigationStore backend (`-Dinvestigations.backend`): `fs` = filesystem, `db` = PostgreSQL. Read-only, not a setting. */
+    investigationStoreInForce?: 'fs' | 'db';
 }
 
 /** D7-6: the per-Space Draft admission and idle periods; a `null` key inherits the shipped default (50 / 60 / 30). */

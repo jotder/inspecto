@@ -28,6 +28,7 @@ import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from '
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import type { LaAiDraft, LaDataset } from '@inspecto/link-analysis/la-host';
 import { LA_AI_ASSIST, LaHostSlotComponent } from '@inspecto/link-analysis/la-host';
+import { InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisView } from './link-analysis.service';
 import { ColumnLike, LinkShape, rankDatasets, suggestLinkColumns } from './la-starter';
 
@@ -70,6 +71,8 @@ export interface QuerySummaryItem {
 export class LinkAnalysisQueryPanelComponent implements OnInit {
     private fb = inject(FormBuilder);
     private datasetRows = inject(DatasetRowsService);
+    /** DR-D2: the masking the last exploration read was served under, for the badge. */
+    readonly masking = inject(InvService).masking;
     /** The host's AI assist component, rendered through `<inspecto-la-host-slot>`. */
     readonly aiAssist = inject(LA_AI_ASSIST).assist;
     readonly aiAssistOutputs = { applyDraft: (d: LaAiDraft) => this.applyProjectionDraft(d) };
@@ -110,6 +113,8 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     /** Columns offered by the projection mapping selects — the picked Dataset's declared columns, or the
      *  ones the rows seam probes off its store. */
     readonly datasetColumns = signal<string[]>([]);
+    /** The picked Dataset's first date-typed column ('' = none declared) - the default event time of an Investigation. */
+    readonly datasetTimeColumn = signal('');
 
     /**
      * Extra entity-projection mappings beyond the primary one above (Phase C, multi-entity/multi-dataset
@@ -309,6 +314,7 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     private async onDatasetPicked(id: string): Promise<void> {
         const meta = await this.columnMetaForDataset(id);
         this.datasetColumns.set(meta.map((c) => c.name));
+        this.datasetTimeColumn.set(meta.find((c) => c.type === 'date')?.name ?? '');
         const f = this.queryForm.controls;
         // Pre-fill only a blank mapping: a loaded saved view, or the analyst's own pick, is never overwritten.
         const guess = !f.sourceCol.value && !f.targetCol.value ? suggestLinkColumns(meta) : null;

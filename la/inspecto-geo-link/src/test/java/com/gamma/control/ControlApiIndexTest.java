@@ -206,7 +206,7 @@ class ControlApiIndexTest {
         try (Ctx c = open(cfg, root, "")) {
             JsonNode before = ok(c, "GET", "/inv/index", null, OWNER);
             assertEquals(0, before.get("total").asInt());
-            assertFalse(before.get("enabled").asBoolean(), "index.enabled defaults to false (design Decision 8)");
+            assertTrue(before.get("enabled").asBoolean(), "index.enabled defaults to ON (operator 2026-10-10)");
 
             String id = start(c, PRIVATE_BUILD, OWNER);
             awaitStatus(c, id, OWNER, "COMPLETED");
@@ -229,6 +229,17 @@ class ControlApiIndexTest {
             assertEquals("ts", ix.get("mapping").get("timeCol").asText());
             assertFalse(ix.get("stale").asBoolean(), "just built: " + ix.get("reason"));
             assertTrue(ix.get("reason").isNull());
+            // DR-T9: per-table rows/files/bytes, the dropped-NULL count and per-version bytes, all from the manifest
+            assertEquals(0, ix.get("droppedNull").asLong());
+            assertEquals(3, ix.at("/tables/out/rows").asLong());
+            assertTrue(ix.at("/tables/out/files").asLong() >= 1 && ix.at("/tables/nodes/files").asLong() >= 1);
+            long tableBytes = 0;
+            for (JsonNode t : ix.get("tables")) tableBytes += t.get("bytes").asLong();
+            assertEquals(ix.get("bytes").asLong(), tableBytes, "per-table bytes add up to the index total");
+            assertEquals(1, ix.get("versions").size());
+            assertEquals(1, ix.at("/versions/0/version").asInt());
+            assertEquals(ix.get("bytes").asLong(), ix.at("/versions/0/bytes").asLong());
+            assertTrue(ix.at("/versions/0/current").asBoolean());
             assertTrue(Files.isDirectory(root.resolve("la-index")), "the index lives under the Space write root");
 
             // a second build of the same index publishes the next version (the first finished, so it is no duplicate)
@@ -262,6 +273,14 @@ class ControlApiIndexTest {
         subjects();
         try (Ctx c = open(cfg, root, "index:\n  enabled: true\n")) {
             assertTrue(ok(c, "GET", "/inv/index", null, OWNER).get("enabled").asBoolean());
+        }
+    }
+
+    @Test
+    void anExplicitFalseStillDisablesTheIndex(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "index:\n  enabled: false\n")) {
+            assertFalse(ok(c, "GET", "/inv/index", null, OWNER).get("enabled").asBoolean(), "an explicit false still disables");
         }
     }
 

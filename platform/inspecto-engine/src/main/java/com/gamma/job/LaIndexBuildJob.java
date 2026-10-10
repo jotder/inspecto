@@ -11,8 +11,10 @@ import java.util.Map;
 
 /**
  * The {@code la.index.build} Job Type - builds or refreshes the Link Analysis Index of one configured Dataset
- * mapping after a daily partition lands (LA-DAILY-INGEST-1, T5; decisions D-ING2 / D-ING5). Triggered like
- * {@code orders_summary_followup_job}: {@code on_signal: job.dataset.produced} with a {@code when} guard.
+ * mapping after a daily partition lands (LA-DAILY-INGEST-1, T5; decisions D-ING2 / D-ING5). A landed file commits
+ * a Pipeline batch, which is mirrored as {@code pipeline.commit}: trigger it with {@code on_signal: pipeline.commit}
+ * and a {@code when} guard on {@code $signal.pipeline} (or {@code on_pipeline}). NOT {@code job.dataset.produced}:
+ * only the {@code sql.template} Job emits that, so a Job on it never fires on a file commit.
  *
  * <p>It is a clock over a build that already exists, and nothing more. The Link Analysis side
  * ({@link LinkIndexAccess}) re-decides the delegated principal's authority, reads the index {@code plan} advice

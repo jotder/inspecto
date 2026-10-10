@@ -859,6 +859,46 @@ window, `seasonality: weekday`, `minBaselinePoints: 3` and `highThreshold: 80`.
   counts only the `sql.template` detection Jobs. The pack golden corpora are not extended (one or ten days of data,
   below the baseline window). No dashboard tile yet.
 
+#### 3.5.6 The `la-showcase` Link Analysis demo (`LA-DEMO-SEED-1`, 2026-10-10)
+
+Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty companion whose `modules.toon` disables `geoLink`, so
+`/inv/*` there answers 404 `MODULE_DISABLED` while its other routes work; DR-S7). Needs the Enterprise **Demo Auth** build (`package.ps1
+-Edition Enterprise -DemoAuth`, add `-Ui la-app` for the la-app shell); the Link Analysis modules and `canAdminister` to create it.
+
+- **Content.** One Collector + Pipeline + Dataset (`mule_transfers`, partition `BOOKED_DATE`, one file per UTC day, `file_template` so a missing
+  day is a delivery gap). `data/inbox` carries the three landed days (ingested within one poll after boot); `data/staged` carries
+  `TRANSFERS_20260904.csv` (next day) and `TRANSFERS_20260906.csv` (gap day: 0905 missing) with a one-line `README.txt` - copy one into
+  `data/inbox/mule_transfers`. Three saved views (`mule_*`). Settings: `link-analysis.toon` (`masking_mode: typed`, `four_eyes_fan_out_above: 5`,
+  `index.enabled: true` set explicitly, Drafts limits). Jobs: `la_index_build` (`on_signal: pipeline.commit`, guard `$signal.pipeline == mule_transfers &&
+  $signal.status == SUCCESS`, `allow_full: "true"`, `owner` is re-stamped to the applier by `TemplateSeedGate`) and `la_detect` (`*/5 * * * *`).
+- **Personas** (`demo-users.toon` + `roles.toon`; an authored role REPLACES a seed role of the same name): `admin` (`admin;fraud-analyst`: Reveal),
+  `fm.analyst` (`fraud-analyst`: Manage Incidents, Run Link Graph Analysis, Build Link Index, Author Alert Rules, Work Incidents),
+  `fm.manager` (`fraud-manager`: Approve Link Expansions, Manage Incidents, Work Incidents - the second approver), `ra.analyst` and `demo.manager`
+  (`la-viewer`: no capability at all). The Dataset carries explicit `user` shares for all five (standing detection refuses a role-only share).
+- **Data tuning (DR-S10).** The ordinary traffic is acyclic and triangle-free (first half of the accounts pays the second half) and small, so the Suspicion
+  score ranks `MULE-HUB-01` first (top 3 asserted) and `SHELL-A->B->C->D->A` is the only directed cycle. Pinned by `LaShowcaseGoldenTest`
+  (inspecto-la-graph, reads the shipped CSVs); regenerate with `tools/gen-la-showcase-data.py`. Trade-off: the ordinary traffic is less realistic than the
+  `demo` Space's, and the manual's section 10 figures that depend on the old noise (170 nodes, 13 pass-through accounts) differ here.
+- **Runtime state has NO template home** (checked 2026-10-10: no registry kind, `case-link.json` is import-reserved, `TemplateSeedGate` seeds registry
+  components only). `tools/seed-la-showcase.mjs` seeds it over HTTP as the right personas: the Investigation `mule-hub-case` (8 ops, owner `fm.analyst`),
+  reviewers `ra.analyst`, `fm.manager`, `admin` (`demo.manager` stays a non-member), Entity List `smurf-accounts` (12 members, one prefix range, one
+  expiring entry), one identity assertion, a Case assigned to `fm.manager` and linked, an Investigation Template, and the bound pass-through Alert Rule
+  with standing detection. **Owner is `fm.analyst`, not `admin`**: binding and enabling need the Investigation's owner-and-lead holding Author Alert
+  Rules, and the Dataset share must name that owner. Dry run by default; `--apply` writes; re-runs skip what exists.
+- **Operator steps.** (1) `pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth [-Ui la-app]`; (2) launch `inspecto-la-app` (it scaffolds
+  `inspecto-demo/spaces-la-showcase` with both Spaces, then serves on 8097); (3) `node tools/seed-la-showcase.mjs --base http://127.0.0.1:8097` (dry run), then
+  `--apply`. On a fresh spaces root the sign-in picker is empty until a Space with `demo-users.toon` exists - that is why step 2 scaffolds first.
+  A Space created later from the gallery (`POST /spaces {"id":"la-showcase","template":"la-showcase"}`) is equivalent.
+- **Variants.** `inspecto-personal` (launch config; a Personal bundle from `package.ps1` with no flags, port 8098): `GET /inv/investigations` answers 503
+  `CAPABILITY_UNAVAILABLE`. **Postgres store (no Docker automation):** start the Enterprise/Preview server with
+  `-Dinvestigations.backend=db -Dinvestigations.db.url=jdbc:postgresql://<host>:5432/<db>` (password through the `SecretResolver`; the `la-store-pg` jar is
+  Preview/Enterprise only), create the Space, seed. Sample Enterprise PDP policy (deny `ra.analyst` Investigation reads): `config/examples/access-policy-deny-persona.md`,
+  inert until applied with `PUT /access/policies`; a persona-based `when` is unverified by any repository test.
+- **Not verified here.** The seed script's request bodies are grounded in route code and tests and unit-tested against a mocked `fetch`; it has NOT been run
+  against a live server, nor has a Space been created from the template in a Link Analysis build (the template-scanning tests create it in a build without
+  the module: `la_index_build` then fails closed on every commit, which is the correct refusal). The `passThrough` value-Measure body is copied from tests of
+  other measures. **Cut:** the roaming views (no roaming Dataset in the template), the `account_links` feed (identity is asserted by the seed instead).
+
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 
 A bundle is a *serialised, self-describing subgraph* of the component graph for **instance-to-instance

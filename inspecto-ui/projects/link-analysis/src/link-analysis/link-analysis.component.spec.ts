@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -102,7 +102,7 @@ function create(
             { provide: GraphSourcesService, useValue: { sources: [fakeSource], byId: () => fakeSource } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: PipelinesService, useValue: { list: () => of([]) } },
-            ...(opts.inv ? [{ provide: InvService, useValue: opts.inv }] : []),
+            ...(opts.inv ? [{ provide: InvService, useValue: { masking: signal(null), ...opts.inv } }] : []),
             { provide: LinkAnalysisService, useValue: { list: () => of(opts.views ?? []), save } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             {

@@ -68,7 +68,7 @@ public final class PatternRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.post("/inv/pattern/branching", (e, m) -> branching(api, e, api.body(e)));
-        api.post("/inv/pattern/temporal", (e, m) -> scan(api, e, api.body(e)));
+        api.post("/inv/pattern/temporal", (e, m) -> scan(api, e, api.body(e), true));
     }
 
     // ── POST /inv/pattern/temporal — burst / periodicity over each link's event times ─────────────────────────────
@@ -91,7 +91,13 @@ public final class PatternRoutes implements RouteModule {
      * {@value #TIMEOUT_SECONDS} s timeout, a result limit. Read-shaped: persists nothing, audited as
      * {@code LINK_PATTERN_MATCHED}. Output is endpoints and times the Dataset's own viewer could read - it never adds a column.
      */
+    /** The scan with RAW ids, for an Investigation op that narrows it to its Working Set and masks the answer itself. */
     static Map<String, Object> scan(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        return scan(api, ex, body, false);
+    }
+
+    /** {@code maskIds}: the stateless route answers aliases when the Space masks (DR-D2). */
+    static Map<String, Object> scan(ApiContext api, HttpExchange ex, Map<String, Object> body, boolean maskIds) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "temporal pattern");
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
@@ -200,11 +206,20 @@ public final class PatternRoutes implements RouteModule {
             found.sort(strongest.thenComparing(Found::s).thenComparing(f -> f.t() == null ? "" : f.t()).thenComparingLong(Found::startMs));
             boolean limited = found.size() > limit;
             List<Map<String, Object>> results = new ArrayList<>();
-            for (Found f : found.subList(0, Math.min(limit, found.size()))) results.add(f.view());
+            // DR-D2: the findings are computed on raw ids and leave as aliases when the Space masks them
+            ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+            for (Found f : found.subList(0, Math.min(limit, found.size()))) {
+                Map<String, Object> view = f.view();
+                if (maskIds && mask.active())
+                    for (String k : List.of("entity", "source", "target"))
+                        if (view.get(k) != null) view.put(k, mask.out(view.get(k)));
+                results.add(view);
+            }
 
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("mode", mode);
             out.put("series", entity ? "entity" : "link");
+            out.put("masking", mask.describe());
             out.put("results", results);
             out.put("truncated", limited || rowCapped);
             out.put("rowCapped", rowCapped);
@@ -339,11 +354,13 @@ public final class PatternRoutes implements RouteModule {
             for (int i = 0; i < stages.size(); i++) byStage.add(new ArrayList<>());
             Map<String, String> label = new LinkedHashMap<>();
             Map<String, Map<String, Object>> legOut = new LinkedHashMap<>();
+            // DR-D2: the engine runs on the aliases when the Space masks them (a bijection, so the match is the same)
+            ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
             for (Map<String, Object> row : r.rows()) {
                 int stage = ((Number) row.get("stage")).intValue();
-                String s = String.valueOf(row.get("s")), t = String.valueOf(row.get("t"));
-                label.putIfAbsent(s, String.valueOf(row.get("sl")));
-                label.putIfAbsent(t, String.valueOf(row.get("tl")));
+                String s = mask.out(String.valueOf(row.get("s"))), t = mask.out(String.valueOf(row.get("t")));
+                label.putIfAbsent(s, mask.active() ? s : String.valueOf(row.get("sl")));
+                label.putIfAbsent(t, mask.active() ? t : String.valueOf(row.get("tl")));
                 Map<String, Object> legAttrs = new LinkedHashMap<>();
                 if (timeCol != null) legAttrs.put(timeCol, row.get("tr"));
                 for (int i = 0; i < attrs.size(); i++) legAttrs.put(attrs.get(i), row.get("r_" + i));
@@ -374,6 +391,7 @@ public final class PatternRoutes implements RouteModule {
             }
             boolean truncated = res.truncated() || r.truncated();
             Map<String, Object> out = new LinkedHashMap<>();
+            out.put("masking", mask.describe());
             out.put("matches", matches);
             out.put("edges", edges);
             out.put("truncated", truncated);

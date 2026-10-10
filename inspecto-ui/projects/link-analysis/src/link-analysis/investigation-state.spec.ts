@@ -152,3 +152,23 @@ describe('LA-10 investigation-state', () => {
         expect(investigationErrorMessage(new Error('boom'), 'fallback')).toBe('fallback');
     });
 });
+
+describe('idsInWorkingSet through an exploration alias (DR-D2)', () => {
+    const node = { id: 'n', data: { label: 'masked:aaaa', kind: 'entity', spellings: ['masked:aaaa'] } } as never;
+
+    it('finds the Working Set entity whose exploreAliases entry is the alias the query graph shows', () => {
+        const ws: WorkingSet = {
+            entities: [entity('masked:bbbb')],
+            links: [],
+            excluded: [],
+            exploreAliases: { 'masked:bbbb': 'masked:aaaa' },
+            hash: '',
+        };
+        expect(idsInWorkingSet(node, ws)).toEqual(['masked:bbbb']);
+    });
+
+    it('is not in the Working Set when no pairing names it (positive twin: the same node WITH the pairing is)', () => {
+        const ws: WorkingSet = { entities: [entity('masked:bbbb')], links: [], excluded: [], hash: '' };
+        expect(idsInWorkingSet(node, ws)).toEqual([]);
+    });
+});

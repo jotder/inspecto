@@ -165,6 +165,22 @@ describe('recursivePathsToGraph (LA-11)', () => {
         expect(graph.edges[1]).toMatchObject({ source: b, target: c, data: { kind: 'path' } });
     });
 
+    it('shows one row per node sequence: parallel links collapse, with a count and the link kinds (DR-D5a)', () => {
+        const par: G6GraphData = {
+            nodes: base.nodes,
+            edges: [
+                { id: 'l1', source: a, target: b, data: { kind: 'wire' } },
+                { id: 'l2', source: a, target: b, data: { kind: 'cash' } },
+            ],
+        };
+        const twice: RecursivePathsResult = { ...res, paths: [res.paths[0], res.paths[0], res.paths[0]] };
+        const { state } = recursivePathsToGraph(twice, par);
+        expect(state.paths).toHaveLength(1);
+        expect(state.paths[0].count).toBe(3);
+        expect(state.paths[0].kinds).toEqual(['wire', 'cash', 'path']);
+        expect(state.paths[0].edgeIds.slice(0, 2)).toEqual(['l1', 'l2']);
+    });
+
     it('reports the fences honestly: truncated, edge-yield cap, depth limit and deepest path', () => {
         const { state } = recursivePathsToGraph(res, base);
         expect(state).toMatchObject({ truncated: true, edgeYieldCapped: true, depthLimit: 4, deepest: 2 });

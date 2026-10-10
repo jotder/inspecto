@@ -176,10 +176,18 @@ describe('LinkAnalysisStandingMonitorComponent', () => {
                 ),
         });
         await click('[data-test=monitor-refresh]');
-        expect(el.querySelector('[data-test=monitor-counts]')!.textContent).toContain('1 sweep(s) read');
+        expect(el.querySelector('[data-test=monitor-counts]')!.textContent).toContain('1 sweep read');
         expect(el.querySelector('[data-test=monitor-refusals]')!.textContent).toContain('NOT_LEAD × 1');
         expect(el.textContent).not.toContain('inv-1 ');
         await expectNoA11yViolations(el);
+    });
+
+    it('says "0 sweeps" and "No events yet" instead of staying silent when nothing has run', async () => {
+        const { el, click } = setup({ events: () => of([]) });
+        await click('[data-test=monitor-refresh]');
+        expect(el.querySelector('[data-test=monitor-counts]')!.textContent).toContain('0 sweeps read their Dataset');
+        expect(el.querySelector('[data-test=monitor-counts]')!.textContent).toContain('0 sweeps refused');
+        expect(el.querySelector('[data-test=monitor-none]')!.textContent).toContain('No events yet');
     });
 
     it('says so when the events cannot be read', async () => {

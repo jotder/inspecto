@@ -195,6 +195,20 @@ list member's token differs from an Investigation's for the same value. `LinkAna
 to `typed` (fail closed). `EntityMasking` (la-api) masks on the way **out**: engine results and caches stay raw; a
 raw id that masking hides is answered as a nonexistent node; `reveal` needs `canRevealLinkEntities`.
 
+**Mask the same way everywhere (DR-D2, operator 2026-10-10).** The stateless exploration reads (`/inv/projection{,/neighbors,/multi}`,
+`/inv/traversal/recursive-paths`, `/inv/pattern/*`, `/inv/value-measures`) have no Investigation, so `ExplorationMasking`
+(la-api) masks them under the **Space** key (the identity fact log's `mask.key`, the key an Entity List member uses): `all`
+masks every id; `typed` masks every id when a bound endpoint column's classification is claimed by a masked Entity Type
+(`EntityMasking.maskedColumns`, the rule an Investigation applies); `none` shows raw. Each answer carries
+`masking {mode, masked, basis}`, which the SPA shows as a *Masking: mode* badge in the query panel. An alias handed back (an
+expand's `value`, a traversal's `startNode`, an Investigation seed's `ids`) is resolved from an in-memory alias-to-raw
+book of what this server minted for this Space (bounded LRU; nothing raw is ever sent); after a restart or eviction it is
+422 *alias not known* and the query is re-run. ⚠ An Investigation keeps its own key, so a seeded entity has a second alias
+there: Working Set answers (`/working-set`, `/replay`, op answers) carry `exploreAliases` (Investigation alias to
+exploration alias, aliases only) and the SPA matches a selected node to its Working Set entity through it. Sealed logs still
+bind raw ids. Known gap: an Investigation also masks a seed's explicit `entityType`, which a stateless read does not
+carry, so a column no Entity Type claims is raw on the query graph but seeded ids of a masked `entityType` are aliased in the Working Set.
+
 ### 3.5 Entity store (identity data)
 
 * **Identity Fact log** (`EntityFactLog`): `<Space config root>/audit/entity-facts/`, one file per fact
@@ -238,7 +252,7 @@ raw id that masking hides is answered as a nonexistent node; `reveal` needs `can
 * **Reader** (`IndexReader`): one sealed `SqlSandbox` connection per request limited to the version directory,
   views over `read_parquet(... hive_partitioning)`, one key equality per side `UNION ALL`ed, **one hop per query**;
   idle pool of 4 per version, siblings evicted unless pinned. Parquet is the only persisted form — no `.duckdb` file.
-* **What reads from it** (`IndexedRead` gate in la-api: `index.enabled` (default false) + a matching published index
+* **What reads from it** (`IndexedRead` gate in la-api: `index.enabled` (default ON since 2026-10-10; only an explicit `false` disables) + a matching published index
   + staleness gate, else a closed fallback `Reason`): `recursive-paths` (`IndexedTraversal`, depth ≤ 2, frontier
   ≤ 20), neighbours, simple Investigation `expand` (byte-identical fingerprint to the flat read), temporal, and Graph
   Run with `input: "index"`. A response never mixes index and flat answers.

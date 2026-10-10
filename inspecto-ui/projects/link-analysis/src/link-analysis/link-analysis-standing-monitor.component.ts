@@ -42,10 +42,17 @@ const PAGE = 500;
             }
             @if (summary(); as s) {
                 <p class="m-0" data-test="monitor-counts">
-                    {{ s.swept }} sweep(s) read their Dataset · {{ s.refused }} sweep(s) refused{{
+                    {{ s.swept }} {{ s.swept === 1 ? 'sweep' : 'sweeps' }} read their Dataset · {{ s.refused }}
+                    {{ s.refused === 1 ? 'sweep' : 'sweeps' }} refused{{
                         s.capped ? ' (at least — the newest ' + page + ' events were counted)' : ''
                     }}.
                 </p>
+                @if (!s.swept && !s.refused) {
+                    <p class="text-secondary m-0" data-test="monitor-none">
+                        No events yet: no sweep has run for any bound Alert Rule. A rule is only swept after its
+                        Investigation's owner enables standing detection.
+                    </p>
+                }
                 @if (s.refusedByCode.length) {
                     <ul class="m-0 list-disc pl-4" data-test="monitor-refusals">
                         @for (r of s.refusedByCode; track r.code) {

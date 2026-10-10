@@ -34,6 +34,23 @@ function create(opts: { comments?: ObjectNote[] } = {}) {
 }
 
 describe('LinkAnalysisCommentsDialog', () => {
+    it('Add cancels the native form submit (DR-D1: no page navigation)', async () => {
+        const { f, c, addComment } = create();
+        c.commentControl.setValue('Looks good');
+        const el = f.nativeElement as HTMLElement;
+        const seen: Event[] = [];
+        const onSubmit = (e: Event) => seen.push(e);
+        el.ownerDocument.addEventListener('submit', onSubmit);
+        try {
+            (el.querySelector('form button[type="submit"]') as HTMLButtonElement).click();
+        } finally {
+            el.ownerDocument.removeEventListener('submit', onSubmit);
+        }
+        expect(seen.length).toBe(1);
+        expect(seen[0].defaultPrevented).toBe(true);
+        expect(addComment).toHaveBeenCalledTimes(1);
+    });
+
     it('loads comments for the (link-analysis-view, id) target', () => {
         const { c, comments } = create();
         expect(comments).toHaveBeenCalledWith('link-analysis-view', 'triage-view');

@@ -36,6 +36,7 @@ public final class MaskTokens {
     public static byte[] key(Path dir) throws IOException {
         Path f = dir.resolve(KEY_FILE);
         if (!Files.isRegularFile(f)) {
+            Files.createDirectories(dir);
             byte[] k = new byte[32];
             new SecureRandom().nextBytes(k);
             Path tmp = Files.createTempFile(dir, ".mask-", ".tmp");

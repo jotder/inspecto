@@ -5,6 +5,15 @@
         class="flex flex-wrap items-start gap-3"
         aria-label="Graph query"
     >
+        @if (masking(); as m) {
+            <span
+                class="rounded-md border px-2 py-0.5 text-xs"
+                style="border-color: var(--gamma-border)"
+                data-testid="masking-badge"
+                [attr.title]="m.basis"
+                >Masking: {{ m.mode }}{{ m.masked === true ? ' (ids shown as aliases)' : '' }}</span
+            >
+        }
         <inspecto-option-picker
             class="w-56"
             [outlined]="true"

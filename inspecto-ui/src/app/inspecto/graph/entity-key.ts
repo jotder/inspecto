@@ -17,7 +17,11 @@ export type EntityNormaliser = 'default' | 'digits' | 'e164' | 'upper-trim';
 
 export const ENTITY_NORMALISERS: readonly EntityNormaliser[] = ['default', 'digits', 'e164', 'upper-trim'];
 
+/** DR-D2: a masked alias is already an opaque identity - no normaliser may touch it (`digits` would strip it to nothing). */
+const isAlias = (value: string): boolean => value.startsWith('masked:');
+
 export function normalizeEntityKey(value: string): string {
+    if (isAlias(value)) return value;
     return value
         .toLowerCase()
         .replace(/ς/g, 'σ') // final sigma -> sigma: Java and JS place Final_Sigma differently
@@ -28,6 +32,7 @@ export function normalizeEntityKey(value: string): string {
 
 /** The key under one of the closed-set normalisers; `default` is {@link normalizeEntityKey}. */
 export function normalizeTypedKey(value: string, normaliser: EntityNormaliser): string {
+    if (isAlias(value)) return value;
     switch (normaliser) {
         case 'digits':
             return value.replace(/[^0-9]/g, '');

@@ -594,7 +594,8 @@ public final class InvRoutes implements RouteModule {
     /** One validated LA-08 mapping, resolved and rendered before any query runs. */
     private record Mapping(boolean node, String dataset, String relationSql, String sql, String kind,
                            String category, List<String> attrs, Map<String, Object> idType,
-                           Map<String, Object> sourceType, Map<String, Object> targetType, List<String> binds) {}
+                           Map<String, Object> sourceType, Map<String, Object> targetType, List<String> binds,
+                           ExplorationMasking mask) {}
 
     /**
      * {@code POST /inv/projection/multi} (LA-08, contract §5.2) — node mappings and edge projections over
@@ -638,7 +639,8 @@ public final class InvRoutes implements RouteModule {
             sql.append(" FROM ").append(q(ds)).append(" WHERE ").append(q(idCol)).append(" IS NOT NULL ORDER BY 1, 2");
             Map<String, Map<String, Object>> types = columnTypes(writeRoot, ds, List.of(idCol));
             plan.add(new Mapping(true, ds, relationSql, guarded(sql.toString(), ds), null,
-                    ApiContext.str(m, "category"), attrs, types.get(idCol), null, null, List.of()));
+                    ApiContext.str(m, "category"), attrs, types.get(idCol), null, null, List.of(),
+                    ExplorationMasking.of(writeRoot, ds, Map.of("sourceCol", idCol, "targetCol", idCol))));
         }
         for (Map<String, Object> m : edgeSpecs) {
             String ds = datasetOf(m, "edges");
@@ -650,7 +652,8 @@ public final class InvRoutes implements RouteModule {
             String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filter);
             Map<String, Map<String, Object>> types = columnTypes(writeRoot, ds, List.of(srcCol, tgtCol));
             plan.add(new Mapping(false, ds, relationSql, guarded(sql, ds), ApiContext.str(m, "type"), null, attrs,
-                    null, types.get(srcCol), types.get(tgtCol), filter.binds()));
+                    null, types.get(srcCol), types.get(tgtCol), filter.binds(),
+                    ExplorationMasking.of(writeRoot, ds, Map.of("sourceCol", srcCol, "targetCol", tgtCol))));
         }
         // D-U7, judged on the WHOLE plan before any mapping runs (fail closed, whole call): `limit` applies per
         // mapping, so the call reads up to limit × mappings rows, and one entity can take up to `limit` links from
@@ -672,8 +675,9 @@ public final class InvRoutes implements RouteModule {
                 Map<String, Object> out;
                 if (mp.node()) {
                     out = new LinkedHashMap<>();
-                    out.put("id", row.get("id"));
-                    out.put("label", row.get("label"));
+                    out.put("id", mp.mask().out(row.get("id")));
+                    // a label column can restate the id (or name its owner), so a masked mapping shows the alias as the label
+                    out.put("label", mp.mask().active() && row.get("label") != null ? mp.mask().out(row.get("id")) : row.get("label"));
                     out.put("category", mp.category());
                     if (!mp.attrs().isEmpty()) {
                         Map<String, Object> attrs = new LinkedHashMap<>();
@@ -682,7 +686,7 @@ public final class InvRoutes implements RouteModule {
                     }
                     if (mp.idType() != null) out.put("entityType", mp.idType());
                 } else {
-                    out = edgeRow(row, mp.kind(), mp.attrs());
+                    out = maskEnds(mp.mask(), edgeRow(row, mp.kind(), mp.attrs()));
                     if (mp.sourceType() != null) out.put("sourceType", mp.sourceType());
                     if (mp.targetType() != null) out.put("targetType", mp.targetType());
                 }
@@ -694,6 +698,7 @@ public final class InvRoutes implements RouteModule {
             summary.put("role", mp.node() ? "node" : "edge");
             summary.put("rows", r.rows().size());
             summary.put("truncated", r.truncated());
+            summary.put("masking", mp.mask().describe());
             mappings.add(summary);
             truncated |= r.truncated();
             audit(ex, mp.dataset(), null, r.rows().size(), r.truncated(), null);
@@ -768,6 +773,9 @@ public final class InvRoutes implements RouteModule {
                 ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
 
         String relationSql = relationFor(api, ex, writeRoot, datasetId);
+        // DR-D2: the read's ids leave as aliases when the Space masks them; an alias handed back (expand's value) is resolved here.
+        ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+        if (neighborsOf != null) neighborsOf = mask.in(neighborsOf);
 
         // LA-01: the optional condition tree is validated against the relation's REAL columns and
         // rendered BEFORE a single character of the statement is assembled below — an identifier the
@@ -787,8 +795,9 @@ public final class InvRoutes implements RouteModule {
             if (indexed.served()) {
                 List<Map<String, Object>> rows = new ArrayList<>(indexed.result().rows().size());
                 for (Map<String, Object> row : indexed.result().rows())
-                    rows.add(edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols));
+                    rows.add(maskEnds(mask, edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols)));
                 Map<String, Object> out = new LinkedHashMap<>();
+                out.put("masking", mask.describe());
                 out.put("rows", rows);
                 out.put("truncated", indexed.result().truncated());
                 out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
@@ -820,8 +829,9 @@ public final class InvRoutes implements RouteModule {
                     datasetId, relationSql, sql, limit, 0, List.of(), List.of(), binds));
             List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
             for (Map<String, Object> row : r.rows())
-                rows.add(edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols));
+                rows.add(maskEnds(mask, edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols)));
             Map<String, Object> out = new LinkedHashMap<>();
+            out.put("masking", mask.describe());
             out.put("rows", rows);
             out.put("truncated", r.truncated());
             out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
@@ -899,6 +909,15 @@ public final class InvRoutes implements RouteModule {
                 + " ORDER BY cnt DESC, source, target";
     }
 
+    /** DR-D2: an edge row's two endpoints as the caller may see them (the row is this read's own copy). */
+    private static Map<String, Object> maskEnds(ExplorationMasking mask, Map<String, Object> row) {
+        if (mask.active()) {
+            row.put("source", mask.out(row.get("source")));
+            row.put("target", mask.out(row.get("target")));
+        }
+        return row;
+    }
+
     /** One {@link #edgeSql} result row in the response shape {@code {source,target,kind,count,attrs?}}. */
     private static Map<String, Object> edgeRow(Map<String, Object> row, Object kind, List<String> attrCols) {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -947,9 +966,12 @@ public final class InvRoutes implements RouteModule {
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String weightCol = ident(body, "weightCol", false);
-        String startNode = ApiContext.str(body, "startNode");
-        if (startNode == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'startNode'");
-        String targetNode = ApiContext.str(body, "targetNode");
+        String startNodeIn = ApiContext.str(body, "startNode");
+        if (startNodeIn == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'startNode'");
+        // DR-D2: the walk runs on raw ids; the nodes leave as aliases when the Space masks them, and an alias comes back here.
+        ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+        String startNode = mask.in(startNodeIn);
+        String targetNode = mask.in(ApiContext.str(body, "targetNode"));
         if (startNode.equals(targetNode)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'targetNode' must differ from 'startNode'");
         String direction = ApiContext.str(body, "direction") != null ? ApiContext.str(body, "direction") : "DIRECTED";
         if (!direction.equals("DIRECTED") && !direction.equals("UNDIRECTED"))
@@ -993,7 +1015,7 @@ public final class InvRoutes implements RouteModule {
             List<Map<String, Object>> paths = new ArrayList<>(indexed.result().paths().size());
             for (com.gamma.la.storage.IndexedTraversal.PathRow row : indexed.result().paths()) {
                 Map<String, Object> pathOut = new LinkedHashMap<>();
-                pathOut.put("nodes", row.nodes());
+                pathOut.put("nodes", mask.active() ? row.nodes().stream().map(n -> mask.out(String.valueOf(n))).toList() : row.nodes());
                 pathOut.put("hops", row.hops());
                 pathOut.put("weight", weightCol != null ? row.weight() : null);
                 paths.add(pathOut);
@@ -1003,6 +1025,7 @@ public final class InvRoutes implements RouteModule {
             out.put("paths", paths);
             out.put("truncated", truncated);
             out.put("edgeYieldCapped", indexed.result().yieldCapped());
+            out.put("masking", mask.describe());
             out.put("fences", traversalFences(maxDepth, maxEdges));
             out.put("source", indexed.source());
             auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);
@@ -1075,7 +1098,8 @@ public final class InvRoutes implements RouteModule {
             boolean yieldCapped = false;
             for (Map<String, Object> row : r.rows()) {
                 Map<String, Object> out = new LinkedHashMap<>();
-                out.put("nodes", ApiContext.JSON.readValue(String.valueOf(row.get("path_json")), List.class));
+                List<?> walked = ApiContext.JSON.readValue(String.valueOf(row.get("path_json")), List.class);
+                out.put("nodes", mask.active() ? walked.stream().map(n -> mask.out(String.valueOf(n))).toList() : walked);
                 out.put("hops", row.get("hops"));
                 out.put("weight", weightCol != null ? row.get("weight") : null);
                 paths.add(out);
@@ -1087,6 +1111,7 @@ public final class InvRoutes implements RouteModule {
             out.put("paths", paths);
             out.put("truncated", truncated);
             out.put("edgeYieldCapped", yieldCapped);
+            out.put("masking", mask.describe());
             out.put("fences", fences);
             out.put("source", indexed.source());
             auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);

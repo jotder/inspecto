@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import {
     FormControl,
     FormGroup,
@@ -30,7 +30,8 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
-import { expandFallbackNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
+import { stepReadSuffix } from './index-source';
+import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
@@ -106,6 +107,14 @@ export class LinkAnalysisInvestigationComponent {
     readonly timeColumn = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
     /** The IANA zone a naive TIMESTAMP time column is in; blank = UTC (the server records that explicitly). */
     readonly timeColumnZone = new FormControl('', { nonNullable: true });
+
+    constructor() {
+        // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
+        effect(() => {
+            const col = this.timeCol();
+            if (this.timeColumn.pristine) this.timeColumn.setValue(col, { emitEvent: false });
+        });
+    }
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 
     readonly title = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
@@ -193,7 +202,11 @@ export class LinkAnalysisInvestigationComponent {
     });
 
     /** Why the last expand was answered by the flat Dataset instead of the edge index; null when it was not (or no step yet). */
-    readonly fallbackNote = computed(() => expandFallbackNote(this.store.lastStep()?.read));
+    readonly fallbackNote = computed(() => expandSourceNote(this.store.lastStep()?.read));
+    /** DR-U4: a log step's sealed read, when the server's log view says the link index answered it. */
+    readSuffix(e: InvestigationLogEntry): string | null {
+        return stepReadSuffix(e.read);
+    }
 
     readonly counts = computed(() => {
         const ws = this.store.workingSet();
@@ -229,7 +242,7 @@ export class LinkAnalysisInvestigationComponent {
                 this.timeColumnZone.value,
             )
         ) {
-            this.timeColumn.reset('');
+            this.timeColumn.reset(this.timeCol());
             this.timeColumnZone.reset('');
             this.title.reset('');
             this.purpose.reset('');
@@ -260,7 +273,10 @@ export class LinkAnalysisInvestigationComponent {
         const n = this.store.selected();
         if (!n) return;
         const entityType = this.store.activeRef()?.entityType;
-        this.store.apply({ op: 'seed', ids: rawIdsOf(n), ...(entityType ? { entityType } : {}) });
+        // DR-D3: seeding is what the query graph was for - draw the Working Set it just grew, so Expand/Keep/Hide act on it.
+        this.store
+            .apply({ op: 'seed', ids: rawIdsOf(n), ...(entityType ? { entityType } : {}) })
+            .then((ok) => ok && this.store.showWorkingSet.set(true));
     }
 
     /** The expand form's Advanced rung fields (LA-SPA-OWED-SURFACES-1). */

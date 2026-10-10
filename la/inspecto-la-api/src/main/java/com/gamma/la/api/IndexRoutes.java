@@ -70,8 +70,8 @@ import java.util.function.Supplier;
  * (applied when it is built), closed with the API or when idle ({@link IndexBuildServices}). The disk budget
  * ({@code index.max_disk_bytes}) and {@code index.keep_versions} are read per request.
  *
- * <p><b>Nothing reads the index yet.</b> {@code index.enabled} (default false) lands now and is echoed by {@code GET
- * /inv/index}; the read paths arrive in later steps (design 5).
+ * <p><b>The index is ON by default</b> (operator 2026-10-10): {@code index.enabled} is unset = on, an explicit {@code false} disables; it is echoed by
+ * {@code GET /inv/index}. A read uses it only when a fresh published index exists, otherwise the flat Dataset answers (design 5).
  *
  * <p><b>The base fingerprint is grounded in files</b> (design 5.3a): {@code DatasetProvider#inputFingerprint} lists the files
  * the relation reads (the engine's own resolution, superseded files subtracted) and the build records the fingerprint plus, up
@@ -348,6 +348,10 @@ public final class IndexRoutes implements RouteModule {
         o.put("nodes", m.tables().containsKey("nodes") ? m.tables().get("nodes").rows() : 0L);
         o.put("bytes", m.tables().values().stream().mapToLong(IndexManifest.TableStats::bytes).sum());
         o.put("droppedNull", m.droppedNull());
+        Map<String, Object> tables = new LinkedHashMap<>();                  // DR-T9: per-table rows / files / bytes, straight from the manifest
+        m.tables().forEach((name, t) -> tables.put(name, Map.of("rows", t.rows(), "files", t.files(), "bytes", t.bytes())));
+        o.put("tables", tables);
+        o.put("versions", versionSizes(new IndexStore(root, dataset, hash), m.version()));
         o.put("buckets", m.buckets());
         o.put("stale", st.stale());
         o.put("reason", st.stale() ? String.join("; ", st.details()) : null);
@@ -359,6 +363,28 @@ public final class IndexRoutes implements RouteModule {
         o.put("fingerprintReason", st.fingerprintKnown() ? null : InputFingerprint.unknownReason(input));   // no-files, too-many-files, timeout, budget, unavailable
         if (input != null && input.known()) o.put("inputFiles", input.files().size());
         return o;
+    }
+
+    /** DR-T9: the retained published versions, newest first, each with its on-disk bytes (tables + appended deltas); looks back at most 16. */
+    private static List<Map<String, Object>> versionSizes(IndexStore store, long current) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (long n = current; n >= 1 && n > current - 16; n--) {
+            Optional<Path> dir = store.version(n);
+            if (dir.isEmpty()) continue;
+            try {
+                IndexManifest vm = IndexManifest.read(dir.get());
+                long bytes = vm.tables().values().stream().mapToLong(IndexManifest.TableStats::bytes).sum()
+                        + vm.deltas().stream().mapToLong(IndexManifest.Delta::bytes).sum();
+                Map<String, Object> v = new LinkedHashMap<>();
+                v.put("version", n);
+                v.put("bytes", bytes);
+                v.put("current", n == current);
+                out.add(v);
+            } catch (IOException | IllegalArgumentException unreadable) {
+                // an unreadable version is simply not listed
+            }
+        }
+        return out;
     }
 
     /**
