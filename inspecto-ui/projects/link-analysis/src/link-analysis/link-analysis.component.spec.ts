@@ -2,7 +2,7 @@ import { Component, Input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { of } from 'rxjs';
@@ -295,6 +295,51 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         expect(adopt).toHaveBeenCalledWith('case-v');
         expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
+    });
+
+    it('?seed= binds the number to the telecom profile mapping and asks the purpose in the Investigation tab', async () => {
+        const { fixture } = create({ queryParams: { seed: '966501', entityType: 'msisdn', dataset: 'links-ds' } });
+        const c = fixture.componentInstance;
+        c.ngOnInit();
+        await new Promise((r) => setTimeout(r));
+        expect(c.pendingInvestigation()).toMatchObject({
+            seed: '966501',
+            profileId: 'telecom',
+            projection: {
+                datasetId: 'links-ds',
+                sourceCol: 'a_msisdn',
+                targetCol: 'b_msisdn',
+                linkKindCol: 'link_kind',
+            },
+            timeCol: 'last_seen',
+        });
+        expect(c.profileId()).toBe('telecom');
+        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
+        expect(c.toolboxTab()).toBe('investigation');
+        expect(c.investigateIssue()).toBe('');
+    });
+
+    it('?seed= over a Dataset the Space lacks: says so, queues the number, creates nothing', async () => {
+        const { fixture } = create({ queryParams: { seed: '966501', entityType: 'msisdn' } }); // telecom_links absent
+        const c = fixture.componentInstance;
+        c.ngOnInit();
+        await new Promise((r) => setTimeout(r));
+        expect(c.pendingInvestigation()).toBeNull();
+        expect(c.investigateIssue()).toContain('The Dataset telecom_links is not in this Space');
+        expect(c.investigation.queuedSeeds()).toEqual([{ id: '966501', label: '966501', ids: ['966501'] }]);
+    });
+
+    it('the "Investigate a number" card navigates with ?seed= (the deep link flow), dropping a stale dataset', () => {
+        const { fixture } = create({});
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture.componentInstance.investigateNumber('+966501234567');
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({
+                queryParams: { seed: '+966501234567', entityType: 'msisdn', dataset: null },
+                queryParamsHandling: 'merge',
+            }),
+        );
     });
 
     it('opens no Investigation without ?investigation=', async () => {

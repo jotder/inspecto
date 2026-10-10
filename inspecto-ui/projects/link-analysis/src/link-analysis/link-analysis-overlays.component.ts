@@ -8,6 +8,7 @@ import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
 import { WorkingSetStat } from '@inspecto/link-analysis/graph/working-set-stats';
 import { nodeColor } from '@inspecto/core/graph/catalog-graph';
 import { baseEdgeKind } from '@inspecto/core/graph/graph-view.component';
+import { ChipComponent } from '@inspecto/core/components/chip.component';
 
 /** One swatch row of the legend. */
 export interface LegendItem {
@@ -46,6 +47,21 @@ export function legendEdgeKindsFor(g: G6GraphData | null): string[] {
     return g ? [...new Set(g.edges.map((e) => baseEdgeKind(e.data.kind)))].sort() : [];
 }
 
+/** Toggle one link kind in the hidden set (a new array, sorted — the order never depends on click order). */
+export function toggleHiddenKind(hidden: readonly string[], kind: string): string[] {
+    return hidden.includes(kind) ? hidden.filter((k) => k !== kind) : [...hidden, kind].sort();
+}
+
+/**
+ * The graph without the links of the hidden kinds — a client-side view filter, the nodes all stay. Any other field of
+ * the graph (a Working Set's `omittedLinks`, `truncated`) is kept; nothing hidden returns the same object.
+ */
+export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readonly string[]): G | null {
+    if (!g || !hidden.length) return g;
+    const off = new Set(hidden);
+    return { ...g, edges: g.edges.filter((e) => !off.has(baseEdgeKind(e.data.kind))) };
+}
+
 /**
  * **Link Analysis — canvas legend** (presentational). Node kinds with their canvas colour and count, plus the
  * link kinds present. Minimises to a pill so the graph gets the space; the host owns the open state so the
@@ -55,11 +71,17 @@ export function legendEdgeKindsFor(g: G6GraphData | null): string[] {
     selector: 'inspecto-link-analysis-legend',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, MatIconModule, MatTooltipModule],
+    imports: [MatButtonModule, MatIconModule, MatTooltipModule, ChipComponent],
     host: { class: 'block' },
+    styles: `
+        .link-kind:focus-visible {
+            outline: 2px solid currentColor;
+            outline-offset: 2px;
+        }
+    `,
     template: `
         @if (open()) {
-            <div class="rounded-lg border p-2 text-xs shadow-sm" style="background: var(--gamma-bg-card)">
+            <div class="max-w-xs rounded-lg border p-2 text-xs shadow-sm" style="background: var(--gamma-bg-card)">
                 <div class="flex items-center gap-1">
                     <span class="font-semibold">Legend</span>
                     <button
@@ -86,7 +108,40 @@ export function legendEdgeKindsFor(g: G6GraphData | null): string[] {
                     }
                 </ul>
                 @if (edgeKinds().length) {
-                    <div class="text-secondary mt-1 border-t pt-1">links: {{ edgeKinds().join(' · ') }}</div>
+                    <!-- one toggle per link kind: pressed = drawn; unpressing hides that kind's links on the canvas -->
+                    <ul class="m-0 mt-1 flex list-none flex-wrap gap-1 border-t p-0 pt-1" aria-label="Link kinds">
+                        @for (k of edgeKinds(); track k) {
+                            <li>
+                                <button
+                                    type="button"
+                                    class="link-kind rounded-full"
+                                    [attr.aria-pressed]="!hiddenEdgeKinds().includes(k)"
+                                    [attr.aria-label]="
+                                        (hiddenEdgeKinds().includes(k) ? 'Show ' : 'Hide ') +
+                                        (k || 'unlabelled') +
+                                        ' links'
+                                    "
+                                    [attr.data-kind]="k"
+                                    (click)="edgeKindToggle.emit(k)"
+                                >
+                                    <inspecto-chip
+                                        [variant]="hiddenEdgeKinds().includes(k) ? 'outline' : 'soft'"
+                                        [tone]="hiddenEdgeKinds().includes(k) ? 'neutral' : 'primary'"
+                                    >
+                                        <span
+                                            class="inline-block h-2 w-3 shrink-0 rounded-sm"
+                                            [style.background]="edgeColors()[k] ?? 'var(--gamma-text-secondary)'"
+                                            [style.opacity]="hiddenEdgeKinds().includes(k) ? 0.4 : 1"
+                                            aria-hidden="true"
+                                        ></span>
+                                        <span [class.line-through]="hiddenEdgeKinds().includes(k)">{{
+                                            k || 'unlabelled'
+                                        }}</span>
+                                    </inspecto-chip>
+                                </button>
+                            </li>
+                        }
+                    </ul>
                 }
                 @if (hint()) {
                     <div class="text-secondary mt-1">{{ hint() }}</div>
@@ -109,6 +164,12 @@ export function legendEdgeKindsFor(g: G6GraphData | null): string[] {
 export class LinkAnalysisLegendComponent {
     readonly items = input<LegendItem[]>([]);
     readonly edgeKinds = input<string[]>([]);
+    /** Link kinds hidden on the canvas (their chip shows unpressed). */
+    readonly hiddenEdgeKinds = input<string[]>([]);
+    /** The view's per-kind link colours — the swatch; a kind without one shows the default link ink. */
+    readonly edgeColors = input<Record<string, string>>({});
+    /** A link-kind chip was pressed: the host toggles that kind's links on the canvas. */
+    readonly edgeKindToggle = output<string>();
     readonly hint = input('');
     readonly open = input(true);
     readonly openChange = output<boolean>();

@@ -348,6 +348,8 @@ export interface InvestigationHeader {
     sourceCol: string;
     targetCol: string;
     linkKindCol: string | null;
+    /** LA-13: the bound event-time column; absent on a timeless Investigation. */
+    timeCol?: string | null;
     createdAt: string;
     /** Always null (D-E3): no version-addressable read exists, so reads are sealed at use, not pinned. */
     datasetVersion: null;
@@ -420,6 +422,9 @@ export interface WorkingSetSummary {
 }
 
 export interface InvestigationStepResult {
+    /** D-U7: `pending` = a sensitive expand was HELD for four-eyes approval — nothing ran, no step, no delta. */
+    status?: 'pending';
+    pending?: { id: string; sensitivity?: { exceeded?: string[] } };
     step: number;
     op: InvestigationOpName | 'undo';
     undoes?: number;
@@ -432,6 +437,8 @@ export interface InvestigationStepResult {
         rowCount: number;
         fingerprint: string;
         readAt: string;
+        /** `expand`: candidate links the rung's `maxFanOut` left out (the strongest per entity were kept). Not a truncation. */
+        fanOutCapped?: number;
         /** Only when an expand was answered by the link index: the version it read (never part of the fingerprint). */
         index?: { version: number; stale: boolean; fingerprint?: string };
         /** Only when an expand was answered by the flat Dataset: the closed reason (never part of the fingerprint). */

@@ -22,6 +22,11 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
 import {
+    LINK_ANALYSIS_ROUTE,
+    investigableEntityOf,
+    investigateQueryParams,
+} from '@inspecto/link-analysis/link-analysis/investigate-number';
+import {
     apiErrorMessage,
     EventRow,
     EventsService,
@@ -133,6 +138,15 @@ export class ObjectDetailComponent implements OnInit {
     readonly id = signal('');
     readonly obj = signal<OperationalObject | null>(null);
     /** The server-stamped SLA due / breached facts (ASSURE-WORKFLOW-SLA-1). */
+    /**
+     * "Investigate in Link Analysis": the entity a keyed Alert Rule's `key.<column>` attribute names (an MSISDN), as the
+     * deep link's query params; null when the record carries none — then no link is offered.
+     */
+    readonly investigateParams = computed(() => {
+        const e = investigableEntityOf(this.obj()?.attributes);
+        return e ? investigateQueryParams(e.seed, e.entityType) : null;
+    });
+    readonly linkAnalysisRoute = LINK_ANALYSIS_ROUTE;
     readonly sla = computed(() => (this.obj() ? slaBadges(this.obj()!) : []));
     readonly loading = signal(false);
 

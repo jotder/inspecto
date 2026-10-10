@@ -40,11 +40,23 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 
 ## 2. Quick start (five minutes)
 
-**Fastest start:** the first screen offers three starter cards. **Follow the money (example)** opens a ready-made
+**Fastest start:** the first screen offers four starter cards. **Follow the money (example)** opens a ready-made
 saved view of your Space and draws it at once (shown only when your Space has one). **Explore a Dataset** opens the
 Dataset picker — the Datasets that look like links are listed first, each with a one-line reason — and when you
 pick one its from and to columns are filled in for you and the graph is drawn. **Open a saved view** opens
 your saved views. The steps below are the same thing done by hand.
+
+**Investigate a number:** the fourth card takes an MSISDN (6 to 15 digits, an optional `+`). It opens the same
+flow as the deep link `/studio/link-analysis?seed=<id>&entityType=msisdn[&dataset=<datasetId>]`, which an
+Incident or Case page offers as **Investigate … in Link Analysis** when a keyed Alert Rule recorded the number
+(`key.msisdn`-style attribute). The Telecom profile binds the Dataset `telecom_links` (`a_msisdn` → `b_msisdn`, link
+kind `link_kind`, time `last_seen`); `dataset=` names another one. The Investigation tab asks only the purpose (the
+title is pre-filled *Suspect &lt;id&gt;*); **Investigate** then creates the Investigation, seeds the number and expands
+two degrees. **Expand next degree** goes one hop further from the outermost entities, up to degree 4, with the
+profile's presets (last 30 days, at least 1 event per link, at most 50 links per entity, 2 000 rows per degree);
+each degree's result, any budget cut or fan-out cap, and a degree held for four-eyes approval ("waiting for approval") is stated under the button. If the Space has no such
+Dataset the screen says so, keeps the number queued as a seed and offers the Dataset picker. The legend's link-kind
+chips hide or show each kind of link on the canvas.
 
 1. Open *Studio → Link Analysis*. Choose a **Domain profile** (for example *Financial crime — transactions* or
    *Telecom — call detail records*): it pre-selects the most useful tools.

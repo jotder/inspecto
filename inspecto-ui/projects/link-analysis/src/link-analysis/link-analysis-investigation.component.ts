@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+    viewChild,
+} from '@angular/core';
 import {
     FormControl,
     FormGroup,
@@ -27,6 +37,15 @@ import {
 import { apiErrorMessage } from '@inspecto/core/api';
 import { WORKING_SET_PLUGIN } from '@inspecto/core/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { ChipComponent } from '@inspecto/core/components/chip.component';
+import { DEFAULT_MAX_DEGREE, DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
+import {
+    PendingInvestigation,
+    degreeOutcomeMessage,
+    degreeState,
+    presetsSummary,
+    suspectTitle,
+} from './investigate-number';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
@@ -75,6 +94,7 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         MatRadioModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        ChipComponent,
         InspectoOptionPickerComponent,
         InvestigationExpandRungComponent,
         InvestigationWindowOpComponent,
@@ -114,12 +134,70 @@ export class LinkAnalysisInvestigationComponent {
     /** The IANA zone a naive TIMESTAMP time column is in; blank = UTC (the server records that explicitly). */
     readonly timeColumnZone = new FormControl('', { nonNullable: true });
 
+    /** A deep-linked "Investigate a number" waiting for a purpose; it replaces the start form while set. */
+    readonly pending = input<PendingInvestigation | null>(null);
+    /** The current profile's "Expand next degree" rung and the degree it stops at. */
+    readonly degreePresets = input<DegreePresets>({});
+    readonly maxDegree = input(DEFAULT_MAX_DEGREE);
+    /** The pending investigation was created (or abandoned) — the host drops it. */
+    readonly pendingDone = output<void>();
+
     constructor() {
         // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
         effect(() => {
             const col = this.timeCol();
             if (this.timeColumn.pristine) this.timeColumn.setValue(col, { emitEvent: false });
         });
+        // A deep link names its suspect: "Suspect <id>", unless the analyst already typed a title.
+        effect(() => {
+            const p = this.pending();
+            if (p && this.title.pristine) this.title.setValue(suspectTitle(p.seed), { emitEvent: false });
+        });
+    }
+
+    /** What the pending investigation's Start will do, in words. */
+    readonly pendingSummary = computed(() => {
+        const p = this.pending();
+        return p ? presetsSummary(p.presets) : '';
+    });
+
+    /** "Investigate <id>": create, seed, then expand two degrees. Asks for the purpose like every Investigation. */
+    async investigatePending(): Promise<void> {
+        const p = this.pending();
+        if (!p) return;
+        if (this.title.invalid || this.purpose.invalid) {
+            this.title.markAsTouched();
+            this.purpose.markAsTouched();
+            return;
+        }
+        const ok = await this.store.investigateNumber({
+            projection: p.projection,
+            purpose: this.purpose.value.trim(),
+            title: this.title.value.trim(),
+            timeCol: p.timeCol,
+            seed: p.seed,
+            presets: p.presets,
+            maxDegree: p.maxDegree,
+            degrees: 2,
+        });
+        // Once created the Investigation is open — the pending form is done even when a later expand was refused.
+        if (ok || this.store.active()) {
+            this.title.reset('');
+            this.purpose.reset('');
+            this.pendingDone.emit();
+        }
+    }
+
+    // ── "Expand next degree" ──
+    readonly degree = computed(() =>
+        degreeState(this.store.workingSet(), this.maxDegree(), this.store.degreeOutcomes()),
+    );
+    /** 1 … maxDegree, for the indicator. */
+    readonly degreeSteps = computed(() => Array.from({ length: this.maxDegree() }, (_, i) => i + 1));
+    readonly outcomeMessage = degreeOutcomeMessage;
+
+    expandNextDegree(): void {
+        void this.store.expandNextDegree(this.degreePresets(), this.maxDegree());
     }
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 

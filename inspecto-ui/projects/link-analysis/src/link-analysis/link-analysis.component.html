@@ -813,7 +813,7 @@
                 class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-1 max-md:min-h-[24rem]"
                 [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
             >
-                @if (graph(); as g) {
+                @if (graph() || workingSetCanvas()) {
                     @if (!workingSetCanvas() && timeColumn() && timeExtent(); as ext) {
                         <inspecto-link-analysis-timeline-playback
                             [graph]="displayed()"
@@ -842,7 +842,10 @@
                             class="absolute left-2 top-2 z-10"
                             [attr.inert]="listMode() ? '' : null"
                             [items]="legendItems()"
-                            [edgeKinds]="edgeKinds()"
+                            [edgeKinds]="legendLinkKinds()"
+                            [hiddenEdgeKinds]="hiddenLinkKinds()"
+                            [edgeColors]="edgeColors()"
+                            (edgeKindToggle)="toggleLinkKind($event)"
                             [open]="legendOpen()"
                             (openChange)="legendOpen.set($event)"
                         ></inspecto-link-analysis-legend>
@@ -902,13 +905,25 @@
                 } @else if (loading()) {
                     <inspecto-skeleton [lines]="6" height="2rem"></inspecto-skeleton>
                 } @else {
-                    <div class="flex flex-auto items-center justify-center overflow-auto">
+                    <div class="flex flex-auto flex-col items-center justify-center overflow-auto">
+                        @if (investigateIssue(); as issue) {
+                            <inspecto-empty-state
+                                class="block w-full max-w-3xl p-4"
+                                icon="heroicons_outline:circle-stack"
+                                title="Choose a Dataset to investigate this number"
+                                [message]="issue"
+                                actionLabel="Choose a Dataset"
+                                (action)="exploreDataset()"
+                                data-testid="investigate-issue"
+                            ></inspecto-empty-state>
+                        }
                         <inspecto-link-analysis-starter-cards
                             [followView]="followView()"
                             [savedViewCount]="views().length"
                             (followMoney)="loadFollowTheMoney()"
                             (exploreDataset)="exploreDataset()"
                             (openSavedViews)="openSavedViews()"
+                            (investigateNumber)="investigateNumber($event)"
                         ></inspecto-link-analysis-starter-cards>
                     </div>
                 }
@@ -1036,6 +1051,10 @@
                                 [projection]="investigationProjection()"
                                 [projectionIssue]="investigationIssue()"
                                 [timeCol]="investigationTimeDefault()"
+                                [pending]="pendingInvestigation()"
+                                [degreePresets]="degreePresets()"
+                                [maxDegree]="maxDegree()"
+                                (pendingDone)="pendingInvestigation.set(null)"
                             ></inspecto-link-analysis-investigation>
                         }
 
