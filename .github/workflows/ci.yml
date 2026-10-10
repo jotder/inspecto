@@ -285,7 +285,7 @@ jobs:
 
       # Engine-names-no-LA guard (LA-DEMO-GUARDS-1 / DR-T3): inspecto/src/main must not name com.gamma.la.* / com.gamma.geolink.*.
       - name: Guard - the engine names no Link Analysis class
-        run: node tools/check-engine-names-no-la.mjs && node --test tools/check-engine-names-no-la.test.mjs
+        run: node tools/check-engine-names-no-la.mjs && node --test tools/check-engine-names-no-la.test.mjs tools/la-demo-smoke.test.mjs
 
       # Launcher guard (LAUNCHER-GUARD-1, 2026-09-14). Third in the same family: package.ps1 emits the
       # deployment surface and nothing had ever EXECUTED any of it. serve.bat spent its life dropping
