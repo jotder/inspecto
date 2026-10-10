@@ -828,6 +828,7 @@
                                     [model]="riskModel()"
                                     [entityKey]="riskEntity()!"
                                 />
+                                <inspecto-anomaly-panel class="mt-2 block max-w-md" [entityKey]="riskEntity()!" />
                             }
                             @if (suspicion().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">

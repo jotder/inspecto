@@ -7,6 +7,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { EventsService, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
+import { AnomalyScoresService } from 'app/inspecto/api/anomaly-scores.service';
+import { RiskScoresService } from 'app/inspecto/api/risk-scores.service';
 import { ObjectDetailComponent } from './object-detail.component';
 
 const CASE: OperationalObject = {
@@ -22,7 +24,7 @@ const CASE: OperationalObject = {
     closedAt: 0,
 };
 
-function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}) {
+function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}, extra: unknown[] = []) {
     const api = {
         get: () => of(CASE),
         comments: vi.fn(() => of([])),
@@ -44,6 +46,7 @@ function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}) 
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } },
             // A real router (RouterLink needs createUrlTree); at the root URL listBase falls back to 'incidents'.
             provideRouter([]),
+            ...(extra as never[]),
             // ⚠ `paramMap` as an OBSERVABLE, not just the snapshot: the component tracks param changes,
             // because navigating from the graph tab to a neighbour reuses this same route config and
             // ngOnInit does not run again. A snapshot-only stub is what the component used to read.
@@ -146,6 +149,42 @@ describe('ObjectDetailComponent', () => {
         const badges = [...fixture.nativeElement.querySelectorAll('[data-testid="sla-badge"]')] as HTMLElement[];
         expect(badges.map((b) => b.textContent?.trim())).toEqual(['SLA breached']);
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('shows the entity anomaly panel on an Incident raised over an Anomaly Score', async () => {
+        const incident = {
+            ...CASE,
+            objectType: 'INCIDENT',
+            attributes: { 'key.model': 'usage', 'key.entity_key': 'masked:0123456789abcdef' },
+        };
+        const anomalyLatest = vi.fn(() =>
+            of({
+                model: 'usage',
+                entityType: 'subscriber',
+                entityKey: 'masked:0123456789abcdef',
+                keyMasked: true,
+                score: 91,
+                band: 'high',
+                elevatedThreshold: 60,
+                highThreshold: 80,
+                periodStart: '2026-10-09',
+                modelVersion: 'v',
+                runId: 'r',
+                scoredAt: 't',
+                features: [{ feature: 'data', label: 'Data MB', contribution: 1, reason: 'data MB 4 812 vs 310' }],
+                history: [],
+            }),
+        );
+        const { fixture } = create({ get: () => of(incident) }, [
+            { provide: AnomalyScoresService, useValue: { latest: anomalyLatest } },
+            { provide: RiskScoresService, useValue: { latest: () => throwError(() => ({ status: 404 })) } },
+        ]);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(anomalyLatest).toHaveBeenCalledWith('usage', 'masked:0123456789abcdef');
+        expect(el.querySelector('inspecto-anomaly-panel section')?.textContent).toContain('data MB 4 812 vs 310');
+        expect(el.querySelector('inspecto-risk-score-panel section')).toBeNull();
     });
 
     it('a transition replaces the object in place', () => {

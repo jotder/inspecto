@@ -8,6 +8,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { RiskScoresService } from 'app/inspecto/api/risk-scores.service';
+import { AnomalyScoresService } from 'app/inspecto/api/anomaly-scores.service';
 import { PendingChange, PendingChangesService } from 'app/inspecto/api/pending-changes.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { RiskScoresComponent } from './risk-scores.component';
@@ -71,6 +72,8 @@ function create(list: () => unknown, pending: unknown[] = []) {
         }),
     );
     const open = vi.fn(() => ({ afterClosed: () => of(false) }));
+    // No Anomaly Score for the entity: the anomaly panel beside the Risk Score renders nothing.
+    const anomalyLatest = vi.fn(() => throwError(() => ({ status: 404 })));
     TestBed.configureTestingModule({
         imports: [RiskScoresComponent],
         providers: [
@@ -78,6 +81,7 @@ function create(list: () => unknown, pending: unknown[] = []) {
             provideRouter([]),
             { provide: ComponentsService, useValue: { list: vi.fn(list) } },
             { provide: RiskScoresService, useValue: { latest, preview } },
+            { provide: AnomalyScoresService, useValue: { latest: anomalyLatest } },
             { provide: MatDialog, useValue: { open } },
             { provide: ToastrService, useValue: {} },
             {
@@ -89,12 +93,12 @@ function create(list: () => unknown, pending: unknown[] = []) {
     TestBed.overrideComponent(RiskScoresComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
     const fixture = TestBed.createComponent(RiskScoresComponent);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, latest, preview, open };
+    return { fixture, el: fixture.nativeElement as HTMLElement, latest, preview, open, anomalyLatest };
 }
 
 describe('RiskScoresComponent', () => {
     it('lists models, shows one in detail and looks up a masked entity score', async () => {
-        const { fixture, el, latest, open } = create(() => of([MODEL, BROKEN]));
+        const { fixture, el, latest, open, anomalyLatest } = create(() => of([MODEL, BROKEN]));
         const items = Array.from(el.querySelectorAll('nav li button')) as HTMLButtonElement[];
         expect(items.map((b) => b.textContent)).toEqual([
             expect.stringContaining('sim_box'),
@@ -120,6 +124,9 @@ describe('RiskScoresComponent', () => {
         expect(latest).toHaveBeenCalledWith('sim_box', '966501234567');
         const panel = el.querySelector('inspecto-risk-score-panel section');
         expect(panel?.getAttribute('aria-label')).toBe('Risk Score of ••••••••4567');
+        // the anomaly panel looks the same entity up in every Anomaly Model, and hides on a 404
+        expect(anomalyLatest).toHaveBeenCalledWith(expect.any(String), '966501234567');
+        expect(el.querySelector('inspecto-anomaly-panel section')).toBeNull();
 
         (
             Array.from(el.querySelectorAll('section button')).find((b) =>

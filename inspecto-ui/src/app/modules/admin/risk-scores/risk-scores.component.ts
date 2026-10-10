@@ -11,6 +11,7 @@ import { ComponentHistoryDialog } from 'app/inspecto/components/component-histor
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { RiskScorePanelComponent } from 'app/inspecto/components/risk-score-panel.component';
+import { AnomalyPanelComponent } from 'app/inspecto/components/anomaly-panel.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { RiskModelView, riskModelView } from 'app/inspecto/risk/risk-score-view';
@@ -34,6 +35,7 @@ import { RiskScoreHeldBadgeComponent, RiskScoreHeldStore } from './risk-score-he
         InspectoSkeletonComponent,
         StatusBadgeComponent,
         RiskScorePanelComponent,
+        AnomalyPanelComponent,
         RiskScoreActionsComponent,
         RiskScoreHeldBadgeComponent,
         RouterLink,

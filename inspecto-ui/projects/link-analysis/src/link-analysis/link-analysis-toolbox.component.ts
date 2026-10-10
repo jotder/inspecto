@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { RiskScorePanelComponent } from '@inspecto/core/components/risk-score-panel.component';
+import { AnomalyPanelComponent } from '@inspecto/core/components/anomaly-panel.component';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -175,6 +176,7 @@ type CentralityMetric =
         LinkAnalysisResultNextComponent,
         FormsModule,
         RiskScorePanelComponent,
+        AnomalyPanelComponent,
         LinkAnalysisServerRunComponent,
         LinkAnalysisIndexBuildComponent,
     ],

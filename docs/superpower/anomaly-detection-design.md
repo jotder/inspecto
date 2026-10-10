@@ -523,6 +523,52 @@ exclusion run AROUND `AnomalyScoreEvaluator.evaluate`, never inside it.
   is not wired. The pane was not driven in the browser preview from this lane (no backend with the anomaly module
   served from this worktree); unit specs + axe cover it.
 
+### 16.5 S5 lane B as-built: entity anomaly panel + dashboard tile (lane s5-panel, 2026-10-10)
+
+- **Score-reading service.** `inspecto-ui/src/app/inspecto/api/anomaly-scores.service.ts` (`AnomalyScoresService.latest`)
+  types `GET /anomaly-scores/{model}/{entityKey}` as served by `AnomalyScoreRoutes#latest` (score, `band`, both
+  thresholds, `keyMasked`, `features`, `history` newest first). Model config + preview stay in lane A's
+  `anomaly-models.service.ts`. `ComponentType` gains `anomaly-model`. Pure helpers (band → badge tone, ranking by
+  contribution share, sparkline points on a fixed 0..100 axis) are `inspecto/anomaly/anomaly-score-view.ts`.
+- **Panel** `<inspecto-anomaly-panel [entityKey] [model]?>` (`inspecto/components/anomaly-panel.component.ts`): score +
+  band `<inspecto-status-badge>` (high → error, elevated → warning, normal → success), features by contribution (top 3,
+  "Show all N" on demand) with observed vs baseline median (+ peer median) and the `reason` line, an SVG sparkline of
+  the history (`role="img"`, described in words, `currentColor` so no colour is hard-coded), and the key. **Masking:**
+  a `keyMasked` key shows the `masked:` token with NO reveal control; an unmasked key (the caller holds
+  `canRevealLinkEntities`) is dotted to its last 4 with a "Reveal key" toggle (`aria-pressed`). **Hiding:** every
+  failure renders nothing — a 404 is "no score", a 503 `CAPABILITY_UNAVAILABLE` or an unknown `anomaly-model` kind on
+  `GET /components/anomaly-model` means the module is absent.
+- **Model choice — DECIDED (lane, recorded):** a host that knows the model passes `[model]`; a host that knows only the
+  entity omits it, and the panel lists `GET /components/anomaly-model` and shows **one block per model that has a
+  score** for the entity (per-model 404s dropped). Chosen over a model selector: no extra control, nothing to pick when
+  only one model scores the entity (the usual case), and an entity scored by two models shows both.
+- **Hosts (three).** Incident page (`object-detail.component.html`): beside the Risk Score panel under the same
+  `key.model` + `key.entity_key` condition, with `[model]` bound — each panel hides on the other kind's 404, so no kind
+  discrimination is needed. Risk Score entity view (`risk-scores.component.html`): after the looked-up Risk Score, entity
+  only. Link Analysis: ONE insertion in `link-analysis-toolbox.component.html` (+ its import) beside the existing Risk
+  Score panel of the picked node (`riskEntity()`), entity only. ⚠ There is no separate "entity drawer" component in the
+  LA library; the toolbox's scoring entity view is where LA shows a node's scores, so the panel went there. It shows only
+  once a Risk Score model is named (that section's existing gate); widening that is LA's call.
+- **Dashboard tile — pure content, no code, no endpoint.** A template wires it with registry files (model `usage` shown;
+  replace with the model id). Two identity Datasets (the only Dataset shape `AnomalyKindValidator` accepts over a scores
+  store: `id = physicalRef`, nothing else):
+  `registry/datasets/anomaly_scores_usage_latest.toon` = `physicalRef: anomaly_scores_usage_latest`, and
+  `registry/datasets/anomaly_scores_usage.toon` = `physicalRef: anomaly_scores_usage`. Three Widgets over the existing
+  Visualization Types:
+  1. counts by band (`vizType: bar`, `datasetId: anomaly_scores_usage_latest`, `x[1]{field}: band`,
+     `y[1]{field,agg}: entity_key,count`, title "Entities by anomaly band");
+  2. top 10 by score (`vizType: bar`, same Dataset, `x: entity_key`, `y: score,max`, `options: {sort: desc, limit: 10}`);
+  3. trend per run (`vizType: line`, `datasetId: anomaly_scores_usage`, `x: period_start`, `y: entity_key,count`,
+     `series: band`) — the `high` line is the high count per run.
+  plus a `registry/dashboards/<pack>_anomaly.toon` with `tiles[3]{widgetId,span}` (2, 2, 4). Lane C owns the
+  `telco-fraud` / `mobile-money` / `aml` copies; this lane did not touch `spaces/_templates`.
+- **Deferred.** (a) A true count KPI of `high` + `elevated` only and a top-10 TABLE need a Widget-level filter and a
+  table row limit, which the Widget layer does not have (filters come only from the Dashboard; `limit` trims Chart.js
+  categories only) — hence the band bar and the top-10 bar. (b) Entity keys in the top-10 Widget are read through
+  `/bi/query`, which does not apply `EntityKeyMasking`; the `_latest` store holds raw keys, so a template should only
+  ship widget 2 where the readers may see keys, until BI masking of classified columns covers scores Datasets.
+  (c) The LA panel's dependence on a Risk Score model being named. (d) No evidence rows in the panel (S4 writes none).
+
 ## 17. Decisions (D-AD1..D-AD12) — taken (operator, 2026-10-10)
 
 Every recommendation below was approved as written; the *Decided* column is binding.

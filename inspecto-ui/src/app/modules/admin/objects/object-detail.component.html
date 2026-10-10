@@ -156,6 +156,12 @@
                                 [model]="obj().attributes!['key.model']"
                                 [entityKey]="obj().attributes!['key.entity_key']"
                             />
+                            <!-- ANOMALY-DETECTION-1: the same keys from an Anomaly Score Alert Rule; hides on a 404 -->
+                            <inspecto-anomaly-panel
+                                class="mt-6 block"
+                                [model]="obj().attributes!['key.model']"
+                                [entityKey]="obj().attributes!['key.entity_key']"
+                            />
                         }
                         @if (attributeRows.length) {
                             <div class="mt-6">

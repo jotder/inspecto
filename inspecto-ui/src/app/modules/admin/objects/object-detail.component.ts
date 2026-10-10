@@ -48,6 +48,7 @@ import { ObjectLinkDialog } from './object-link.dialog';
 import { ActionRequestsPanelComponent } from './action-requests-panel.component';
 import { ImpactPanelComponent } from './impact-panel.component';
 import { RiskScorePanelComponent } from 'app/inspecto/components/risk-score-panel.component';
+import { AnomalyPanelComponent } from 'app/inspecto/components/anomaly-panel.component';
 import { RunbookPanelComponent } from 'app/inspecto/components/runbook-panel.component';
 import { ResolveDialog, ResolveDialogData, ResolveResult } from './resolve.dialog';
 import { postmortemGaps, slaBadges } from './mail-model';
@@ -92,6 +93,7 @@ interface MemberTimelineEntry {
         ImpactPanelComponent,
         ActionRequestsPanelComponent,
         RiskScorePanelComponent,
+        AnomalyPanelComponent,
         RunbookPanelComponent,
     ],
     templateUrl: './object-detail.component.html',
