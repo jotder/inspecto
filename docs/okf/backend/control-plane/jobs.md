@@ -170,6 +170,33 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   (`SQL-TEMPLATE-SANDBOX-1`): the substituted text must pass `SqlGuard` (one read-only `SELECT`/`WITH`, the
   `transform.sql` allow-list), and the connection is sealed to the data root — see
   [Auth & Security](../editions/auth-security.md#the-sqltemplate-job-runs-behind-sqlguard-and-a-sealed-connection-sql-template-sandbox-1-2026-09-24).
+  **Incremental mode by per-day partitions (operator, 2026-10-10; `ASSURE-PACK-TELCO-FRAUD-1` (b)).**
+  `incremental: {by: day, column: <date col>, lookback: N}` makes a run replace only the last `N` days
+  (ending on the trigger's `day` param, declared for incremental Jobs only, else today UTC) of its sink,
+  laid out Hive-style as `<sink>/<column>=YYYY-MM-DD/part-<run>.parquet` with the date column held in the
+  folder name only, so the store reader (`hive_partitioning=true`) gives it back as a DATE — as the
+  **last** column. Every older day is never opened (byte-identical, pinned). Output rows outside the window
+  are dropped and counted in the run message: a **late row older than the lookback is not picked up** —
+  re-run with a wider lookback (or a `day`) to backfill it. Seams: `IncrementalSpec` (the block, flattened
+  to `incremental.*` params by `JobConfig.fromMap` and re-nested by `toMap`), `IncrementalSink` (lock,
+  layout, replace, recovery). **Save gates (422):** `by` must be `day`, `lookback` 1..366, `column` a plain
+  identifier that appears in the SQL, only on `sql.template`; and `POST/PUT /jobs` refuses a sink that is
+  not empty or already `<column>=` day folders (a flat snapshot, another layout, or another incremental
+  Job's ownership marker `.sql-template-incremental`). That the column is really in the output and typed
+  DATE is checked at run, **before the sink is touched** — the SQL's `$params` cannot be resolved at save.
+  **Concurrency / crash safety:** a replace holds the sink lock (an in-JVM monitor plus a `FileLock` on
+  `<sink>/.incremental.lock`); per day it stages `*.parquet.tmp`, hides the live files as `*.stale`,
+  reveals by one atomic move, then drops the stale files. Recovery at the start of every replace: a
+  surviving `.tmp` means the reveal never happened → restore the old files; only `.stale` → drop them.
+  So a crash leaves the old or the new partition, never a mix; a reader in the hide→reveal window sees
+  that one day briefly empty (the full-snapshot swap's discipline). Measured 2026-10-10 (6M source rows →
+  3M output rows over 30 days, aggregate SQL that reads the whole source): full snapshot 1.6-1.7 s and
+  22.8 MB rewritten per run; incremental `lookback: 1` 0.9-1.0 s and ~0.8 MB (one day) rewritten; the
+  30-day backfill took 3.0 s. The read side is unchanged unless the SQL filters its source by the window.
+  ⚠ Not enabled in the shipped packs: the telco-fraud Jobs carry history by reading their own sink and
+  pruning by `retention_days`, their sinks ship a flat zero-row `seed.parquet` (which this gate refuses),
+  and an incremental sink never prunes old days — enabling it would change the golden run, so the
+  templates were left as they are.
 * **`caserule.evaluate`** — schedules the auto-grouping tail of the Alert → Incident → Case chain (C5):
   evaluates a saved Case Rule, grouping matching in-window Incidents under a Case via
   `ObjectService.evaluateCaseRule` — the same step `POST /cases/rules/{name}/evaluate` drives — and emits

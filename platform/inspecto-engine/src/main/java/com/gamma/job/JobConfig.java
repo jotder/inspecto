@@ -196,6 +196,13 @@ public record JobConfig(String name, String type, String cron, String onPipeline
             switch (e.getKey()) {
                 case "name", "type", "cron", "on_pipeline", "on_signal", "when", "enabled", "catch_up",
                      "args", "bind" -> { /* known keys */ }
+                // INCREMENTAL-1 (operator, 2026-10-10): the nested incremental: block is flattened to
+                // incremental.* params (re-nested by toMap) so it is not stringified into one opaque value.
+                case "incremental" -> {
+                    if (e.getValue() instanceof Map<?, ?> m)
+                        m.forEach((k, v) -> { if (v != null) params.put(IncrementalSpec.PREFIX + k, v.toString()); });
+                    else if (e.getValue() != null) params.put("incremental", e.getValue().toString());
+                }
                 default -> { if (e.getValue() != null) params.put(e.getKey(), e.getValue().toString()); }
             }
         }
@@ -207,6 +214,7 @@ public record JobConfig(String name, String type, String cron, String onPipeline
                 && !onPipeline.isBlank())
             KpiCompletenessJob.effectivePipeline(name, params.get("pipeline"),
                     java.util.Arrays.stream(onPipeline.split(",")).map(String::trim).filter(t -> !t.isEmpty()).toList());
+        IncrementalSpec.parse(name, type, params);   // INCREMENTAL-1: a malformed block refuses at save
         String deadline = params.get(DEADLINE_SECONDS);
         if (deadline != null && !deadline.isBlank()) JobDeadline.parse(deadline);   // fail closed at load
         return new JobConfig(name, type, cron, onPipeline, enabled, catchUp, params, onSignal, when, args, bind);
@@ -227,7 +235,12 @@ public record JobConfig(String name, String type, String cron, String onPipeline
         if (catchUp) m.put("catch_up", true);
         if (!args.isEmpty()) m.put("args", new LinkedHashMap<>(args));
         if (!bind.isEmpty()) m.put("bind", new LinkedHashMap<>(bind));
-        params.forEach(m::put);
+        Map<String, Object> incremental = new LinkedHashMap<>();
+        params.forEach((k, v) -> {
+            if (k.startsWith(IncrementalSpec.PREFIX)) incremental.put(k.substring(IncrementalSpec.PREFIX.length()), v);
+            else m.put(k, v);
+        });
+        if (!incremental.isEmpty()) m.put("incremental", incremental);
         return m;
     }
 

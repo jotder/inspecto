@@ -508,6 +508,10 @@ final class JobRoutes implements RouteModule {
         if (c.enabled() && jobs(api).jobTypeView(c.type()).isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' has type '" + c.type()
                     + "', which no installed module registers — nothing was written (an existing config stays as it is)");
+        String sinkRefusal = jobs(api).incrementalSinkRefusal(c);
+        if (sinkRefusal != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: incremental "
+                    + sinkRefusal + " - nothing was written");
         Path target = jobFile(api, c.name());
         byte[] bytes = ConfigCodec.toToon(Map.of("job", c.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".job-");

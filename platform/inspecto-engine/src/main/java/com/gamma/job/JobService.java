@@ -813,6 +813,21 @@ public final class JobService implements AutoCloseable {
      * {@link #armCron}. A disabled config ({@code enabled=false}) is built (so it can be run manually)
      * but never armed — no cron, no signal coalescer; see {@link #buildDisabled}.
      */
+    /**
+     * The save-time refusal for an incremental {@code sql.template} Job whose sink cannot be day-partitioned
+     * (a flat snapshot, another layout, or another incremental Job's sink), or {@code null} (operator, 2026-10-10).
+     * The block's own shape is refused earlier, by {@link JobConfig#fromMap}.
+     */
+    public String incrementalSinkRefusal(JobConfig c) throws java.io.IOException {
+        IncrementalSpec inc = IncrementalSpec.parse(c.name(), c.type(), c.params());
+        String sink = c.params().get("sink_dataset");
+        if (inc == null || sink == null || sink.isBlank() || dataDir == null || dataDir.isBlank()) return null;
+        java.nio.file.Path root = java.nio.file.Path.of(dataDir).toAbsolutePath().normalize();
+        java.nio.file.Path dir = root.resolve(sink.trim()).normalize();
+        if (!dir.startsWith(root) || dir.equals(root)) return "sink_dataset '" + sink + "' escapes the data root";
+        return IncrementalSink.layoutRefusal(dir, inc.column(), c.name());
+    }
+
     public synchronized void upsertJob(JobConfig c) {
         removeJobInternal(c.name());
         configs.add(c);

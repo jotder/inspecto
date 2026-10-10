@@ -92,9 +92,14 @@ final class SqlTemplateJob implements Job {
                     + String.join("; ", violations.stream().map(Finding::message).toList()));
         List<String> sources = splitCsv(cfg.opt("sources", ""));
 
+        IncrementalSpec inc = IncrementalSpec.parse(cfg.name(), type(), cfg.params());
         Path outDir = Path.of(dataDir).resolve(sink);
+        if (inc != null) {
+            String refusal = IncrementalSink.layoutRefusal(outDir, inc.column(), cfg.name());
+            if (refusal != null) throw new IllegalStateException("sql.template job '" + cfg.name() + "' refused: " + refusal);
+        }
         Files.createDirectories(outDir);
-        cleanLeftovers(outDir);   // a crashed prior run leaves only invisible .tmp/.stale files
+        if (inc == null) cleanLeftovers(outDir);   // a crashed prior run leaves only invisible .tmp/.stale files
         String snapshot = "sql-" + System.currentTimeMillis() + ".parquet";
         Path tmp = outDir.resolve(snapshot + ".tmp");
 
@@ -135,6 +140,16 @@ final class SqlTemplateJob implements Job {
                                 List.of());
                     });
             meta = resultSetMeta(conn);
+            if (inc != null) {
+                java.time.LocalDate day = runDay(ctx.params());
+                IncrementalSink.Outcome o = IncrementalSink.replace(conn, OUT_TABLE, outDir, inc, day, cfg.name(), ctx.runId());
+                ctx.artifacts().dataset("output", sink, meta, o.rows(), Instant.now());
+                ctx.signals().emit(com.gamma.signal.SignalType.JOB_DATASET_PRODUCED, Severity.INFO, Map.of("dataset", sink, "rows", o.rows()));
+                ctx.log().info("replaced day partitions", "sink", sink, "rows", o.rows(), "days", o.days(),
+                        "outside_window_dropped", o.dropped());
+                return JobResult.ok("sql.template: " + o.rows() + " row(s) in " + o.days() + " day partition(s) → dataset '"
+                        + sink + "' (" + o.dropped() + " row(s) outside the lookback dropped)", (System.nanoTime() - t0) / 1_000_000L);
+            }
             try (ResultSet rs = st.executeQuery("SELECT count(*) FROM " + OUT_TABLE)) {
                 rs.next();
                 rows = rs.getLong(1);
@@ -148,6 +163,14 @@ final class SqlTemplateJob implements Job {
         ctx.log().info("wrote derived dataset", "sink", sink, "rows", rows, "sources", sources);
         return JobResult.ok("sql.template: " + rows + " row(s) → dataset '" + sink + "'",
                 (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /** The run's day: the trigger's {@code day} param (ISO date) when given, else today in UTC. */
+    static java.time.LocalDate runDay(Map<String, String> params) {
+        String d = params == null ? null : params.get("day");
+        if (d == null || d.isBlank()) return java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+        try { return java.time.LocalDate.parse(d.trim().length() > 10 ? d.trim().substring(0, 10) : d.trim()); }
+        catch (java.time.format.DateTimeParseException e) { throw new IllegalArgumentException("sql.template: param 'day' is not an ISO date: '" + d + "'"); }
     }
 
     /** The output shape from the materialized table's JDBC metadata (drives $upstream + BI, §10). */

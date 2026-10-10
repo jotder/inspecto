@@ -37,9 +37,14 @@ final class SqlTemplateJobType implements JobTypeProvider {
     @Override
     public List<ParameterDecl> parameters(JobConfig config) {
         List<ParameterDecl> scanned = SqlParamScanner.scan(config.params().get("sql"));
-        if (scanned.isEmpty()) return DESCRIPTOR.parameters();
+        boolean incremental = IncrementalSpec.parse(config.name(), config.type(), config.params()) != null;
+        if (scanned.isEmpty() && !incremental) return DESCRIPTOR.parameters();
         List<ParameterDecl> all = new ArrayList<>(DESCRIPTOR.parameters());
         all.addAll(scanned);
+        // INCREMENTAL-1 (operator, 2026-10-10): the day the lookback ends on; absent = today (UTC).
+        if (incremental && scanned.stream().noneMatch(d -> d.name().equals("day")))
+            all.add(ParameterDecl.optional("day", ParamType.DATE, null,
+                    "Incremental: the day the lookback window ends on (default today, UTC)"));
         return List.copyOf(all);
     }
 }
