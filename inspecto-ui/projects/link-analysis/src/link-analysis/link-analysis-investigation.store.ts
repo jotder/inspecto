@@ -20,6 +20,8 @@ import {
 } from './investigation-state';
 import { ProjectedGraph } from './entity-projection';
 import { QueuedSeed } from './la-starter';
+import { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
+import { DegreeOutcome, degreeOutcome, degreeState, presetRung, windowLabel } from './investigate-number';
 
 const EMPTY_SET: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
 
@@ -80,6 +82,9 @@ export class InvestigationSessionStore {
      * the analyst to confirm: nothing is created or seeded until they press Start (or Seed) in the Investigation tab.
      */
     readonly queuedSeeds = signal<QueuedSeed[]>([]);
+
+    /** "Expand next degree": what each degree expanded in THIS session did (the open Investigation only). */
+    readonly degreeOutcomes = signal<DegreeOutcome[]>([]);
 
     readonly active = computed(() => this.activeId() !== null);
     readonly activeRef = computed(() => this.refs().find((r) => r.id === this.activeId()) ?? null);
@@ -145,6 +150,8 @@ export class InvestigationSessionStore {
         this.replayResult.set(null);
         this.selected.set(null);
         this.error.set('');
+        this.degreeOutcomes.set([]);
+        this.windowEnd.set(null);
     }
 
     /** Stop remembering an id (e.g. one the server no longer answers for). Nothing is deleted server-side. */
@@ -193,6 +200,89 @@ export class InvestigationSessionStore {
             this.workingSet.set(EMPTY_SET);
             this.log.set(await firstValueFrom(this.inv.investigationLog(h.id)));
         });
+    }
+
+    /**
+     * "Expand next degree": one `expand` from the visible entities at the Working Set's outermost hop, with the
+     * profile's preset rung. Records the degree's outcome; false (with `error` set) when blocked or refused.
+     */
+    async expandNextDegree(presets: DegreePresets, maxDegree: number): Promise<boolean> {
+        if (this.expanding) return false; // one degree at a time: a second click while one runs is ignored
+        const state = degreeState(this.workingSet(), maxDegree, this.degreeOutcomes());
+        if (state.blocked) {
+            this.error.set(state.blocked);
+            return false;
+        }
+        const id = this.activeId();
+        const end = this.windowEnd();
+        const rung = presetRung(presets, !!this.header()?.timeCol, end);
+        this.expanding = true;
+        try {
+            if (!(await this.apply({ op: 'expand', ids: state.frontier, ...rung }))) return false;
+        } finally {
+            this.expanding = false;
+        }
+        if (this.activeId() !== id) return false; // switched away meanwhile - the answer belongs to another one
+        const step = this.lastStep();
+        const range = rung.window
+            ? windowLabel(presets, end)
+            : presets.windowDays != null
+              ? 'all available data'
+              : null;
+        if (step) this.degreeOutcomes.update((all) => [...all, degreeOutcome(state.current + 1, step, rung, range)]);
+        return true;
+    }
+
+    private expanding = false;
+    /** True while "Investigate a number" runs its create → seed → expand chain; the panel disables its buttons. */
+    readonly chainRunning = signal(false);
+    /**
+     * The end of the preset window: the bound Dataset's latest event time, looked up when the Investigation was
+     * created here. Null = unknown, and then no window is sent ("all available data") — never "today".
+     */
+    readonly windowEnd = signal<string | null>(null);
+
+    /**
+     * "Investigate a number": create the Investigation, seed the id, then expand `degrees` degrees with the presets.
+     * Stops at the first refusal (its message is in `error`) and when a degree finds nobody new.
+     */
+    async investigateNumber(req: {
+        projection: EntityProjection;
+        purpose: string;
+        title: string;
+        timeCol?: string;
+        seed: string;
+        presets: DegreePresets;
+        maxDegree: number;
+        degrees: number;
+        /** The Dataset's latest event time — the window's end. */
+        windowEnd?: string | null;
+    }): Promise<boolean> {
+        if (this.chainRunning()) return false;
+        this.chainRunning.set(true);
+        try {
+            return await this.runInvestigateChain(req);
+        } finally {
+            this.chainRunning.set(false);
+        }
+    }
+
+    private async runInvestigateChain(
+        req: Parameters<InvestigationSessionStore['investigateNumber']>[0],
+    ): Promise<boolean> {
+        if (!(await this.start(req.projection, req.purpose, req.title, req.timeCol))) return false;
+        const id = this.activeId();
+        this.windowEnd.set(req.windowEnd ?? null);
+        const entityType = req.projection.entityType;
+        if (!(await this.apply({ op: 'seed', ids: [req.seed], ...(entityType ? { entityType } : {}) }))) return false;
+        this.showWorkingSet.set(true);
+        // A held (pending-approval) degree blocks the next one, so the loop stops there - no error, no retry.
+        for (let i = 0; i < req.degrees; i++) {
+            if (this.activeId() !== id) return false; // closed or switched mid-chain: stop, never act on another one
+            if (degreeState(this.workingSet(), req.maxDegree, this.degreeOutcomes()).blocked) break;
+            if (!(await this.expandNextDegree(req.presets, req.maxDegree))) return false;
+        }
+        return true;
     }
 
     /** Open a remembered Investigation: its log and (via replay) its Working Set. */

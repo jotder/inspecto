@@ -51,6 +51,19 @@
                         <span class="ml-2">Link Analysis</span>
                     </a>
                 }
+                <!-- Sprint 1: the entity a keyed Alert Rule breached on (key.msisdn) — investigate it as a graph -->
+                @if (investigateParams(); as q) {
+                    <a
+                        mat-stroked-button
+                        [routerLink]="[linkAnalysisRoute]"
+                        [queryParams]="q"
+                        matTooltip="Seed this number in a new Investigation and expand two degrees"
+                        data-testid="investigate-entity"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                        <span class="ml-2">Investigate {{ q['seed'] }} in Link Analysis</span>
+                    </a>
+                }
                 @for (a of actions; track a) {
                     <button mat-stroked-button (click)="transition(a)">
                         <mat-icon svgIcon="heroicons_outline:arrow-right-circle"></mat-icon>

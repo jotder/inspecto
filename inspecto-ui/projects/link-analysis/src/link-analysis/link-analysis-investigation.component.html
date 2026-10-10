@@ -105,7 +105,53 @@
 
     @if (!store.active()) {
         <!-- ── start ── -->
-        @if (projection(); as p) {
+        @if (pending(); as q) {
+            <!-- "Investigate a number" (deep link / starter card): the binding is the profile's, the purpose is asked -->
+            <form
+                class="flex flex-col gap-2 rounded-md border p-2"
+                style="border-color: var(--gamma-border)"
+                aria-label="Investigate a number"
+                data-testid="investigate-pending"
+                (ngSubmit)="investigatePending()"
+            >
+                <h3 class="m-0 text-sm font-semibold">Investigate {{ q.seed }}</h3>
+                <p class="text-secondary m-0 text-xs">
+                    Creates an Investigation over <strong>{{ q.projection.datasetId }}</strong> ({{
+                        q.projection.sourceCol
+                    }}
+                    → {{ q.projection.targetCol }}), seeds {{ q.seed }} and expands two degrees —
+                    {{ pendingSummary() }}.
+                </p>
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Title</mat-label>
+                    <input matInput [formControl]="title" />
+                    @if (title.hasError('maxlength')) {
+                        <mat-error>At most 200 characters.</mat-error>
+                    }
+                </mat-form-field>
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Purpose / legal basis</mat-label>
+                    <input matInput required [formControl]="purpose" data-testid="investigate-purpose" />
+                    <mat-hint>Recorded with the Investigation and shown in its Dossier.</mat-hint>
+                    @if (purpose.hasError('maxlength')) {
+                        <mat-error>At most 1000 characters.</mat-error>
+                    } @else if (purpose.invalid) {
+                        <mat-error>State the purpose — every Investigation records why it was opened.</mat-error>
+                    }
+                </mat-form-field>
+                <div class="flex flex-wrap gap-1">
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        type="submit"
+                        [disabled]="store.busy() || store.chainRunning()"
+                    >
+                        Investigate {{ q.seed }}
+                    </button>
+                    <button mat-button type="button" (click)="pendingDone.emit()">Cancel</button>
+                </div>
+            </form>
+        } @else if (projection(); as p) {
             <p class="text-secondary m-0 text-xs">
                 An Investigation is an ordered, append-only log of steps over <strong>{{ p.datasetId }}</strong> ({{
                     p.sourceCol
@@ -217,6 +263,53 @@
             <strong>Working Set:</strong> {{ counts().entities }} entities · {{ counts().links }} links ·
             {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
         </p>
+        <!-- ── "Expand next degree": the outermost hop, with the profile's presets ── -->
+        <section
+            class="flex flex-col gap-1 rounded-md border p-2"
+            style="border-color: var(--gamma-border)"
+            aria-label="Degrees"
+            data-testid="degrees"
+        >
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold" data-testid="degree-label">
+                    Degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}
+                </span>
+                <ol class="m-0 flex list-none gap-1 p-0" aria-hidden="true">
+                    @for (d of degreeSteps(); track d) {
+                        <li>
+                            <inspecto-chip
+                                [variant]="d <= degree().current ? 'soft' : 'outline'"
+                                [tone]="d <= degree().current ? 'primary' : 'neutral'"
+                                >{{ d }}</inspecto-chip
+                            >
+                        </li>
+                    }
+                </ol>
+            </div>
+            <button
+                mat-stroked-button
+                type="button"
+                data-testid="expand-next-degree"
+                [disabled]="store.busy() || store.chainRunning() || !!degree().blocked"
+                (click)="expandNextDegree()"
+            >
+                Expand next degree
+            </button>
+            @if (degree().blocked; as why) {
+                <p class="text-secondary m-0 text-xs" data-testid="degree-blocked">{{ why }}</p>
+            }
+            @if (store.degreeOutcomes().length) {
+                <ul
+                    class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"
+                    aria-live="polite"
+                    aria-label="Degree results"
+                >
+                    @for (o of store.degreeOutcomes(); track $index) {
+                        <li [class.text-warn]="o.truncated">{{ outcomeMessage(o) }}</li>
+                    }
+                </ul>
+            }
+        </section>
         <mat-checkbox [ngModel]="!store.showWorkingSet()" (ngModelChange)="store.showWorkingSet.set(!$event)">
             Show the query graph (to pick seeds)
         </mat-checkbox>

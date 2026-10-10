@@ -2,7 +2,8 @@ import { Component, Input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { of } from 'rxjs';
@@ -78,6 +79,8 @@ function create(
         inv?: Partial<InvService>;
         /** Swap the G6 host for an inert stand-in, so the template can render with a graph in jsdom. */
         stubGraph?: boolean;
+        /** "Investigate a number": a stand-in for the Dataset reads (latest event time, column probe). */
+        rows?: Partial<DatasetRowsService>;
     } = {},
 ) {
     const queried: unknown[] = [];
@@ -102,6 +105,7 @@ function create(
             { provide: GraphSourcesService, useValue: { sources: [fakeSource], byId: () => fakeSource } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: PipelinesService, useValue: { list: () => of([]) } },
+            ...(opts.rows ? [{ provide: DatasetRowsService, useValue: opts.rows }] : []),
             ...(opts.inv ? [{ provide: InvService, useValue: { masking: signal(null), ...opts.inv } }] : []),
             { provide: LinkAnalysisService, useValue: { list: () => of(opts.views ?? []), save } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
@@ -295,6 +299,107 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         expect(adopt).toHaveBeenCalledWith('case-v');
         expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
+    });
+
+    /** Run ngOnInit over a ?seed= link with the param-clearing navigation stubbed; returns the navigate spy. */
+    async function consume(fixture: ReturnType<typeof create>['fixture']) {
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture.componentInstance.ngOnInit();
+        for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r));
+        return navigate;
+    }
+    const ROWS = (latest: unknown, columns = ['a_msisdn', 'b_msisdn', 'link_kind', 'last_seen']) => ({
+        sql: vi.fn(async () => ({ rows: [{ latest }], columns: [], truncated: false })),
+        columns: vi.fn(async () => columns.map((name) => ({ name, type: 'string' as const }))),
+    });
+
+    it('?seed= binds the telecom mapping, anchors the window at the Dataset latest time, and clears the params', async () => {
+        const rows = ROWS('2026-09-29 18:30:00');
+        const { fixture } = create({
+            queryParams: { seed: '966501', entityType: 'msisdn', dataset: 'links-ds' },
+            rows,
+        });
+        const navigate = await consume(fixture);
+        const c = fixture.componentInstance;
+        expect(c.pendingInvestigation()).toMatchObject({
+            seed: '966501',
+            profileId: 'telecom',
+            projection: {
+                datasetId: 'links-ds',
+                sourceCol: 'a_msisdn',
+                targetCol: 'b_msisdn',
+                linkKindCol: 'link_kind',
+            },
+            timeCol: 'last_seen',
+            windowEnd: '2026-09-29T18:30:00.000Z',
+        });
+        expect(rows.sql).toHaveBeenCalledWith('links', 'SELECT MAX("last_seen") AS latest FROM "links"', 1);
+        expect(c.profileId()).toBe('telecom');
+        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
+        expect(c.toolboxTab()).toBe('investigation');
+        expect(c.investigateIssue()).toBe('');
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({
+                queryParams: { seed: null, entityType: null, dataset: null },
+                queryParamsHandling: 'merge',
+                replaceUrl: true,
+            }),
+        );
+    });
+
+    it('?seed= with an unreadable latest time binds without a window end (no "30 days" claim)', async () => {
+        const rows = {
+            ...ROWS(null),
+            sql: vi.fn(async () => ({ rows: [], columns: [], truncated: false, error: 'denied' })),
+        };
+        const { fixture } = create({ queryParams: { seed: '966501', dataset: 'links-ds' }, rows });
+        await consume(fixture);
+        expect(fixture.componentInstance.pendingInvestigation()).not.toHaveProperty('windowEnd');
+    });
+
+    it('?seed= naming a Dataset without the mapped columns shows why and binds nothing', async () => {
+        const { fixture } = create({
+            queryParams: { seed: '966501', dataset: 'links-ds' },
+            rows: ROWS(null, ['src', 'dst']),
+        });
+        await consume(fixture);
+        const c = fixture.componentInstance;
+        expect(c.pendingInvestigation()).toBeNull();
+        expect(c.investigateIssue()).toContain('has no column a_msisdn, b_msisdn, link_kind, last_seen');
+    });
+
+    it('?seed= that is not an MSISDN is refused with the starter card message, nothing queued', async () => {
+        const { fixture } = create({ queryParams: { seed: '12ab', entityType: 'msisdn' }, rows: ROWS(null) });
+        await consume(fixture);
+        const c = fixture.componentInstance;
+        expect(c.investigateIssue()).toBe(
+            '12ab cannot be investigated: A number is 6 to 15 digits, optionally starting with +.',
+        );
+        expect(c.investigation.queuedSeeds()).toEqual([]);
+    });
+
+    it('?seed= over a Dataset the Space lacks: says so, queues the number, creates nothing', async () => {
+        // telecom_links is absent from this Space
+        const { fixture } = create({ queryParams: { seed: '966501', entityType: 'msisdn' }, rows: ROWS(null) });
+        await consume(fixture);
+        const c = fixture.componentInstance;
+        expect(c.pendingInvestigation()).toBeNull();
+        expect(c.investigateIssue()).toContain('The Dataset telecom_links is not in this Space');
+        expect(c.investigation.queuedSeeds()).toEqual([{ id: '966501', label: '966501', ids: ['966501'] }]);
+    });
+
+    it('the "Investigate a number" card navigates with ?seed= (the deep link flow), dropping a stale dataset', () => {
+        const { fixture } = create({});
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture.componentInstance.investigateNumber('+966501234567');
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({
+                queryParams: { seed: '+966501234567', entityType: 'msisdn', dataset: null },
+                queryParamsHandling: 'merge',
+            }),
+        );
     });
 
     it('opens no Investigation without ?investigation=', async () => {

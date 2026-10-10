@@ -7,7 +7,13 @@ import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-sta
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 import { GraphSourcesService } from './graph-sources';
-import { legendEdgeKindsFor, legendItemsFor, LinkAnalysisLegendComponent } from './link-analysis-overlays.component';
+import {
+    hideLinkKinds,
+    legendEdgeKindsFor,
+    legendItemsFor,
+    LinkAnalysisLegendComponent,
+    toggleHiddenKind,
+} from './link-analysis-overlays.component';
 
 /**
  * Read-only **Link analysis widget** host (Phase 4): renders a saved `link-analysis-view` Component on a
@@ -44,7 +50,7 @@ import { legendEdgeKindsFor, legendItemsFor, LinkAnalysisLegendComponent } from 
                 <div class="relative flex min-h-0 flex-auto flex-col">
                     <inspecto-graph-view
                         class="min-h-0 flex-auto"
-                        [data]="d"
+                        [data]="drawn()"
                         [display]="view()?.display ?? null"
                         [layout]="view()?.layout ?? null"
                         [fill]="true"
@@ -53,6 +59,9 @@ import { legendEdgeKindsFor, legendItemsFor, LinkAnalysisLegendComponent } from 
                         class="absolute left-2 top-2 z-10"
                         [items]="legendItems()"
                         [edgeKinds]="edgeKinds()"
+                        [hiddenEdgeKinds]="hiddenLinkKinds()"
+                        [edgeColors]="view()?.display?.edgeColors ?? {}"
+                        (edgeKindToggle)="hiddenLinkKinds.set(toggleHiddenKind(hiddenLinkKinds(), $event))"
                         [open]="legendOpen()"
                         (openChange)="legendOpen.set($event)"
                     />
@@ -92,6 +101,10 @@ export class LinkViewWidgetComponent {
     readonly legendOpen = signal(true);
     readonly legendItems = computed(() => legendItemsFor(this.data(), this.view()?.display?.nodeColors));
     readonly edgeKinds = computed(() => legendEdgeKindsFor(this.data()));
+    /** Link kinds the legend's chips hide (client-side, this tile only). */
+    readonly hiddenLinkKinds = signal<string[]>([]);
+    readonly drawn = computed(() => hideLinkKinds(this.data(), this.hiddenLinkKinds()));
+    protected readonly toggleHiddenKind = toggleHiddenKind;
     readonly header = computed(() => ({ description: this.view()?.description }));
 
     constructor() {

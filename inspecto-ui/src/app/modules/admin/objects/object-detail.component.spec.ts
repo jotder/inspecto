@@ -292,6 +292,21 @@ describe('ObjectDetailComponent', () => {
         expect(link).toBeUndefined();
     });
 
+    it('offers "Investigate in Link Analysis" where a keyed Alert Rule left the MSISDN it breached on', () => {
+        const { fixture } = create({
+            get: () => of({ ...CASE, objectType: 'INCIDENT', attributes: { rule: 'r', 'key.a_msisdn': '966501' } }),
+        });
+        fixture.detectChanges();
+        const link = fixture.nativeElement.querySelector('[data-testid="investigate-entity"]') as HTMLAnchorElement;
+        expect(link.textContent).toContain('Investigate 966501 in Link Analysis');
+        expect(link.getAttribute('href')).toBe('/studio/link-analysis?seed=966501&entityType=msisdn');
+
+        // a record without such a key offers nothing — there is no entity to investigate
+        fixture.componentInstance.obj.set({ ...CASE, attributes: { 'key.entity_key': 'E-1' } });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="investigate-entity"]')).toBeNull();
+    });
+
     it('renders the overview with no a11y violations', async () => {
         const { fixture } = create();
         fixture.detectChanges();

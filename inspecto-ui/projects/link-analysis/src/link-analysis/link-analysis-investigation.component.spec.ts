@@ -18,6 +18,7 @@ import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/gri
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { PendingInvestigation } from './investigate-number';
 import { WidgetsService } from 'app/modules/admin/studio/widgets/widgets.service';
 import { Widget } from 'app/modules/admin/studio/widgets/widget-types';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
@@ -30,11 +31,16 @@ import { provideLaHostServices } from 'app/modules/admin/studio/la-host.provider
         [projection]="projection()"
         projectionIssue="Run a query first."
         [timeCol]="timeCol()"
+        [pending]="pending()"
+        [degreePresets]="{ budget: 2000 }"
+        [maxDegree]="4"
+        (pendingDone)="pending.set(null)"
     ></inspecto-link-analysis-investigation>`,
 })
 class Host {
     readonly projection = signal<EntityProjection | null>({ datasetId: 'calls', sourceCol: 'A', targetCol: 'B' });
     readonly timeCol = signal('');
+    readonly pending = signal<PendingInvestigation | null>(null);
 }
 
 const LOG: InvestigationLog = {
@@ -600,5 +606,80 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
             expect.objectContaining({ op: 'seed', ids: ['acct-a'] }),
         );
         expect(store.showWorkingSet()).toBe(true);
+    });
+
+    it('a pending "Investigate a number" asks the purpose, then creates, seeds and expands two degrees', async () => {
+        const { fixture, el, inv, store } = create();
+        const host = fixture.componentInstance as unknown as Host;
+        host.pending.set({
+            seed: '966501',
+            profileId: 'telecom',
+            projection: {
+                datasetId: 'telecom_links',
+                sourceCol: 'a_msisdn',
+                targetCol: 'b_msisdn',
+                entityType: 'msisdn',
+            },
+            timeCol: 'last_seen',
+            presets: { minEvents: 2 },
+            maxDegree: 4,
+        });
+        fixture.detectChanges();
+        const form = el.querySelector('[data-testid="investigate-pending"]') as HTMLFormElement;
+        expect(form.textContent).toContain('Investigate 966501');
+        expect(form.textContent).toContain('at least 2 events per link');
+        const title = form.querySelector('input') as HTMLInputElement;
+        expect(title.value).toBe('Suspect 966501');
+        await expectNoA11yViolations(el);
+
+        // no purpose: nothing is created and the error is on screen
+        form.dispatchEvent(new Event('submit'));
+        fixture.detectChanges();
+        expect(inv.createInvestigation).not.toHaveBeenCalled();
+        expect(form.querySelector('mat-error')?.textContent).toContain('State the purpose');
+
+        const spy = vi.spyOn(store, 'investigateNumber').mockResolvedValue(true);
+        const purpose = form.querySelector('[data-testid="investigate-purpose"]') as HTMLInputElement;
+        purpose.value = 'fraud alert 12';
+        purpose.dispatchEvent(new Event('input'));
+        form.dispatchEvent(new Event('submit'));
+        await fixture.whenStable();
+        expect(spy).toHaveBeenCalledWith(
+            expect.objectContaining({ seed: '966501', title: 'Suspect 966501', purpose: 'fraud alert 12', degrees: 2 }),
+        );
+        fixture.detectChanges();
+        expect(host.pending()).toBeNull();
+    });
+
+    it('"Expand next degree" shows the degree, the per-degree result, and stops at degree 4', async () => {
+        const { fixture, el, store } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const next = () => el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
+        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('Degree 0 of 4');
+        expect(next().disabled).toBe(false);
+
+        const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
+        next().click();
+        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4);
+
+        store.degreeOutcomes.set([
+            { degree: 1, admitted: 3, linksAdded: 4, truncated: true, fanOutCapped: 0, budget: 2000 },
+        ]);
+        store.workingSet.set({
+            ...WS,
+            entities: [
+                WS.entities[0],
+                { id: 'd', type: null, hop: 4, seed: 'a', admittedBy: 3, hidden: false, kept: false },
+            ],
+        });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('Degree 4 of 4');
+        expect(next().disabled).toBe(true);
+        expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Degree 4 reached');
+        expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain(
+            'Degree 1: 3 new entities, 4 links added. The read stopped at its budget of 2,000 rows',
+        );
+        await expectNoA11yViolations(el);
     });
 });

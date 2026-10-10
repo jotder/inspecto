@@ -21,7 +21,39 @@ export interface DomainProfile {
     timeHints: RegExp[];
     /** Analysis toolbox group ids to badge as suggested for this domain. */
     suggestedTools: string[];
+    /** "Investigate a number": the default Investigation binding and the next-degree presets. Absent = not offered. */
+    investigate?: InvestigateProfile;
 }
+
+/** The Dataset + columns an Investigation binds by default (`POST /inv/investigations`). */
+export interface InvestigateMapping {
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    linkKindCol?: string;
+    timeCol?: string;
+}
+
+/** The rung every "Expand next degree" sends (`expand` op options). */
+export interface DegreePresets {
+    /** The window, in days back from now. Sent only when the Investigation has a time column (else the server 422s). */
+    windowDays?: number;
+    minEvents?: number;
+    maxFanOut?: number;
+    budget?: number;
+}
+
+export interface InvestigateProfile {
+    /** The Entity Type a deep link's `entityType` names, e.g. `msisdn`. */
+    entityType: string;
+    mapping: InvestigateMapping;
+    expand: DegreePresets;
+    /** "Expand next degree" stops here. */
+    maxDegree: number;
+}
+
+/** The degree "Expand next degree" stops at when the profile does not say. */
+export const DEFAULT_MAX_DEGREE = 4;
 
 export const DOMAIN_PROFILES: readonly DomainProfile[] = [
     {
@@ -50,6 +82,20 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
         measureHints: [/duration/i, /seconds/i, /minutes/i],
         timeHints: [/start/i, /_at$/i, /time/i, /date/i],
         suggestedTools: ['communities', 'explain', 'cohesion'],
+        investigate: {
+            entityType: 'msisdn',
+            mapping: {
+                dataset: 'telecom_links',
+                sourceCol: 'a_msisdn',
+                targetCol: 'b_msisdn',
+                linkKindCol: 'link_kind',
+                timeCol: 'last_seen',
+            },
+            // minEvents 1, not 2: expand counts ROWS per (source, target, kind) and `telecom_links` is pre-aggregated (one row
+            // per pair + kind), so 2 would drop every link. Back to 2 once expand can weight by an events column (planned).
+            expand: { windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 },
+            maxDegree: 4,
+        },
     },
     {
         id: 'supply-chain',
@@ -73,6 +119,12 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
 
 export function domainProfile(id: DomainProfileId | null | undefined): DomainProfile {
     return DOMAIN_PROFILES.find((p) => p.id === id) ?? DOMAIN_PROFILES[0];
+}
+
+/** The profile that investigates entities of this type (`msisdn` → telecom), or null. Case-insensitive. */
+export function profileForEntityType(entityType: string | null | undefined): DomainProfile | null {
+    const t = (entityType ?? '').trim().toLowerCase();
+    return (t && DOMAIN_PROFILES.find((p) => p.investigate?.entityType.toLowerCase() === t)) || null;
 }
 
 /**
