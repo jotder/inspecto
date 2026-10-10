@@ -364,10 +364,14 @@
                                 [nodeOptions]="nodeOptions()"
                                 [serverIds]="serverIds()"
                                 (emphasisChange)="emphasisChange.emit($event)"
+                                (resultChange)="applyCatalogueResult($event)"
                             />
                         }
                         @case ('index-build') {
-                            <inspecto-link-analysis-index-build [allowed]="canBuildIndex()" [mappings]="indexMappings()" />
+                            <inspecto-link-analysis-index-build
+                                [allowed]="canBuildIndex()"
+                                [mappings]="indexMappings()"
+                            />
                         }
                         @case ('centrality') {
                             <div class="flex flex-wrap items-center gap-2">
