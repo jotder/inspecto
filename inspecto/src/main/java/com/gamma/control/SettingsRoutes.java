@@ -182,6 +182,7 @@ final class SettingsRoutes implements RouteModule {
         m.put("analysisNodeCap", s.analysisNodeCap());
         m.put("suspicionNodeCap", s.suspicionNodeCap());
         m.put("maskingMode", s.maskingMode());
+        m.put("maskingModeInForce", s.effectiveMaskingMode());
         m.put("fourEyesBudgetAbove", s.fourEyesBudgetAbove());
         m.put("fourEyesFanOutAbove", s.fourEyesFanOutAbove());
         m.put("entityTypes", s.entityTypes() == null ? null : EntityTypes.shape(s.entityTypes()));
@@ -217,6 +218,16 @@ final class SettingsRoutes implements RouteModule {
             idx.put("queue", x.queue());
         }
         m.put("index", idx);
+        LinkAnalysisSettings.Index ix = s.effectiveIndex();   // read-only echo: what the index is doing now, whatever the shipped default is
+        Map<String, Object> idxInForce = new LinkedHashMap<>();
+        idxInForce.put("enabled", ix.enabledInForce());
+        idxInForce.put("maxDiskBytes", ix.maxDiskBytesInForce());
+        idxInForce.put("keepVersions", ix.keepVersionsInForce());
+        idxInForce.put("threads", ix.threadsInForce());
+        idxInForce.put("queue", ix.queueInForce());
+        m.put("indexInForce", idxInForce);
+        // Read-only echo of the process-wide -Dinvestigations.backend selection (fs default | db = PostgreSQL); not a setting.
+        m.put("investigationStoreInForce", "db".equalsIgnoreCase(System.getProperty("investigations.backend", "fs").trim()) ? "db" : "fs");
         LinkAnalysisSettings.Drafts dr = s.drafts();
         Map<String, Object> drafts = null;   // LA-DRAFT-PROMOTE-COST-1: null = every knob inherits the shipped default
         if (dr != null) {

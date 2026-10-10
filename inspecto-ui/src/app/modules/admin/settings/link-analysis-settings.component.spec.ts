@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LensService } from 'app/inspecto/api';
+import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import {
     LinkAnalysisLimits,
     LinkAnalysisSettingsService,
@@ -26,11 +27,21 @@ const SERVED: LinkAnalysisLimits = {
     mergedDistinctCapInForce: 20000,
 };
 
-function setup(opts: { served?: Partial<LinkAnalysisLimits>; save?: () => unknown; canEdit?: boolean } = {}) {
+function setup(opts: { served?: Partial<LinkAnalysisLimits>; save?: () => unknown; canEdit?: boolean; catalogueFails?: boolean } = {}) {
     const served = { ...SERVED, ...opts.served };
     const api = {
         get: vi.fn(() => of(served)),
         save: vi.fn(opts.save ?? ((b: LinkAnalysisLimits) => of({ ...b, mergedDistinctCapInForce: 20000 }))),
+    };
+    const runs = {
+        algorithms: vi.fn(() =>
+            opts.catalogueFails
+                ? throwError(() => new HttpErrorResponse({ status: 503 }))
+                : of({
+                      defaults: { maxNodes: 50000, maxEdges: 500000, timeoutMs: 30000, clamped: false },
+                      ceilings: { maxNodes: 500000, maxEdges: 5000000, timeoutMs: 300000 },
+                  }),
+        ),
     };
     const toastr = { success: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
@@ -38,6 +49,7 @@ function setup(opts: { served?: Partial<LinkAnalysisLimits>; save?: () => unknow
         providers: [
             provideNoopAnimations(),
             { provide: LinkAnalysisSettingsService, useValue: api },
+            { provide: GraphRunsService, useValue: runs },
             { provide: ToastrService, useValue: toastr },
             { provide: LensService, useValue: { canAuthorWorkbench: () => opts.canEdit !== false } },
         ],
@@ -298,6 +310,91 @@ describe('LinkAnalysisSettingsComponent', () => {
             c.form.controls.maxInvestigationBytes.setValue(1099511627776);
             submit();
             expect(api.save).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('DR-U3 controls', () => {
+        const ET = [{ id: 'msisdn', label: 'Subscriber', normaliser: 'msisdn' as never, masked: true, classifications: ['PII'] }];
+        const FULL: Partial<LinkAnalysisLimits> = {
+            maskingMode: 'all',
+            maskingModeInForce: 'all',
+            entityTypesInForce: ET,
+            index: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8 },
+            indexInForce: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8 },
+            graphRun: { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: 7, maxResultItems: 55 },
+            investigationStoreInForce: 'db',
+        };
+
+        it('shows masking in force with each mode explained, the Entity Types, the store and the budgets with ceilings (a11y)', async () => {
+            const { el, c } = setup({ served: FULL });
+            expect(c.form.controls.maskingMode.value).toBe('all');
+            expect(el.textContent).toContain('In force: all.');
+            expect(el.textContent).toContain('raw value stays on the server');
+            expect(el.textContent).toContain('Subscriber');
+            expect(el.textContent).toContain('Investigation store: PostgreSQL');
+            expect(el.textContent).toContain('In force: 50000; server ceiling: 500000');
+            expect(el.textContent).toContain('Serve reads from the link index when a fresh one exists');
+            await expectNoA11yViolations(el);
+        });
+
+        it('says filesystem for fs and falls back to dashes when the catalogue route does not answer', () => {
+            const { el } = setup({ served: { investigationStoreInForce: 'fs' }, catalogueFails: true });
+            expect(el.textContent).toContain('Investigation store: filesystem');
+            expect(el.textContent).toContain('In force: -; server ceiling: -');
+        });
+
+        it('edits masking, index and graph-run keys and keeps the keys the form does not show', () => {
+            const { c, api, submit } = setup({ served: FULL });
+            c.form.controls.maskingMode.setValue('none');
+            c.form.controls.index.controls.enabled.setValue(false);
+            c.form.controls.index.controls.queue.setValue(null);
+            c.form.controls.graphRun.controls.maxEdges.setValue(1234);
+            submit();
+            const body = api.save.mock.calls[0][0] as unknown as Record<string, unknown>;
+            expect(body['maskingMode']).toBe('none');
+            expect(body['index']).toEqual({ enabled: false, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: null });
+            expect(body['graphRun']).toEqual({ maxNodes: 900, maxEdges: 1234, timeoutMs: 4000, threads: 3, queue: 7, maxResultItems: 55 });
+            expect(body['entityTypesInForce']).toBeUndefined();
+            expect(body['indexInForce']).toBeUndefined();
+            expect(body['investigationStoreInForce']).toBeUndefined();
+        });
+
+        it('blank masking sends null (inherit) and untouched blank blocks are omitted', () => {
+            const { c, api, submit } = setup({ served: { maskingMode: 'all' } });
+            c.form.controls.maskingMode.setValue(null);
+            submit();
+            const body = api.save.mock.calls[0][0] as unknown as Record<string, unknown>;
+            expect(body['maskingMode']).toBeNull();
+            expect(body).not.toHaveProperty('index');
+            expect(body).not.toHaveProperty('graphRun');
+        });
+
+        it.each([
+            ['index', 'threads', 65],
+            ['index', 'queue', 1001],
+            ['index', 'maxDiskBytes', -1],
+            ['graphRun', 'maxNodes', 10000001],
+            ['graphRun', 'timeoutMs', 0],
+        ])('refuses %s.%s = %s client-side and does not save', (group, key, bad) => {
+            const { c, api, submit } = setup();
+            const g = c.form.controls[group as 'index' | 'graphRun'].controls as Record<string, { setValue(v: number): void }>;
+            g[key].setValue(bad);
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+        });
+
+        it('accepts the index and graph-run bounds', () => {
+            const { c, api, submit } = setup();
+            c.form.controls.index.patchValue({ threads: 64, queue: 1000, maxDiskBytes: 0 });
+            c.form.controls.graphRun.patchValue({ maxNodes: 10000000 });
+            submit();
+            expect(api.save).toHaveBeenCalledTimes(1);
+        });
+
+        it('disables the selects and shows no save button without the authoring capability', () => {
+            const { c } = setup({ canEdit: false, served: FULL });
+            expect(c.form.controls.maskingMode.disabled).toBe(true);
+            expect(c.form.controls.index.controls.enabled.disabled).toBe(true);
         });
     });
 

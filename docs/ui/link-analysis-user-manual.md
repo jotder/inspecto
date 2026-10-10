@@ -373,7 +373,12 @@ would a name. The Investigation gives the seeded entity its own alias, so the Wo
 the Selected line keeps them one entity and marks it *(masked)*. After a server restart an old alias is refused: run the query again.
 
 **Settings → Link Analysis** sets per-Space limits: the four-eyes thresholds (large expands wait for a second
-person), the merged-traversal cap and the `seedBy` cap.
+person), the merged-traversal cap and the `seedBy` cap. It also shows and, with the authoring capability, changes the
+**masking mode** (`typed`, `all` or `none`, each explained beside the field, with the mode in force), the **link index**
+(whether reads are served from a fresh index, plus its build workers, waiting line and disk budget), the default
+**server graph-run budget** (nodes, edges, time, shown with the server's ceilings) and the Draft limits. It lists the
+Entity Types in force and names the active Investigation store (filesystem or PostgreSQL) read only. Without the
+capability every field is read only.
 
 ---
 
