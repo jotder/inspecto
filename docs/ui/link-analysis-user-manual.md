@@ -271,6 +271,18 @@ seeds from the wider picture. Pressing *Seed* returns the canvas to the Working 
   and shows **drift** — what changed in the data since you did it.
 * **Re-order** steps creates a **fork**: a new Investigation showing its parent; the original stays untouched.
 
+**Members.** Under the Investigation's header, **Members** lists who works on it, each with a role chip (lead, analyst,
+reviewer). A lead can **Grant** a role to a Subject id and **Revoke** a member; an Investigation always keeps at least one
+lead, so revoking or demoting the last one is refused and the panel says so. Everyone else sees the list without the
+controls. If you are not a member, the list is not shown at all.
+
+**Drafts.** **Drafts** is your own working copy: **Fork a Draft** (one live Draft per person, up to 50 open in a Space),
+then use **Working Set** to see its size, **Conflicts** to see what a rebase would do, **Rebase** to move it onto the
+Investigation's current head (steps that were superseded or blocked are dropped, and the panel names them), **Promote** to
+apply its steps to the Investigation, or **Discard**. A Draft shows a state badge (open, hibernated) and how many steps the
+Investigation has moved since you forked. A promote that contains a sensitive expand is **held for four-eyes approval**: a
+different person approves it under Oversight, and nothing is applied until then.
+
 ### 9.4 Working Set and rows
 The **Working Set rows** table lists entities, links or exclusions with paging; it states if it is truncated and at
 which step. **Coverage** shows how much of the world your steps actually looked at.

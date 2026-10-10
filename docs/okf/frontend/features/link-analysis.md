@@ -942,6 +942,13 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   `publish.postgres` and Risk Score evidence use): several classes on one computed column resolve strictest-wins
   (masked if any input's type is masked), and untraceable lineage of a masked class masks every id (fail closed).
   The panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
+  **Members and Drafts panels** (`link-analysis-members.component`, `link-analysis-drafts.component`, 2026-10-10,
+  `LA-UI-MEMBERS-DRAFTS-1`): Members reads `GET …/members` and a lead grants/revokes over `POST …/members[/revoke]`
+  (`you` decides whether the controls show; a 404 reads as "not available to you"; a 422 is the last-lead refusal).
+  Drafts reads `GET …/drafts` and drives fork, `working-set`, `conflicts`, `rebase` (confirms exactly the conflicts the
+  report lists as needing confirmation), `promote` (`expectHead` = the Draft's base step plus its `behind`; a 202 is a
+  four-eyes hold, no `(promoted)` emit) and `discard`; the 50-open-Drafts and one-live-Draft 409s get readable text.
+  Draft ops (appending steps to a Draft) are not surfaced here.
   **Oversight surface** (`link-analysis-oversight.component`, 2026-10-03, `LA-SPA-OWED-SURFACES-1` slice): lists
   `GET …/log`'s `pending[]` — each request's requester, the thresholds it crossed (`sensitivity.exceeded` and the
   Space's `fourEyes*Above`) and its status; a holder of `canApproveLinkExpansions` gets **Approve / Deny** (optional
