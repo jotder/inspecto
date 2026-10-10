@@ -42,8 +42,11 @@ import {
 import { InvestigationCompareOpComponent } from './investigation-compare-op.component';
 import { InvestigationWindowOpComponent } from './investigation-window-op.component';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
+import { LinkAnalysisReferencesComponent } from './link-analysis-references.component';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
+import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
+import { LinkAnalysisMembersComponent } from './link-analysis-members.component';
 import { LinkAnalysisInvestigationCaseComponent } from './link-analysis-investigation-case.component';
 import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
@@ -79,9 +82,12 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         InvestigationSnapshotOpComponent,
         InvestigationCompareOpComponent,
         LinkAnalysisDossierComponent,
+        LinkAnalysisDraftsComponent,
+        LinkAnalysisReferencesComponent,
         LinkAnalysisEntityListsComponent,
         LinkAnalysisIdentitiesComponent,
         LinkAnalysisInvestigationCaseComponent,
+        LinkAnalysisMembersComponent,
         LinkAnalysisOversightComponent,
         LinkAnalysisTemplateMeasuresComponent,
         LinkAnalysisValueMeasuresComponent,

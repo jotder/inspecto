@@ -11,7 +11,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * The on-disk layout of an Investigation's records ({@code <audit root>/investigations/<id>/...}), as {@code SnapshotStore} wrote it
+ * The on-disk layout of an Investigation's records ({@code <write root>/audit/snapshots/investigations/<id>/...}), as {@code SnapshotStore} wrote it
  * (LA-10, decision D-E2) before the {@link InvestigationStore} port existed. An implementation detail of
  * {@link FsInvestigationStore}: nothing else may name it. Every method is the unchanged code it was, so each byte on disk is too.
  *

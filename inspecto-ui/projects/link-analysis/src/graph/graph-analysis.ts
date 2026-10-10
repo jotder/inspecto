@@ -65,7 +65,7 @@ export function configureGraphLimits(
  * which is slow only because it calls it (decision D-S3, operator 2026-09-22).
  *
  * 🔴 **Corrected 2026-09-23.** This was applied to suspicion score alone, on the plan's §1.7 claim that
- * "25 of 27 algorithms stay under 60 ms at 1 999 nodes" with suspicion score the sole outlier. That claim
+ * "25 of 27 algorithms stay under 60 ms at 1 999 nodes" (the count then; the server catalogue now lists 28) with suspicion score the sole outlier. That claim
  * was wrong: betweenness had never been isolated, and its cost hid inside the blend. Measured per
  * component at 2 000 nodes — **betweenness 9 757 ms**, pageRank 61, kCore 60, triangleCount 6,
  * degreeCentrality 2. The blend is betweenness plus noise. ⛔ So the cap had been guarding the CALLER

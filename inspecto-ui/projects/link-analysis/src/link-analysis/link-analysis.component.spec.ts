@@ -289,6 +289,21 @@ describe('LinkAnalysisComponent', () => {
         expect(infoSpy).toHaveBeenCalled();
     });
 
+    it('opens the Investigation named by ?investigation= (the Alerts deep link, DR-U9)', async () => {
+        const { fixture } = create({ queryParams: { investigation: 'case-v' } });
+        const adopt = vi.spyOn(fixture.componentInstance.investigation, 'adopt').mockResolvedValue(true);
+        fixture.detectChanges();
+        expect(adopt).toHaveBeenCalledWith('case-v');
+        expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
+    });
+
+    it('opens no Investigation without ?investigation=', async () => {
+        const { fixture } = create({});
+        const adopt = vi.spyOn(fixture.componentInstance.investigation, 'adopt').mockResolvedValue(true);
+        fixture.detectChanges();
+        expect(adopt).not.toHaveBeenCalled();
+    });
+
     // Analysis-toolbox logic (shortest path, explain, centrality, communities, all-paths, components,
     // patterns, tool badges) lives in LinkAnalysisToolboxComponent — see its own spec.
 

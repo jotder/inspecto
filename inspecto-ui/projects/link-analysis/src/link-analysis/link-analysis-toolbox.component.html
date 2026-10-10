@@ -356,6 +356,16 @@
                                 [allowed]="canRunOnServer()"
                             />
                         }
+                        @case ('server-algorithms') {
+                            <inspecto-link-analysis-server-algorithms
+                                [investigationId]="investigationId()"
+                                [investigationOpen]="investigationOpen()"
+                                [allowed]="canRunOnServer()"
+                                [nodeOptions]="nodeOptions()"
+                                [serverIds]="serverIds()"
+                                (emphasisChange)="emphasisChange.emit($event)"
+                            />
+                        }
                         @case ('index-build') {
                             <inspecto-link-analysis-index-build [allowed]="canBuildIndex()" [mappings]="indexMappings()" />
                         }

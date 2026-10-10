@@ -182,6 +182,7 @@ import {
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoPageHeaderComponent } from '@inspecto/core/components/page-header.component';
@@ -249,6 +250,7 @@ function initialToolboxOpen(): boolean {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        LinkAnalysisModulesComponent,
         InspectoPageHeaderComponent,
         ChipComponent,
         FormsModule,
@@ -1028,6 +1030,12 @@ export class LinkAnalysisComponent implements OnInit {
         this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
         this.graphRuns.loadCatalogue(); // the footer's server ceiling; absent when the server cannot answer
         this.pendingPivot = this.pivotService.readIncoming(this.route);
+        // DR-U9: `?investigation=<id>` (the Alerts page's link from a fired Investigation rule) opens that Investigation.
+        const investigationId = this.route.snapshot.queryParamMap.get('investigation');
+        if (investigationId) {
+            this.openInvestigation();
+            void this.investigation.adopt(investigationId);
+        }
     }
 
     /** Try to find the pivoted-in record among the just-loaded graph's nodes; focus it if present,

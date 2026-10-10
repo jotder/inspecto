@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { convertToParamMap, provideRouter } from '@angular/router';
+import { convertToParamMap, provideRouter, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
@@ -259,6 +259,22 @@ describe('AlertsComponent ack / resolve', () => {
         expect(names(c, STORED)).toEqual(['What happened', `Acknowledge alert ${title}`, `Resolve alert ${title}`]);
         expect(names(c, { ...STORED, state: 'ACKNOWLEDGED' })).toEqual(['What happened', `Resolve alert ${title}`]);
         expect(names(c, { ...STORED, state: 'RESOLVED' })).toEqual(['What happened']);
+    });
+
+    it('offers Open Investigation only for a rule that watches one, deep-linking to it (DR-U9)', async () => {
+        const invRule = { ...RULE, name: 'smurfs', investigation: 'case-v', relation: 'entities', measure: 'count' };
+        const invFired = { ...FIRED, rule: 'smurfs', pipeline: 'case-v' };
+        const { fixture } = await create({ rules: () => of([RULE, invRule]), recent: () => of([FIRED, invFired]) });
+        const c = fixture.componentInstance;
+        expect(names(c, FIRED)).toEqual(['What happened']);
+        expect(names(c, invFired)).toEqual([
+            'What happened',
+            'Open Investigation case-v — it lists the breaching entities',
+        ]);
+        const nav = vi.spyOn((c as unknown as { router: Router }).router, 'navigate').mockResolvedValue(true);
+        const open = c.firedActions().find((x) => x.visible?.(invFired) && x.icon === 'heroicons_outline:share')!;
+        open.onClick(invFired);
+        expect(nav).toHaveBeenCalledWith(['/studio/link-analysis'], { queryParams: { investigation: 'case-v' } });
     });
 
     it('offers no work actions for an entry without an id', async () => {

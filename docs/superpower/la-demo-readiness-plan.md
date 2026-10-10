@@ -1,6 +1,6 @@
 # Link Analysis — demo readiness plan (defending the architecture page with the live application)
 
-**Status: DRAFT 2026-10-10 — requirements filed, nothing built.** Written after a five-way audit of
+**Status: IN FLIGHT 2026-10-10 — waves 1-4 BUILT and pushed (`27fdd6928`, `c137ae2c4`); open: `LA-UI-DRAFT-OPS-1`, the live la-showcase seed + smoke run + browser pass, the index staleness review (per-row notes in `docs/BACKLOG.md` §3.12).** Written after a five-way audit of
 [`okf/backend/modules/link-analysis.md`](../okf/backend/modules/link-analysis.md) (the claims) against the application
 on `origin/master` (code, the live API of the Enterprise demo bundle on :8096, and the real UI driven as Demo Users).
 Backlog rows: `LA-DEMO-SEED-1`, `LA-DEMO-DEFECTS-1`, `LA-DEMO-INDEX-1`, `LA-UI-MEMBERS-DRAFTS-1`,
@@ -17,6 +17,7 @@ This page lives in `docs/superpower/` while the work is in flight; when it ships
 | Where the seeded demo lives | **A new `la-showcase` Space Template** (the tracked `demo` Space is not edited); runtime state (Investigation, members, lists, Case, bound rule) comes from an idempotent seed script if no template mechanism exists |
 | Second approver | **`fm.manager`** holds Approve link expansions and is a reviewer on the seeded Investigation; `admin` keeps Reveal |
 | Alert authoring | **`fm.analyst` also holds Author Alert Rules** in the showcase (one persona can run the whole story) |
+| Alert content | **A fired standing-detection Alert stays aggregate-only** (rule, Measure, threshold, breach count, worst value) and links to its Investigation; entities are named only inside the Investigation under its own gates (operator 2026-10-10; row `LA-DETECT-ALERT-AGGREGATE-1`) |
 | Link index default | **ON by default, product-wide** (a Space with a fresh published index serves reads from it; otherwise the flat read with a closed `Reason`; explicit `false` still disables). Not the recommended option (the alternative was showcase-only); it needs the full reactor gate and a staleness review |
 | Demo variants | **la-app and Personal as launch configurations**; the Postgres store as a documented runbook step (no Docker automation) |
 
@@ -143,7 +144,7 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 | 0 | — | Smoke runner passes; modules ACTIVE; route inventory 75 | DR-T5, DR-T2 |
 | 1 | `fm.analyst` | *Follow the money* card → 170 nodes, 1,803 links; shortest path `SMURF-01`→`RELAY-01` via `MULE-HUB-01`; cut points = `MULE-HUB-01`; centrality `ACC-1008` | ready |
 | 2 | `fm.analyst` | Open the seeded Investigation; replay equal; append the next day's file; replay still equal, *Re-read* shows drift | DR-S1, DR-T8 |
-| 3 | `fm.analyst` | Value Measures pass-through: 5 entities breach (`SHELL-A` 1.08 … `MULE-HUB-01` 0.980) | DR-D4, DR-T6 |
+| 3 | `fm.analyst` | Value Measures pass-through: 13 accounts flagged on the shipped la-showcase data at default thresholds (`SHELL-A` 1.08, the two relays 0.985, `MULE-HUB-01` 0.979; the DR-T6 test pins these) | DR-D4, DR-T6 |
 | 4 | `fm.analyst` | Masking: Working Set shows tokens; `admin` Reveal is audited | DR-D2 |
 | 5 | `fm.analyst` + second approver | Expand the hub → pending; requester cannot approve; approver does | DR-S2, DR-S6 |
 | 6 | any | Dossier build/verify; tamper one hash → verify fails | ready |

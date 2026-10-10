@@ -16,5 +16,6 @@ describe('EntityListsPageComponent', () => {
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('h1')?.textContent).toContain('Entity Lists');
         expect(el.querySelector('inspecto-link-analysis-entity-lists')).toBeTruthy();
+        expect(el.querySelector('inspecto-link-analysis-identity')).toBeTruthy();
     }, 30_000);
 });

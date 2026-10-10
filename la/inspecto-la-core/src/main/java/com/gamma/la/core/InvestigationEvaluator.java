@@ -27,7 +27,7 @@ import java.util.TreeSet;
  * carries its SEALED read (the materialised rows, decision D-E3), so evaluating a log is a function of the log
  * alone and replays identically on any day, against any data.
  *
- * <p>The op semantics (plan §2.3), for the twelve ops shipped (the closed vocabulary is complete):
+ * <p>The op semantics (plan §2.3), for the fourteen ops shipped (the closed vocabulary is complete):
  * <ul>
  *   <li>{@code seed {ids, entityType?}} — admits each id at hop 0 as its own seed. An already-admitted id keeps
  *       its original provenance; an EXCLUDED id is re-admitted, because a later explicit analyst op wins.</li>

@@ -187,6 +187,11 @@ export class AlertsComponent implements OnInit {
      * state that allows the move (OPEN → Acknowledge + Resolve, ACKNOWLEDGED → Resolve). Resolve asks no
      * confirmation, mirroring the Incident lifecycle verbs. Computed so the array identity is stable.
      */
+    /** The Investigation an alert's rule watches (an Investigation rule fires with the Investigation as its scope). */
+    investigationOf(a: FiredAlert): string | null {
+        return this.rules().find((r) => r.name === a.rule)?.investigation ?? null;
+    }
+
     readonly firedActions = computed<InspectoRowAction<FiredAlert>[]>(() => {
         const actions: InspectoRowAction<FiredAlert>[] = [
             {
@@ -198,6 +203,18 @@ export class AlertsComponent implements OnInit {
                             label: a.rule,
                             pipelineId: a.pipeline,
                         } satisfies AiStatusData,
+                    }),
+            },
+            {
+                // DR-U9: the Alert carries the COUNT only (by design — an Alert is readable by people who are not members
+                // of the Investigation), so the breaching entities are read where the Investigation's own gates and
+                // masking apply: open it, and its Value Measures show who breached.
+                icon: 'heroicons_outline:share',
+                hint: (a) => `Open Investigation ${this.investigationOf(a)} — it lists the breaching entities`,
+                visible: (a) => !!this.investigationOf(a),
+                onClick: (a) =>
+                    void this.router.navigate(['/studio/link-analysis'], {
+                        queryParams: { investigation: this.investigationOf(a) },
                     }),
             },
         ];

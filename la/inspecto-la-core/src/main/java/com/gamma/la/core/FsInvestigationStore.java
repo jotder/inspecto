@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The filesystem {@link InvestigationStore}: a thin wrapper over the Investigation layout {@code FsInvestigationLayout} (moved out of {@code SnapshotStore})
- * ({@code <audit root>/investigations/<id>/...}) and {@link DraftStore}'s Draft log writer, so every byte written is exactly
+ * ({@code <write root>/audit/snapshots/investigations/<id>/...}) and {@link DraftStore}'s Draft log writer, so every byte written is exactly
  * what those wrote before the port existed (the sealed {@code workingSetHash}, the set file embedding its own hash,
  * {@code DraftStore.prefixHash} over the log lines).
  *

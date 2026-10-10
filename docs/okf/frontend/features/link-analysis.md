@@ -281,7 +281,12 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 * **An edge is a folded aggregate** (`GROUP BY`, carrying `count`), nodes are implied endpoints with no
   identity service, and **nothing is persisted server-side** — every call re-runs the aggregation. So
   🔴 **a saved view is not evidence**: reopened after the Dataset changed it silently shows a different graph.
-* **All 27 algorithms run in the browser, on the main thread.** The backend does SQL fold and filter only
+* **Every algorithm of the 28-entry server catalogue is reachable from the toolbox** (`LA-ALGO-UI-PARITY-1`, DR-U11/U12):
+  the *All algorithms (server)* group (`link-analysis-server-algorithms.component.ts`) builds its form from the
+  catalogue's parameter descriptors, reuses `LinkAnalysisServerRunComponent` and reads any answer by its result kind
+  (`graph-run-summary.ts`) - no per-algorithm panel. The footer's `link-analysis-modules.component.ts` filters
+  `GET /modules` to `geo-link` + `la-*`. The browser still runs the 21 with local code (the earlier "27" count was stale).
+  Older line follows: the algorithms run in the browser, on the main thread. The backend does SQL fold and filter only
   (`InvRoutes.java:36-39`, deliberate). Supported graph size is therefore bounded by one tab.
 * **Safety is narrowness:** identifiers must match `SAFE_IDENT` (`InvRoutes.java:61`), values bind as JDBC
   `?`; 503 without a write root, 404 unknown Dataset, 422 bad identifier.
@@ -942,6 +947,13 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   `publish.postgres` and Risk Score evidence use): several classes on one computed column resolve strictest-wins
   (masked if any input's type is masked), and untraceable lineage of a masked class masks every id (fail closed).
   The panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
+  **Members and Drafts panels** (`link-analysis-members.component`, `link-analysis-drafts.component`, 2026-10-10,
+  `LA-UI-MEMBERS-DRAFTS-1`): Members reads `GET …/members` and a lead grants/revokes over `POST …/members[/revoke]`
+  (`you` decides whether the controls show; a 404 reads as "not available to you"; a 422 is the last-lead refusal).
+  Drafts reads `GET …/drafts` and drives fork, `working-set`, `conflicts`, `rebase` (confirms exactly the conflicts the
+  report lists as needing confirmation), `promote` (`expectHead` = the Draft's base step plus its `behind`; a 202 is a
+  four-eyes hold, no `(promoted)` emit) and `discard`; the 50-open-Drafts and one-live-Draft 409s get readable text.
+  Draft ops (appending steps to a Draft) are not surfaced here.
   **Oversight surface** (`link-analysis-oversight.component`, 2026-10-03, `LA-SPA-OWED-SURFACES-1` slice): lists
   `GET …/log`'s `pending[]` — each request's requester, the thresholds it crossed (`sensitivity.exceeded` and the
   Space's `fourEyes*Above`) and its status; a holder of `canApproveLinkExpansions` gets **Approve / Deny** (optional
@@ -1974,3 +1986,10 @@ Already covered there (skip): LD refusal codes, `standing` binding, `canViewAs`,
 - `GET /inv/investigation-templates` -> `{templates:[{id,title,createdAt,dataset,investigation,parameters,ops}]}` (counts; a Personal host lists all); disable response `{rule,investigation,enabled:false,wasEnabled}`; PUT adds `replaced:true`, `standingDetection:"disabled: ..."`, 404 not bound, 409 armed rule edited out of band. Events `LINK_STANDING_DETECTION_DISABLED`, `LINK_INVESTIGATION_ALERT_RULE_EDITED {rule,investigationId,standingDetectionDropped}`.
 - `la.detect` is authored as `config/jobs/<name>.toon` `job:{name,type:la.detect,schedule:"<cron>"}`; Signal `la.detect.completed {job,fired,rules[]}`; `AlertAccess.evaluateInvestigationRules()` default = the full sweep. `RowScope.visibleAs` uses an inert package-private `SweepExchange`. Enable reads the ARMED rule (a stored copy hashes differently after the TOON number round-trip).
 - Gates cleared per new route: `CapabilityManifest`, `the la-api and geo-link manifests' `provides.routes``, `docs/api/openapi-v1.json`, `compliance/evidence/route-gating.md`, auth-gate baseline; `JobWritersTest` row for the PUT only; `ConfigWriteFunnelTest.WRITERS` / `DecisionRuleWritersTest` list `sealList` / `sealResolution` as fact-log readers (operator-approved 2026-09-30).
+
+## Evidence UI (DR-U6..U9 — as-built 2026-10-10)
+- **Dossier bundle**: `LinkAnalysisDossierComponent` has *Download sealed bundle* (`GET …/dossier/bundle` at the on-screen step, saved `<id>-bundle.json`) and *Verify a bundle…* (the uploaded file is POSTed WHOLE, never re-shaped: the seal covers all of it). Result wording: `sealIntact:false` = "edited after export"; `problems[]` is shown verbatim; a seal mismatch is a RESULT, not an error.
+- **References**: `LinkAnalysisReferencesComponent` (under the Dossier) lists/adds `…/references`; `url` is rendered as TEXT, never a link; no edit/delete (append-only by design).
+- **Compare**: the `compare` op through the Investigation tab hits the same `…/ops` route; checked live against a demo backend (activity mode, two windows) — answered with a sealed `comparison`.
+- **Identity Fact log**: `LinkAnalysisIdentityComponent` on the la-app Entity Lists page reads `GET /inv/entity-identities`; the server re-verifies the WHOLE chain on every read (`EntityFactLog.read`), so a successful read renders *Chain verified* + head seq/hash, a 500 renders *Chain NOT verified* and hides the stale head. Tail truncation is undetectable from the log alone (stated on screen). Import form → `POST /inv/entity-identities/import` (counts only).
+- **Alert → Investigation (DR-U9)**: DECISION — the Alert does NOT carry the breaching entity names. `la-live-detection-design` invariant 2 ("aggregate output only"; D-LD9 relies on it) holds: an Alert is readable by people outside the Investigation's gates, so names on it would bypass R3/PDP/membership even masked per Space. Instead the Alerts page offers *Open Investigation* for an Investigation rule's fired Alert (`?investigation=<id>` deep link, handled in `LinkAnalysisComponent.ngOnInit`), where Value Measures name them under the Investigation's own gates and masking. Reversing this needs the invariant changed first.

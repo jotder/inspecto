@@ -252,6 +252,21 @@ export interface LinkIndexList {
     indexes: LinkIndexSummary[];
 }
 
+/** The fields of `GET /modules` the Link Analysis modules view reads. `state` is e.g. ACTIVE / INERT / not-installed. */
+export interface ModuleView {
+    id: string;
+    title: string;
+    state: string;
+    buildId: string | null;
+    reasons?: string[];
+    enabledInSpace: boolean;
+}
+
+export interface ModulesReport {
+    hostBuildId: string;
+    modules: ModuleView[];
+}
+
 export interface GraphAlgorithmCatalogue {
     engine: string;
     algorithms: GraphAlgorithm[];
@@ -396,6 +411,11 @@ export class GraphRunsService {
     reloadIndexes(): void {
         this.indexes.set(null);
         this.loadIndexes();
+    }
+
+    /** `GET /modules`: the installed-module topology (read-only; any authenticated Subject). */
+    modules(): Observable<ModulesReport> {
+        return this.http.get<ModulesReport>(apiUrl('/modules'));
     }
 
     algorithms(): Observable<GraphAlgorithmCatalogue> {

@@ -133,7 +133,11 @@ condition*).
 * The server returns at most **2 000 links** (hard ceiling 20 000) and the projection is capped at **500 nodes**;
   analysis in the browser is capped at **2 000 nodes**. The footer prints the caps.
 * When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query, or use a server-side
-  tool (*Find paths (server)*, *Run on server* for patterns, the Measures panel).
+  tool (*Find paths (server)*, *Run on server* for patterns, the Measures panel). The Analysis tab's
+  **All algorithms (server)** group lists every algorithm the server offers (28), builds its form from the
+  server's parameter list, and runs it on the open Investigation's Working Set whatever its size; the answer is
+  summarised in words with *Highlight on canvas*. The footer's **Installed modules** lists the Link Analysis modules
+  and whether each is active, inert (with the reason), switched off in this Space, or not installed.
 * Very busy hub nodes are folded into a **super-node** so they do not hide everything else.
 * Above 20 links on the canvas, link labels are hidden (shown on hover or click) to keep the picture readable; *All link labels* in the Display menu overrides it.
 
@@ -271,6 +275,18 @@ seeds from the wider picture. Pressing *Seed* returns the canvas to the Working 
   and shows **drift** — what changed in the data since you did it.
 * **Re-order** steps creates a **fork**: a new Investigation showing its parent; the original stays untouched.
 
+**Members.** Under the Investigation's header, **Members** lists who works on it, each with a role chip (lead, analyst,
+reviewer). A lead can **Grant** a role to a Subject id and **Revoke** a member; an Investigation always keeps at least one
+lead, so revoking or demoting the last one is refused and the panel says so. Everyone else sees the list without the
+controls. If you are not a member, the list is not shown at all.
+
+**Drafts.** **Drafts** is your own working copy: **Fork a Draft** (one live Draft per person, up to 50 open in a Space),
+then use **Working Set** to see its size, **Conflicts** to see what a rebase would do, **Rebase** to move it onto the
+Investigation's current head (steps that were superseded or blocked are dropped, and the panel names them), **Promote** to
+apply its steps to the Investigation, or **Discard**. A Draft shows a state badge (open, hibernated) and how many steps the
+Investigation has moved since you forked. A promote that contains a sensitive expand is **held for four-eyes approval**: a
+different person approves it under Oversight, and nothing is applied until then.
+
 ### 9.4 Working Set and rows
 The **Working Set rows** table lists entities, links or exclusions with paging; it states if it is truncated and at
 which step. **Coverage** shows how much of the world your steps actually looked at.
@@ -280,6 +296,11 @@ Named lists of entities (watch lists, agent tills, accounts of interest) with ra
 expiry. A list can seed or exclude in bulk (*seedBy / excludeBy*); large lists may need a second approver.
 
 ### 9.6 Identity resolution
+The **Entity Lists** page also shows the **Identity Fact log**: its head (fact number and hash) and *Chain verified* —
+the server re-checks every link of the hash chain on each read, so a broken chain shows *Chain NOT verified* and nothing
+else. Cutting the end of a chain leaves a shorter valid chain, so note the head hash and compare it later. The same
+panel has the **mapping Dataset** import (Dataset, two columns, optional types, a reason); it reports counts only.
+
 **Identity resolution** panel: assert that two identifiers are the same entity (for example a phone number and a
 SIM), see a group's members and the assertions that joined them, retract one. Keys must be typed and normalised
 (`msisdn:+4477…`). A **mapping Dataset** can import many pairs at once. Inside an Investigation the **resolve** op
@@ -291,6 +312,10 @@ is conservative: if more than one type could claim a value, it stays unmatched a
 * **Measures** strip: entity count, link count, events, excluded count, deepest hop, links by kind.
 * **Watch this measure** creates an **Alert Rule** on an Investigation's Measure. It fires through the normal alert
   path and can open an Incident. It watches the sealed Working Set.
+* **A fired Alert names the Investigation, not the entities.** On the Alerts page, an Alert from an Investigation rule has
+  an *Open Investigation* action (it opens Link Analysis on that Investigation). The Alert carries the **count** only, by
+  design: an Alert is readable by people who are not members of the Investigation, so the breaching entities are read in
+  the Investigation (its Value Measures), where its access rules and masking apply.
 
 ### 9.8 Value Measures (whole-Dataset behaviour detectors)
 Choose a Dataset and column roles (value, time, link kind), a window (from/to, or **last N hours/days**, at most 31
@@ -317,6 +342,15 @@ reason, the exclusions, score tables, and a **SHA-256 manifest** over every stor
 *steps* (plain language) and *method* statements, or the full JSON. **Verify** checks a manifest against the store and
 reports anything **changed, missing or added**. Tampering is detectable.
 
+**Sealed bundle.** *Download sealed bundle* gives one JSON file to hand outside the system: the Dossier, the
+Investigation's references and a seal over both (ids masked as the Space masks them). *Verify a bundle…* uploads a file
+back: an edited file fails the **seal** ("edited after export"), and the server also checks the Dossier against the
+store as it is now. Adding a reference after export never breaks a bundle.
+
+**References** (below the Dossier) lists the Investigation's pointers to records in other systems (system, type, id,
+optional URL and label). They are shown as text, never opened, never trusted and they grant no access; they cannot be
+edited or deleted — add a new one to supersede a wrong one. Adding needs the Incident-management permission and the owner.
+
 ### 9.10 Templates
 **Save as template** turns an Investigation's method into a reusable recipe: seeds become parameters; your ad-hoc
 exclusions are **dropped** (they name specific entities) and the preview tells you what was dropped or generalised.
@@ -342,13 +376,13 @@ else sees "Not available to you". A Live Widget cannot be exported to another Sp
 
 ## 10. Worked examples (demo Space)
 
-**Find a money-mule ring.** Load `mule_layering_ring` (193 accounts). Toolbox → *Suspicion score* puts the relays
+**Find a money-mule ring.** Load `mule_layering_ring` (on the `la-showcase` Space Template: 112 accounts over the three landed days). Toolbox → *Suspicion score* puts the relays
 and the hub in the top decile. *Pattern match → Structuring (smurfing)* finds `MULE-HUB-01`: 96 in-band legs from 12
-payers. Value Measures → *Pass-through* flags 13 accounts (relays at ≈ 0.985); *Velocity* shows them forwarding within an
-hour. *Save this analysis → create a new Case from graph nodes*, tick the hub and relays.
+payers. Value Measures → *Pass-through* flags 13 accounts (the two relays at ≈ 0.985, the hub at 0.979, `SHELL-A` above 1); *Velocity* shows them forwarding within
+hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub). *Save this analysis → create a new Case from graph nodes*, tick the hub and relays.
 
 **Find the cash-out point.** Value Measures → *Cash-out concentration* with cash-out kind `cash_out`: `TILL-06` holds
-82 % of cash-out value from 8 payers. *Benefit-transfer* isolates `SKIMMER-01` (6 recipients).
+97 % of cash-out value from 8 payers (reproduced by `ControlApiLaShowcaseFiguresTest`). *Benefit-transfer* isolates `SKIMMER-01` (6 recipients).
 
 **Check for one person behind two identities.** Load `roaming_imsi_footprint` (212 subscribers). The panel notes
 *1 possible split identity*. In an Investigation open **Identity resolution**, assert the two identifiers, then **resolve**.

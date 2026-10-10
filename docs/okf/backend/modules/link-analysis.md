@@ -127,7 +127,7 @@ Design rules visible in the dependency graph:
 * **Ports point inward.** la-core defines `GraphEngine`, `GraphInput`, `DatasetProvider`, `CasePort`,
   `CollectorCoveragePort` and `InvestigationStoreProvider`; storage, geo-link and store-pg implement them. la-core
   never names an index class: `GraphInput.IndexRef` carries only primitives (version dir, seeds, estimates).
-* **The engine names no `la-*` class** (grep-true; LA route paths appear only as strings, and no named guard enforces it yet — `LA-DEMO-GUARDS-1`). The host reaches LA only through ServiceLoader SPIs it owns
+* **The engine names no `la-*` class** (grep-true; LA route paths appear only as strings, and enforced by `tools/check-engine-names-no-la.mjs`). The host reaches LA only through ServiceLoader SPIs it owns
   (`RouteModule`, `LinkIndexBuilder`, `InvestigationMeasureProbe`); absent jars degrade to
   `AbsentModuleRoutes` (503 `CAPABILITY_UNAVAILABLE`, "Professional edition and above").
 * **Entity Lists are not LA.** `/entity-lists/*` routes live in `features/inspecto-entity-list`; LA reads the same
@@ -141,8 +141,7 @@ Design rules visible in the dependency graph:
   (`sets/<step>.json`, the audit/replay record, not the evaluation input).
 * `InvestigationEvaluator` is a **pure fold** of the log. The apply switch handles 14 labels: `seed`, `seedBy`,
   `expand`, `exclude`, `excludeBy`, `hide`, `keep`, `threshold`, `annotate`, `window`, `resolve`, and the markers
-  `snapshot`, `compare`, `temporal`. An unknown op throws "not evaluable" (fail closed). ⚠ Its Javadoc still says
-  "twelve ops".
+  `snapshot`, `compare`, `temporal`. An unknown op throws "not evaluable" (fail closed).
 * **Sealed reads (D-E3).** `expand` stores the rows it read, `compare`/`temporal` store their findings with a
   fingerprint, so replay needs no Dataset and a Dataset change cannot rewrite history.
 * **Hashing.** State hash = `sha256(canonical(workingSet))`, recorded per log entry; the prefix hash
@@ -281,7 +280,7 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
 
 ## 6. HTTP surface (la-api, geo-link)
 
-18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **75 routes** (69 in la-api + 6 in geo-link;
+18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **75**<!--count:la-routes--> routes (**69**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 75 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -368,6 +367,5 @@ Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Pe
 * Per-key index lookup cost is linear in the key's degree; the frontier cap bounds key count, not hub cost.
 * `FsInvestigationStore` carries a self-declared TRANSITIONAL note: path-keyed Draft code still reaches into the
   directory; legacy `SnapshotStore` still exists in la-core.
-* Stale comments: evaluator "twelve ops"; FS layout path in Javadoc.
 * Entity List purposes (`allow | block | watch | exclusion`) are a free string in the fold; no enum enforces them
   in entity-store.

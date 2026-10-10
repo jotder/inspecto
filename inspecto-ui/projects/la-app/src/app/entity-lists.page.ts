@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { InvestigationSessionStore } from '@inspecto/link-analysis/link-analysis/link-analysis-investigation.store';
 import { LinkAnalysisEntityListsComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-entity-lists.component';
+import { LinkAnalysisIdentityComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-identity.component';
 
 /**
  * Entity Lists on their own page. The library renders them inside an Investigation; here there is no open
@@ -11,12 +12,13 @@ import { LinkAnalysisEntityListsComponent } from '@inspecto/link-analysis/link-a
     selector: 'la-app-entity-lists-page',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [LinkAnalysisEntityListsComponent],
+    imports: [LinkAnalysisEntityListsComponent, LinkAnalysisIdentityComponent],
     providers: [InvestigationSessionStore],
     template: `
         <section class="mx-auto flex w-full max-w-4xl flex-col gap-4 p-6" aria-labelledby="la-entity-lists-title">
             <h1 id="la-entity-lists-title" class="text-title m-0 font-semibold">Entity Lists</h1>
             <inspecto-link-analysis-entity-lists></inspecto-link-analysis-entity-lists>
+            <inspecto-link-analysis-identity></inspecto-link-analysis-identity>
         </section>
     `,
 })

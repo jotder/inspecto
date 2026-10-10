@@ -782,6 +782,79 @@ export interface InvestigationCaseLink {
     reason: string;
 }
 
+// ── Members and Drafts (`InvestigationMemberRoutes`, `DraftRoutes`) ───────────────────────────────────
+
+export type InvestigationRole = 'lead' | 'analyst' | 'reviewer';
+
+/** `GET|POST /inv/investigations/{id}/members[/revoke]` — the current roles, the history, and the caller's own role. */
+export interface InvestigationMembers {
+    investigationId: string;
+    owner: string | null;
+    members: { subject: string; role: InvestigationRole }[];
+    history: {
+        seq: number;
+        ts: string;
+        actor: string;
+        subject: string;
+        role: InvestigationRole;
+        op: 'grant' | 'revoke';
+    }[];
+    /** The caller's role; null when no Subject is attached. */
+    you: InvestigationRole | null;
+}
+
+export type DraftStateName = 'open' | 'hibernated' | 'discarded' | 'promoted';
+
+/** One Draft as `GET …/drafts[/{draftId}]` shows it. */
+export interface InvestigationDraft {
+    draftId: string;
+    investigationId: string;
+    actor: string;
+    createdAt: string;
+    baseStep: number;
+    state: DraftStateName;
+    expired?: boolean;
+    lastAccessAt?: string;
+    expiresAt?: string;
+    expiryWarning?: boolean;
+    steps: number;
+    headStep: number;
+    /** Main-log steps appended since the fork. */
+    behind: number;
+    stale: boolean;
+    pinWarning: boolean;
+}
+
+export interface InvestigationDraftList {
+    investigationId: string;
+    items: InvestigationDraft[];
+    total: number;
+}
+
+export interface DraftConflict {
+    step: number;
+    op: string;
+    kind: string;
+    detail: string;
+    requiresConfirm: boolean;
+    oldRows?: number;
+    newRows?: number;
+}
+
+/** `GET …/drafts/{draftId}/conflicts` — what a rebase onto the current head would do; writes nothing. */
+export interface DraftConflictReport {
+    draftId: string;
+    baseStep: number;
+    mainHead: number;
+    behind: number;
+    effectiveOps: number;
+    carried: number;
+    conflicts: DraftConflict[];
+}
+
+/** `POST …/drafts/{draftId}/promote` — applied to the main log, or HELD as a pending four-eyes request (202). */
+export type DraftPromoteResult = { status?: 'pending'; pending?: PendingExpansion } & Record<string, unknown>;
+
 // ── LA-12: the Dossier (`DossierRoutes`) ──────────────────────────────────────────────────────────────
 
 export interface DossierQuery {
@@ -864,6 +937,80 @@ export interface DossierVerifyResult {
     missing: string[];
     added: string[];
     contentChanged: string[];
+}
+
+/** `GET …/dossier/bundle` — D-6: one portable, SEALED document. Kept opaque: what is saved is exactly what the server
+ *  sent, and the verify route (not this type) is the arbiter of the seal. */
+export type DossierBundle = Record<string, unknown> & { format?: string; investigationId?: string };
+
+/** `POST …/dossier/bundle/verify`. A seal that does not match is a RESULT (`verified: false`), never an error. */
+export interface DossierBundleVerifyResult {
+    id: string;
+    verified: boolean;
+    /** The seal still matches the bundle's content — false means the file was edited after export. */
+    sealIntact: boolean;
+    /** `custody.manifestRoot` is the embedded Dossier manifest's own root. */
+    rootMatches: boolean;
+    /** The bundle's references are still the FIRST ones of the store. */
+    referencesIntact: boolean;
+    /** References added after export (null when not intact) — appending never breaks a bundle. */
+    referencesAddedSince: number | null;
+    problems: string[];
+    /** The Dossier manifest checked against the store now (same shape as `…/dossier/verify`). */
+    custody: Partial<DossierVerifyResult>;
+}
+
+/** One external reference (`GET …/references`): a pointer, never fetched, never trusted, granting nothing. */
+export interface InvestigationReference {
+    seq: number;
+    key: string;
+    system: string;
+    type: string;
+    id: string;
+    url?: string;
+    label?: string;
+    addedBy?: string | null;
+    addedAt?: string;
+    trusted: false;
+}
+
+export interface InvestigationReferences {
+    investigationId: string;
+    references: InvestigationReference[];
+    count: number;
+    max: number;
+    note: string;
+}
+
+export interface InvestigationReferenceRequest {
+    system: string;
+    type: string;
+    id: string;
+    url?: string;
+    label?: string;
+}
+
+/** `POST /inv/entity-identities/import` — bulk assertions from a mapping Dataset's two columns. */
+export interface IdentityImportRequest {
+    dataset: string;
+    aCol: string;
+    bCol: string;
+    aType?: string;
+    bType?: string;
+    reason: string;
+    limit?: number;
+}
+
+/** The import's answer: COUNTS only — no key is echoed. */
+export interface IdentityImportResult {
+    imported: number;
+    skipped: { alreadyAsserted: number; duplicate: number; empty: number; self: number };
+    rowsRead: number;
+    truncated: boolean;
+    dataset: string;
+    fingerprint: string;
+    atSeq: number;
+    headHash: string;
 }
 
 // ── LA-23: Investigation Template, Measures, Alert Rules ──────────────────────────────────────────────
@@ -1372,6 +1519,75 @@ export class InvService {
         return this.http.delete<InvestigationCaseLink>(invPath(id, 'case'));
     }
 
+    /** Members of an Investigation: the roles and the history. Any member reads; a non-member gets 404 (absence). */
+    investigationMembers(id: string): Observable<InvestigationMembers> {
+        return this.http.get<InvestigationMembers>(invPath(id, 'members'));
+    }
+
+    /** Grant (or change) a role — lead only. */
+    grantInvestigationMember(id: string, subject: string, role: InvestigationRole): Observable<InvestigationMembers> {
+        return this.http.post<InvestigationMembers>(invPath(id, 'members'), { subject, role });
+    }
+
+    /** Revoke a member — lead only; the last lead cannot be revoked (422). */
+    revokeInvestigationMember(id: string, subject: string): Observable<InvestigationMembers> {
+        return this.http.post<InvestigationMembers>(invPath(id, 'members/revoke'), { subject });
+    }
+
+    /** The caller's Drafts (a lead and a reviewer see all); `closed` adds discarded and promoted ones. */
+    investigationDrafts(id: string, closed = false): Observable<InvestigationDraftList> {
+        return this.http.get<InvestigationDraftList>(invPath(id, 'drafts'), {
+            params: toParams({ closed: closed ? 'true' : undefined }),
+        });
+    }
+
+    /** Fork a Draft at the head (or at `at`). One live Draft per member (409); a Space-wide cap (409). */
+    forkDraft(id: string, at?: number): Observable<InvestigationDraft> {
+        return this.http.post<InvestigationDraft>(invPath(id, 'drafts'), at === undefined ? {} : { at });
+    }
+
+    /** One relation page of a Draft's Working Set (the `total` is the true row count). */
+    draftWorkingSet(
+        id: string,
+        draftId: string,
+        of: WorkingSetRelationName,
+        limit = 1,
+    ): Observable<WorkingSetRelation> {
+        return this.http.get<WorkingSetRelation>(invPath(id, `drafts/${encodeURIComponent(draftId)}/working-set`), {
+            params: toParams({ of, limit }),
+        });
+    }
+
+    draftConflicts(id: string, draftId: string): Observable<DraftConflictReport> {
+        return this.http.get<DraftConflictReport>(invPath(id, `drafts/${encodeURIComponent(draftId)}/conflicts`));
+    }
+
+    /** Rebase onto the main head; `confirm` lists the superseded / blocked steps the caller accepts dropping. */
+    rebaseDraft(
+        id: string,
+        draftId: string,
+        confirm: number[],
+        expectHead: number,
+    ): Observable<Record<string, unknown>> {
+        return this.http.post<Record<string, unknown>>(invPath(id, `drafts/${encodeURIComponent(draftId)}/rebase`), {
+            confirm,
+            expectHead,
+        });
+    }
+
+    promoteDraft(id: string, draftId: string, expectHead: number): Observable<DraftPromoteResult> {
+        return this.http.post<DraftPromoteResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/promote`), {
+            expectHead,
+        });
+    }
+
+    discardDraft(id: string, draftId: string): Observable<{ discarded: boolean; alreadyDiscarded: boolean }> {
+        return this.http.post<{ discarded: boolean; alreadyDiscarded: boolean }>(
+            invPath(id, `drafts/${encodeURIComponent(draftId)}/discard`),
+            {},
+        );
+    }
+
     /** LA-12: the dossier as JSON (all three renderings included). Owner-only; audited server-side. */
     dossier(id: string, q: DossierQuery = {}): Observable<Dossier> {
         return this.http.get<Dossier>(invPath(id, 'dossier'), { params: dossierParams(q, 'json') });
@@ -1390,6 +1606,28 @@ export class InvService {
     /** LA-12: check a held manifest against the store as it is NOW. Persists nothing. */
     verifyDossier(id: string, manifest: unknown): Observable<DossierVerifyResult> {
         return this.http.post<DossierVerifyResult>(invPath(id, 'dossier/verify'), { manifest });
+    }
+
+    /** D-6: the sealed export bundle as JSON (masked per the Space; audited server-side). */
+    dossierBundle(id: string, q: DossierQuery = {}): Observable<DossierBundle> {
+        return this.http.get<DossierBundle>(invPath(id, 'dossier/bundle'), {
+            params: toParams({ at: q.at, snapshots: q.snapshots?.length ? q.snapshots.join(',') : undefined }),
+        });
+    }
+
+    /** D-6: check a held bundle — its seal, its manifest root, its references and the store's custody NOW. */
+    verifyDossierBundle(id: string, bundle: unknown): Observable<DossierBundleVerifyResult> {
+        return this.http.post<DossierBundleVerifyResult>(invPath(id, 'dossier/bundle/verify'), { bundle });
+    }
+
+    /** The Investigation's external references, in the order added (read gate: owner or Case member). */
+    investigationReferences(id: string): Observable<InvestigationReferences> {
+        return this.http.get<InvestigationReferences>(invPath(id, 'references'));
+    }
+
+    /** Append one reference (owner-only, Manage Incidents). Duplicate or full → 409. */
+    addInvestigationReference(id: string, req: InvestigationReferenceRequest): Observable<InvestigationReferences> {
+        return this.http.post<InvestigationReferences>(invPath(id, 'references'), req);
     }
 
     /** LA-23: save the effective log as a write-once template. The answer lists what was dropped/generalised. */
@@ -1514,6 +1752,11 @@ export class InvService {
     /** → 201. Self-assertion / untyped key / type not in force → 422. */
     assertIdentity(req: IdentityAssertRequest): Observable<IdentityAssertResult> {
         return this.http.post<IdentityAssertResult>(apiUrl('/inv/entity-identities'), req);
+    }
+
+    /** → 201 (new assertions) or 200 (nothing new). Refuses a sensitive Dataset (four-eyes bound) and over-limit reads. */
+    importIdentities(req: IdentityImportRequest): Observable<IdentityImportResult> {
+        return this.http.post<IdentityImportResult>(apiUrl('/inv/entity-identities/import'), req);
     }
 
     /** Unknown or already-retracted assertion → 409. */
