@@ -25,6 +25,18 @@ test('tamperManifest changes every 64-hex hash and keeps the rest', () => {
   assert.equal(t.n, 3);
 });
 
+test('tamperManifest flips the server form sha256:<64hex> and keeps the prefix', () => {
+  const h = 'sha256:' + 'a'.repeat(64);
+  const t = tamperManifest({ root: h, artefacts: [{ sha256: h }], content: { entities: h } });
+  assert.equal(t.root, 'sha256:0' + 'a'.repeat(63));
+  assert.notEqual(t.artefacts[0].sha256, h);
+  assert.notEqual(t.content.entities, h);
+});
+
+test('tamperManifest refuses a manifest with no hash to tamper', () => {
+  assert.throws(() => tamperManifest({ root: 'not-a-hash', n: 3 }), /no hash field/);
+});
+
 test('rateLimitVerdict needs a 429 and a bounded pass-through', () => {
   assert.equal(rateLimitVerdict([...Array(20).fill(200), ...Array(5).fill(429)]), null);
   assert.match(rateLimitVerdict(Array(25).fill(200)), /no 429/);

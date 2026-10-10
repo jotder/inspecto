@@ -6,6 +6,7 @@ offeringRole: optional
 bindingTime: boot
 absentMessage: "Geo map and link analysis are not installed in this bundle - they are provided by the optional inspecto-geo-link module (Professional edition and above)."
 provides:
+  features[1]: geoLink
   contracts[5]: CasePort,CollectorCoveragePort,DatasetProvider,LinkIndexBuilder,InvestigationMeasureProbe
   routes[6]: "GET /inv/investigations/([^/]+)/measures","GET /inv/investigations/([^/]+)/alert-rules","POST /inv/investigations/([^/]+)/alert-rules","POST /inv/investigations/([^/]+)/standing-detection","DELETE /inv/investigations/([^/]+)/standing-detection/([^/]+)","PUT /inv/investigations/([^/]+)/alert-rules/([^/]+)"
 requires:

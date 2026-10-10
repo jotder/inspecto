@@ -54,6 +54,12 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
  */
 public final class DraftRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     private static final int PIN_WARN_DAYS = IndexPins.PIN_WARN_DAYS;
     private final InvestigationRoutes investigations = new InvestigationRoutes();
 

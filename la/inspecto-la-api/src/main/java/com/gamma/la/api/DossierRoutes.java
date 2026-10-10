@@ -57,6 +57,12 @@ import java.util.function.UnaryOperator;
  */
 public final class DossierRoutes implements RouteModule {
 
+    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
     static final int MAX_STEPS = 5_000;
     static final int MAX_SNAPSHOTS = 20;
 
