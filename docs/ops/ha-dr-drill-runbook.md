@@ -165,11 +165,24 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
   the two processes and Postgres was never failed, so neither of the runbook's two RPO terms (replication lag,
   `spaces/` not yet rsync'd) could occur. The commit fence did its job in the one place it could be tested: no
   file was lost when the holder died mid-batch, and the survivor re-planned the same inbox.
-- **At-least-once, not exactly-once, across a kill.** In one of five mid-run kills 100 rows (one 100-row file)
-  were present twice. Most likely mechanism (NOT root-caused): the dead node committed that file's output and was
-  killed before moving the original out of the inbox; the survivor's dedup ledger is node-local, so it ingested
-  the file again. D1's pass criterion "no file processed twice (provenance)" is therefore not guaranteed on
-  `kill -9` while the dedup ledger is node-local DuckDB (a Postgres-backed ledger was not tried here).
+- **At-least-once, not exactly-once, across a kill — root-caused 2026-10-10 (`HA-KILL9-DOUBLE-INGEST-1`).** In one
+  of five mid-run kills 100 rows (one 100-row file, `i4-p2.csv`) were present twice. The mechanism is now proven from
+  the drill's own tree, not suspected: node-a had written `i4-p2_out.parquet` into ITS `database/` tree (09:52) and was
+  killed before the acknowledgement — the backup move out of the inbox and the processed marker, which
+  `finalizeSource` deliberately performs LAST. Node-a has no status row, no backup and no marker for that file. The
+  survivor found the file still in the shared inbox with no marker of its own and ingested it again, into ITS OWN
+  `database/` tree (09:53). The harness read both trees, so the file counted twice. It is **not** the dedup ledger:
+  `DbDedupLedger` only serves the windowed `transform.dedup` step. File-level dedup here is the processed marker
+  (PATH mode), which is node-local, and it is written after the output by design (an ack before the output is durable
+  would lose a file instead). Reproduced deterministically by `KillBeforeAckDuplicateTest`.
+  What decides whether the second write is a duplicate is **whether both writes land in the same output tree**:
+  a single-file batch writes `<stem>_out.<ext>` under the same partition path, so a re-ingest into a SHARED (or
+  already-synced) `database/` tree overwrites its own earlier output — idempotent. Two node-local trees (this drill) hold
+  two copies, and nothing in the product knows the first exists. A second, narrower hole exists even on shared
+  storage: a multi-file batch is named by its batch id, a hash of its members, so a survivor that re-plans a
+  different member set mints a different id and writes a second, differently named file. The paused-then-resumed
+  holder (lease expiry race) cannot commit — `CommitFence` refuses at both commit points — but it may leave
+  already-written outputs behind (written before the fence), which are overwrites under the same rule.
 - **No designed standby.** With two equal pollers the work was not shared evenly: node-b took every cycle in
   the steady-state minute. That looks like active/passive by luck of timing, not by design.
 
@@ -206,7 +219,10 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    credentials here, or fix the runbook example and make a node with no bootable Space not report ready.
 2. **A graceful stop does not release a held lease** (above) — restarting the holder costs the full TTL whenever
    a cycle is in flight.
-3. **At-least-once on `kill -9` with a node-local dedup ledger** (above).
+3. **At-least-once on `kill -9`** (above) — root-caused to the output-before-acknowledgement window with
+   node-local output trees; not the dedup ledger. Open decision: see `HA-KILL9-DOUBLE-INGEST-1` for the options.
+   **Contract until decided: failover delivery is at-least-once unless the output tree is shared or synced (then a
+   single-file batch is idempotent).**
 4. `GET /health/details` shows `live.runLease.run` UP on the survivor while the dead holder's lease row is still
    held — nothing surfaces "lease held by an owner that has stopped renewing", so an operator watching only
    `/health/details` sees no takeover wait.
