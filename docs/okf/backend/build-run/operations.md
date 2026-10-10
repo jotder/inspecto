@@ -57,6 +57,17 @@ and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_
   release when `VULN_DB_DIR` is unset or the scan exits non-zero. A dispatch dry run warns instead. ⚠ Until
   a snapshot is configured, no tag can be released from a hosted runner.
 
+**First real run (2026-10-10, snapshot taken 2026-10-10, 7190 Maven records, lock mode):** 36 unwaived
+HIGH/CRITICAL findings → **1** after the bumps. Moved (root `<dependencyManagement>` pins, so every module
+resolves one version; the asn `legacy-code` module, outside the root parent, pinned literally): jackson 2.x
+`jackson-core`/`jackson-databind` 2.17.1 + 2.21.3 → 2.21.7 · jackson 3.x `jackson-core`/`jackson-databind`/
+`jackson-module-blackbird` 3.0.4 → 3.2.3 · BouncyCastle `bcprov`/`bcpkix`/`bcutil` 1.78.1 → 1.85 · postgresql
+42.7.2 + 42.7.4 → 42.7.12 · `lz4-java` 1.10.1 → 1.11.4 · `commons-beanutils` 1.9.4 → 1.11.0 (pulls
+`commons-logging` 1.2 → 1.3.5). ⚠ The one remaining finding, `GHSA-642r-3gj9-2pj5` on `tools.jackson.core:jackson-core:3.2.3`,
+is a **withdrawn** duplicate of `GHSA-r7wm-3cxj-wff9` (fixed in 3.2.3) whose frozen `versions` list still names
+3.2.3 — `vuln-scan.mjs` does not yet honour the OSV `withdrawn` field. Open: teach the matcher to skip
+withdrawn records (operator decision; an agent edit to the guard was refused), or waive it with a date.
+
 **Snapshot refresh (scripted, operator-approved per run - decision 2026-10-10):** `tools/vuln-db-refresh.mjs`
 (Node built-ins only) fetches the OSV `Maven` export into `$VULN_DB_DIR` in the layout `tools/vuln-scan.mjs` reads.
 It **never touches the network without `--confirm`**.
