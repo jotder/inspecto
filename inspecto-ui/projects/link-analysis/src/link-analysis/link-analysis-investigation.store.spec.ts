@@ -88,6 +88,10 @@ function setup() {
         ),
         appendInvestigationOp: vi.fn(),
         undoInvestigation: vi.fn(),
+        draftLog: vi.fn((id: string, d: string) => of(structuredClone(logs[id + '/' + d]))),
+        draftReplay: vi.fn((id: string, d: string) => of({ workingSet: sets[id + '/' + d] })),
+        appendDraftOp: vi.fn(),
+        undoDraft: vi.fn(),
         reorderInvestigation: vi.fn(),
     };
     TestBed.configureTestingModule({ providers: [InvestigationSessionStore, { provide: InvService, useValue: inv }] });
@@ -168,6 +172,41 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(store.effectiveSteps()).toEqual([]);
         expect(store.canUndo()).toBe(false);
         expect(store.canvas()?.nodes).toEqual([]);
+    });
+
+    it('LA-UI-DRAFT-OPS-1: with a Draft as the working scope, steps and undo go to the Draft, never the main log', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        logs['inv-1/d-1'] = { header: header('inv-1'), entries: [], total: 0, truncated: false };
+        sets['inv-1/d-1'] = ws([]);
+        expect(await store.useDraft('d-1')).toBe(true);
+        expect(inv.draftLog).toHaveBeenCalledWith('inv-1', 'd-1');
+
+        inv.appendDraftOp.mockImplementation(() => {
+            logs['inv-1/d-1'].entries.push(entry(1, { op: 'seed', params: { ids: ['4471'] } }));
+            sets['inv-1/d-1'] = ws(['4471']);
+            return of(step(1, 'seed'));
+        });
+        expect(await store.apply({ op: 'seed', ids: ['4471'] })).toBe(true);
+        expect(inv.appendDraftOp).toHaveBeenCalledWith('inv-1', 'd-1', { op: 'seed', ids: ['4471'] });
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+        expect(store.canvas()?.nodes.map((n) => n.id)).toEqual([entityId('msisdn', '4471')]);
+
+        inv.undoDraft.mockImplementation(() => {
+            sets['inv-1/d-1'] = ws([]);
+            return of(step(2, 'undo'));
+        });
+        expect(await store.undo()).toBe(true);
+        expect(inv.undoDraft).toHaveBeenCalledWith('inv-1', 'd-1');
+        expect(inv.undoInvestigation).not.toHaveBeenCalled();
+        expect(store.canvas()?.nodes).toEqual([]);
+
+        // back to the main log; closing (e.g. re-open after promote) also leaves the Draft
+        expect(await store.useDraft(null)).toBe(true);
+        expect(store.activeDraftId()).toBeNull();
+        await store.useDraft('d-1');
+        store.close();
+        expect(store.activeDraftId()).toBeNull();
     });
 
     it('re-ordering FORKS: the fork is remembered with its parent and becomes the open Investigation', async () => {

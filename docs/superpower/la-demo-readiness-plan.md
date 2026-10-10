@@ -1,6 +1,6 @@
 # Link Analysis — demo readiness plan (defending the architecture page with the live application)
 
-**Status: IN FLIGHT 2026-10-10 — waves 1-4 BUILT and pushed (`27fdd6928`, `c137ae2c4`); open: `LA-UI-DRAFT-OPS-1`, the live la-showcase seed + smoke run + browser pass, the index staleness review (per-row notes in `docs/BACKLOG.md` §3.12).** Written after a five-way audit of
+**Status: IN FLIGHT 2026-10-10 — waves 1-4 BUILT and pushed (`27fdd6928`, `c137ae2c4`); open: the live la-showcase seed + smoke run + browser pass, the index staleness review (per-row notes in `docs/BACKLOG.md` §3.12).** Written after a five-way audit of
 [`okf/backend/modules/link-analysis.md`](../okf/backend/modules/link-analysis.md) (the claims) against the application
 on `origin/master` (code, the live API of the Enterprise demo bundle on :8096, and the real UI driven as Demo Users).
 Backlog rows: `LA-DEMO-SEED-1`, `LA-DEMO-DEFECTS-1`, `LA-DEMO-INDEX-1`, `LA-UI-MEMBERS-DRAFTS-1`,

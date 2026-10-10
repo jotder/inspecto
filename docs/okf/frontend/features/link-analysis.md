@@ -953,7 +953,12 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   Drafts reads `GET …/drafts` and drives fork, `working-set`, `conflicts`, `rebase` (confirms exactly the conflicts the
   report lists as needing confirmation), `promote` (`expectHead` = the Draft's base step plus its `behind`; a 202 is a
   four-eyes hold, no `(promoted)` emit) and `discard`; the 50-open-Drafts and one-live-Draft 409s get readable text.
-  Draft ops (appending steps to a Draft) are not surfaced here.
+  **Draft as the working scope** (`LA-UI-DRAFT-OPS-1`, 2026-10-10): "Work on this Draft" emits `(scope)`; the host calls
+  `InvestigationSessionStore.useDraft(draftId)`, after which `apply` / `undo` post to `…/drafts/{draftId}/ops` · `/undo` and
+  the log and canvas come from the Draft's `GET /log` · `GET /replay`; an info alert says steps go to the Draft. "Back to
+  the Investigation" (or discarding that Draft, or `close()` / re-open after promote) returns to the main log. ⚠ Replay
+  (`reread`) and re-order (fork) still act on the MAIN log while a Draft is the scope; the panel's own-step count refreshes
+  only on its next action.
   **Oversight surface** (`link-analysis-oversight.component`, 2026-10-03, `LA-SPA-OWED-SURFACES-1` slice): lists
   `GET …/log`'s `pending[]` — each request's requester, the thresholds it crossed (`sensitivity.exceeded` and the
   Space's `fourEyes*Above`) and its status; a holder of `canApproveLinkExpansions` gets **Approve / Deny** (optional

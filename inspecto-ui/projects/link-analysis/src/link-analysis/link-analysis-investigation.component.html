@@ -198,12 +198,20 @@
             <inspecto-link-analysis-members [investigationId]="h.id"></inspecto-link-analysis-members>
             <inspecto-link-analysis-drafts
                 [investigationId]="h.id"
+                [activeDraftId]="store.activeDraftId()"
+                (scope)="store.useDraft($event)"
                 (promoted)="store.open(h.id)"
             ></inspecto-link-analysis-drafts>
         } @else if (!store.busy()) {
             <button mat-stroked-button (click)="store.forget(store.activeId()!)">Forget this Investigation</button>
         }
 
+        @if (store.activeDraftId(); as draft) {
+            <inspecto-alert variant="info" title="Working on a Draft">
+                Steps and Undo go to Draft <code>{{ draft }}</code
+                >, not to the Investigation — promote it from Drafts.
+            </inspecto-alert>
+        }
         <p class="m-0 text-xs tabular-nums" aria-label="Working Set">
             <strong>Working Set:</strong> {{ counts().entities }} entities · {{ counts().links }} links ·
             {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
@@ -355,7 +363,9 @@
                                 </div>
                                 <div class="text-xs" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
                                 @if (readSuffix(e); as how) {
-                                    <div class="text-secondary text-[11px]" data-testid="step-read-source">{{ how }}</div>
+                                    <div class="text-secondary text-[11px]" data-testid="step-read-source">
+                                        {{ how }}
+                                    </div>
                                 }
                                 @if (e.params?.reason) {
                                     <div class="text-secondary text-xs">Reason: {{ e.params!.reason }}</div>
