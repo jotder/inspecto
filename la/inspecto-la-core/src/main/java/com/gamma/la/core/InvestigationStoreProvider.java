@@ -30,9 +30,11 @@ public interface InvestigationStoreProvider {
      * The store of one Space. {@code spaceId} names the Space (one schema per Space, D-IS8).
      *
      * {@code maxSetBytes} is the Space's per-set size limit ({@link WorkingSetSizeLimit}), read per write; the store enforces it on
-     * every write path that stores a set.
+     * every write path that stores a set. {@code maxInvestigationBytes} is the Space's per-Investigation total set budget
+     * ({@link InvestigationSetBudget}), likewise read per write.
      *
      * @throws IOException when the database cannot be reached or its schema cannot be created; the caller turns this into 503
      */
-    InvestigationStore open(String spaceId, Connection connection, java.util.function.LongSupplier maxSetBytes) throws IOException;
+    InvestigationStore open(String spaceId, Connection connection, java.util.function.LongSupplier maxSetBytes,
+                           java.util.function.LongSupplier maxInvestigationBytes) throws IOException;
 }

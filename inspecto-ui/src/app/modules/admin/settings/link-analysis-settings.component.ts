@@ -53,6 +53,11 @@ const DRAFT_FIELDS: { key: DraftKey; label: string; max: number; def: number; hi
 const SET_BYTES_MIN = 1024;
 const SET_BYTES_MAX = 1_073_741_824;
 const SET_BYTES_DEFAULT = 64 * 1024 * 1024;
+/** `SettingsRoutes` `maxInvestigationBytes`: 1 MiB..1 TiB, refused 422 outside; blank = 4 GiB. */
+const INV_BYTES_MIN = 1_048_576;
+const INV_BYTES_MAX = 1_099_511_627_776;
+const INV_BYTES_DEFAULT = 4 * 1024 * 1024 * 1024;
+const invBytesValidators = [Validators.min(INV_BYTES_MIN), Validators.max(INV_BYTES_MAX), Validators.pattern('\\d*')];
 const setBytesValidators = [Validators.min(SET_BYTES_MIN), Validators.max(SET_BYTES_MAX), Validators.pattern('\\d*')];
 const draftValidators = (max: number) => [Validators.min(1), Validators.max(max), Validators.pattern('\\d*')];
 
@@ -147,6 +152,31 @@ function expiryAfterHibernation(
                             }
                         </mat-form-field>
                     }
+                    @if (hasInvestigationBudget()) {
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Investigation total size budget (bytes)</mat-label>
+                            <input
+                                matInput
+                                type="number"
+                                [min]="invBytesMin"
+                                [max]="invBytesMax"
+                                formControlName="maxInvestigationBytes"
+                                [readonly]="!canEdit()"
+                                [placeholder]="'default ' + invBytesInForce()"
+                            />
+                            <mat-hint
+                                >In force: {{ invBytesInForce() / 1073741824 }} GiB ({{ invBytesInForce() }} bytes). A write
+                                that would take one Investigation's sealed Working Sets (main plus open Drafts) over the
+                                budget is refused with 413; fork a smaller Investigation or raise the budget.</mat-hint
+                            >
+                            @if (form.controls.maxInvestigationBytes.invalid) {
+                                <mat-error
+                                    >A whole number of bytes from {{ invBytesMin }} (1 MiB) to {{ invBytesMax }} (1 TiB),
+                                    or blank for the default (4 GiB).</mat-error
+                                >
+                            }
+                        </mat-form-field>
+                    }
                     <fieldset formGroupName="drafts" class="flex flex-col gap-3">
                         <legend class="text-sm font-semibold">Drafts</legend>
                         @for (d of draftFields; track d.key) {
@@ -207,6 +237,8 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly draftFields = DRAFT_FIELDS;
     readonly setBytesMin = SET_BYTES_MIN;
     readonly setBytesMax = SET_BYTES_MAX;
+    readonly invBytesMin = INV_BYTES_MIN;
+    readonly invBytesMax = INV_BYTES_MAX;
     readonly canEdit = computed(() => this.lens.canAuthorWorkbench());
     readonly loading = signal(true);
     readonly saving = signal(false);
@@ -217,6 +249,8 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     /** Shown only when the server reports the key (it always does since 2026-10-10). */
     readonly hasSetLimit = computed(() => this.served() !== null && 'maxSetBytes' in this.served()!);
     readonly setBytesInForce = computed(() => this.served()?.maxSetBytesInForce ?? SET_BYTES_DEFAULT);
+    readonly hasInvestigationBudget = computed(() => this.served() !== null && 'maxInvestigationBytes' in this.served()!);
+    readonly invBytesInForce = computed(() => this.served()?.maxInvestigationBytesInForce ?? INV_BYTES_DEFAULT);
 
     readonly form = new FormGroup({
         fourEyesBudgetAbove: new FormControl<number | null>(null, intOrBlank),
@@ -224,6 +258,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         mergedDistinctCap: new FormControl<number | null>(null, intOrBlank),
         seedByDistinctCap: new FormControl<number | null>(null, intOrBlank),
         maxSetBytes: new FormControl<number | null>(null, setBytesValidators),
+        maxInvestigationBytes: new FormControl<number | null>(null, invBytesValidators),
         drafts: new FormGroup(
             {
                 maxOpen: new FormControl<number | null>(null, draftValidators(1000)),
@@ -302,6 +337,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         if ('seedByDistinctCap' in served) body['seedByDistinctCap'] = num(v.seedByDistinctCap);
         else delete body['seedByDistinctCap'];
         if ('maxSetBytes' in served) body['maxSetBytes'] = num(v.maxSetBytes);
+        if ('maxInvestigationBytes' in served) body['maxInvestigationBytes'] = num(v.maxInvestigationBytes);
         // Blank keys are omitted (inherit); no stated key at all = no block.
         const drafts: Record<string, number> = {};
         for (const d of DRAFT_FIELDS) {
@@ -339,6 +375,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             mergedDistinctCap: s.mergedDistinctCap ?? null,
             seedByDistinctCap: s.seedByDistinctCap ?? null,
             maxSetBytes: s.maxSetBytes ?? null,
+            maxInvestigationBytes: s.maxInvestigationBytes ?? null,
             drafts: {
                 maxOpen: s.drafts?.maxOpen ?? null,
                 hibernateAfterMinutes: s.drafts?.hibernateAfterMinutes ?? null,

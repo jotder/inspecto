@@ -113,7 +113,7 @@ public final class InvestigationStores {
         String password = SecretResolver.resolve(first(System.getProperty(PASSWORD_PROPERTY), System.getProperty("inspecto.db.password")));
         try {
             return provider.open(spaceId(writeRoot), new InvestigationStoreProvider.Connection(url, user, password),
-                    WorkingSetSizeLimit.forRoot(writeRoot));
+                    WorkingSetSizeLimit.forRoot(writeRoot), InvestigationSetBudget.forRoot(writeRoot));
         } catch (IOException e) {
             throw unavailable("the Investigation database cannot be used: " + e.getMessage());
         }

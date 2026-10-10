@@ -40,6 +40,9 @@ abstract class InvestigationStoreContract {
     /** A new, empty store whose per-set size limit ({@link WorkingSetSizeLimit}) is {@code bytes}. */
     abstract InvestigationStore freshWithSetLimit(long bytes) throws Exception;
 
+    /** A new, empty store whose per-Investigation total set budget ({@link InvestigationSetBudget}) is {@code bytes}. */
+    abstract InvestigationStore freshWithInvestigationBudget(long bytes) throws Exception;
+
     private static InvestigationStore.Scope main(String id) {
         return InvestigationStore.Scope.main(id);
     }
@@ -737,6 +740,119 @@ abstract class InvestigationStoreContract {
         assertEquals(0, s.openDraftCount());
         assertEquals(Optional.empty(), s.closeDraft("c", d, java.time.Duration.ofDays(30), own -> "{}"),
                 "a conditional close of a closed Draft is not applicable");
+    }
+
+    // ── the per-Investigation total set budget (D-IS12 b) ───────────────────────────────────────────────
+
+    private static final long BUDGET = 3000;
+
+    private static void assertOverBudget(String inv, long held, org.junit.jupiter.api.function.Executable write) {
+        com.gamma.spi.auth.ApiException e = assertThrows(com.gamma.spi.auth.ApiException.class, write);
+        assertEquals(413, e.status);
+        assertEquals(com.gamma.spi.auth.ErrorCodes.PAYLOAD_TOO_LARGE, e.errorCode);
+        assertTrue(e.getMessage().contains("'" + inv + "'"), "names the Investigation: " + e.getMessage());
+        assertTrue(e.getMessage().contains("holds " + held + " bytes"), "states the current total: " + e.getMessage());
+        assertTrue(e.getMessage().contains(String.valueOf(BUDGET)), "states the budget: " + e.getMessage());
+        assertTrue(e.getMessage().contains("max_investigation_bytes"), "says how to raise it: " + e.getMessage());
+    }
+
+    /** An Investigation with the given main set sizes and a Draft (own steps after main) with the given own set sizes. */
+    private String budgeted(InvestigationStore s, String inv, long[] mainSets, long[] ownSets) throws Exception {
+        s.create(inv, "{}");
+        for (int i = 1; i <= mainSets.length; i++) s.append(main(inv), i - 1, i, line(i), setOf(mainSets[i - 1], false));
+        String d = DraftStore.newId();
+        s.createDraft(inv, d, draftHeader(d, "ann", mainSets.length), "ann", 99);
+        for (int k = 1; k <= ownSets.length; k++)
+            s.append(draft(inv, d), k - 1, mainSets.length + k, "{\"step\":" + (mainSets.length + k) + ",\"own\":true}", setOf(ownSets[k - 1], false));
+        return d;
+    }
+
+    @Test
+    void mainAppendIsHeldToTheInvestigationTotalExactlyAtTheBudgetPassesOneByteOverIsRefused() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(BUDGET);
+        s.create("a", "{}");
+        for (int i = 1; i <= 3; i++) s.append(main("a"), i - 1, i, line(i), setOf(1000, false));   // 3000 = the budget: passes
+        assertOverBudget("a", 3000, () -> s.append(main("a"), 3, 4, line(4), setOf(1, false)));
+        assertEquals(3, s.version(main("a")), "a refused set writes no log line");
+        assertTrue(s.set("a", 4).isEmpty(), "and stores no set");
+        assertTrue(s.header("a").isPresent());
+        s.create("b", "{}");   // the budget is per Investigation: a neighbour is unaffected
+        s.append(main("b"), 0, 1, line(1), setOf(1000, false));
+    }
+
+    @Test
+    void aMultibyteSetIsCountedInBytesAgainstTheTotal() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(BUDGET);
+        s.create("m", "{}");
+        s.append(main("m"), 0, 1, line(1), setOf(2000, true));   // 1000 chars, 2000 bytes
+        assertOverBudget("m", 2000, () -> s.append(main("m"), 1, 2, line(2), setOf(1001, false)));
+        s.append(main("m"), 1, 2, line(2), setOf(1000, false));
+    }
+
+    @Test
+    void liveDraftSetsCountTowardsTheTotalForBothMainAndDraftAppends() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(BUDGET);
+        String d = budgeted(s, "a", new long[] {1000}, new long[] {1000, 1000});   // 1000 main + 2000 draft = 3000
+        assertOverBudget("a", 3000, () -> s.append(draft("a", d), 2, 4, "{\"own\":4}", setOf(1, false)));
+        assertEquals(2, s.version(draft("a", d)), "a refused Draft append wrote nothing");
+        assertTrue(s.draftSet("a", d, 4).isEmpty());
+        assertOverBudget("a", 3000, () -> s.append(main("a"), 1, 2, line(2), setOf(1, false)));
+        assertEquals(1, s.version(main("a")));
+    }
+
+    @Test
+    void discardingADraftFreesItsSetsFromTheTotal() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(BUDGET);
+        String d = budgeted(s, "a", new long[] {1000}, new long[] {1000, 1000});
+        assertEquals(Optional.of(true), s.closeDraft("a", d, null, own -> "{}"));
+        s.append(main("a"), 1, 2, line(2), setOf(2000, false));   // 1000 + 2000 = 3000: the Draft's 2000 are gone
+        assertOverBudget("a", 3000, () -> s.append(main("a"), 2, 3, line(3), setOf(1, false)));
+    }
+
+    @Test
+    void promoteCountsTheSharedSetsOnceNeitherDoubledNorLost() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(BUDGET);
+        String d = budgeted(s, "p", new long[] {1000}, new long[] {1000, 1000});   // 3000 now
+        List<String> main = s.log(main("p")), own = s.log(draft("p", d));
+        String mh = DraftStore.prefixHash(main, 1), oh = DraftStore.prefixHash(own, own.size());
+        List<String> lines = List.of("{\"step\":2}", "{\"step\":3}");
+        List<String> over = new ArrayList<>();
+        over.add(null);
+        over.add(setOf(1001, false));   // net 3000 - 2000 + 1000 + 1001 = 3001
+        assertOverBudget("p", 3000, () -> s.promoteDraft("p", d, 1, mh, oh, lines, over, "{}"));
+        assertEquals(1, s.version(main("p")), "a refused promote left the main log as it was");
+        assertEquals(InvestigationStore.DraftState.OPEN, s.draftState("p", d), "and the Draft open");
+        assertEquals(setOf(1000, false), s.draftSet("p", d, 3).orElseThrow(), "and its sets in place");
+        List<String> shared = new ArrayList<>();
+        shared.add(null);
+        shared.add(null);   // net 3000 - 2000 + 2000 = 3000: passes
+        s.promoteDraft("p", d, 1, mh, oh, lines, shared, "{\"promoted\":true}");
+        assertEquals(3, s.version(main("p")));
+        assertOverBudget("p", 3000, () -> s.append(main("p"), 3, 4, line(4), setOf(1, false)));   // exactly 3000: not 1000 (lost), not 5000 (doubled)
+    }
+
+    @Test
+    void aRebaseReplacesTheDraftsSetsInTheTotalInsteadOfAddingToThem() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(BUDGET);
+        String d = budgeted(s, "r", new long[] {1000}, new long[] {1000, 1000});   // 3000 now
+        List<String> main = s.log(main("r")), own = s.log(draft("r", d));
+        String mh = DraftStore.prefixHash(main, 1), oh = DraftStore.prefixHash(own, own.size());
+        assertOverBudget("r", 3000, () -> s.replaceDraft("r", d, 1, mh, oh, "{\"new\":1}", List.of("{\"step\":2}"), List.of(setOf(2001, false)), List.of(2)));
+        assertEquals(own, s.log(draft("r", d)), "a refused swap changed nothing");
+        s.replaceDraft("r", d, 1, mh, oh, "{\"new\":1}", List.of("{\"step\":2}"), List.of(setOf(2000, false)), List.of(2));   // net 1000 + 2000
+        assertOverBudget("r", 3000, () -> s.append(main("r"), 1, 2, line(2), setOf(1, false)));   // exactly 3000: the old 2000 were replaced
+    }
+
+    @Test
+    void createForkIsHeldToTheBudgetAndSeedsTheTotal() throws Exception {
+        InvestigationStore s = freshWithInvestigationBudget(BUDGET);
+        com.gamma.spi.auth.ApiException e = assertThrows(com.gamma.spi.auth.ApiException.class,
+                () -> s.createFork("f", "{}", List.of(line(1), line(2)), List.of(setOf(1500, false), setOf(1501, false))));
+        assertEquals(413, e.status);
+        assertTrue(e.getMessage().contains("max_investigation_bytes"), e.getMessage());
+        assertTrue(s.header("f").isEmpty(), "not even the header of a refused fork exists");
+        assertTrue(s.createFork("f", "{}", List.of(line(1), line(2)), List.of(setOf(1500, false), setOf(1500, false))));
+        assertOverBudget("f", 3000, () -> s.append(main("f"), 2, 3, line(3), setOf(1, false)));
     }
 
     private static String sha256(byte[] b) throws Exception {

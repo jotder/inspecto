@@ -37,7 +37,8 @@ class InvestigationStoresTest {
         @Override public String backend() { return "db"; }
 
         @Override
-        public InvestigationStore open(String spaceId, Connection c, java.util.function.LongSupplier maxSetBytes) throws IOException {
+        public InvestigationStore open(String spaceId, Connection c, java.util.function.LongSupplier maxSetBytes,
+                                       java.util.function.LongSupplier maxInvestigationBytes) throws IOException {
             if (failWith != null) throw failWith;
             space = spaceId;
             connection = c;

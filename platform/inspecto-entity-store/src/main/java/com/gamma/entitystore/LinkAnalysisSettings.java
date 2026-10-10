@@ -47,7 +47,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
                                    Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
-                                   Integer maxSetBytes) {
+                                   Integer maxSetBytes, Long maxInvestigationBytes) {
 
     /**
      * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
@@ -141,7 +141,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     public static final String FILE = "link-analysis.toon";
-    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null);
+    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -165,6 +165,14 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     /** The per-set size limit in force, in bytes: the stated one, else {@link #DEFAULT_MAX_SET_BYTES}. */
     public int effectiveMaxSetBytes() {
         return maxSetBytes != null ? maxSetBytes : DEFAULT_MAX_SET_BYTES;
+    }
+
+    /** The shipped default of {@code max_investigation_bytes}: 4 GiB of sealed Working Set text per Investigation (main + live Drafts). */
+    public static final long DEFAULT_MAX_INVESTIGATION_BYTES = 4L * 1024 * 1024 * 1024;
+
+    /** The per-Investigation total set budget in force, in bytes: the stated one, else {@link #DEFAULT_MAX_INVESTIGATION_BYTES}. */
+    public long effectiveMaxInvestigationBytes() {
+        return maxInvestigationBytes != null ? maxInvestigationBytes : DEFAULT_MAX_INVESTIGATION_BYTES;
     }
 
     /** The graph-run knobs in force: the stated ones; a field never stated is {@code null} inside (the service's default). */
@@ -205,6 +213,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (mergedDistinctCap != null) m.put("merged_distinct_cap", mergedDistinctCap);
         if (seedByDistinctCap != null) m.put("seed_by_distinct_cap", seedByDistinctCap);
         if (maxSetBytes != null) m.put("max_set_bytes", maxSetBytes);
+        if (maxInvestigationBytes != null) m.put("max_investigation_bytes", maxInvestigationBytes);
         if (graphRun != null && !graphRun.isNone()) {
             Map<String, Object> g = new LinkedHashMap<>();
             if (graphRun.maxNodes() != null) g.put("max_nodes", graphRun.maxNodes());
@@ -249,7 +258,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
                     entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
                     optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")),
-                    optInt(m, "max_set_bytes"));
+                    optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"));
         } catch (Exception e) {
             return EMPTY;
         }
@@ -317,6 +326,17 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /** An absent, blank, unparseable or out-of-floor value reads as {@code null} = inherit the default. */
+    private static Long optLong(Map<String, Object> m, String key) {
+        String raw = ToonHelper.opt(m, key, "");
+        if (raw.isBlank()) return null;
+        try {
+            long v = Long.parseLong(raw.trim());
+            return v >= 1 ? v : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private static Integer optInt(Map<String, Object> m, String key) {
         String raw = ToonHelper.opt(m, key, "");
         if (raw.isBlank()) return null;

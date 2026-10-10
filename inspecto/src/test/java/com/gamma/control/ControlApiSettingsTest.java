@@ -347,6 +347,32 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** The per-Investigation total set budget: a per-Space setting, 1 MiB..1 TiB, default 4 GiB (operator 2026-10-10); beyond int range. */
+    @Test
+    void linkAnalysisMaxInvestigationBytesRoundTripsDefaultsAndIsRangeChecked(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String url = "/spaces/acme/settings/link-analysis";
+            JsonNode def = json(send(c.port, "GET", url, null));
+            assertTrue(def.get("maxInvestigationBytes").isNull(), "absent => inherit");
+            assertEquals(4_294_967_296L, def.get("maxInvestigationBytesInForce").asLong(), "the shipped default is 4 GiB");
+            HttpResponse<String> put = send(c.port, "PUT", url, "{\"maxInvestigationBytes\":8589934592}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("max_investigation_bytes: 8589934592"), toon);
+            JsonNode back = json(send(c.port, "GET", url, null));
+            assertEquals(8_589_934_592L, back.get("maxInvestigationBytes").asLong());
+            assertEquals(8_589_934_592L, back.get("maxInvestigationBytesInForce").asLong());
+            assertEquals(200, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":1048576}").statusCode(), "the floor passes");
+            assertEquals(200, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":1099511627776}").statusCode(), "the ceiling passes");
+            assertEquals(422, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":1048575}").statusCode(), "below 1 MiB");
+            assertEquals(422, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":1099511627777}").statusCode(), "above 1 TiB");
+            assertEquals(422, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":\"lots\"}").statusCode(), "not an integer");
+            assertEquals(200, send(c.port, "PUT", url, "{}").statusCode());
+            assertTrue(json(send(c.port, "GET", url, null)).get("maxInvestigationBytes").isNull(), "a save that omits it returns to inherit");
+        }
+    }
+
     /** D-4 step 6: the graph-run knobs are a nested block; absent = inherit, a stated block round-trips and a bad one is 422. */
     @Test
     void linkAnalysisGraphRunRoundTripsAndRefusesBadValues(@TempDir Path root) throws Exception {

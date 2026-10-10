@@ -61,10 +61,89 @@ public final class FsInvestigationStore implements InvestigationStore {
     private final FsInvestigationLayout snapshots;
 
     private final java.util.function.LongSupplier maxSetBytes;
+    private final java.util.function.LongSupplier maxInvestigationBytes;
 
     public FsInvestigationStore(Path writeRoot) {
         this.snapshots = new FsInvestigationLayout(writeRoot);
         this.maxSetBytes = WorkingSetSizeLimit.forRoot(writeRoot);
+        this.maxInvestigationBytes = InvestigationSetBudget.forRoot(writeRoot);
+    }
+
+    // -- the per-Investigation set budget: a counter, never a scan per write ---------------------------
+
+    /**
+     * {@code <investigation>/sets.bytes}: the total UTF-8 bytes of the Investigation's main sets plus its live Drafts' sets
+     * (see {@link InvestigationSetBudget}). A CACHE of what the {@code sets/} directories hold, kept only under the Investigation lock.
+     * Crash-safe and self-healing by ordering: it is DELETED before a mutation that changes the sets and rewritten (temp file + atomic
+     * move) after it succeeds, so a crash or a failure in between leaves NO counter, never a wrong one; an absent or unreadable counter
+     * is recomputed once from the directories ({@link #walkSets}) on the next write. An Investigation that predates the counter has
+     * none and is handled the same way.
+     */
+    static final String SET_BYTES = "sets.bytes";
+
+    private static long readCounter(Path inv) {
+        try {
+            long v = Long.parseLong(Files.readString(inv.resolve(SET_BYTES), StandardCharsets.UTF_8).trim());
+            return v >= 0 ? v : -1;
+        } catch (IOException | RuntimeException e) {
+            return -1;
+        }
+    }
+
+    private static void dropCounter(Path inv) throws IOException {
+        Files.deleteIfExists(inv.resolve(SET_BYTES));
+    }
+
+    /** Best effort: a counter that cannot be written is simply absent, and is recomputed on the next write. */
+    private static void writeCounter(Path inv, long total) {
+        Path tmp = inv.resolve(SET_BYTES + ".tmp");
+        try {
+            Files.writeString(tmp, Long.toString(total), StandardCharsets.UTF_8);
+            Files.move(tmp, inv.resolve(SET_BYTES), java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException ignored) {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException alsoIgnored) {
+                // nothing more to do
+            }
+        }
+    }
+
+    private static long dirBytes(Path setsDir) {
+        if (!Files.isDirectory(setsDir)) return 0;
+        long n = 0;
+        try (var files = Files.list(setsDir)) {
+            for (Path f : (Iterable<Path>) files::iterator)
+                if (f.getFileName().toString().endsWith(".json") && Files.isRegularFile(f)) n += Files.size(f);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return n;
+    }
+
+    /** The bytes of one Draft's own sets. */
+    private static long draftSetBytes(Path draftDir) {
+        return dirBytes(draftDir.resolve("sets"));
+    }
+
+    /** The one-off recomputation: main sets plus every Draft directory's sets (a closed Draft has none). */
+    private static long walkSets(Path inv) {
+        long n = dirBytes(inv.resolve("sets"));
+        Path drafts = DraftStore.draftsDir(inv);
+        if (!Files.isDirectory(drafts)) return n;
+        try (var dirs = Files.list(drafts)) {
+            for (Path d : (Iterable<Path>) dirs::iterator)
+                if (DraftStore.DRAFT_ID.matcher(d.getFileName().toString()).matches()) n += draftSetBytes(d);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return n;
+    }
+
+    /** The total in force: the counter, else (once) the walk. Caller holds the Investigation lock. */
+    private static long totalOf(Path inv) {
+        long c = readCounter(inv);
+        return c >= 0 ? c : walkSets(inv);
     }
 
     /** TRANSITIONAL (Draft vertical): one Investigation's directory. Not part of the port. */
@@ -113,8 +192,12 @@ public final class FsInvestigationStore implements InvestigationStore {
     public boolean createFork(String id, String headerJson, List<String> lines, List<String> sets) throws IOException {
         contained(id);
         WorkingSetSizeLimit.enforceAll(maxSetBytes, id, 1, sets);
+        long added = InvestigationSetBudget.bytes(sets);
+        InvestigationSetBudget.enforce(maxInvestigationBytes, id, 0, added);   // a new Investigation: nothing stored yet, nothing to race
         synchronized (monitor(investigationsRoot())) {
-            return snapshots.createFork(id, headerJson, lines, sets);
+            boolean made = snapshots.createFork(id, headerJson, lines, sets);
+            if (made) writeCounter(investigationDir(id), added);
+            return made;
         }
     }
 
@@ -165,8 +248,15 @@ public final class FsInvestigationStore implements InvestigationStore {
                     long actual = committedLines(dir.resolve("log.jsonl")).size();
                     if (actual != expectedVersion)
                         throw new InvestigationVersionConflictException(scope.investigationId(), expectedVersion, actual);
+                    long before = 0, added = InvestigationSetBudget.bytes(setJson);
+                    if (setJson != null) {
+                        before = totalOf(inv);
+                        InvestigationSetBudget.enforce(maxInvestigationBytes, scope.investigationId(), before, before + added);   // under the lock, before any write
+                        dropCounter(inv);
+                    }
                     if (scope.isDraft()) DraftStore.appendStep(dir, step, lineJson, setJson);
                     else snapshots.appendStep(scope.investigationId(), step, lineJson, setJson);
+                    if (setJson != null) writeCounter(inv, before + added);
                 }
             }
         }
@@ -435,7 +525,10 @@ public final class FsInvestigationStore implements InvestigationStore {
                     if (idleAtLeast != null && (DraftStore.isClosed(dir) || DraftLifecycle.idle(dir).compareTo(idleAtLeast) < 0))
                         return Optional.empty();
                     if (idleAtLeast != null && !Files.isRegularFile(dir.resolve(DraftStore.HEADER))) return Optional.empty();
+                    long counted = readCounter(inv), freed = counted >= 0 ? draftSetBytes(dir) : 0;
+                    if (counted >= 0) dropCounter(inv);
                     boolean first = DraftStore.markDiscarded(dir, marker.apply(committedLines(dir.resolve("log.jsonl"))));
+                    if (counted >= 0) writeCounter(inv, counted - freed);
                     DraftCheckpoints.forget(dir);
                     return Optional.of(first);
                 }
@@ -462,6 +555,14 @@ public final class FsInvestigationStore implements InvestigationStore {
                 Path log = invDir.resolve("log.jsonl");
                 long before = Files.isRegularFile(log) ? Files.size(log) : 0;
                 int from = main.size();
+                long total = totalOf(invDir), freed = draftSetBytes(draftDir), added = 0;
+                for (int i = 0; i < lines.size(); i++) {   // a null entry seals the Draft's own set as it is: same bytes, logically main's now
+                    Path ownSet = draftDir.resolve("sets").resolve((from + i + 1) + ".json");
+                    added += sets.get(i) != null ? InvestigationSetBudget.bytes(sets.get(i)) : (Files.isRegularFile(ownSet) ? Files.size(ownSet) : 0);
+                }
+                long after = total - freed + added;   // the Draft's sets are removed by this same promote
+                InvestigationSetBudget.enforce(maxInvestigationBytes, investigationId, total, after);   // before the intent file or any write
+                dropCounter(invDir);
                 // the intent first: a crash from here until the Draft is marked is finished or undone by recoverDrafts
                 Files.writeString(draftDir.resolve(PROMOTING), InvestigationEvaluator.CANONICAL.writeValueAsString(java.util.Map.of(
                         "from", from, "to", from + lines.size(), "linesHash", DraftStore.prefixHash(lines, lines.size()),
@@ -483,6 +584,7 @@ public final class FsInvestigationStore implements InvestigationStore {
                 }
                 Files.deleteIfExists(draftDir.resolve(PROMOTING));
                 DraftCheckpoints.forget(draftDir);
+                writeCounter(invDir, after);
             }
           }
         }
@@ -524,8 +626,12 @@ public final class FsInvestigationStore implements InvestigationStore {
                 List<String> own = committedLines(draftDir.resolve("log.jsonl"));
                 if (!DraftStore.prefixHash(own, own.size()).equals(expectedDraftLogHash))
                     throw new InvestigationVersionConflictException(investigationId, own.size(), own.size());
+                long total = totalOf(invDir), after = total - draftSetBytes(draftDir) + InvestigationSetBudget.bytes(sets);   // the old sets are replaced, not added to
+                InvestigationSetBudget.enforce(maxInvestigationBytes, investigationId, total, after);
+                dropCounter(invDir);
                 DraftStore.replaceRebased(draftDir, headerJson, lines, sets, setSteps);
                 DraftCheckpoints.forget(draftDir);
+                writeCounter(invDir, after);
             }
           }
         }
@@ -549,6 +655,7 @@ public final class FsInvestigationStore implements InvestigationStore {
                     int from = ((Number) intent.get("from")).intValue(), to = ((Number) intent.get("to")).intValue();
                     List<String> main = committedLines(invDir.resolve("log.jsonl"));
                     boolean landed = main.size() >= to && DraftStore.prefixHash(main.subList(from, to), to - from).equals(intent.get("linesHash"));
+                    dropCounter(invDir);   // the promote that wrote the intent died before it could rewrite the counter: recompute on the next write
                     if (landed) {   // every main step is there: the promote happened, only the Draft's marker is missing
                         DraftStore.markPromoted(draftDir, String.valueOf(intent.get("marker")));
                         DraftCheckpoints.forget(draftDir);

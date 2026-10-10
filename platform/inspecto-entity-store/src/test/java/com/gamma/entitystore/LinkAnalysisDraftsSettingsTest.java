@@ -31,7 +31,7 @@ class LinkAnalysisDraftsSettingsTest {
     @Test
     void aStatedBlockRoundTripsAndIsInForce(@TempDir Path dir) throws Exception {
         new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null,
-                new LinkAnalysisSettings.Drafts(7, 15, 3), null).write(dir.resolve(LinkAnalysisSettings.FILE));
+                new LinkAnalysisSettings.Drafts(7, 15, 3), null, null).write(dir.resolve(LinkAnalysisSettings.FILE));
         LinkAnalysisSettings.Drafts d = LinkAnalysisSettings.forRoot(dir).effectiveDrafts();
         assertEquals(7, d.maxOpenInForce());
         assertEquals(Duration.ofMinutes(15), d.hibernateAfterInForce());

@@ -1290,6 +1290,11 @@ public final class ConfigSpecs {
                         "The most sealed Working Set text one step may store (UTF-8 bytes, 1024..1073741824); a set above "
                                 + "it is refused with 413 PAYLOAD_TOO_LARGE, never truncated, on both the filesystem and the "
                                 + "database Investigation store; absent = 67108864 (64 MiB)."),
+                FieldSpec.of("max_investigation_bytes", "Maximum Investigation set total (bytes)", FieldType.LONG,
+                        "The most sealed Working Set text ONE Investigation may hold in total (its main sets plus the sets of its "
+                                + "live Drafts; UTF-8 bytes, 1048576..1099511627776); a write that would take the total over it is "
+                                + "refused with 413 PAYLOAD_TOO_LARGE, never truncated, on both the filesystem and the database "
+                                + "Investigation store; absent = 4294967296 (4 GiB)."),
                 FieldSpec.of("graph_run", "Graph run service", FieldType.MAP,
                         "The server-side graph-run service (D-4): {max_nodes, max_edges, timeout_ms} is the DEFAULT "
                                 + "budget of a run that states none (clamped to the server's hard ceilings, echoed by "
