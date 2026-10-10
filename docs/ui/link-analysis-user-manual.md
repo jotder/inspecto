@@ -376,13 +376,13 @@ else sees "Not available to you". A Live Widget cannot be exported to another Sp
 
 ## 10. Worked examples (demo Space)
 
-**Find a money-mule ring.** Load `mule_layering_ring` (193 accounts). Toolbox → *Suspicion score* puts the relays
+**Find a money-mule ring.** Load `mule_layering_ring` (on the `la-showcase` Space Template: 112 accounts over the three landed days). Toolbox → *Suspicion score* puts the relays
 and the hub in the top decile. *Pattern match → Structuring (smurfing)* finds `MULE-HUB-01`: 96 in-band legs from 12
-payers. Value Measures → *Pass-through* flags 13 accounts (relays at ≈ 0.985); *Velocity* shows them forwarding within an
-hour. *Save this analysis → create a new Case from graph nodes*, tick the hub and relays.
+payers. Value Measures → *Pass-through* flags 13 accounts (the two relays at ≈ 0.985, the hub at 0.979, `SHELL-A` above 1); *Velocity* shows them forwarding within
+hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub). *Save this analysis → create a new Case from graph nodes*, tick the hub and relays.
 
 **Find the cash-out point.** Value Measures → *Cash-out concentration* with cash-out kind `cash_out`: `TILL-06` holds
-82 % of cash-out value from 8 payers. *Benefit-transfer* isolates `SKIMMER-01` (6 recipients).
+97 % of cash-out value from 8 payers (reproduced by `ControlApiLaShowcaseFiguresTest`). *Benefit-transfer* isolates `SKIMMER-01` (6 recipients).
 
 **Check for one person behind two identities.** Load `roaming_imsi_footprint` (212 subscribers). The panel notes
 *1 possible split identity*. In an Investigation open **Identity resolution**, assert the two identifiers, then **resolve**.
