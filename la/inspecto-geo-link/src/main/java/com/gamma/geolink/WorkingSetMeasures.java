@@ -152,13 +152,32 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
         // parsed NOW: a rolling `last` window resolves against the sweep's clock (UTC), never the binding's
         ValueMeasures.Spec spec = ValueMeasures.parse(rule.valueMeasure(), true);
         ValueMeasures.Agents agents = ValueMeasures.agents(writeRoot, spec);   // read LIVE at this sweep
-        OptionalDouble value = OptionalDouble.of(ValueMeasures.forInvestigation(ds, relationSql, header, spec, agents)
-                .entities().size());
-        if (agents == null) return Reading.of(value);
-        // A3 (operator 2026-09-30): the list version in force when THIS sweep evaluated, recorded on the firing
-        return new Reading(value, Map.of("agentList", spec.agentList(), "agentListSeq", String.valueOf(agents.atSeq()),
-                "agentListHash", String.valueOf(agents.atHash())));
+        List<Map<String, Object>> breaching = ValueMeasures.forInvestigation(ds, relationSql, header, spec, agents)
+                .entities();
+        OptionalDouble value = OptionalDouble.of(breaching.size());
+        // LA-DETECT-ALERT-AGGREGATE-1 (invariant 2): aggregate breach facts only — never an entity id, name or alias
+        Map<String, String> evidence = new LinkedHashMap<>();
+        evidence.put("measure", spec.name());
+        evidence.put("threshold", ValueMeasures.label(spec));
+        evidence.put("breachCount", String.valueOf(breaching.size()));
+        String worstOf = WORST_OF.get(spec.name());
+        if (!breaching.isEmpty() && breaching.get(0).get(worstOf) instanceof Number n) {   // rows come worst first
+            evidence.put("worstOf", worstOf);
+            evidence.put("worstValue", String.valueOf(n.doubleValue()));
+        }
+        if (agents != null) {
+            // A3 (operator 2026-09-30): the list version in force when THIS sweep evaluated, recorded on the firing
+            evidence.put("agentList", spec.agentList());
+            evidence.put("agentListSeq", String.valueOf(agents.atSeq()));
+            evidence.put("agentListHash", String.valueOf(agents.atHash()));
+        }
+        return new Reading(value, evidence);
     }
+
+    /** Each alertable Measure's headline column — the one its breaching rows are ordered worst-first by. */
+    private static final Map<String, String> WORST_OF = Map.of("passThrough", "ratio", "velocity", "hours",
+            "timeToCashOut", "hours", "cashOutConcentration", "share", "structuring", "legs",
+            "benefitTransfer", "recipients");
 
     /** Best-effort audit of a sweep outcome (the LA-04 pattern): the sweep is the actor, and no entity id is ever named. */
     private static void audit(String type, String action, String principal, String rule, String investigation,

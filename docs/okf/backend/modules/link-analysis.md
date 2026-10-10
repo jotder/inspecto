@@ -331,7 +331,10 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
   `AlertService.evaluateInvestigationRules` → `WorkingSetMeasures` → `StandingDetection.decide`, which re-decides
   before every read (refusals `NOT_ENABLED`, `NO_OWNER`, `BINDING_CHANGED`, `DATASET_GONE`, `DATASET_NOT_SHARED`,
   `ROLE_SHARE_ONLY`, `NOT_LEAD`, `MASKING_TIGHTENED`, `POLICY_DENIED`, `UNDECIDABLE`). The sweep holds no capability
-  of its own; a breach fires an Alert.
+  of its own; a breach fires an Alert. The Alert's `evidence` carries the aggregate breach facts only
+  (`LA-DETECT-ALERT-AGGREGATE-1`): `measure`, `threshold` (the `ValueMeasures.label` line), `breachCount`, and
+  `worstOf` / `worstValue` (the Measure's headline column on its first, worst-ordered row). Never an entity id,
+  name or alias; entities are named only inside the Investigation.
 
 ## 8. Editions and packaging
 

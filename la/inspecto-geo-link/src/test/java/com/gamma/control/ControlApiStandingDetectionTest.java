@@ -183,6 +183,17 @@ class ControlApiStandingDetectionTest {
             JsonNode fired = ok(c, "/alerts/evaluate", "", null);
             assertEquals(1, fired.size(), fired.toString());
             assertFalse(fired.toString().contains("HUB"), "the Alert names no entity: " + fired);
+            // LA-DETECT-ALERT-AGGREGATE-1: the aggregate breach facts ride on the Alert — and nothing else
+            JsonNode ev = fired.get(0).get("evidence");
+            assertEquals("structuring", ev.get("measure").asText(), ev.toString());
+            assertTrue(ev.get("threshold").asText().contains("legs"), ev.toString());
+            assertEquals("1", ev.get("breachCount").asText());
+            assertEquals("legs", ev.get("worstOf").asText());
+            assertTrue(Double.parseDouble(ev.get("worstValue").asText()) >= 10, "at least minLegs: " + ev);
+            Set<String> keys = new java.util.HashSet<>();
+            ev.fieldNames().forEachRemaining(keys::add);
+            assertEquals(Set.of("measure", "threshold", "breachCount", "worstOf", "worstValue"), keys,
+                    "no entity field on the Alert");
             assertTrue(ok(c, ENABLE, enableBody("smurfs"), null).get("replaced").asBoolean(), "re-enable re-snapshots");
 
             List<Event> swept = seen.stream().filter(e -> LinkEventTypes.LINK_STANDING_DETECTION_SWEPT.equals(e.type())).toList();
