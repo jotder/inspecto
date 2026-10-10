@@ -159,7 +159,9 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   `spaces/demo` `orders_regional_recon` (operator, 2026-10-09): the `orders_enriched_rollup` pipeline now groups by
   `REGION, ORDER_DATE`, and `orders_dataset`, `orders_enriched_dataset` and `orders_rollup_dataset` all carry
   `dateField: ORDER_DATE`, so all three sides are dated.
-* **Open residuals** are tracked as `RECON-PERF-RESIDUALS-1` in [`BACKLOG.md`](../../../BACKLOG.md).
+* **Residuals closed** (`RECON-PERF-RESIDUALS-1`, closed 2026-10-10): the last item, the live browser drive, was done on the
+  demo Space — the Board loaded 50 of 4,000 rows with the spinner, paging and the URL offset worked, *Record run*
+  recorded the day, and a repeat answered `cached:true`. Nothing is open.
 
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §7): a **Reconciliation** compares **Datasets** on key columns

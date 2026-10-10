@@ -365,6 +365,7 @@ lane **S2** (another worktree, in parallel) = the pure peer / seasonal statistic
   **Reading of D-AD8 + §14 (the new-entity look-alike):** an entity's history starts at its **first bucket in the
   window** (any feature); from there an empty count/sum day is 0. Densifying from the window start gave a two-day-old
   entity 26 zero days and scored it `high` — the golden corpus caught it.
+  This reading is **CONFIRMED (operator, 2026-10-10)**.
 - **Golden corpus + mutations** (`AnomalyGoldenCorpusTest`): planted `spike`, `masked` are exactly the `high` set;
   look-alikes `heavy`, `flat`, `newbie`, `drop` stay `normal`. Red for the expected value: drop the 1-unit floor
   (`flat` → elevated); mean for median (`masked` median 713, a background entity enters the top 2); scored day kept at
