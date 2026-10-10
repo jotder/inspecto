@@ -99,6 +99,15 @@ describe('LinkAnalysisServerRunComponent', () => {
         expect(q('blocked-reason')!.textContent).toMatch(/Investigation/);
     });
 
+    it('DR-D3: with an Investigation open but the query graph drawn, it names the checkbox, not "open one"', () => {
+        const { q, fixture } = make({ investigationId: null });
+        fixture.componentRef.setInput('investigationOpen', true);
+        fixture.detectChanges();
+        const text = q('blocked-reason')!.textContent!;
+        expect(text).toMatch(/Show the query graph/);
+        expect(text).not.toMatch(/open or start an Investigation/);
+    });
+
     it('starts the run with the Investigation and the parameters - no log step, so the server reads the head', () => {
         const { click, runs, fixture } = make();
         fixture.componentRef.setInput('params', { minSize: 3 });
