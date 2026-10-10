@@ -378,7 +378,7 @@ person), the merged-traversal cap and the `seedBy` cap.
 * Nothing is silently dropped: truncation, unmatched values, unvalued rows and refusals are all stated.
 * Time-based tools read times in a stated zone (UTC for Measures); naive timestamps are assumed UTC.
 * The server-side path search works directly over a Dataset and is certified at about one million links (5-hop walk, warm p95 under
-  350 ms); above that a Space can switch on the edge index (Space setting `index.enabled`, off by default), measured to 100 million links.
+  350 ms); above that a Space can switch on the edge index (Space setting `index.enabled`, on by default since 2026-10-10; set it false to switch it off), measured to 100 million links.
 * An Alert on an Investigation watches its **sealed** Working Set, not live data.
 
 ## 13. Troubleshooting

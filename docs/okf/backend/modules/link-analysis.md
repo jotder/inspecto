@@ -238,7 +238,7 @@ raw id that masking hides is answered as a nonexistent node; `reveal` needs `can
 * **Reader** (`IndexReader`): one sealed `SqlSandbox` connection per request limited to the version directory,
   views over `read_parquet(... hive_partitioning)`, one key equality per side `UNION ALL`ed, **one hop per query**;
   idle pool of 4 per version, siblings evicted unless pinned. Parquet is the only persisted form — no `.duckdb` file.
-* **What reads from it** (`IndexedRead` gate in la-api: `index.enabled` (default false) + a matching published index
+* **What reads from it** (`IndexedRead` gate in la-api: `index.enabled` (default ON since 2026-10-10; only an explicit `false` disables) + a matching published index
   + staleness gate, else a closed fallback `Reason`): `recursive-paths` (`IndexedTraversal`, depth ≤ 2, frontier
   ≤ 20), neighbours, simple Investigation `expand` (byte-identical fingerprint to the flat read), temporal, and Graph
   Run with `input: "index"`. A response never mixes index and flat answers.

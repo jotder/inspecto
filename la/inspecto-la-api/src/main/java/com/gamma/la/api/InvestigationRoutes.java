@@ -797,6 +797,8 @@ public final class InvestigationRoutes implements RouteModule {
                 Map<String, Object> summary = new LinkedHashMap<>();   // the sealed rows stay out of the log view
                 for (String k : List.of("dataset", "readAt", "rowCount", "truncated", "fanOutCapped", "fingerprint"))
                     summary.put(k, r.get(k));
+                if (r.get("index") != null) summary.put("index", r.get("index"));          // which store answered: only when the index did
+                if (r.get("fallback") != null) summary.put("fallback", r.get("fallback"));   // ...or why the flat Dataset did
                 out.put("read", summary);
             }
             if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // ...and a diff's item lists

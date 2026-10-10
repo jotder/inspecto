@@ -477,6 +477,8 @@ final class GraphDossierBuilder {
                 Map<String, Object> read = new LinkedHashMap<>();
                 for (String k : List.of("dataset", "readAt", "query", "rowCount", "truncated", "fingerprint"))
                     read.put(k, r.get(k));
+                if (r.get("index") != null) read.put("index", r.get("index"));          // which store answered: only when the index did
+                if (r.get("fallback") != null) read.put("fallback", r.get("fallback"));   // ...or why the flat Dataset did
                 out.put("read", read);
             }
             if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // the full diff is under "comparisons"

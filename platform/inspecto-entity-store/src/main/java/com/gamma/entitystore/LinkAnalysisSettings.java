@@ -67,8 +67,8 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
     /**
      * The edge/node index's per-Space knobs (LA separation D-3 step 4; {@code index} in {@code link-analysis.toon}):
-     * {@code enabled} - whether reads may use an index (default OFF, D-3 Decision 8; nothing reads one yet, the flag lands
-     * first); {@code maxDiskBytes} - the build refuses an estimate above it (0 or unstated = no limit);
+     * {@code enabled} - whether reads may use an index (default ON since 2026-10-10; an explicit {@code false} disables; a read
+     * with no fresh published index still falls back to the flat Dataset); {@code maxDiskBytes} - the build refuses an estimate above it (0 or unstated = no limit);
      * {@code keepVersions} - published versions kept per index (default 2); {@code threads} / {@code queue} - the build
      * workers and waiting line. Every field is optional ({@code null} = the shipped default).
      */
@@ -82,9 +82,9 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             return enabled == null && maxDiskBytes == null && keepVersions == null && threads == null && queue == null;
         }
 
-        /** Whether reads may use an index: only an explicit {@code true}. */
+        /** Whether reads may use an index: ON unless explicitly {@code false} (operator 2026-10-10; a read still needs a fresh published index). */
         public boolean enabledInForce() {
-            return Boolean.TRUE.equals(enabled);
+            return !Boolean.FALSE.equals(enabled);
         }
 
         /** The disk budget in force in bytes; 0 = no limit. */
