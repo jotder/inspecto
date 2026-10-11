@@ -58,6 +58,15 @@ describe('SettingsComponent', () => {
         fixture.destroy();
     });
 
+    it('LA-UI-DRAFT-POLISH-1: describes everything the Link Analysis pane covers', () => {
+        const fixture = create();
+        const la = fixture.componentInstance.drawers.find((d) => /Four-eyes|four-eyes/.test(d.description ?? ''));
+        expect(la?.description).toContain('masking');
+        expect(la?.description).toContain('graph-run budgets');
+        expect(la?.description).toContain('Drafts');
+        fixture.destroy();
+    });
+
     it('binds the selection to the :section route param and navigates on select (R5)', () => {
         const params = new BehaviorSubject(convertToParamMap({ section: 'spaces' }));
         TestBed.configureTestingModule({

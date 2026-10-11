@@ -65,6 +65,7 @@ async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}
         rebaseDraft: vi.fn(() => of({})),
         promoteDraft: vi.fn(() => of({ promoted: true })),
         discardDraft: vi.fn(() => of({ discarded: true, alreadyDiscarded: false })),
+        draftLog: vi.fn(() => throwError(() => http(404, 'no log'))),
         ...overrides,
     };
     TestBed.configureTestingModule({
@@ -125,6 +126,23 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         f.detectChanges();
         expect(inv.investigationDrafts).toHaveBeenCalledTimes(2);
         expect(el.textContent).toContain('3 own step(s)');
+    });
+
+    it('LA-UI-DRAFT-POLISH-1: counts EFFECTIVE own steps (an undo and the op it undid fold away)', async () => {
+        const entries = [
+            { step: 3, kind: 'op', undoneBy: null },
+            { step: 4, kind: 'op', undoneBy: 5 },
+            { step: 5, kind: 'undo', undoes: 4, undoneBy: null },
+        ];
+        const draftLog = vi.fn(() => of({ entries, total: 3, truncated: false }));
+        const { el, inv } = await create({ draftLog });
+        expect(inv.draftLog).toHaveBeenCalledWith('inv-1', 'd-1');
+        expect(el.textContent).toContain('0 own step(s)');
+    });
+
+    it('LA-UI-DRAFT-POLISH-1: keeps the raw count when the Draft log cannot be read', async () => {
+        const { el } = await create();
+        expect(el.textContent).toContain('2 own step(s)');
     });
 
     it('forks a Draft', async () => {
@@ -204,6 +222,29 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         });
         await click(f, button(el, 'Promote'));
         expect(el.textContent).toContain('rebase this Draft onto the current head');
+    });
+
+    it('LA-UI-DRAFT-POLISH-1: words a promote refused for undone steps from the server reason', async () => {
+        const msg = 'must rebase: the draft holds undone steps - rebase it (which compacts them away), then promote';
+        const { f, el } = await create({ promoteDraft: vi.fn(() => throwError(() => http(409, msg))) });
+        await click(f, button(el, 'Promote'));
+        expect(el.textContent).toContain('The Draft holds undone steps');
+        expect(el.textContent).not.toContain('main log has moved on');
+    });
+
+    it('LA-UI-DRAFT-POLISH-1: words an expired index pin', async () => {
+        const msg = 'must rebase: the index version this draft pinned expired';
+        const { f, el } = await create({ promoteDraft: vi.fn(() => throwError(() => http(409, msg))) });
+        await click(f, button(el, 'Promote'));
+        expect(el.textContent).toContain('pinned has expired');
+    });
+
+    it('LA-UI-DRAFT-POLISH-1: falls back to a generic rebase wording for an unknown reason', async () => {
+        const { f, el } = await create({
+            promoteDraft: vi.fn(() => throwError(() => http(409, 'must rebase: something new'))),
+        });
+        await click(f, button(el, 'Promote'));
+        expect(el.textContent).toContain('must be rebased before it can be promoted');
     });
 
     it('discards a Draft', async () => {

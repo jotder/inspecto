@@ -167,7 +167,8 @@ export class SettingsComponent {
             id: 'link-analysis',
             title: 'Link Analysis',
             icon: 'heroicons_outline:share',
-            description: 'Four-eyes thresholds and traversal caps for Investigations.',
+            description:
+                'Investigations: four-eyes thresholds, traversal caps, masking, index, graph-run budgets, hub threshold and Drafts.',
             component: LinkAnalysisSettingsComponent,
         },
         {
