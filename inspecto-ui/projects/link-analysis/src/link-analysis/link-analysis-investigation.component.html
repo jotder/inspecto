@@ -345,7 +345,8 @@
         @if (store.lastOverride(); as o) {
             <p class="m-0 text-xs" role="status" data-testid="hub-override-recorded">
                 Override recorded at step {{ o.step }}: expanded through high-connectivity
-                {{ o.ids.slice(0, 5).join(', ') }}{{ o.ids.length > 5 ? ', …' : '' }} — sealed in the log, with your name.
+                {{ o.ids.slice(0, 5).join(', ') }}{{ o.ids.length > 5 ? ', …' : '' }} — sealed in the log, with your
+                name.
             </p>
         }
         @if (hubs().length) {
@@ -366,17 +367,21 @@
                     @for (e of hubs().slice(0, 50); track e.id) {
                         <li class="flex flex-wrap items-center gap-1">
                             <span class="font-mono">{{ e.id }}</span>
-                            <inspecto-chip variant="soft" tone="warning">{{ hubBadge(e.contacts) }}</inspecto-chip>
-                            <button
-                                mat-button
-                                type="button"
-                                class="ml-auto"
-                                [disabled]="store.busy() || store.chainRunning()"
-                                [attr.aria-label]="'Expand anyway from ' + e.id"
-                                (click)="expandAnyway(e.id)"
-                            >
-                                Expand anyway
-                            </button>
+                            <inspecto-chip variant="soft" tone="warning">{{
+                                hubBadge(e.contacts, e.id)
+                            }}</inspecto-chip>
+                            @if (!isOverridden(e.id)) {
+                                <button
+                                    mat-button
+                                    type="button"
+                                    class="ml-auto"
+                                    [disabled]="store.busy() || store.chainRunning()"
+                                    [attr.aria-label]="'Expand anyway from ' + e.id"
+                                    (click)="expandAnyway(e.id)"
+                                >
+                                    Expand anyway
+                                </button>
+                            }
                         </li>
                     }
                 </ul>
@@ -416,7 +421,7 @@
                 </div>
                 <div class="flex flex-wrap gap-1">
                     <button mat-stroked-button [disabled]="store.busy()" (click)="seed()">Seed</button>
-                    @if (selectedHubs().length && !includeHubs()) {
+                    @if (selectedHubs().length && !includeHubs() && !isOverridden(selectedHubs()[0])) {
                         <button
                             mat-stroked-button
                             data-testid="selected-expand-anyway"

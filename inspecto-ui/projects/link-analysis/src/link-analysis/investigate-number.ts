@@ -133,6 +133,9 @@ export function profileForDataset(datasetId: string | null | undefined): DomainP
     return (datasetId && DOMAIN_PROFILES.find((p) => p.investigate?.mapping.dataset === datasetId)?.id) || null;
 }
 
+const plural = (n: number, one: string, many = `${one}s`): string =>
+    `${n.toLocaleString('en')} ${n === 1 ? one : many}`;
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A day as the analyst reads it, in UTC: `29 Sep 2026`. */
@@ -152,8 +155,11 @@ export function windowLabel(p: DegreePresets, windowEnd?: string | null): string
  * runs for analysts). Identifiers are double-quoted with embedded quotes doubled.
  */
 export function latestTimeSql(sourceName: string, timeCol: string): string {
+    // Read as a zone-free STRING: `/db/query` serialises a naive TIMESTAMP as epoch ms converted in the HOST's zone
+    // (DuckDB's session TimeZone), so on an IST host the end came back 5.5 h early and the window dropped the last
+    // hours of links. The expand window reads a naive timestamp as UTC (no `timeColZone`); `latestTimeOf` does too.
     const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
-    return `SELECT MAX(${q(timeCol)}) AS latest FROM ${q(sourceName)}`;
+    return `SELECT strftime(MAX(${q(timeCol)}), '%Y-%m-%dT%H:%M:%S') AS latest FROM ${q(sourceName)}`;
 }
 
 /** A zone-less timestamp (a naive DuckDB TIMESTAMP) read as UTC, the Investigation's default zone. */
@@ -174,7 +180,7 @@ export function presetsSummary(p: DegreePresets, windowEnd?: string | null): str
     const parts: string[] = [];
     const w = windowLabel(p, windowEnd);
     if (w) parts.push(w);
-    if (p.minEvents != null) parts.push(`at least ${p.minEvents} events per link`);
+    if (p.minEvents != null) parts.push(`at least ${plural(p.minEvents, 'event')} per link`);
     if (p.maxFanOut != null) parts.push(`at most ${p.maxFanOut} links per entity`);
     if (p.budget != null) parts.push(`${p.budget.toLocaleString('en')} rows per degree`);
     return parts.length ? parts.join(', ') : 'the server defaults';
@@ -235,10 +241,39 @@ export function overrideSteps(entries: readonly InvestigationLogEntry[]): Set<nu
     return new Set(
         entries
             .filter(
-                (e) => e.kind === 'op' && e.op === 'expand' && e.undoneBy == null && (e.params?.expandHubs?.length ?? 0) > 0,
+                (e) =>
+                    e.kind === 'op' &&
+                    e.op === 'expand' &&
+                    e.undoneBy == null &&
+                    (e.params?.expandHubs?.length ?? 0) > 0,
             )
             .map((e) => e.step),
     );
+}
+
+/**
+ * The flagged entities an analyst override in effect expanded THROUGH, from the log: an expand step (not undone) that
+ * named them in `expandHubs` ("Expand anyway", also once a held request is approved and runs as a step), or that
+ * ticked `includeHubs` and named them among its ids. `flagged` = the Working Set's high-connectivity ids.
+ */
+export function overriddenHubs(entries: readonly InvestigationLogEntry[], flagged: ReadonlySet<string>): Set<string> {
+    const out = new Set<string>();
+    for (const e of entries) {
+        if (e.kind !== 'op' || e.op !== 'expand' || e.undoneBy != null) continue;
+        for (const id of e.params?.expandHubs ?? []) out.add(id);
+        if (e.params?.includeHubs) for (const id of e.params.ids ?? []) if (flagged.has(id)) out.add(id);
+    }
+    return out;
+}
+
+/** The hub threshold the latest expand in effect sealed (its rung arrives resolved in the log); null = none sealed. */
+export function sealedHubThreshold(entries: readonly InvestigationLogEntry[]): number | null {
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const e = entries[i];
+        if (e.kind === 'op' && e.op === 'expand' && e.undoneBy == null && typeof e.params?.hubThreshold === 'number')
+            return e.params.hubThreshold;
+    }
+    return null;
 }
 
 /**
@@ -249,8 +284,10 @@ export function hubContactsFromRows(rows: readonly Record<string, unknown>[]): M
     const out = new Map<string, number>();
     for (const r of rows) {
         const id = r['entityId'];
-        const c = r['contacts'];
-        if (typeof id === 'string' && typeof c === 'number') out.set(id, c);
+        // a count may arrive as a JSON string (a long serialised as text) — read it either way
+        const raw = r['contacts'];
+        const c = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
+        if (typeof id === 'string' && typeof c === 'number' && Number.isFinite(c)) out.set(id, c);
     }
     return out;
 }
@@ -293,6 +330,8 @@ export interface DegreeOutcome {
     decision?: 'approved' | 'denied';
     /** On a deny, the reason when one was given. */
     reason?: string;
+    /** "Expand anyway" through this flagged entity — an override, not a degree of the ladder. */
+    override?: string;
 }
 
 /** True while a held degree is still waiting for its four-eyes decision. */
@@ -323,7 +362,8 @@ export function reconcileApprovals(
         const p = o.awaitingApproval && !o.decision ? byId.get(o.awaitingApproval) : undefined;
         if (!p || p.status === 'pending') return o;
         changed = true;
-        if (p.status === 'denied') return { ...o, decision: 'denied' as const, ...(p.reason ? { reason: p.reason } : {}) };
+        if (p.status === 'denied')
+            return { ...o, decision: 'denied' as const, ...(p.reason ? { reason: p.reason } : {}) };
         const admitted = p.step != null ? (ws?.entities ?? []).filter((e) => e.admittedBy === p.step).length : 0;
         const hop = p.step != null ? admittedHop(ws, p.step) : null;
         return { ...o, decision: 'approved' as const, admitted, degree: hop ?? o.degree };
@@ -337,7 +377,10 @@ export function reconcileApprovals(
         const current = visible.length ? Math.max(...visible.map((e) => e.hop)) : 0;
         const named = p.params?.['ids'];
         const ids = Array.isArray(named) ? named.filter((v): v is string => typeof v === 'string') : [];
+        const hubs = p.params?.['expandHubs'];
+        const override = Array.isArray(hubs) && typeof hubs[0] === 'string' ? hubs[0] : undefined;
         next.push({
+            ...(override ? { override } : {}),
             degree: requestedDegree(ws, ids) ?? current + 1,
             admitted: 0,
             linksAdded: 0,
@@ -462,9 +505,6 @@ export function degreeOutcome(
     };
 }
 
-const plural = (n: number, one: string, many = `${one}s`): string =>
-    `${n.toLocaleString('en')} ${n === 1 ? one : many}`;
-
 const HUB_SOURCE: Record<'index' | 'flat', string> = {
     index: 'counted from the link index',
     flat: 'counted from the Dataset',
@@ -472,14 +512,19 @@ const HUB_SOURCE: Record<'index' | 'flat', string> = {
 
 /** One degree's result in plain language, truncation and the fan-out cap included. */
 export function degreeOutcomeMessage(o: DegreeOutcome): string {
+    // An override names the hub and the degree its contacts are admitted at — the same words held and approved, so it
+    // is never read as the ladder's own next degree.
+    const head = o.override
+        ? `Expand anyway through ${o.override} (admits at degree ${o.degree})`
+        : `Degree ${o.degree}`;
     if (o.decision === 'approved')
-        return `Degree ${o.degree}: approved (request ${o.awaitingApproval}) — ${
+        return `${head}: approved (request ${o.awaitingApproval}) — ${
             o.admitted ? `${plural(o.admitted, 'new entity', 'new entities')} admitted.` : 'nothing new was found.'
         }`;
     if (o.decision === 'denied')
-        return `Degree ${o.degree}: request ${o.awaitingApproval} was denied${o.reason ? ` (${o.reason})` : ''} — nothing was read.`;
+        return `${head}: request ${o.awaitingApproval} was denied${o.reason ? ` (${o.reason})` : ''} — nothing was read.`;
     if (o.awaitingApproval)
-        return `Degree ${o.degree}: waiting for approval — this expand exceeds the Space's four-eyes limit, so it runs once a second person approves request ${o.awaitingApproval}.`;
+        return `${head}: waiting for approval — this expand exceeds the Space's four-eyes limit, so it runs once a second person approves request ${o.awaitingApproval}.`;
     const parts = [
         `Degree ${o.degree}${o.range ? ` (${o.range})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
     ];
@@ -511,13 +556,14 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
  * `threshold` is the hub threshold the flag was measured against when known (the step's sealed rung, else the
  * Space's value in force). Nothing unserved is guessed.
  */
-export function hubBadgeText(threshold?: number | null, contacts?: number | null): string {
+export function hubBadgeText(threshold?: number | null, contacts?: number | null, overridden = false): string {
+    const state = overridden ? 'expanded through override' : 'not expanded';
     if (contacts != null)
         return (
             `High connectivity — ${plural(contacts, 'contact')}` +
-            `${threshold != null ? ` (threshold ${threshold.toLocaleString('en')})` : ''}, not expanded`
+            `${threshold != null ? ` (threshold ${threshold.toLocaleString('en')})` : ''}, ${state}`
         );
     return threshold != null
-        ? `High connectivity — more than ${threshold.toLocaleString('en')} contacts, not expanded`
-        : 'High connectivity — not expanded';
+        ? `High connectivity — more than ${threshold.toLocaleString('en')} contacts, ${state}`
+        : `High connectivity — ${state}`;
 }

@@ -72,8 +72,26 @@ test computes distances with the HUB as a non-expanded node and pins the ladder 
 | 5 | SIMBOX-02..05 | shared_device (the gateway IMEIs) |
 
 **Demo order (live walk-through 2026-10-11):** expand degrees 1 → 4 with the hub held, and only then, as the last
-step, show "Expand anyway" on the hub. Overriding the hub first admits its ~650 background contacts; they crowd the
-2000-row expand budget, so degree 4 is truncated before it reaches the `shared_payment` rings (SIMBOX-01, MULE-01..05).
+step, show "Expand anyway" on the hub. Overriding the hub first admits its ~650 background contacts into the ladder's
+frontier.
+
+**The Telecom preset reaches this ladder by degree 4 (re-tuned 2026-10-12): 30 days, `minEvents` 1, `maxFanOut` 500,
+`budget` 10 000.** Measured by replaying the expand (fan-out ranked by `events`, budget over the ranked rows) on the
+folded seed CSVs with the hub held:
+
+| Degree | Frontier | Candidate rows | Admitted |
+|---|---|---|---|
+| 1 | 1 (the suspect) | 403 | 402 |
+| 2 | 402 | 4 386 | 528 (the hub flagged) |
+| 3 | 527 | 4 731 | 134 |
+| 4 | 134 | 816 | 50 |
+
+Nothing is fan-out capped and nothing truncated. The old preset (`maxFanOut` 50, `budget` 2000) failed twice: the
+suspect's 403 rows ranked by `events` put the 1-event `shared_device` link to WANGIRI-B last, so a cap of 50 dropped it
+at degree 1 (it then arrived at degree 2); and the 2000-row budget truncated degree 4 (2 386 rows) before the
+`shared_payment` rings. `maxFanOut` must stay ≥ 403 and at or under `four_eyes_fan_out_above` (2000) so the ladder runs
+without approval; `budget` 10 000 leaves 2× headroom over the busiest degree (the showcase sets no four-eyes budget
+threshold).
 
 The intended path is suspect →(forwarding) PREMIUM-01 →(voice) IRSF-01 →(shared_identity) SUBFRAUD-03 →(shared_payment,
 card) SIMBOX-01.
@@ -273,7 +291,10 @@ Use JDK 27 (`JAVA_HOME=C:\sandbox\.graalvm-cache\jdk-27-win`).
    profile's "Investigate a number" preset therefore sends `minEvents: 1` (it sent 2, which admitted nobody at degree 1:
    a Wangiri victim has one row; API repro with `maxFanOut` 5 gave 5 rows plain and 0 with `minEvents` 2). The
    Advanced "Minimum events per link" field, when set, overrides the preset on "Expand next degree" and auto-expand.
-2. **The preset window is 30 days on `last_seen`, ending at the Dataset's latest `last_seen` (2026-09-29), not today.**
+2. **The preset window is 30 days on `last_seen`, ending at the Dataset's latest `last_seen` (2026-09-29 23:57:59), not today.**
+   The end is read as a zone-free string (`strftime(MAX(last_seen), …)`) and parsed as UTC, as the expand window
+   reads a naive timestamp. Read as a bare `MAX(...)`, `/db/query` converted it in the HOST zone: on an IST host the
+   end came 5.5 h early (18:27:59Z), dropping the suspect's forwarding link and both `shared_device` links.
    It keeps every planted ring: for the shared kinds `first_seen`/`last_seen` span both numbers' evidence, and every
    degree 1–4 link's `last_seen` is on or after 2026-09-02 (card `5d80…` SUBFRAUD-03/SIMBOX-01 2026-09-19, `agent:AGT-666`
    2026-09-29, `subscriber:CUST-M01` 2026-09-20, IRSF `id_doc` 2026-09-12+). Only `first_seen` can predate the window,

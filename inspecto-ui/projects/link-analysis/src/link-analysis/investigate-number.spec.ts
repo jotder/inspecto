@@ -14,6 +14,8 @@ import {
     degreeState,
     hubBadgeText,
     hubContactsFromRows,
+    overriddenHubs,
+    sealedHubThreshold,
     investigationTitle,
     overrideSteps,
     profileForDataset,
@@ -113,7 +115,7 @@ describe('investigate-number - the telecom binding', () => {
         });
         expect(b.timeCol).toBe('last_seen');
         expect(b.eventsCol).toBe('events');
-        expect(b.presets).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
+        expect(b.presets).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 500, budget: 10000 });
         expect(b.maxDegree).toBe(4);
         expect(b.presets).toBe(domainProfile('telecom').investigate!.expand); // ONE home for the presets
     });
@@ -188,7 +190,9 @@ describe('investigate-number - next degree', () => {
         expect(degreeOutcomeMessage({ ...base, hubDegreeSource: 'index' })).toContain(
             '1 high-connectivity number shown but not expanded (contacts counted from the link index).',
         );
-        expect(degreeOutcomeMessage({ ...base, hubDegreeSource: 'flat' })).toContain('(contacts counted from the Dataset)');
+        expect(degreeOutcomeMessage({ ...base, hubDegreeSource: 'flat' })).toContain(
+            '(contacts counted from the Dataset)',
+        );
         expect(degreeOutcomeMessage(base)).toContain('1 high-connectivity number shown but not expanded.');
         expect(
             degreeOutcomeMessage({
@@ -210,9 +214,9 @@ describe('investigate-number - next degree', () => {
     it('anchors the window at the Dataset latest event time, never today; no end = no window', () => {
         const p = domainProfile('telecom').investigate!.expand;
         expect(presetRung(p, true, '2026-09-29T18:30:00.000Z')).toEqual({
-            budget: 2000,
+            budget: 10000,
             minEvents: 1,
-            maxFanOut: 50,
+            maxFanOut: 500,
             window: { from: '2026-08-30T18:30:00.000Z', to: '2026-09-29T18:30:01.000Z' },
         });
         expect(presetRung(p, false, '2026-09-29T18:30:00.000Z')).not.toHaveProperty('window');
@@ -231,7 +235,9 @@ describe('investigate-number - next degree', () => {
     });
 
     it('reads the latest event time with quoted identifiers and parses DuckDB timestamps', () => {
-        expect(latestTimeSql('tele"links', 'last_seen')).toBe('SELECT MAX("last_seen") AS latest FROM "tele""links"');
+        expect(latestTimeSql('tele"links', 'last_seen')).toBe(
+            `SELECT strftime(MAX("last_seen"), '%Y-%m-%dT%H:%M:%S') AS latest FROM "tele""links"`,
+        );
         expect(latestTimeOf('2026-09-29 18:30:00')).toBe('2026-09-29T18:30:00.000Z');
         expect(latestTimeOf(Date.parse('2026-09-29T00:00:00Z'))).toBe('2026-09-29T00:00:00.000Z');
         expect(latestTimeOf(null)).toBeNull();
@@ -365,13 +371,15 @@ describe('investigate-number - third live run fixes', () => {
         const pending = [{ id: 'p4', status: 'pending', params: { ids: ['h'], expandHubs: ['h'] } }] as never;
         const held = reconcileApprovals([], pending, set);
         expect(held[0]).toMatchObject({ degree: 3, awaitingApproval: 'p4' });
-        expect(degreeOutcomeMessage(held[0])).toMatch(/^Degree 3: waiting/);
+        expect(degreeOutcomeMessage(held[0])).toMatch(/^Expand anyway through h \(admits at degree 3\): waiting/);
         const approved = reconcileApprovals(
             held,
             [{ id: 'p4', status: 'approved', step: 5 }] as never,
             ws(...set.entities, at('n', 3, 5)),
         );
-        expect(degreeOutcomeMessage(approved[0])).toMatch(/^Degree 3: approved \(request p4\)/);
+        expect(degreeOutcomeMessage(approved[0])).toMatch(
+            /^Expand anyway through h \(admits at degree 3\): approved \(request p4\)/,
+        );
         expect(requestedDegree(set, ['h'])).toBe(3);
         expect(requestedDegree(set, ['nobody'])).toBeNull();
     });
@@ -409,5 +417,83 @@ describe('investigate-number - third live run fixes', () => {
         expect(profileForDataset('telecom_links_dataset')).toBe('telecom');
         expect(profileForDataset('something_else')).toBeNull();
         expect(profileForDataset(null)).toBeNull();
+    });
+});
+
+describe('investigate-number - fourth live run fixes', () => {
+    it('D1: the window end is read as a zone-free string and parsed as UTC, whatever the host zone', () => {
+        // the seed corpus' latest last_seen; strftime answers it without any zone, so no host offset can enter
+        const end = latestTimeOf('2026-09-29T23:57:59');
+        expect(end).toBe('2026-09-29T23:57:59.000Z');
+        const rung = presetRung(domainProfile('telecom').investigate!.expand, true, end);
+        // inclusive end: `to` is exclusive, so it sits one second after the latest event
+        expect(rung.window).toEqual({ from: '2026-08-30T23:57:59.000Z', to: '2026-09-29T23:58:00.000Z' });
+        const lastLink = Date.parse('2026-09-29T23:57:59Z');
+        const w = rung.window as { from: string; to: string };
+        expect(lastLink >= Date.parse(w.from) && lastLink < Date.parse(w.to)).toBe(true);
+        expect(latestTimeSql('telecom_links', 'last_seen')).not.toContain('SELECT MAX("last_seen") AS');
+    });
+
+    it('D4: the telecom preset reaches the documented ladder without four-eyes', () => {
+        const p = domainProfile('telecom').investigate!.expand;
+        // the suspect's 403 candidate rows all fit, so the 1-event shared_device link to WANGIRI-B survives degree 1
+        expect(p.maxFanOut).toBeGreaterThanOrEqual(403);
+        // the busiest degree of the hub-held ladder reads ~4 700 rows
+        expect(p.budget).toBeGreaterThanOrEqual(5000);
+        // the showcase's four_eyes_fan_out_above
+        expect(p.maxFanOut).toBeLessThanOrEqual(2000);
+    });
+
+    it('pluralises the events floor', () => {
+        expect(presetsSummary({ minEvents: 1 })).toBe('at least 1 event per link');
+        expect(presetsSummary({ minEvents: 3 })).toBe('at least 3 events per link');
+    });
+
+    it('D3: a hub named by an applied or approved override is expanded through, read from the log', () => {
+        const entries = [
+            { step: 1, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['s'], hubThreshold: 500 } },
+            { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['h'], expandHubs: ['h'] } },
+            { step: 3, kind: 'op', op: 'expand', undoneBy: 4, params: { ids: ['g'], expandHubs: ['g'] } },
+            { step: 5, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['k', 'x'], includeHubs: true } },
+        ] as never;
+        expect([...overriddenHubs(entries, new Set(['h', 'g', 'k']))].sort()).toEqual(['h', 'k']);
+        expect(sealedHubThreshold(entries)).toBe(500);
+        expect(sealedHubThreshold([] as never)).toBeNull();
+        expect(hubBadgeText(500, 650, true)).toBe(
+            'High connectivity — 650 contacts (threshold 500), expanded through override',
+        );
+    });
+
+    it('D3: reads a contact count served as a string', () => {
+        expect(
+            hubContactsFromRows([
+                { entityId: 'h', contacts: '650' },
+                { entityId: 'y', contacts: null },
+            ]).get('h'),
+        ).toBe(650);
+    });
+
+    it('names the hub and the degree an override admits at, held and approved alike', () => {
+        const o = {
+            degree: 3,
+            admitted: 0,
+            linksAdded: 0,
+            truncated: false,
+            fanOutCapped: 0,
+            awaitingApproval: 'r1',
+            override: 'h',
+        };
+        expect(degreeOutcomeMessage(o)).toMatch(
+            /^Expand anyway through h \(admits at degree 3\): waiting for approval/,
+        );
+        expect(degreeOutcomeMessage({ ...o, decision: 'approved', admitted: 2 })).toMatch(
+            /^Expand anyway through h \(admits at degree 3\): approved \(request r1\)/,
+        );
+        const r = reconcileApprovals(
+            [],
+            [{ id: 'r2', status: 'pending', params: { ids: ['h'], expandHubs: ['h'] } }] as never,
+            ws(entity('s', 0), entity('h', 2)),
+        );
+        expect(r[0]).toMatchObject({ override: 'h', degree: 3, awaitingApproval: 'r2' });
     });
 });

@@ -169,7 +169,14 @@ function create(opts: { noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: ()
             ...(opts.noWidgetLibrary
                 ? [{ provide: LA_WIDGETS, useValue: { available: false, saveWorkingSetWidget: vi.fn() } }]
                 : []),
-            ...(opts.confirm ? [{ provide: InspectoConfirmService, useValue: { confirm: vi.fn(opts.confirm) } }] : []),
+            ...(opts.confirm
+                ? [
+                      {
+                          provide: InspectoConfirmService,
+                          useValue: { confirm: vi.fn(opts.confirm), confirmDestructive: vi.fn(opts.confirm) },
+                      },
+                  ]
+                : []),
             { provide: LensService, useValue: { canManageIncidents: signal(true) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
@@ -698,7 +705,16 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         entities: [
             { id: 'a', type: null, hop: 0, seed: 'a', admittedBy: 1, hidden: false, kept: false },
             { id: 'b', type: null, hop: 1, seed: 'a', admittedBy: 2, hidden: false, kept: false },
-            { id: 'hub', type: null, hop: 1, seed: 'a', admittedBy: 2, hidden: false, kept: false, highConnectivity: true },
+            {
+                id: 'hub',
+                type: null,
+                hop: 1,
+                seed: 'a',
+                admittedBy: 2,
+                hidden: false,
+                kept: false,
+                highConnectivity: true,
+            },
         ],
         links: [
             { source: 'a', target: 'b', kind: 'voice', count: 2, admittedBy: 2 },
@@ -755,6 +771,48 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         );
     });
 
+    it('the override confirmation\'s button reads "Expand anyway"', async () => {
+        const { fixture, store, el } = create({ ws: HUB_WS, confirm: async () => false });
+        await openInv(store);
+        fixture.detectChanges();
+        const svc = TestBed.inject(InspectoConfirmService) as unknown as {
+            confirmDestructive: ReturnType<typeof vi.fn>;
+        };
+        (el.querySelector('button[aria-label="Expand anyway from hub"]') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        expect(svc.confirmDestructive).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ confirmText: 'Expand anyway', destructive: false }),
+        );
+    });
+
+    it('D3: after an approved override (and on reload) the hub reads expanded through override, no second offer', async () => {
+        const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm: async () => true });
+        const override = {
+            step: 3,
+            kind: 'op' as const,
+            op: 'expand' as const,
+            params: { ids: ['hub'], expandHubs: ['hub'], hubThreshold: 500 },
+            author: 'alice',
+            at: '2026-09-23T10:02:00Z',
+            undoneBy: null,
+            workingSetHash: '',
+            text: '3. Expanded through hub.',
+        };
+        inv.investigationLog.mockReturnValue(of({ ...LOG, entries: [...LOG.entries, override] }) as never);
+        inv.workingSetRelation.mockReturnValue(
+            of({ rows: [{ entityId: 'hub', contacts: 650 }], total: 1, truncated: false }) as never,
+        );
+        await openInv(store);
+        fixture.detectChanges();
+        const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
+        // threshold from the sealed step, contacts from the Working Set rows — not "more than 500"
+        expect(list.textContent).toContain(
+            'High connectivity — 650 contacts (threshold 500), expanded through override',
+        );
+        expect(list.querySelector('button[aria-label="Expand anyway from hub"]')).toBeNull();
+    });
+
     it('a declined confirmation sends nothing', async () => {
         const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm: async () => false });
         await openInv(store);
@@ -804,7 +862,14 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
     it('a held degree says it is waiting once; the decision replaces it', async () => {
         const { fixture, store, el } = create({ ws: HUB_WS });
         await openInv(store);
-        const held = { degree: 2, admitted: 0, linksAdded: 0, truncated: false, fanOutCapped: 0, awaitingApproval: 'p2' };
+        const held = {
+            degree: 2,
+            admitted: 0,
+            linksAdded: 0,
+            truncated: false,
+            fanOutCapped: 0,
+            awaitingApproval: 'p2',
+        };
         store.degreeOutcomes.set([held]);
         fixture.detectChanges();
         const next = el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
