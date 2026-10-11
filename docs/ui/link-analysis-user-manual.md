@@ -204,8 +204,13 @@ flagged, and Compute risk is then held - an incomplete score map would understat
   (or the *Run link graph analysis* capability) the button is held and says why. The weights are the Space default
   (`graph_run.propagated_risk_weights`, shipped 1.0 / 0.6 / 0.35 / 0.15).
 * **Enrichment** — the node's CRM/KYC row when the profile maps one (Telecom: `crm_kyc` by `msisdn`; if the Space
-  cannot read it, the section says so), and the Entity Lists of its Entity Type it is on. Case history is not shown:
-  no API lists the Incidents or Cases that reference an entity yet.
+  cannot read it, the section says so), and the Entity Lists of its Entity Type it is on.
+* **Case history** — collapsed; opening it reads the Incidents and Cases that reference the node's entity (Telecom:
+  by `msisdn`), newest first: kind, title (a link to the Incident or Case), status, severity and date, and *via
+  Incident …* for a Case found through an Incident it contains. *Show* filters all / open / closed. When the server
+  searched only its newest objects the section warns that older ones may be missing. A masked node (an alias) has no
+  case history here; an id too short or of another Entity Type, a busy server (*Too many lookups*) or any other
+  failure is stated in the section, and reopening it tries again.
 * **Actions** — **Add to watch / block list** (one button per watch or block list of the node's Entity Type that does
   not already hold it) asks for a reason first; a list under four-eyes answers *Waiting for approval* and nothing is
   written until a second person approves. The buttons need *Manage incidents*; without it they are disabled and the
