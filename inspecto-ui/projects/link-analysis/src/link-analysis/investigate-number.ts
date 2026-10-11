@@ -1,6 +1,7 @@
 import type { EntityProjection } from '@inspecto/core/graph';
 import type {
     ExpandRung,
+    InvestigationLogEntry,
     InvestigationStepResult,
     PendingExpansion,
     WorkingSet,
@@ -127,6 +128,11 @@ export function investigateBinding(req: InvestigateRequest): PendingInvestigatio
     };
 }
 
+/** The profile whose default mapping binds this Dataset (what a reopened Investigation restores); null = none. */
+export function profileForDataset(datasetId: string | null | undefined): DomainProfileId | null {
+    return (datasetId && DOMAIN_PROFILES.find((p) => p.investigate?.mapping.dataset === datasetId)?.id) || null;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A day as the analyst reads it, in UTC: `29 Sep 2026`. */
@@ -188,9 +194,65 @@ export function seedError(req: InvestigateRequest): string | null {
     return req.entityType.toLowerCase() === 'msisdn' ? msisdnError(req.seed) : null;
 }
 
-/** The Investigation's title for a suspect id. */
-export function suspectTitle(seed: string): string {
-    return `Suspect ${seed}`;
+/**
+ * The Investigation's default title for a suspect id. The title is stored and shown like any value, so the raw id
+ * goes into it only when the Space is known NOT to mask (`maskingMode` `none`); masked or not yet known, it reads
+ * `Suspect number` — never the raw MSISDN.
+ */
+export function suspectTitle(seed: string, maskingMode?: string | null): string {
+    return maskingMode === 'none' ? `Suspect ${seed}` : 'Suspect number';
+}
+
+/** The `maskingMode` pseudonym prefix (D-U6). */
+const MASKED = 'masked:';
+
+/**
+ * The open Investigation's name: the server's title, unless the server masked it (a title is masked like an entity
+ * value) — then the analyst's own title as typed here, else `(title masked)`. A raw pseudonym is never the name.
+ */
+export function investigationTitle(
+    serverTitle: string | null | undefined,
+    localTitle: string | null | undefined,
+    id: string,
+): string {
+    const server = (serverTitle ?? '').trim();
+    const local = (localTitle ?? '').trim();
+    const localOk = !!local && !local.startsWith(MASKED);
+    if (!server) return localOk ? local : id;
+    if (!server.startsWith(MASKED)) return server;
+    return localOk ? local : '(title masked)';
+}
+
+/** The hop a request's named ids would admit at: one past the outermost of them in the Working Set; null = unknown. */
+export function requestedDegree(ws: WorkingSet | null, ids: readonly string[] | null | undefined): number | null {
+    const want = new Set(ids ?? []);
+    const hops = (ws?.entities ?? []).filter((e) => want.has(e.id)).map((e) => e.hop);
+    return hops.length ? Math.max(...hops) + 1 : null;
+}
+
+/** The log steps still in effect that expanded THROUGH a named hub ("Expand anyway", `expandHubs`). */
+export function overrideSteps(entries: readonly InvestigationLogEntry[]): Set<number> {
+    return new Set(
+        entries
+            .filter(
+                (e) => e.kind === 'op' && e.op === 'expand' && e.undoneBy == null && (e.params?.expandHubs?.length ?? 0) > 0,
+            )
+            .map((e) => e.step),
+    );
+}
+
+/**
+ * Each flagged entity's sealed contact count from `GET working-set?of=entities` rows (`entityId`, `contacts`) — that
+ * route serves `contacts`; `/replay` does not.
+ */
+export function hubContactsFromRows(rows: readonly Record<string, unknown>[]): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const r of rows) {
+        const id = r['entityId'];
+        const c = r['contacts'];
+        if (typeof id === 'string' && typeof c === 'number') out.set(id, c);
+    }
+    return out;
 }
 
 /** Where "Expand next degree" stands over a Working Set. */
@@ -269,10 +331,14 @@ export function reconcileApprovals(
     const known = new Set(outcomes.map((o) => o.awaitingApproval).filter(Boolean));
     for (const p of pending ?? []) {
         if (p.status !== 'pending' || known.has(p.id)) continue;
+        // Labelled by the hop it would admit at — one past the ids it names (an "Expand anyway" names a hub inside the
+        // Working Set) — the same hop the approved step's admitted rows then carry.
         const visible = (ws?.entities ?? []).filter((e) => !e.hidden);
         const current = visible.length ? Math.max(...visible.map((e) => e.hop)) : 0;
+        const named = p.params?.['ids'];
+        const ids = Array.isArray(named) ? named.filter((v): v is string => typeof v === 'string') : [];
         next.push({
-            degree: current + 1,
+            degree: requestedDegree(ws, ids) ?? current + 1,
             admitted: 0,
             linksAdded: 0,
             truncated: false,
@@ -305,8 +371,13 @@ export function degreeState(
     maxDegree = DEFAULT_MAX_DEGREE,
     outcomes: readonly DegreeOutcome[] = [],
     includeHubs = false,
+    overrides: ReadonlySet<number> = new Set(),
 ): DegreeState {
-    const visible = (ws?.entities ?? []).filter((e) => !e.hidden);
+    const shown = (ws?.entities ?? []).filter((e) => !e.hidden);
+    // A hub's background contacts admitted by "Expand anyway" are not a degree of the ladder: leaving them out of the
+    // frontier keeps the next degree's budget for the rings (unless they are all there is).
+    const ladder = shown.filter((e) => !overrides.has(e.admittedBy));
+    const visible = ladder.length ? ladder : shown;
     if (!visible.length)
         return { current: -1, frontier: [], heldHubs: [], maxDegree, blocked: 'Seed an entity first.' };
     const current = Math.max(...visible.map((e) => e.hop));

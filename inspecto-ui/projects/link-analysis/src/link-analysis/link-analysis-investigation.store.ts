@@ -1,4 +1,5 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { EntityProjection, G6Node } from '@inspecto/core/graph';
 import {
@@ -21,17 +22,27 @@ import {
 } from './investigation-state';
 import { ProjectedGraph } from './entity-projection';
 import { QueuedSeed } from './la-starter';
-import { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
+import { DegreePresets, DomainProfileId, domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     DegreeOutcome,
     degreeOutcome,
     degreeState,
+    hubContactsFromRows,
+    investigationTitle,
     isAwaiting,
     mergeRung,
+    overrideSteps,
     presetRung,
+    profileForDataset,
     reconcileApprovals,
+    requestedDegree,
     windowLabel,
 } from './investigate-number';
+
+/** The query parameter that keeps the open Investigation across a reload (`?investigation=<id>`). */
+export const INVESTIGATION_PARAM = 'investigation';
+/** The most Working Set rows read for the flagged entities' contact counts (the route's own cap). */
+const HUB_ROWS_LIMIT = 10_000;
 
 const EMPTY_SET: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
 
@@ -68,6 +79,28 @@ function fromDraftReplay(id: string, r: DraftReplayResult): InvestigationReplayR
 @Injectable()
 export class InvestigationSessionStore {
     private inv = inject(InvService);
+    private router = inject(Router, { optional: true });
+    private route = inject(ActivatedRoute, { optional: true });
+
+    constructor() {
+        // Keep `?investigation=<id>` in the URL while one is open (replaceUrl), so a reload or a persona switch reopens
+        // it (the host adopts that param on init). The param is dropped only when THIS store closed what it had set.
+        let synced: string | null = null;
+        effect(() => {
+            const id = this.activeId();
+            if (!this.router || id === synced) return;
+            const had = synced;
+            synced = id;
+            if (!id && !had) return;
+            if (id && this.route?.snapshot.queryParamMap.get(INVESTIGATION_PARAM) === id) return;
+            void this.router.navigate([], {
+                ...(this.route ? { relativeTo: this.route } : {}),
+                queryParams: { [INVESTIGATION_PARAM]: id },
+                queryParamsHandling: 'merge',
+                replaceUrl: true,
+            });
+        });
+    }
 
     /** Every Investigation this screen knows about (created here or restored from a saved view). */
     readonly refs = signal<InvestigationRef[]>([]);
@@ -109,6 +142,20 @@ export class InvestigationSessionStore {
     readonly active = computed(() => this.activeId() !== null);
     readonly activeRef = computed(() => this.refs().find((r) => r.id === this.activeId()) ?? null);
     readonly header = computed(() => this.log()?.header ?? null);
+    /** The open Investigation's name: the analyst's own title when the server masked it, never a raw pseudonym. */
+    readonly displayTitle = computed(() => {
+        const id = this.activeId();
+        return id ? investigationTitle(this.header()?.title, this.activeRef()?.title, id) : '';
+    });
+    /**
+     * The domain profile the open Investigation belongs to — remembered on its ref, else the profile whose default
+     * mapping binds its Dataset. The host switches its profile to this on open/reload; null = leave it as it is.
+     */
+    readonly boundProfileId = computed<DomainProfileId | null>(
+        () => this.activeRef()?.profileId ?? profileForDataset(this.header()?.dataset),
+    );
+    /** The "Expand anyway" steps in effect — their hub's contacts are kept out of the next degree's frontier. */
+    readonly overrideSteps = computed(() => overrideSteps(this.log()?.entries ?? []));
     readonly effectiveSteps = computed(() => effectiveOpSteps(this.log()?.entries ?? []));
     readonly truncatedSteps = computed(() => truncatedSteps(this.log()?.entries ?? []));
     /** A Draft's Undo reverts only its OWN steps, so the main-log prefix it forked from never counts. */
@@ -125,7 +172,10 @@ export class InvestigationSessionStore {
             sourceCol: h.sourceCol,
             targetCol: h.targetCol,
             linkKindCol: h.linkKindCol ?? undefined,
-            entityType: this.activeRef()?.entityType,
+            // A reopened Investigation (reload) has no remembered type: its profile's investigated type stands in.
+            entityType:
+                this.activeRef()?.entityType ??
+                (this.boundProfileId() ? domainProfile(this.boundProfileId()!).investigate?.entityType : undefined),
             sourceType: this.activeRef()?.sourceType,
             targetType: this.activeRef()?.targetType,
         };
@@ -194,6 +244,7 @@ export class InvestigationSessionStore {
         timeColZone?: string,
         eventsCol?: string,
         entityType?: string,
+        profileId?: DomainProfileId,
     ): Promise<boolean> {
         return this.run('Could not start the Investigation.', async () => {
             const h = await firstValueFrom(
@@ -216,7 +267,9 @@ export class InvestigationSessionStore {
                 ...all,
                 {
                     id: h.id,
-                    title: h.title ?? undefined,
+                    // The analyst's own title as typed: the server may answer it masked (a title is a value).
+                    title: title || h.title || undefined,
+                    ...(profileId ? { profileId } : {}),
                     entityType: p.entityType,
                     sourceType: p.sourceType,
                     targetType: p.targetType,
@@ -245,7 +298,13 @@ export class InvestigationSessionStore {
         advanced: ExpandRung | null = null,
     ): Promise<boolean> {
         if (this.expanding) return false; // one degree at a time: a second click while one runs is ignored
-        const state = degreeState(this.workingSet(), maxDegree, this.degreeOutcomes(), includeHubs);
+        const state = degreeState(
+            this.workingSet(),
+            maxDegree,
+            this.degreeOutcomes(),
+            includeHubs,
+            this.overrideSteps(),
+        );
         if (state.blocked) {
             this.error.set(state.blocked);
             return false;
@@ -304,9 +363,18 @@ export class InvestigationSessionStore {
         const rest: ExpandRung = { ...rung };
         delete rest.includeHubs; // the override names this entity only
         delete rest.expandHubs;
+        // The hop this override admits at: one past the hub's own — the held and the approved line both say it.
+        const degree = requestedDegree(this.workingSet(), [id]) ?? 1;
         if (!(await this.apply({ op: 'expand', ids: [id], ...rest, expandHubs: [id] }))) return false;
         const step = this.lastStep();
         if (step && step.status !== 'pending') this.lastOverride.set({ step: step.step, ids: [id] });
+        if (step?.status === 'pending') {
+            const outcome = degreeOutcome(degree, step, rest);
+            this.degreeOutcomes.update((all) => [
+                ...all.filter((o) => o.awaitingApproval !== outcome.awaitingApproval),
+                outcome,
+            ]);
+        }
         return true;
     }
 
@@ -337,6 +405,8 @@ export class InvestigationSessionStore {
         windowEnd?: string | null;
         /** The analyst's Advanced rung fields, laid over the presets on every degree. */
         advanced?: ExpandRung | null;
+        /** The profile the deep link bound — remembered on the ref so a reopen restores it. */
+        profileId?: DomainProfileId;
     }): Promise<boolean> {
         if (this.chainRunning()) return false;
         this.chainRunning.set(true);
@@ -350,7 +420,19 @@ export class InvestigationSessionStore {
     private async runInvestigateChain(
         req: Parameters<InvestigationSessionStore['investigateNumber']>[0],
     ): Promise<boolean> {
-        if (!(await this.start(req.projection, req.purpose, req.title, req.timeCol, undefined, req.eventsCol, req.projection.entityType))) return false;
+        if (
+            !(await this.start(
+                req.projection,
+                req.purpose,
+                req.title,
+                req.timeCol,
+                undefined,
+                req.eventsCol,
+                req.projection.entityType,
+                req.profileId,
+            ))
+        )
+            return false;
         const id = this.activeId();
         this.windowEnd.set(req.windowEnd ?? null);
         const entityType = req.projection.entityType;
@@ -360,7 +442,8 @@ export class InvestigationSessionStore {
         for (let i = 0; i < req.degrees; i++) {
             if (this.activeId() !== id) return false; // closed or switched mid-chain: stop, never act on another one
             // The chain never opts into hubs: an override is the analyst's own, confirmed decision.
-            if (degreeState(this.workingSet(), req.maxDegree, this.degreeOutcomes()).blocked) break;
+            const s = degreeState(this.workingSet(), req.maxDegree, this.degreeOutcomes(), false, this.overrideSteps());
+            if (s.blocked) break;
             if (!(await this.expandNextDegree(req.presets, req.maxDegree, false, req.advanced ?? null))) return false;
         }
         return true;
@@ -497,6 +580,35 @@ export class InvestigationSessionStore {
         const loaded = await this.load(id, draft);
         if (this.activeId() !== id || this.activeDraftId() !== draft) return; // switched away meanwhile
         this.commit(loaded);
+        if (!draft) await this.loadHubContacts(id);
+    }
+
+    /**
+     * `/replay` rows carry no `contacts`, and a hub flagged by a step this session did not run (approved by someone
+     * else, or before a reopen) has none in `hubContacts` either — read them from `GET working-set?of=entities`,
+     * which serves each flagged entity's sealed count. Quiet: a refusal leaves the threshold wording in place.
+     */
+    private hubRowsRead = '';
+    private async loadHubContacts(id: string): Promise<void> {
+        const known = this.hubContacts();
+        const missing = (this.workingSet()?.entities ?? []).some(
+            (e) => e.highConnectivity && e.contacts == null && !known.has(e.id),
+        );
+        // Once per Working Set head: a poll of an unchanged set does not read the rows again.
+        const key = `${id}@${this.workingSet()?.hash ?? ''}`;
+        if (!missing || key === this.hubRowsRead) return;
+        this.hubRowsRead = key;
+        try {
+            const page = await firstValueFrom(
+                this.inv.workingSetRelation(id, { of: 'entities', limit: HUB_ROWS_LIMIT }),
+            );
+            if (this.activeId() !== id) return;
+            const read = hubContactsFromRows(page.rows ?? []);
+            if (!read.size) return;
+            this.hubContacts.set(new Map([...this.hubContacts(), ...read]));
+        } catch {
+            // the step-read counts and the threshold wording stand
+        }
     }
 
     /** Read the log and the Working Set of the main log or of a Draft — without touching the store. */
