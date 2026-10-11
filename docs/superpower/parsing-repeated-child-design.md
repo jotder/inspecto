@@ -1,6 +1,18 @@
 # Parsing D9 — a repeated-child operation for the ASN.1 Decode Profile (design)
 
-**Status 2026-10-11: DESIGNED, awaiting operator approval of the design. No code written.** Operator decision
+**Status 2026-10-11: APPROVED. SLICE 1 BUILT (commit 9c07a0aeb); slices 2-3 open.**
+Operator answers: closed vocabulary, select/reduce first; `group_by` sums groups into one scalar (per-group rows =
+explode, slice 2); read-only drawer in v1; 10 000 defaults; `select` matches the stringified leaf.
+**Slice 1 as-built deviations:** (a) `DeriveSpec` (public, `platform/inspecto-etl`) holds compile + evaluate instead
+of a package-private `RepeatedChild` in the ASN.1 module, so DecodeProfile can validate it; (b) a `SEQUENCE OF X`
+decodes as `{field: {X: [..]}}`, so list paths are `field.X`; (c) TOON has no flow maps or lists: `where:` is a
+nested block, `group_by[1]: leaf` an array; (d) `of` is optional for `first` / `join` (scalar list: the element
+itself); (e) `group_by` is accepted for sum / min / max / count only, and since group results are combined with the
+same op it does not change the scalar (kept for the design's shape); (f) `derive`, `max_list_elements`,
+`max_derived_columns` flow `asn1:` to `ingester_config`; the clash with `raw.fields` is checked when segments are
+declared; (g) `derive_non_numeric` / `derive_no_match` are logged per file (INFO), not in a sink summary;
+(h) `ASN1-DERIVE-NOT-IN-GRAMMAR` is NOT implemented (needs the compiled grammar's schema walk); open.
+Tests: `DeriveSpecTest` (13), `Asn1RecordIngesterDeriveTest` (5) over synthetic case `repeated_child`. Operator decision
 2026-10-11: design it now. Home: the Decode Profile (`platform/inspecto-etl/src/main/java/com/gamma/etl/DecodeProfile.java`,
 shipped C1-C4 2026-09-25; as-built in `docs/okf/backend/engine/parser-plugins.md`). When the work ships, distil
 into that concept, move leftovers to `docs/BACKLOG.md`, and `git mv` this plan to
