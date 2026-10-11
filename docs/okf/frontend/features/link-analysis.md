@@ -978,6 +978,15 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   every refusal renders in place verbatim, and nothing is re-read until a decision succeeds (`(decided)` → the
   store re-opens the Investigation). A pending expand's own `POST …/ops` answer is not rendered as a step; the
   re-read log's `pending[]` is what shows it.
+  **Approver inbox** (2026-10-11): the oversight panel only reaches an approver who can OPEN the Investigation, so a
+  non-member approver had no way to the request. `GET /inv/pending?status=pending|approved|denied|all&limit`
+  (`canApproveLinkExpansions`; 503 no write root; 403 no Subject; 422 bad status/limit) lists, across the Space,
+  the requests the caller could decide — each Investigation judged by the SAME `openForApproval` gate approve/deny use
+  (explicit members: lead/reviewer only; owner-only: any approver; R3 + PDP), the caller's OWN requests never listed —
+  as `{investigationId, title, dataset, purpose, requestId, kind, status, requestedBy, requestedAt, params,
+  sensitivity, summary, draftId?, decidedBy?, decidedAt?, reason?}`, masked per the Space, bounded with the true
+  `total`, audited `LINK_EXPANSION_INBOX_READ` (counts only). SPA: **Approvals → Link expansions**
+  (`modules/admin/approvals/link-expansions/`), rendered only for `LensService.canApproveLinkExpansions()`.
   ⚠ When a Space sets a four-eyes threshold, every stateless graph read — the projection that loads the canvas
   (`/inv/projection`, `/inv/projection/multi`), *expand node* (`/inv/projection/neighbors`) and the traversal
   (`/inv/traversal/recursive-paths`) — is **refused with 403** above it, because a stateless read has nothing that

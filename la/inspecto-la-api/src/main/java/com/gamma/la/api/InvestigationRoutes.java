@@ -78,6 +78,8 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *       the pending sensitive expands (D-U7).</li>
  *   <li>{@code POST /inv/investigations/{id}/reveal} — reveal masked entity ids, per entity (D-U6).</li>
  *   <li>{@code POST /inv/investigations/{id}/pending/{rid}/approve} · {@code .../deny} — four-eyes (D-U7).</li>
+ *   <li>{@code GET /inv/pending?status} — the approver's inbox: the requests across the Space the caller may decide;
+ *       see {@link #approvalInbox}.</li>
  * </ul>
  *
  * <p><b>LA-19 controls (operator decisions 2026-09-24).</b> <i>Purpose</i> (D-U5): every Investigation states a
@@ -163,6 +165,8 @@ public final class InvestigationRoutes implements RouteModule {
                 (e, m) -> decide(api, e, m.group(1), m.group(2), true, api.body(e))));
         api.post("/inv/investigations/([^/]+)/pending/([^/]+)/deny", ApiContext.withCapability("canApproveLinkExpansions",
                 (e, m) -> decide(api, e, m.group(1), m.group(2), false, api.body(e))));
+        api.get("/inv/pending", ApiContext.withCapability("canApproveLinkExpansions",
+                (e, m) -> approvalInbox(api, e)));
         try {
             InvestigationStores.probeAtBoot(api.writeRoot());   // -Dinvestigations.backend=db: WARN + health now, never refuse the boot
         } catch (RuntimeException noBootSpace) {
@@ -2313,6 +2317,102 @@ public final class InvestigationRoutes implements RouteModule {
         out.put("pending", rec);
         out.put("workingSet", summary(before));
         return out;
+    }
+
+    /** The {@code status} values the approver inbox filters on; {@code all} lifts the filter. */
+    private static final Set<String> INBOX_STATUSES = Set.of("pending", "approved", "denied", "all");
+
+    /**
+     * {@code GET /inv/pending?status=pending|approved|denied|all&limit} — the APPROVER's inbox (D-U7): the four-eyes
+     * requests, across every Investigation in the Space, that the caller could decide. Each Investigation is judged by
+     * {@link #openForApproval} itself — the gate {@code approve}/{@code deny} open through — so the inbox never shows a
+     * request a decision would refuse (a member whose role cannot approve, a non-member where a membership record exists,
+     * R3, the Enterprise PDP); and the caller's OWN requests are left out, since four-eyes refuses them anyway.
+     * Gates: {@code canApproveLinkExpansions} (the route) → write root 503 → an authenticated Subject 403 (without one,
+     * "not the requester" cannot be decided) → a bad {@code status} or {@code limit} 422. Entity ids, titles and purposes
+     * are masked per each Space's {@code maskingMode} (D-U6). Bounded by {@code limit}, with the TRUE {@code total}.
+     * Audited as {@code LINK_EXPANSION_INBOX_READ}.
+     */
+    @SuppressWarnings("unchecked")
+    private Object approvalInbox(ApiContext api, HttpExchange ex) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis approval inbox");
+        Optional<Subject> subject = ApiContext.subject(ex);
+        if (subject.isEmpty())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "the approval inbox needs an authenticated Subject — without one, "
+                    + "the requester and the approver cannot be told apart");
+        String status = ApiContext.query(ex, "status");
+        status = status == null || status.isBlank() ? "pending" : status.trim();
+        if (!INBOX_STATUSES.contains(status))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status must be one of pending, approved, denied, all; got '" + status + "'");
+        int limit = Math.min(Math.max(queryInt(ex, "limit", LIST_DEFAULT), 1), LIST_MAX);
+        InvestigationStore store = InvestigationStores.of(writeRoot);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (String id : store.ids()) {
+            if (store.listPending(id).isEmpty()) continue;   // nothing to decide: skip the gate's reads
+            Inv inv;
+            try {
+                inv = openForApproval(api, ex, id);
+            } catch (ApiException refused) {
+                continue;   // not decidable by this caller — absent here exactly as the decision would refuse it
+            }
+            EntityMasking mask = null;
+            for (String raw : inv.store().listPending(id)) {
+                Map<String, Object> rec = parse(raw);
+                if (!"all".equals(status) && !status.equals(rec.get("status"))) continue;
+                if (subject.get().id().equals(rec.get("requestedBy"))) continue;   // four-eyes: never your own
+                if (mask == null) mask = EntityMasking.of(inv, List.of());
+                Map<String, Object> h = inv.header();
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("investigationId", id);
+                item.put("title", h.get("title") == null ? null : mask.inText(String.valueOf(h.get("title"))));
+                item.put("dataset", h.get("dataset"));
+                item.put("purpose", h.get("purpose") == null ? null : mask.inText(String.valueOf(h.get("purpose"))));
+                item.put("requestId", rec.get("id"));
+                String kind = rec.get("kind") == null ? "expand" : String.valueOf(rec.get("kind"));
+                item.put("kind", kind);
+                item.put("status", rec.get("status"));
+                item.put("requestedBy", rec.get("requestedBy"));
+                item.put("requestedAt", rec.get("requestedAt"));
+                Map<String, Object> params = rec.get("params") instanceof Map<?, ?> p
+                        ? (Map<String, Object>) mask.apply(p) : Map.of();
+                item.put("params", params);
+                item.put("sensitivity", mask.apply(rec.get("sensitivity")));
+                if (rec.get("draftId") != null) item.put("draftId", rec.get("draftId"));
+                item.put("summary", "promote".equals(kind)
+                        ? "Promote Draft " + rec.get("draftId") + " into the main log; it carries a sensitive expand."
+                        : inboxExpandSummary(params, h.get("dataset")));
+                for (String k : List.of("decidedBy", "decidedAt", "reason", "step"))
+                    if (rec.get(k) != null) item.put(k, rec.get(k));
+                items.add(item);
+            }
+        }
+        items.sort(java.util.Comparator.comparing((Map<String, Object> m) -> String.valueOf(m.get("requestedAt")))
+                .reversed().thenComparing(m -> m.get("investigationId") + "/" + m.get("requestId")));
+        List<Map<String, Object>> page = new ArrayList<>(items.subList(0, Math.min(limit, items.size())));
+        String filter = status;
+        emit(ex, LinkEventTypes.LINK_EXPANSION_INBOX_READ, "link.expansion.inbox.read",
+                "link.expansion.inbox.read — " + page.size() + " of " + items.size() + " " + filter,
+                b -> b.attr("status", filter).attr("rows", page.size()).attr("total", items.size()));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("items", page);
+        out.put("total", items.size());
+        out.put("limit", limit);
+        out.put("truncated", page.size() < items.size());
+        out.put("status", status);
+        return out;
+    }
+
+    /** What a held expand will read, in plain language, from its (already masked) params. */
+    private static String inboxExpandSummary(Map<String, Object> p, Object dataset) {
+        List<String> ids = strings(p.get("ids"));
+        StringBuilder s = new StringBuilder("Expand one hop from ")
+                .append(ids.isEmpty() ? "the current Working Set" : ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies") + " (" + list(ids) + ")")
+                .append(" over ").append(dataset);
+        if (p.get("direction") != null) s.append(", direction ").append(p.get("direction"));
+        if (!strings(p.get("linkKinds")).isEmpty()) s.append(", link kinds ").append(list(strings(p.get("linkKinds"))));
+        if (p.get("budget") != null) s.append(", reading at most ").append(p.get("budget")).append(" link rows");
+        if (p.get("maxFanOut") != null) s.append(", fan-out cap ").append(p.get("maxFanOut"));
+        return s.append(".").toString();
     }
 
     /**

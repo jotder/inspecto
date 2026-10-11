@@ -236,6 +236,10 @@ public final class LinkEventTypes {
      *  {@code requestedBy}, {@code reason}. */
     public static final String LINK_EXPANSION_DENIED = "LINK_EXPANSION_DENIED";
 
+    /** An approver read the four-eyes inbox ({@code GET /inv/pending}, D-U7). {@code status} (the filter),
+     *  {@code rows} served and {@code total} — counts only, never the requests' params. */
+    public static final String LINK_EXPANSION_INBOX_READ = "LINK_EXPANSION_INBOX_READ";
+
     /** A graph run was started ({@code POST /inv/graph/runs}, LA separation D-4). {@code investigationId},
      *  {@code algorithm}, {@code nodes}/{@code edges} (the measured input), {@code key} (the Working Set's relation
      *  key), {@code engine}, {@code runId}. Never the run's parameters: they can embed entity ids. */

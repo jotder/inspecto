@@ -323,6 +323,7 @@
     "/inv/investigations/{investigationId}/reveal",
     "/inv/investigations/{investigationId}/pending/{pendingId}/approve",
     "/inv/investigations/{investigationId}/pending/{pendingId}/deny",
+    "/inv/pending",
     "/inv/investigations/{investigationId}/dossier",
     "/inv/investigations/{investigationId}/dossier/verify",
     "/inv/investigations/{investigationId}/working-set",

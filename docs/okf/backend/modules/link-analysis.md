@@ -361,14 +361,14 @@ and any column whose registry/lineage class is claimed by a masked Entity Type o
 
 ## 6. HTTP surface (la-api, geo-link)
 
-18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **76**<!--count:la-routes--> routes (**70**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
-the live `GET /audit/route-inventory` lists 76 for `/inv` and `/geo`, all present in `openapi-v1.json`):
+18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **77**<!--count:la-routes--> routes (**71**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
+the live `GET /audit/route-inventory` lists 77 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
 |---|---|---|
 | Exploration | `/geo/projection`, `/geo/routes`, `/inv/projection{,/neighbors,/multi}`, `/inv/schema/*`, `/inv/traversal/recursive-paths`, `/inv/reference-rows`, `/inv/pattern/{branching,temporal}`, `/inv/value-measures`, `/inv/snapshots*` | none (rate-limited as expensive); snapshots POST `canManageIncidents` |
 | Investigations | `/inv/investigations` create/list, `…/{id}/ops`, `/undo`, `/reorder`, `/replay`, `/log`, `/working-set`, `/coverage`, `/compare`, `/references`, `/case`, `/members`, `/template`, `/inv/investigation-templates*` | `canManageIncidents` (+ lead) |
-| Four-eyes / reveal | `…/pending/{p}/approve|deny`, `…/reveal` | `canApproveLinkExpansions`, `canRevealLinkEntities` |
+| Four-eyes / reveal | `…/pending/{p}/approve|deny`, `GET /inv/pending` (approver inbox), `…/reveal` | `canApproveLinkExpansions`, `canRevealLinkEntities` |
 | Dossier | `…/dossier`, `/dossier/verify`, `/dossier/bundle`, `/dossier/bundle/verify` | read gate only |
 | Drafts | `…/drafts` create/list, `…/drafts/{d}` + `/log`, `/working-set`, `/replay`, `/conflicts`, `/ops`, `/undo`, `/discard`, `/rebase`, `/promote` | `canManageIncidents` + per-role act check |
 | Identity | `/inv/entity-identities`, `/group`, `/import`, `/{id}/retract` | `canManageIncidents` (the reads too; `/import` has no UI) |

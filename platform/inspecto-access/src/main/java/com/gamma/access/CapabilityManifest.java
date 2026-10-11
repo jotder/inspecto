@@ -82,6 +82,8 @@ public final class CapabilityManifest {
             new Entry("POST", "/inv/investigations/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
             new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/approve", Roles.CAN_APPROVE_LINK_EXPANSIONS),
             new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/deny", Roles.CAN_APPROVE_LINK_EXPANSIONS),
+            // ...and the approver's inbox of those requests, a read that only an approver has a use for.
+            new Entry("GET", "/inv/pending", Roles.CAN_APPROVE_LINK_EXPANSIONS),
             // GraphRunRoutes (LA separation D-4 step 6) - starting a graph run spends compute; reading, listing and
             // cancelling one are not gated by a capability (they inherit the Investigation's access / the run's owner).
             new Entry("POST", "/inv/graph/runs", Roles.CAN_RUN_LINK_GRAPH_ANALYSIS),

@@ -55,6 +55,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/investigations/([^/]+)/reveal"},
             {"POST", "/inv/investigations/([^/]+)/pending/([^/]+)/approve"},
             {"POST", "/inv/investigations/([^/]+)/pending/([^/]+)/deny"},
+            {"GET", "/inv/pending"},
             {"GET", "/inv/investigations/([^/]+)/dossier"},
             {"POST", "/inv/investigations/([^/]+)/dossier/verify"},
             {"GET", "/inv/investigations/([^/]+)/dossier/bundle"},
