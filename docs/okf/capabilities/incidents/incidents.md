@@ -499,9 +499,8 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
     import a new Space's included); `TemplateGovernanceExamplesTest` runs every example through the real parsers.
     **Closed 2026-10-04 (operator):** `ASSURE-WORKFLOW-SLA-1` is closed. Residuals are P3 (`ASSURE-WORKFLOW-SLA-RESIDUALS-1`): the
     sweep-time deleted-assignee recheck (recommended policy when built: skip the reassign, still notify / raise priority, one
-    WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a graphical state-diagram *editor* is ON
-    DEMAND (operator, 2026-10-06) — built only when a customer asks, like the recheck (the read-only diagram and the list
-    editor ship). The live-preview pass of Settings ▸ Incident governance was done 2026-10-04 (see *UI* below).
+    WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a graphical state-diagram *editor* — operator asked
+    2026-10-11, shipped `0d6e0280e` (see *UI* below). The live-preview pass of Settings ▸ Incident governance was done 2026-10-04 (see *UI* below).
   - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
     `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
     transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422
@@ -517,7 +516,17 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
     pure `workflowDiagram()` in `governance-model.ts` (a column per BFS distance from the initial state; unreachable
     states in a trailing dashed column; terminal = thick border; back-edges arc below, self-loops above). Design-token
     colours only (`currentColor`). It is a described image (`role="img"` + a text alternative listing every move);
-    the table stays the accessible, editable equivalent. A full drag-and-drop editor is deliberately not built (P3).
+    the table stays the accessible, editable equivalent.
+    **State-diagram editor (2026-10-11, `ASSURE-WORKFLOW-SLA-RESIDUALS-1` b):** `settings/workflow-state-editor.component.ts`
+    wraps the diagram with a States table (rename, initial radio, terminal checkbox, remove, add state) and From/To
+    *Connect states* selects; clicking two states on the diagram is a pointer shortcut for the same connect (the SVG stays a
+    described image, so the keyboard path is the table + selects). Edits are pure `WorkflowDraft → WorkflowDraft` functions in
+    `governance-model.ts` (`renameState`/`removeState`/`setInitialState`/`setTerminalState`/`connectStates`) written back into the
+    SAME form (`applyDraft`), so the saved `workflow` content is exactly what the table path saves — states are implicit
+    (initial ∪ terminal ∪ transition endpoints), there is no stored state list or layout, hence **auto-layout only** and a
+    just-added state with no transition is UI-local ("not saved until it has one"). A new connection has a blank action the
+    author names in the table. `workflowProblems()` mirrors `Workflow.problems()`/`fromMap` (same wording) as live,
+    advisory feedback — the server stays the judge and its 422 shows verbatim on save. ⚠ Keep it in step with the Java rules.
   - **Tests:** `WorkflowValidationTest`, `SlaPolicyTest` (engine) · `GovernanceSweepTest` (ops: hot reload, a
     hand-planted bypass file is not served, the gate still holds on a custom terminal state, policy stamping,
     response breach, escalation once per breach, age + priority cap, the 50-rule bound) ·

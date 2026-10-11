@@ -87,4 +87,19 @@ describe('WorkflowDiagramComponent', () => {
         f.detectChanges();
         expect(f.nativeElement.querySelectorAll('rect')).toHaveLength(2);
     });
+
+    it('reports a clicked state only when pickable, and draws an extra state', () => {
+        const f = render(draft('A', 'B', [['A', 'go', 'B']]));
+        const picked: string[] = [];
+        f.componentInstance.stateClick.subscribe((s) => picked.push(s));
+        const rects = () => Array.from(f.nativeElement.querySelectorAll('rect')) as SVGRectElement[];
+        rects()[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(picked).toEqual([]);
+        f.componentRef.setInput('pickable', true);
+        f.componentRef.setInput('extraStates', ['LONE']);
+        f.detectChanges();
+        expect(rects()).toHaveLength(3);
+        rects()[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(picked).toEqual(['B']);
+    });
 });
