@@ -171,7 +171,36 @@ export function anomalyModelAttributes(isEdit: boolean): AttributeSpec[] {
     ];
 }
 
-/** One Feature row as the editor holds it; `extra` carries keys the editor does not model (filters, unit). */
+/** `MeasureCompiler.Filter` ops, as the server spells them. A stored alias (`eq`, `gte`, …) is shown verbatim. */
+export const FEATURE_FILTER_OPS: { value: string; label: string }[] = [
+    { value: '=', label: 'equals (=)' },
+    { value: '!=', label: 'does not equal (!=)' },
+    { value: '>', label: 'greater than (>)' },
+    { value: '>=', label: 'at least (>=)' },
+    { value: '<', label: 'less than (<)' },
+    { value: '<=', label: 'at most (<=)' },
+    { value: 'in', label: 'is one of (comma-separated)' },
+    { value: 'like', label: 'matches a LIKE pattern' },
+    { value: 'isNull', label: 'is empty' },
+    { value: 'notNull', label: 'is not empty' },
+];
+
+/** Ops that take no value (`MeasureCompiler.filterTerm`). */
+export const NO_VALUE_OPS = ['isNull', 'notNull'];
+
+/** One `{field, op, value}` Feature filter as the editor holds it; `raw` is its stored map (empty when new). */
+export interface FeatureFilterDraft {
+    field: string;
+    op: string;
+    value: string;
+    raw: Record<string, unknown>;
+}
+
+/**
+ * One Feature row as the editor holds it. `filters` (ANDed before the Measure) and `unit` (the absolute spread floor)
+ * are edited as text; `storedUnit` is the stored `unit` value, written back as-is while `unit` still reads as it, so
+ * opening and saving a model never rewrites what it does not touch. `extra` carries keys the editor does not model.
+ */
 export interface AnomalyFeatureDraft {
     id: string;
     label: string;
@@ -181,6 +210,9 @@ export interface AnomalyFeatureDraft {
     measure: string;
     direction: string;
     weight: string;
+    filters: FeatureFilterDraft[];
+    unit: string;
+    storedUnit?: unknown;
     extra: Record<string, unknown>;
 }
 
@@ -194,11 +226,19 @@ export function emptyFeature(n: number): AnomalyFeatureDraft {
         measure: '',
         direction: 'up',
         weight: '1',
+        filters: [],
+        unit: '',
         extra: {},
     };
 }
 
+export function emptyFilter(): FeatureFilterDraft {
+    return { field: '', op: '=', value: '', raw: {} };
+}
+
 const str = (v: unknown): string => (v == null ? '' : String(v));
+/** A stored value as editor text; a list (an `in` filter's value) reads as `a, b`. */
+const text = (v: unknown): string => (Array.isArray(v) ? v.map(String).join(', ') : str(v));
 
 /** The schema-form seed of a stored model (edit), with `peers` / `watchList` flattened. */
 export function anomalyModelInitial(content: Record<string, unknown>): Record<string, unknown> {
@@ -225,7 +265,14 @@ export function anomalyModelInitial(content: Record<string, unknown>): Record<st
     };
 }
 
-const FEATURE_MODELLED = ['id', 'label', 'dataset', 'key', 'time', 'measure', 'direction', 'weight'];
+const FEATURE_MODELLED = ['id', 'label', 'dataset', 'key', 'time', 'measure', 'direction', 'weight', 'filters', 'unit'];
+
+/** A Feature's stored `filters` as editor rows; a non-map entry is dropped. */
+function filterDrafts(stored: unknown): FeatureFilterDraft[] {
+    return (Array.isArray(stored) ? (stored as unknown[]) : [])
+        .filter((f): f is Record<string, unknown> => !!f && typeof f === 'object' && !Array.isArray(f))
+        .map((f) => ({ field: text(f['field']), op: text(f['op']) || '=', value: text(f['value']), raw: { ...f } }));
+}
 
 export function featureDrafts(content: Record<string, unknown>): AnomalyFeatureDraft[] {
     const raw = Array.isArray(content['features']) ? (content['features'] as unknown[]) : [];
@@ -243,6 +290,9 @@ export function featureDrafts(content: Record<string, unknown>): AnomalyFeatureD
                 measure: str(f['measure']),
                 direction: str(f['direction']) || 'up',
                 weight: f['weight'] == null ? '1' : str(f['weight']),
+                filters: filterDrafts(f['filters']),
+                unit: text(f['unit']),
+                storedUnit: f['unit'],
                 extra,
             };
         });
@@ -252,6 +302,33 @@ const numeric = (v: string): number | string => {
     const t = v.trim();
     return t !== '' && !Number.isNaN(Number(t)) ? Number(t) : t;
 };
+
+/** One filter for storage: no `value` for isNull/notNull, a list for `in`, the stored value when unchanged. */
+function toFeatureFilter(d: FeatureFilterDraft): Record<string, unknown> {
+    const out: Record<string, unknown> = { ...d.raw, field: d.field.trim(), op: d.op };
+    if (NO_VALUE_OPS.includes(d.op)) {
+        delete out['value'];
+        return out;
+    }
+    const unchanged = 'value' in d.raw && d.value === text(d.raw['value']) && d.op === text(d.raw['op']);
+    if (unchanged) out['value'] = d.raw['value'];
+    else if (d.op === 'in')
+        out['value'] = d.value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+    else out['value'] = d.value;
+    return out;
+}
+
+/** A Feature's `filters` and `unit` for storage: an empty list and a blank unit leave no key. */
+function featureFieldsOf(f: AnomalyFeatureDraft): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    if (f.filters.length) out['filters'] = f.filters.map(toFeatureFilter);
+    const u = f.unit.trim();
+    if (u) out['unit'] = u === text(f.storedUnit) ? f.storedUnit : Number(u);
+    return out;
+}
 
 /** Top-level keys the form does not model; carried from the stored model untouched. */
 const TOP_PASSTHROUGH = ['name', 'owner', 'shares', 'bucket', 'scoredPeriod', 'zCap', 'scale'];
@@ -299,6 +376,7 @@ export function toAnomalyModelContent(
     out['features'] = features.map((f) => {
         const row: Record<string, unknown> = {
             ...f.extra,
+            ...featureFieldsOf(f),
             id: f.id.trim(),
             dataset: f.dataset.trim(),
             key: f.key.trim(),

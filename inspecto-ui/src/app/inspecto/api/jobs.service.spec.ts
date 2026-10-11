@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import {
     JobExpressionDecl,
     JobProcessorCatalog,
+    JobRunById,
     JobUpsert,
     JobsService,
     jobFromWire,
@@ -179,5 +180,47 @@ describe('JobsService.processors', () => {
             .flush({ processors: [], total: 0, truncated: false, unusable: 0 });
         expect(failed).toBe(false);
         expect(got?.processors).toEqual([]);
+    });
+});
+
+/**
+ * `GET /jobs/runs/{runId}` (`JobRoutes.runById`) — the poll target of a triggered or admitted run. It is NOT the
+ * `/jobs/runs` list row: the server spells the times `startedAt` / `finishedAt`, and the type must not rename them.
+ */
+describe('JobsService.run', () => {
+    let svc: JobsService;
+    let httpMock: HttpTestingController;
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            providers: [JobsService, provideHttpClient(withXhr()), provideHttpClientTesting()],
+        });
+        svc = TestBed.inject(JobsService);
+        httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => httpMock.verify());
+
+    it('reads one run at the path JobRoutes registers, encoding the id, with the server field names', () => {
+        let got: JobRunById | undefined;
+        svc.run('space.comparison/1').subscribe((r) => (got = r));
+        httpMock
+            .expectOne(
+                (r) => r.method === 'GET' && r.url === `${environment.apiBaseUrl}/v1/jobs/runs/space.comparison%2F1`,
+            )
+            .flush({
+                runId: 'space.comparison/1',
+                job: 'space.comparison',
+                type: 'space.comparison',
+                trigger: 'manual',
+                status: 'RUNNING',
+                startedAt: '2026-10-11T07:00:00Z',
+                finishedAt: null,
+                durationMs: 0,
+                message: null,
+            });
+        expect(got?.status).toBe('RUNNING');
+        expect(got?.startedAt).toBe('2026-10-11T07:00:00Z');
+        expect(got?.finishedAt).toBeNull();
     });
 });

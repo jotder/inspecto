@@ -15,24 +15,11 @@ export interface SpaceComparisonRequest {
     axes?: string[];
 }
 
-/** The `202` answer: the admitted run to poll. */
+/** The `202` answer: the admitted run to poll with `JobsService.run`. */
 export interface SpaceComparisonAdmitted {
     runId: string;
     spaces: string[];
     status: string;
-}
-
-/** `GET /jobs/runs/{runId}` — one run's status, `RUNNING` until it lands on a terminal status. */
-export interface SpaceComparisonRun {
-    runId: string;
-    job: string;
-    type: string;
-    trigger: string;
-    status: string;
-    startedAt: string | null;
-    finishedAt: string | null;
-    durationMs: number;
-    message: string | null;
 }
 
 /** One Space's figures on one axis. */
@@ -75,11 +62,6 @@ export class SpaceComparisonService {
     /** Admit one comparison run — `202` + `runId`. 403 / 422 / 404 / 409 per the route's gates. */
     compare(body: SpaceComparisonRequest): Observable<SpaceComparisonAdmitted> {
         return this.http.post<SpaceComparisonAdmitted>(apiUrl('/space-comparisons'), body);
-    }
-
-    /** Poll one run; 404 once it is evicted. */
-    run(runId: string): Observable<SpaceComparisonRun> {
-        return this.http.get<SpaceComparisonRun>(apiUrl(`/jobs/runs/${encodeURIComponent(runId)}`));
     }
 
     /** The finished run's structured result, or `null` when the ledger holds no Signal for it. */

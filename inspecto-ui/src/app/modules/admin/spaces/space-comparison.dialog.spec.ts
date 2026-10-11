@@ -5,10 +5,11 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+    JobRunById,
+    JobsService,
     Space,
     SpaceComparisonRequest,
     SpaceComparisonResult,
-    SpaceComparisonRun,
     SpaceComparisonService,
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -29,7 +30,7 @@ const RESULT: SpaceComparisonResult = {
     axes: [],
 };
 
-function runOf(status: string, message: string | null = null): SpaceComparisonRun {
+function runOf(status: string, message: string | null = null): JobRunById {
     return {
         runId: 'space.comparison-1',
         job: 'space.comparison',
@@ -43,7 +44,8 @@ function runOf(status: string, message: string | null = null): SpaceComparisonRu
     };
 }
 
-function create(api: Partial<SpaceComparisonService>) {
+/** The comparison service's calls, plus the run poll `JobsService` answers. */
+function create({ run, ...api }: Partial<SpaceComparisonService> & Partial<Pick<JobsService, 'run'>>) {
     TestBed.configureTestingModule({
         imports: [SpaceComparisonDialog],
         providers: [
@@ -51,6 +53,7 @@ function create(api: Partial<SpaceComparisonService>) {
             { provide: MatDialogRef, useValue: { close: () => {} } },
             { provide: MAT_DIALOG_DATA, useValue: { spaces: SPACES } },
             { provide: SpaceComparisonService, useValue: api },
+            { provide: JobsService, useValue: { run } },
             { provide: InspectoConfirmService, useValue: {} },
         ],
     });
