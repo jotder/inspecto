@@ -550,7 +550,7 @@ if ($Edition -ne 'Personal') {
                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                      Select-Object -First 1 -ExpandProperty FullName
     if (-not $anomalyJarSrc -or -not (Test-Path $anomalyJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $anomalyTargetDir\inspecto-anomaly-*.jar."
+        throw "$Edition edition requested but no JAR found matching $anomalyTargetDir\inspecto-anomaly-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-anomaly -am -DskipTests"
     }
     # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Professional and above.
     $caseMgmtTargetDir = Join-Path $sandboxRoot 'features\inspecto-case-management\target'
@@ -601,6 +601,19 @@ if ($Edition -ne 'Personal') {
 }
 
 # ── step 2: create bundle directory ───────────────────────────────────────────
+# Refuse to clear a bundle that a server is running from. The clear below skips locked files and
+# carries on, so a live bundle would lose everything but its runtime (shared sandbox, 2026-10-11).
+if (Test-Path $bundleDir) {
+    $bundleFull = (Resolve-Path $bundleDir).Path.TrimEnd('\') + '\'
+    $running = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($bundleFull, [StringComparison]::OrdinalIgnoreCase)) -or
+        ($_.CommandLine -and $_.CommandLine.IndexOf($bundleFull.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase) -ge 0)
+    } | Where-Object { $_.ProcessId -ne $PID })
+    if ($running.Count -gt 0) {
+        $who = ($running | ForEach-Object { "PID $($_.ProcessId) ($($_.Name))" }) -join ', '
+        throw "Refusing to rebuild $bundleDir : it is in use by $who. Stop that server first (it may belong to another session), then re-run."
+    }
+}
 Write-Host "Assembling bundle at $bundleDir ..." -ForegroundColor Cyan
 if (Test-Path $bundleDir) {
     Get-ChildItem -Path $bundleDir | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue

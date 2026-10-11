@@ -273,6 +273,10 @@ pwsh -File inspecto\package.ps1 -NoBuild        # reuse target/ JAR
 pwsh -File inspecto\package.ps1 -NoUi           # skip Angular UI
 pwsh -File inspecto\package.ps1 -NoRuntime      # skip embedded JVM (target must provide Java 27+)
 ```
+⚠ `package.ps1` REFUSES to rebuild a bundle folder (`inspecto-deploy` / `inspecto-demo`) while any process runs from it
+(its `runtime\bin\java.exe`, or a command line naming the folder) — in this shared sandbox that server may be another
+session's. Stop it first; never kill a server you did not start. (2026-10-11: a rebuild wiped a live demo bundle.)
+
 Editions are build flavors (Personal HTTP/no-auth · Standard HTTPS/OIDC · Enterprise = Standard + ABAC
 policy) — see [docs/EDITIONS.md](../../../docs/EDITIONS.md). All three flavors exist today:
 
