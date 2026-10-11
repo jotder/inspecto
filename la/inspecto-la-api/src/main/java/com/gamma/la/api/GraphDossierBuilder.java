@@ -497,6 +497,7 @@ final class GraphDossierBuilder {
         for (String k : List.of("id", "purpose", "dataset", "sourceCol", "targetCol", "linkKindCol", "timeCol",
                 "timeColZone", "datasetVersion", "parent"))
             bindings.put(k, header.get(k));
+        if (header.get("eventsCol") != null) bindings.put("eventsCol", header.get("eventsCol"));   // only when bound
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("investigation", bindings);
         m.put("log", entries);
@@ -532,6 +533,8 @@ final class GraphDossierBuilder {
          .append(". Dataset ").append(header.get("dataset")).append(", links read from ").append(header.get("sourceCol"))
          .append(" to ").append(header.get("targetCol"));
         if (header.get("linkKindCol") != null) b.append(", kind from ").append(header.get("linkKindCol"));
+        if (header.get("eventsCol") != null)   // a pre-aggregated Dataset: a link's strength is the sum of this column, not a row count
+            b.append(", each row weighing the events counted in ").append(header.get("eventsCol"));
         b.append(".");
         if (header.get("timeCol") != null)   // LA-13: the timezone contract, stated where an authority reads it
             b.append(" Event time from ").append(header.get("timeCol")).append(header.get("timeColZone") == null

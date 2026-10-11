@@ -263,13 +263,17 @@ if the underlying data changes later.
 Run a query with **one** Entity/Link mapping, open the **Investigation** tab and choose **Start Investigation**.
 It binds that Dataset and its columns. (The query's filter is not carried into the Investigation; the panel says so.)
 A Space may require a stated **purpose** for sensitive steps; when asked, it is recorded in the log.
+Over a **pre-aggregated** Dataset (one row per pair with an event count, like `telecom_links`), bind its count column
+as `eventsCol` when the Investigation is created: an expand then counts a link's events as the sum of that column, not
+its rows (an empty count is one event). It must be a whole-number column. The Telecom profile's *Investigate a number*
+binds `events` for you. Without it, each row is one event, as before.
 
 ### 9.2 Steps you can take
 
 | Op | Effect |
 |---|---|
 | **seed** | Put starting entities into the Working Set (by id, or from an Entity List). |
-| **expand** | Follow links one hop. Options (the *hop ladder*): direction, link kinds, time **window**, minimum events / distinct days, candidate degree bounds, fan-out cap, **budget**, and a **hub threshold** (default 500, set per Space): an entity with more distinct contacts is added but flagged *high connectivity* and not expanded further unless you name it in `expandHubs` (or send `includeHubs`). |
+| **expand** | Follow links one hop. Options (the *hop ladder*): direction, link kinds, time **window**, minimum events / distinct days, candidate degree bounds, fan-out cap, **budget**, and a **hub threshold** (default 500, set per Space): an entity this step adds with more distinct contacts is added but flagged *high connectivity* and not expanded further unless you name it in `expandHubs` (or send `includeHubs`); an entity already in the Working Set is never newly flagged. Minimum events, the fan-out ranking and the budget order use the `eventsCol` sum when one is bound (§9.1). |
 | **window** | Set the time range later expands inherit. |
 | **exclude** | Remove entities — a **reason is required**. Stays excluded. |
 | **hide / keep** | Hide from view only; **keep** protects an entity from exclusion. |
