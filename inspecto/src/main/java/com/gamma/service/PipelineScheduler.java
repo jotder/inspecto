@@ -263,7 +263,7 @@ final class PipelineScheduler {
      * {@link #triggerWorkers}. A pipeline still running when the next tick fires is simply not selected
      * again, because its claim is still held.
      */
-    List<Future<Integer>> dispatchCycle() {
+    List<Future<MultiCollectorProcessor.RunResult>> dispatchCycle() {
         // Periodic driver: ingest only. A remote collector's files are fetched by the separate acquisition
         // driver ({@link #dispatchAcquireCycle()}) on its own timer, so the poll tick must not re-fetch (B3b).
         // The returned futures are ignored by the timer; tests await them instead of sleeping.
@@ -277,16 +277,18 @@ final class PipelineScheduler {
      * ({@code CollectorService.runAllOnce}) has already applied this space's MDC, which {@link #dispatch}
      * captures and each worker re-applies, so the runs execute under the right space.
      *
-     * @return the run outcome (total / failed source counts)
+     * @return the run outcome (total / failed / cancelled source counts)
      */
     MultiCollectorProcessor.RunResult runCycle() {
         // Explicit "run all now" (POST /trigger, tests): a self-contained acquire-then-ingest cycle, so it
         // fetches inline exactly as before B3b rather than waiting on the background acquisition driver.
-        List<Future<Integer>> runs = dispatch(selectDue(System.currentTimeMillis()), true);
-        int failed = 0;
-        for (Future<Integer> f : runs) {
+        List<Future<MultiCollectorProcessor.RunResult>> runs = dispatch(selectDue(System.currentTimeMillis()), true);
+        int failed = 0, cancelled = 0;
+        for (Future<MultiCollectorProcessor.RunResult> f : runs) {
             try {
-                failed += f.get();
+                MultiCollectorProcessor.RunResult one = f.get();
+                failed += one.failed();
+                cancelled += one.cancelled();   // HA-CANCEL-RESIDUALS-1: neither succeeded nor failed
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 failed++;
@@ -297,7 +299,7 @@ final class PipelineScheduler {
             }
         }
         if (failed > 0) log.warn("Poll cycle: {} of {} source(s) failed", failed, runs.size());
-        return new MultiCollectorProcessor.RunResult(runs.size(), failed);
+        return new MultiCollectorProcessor.RunResult(runs.size(), failed, cancelled);
     }
 
     /**
@@ -354,12 +356,12 @@ final class PipelineScheduler {
      * whole audit for every config, so per-run would multiply that by the pipeline count. The last task to
      * finish fires it, which is the same point in the cycle as before — see {@link #runOne}.
      */
-    private List<Future<Integer>> dispatch(List<Due> due, boolean acquireFirst) {
+    private List<Future<MultiCollectorProcessor.RunResult>> dispatch(List<Due> due, boolean acquireFirst) {
         if (due.isEmpty()) return List.of();
         com.gamma.metrics.MetricRegistry.global().inc("inspecto_poll_cycles_total", "Poll cycles run", Map.of());
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate this space onto each worker
         AtomicInteger pending = new AtomicInteger(due.size());
-        List<Future<Integer>> runs = new ArrayList<>(due.size());
+        List<Future<MultiCollectorProcessor.RunResult>> runs = new ArrayList<>(due.size());
         for (Due d : due) {
             try {
                 runs.add(triggerWorkers.submit(() -> runOne(d, mdc, pending, acquireFirst)));
@@ -382,9 +384,9 @@ final class PipelineScheduler {
      * per-source logging, and MDC propagation stay in the one tested place; the concurrency bound comes from
      * this scheduler's {@link #runPermits} instead, which is the budget that now spans overlapping cycles.
      *
-     * @return {@code 1} when this pipeline's run failed, else {@code 0} — summed by {@link #runCycle()}
+     * @return this pipeline's outcome as a one-source {@code RunResult} (failed or cancelled) — summed by {@link #runCycle()}
      */
-    private int runOne(Due due, Map<String, String> mdc, AtomicInteger pending, boolean acquireFirst) {
+    private MultiCollectorProcessor.RunResult runOne(Due due, Map<String, String> mdc, AtomicInteger pending, boolean acquireFirst) {
         if (mdc != null) MDC.setContextMap(mdc);
         com.gamma.metrics.MetricRegistry reg = com.gamma.metrics.MetricRegistry.global();
         try (RunLease.Claim claim = due.claim();
@@ -413,7 +415,7 @@ final class PipelineScheduler {
                 }
                 // HA-CANCEL-RESIDUALS-1: a run a closing host cancelled is not a failure — no failure metric, no failed poll.
                 if (r.cancelled() > 0) log.info("Source '{}' run cancelled (host closing)", due.id());
-                return r.failed();
+                return new MultiCollectorProcessor.RunResult(1, r.failed(), r.cancelled());
             } catch (RuntimeException e) {
                 // ⚠ A throw is a poll that happened and failed — recording it here rather than only on the
                 // counted-failure path is the difference between "wedged" and "never looked".
@@ -429,7 +431,7 @@ final class PipelineScheduler {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();             // shutting down while queued for a permit
-            return 1;
+            return new MultiCollectorProcessor.RunResult(1, 1);
         } finally {
             // Refresh the status DB (if DB-backed) once the cycle's last run is done, so its commits are
             // queryable. (Catalog invalidation already fired from configRegistry.rebuild during selection.)

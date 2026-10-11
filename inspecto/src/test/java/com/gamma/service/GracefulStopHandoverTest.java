@@ -187,7 +187,10 @@ class GracefulStopHandoverTest {
                     CompletableFuture.supplyAsync(svc::runAllOnce);
             assertTrue(park.parked.await(20, TimeUnit.SECONDS), "the run emitted an event mid-flight");
             closeWhileParked(svc, park);
-            assertEquals(0, cycle.get(10, TimeUnit.SECONDS).failed(), "a cancel is not a failed source run");
+            com.gamma.inspector.MultiCollectorProcessor.RunResult res = cycle.get(10, TimeUnit.SECONDS);
+            assertEquals(0, res.failed(), "a cancel is not a failed source run");
+            assertEquals(1, res.cancelled(), "run-all reports the source as cancelled: " + res);
+            assertEquals(0, res.succeeded(), "...not as succeeded");
             Map<String, Object> row = svc.collectors().stream()
                     .filter(m -> name.equalsIgnoreCase(String.valueOf(m.get("pipeline")))).findFirst().orElseThrow();
             assertNull(row.get("lastError"), "the poll is not marked failed: " + row);
