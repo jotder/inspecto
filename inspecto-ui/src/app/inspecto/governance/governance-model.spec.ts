@@ -10,6 +10,14 @@ import {
     splitList,
     workflowContent,
     workflowDraft,
+    WorkflowDraft,
+    connectStates,
+    removeState,
+    renameState,
+    setInitialState,
+    setTerminalState,
+    workflowProblems,
+    workflowStates,
 } from './governance-model';
 
 describe('governance-model', () => {
@@ -204,5 +212,78 @@ describe('governance-model', () => {
             expect(d.when).toBeUndefined();
             expect(escalationRuleContent(d, odd)['when']).toBe('status == OPEN');
         });
+    });
+});
+
+describe('workflow state-diagram edits', () => {
+    const base = (): WorkflowDraft => ({
+        objectType: 'INCIDENT',
+        initial: 'IDENTIFIED',
+        terminal: 'ARCHIVED',
+        transitions: [
+            { from: 'IDENTIFIED', to: 'RESOLVED', action: 'resolve' },
+            { from: 'RESOLVED', to: 'ARCHIVED', action: 'archive' },
+        ],
+    });
+
+    it('renames a state everywhere and refuses a clash', () => {
+        const d = renameState(base(), 'resolved', 'done');
+        expect(workflowContent(d)['transitions']).toEqual([
+            { from: 'IDENTIFIED', to: 'DONE', action: 'resolve' },
+            { from: 'DONE', to: 'ARCHIVED', action: 'archive' },
+        ]);
+        expect(renameState(base(), 'RESOLVED', 'archived')).toEqual(base());
+        expect(workflowStates(renameState(base(), 'IDENTIFIED', 'open'))[0]).toBe('OPEN');
+    });
+
+    it('removes a state with its transitions, and clears initial / terminal membership', () => {
+        const d = removeState(base(), 'RESOLVED');
+        expect(d.transitions).toEqual([]);
+        expect(removeState(base(), 'IDENTIFIED').initial).toBe('');
+        expect(removeState(base(), 'ARCHIVED').terminal).toBe('');
+    });
+
+    it('marks initial / terminal and connects with a blank action; the save shape is the form path shape', () => {
+        let d = setInitialState(base(), 'resolved');
+        d = setTerminalState(d, 'resolved', true);
+        d = connectStates(d, 'archived', 'identified');
+        expect(workflowContent(d)).toEqual({
+            id: 'incident',
+            objectType: 'INCIDENT',
+            initial: 'RESOLVED',
+            terminal: ['ARCHIVED', 'RESOLVED'],
+            transitions: [
+                { from: 'IDENTIFIED', to: 'RESOLVED', action: 'resolve' },
+                { from: 'RESOLVED', to: 'ARCHIVED', action: 'archive' },
+                { from: 'ARCHIVED', to: 'IDENTIFIED', action: '' },
+            ],
+        });
+        expect(setTerminalState(d, 'resolved', false).terminal).toBe('ARCHIVED');
+    });
+
+    it('mirrors the server problems with its wording; a valid workflow has none', () => {
+        expect(workflowProblems(base())).toEqual([]);
+        const p = workflowProblems(connectStates(base(), 'ARCHIVED', 'IDENTIFIED'));
+        expect(p).toContain('transition needs from, to and action');
+        const orphan = { ...base(), transitions: [...base().transitions, { from: 'X', to: 'RESOLVED', action: 'x' }] };
+        expect(workflowProblems(orphan)).toContain('state X is unreachable from the initial state IDENTIFIED');
+        const dup = {
+            ...base(),
+            transitions: [...base().transitions, { from: 'IDENTIFIED', to: 'ARCHIVED', action: 'resolve' }],
+        };
+        expect(workflowProblems(dup)).toContain("two transitions leave IDENTIFIED by action 'resolve'");
+        const skip = {
+            ...base(),
+            transitions: [...base().transitions, { from: 'IDENTIFIED', to: 'ARCHIVED', action: 'drop' }],
+        };
+        expect(workflowProblems(skip)).toEqual([]);
+        const around = {
+            ...base(),
+            terminal: 'ARCHIVED, DONE',
+            transitions: [...base().transitions, { from: 'IDENTIFIED', to: 'DONE', action: 'skip' }],
+        };
+        expect(workflowProblems(around).join()).toContain('skipping the Disposition and postmortem gate');
+        expect(workflowProblems({ ...base(), initial: '' })).toContain('an initial state is required');
+        expect(workflowProblems({ ...base(), terminal: '' })).toContain('declare at least one terminal state');
     });
 });
