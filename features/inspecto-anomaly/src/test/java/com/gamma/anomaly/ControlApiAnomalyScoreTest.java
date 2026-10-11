@@ -206,6 +206,28 @@ class ControlApiAnomalyScoreTest {
     }
 
     @Test
+    void thePreviewCarriesEvidenceRowsMaskedAtWriteTime(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, null)) {
+            new ComponentStore(c.config.resolve("registry")).write("dataset", "usage", Map.of("physicalRef", "usage",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            Map<String, Object> content = AnomalyCorpus.model();
+            for (Object f : (List<?>) content.get("features")) {
+                @SuppressWarnings("unchecked") Map<String, Object> fm = (Map<String, Object>) f;
+                fm.put("evidence", List.of("msisdn", "mb"));
+            }
+            HttpResponse<String> r = send(c.port, "POST", "/spaces/s1/anomaly-scores/preview", JSON.writeValueAsString(
+                    Map.of("content", content, "entityKey", "spike", "asOf", "2026-10-01")), "analyst");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode top = data(r).get("features").get(0);
+            assertTrue(top.get("evidence").size() >= 1);
+            String masked = top.get("evidence").get(0).get("msisdn").asText();
+            assertTrue(masked.startsWith("masked:"), "a classified evidence column is a token in the response");
+            assertFalse(top.toString().contains("\"msisdn\":\"spike\""));
+            assertTrue(top.get("evidence").get(0).has("mb"));
+        }
+    }
+
+    @Test
     void thePreviewGatesFailClosed(@TempDir Path root) throws Exception {
         try (Ctx c = open(root, null)) {
             String content = JSON.writeValueAsString(Map.of("content", AnomalyCorpus.model(), "entityKey", "spike",
