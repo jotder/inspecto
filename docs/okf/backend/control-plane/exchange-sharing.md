@@ -161,7 +161,7 @@ no backend change, since both numbers are already loaded for the grid:
 ```
 driftVersion(grant, currentVersion) =
   grant.status === 'active' && grant.pin && currentVersion && currentVersion !== grant.pin
-    && versionSeq(currentVersion) > versionSeq(grant.pin)
+    && compareSnapshotVersions(currentVersion, grant.pin) > 0
   ? currentVersion : null
 ```
 
