@@ -1672,6 +1672,13 @@ public final class JobService implements AutoCloseable {
         try {
             try {
                 res = job.run(ctx);
+            } catch (com.gamma.inspector.CommitFence.RunCancelledException e) {
+                // HA-CANCEL-RESIDUALS-1: the host is closing and cancelled this Run at a checkpoint - a planned
+                // stop, recorded CANCELLED with an INFO job.run.completed, never FAILED/CRITICAL. A genuine lease
+                // LOSS (the parent LeaseLostException) still takes the failure path below.
+                log.info("Job '{}' ({}) cancelled: {}", name, trigger, e.getMessage());
+                ctx.log().info("run cancelled", "reason", String.valueOf(e.getMessage()));
+                res = JobResult.cancelled(String.valueOf(e.getMessage()), (System.nanoTime() - t0) / 1_000_000L);
             } catch (Exception e) {
                 threw = true;
                 log.error("Job '{}' ({}) failed", name, trigger, e);
@@ -1702,7 +1709,8 @@ public final class JobService implements AutoCloseable {
             ctx.signals().emit(SignalType.JOB_RUN_FAILED, Severity.CRITICAL,
                     Map.of("job", name, "run", runId, "outcome", res.status(), "message", String.valueOf(res.message())));
         else
-            ctx.signals().emit(SignalType.JOB_RUN_COMPLETED, res.success() ? Severity.INFO : Severity.WARN,
+            ctx.signals().emit(SignalType.JOB_RUN_COMPLETED,
+                    res.success() || "CANCELLED".equals(res.status()) ? Severity.INFO : Severity.WARN,
                     Map.of("job", name, "run", runId, "outcome", res.status(), "durationMs", res.durationMs()));
         JobRun run = new JobRun(runId, name, job.type(), trigger, start,
                 LocalDateTime.now().format(TS), res.status(), res.durationMs(), res.message());

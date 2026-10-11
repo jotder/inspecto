@@ -50,18 +50,28 @@ class GracefulStopHandoverTest {
      * until the service's close() has signalled, then probes the run's checkpoint from inside the run.
      */
     private static final class Park implements Consumer<Event> {
-        final CountDownLatch parked = new CountDownLatch(1), resume = new CountDownLatch(1);
+        final CountDownLatch parked = new CountDownLatch(1), signalled = new CountDownLatch(1),
+                resume = new CountDownLatch(1);
         final AtomicBoolean armed = new AtomicBoolean(true);
         final AtomicReference<Throwable> probe = new AtomicReference<>();
         final Predicate<Event> match;
         final Runnable checkpoint;
+        final java.util.function.Supplier<java.util.function.BooleanSupplier> cancelSignal;
 
-        Park(Predicate<Event> match, Runnable checkpoint) { this.match = match; this.checkpoint = checkpoint; }
+        Park(Predicate<Event> match, Runnable checkpoint,
+             java.util.function.Supplier<java.util.function.BooleanSupplier> cancelSignal) {
+            this.match = match; this.checkpoint = checkpoint; this.cancelSignal = cancelSignal;
+        }
 
         @Override public void accept(Event e) {
             if (!match.test(e) || !armed.compareAndSet(true, false)) return;
             parked.countDown();
             try {
+                // Deterministic: wait (on the run thread, which carries the run's Space) until close() has
+                // actually raised the cancel - re-resolved each poll - then tell the test it has signalled.
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                while (!cancelSignal.get().getAsBoolean() && System.nanoTime() < until) Thread.sleep(5);
+                signalled.countDown();
                 resume.await(10, TimeUnit.SECONDS);
                 checkpoint.run();
                 probe.set(new AssertionError("checkpoint passed - the run did not see the cancel"));
@@ -71,10 +81,11 @@ class GracefulStopHandoverTest {
         }
     }
 
-    /** close() in the background; give it time to signal, then let the parked run reach its checkpoint. */
+    /** close() in the background; wait until it has signalled the run, then let the parked run reach its checkpoint. */
     private static CompletableFuture<Void> closeWhileParked(CollectorService svc, Park park) throws Exception {
         CompletableFuture<Void> closing = CompletableFuture.runAsync(svc::close);
-        Thread.sleep(300);   // close() signals first (cancelRuns), then drains: the drain is now waiting on us
+        // close() signals first (cancelRuns), then drains: once the run sees the cancel, the drain waits on us
+        assertTrue(park.signalled.await(10, TimeUnit.SECONDS), "close() raised the run's cancel signal");
         assertFalse(closing.isDone(), "close() drains the in-flight run - it must not finish while the run is parked");
         park.resume.countDown();
         closing.get(10, TimeUnit.SECONDS);
@@ -93,7 +104,8 @@ class GracefulStopHandoverTest {
 
         CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
         Park park = new Park(e -> Thread.currentThread().isVirtual() && name.equalsIgnoreCase(e.pipeline()),
-                () -> CommitFence.checkpoint(CommitFence.Scope.RUN, name));
+                () -> CommitFence.checkpoint(CommitFence.Scope.RUN, name),
+                () -> CommitFence.cancelSignal(CommitFence.Scope.RUN, name));
         svc.eventLog().addSubscriber(park);
         try (DbRunLease survivor = DbRunLease.open(url, null, null, svc.spaceId(), DbRunLease.SCOPE_RUN, "pod-b", TTL)) {
             CompletableFuture<?> run = CompletableFuture.runAsync(() -> svc.runPipelineOffThread(name, false));
@@ -130,7 +142,8 @@ class GracefulStopHandoverTest {
                     runId.set(id == null ? null : id.toString());
                     return true;
                 },
-                () -> CommitFence.checkpoint(CommitFence.Scope.JOB, runId.get()));
+                () -> CommitFence.checkpoint(CommitFence.Scope.JOB, runId.get()),
+                () -> CommitFence.cancelSignal(CommitFence.Scope.JOB, runId.get()));
         svc.eventLog().addSubscriber(park);
         try (DbRunLease survivor = DbRunLease.open(url, null, null, svc.spaceId(), DbRunLease.SCOPE_JOB, "pod-b", TTL)) {
             var jobs = svc.jobServiceOrCreate();
