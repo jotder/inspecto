@@ -607,6 +607,37 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
 });
 
 describe('LinkAnalysisToolboxComponent - DR-D5 results', () => {
+    it('Telecom profile: the pack defaults to the Space telecom pack, and never overrides a pick', () => {
+        const chain: ComponentDef = {
+            type: 'pattern-pack',
+            name: 'call-forwarding-chain',
+            ref: 'pattern-pack/call-forwarding-chain',
+            content: {
+                name: 'call-forwarding-chain',
+                label: 'Call-forwarding chain',
+                category: 'telecom',
+                description: 'Forwarding legs.',
+                steps: [{ direction: '' }, { direction: 'out', edgeKind: 'FORWARDS_TO' }],
+            },
+        };
+        const { fixture, c } = make(GRAPH, [chain]);
+        fixture.componentRef.setInput('profileId', 'telecom');
+        fixture.detectChanges();
+        expect(c.loadedPack()?.id).toBe('call-forwarding-chain');
+
+        c.loadPatternPack('layering-chain');
+        fixture.componentRef.setInput('profileId', 'finance');
+        fixture.detectChanges();
+        expect(c.loadedPack()?.id).toBe('layering-chain');
+    });
+
+    it('Telecom profile without Space packs falls to the built-in telecom pack', () => {
+        const { fixture, c } = make();
+        fixture.componentRef.setInput('profileId', 'telecom');
+        fixture.detectChanges();
+        expect(c.loadedPack()?.id).toBe('forwarding-relay');
+    });
+
     it('Pattern match opens on the first pack, never a blank all-edges motif', () => {
         const { fixture, c } = make();
         expect(c.loadedPack()?.id).toBe('layering-chain');

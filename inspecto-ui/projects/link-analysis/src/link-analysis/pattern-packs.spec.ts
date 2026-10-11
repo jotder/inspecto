@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { PATTERN_PACKS, patternColumnNeeds, patternPackFromContent, resolvePatternColumns } from './pattern-packs';
+import {
+    defaultPatternPack,
+    PATTERN_PACKS,
+    patternColumnNeeds,
+    patternPackFromContent,
+    resolvePatternColumns,
+} from './pattern-packs';
 
 /**
  * `patternPackFromContent` parses free-form authored TOON — a `pattern-pack` component has no backend
@@ -227,5 +233,32 @@ describe('pattern pack columns (telecom packs on a projection without link_kind 
         expect(plan.blocked).toContain('This pattern needs a time column — set Time in the Query panel.');
         expect(plan.blocked).toContain('This pattern needs a link kind column');
         expect(resolvePatternColumns({ kind: false, time: false }, {}, null)).toEqual({});
+    });
+});
+
+describe('defaultPatternPack', () => {
+    const space = patternPackFromContent({
+        name: 'call-forwarding-chain',
+        label: 'Call-forwarding chain',
+        category: 'telecom',
+        steps: [{ direction: '' }, { direction: 'out', edgeKind: 'FORWARDS_TO' }],
+    })!;
+
+    it('follows the profile category, a Space pack before a built-in', () => {
+        expect(defaultPatternPack(PATTERN_PACKS, 'telecom')?.id).toBe('forwarding-relay');
+        expect(defaultPatternPack([...PATTERN_PACKS, space], 'telecom')?.id).toBe('call-forwarding-chain');
+        expect(defaultPatternPack([...PATTERN_PACKS, space], 'finance')?.id).toBe('layering-chain');
+    });
+
+    it('falls back to the first pack for an unmapped or absent profile', () => {
+        expect(defaultPatternPack(PATTERN_PACKS, null)?.id).toBe(PATTERN_PACKS[0].id);
+        expect(defaultPatternPack(PATTERN_PACKS, 'cyber')?.id).toBe(PATTERN_PACKS[0].id);
+        expect(defaultPatternPack([], 'telecom')).toBeNull();
+    });
+
+    it('the built-in relay says it is the any-kind pack, not the Space chain', () => {
+        const relay = PATTERN_PACKS.find((p) => p.id === 'forwarding-relay')!;
+        expect(relay.label).toBe('Call-forwarding relay (any link kind)');
+        expect(relay.description).toContain('ANY link kind');
     });
 });

@@ -2,7 +2,18 @@ import { DecimalPipe } from '@angular/common';
 import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { RiskScorePanelComponent } from '@inspecto/core/components/risk-score-panel.component';
 import { AnomalyPanelComponent } from '@inspecto/core/components/anomaly-panel.component';
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    DestroyRef,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+    untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -67,6 +78,7 @@ import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import {
     PATTERN_PACK_COLUMNS,
     PATTERN_PACKS,
+    defaultPatternPack,
     PatternColumnPlan,
     PatternPack,
     patternColumnNeeds,
@@ -219,7 +231,14 @@ export class LinkAnalysisToolboxComponent {
 
     constructor() {
         // Never open the Pattern tool on a blank motif — that matches every link. Start from the first pack.
-        if (PATTERN_PACKS.length) this.loadPatternPack(PATTERN_PACKS[0].id);
+        // Until the investigator picks one, the default follows the domain profile (telecom ⇒ a telecom pack,
+        // this Space's own first) and re-resolves when the Space's authored packs arrive.
+        const first = defaultPatternPack(PATTERN_PACKS, null);
+        if (first) this.applyPatternPack(first.id);
+        effect(() => {
+            const pack = defaultPatternPack(this.patternPacks(), this.profileId());
+            if (pack && !this.packPicked) untracked(() => this.applyPatternPack(pack.id));
+        });
         // This Space's authored pattern packs, if it has any — merged over the shipped built-ins. Degrades
         // silently: an error (no write root, intelligence-free edition, offline) leaves the shipped built-ins
         // in place, which is the whole point of seeding the signal with them — there is no error surface to
@@ -1062,6 +1081,14 @@ export class LinkAnalysisToolboxComponent {
 
     /** Load a pattern pack's motif into the builder (a fresh copy so edits don't mutate the catalog). */
     loadPatternPack(id: string): void {
+        this.packPicked = true;
+        this.applyPatternPack(id);
+    }
+
+    /** Set once the investigator chooses a pack, so a late profile / Space-pack load never overrides it. */
+    private packPicked = false;
+
+    private applyPatternPack(id: string): void {
         const pack = this.patternPacks().find((p) => p.id === id) ?? null;
         this.loadedPack.set(pack);
         this.branchStages.set(

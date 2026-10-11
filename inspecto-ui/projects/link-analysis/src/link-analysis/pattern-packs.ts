@@ -196,9 +196,10 @@ export const PATTERN_PACKS: PatternPack[] = [
     },
     {
         id: 'forwarding-relay',
-        label: 'Call-forwarding relay',
+        label: 'Call-forwarding relay (any link kind)',
         category: 'telecom',
-        description: 'A relay hop A → B → C — the building block of call-forwarding abuse and SIM-box relaying.',
+        description:
+            'A generic relay hop A → B → C over ANY link kind, matched in the browser on the loaded graph — the building block of call-forwarding abuse and SIM-box relaying. Set the link kinds to narrow it; a Space pack such as Call-forwarding chain pins them for you.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
     },
     {
@@ -264,6 +265,25 @@ export const PATTERN_PACKS: PatternPack[] = [
         ],
     },
 ];
+
+/** The pack category a domain profile foregrounds; a profile not listed keeps the catalog's first pack. */
+const PROFILE_PACK_CATEGORY: Partial<Record<DomainProfileId, PatternPack['category']>> = {
+    finance: 'money',
+    telecom: 'telecom',
+};
+
+/**
+ * The pack the Pattern tool opens on: the first pack of the active profile's category — a Space-authored one
+ * before a shipped built-in, since it pins that Space's own kinds — else the catalog's first pack.
+ */
+export function defaultPatternPack(
+    packs: readonly PatternPack[],
+    profileId: DomainProfileId | null | undefined,
+): PatternPack | null {
+    const category = profileId ? PROFILE_PACK_CATEGORY[profileId] : undefined;
+    const matching = category ? packs.filter((p) => p.category === category) : [];
+    return matching.find((p) => !PATTERN_PACKS.includes(p)) ?? matching[0] ?? packs[0] ?? null;
+}
 
 // ── Columns a pack needs (review: telecom packs only worked on a `link_kind` / `first_seen` projection) ──
 
