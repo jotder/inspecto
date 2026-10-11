@@ -709,6 +709,18 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             workingSet: { entities: 3, links: 2, excluded: 0, hash: '' },
         });
 
+    it('badges a flagged entity with its own sealed contact count when served', async () => {
+        const ws: WorkingSet = {
+            ...HUB_WS,
+            entities: HUB_WS.entities.map((e) => (e.id === 'hub' ? { ...e, contacts: 650 } : e)),
+        };
+        const { fixture, store, el } = create({ ws });
+        await openInv(store);
+        fixture.detectChanges();
+        const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
+        expect(list.textContent).toMatch(/High connectivity — 650 contacts( \(threshold [\d,]+\))?, not expanded/);
+    });
+
     it('badges the flagged entity, and "Expand anyway" confirms, then sends expandHubs and says it is recorded', async () => {
         const confirm = vi.fn(async () => true);
         const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm });

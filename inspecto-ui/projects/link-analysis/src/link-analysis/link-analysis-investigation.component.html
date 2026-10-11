@@ -366,7 +366,7 @@
                     @for (e of hubs().slice(0, 50); track e.id) {
                         <li class="flex flex-wrap items-center gap-1">
                             <span class="font-mono">{{ e.id }}</span>
-                            <inspecto-chip variant="soft" tone="warning">{{ hubBadge() }}</inspecto-chip>
+                            <inspecto-chip variant="soft" tone="warning">{{ hubBadge(e.contacts) }}</inspecto-chip>
                             <button
                                 mat-button
                                 type="button"
@@ -410,7 +410,7 @@
                     }
                     @if (selectedHubs().length) {
                         <inspecto-chip variant="soft" tone="warning" data-testid="selected-hub-badge">{{
-                            hubBadge()
+                            selectedHubBadge()
                         }}</inspecto-chip>
                     }
                 </div>

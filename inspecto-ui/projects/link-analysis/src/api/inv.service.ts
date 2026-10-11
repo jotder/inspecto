@@ -452,6 +452,10 @@ export interface InvestigationStepResult {
         fanOutCapped?: number;
         /** Hub suppression: high-connectivity entities this step admitted flagged (shown, not expanded further). */
         hubsFlagged?: number;
+        /** Hub suppression: each flagged entity with its sealed contact count (distinct contacts in the window). */
+        hubs?: { id: string; degree: number }[];
+        /** How the hub counts were computed: from the link index or from the flat Dataset. */
+        hubDegreeSource?: 'index' | 'flat';
         /** The rung as read; `hubsHeld` = frontier hubs the server did not expand from. */
         rung?: { hubsHeld?: string[] } & Record<string, unknown>;
         /** Only when an expand was answered by the link index: the version it read (never part of the fingerprint). */
@@ -526,6 +530,8 @@ export interface WorkingSetEntity {
     /** Supernode suppression: a sealed read flagged it (more contacts than its expand's hub threshold) — shown, not
      *  expanded further unless an expand overrides it. ABSENT when not flagged. */
     highConnectivity?: boolean;
+    /** The sealed hub degree (distinct contacts) — null unless flagged `highConnectivity`; absent in old logs. */
+    contacts?: number | null;
 }
 
 export interface WorkingSetLink {

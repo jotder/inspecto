@@ -18,6 +18,12 @@ describe('hubRow (telecom S3)', () => {
         expect(hubRow({ entityId: 'h', highConnectivity: true })['highConnectivity']).toBe(
             'High connectivity — not expanded',
         );
+        expect(hubRow({ entityId: 'h', highConnectivity: true, contacts: 650 })['highConnectivity']).toBe(
+            'High connectivity — 650 contacts, not expanded',
+        );
+        expect(hubRow({ entityId: 'h', highConnectivity: true, contacts: null })['highConnectivity']).toBe(
+            'High connectivity — not expanded',
+        );
         expect(hubRow({ entityId: 'a', highConnectivity: false })['highConnectivity']).toBe('');
         const link = { source: 'a', target: 'b' };
         expect(hubRow(link)).toBe(link);

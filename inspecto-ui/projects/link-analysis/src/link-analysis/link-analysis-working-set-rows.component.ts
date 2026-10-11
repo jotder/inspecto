@@ -16,11 +16,12 @@ export const WORKING_SET_PAGE = 200;
 
 /**
  * An entities row's `highConnectivity` flag in words — a bare `true`/`false` column says nothing about what the flag
- * means (shown, not expanded further). Unflagged rows read blank; rows of other relations pass unchanged.
+ * means (shown, not expanded further); the row's own sealed `contacts` is named when served. Unflagged rows read blank; rows of other relations pass unchanged.
  */
 export function hubRow(r: Record<string, unknown>): Record<string, unknown> {
     if (!('highConnectivity' in r)) return r;
-    return { ...r, highConnectivity: r['highConnectivity'] === true ? hubBadgeText() : '' };
+    const contacts = typeof r['contacts'] === 'number' ? r['contacts'] : null;
+    return { ...r, highConnectivity: r['highConnectivity'] === true ? hubBadgeText(null, contacts) : '' };
 }
 
 /**

@@ -318,8 +318,10 @@ seeds from the wider picture. Pressing *Seed* returns the canvas to the Working 
 *Hide* and *Exclude* act on the entity you just seeded.
 
 **High connectivity (hubs).** An entity flagged *high connectivity* is ringed on the canvas (legend: *Ringed: high
-connectivity*), badged *High connectivity — not expanded* in the panel and in the Working Set rows, and listed under
-**High connectivity**. *Expand next degree* leaves hubs out of its frontier and says how many it left out. To go
+connectivity*), badged with its own sealed count — *High connectivity — 650 contacts (threshold 500), not expanded* —
+in the panel and in the Working Set rows (logs sealed before the count was recorded show *more than 500 contacts*),
+and listed under **High connectivity**. The degree result says whether the counts came from the link index or the
+Dataset. *Expand next degree* leaves hubs out of its frontier and says how many it left out. To go
 through one anyway, use **Expand anyway** on it (that entity only), or tick **Include hubs** on the expand settings
 (every hub the expand reaches, including the next degree). Either asks you to confirm first, showing the
 Investigation's purpose; the override is sealed in that step and the panel shows *Override recorded at step N*.
