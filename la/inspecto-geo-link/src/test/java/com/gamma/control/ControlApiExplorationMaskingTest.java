@@ -7,6 +7,8 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.service.CollectorService;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,6 +23,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -236,6 +240,61 @@ class ControlApiExplorationMaskingTest {
             JsonNode replay = ok(c, "POST", "/inv/investigations/case-a/replay", "{}", false);
             assertEquals(aliasA, replay.at("/workingSet/exploreAliases").get(invAlias).asText(), "the replay carries it too");
         }
+    }
+
+    /**
+     * Live walk-through 6: a pattern run on an Investigation canvas ({@code investigationId}) answers that Investigation's
+     * pseudonyms — the Working Set's — so its matches line up with the canvas; a non-member is told nothing exists; and
+     * without {@code investigationId} the route still answers the Space's exploration aliases.
+     */
+    @Test
+    void aBranchingPatternRunOnAnInvestigationAnswersItsWorkingSetPseudonyms(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, plain())) {
+            settings(c, "masking_mode: all\n");
+            Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+                case "Bearer owner" -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents")));
+                case "Bearer stranger" -> Optional.of(new Subject("analyst-3", Set.of("canManageIncidents")));
+                default -> Optional.empty();
+            });
+            String own = "Bearer owner";
+            JsonNode proj = JSON.readTree(send(c, "POST", PROJECTION, "{" + BASE + "}", own).body()).get("data");
+            String aliasA = aliasOf(proj, 0, "source");
+            assertEquals(200, send(c, "POST", "/inv/investigations", "{\"id\":\"canvas\",\"purpose\":\"pattern on canvas\","
+                    + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", own).statusCode());
+            assertEquals(200, send(c, "POST", "/inv/investigations/canvas/ops", "{\"op\":\"seed\",\"ids\":[\"" + aliasA + "\"]}", own).statusCode());
+            assertEquals(200, send(c, "POST", "/inv/investigations/canvas/ops", "{\"op\":\"expand\",\"ids\":[\"" + aliasA + "\"]}", own).statusCode());
+            List<String> wsIds = new ArrayList<>();
+            for (JsonNode r : JSON.readTree(send(c, "GET", "/inv/investigations/canvas/working-set", null, own).body()).at("/data/rows"))
+                wsIds.add(r.get("entityId").asText());
+            assertEquals(3, wsIds.size(), wsIds.toString());   // A, and its neighbours B, C
+
+            String pattern = "{" + BASE + ",\"stages\":[{\"shape\":\"fan-out\",\"minBranches\":2}]";
+            HttpResponse<String> onCanvas = send(c, "POST", "/inv/pattern/branching", pattern + ",\"investigationId\":\"canvas\"}", own);
+            assertEquals(200, onCanvas.statusCode(), onCanvas.body());
+            for (String raw : RAW) assertFalse(onCanvas.body().contains(raw), "leaked " + raw + ": " + onCanvas.body());
+            JsonNode m = JSON.readTree(onCanvas.body()).at("/data/matches/0/nodeIds");
+            assertTrue(m.size() >= 3, m.toString());
+            for (JsonNode id : m) assertTrue(wsIds.contains(id.asText()), id + " is not a Working Set pseudonym " + wsIds);
+            assertFalse(wsIds.contains(aliasA), "the canvas never shows the exploration alias");
+
+            HttpResponse<String> stranger = send(c, "POST", "/inv/pattern/branching", pattern + ",\"investigationId\":\"canvas\"}", "Bearer stranger");
+            assertEquals(404, stranger.statusCode(), "a non-member is told nothing exists: " + stranger.body());
+
+            HttpResponse<String> plainRun = send(c, "POST", "/inv/pattern/branching", pattern + "}", own);
+            assertEquals(200, plainRun.statusCode(), plainRun.body());
+            JsonNode pm = JSON.readTree(plainRun.body()).at("/data/matches/0/nodeIds");
+            assertTrue(pm.toString().contains(aliasA), "without investigationId the exploration alias is unchanged: " + pm);
+            for (JsonNode id : pm) assertFalse(wsIds.contains(id.asText()), id.toString());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    private HttpResponse<String> send(Ctx c, String method, String path, String body, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
+                .header("Content-Type", "application/json").header("Authorization", auth);
+        b = "GET".equals(method) ? b.GET() : b.method(method, BodyPublishers.ofString(body == null ? "" : body));
+        return client.send(b.build(), BodyHandlers.ofString());
     }
 
     /**
