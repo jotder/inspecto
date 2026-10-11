@@ -47,7 +47,13 @@ describe('planTemplateCopy', () => {
         expect(plan.pipeline['source']).toEqual({ id: 'orders_eu' });
     });
 
-    it('leaves a binding the author set deliberately on the template as authored', () => {
+    /**
+     * ONB-IMPORT-RETARGET-1: a template copy follows the shared import rule, which mirrors the server
+     * bundle import — a carried binding is re-pointed whatever it holds, so two copies of one template
+     * can never share a Catalog Stream, a ledger dedup key or a lake. (Until then only a value still
+     * holding the template's own stamp was rewritten here.)
+     */
+    it('re-points a binding the author set by hand too, as the server import does', () => {
         const plan = planTemplateCopy(
             templateBundle({
                 template: true,
@@ -57,10 +63,10 @@ describe('planTemplateCopy', () => {
             }),
             { name: 'orders_eu' },
         );
-        expect(plan.pipeline['stream']).toBe('shared_orders');
-        expect(plan.pipeline['collector']).toEqual({ id: 'sftp_orders' });
+        expect(plan.pipeline['stream']).toBe('orders_eu');
+        expect(plan.pipeline['collector']).toEqual({ id: 'orders_eu' });
         expect((plan.pipeline['output'] as Record<string, unknown>)['ducklake']).toEqual({
-            data_path: 'data/lakes/orders',
+            data_path: 'data/orders_eu/ducklake',
         });
     });
 
