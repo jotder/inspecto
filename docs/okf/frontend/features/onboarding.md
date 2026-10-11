@@ -47,9 +47,12 @@ draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOS
    `template` + `active`, so a kept flag would make the copy un-runnable); the identity retarget is
    `planStreamImport`'s (below), so a hand-set binding on a template is re-pointed too (behaviour change,
    `237269fe9`). The name is still typed in the dialog and the draft is written once, at Create
-   (⛔ no client-side name deferral). ⚠ Save-as-template does not copy segment schemas, and
-   `exportPipeline` reads them by the `<pipeline>_<segment>` naming rule, so a plugin-parser template (like
-   Duplicate) loses `parsing.plugin.segments`; the dialog states which parts it could not read.
+   (⛔ no client-side name deferral). Save-as-template copies a plugin parser's per-segment schemas too
+   (`PipelineSettingsRoutes.copySegmentSchemas`, sibling of the `schema_file` copy): each `parsing.plugin.segments`
+   ref is copied beside the template as `<templateId>_<segment>.toon` (the `companionSchemaName` rule) and the ref
+   repointed, so `exportPipeline` finds them and `planStreamImport` renames them to the new pipeline's names. An
+   unreadable ref or an existing target file is left pointing at the source's with a note, like `schema_file`;
+   a maker-checker hold removes the copies. Plugin segments only (asn1 `segments` are not copied).
    **Import retarget (`ONB-IMPORT-RETARGET-1`, shipped 2026-10-11, `237269fe9`).** `planStreamImport`
    (`inspecto/transfer/stream-bundle.ts`) mirrors the server's `PipelineBundleRoutes.retargetPipeline`:
    whenever the key is present it re-points `stream`, the collector `id` (legacy `source.id`) and
