@@ -8,9 +8,10 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { switchMap, takeWhile } from 'rxjs';
 import {
     apiErrorMessage,
+    JobRunById,
+    JobsService,
     Space,
     SpaceComparisonResult,
-    SpaceComparisonRun,
     SpaceComparisonService,
     visibleInterval,
 } from 'app/inspecto/api';
@@ -200,6 +201,7 @@ type Phase = 'form' | 'running' | 'done';
 })
 export class SpaceComparisonDialog {
     private api = inject(SpaceComparisonService);
+    private jobs = inject(JobsService);
     private ref = inject(MatDialogRef<SpaceComparisonDialog>);
     private confirm = inject(InspectoConfirmService);
     private destroyRef = inject(DestroyRef);
@@ -213,7 +215,7 @@ export class SpaceComparisonDialog {
     readonly phase = signal<Phase>('form');
     readonly starting = signal(false);
     readonly error = signal<string | null>(null);
-    readonly run = signal<SpaceComparisonRun | null>(null);
+    readonly run = signal<JobRunById | null>(null);
     readonly result = signal<SpaceComparisonResult | null>(null);
 
     readonly summary = computed(() => {
@@ -284,7 +286,7 @@ export class SpaceComparisonDialog {
     private poll(runId: string): void {
         visibleInterval(SPACE_COMPARISON_POLL_MS)
             .pipe(
-                switchMap(() => this.api.run(runId)),
+                switchMap(() => this.jobs.run(runId)),
                 takeWhile((r) => !isTerminalRunStatus(r.status), true),
                 takeUntilDestroyed(this.destroyRef),
             )
