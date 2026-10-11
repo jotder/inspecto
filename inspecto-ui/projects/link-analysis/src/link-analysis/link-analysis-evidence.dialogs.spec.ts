@@ -17,6 +17,7 @@ import {
     describePredicate,
 } from './link-analysis-evidence.dialogs';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
+import { InvService } from '@inspecto/link-analysis/api/inv.service';
 
 /**
  * A stand-in for the snapshot store with the real one's OBSERVABLE contract (LA-03): `save`/`attachTo`
@@ -376,86 +377,165 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
     });
 });
 
-describe('LinkAnalysisAttachCaseDialog', () => {
-    function create(opsEnabled: boolean, list = () => of([{ id: 'CASE-9', title: 'Real case' }])) {
+describe('LinkAnalysisAttachCaseDialog — one step: seal and attach (telecom S3)', () => {
+    const EG: G6GraphData = {
+        nodes: [
+            { id: 'entity:acme ltd', data: { label: 'ACME Ltd', kind: 'entity' } },
+            { id: 'entity:bob', data: { label: 'Bob', kind: 'entity' } },
+        ],
+        edges: [{ id: 'e', source: 'entity:acme ltd', target: 'entity:bob', data: { kind: 'paid' } }],
+    };
+
+    interface Opts {
+        caseId?: string;
+        investigationId?: string;
+        list?: () => unknown;
+        attachTo?: () => unknown;
+        link?: () => unknown;
+    }
+
+    function create(o: Opts = {}) {
         const close = vi.fn();
-        const store = fakeSnapshots();
-        const snapshot = {
-            id: 's1',
-            title: 'T',
-            manifestHash: 'abcdef0123456789',
-            attachedTo: [],
-        } as unknown as GraphSnapshot;
-        store.snapshots.set([snapshot]);
+        const calls: string[] = [];
+        const base = fakeSnapshots();
+        const store = fakeSnapshots({
+            save: (s: GraphSnapshot) => {
+                calls.push('seal');
+                return base.save(s);
+            },
+            attachTo: (id: string, caseId: string) => {
+                calls.push('attach:' + caseId);
+                return o.attachTo ? o.attachTo() : base.attachTo(id, caseId);
+            },
+        });
+        const openCaseFromEntities = vi.fn(() => {
+            calls.push('case');
+            return of({ case: { id: 'CASE-NEW', title: 'Ring', objectType: 'CASE' }, members: [{ id: 'INC-1' }] });
+        });
+        const linkInvestigationCase = vi.fn((id: string, caseRef: string) => {
+            calls.push(`link:${id}:${caseRef}`);
+            return o.link ? o.link() : of({ investigationId: id, caseRef });
+        });
         TestBed.configureTestingModule({
             imports: [LinkAnalysisAttachCaseDialog],
             providers: [
                 ...provideLaHostServices(),
                 provideNoopAnimations(),
                 { provide: LinkAnalysisSnapshotsService, useValue: store },
-                { provide: SessionService, useValue: { opsEnabled: () => opsEnabled } },
-                { provide: ObjectsService, useValue: { list } },
+                { provide: InvService, useValue: { linkInvestigationCase } },
+                { provide: SessionService, useValue: { opsEnabled: () => true } },
+                {
+                    provide: ObjectsService,
+                    useValue: { list: o.list ?? (() => of([{ id: 'CASE-9', title: 'Real case' }])), openCaseFromEntities },
+                },
                 { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
-                { provide: MAT_DIALOG_DATA, useValue: { snapshot } },
+                {
+                    provide: MAT_DIALOG_DATA,
+                    useValue: {
+                        graph: EG,
+                        predicate: null,
+                        origin: { sourceId: 'investigation', dataset: 'tx', query: {} },
+                        layout: 'dagre',
+                        suggestedTitle: 'Ring',
+                        caseId: o.caseId ?? '',
+                        selectedNodeIds: ['entity:bob'],
+                        investigationId: o.investigationId,
+                    },
+                },
             ],
         });
         const fixture = TestBed.createComponent(LinkAnalysisAttachCaseDialog);
         fixture.detectChanges();
-        return { fixture, close, store, snapshot };
+        return { fixture, close, calls, store, el: fixture.nativeElement as HTMLElement };
     }
 
-    it('offers placeholder Cases without the ops module, refuses without a pick, and records the attachment', async () => {
-        const { fixture, close, store, snapshot } = create(false);
-        const c = fixture.componentInstance;
-        const el: HTMLElement = fixture.nativeElement;
-        // The placeholder path still renders a picker to choose from (the field states it is a placeholder).
-        expect(el.querySelector('inspecto-option-picker')).not.toBeNull();
-        expect(el.textContent).toContain('ops module is not installed');
+    it('seals, attaches and links the open Investigation in ONE action — no separate save first', async () => {
+        const { fixture, close, calls, el } = create({ caseId: 'CASE-9', investigationId: 'inv-7' });
+        expect(el.querySelector('[data-testid="link-investigation"]')?.textContent).toContain('inv-7');
+        await expectNoA11yViolations(el);
+        await fixture.componentInstance.attach();
+        expect(calls).toEqual(['seal', 'attach:CASE-9', 'link:inv-7:CASE-9']);
+        const r = close.mock.calls[0][0] as { snapshot: GraphSnapshot; caseId: string; linkedInvestigation?: string };
+        expect(r.caseId).toBe('CASE-9');
+        expect(r.linkedInvestigation).toBe('inv-7');
+        expect(r.snapshot.investigationId).toBe('inv-7');
+        expect(await verifySnapshot(r.snapshot)).toBe(true);
+    });
 
-        c.attach();
+    it('refuses without a Case — and seals nothing', async () => {
+        const { fixture, close, calls, el } = create();
+        await fixture.componentInstance.attach();
+        fixture.detectChanges();
+        expect(el.querySelector('p[role="alert"]')?.textContent).toContain('Pick a Case');
+        expect(calls).toEqual([]);
+        expect(close).not.toHaveBeenCalled();
+    });
+
+    it('a failed attach AFTER the seal names the sealed snapshot, stays open, and a retry only attaches', async () => {
+        let fail = true;
+        const { fixture, close, calls, el } = create({
+            caseId: 'CASE-9',
+            attachTo: () => (fail ? throwError(() => new Error('down')) : of(['CASE-9'])),
+        });
+        await fixture.componentInstance.attach();
         fixture.detectChanges();
         expect(close).not.toHaveBeenCalled();
-        expect(el.querySelector('p[role="alert"]')?.textContent).toContain('Pick a Case');
-
-        c.form.patchValue({ caseId: store.mockCases[0].id });
-        c.attach();
-        expect(close).toHaveBeenCalledWith({ caseId: store.mockCases[0].id });
-        expect(store.snapshots()[0].attachedTo).toEqual([store.mockCases[0].id]);
-        expect(snapshot.attachedTo).toEqual([]); // the store replaced the entry rather than mutating it
+        const sealedId = fixture.componentInstance.sealed()!.id;
+        const notice = el.querySelector('[data-testid="attach-step-error"]')?.textContent ?? '';
+        expect(notice).toContain(`Sealed snapshot ${sealedId} is saved`);
+        expect(notice).toContain('It was not attached to CASE-9');
         await expectNoA11yViolations(el);
+
+        fail = false;
+        await fixture.componentInstance.attach();
+        expect(calls).toEqual(['seal', 'attach:CASE-9', 'attach:CASE-9']);
+        expect((close.mock.calls[0][0] as { snapshot: GraphSnapshot }).snapshot.id).toBe(sealedId);
     });
 
-    it('lists real Cases with the ops module', () => {
-        const { fixture } = create(true);
-        expect(fixture.nativeElement.textContent).toContain('Open Cases from the objects store');
-    });
-
-    it('surfaces an errored Case lookup and offers NO attachable case', async () => {
-        const { fixture, close, store, snapshot } = create(true, () => throwError(() => new Error('down')) as never);
-        const c = fixture.componentInstance;
-        const el: HTMLElement = fixture.nativeElement;
-
-        // The error state is honest: nothing attachable, and no placeholder leaked in as a real Case.
-        for (const mock of store.mockCases) expect(el.textContent).not.toContain(mock.id);
-        // Pick the alert by its TITLE, not by document order: the dialog's pre-existing "UI-first"
-        // notice is also an `<inspecto-alert>` carrying role="alert" (the component gives warning and
-        // error the same role), so a positional query silently depends on which one comes first.
-        const errorAlert = Array.from(el.querySelectorAll('inspecto-alert')).find((a) =>
-            a.textContent?.includes('Cases could not be loaded'),
-        );
-        expect(errorAlert).toBeTruthy();
-        expect(errorAlert?.querySelector('[role="alert"]')?.textContent).toContain('no Case can be offered');
-        expect(el.querySelector('inspecto-option-picker')).toBeNull();
-        expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
-
-        // Even a caseId forced onto the form cannot be attached while the lookup is errored: nothing
-        // offered it, so nothing vouches that the Case exists.
-        c.form.patchValue({ caseId: store.mockCases[0].id });
-        c.attach();
+    it('a failed Investigation link keeps the attachment and retries the link alone', async () => {
+        let fail = true;
+        const { fixture, close, calls, el } = create({
+            caseId: 'CASE-9',
+            investigationId: 'inv-7',
+            link: () =>
+                fail
+                    ? throwError(
+                          () =>
+                              new HttpErrorResponse({
+                                  status: 403,
+                                  error: { error: { message: 'missing capability canManageIncidents' } },
+                              }),
+                      )
+                    : of({}),
+        });
+        await fixture.componentInstance.attach();
+        fixture.detectChanges();
         expect(close).not.toHaveBeenCalled();
-        expect(store.snapshots()[0].attachedTo).toEqual([]);
-        expect(snapshot.attachedTo).toEqual([]);
-        await expectNoA11yViolations(el);
+        expect(el.textContent).toContain('missing capability canManageIncidents');
+        fail = false;
+        await fixture.componentInstance.attach();
+        expect(calls).toEqual(['seal', 'attach:CASE-9', 'link:inv-7:CASE-9', 'link:inv-7:CASE-9']);
+        expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates a new Case from the selected nodes, then attaches to it', async () => {
+        const { fixture, close, calls } = create();
+        fixture.componentInstance.form.controls.mode.setValue('new');
+        fixture.detectChanges();
+        await fixture.componentInstance.attach();
+        expect(calls).toEqual(['seal', 'case', 'attach:CASE-NEW']);
+        expect((close.mock.calls[0][0] as { caseId: string }).caseId).toBe('CASE-NEW');
+    });
+
+    it('a failed seal attaches nothing and keeps the dialog open', async () => {
+        const { fixture, close, calls, el } = create({ caseId: 'CASE-9' });
+        TestBed.inject(LinkAnalysisSnapshotsService).save = () => throwError(() => new Error('write root unavailable'));
+        await fixture.componentInstance.attach();
+        fixture.detectChanges();
+        expect(close).not.toHaveBeenCalled();
+        expect(calls).toEqual([]);
+        expect(el.textContent).toContain('write root unavailable');
+        expect(fixture.componentInstance.sealed()).toBeNull();
     });
 });
 

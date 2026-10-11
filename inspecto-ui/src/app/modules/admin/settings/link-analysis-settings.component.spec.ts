@@ -75,6 +75,32 @@ describe('LinkAnalysisSettingsComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('hub threshold: shows the value in force, saves a whole number >= 1, refuses 0 (telecom S3, a11y)', async () => {
+        const { el, c, api, submit } = setup({ served: { hubThreshold: null, hubThresholdInForce: 500 } });
+        expect(el.textContent).toContain('Hub threshold (distinct contacts)');
+        expect(el.textContent).toContain('In force: 500');
+        await expectNoA11yViolations(el);
+
+        c.form.controls.hubThreshold.setValue(0);
+        submit();
+        expect(api.save).not.toHaveBeenCalled();
+        expect(el.textContent).toContain('A whole number from 1 to');
+
+        c.form.controls.hubThreshold.setValue(250);
+        submit();
+        expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ hubThreshold: 250 }));
+        expect(api.save.mock.calls[0][0]).not.toHaveProperty('hubThresholdInForce');
+    });
+
+    it('hub threshold is read only without the authoring capability', () => {
+        const { el } = setup({ served: { hubThreshold: 300, hubThresholdInForce: 300 }, canEdit: false });
+        const field = Array.from(el.querySelectorAll('mat-form-field')).find((f) =>
+            f.textContent?.includes('Hub threshold'),
+        );
+        expect(field?.querySelector('input')?.readOnly).toBe(true);
+        expect(el.textContent).toContain('needs the Workbench authoring capability');
+    });
+
     it('shows seedByDistinctCap only when the server reports it', () => {
         const { el } = setup({ served: { seedByDistinctCap: null, seedByDistinctCapInForce: 5000 } });
         expect(el.textContent).toContain('Seed by Entity List');

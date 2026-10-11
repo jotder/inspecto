@@ -7,7 +7,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvService, WorkingSetRelation, WorkingSetRelationQuery } from '@inspecto/link-analysis/api/inv.service';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { LinkAnalysisWorkingSetRowsComponent, WORKING_SET_PAGE } from './link-analysis-working-set-rows.component';
+import {
+    LinkAnalysisWorkingSetRowsComponent,
+    WORKING_SET_PAGE,
+    hubRow,
+} from './link-analysis-working-set-rows.component';
+
+describe('hubRow (telecom S3)', () => {
+    it('words an entities row flag as the badge, blanks an unflagged one, and passes other relations through', () => {
+        expect(hubRow({ entityId: 'h', highConnectivity: true })['highConnectivity']).toBe(
+            'High connectivity — not expanded',
+        );
+        expect(hubRow({ entityId: 'a', highConnectivity: false })['highConnectivity']).toBe('');
+        const link = { source: 'a', target: 'b' };
+        expect(hubRow(link)).toBe(link);
+    });
+});
 
 @Component({
     standalone: true,

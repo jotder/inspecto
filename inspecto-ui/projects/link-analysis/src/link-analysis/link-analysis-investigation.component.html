@@ -298,6 +298,19 @@
             @if (degree().blocked; as why) {
                 <p class="text-secondary m-0 text-xs" data-testid="degree-blocked">{{ why }}</p>
             }
+            @if (degree().heldHubs.length) {
+                <p class="text-secondary m-0 text-xs" data-testid="degree-hubs">
+                    @if (includeHubs()) {
+                        “Include hubs” is ticked: the next degree also expands through
+                        {{ degree().heldHubs.length }} high-connectivity
+                        {{ degree().heldHubs.length === 1 ? 'entity' : 'entities' }} — you are asked to confirm first.
+                    } @else {
+                        {{ degree().heldHubs.length }} high-connectivity
+                        {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} left out of the next degree.
+                        Tick “Include hubs” below, or use “Expand anyway” on one.
+                    }
+                </p>
+            }
             @if (store.degreeOutcomes().length) {
                 <ul
                     class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"
@@ -329,6 +342,51 @@
         @if (fallbackNote(); as note) {
             <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-fallback">{{ note }}</p>
         }
+        @if (store.lastOverride(); as o) {
+            <p class="m-0 text-xs" role="status" data-testid="hub-override-recorded">
+                Override recorded at step {{ o.step }}: expanded through high-connectivity
+                {{ o.ids.slice(0, 5).join(', ') }}{{ o.ids.length > 5 ? ', …' : '' }} — sealed in the log, with your name.
+            </p>
+        }
+        @if (hubs().length) {
+            <section
+                class="flex flex-col gap-1 rounded-md border p-2"
+                style="border-color: var(--gamma-border)"
+                aria-label="High connectivity"
+                data-testid="hub-list"
+            >
+                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+                    High connectivity ({{ hubs().length }})
+                </h3>
+                <p class="text-secondary m-0 text-xs">
+                    Shown, but not expanded further: each has more contacts than the hub threshold. Expanding through
+                    one is an override you confirm, and it is recorded.
+                </p>
+                <ul class="m-0 flex list-none flex-col gap-1 p-0 text-xs">
+                    @for (e of hubs().slice(0, 50); track e.id) {
+                        <li class="flex flex-wrap items-center gap-1">
+                            <span class="font-mono">{{ e.id }}</span>
+                            <inspecto-chip variant="soft" tone="warning">{{ hubBadge() }}</inspecto-chip>
+                            <button
+                                mat-button
+                                type="button"
+                                class="ml-auto"
+                                [disabled]="store.busy() || store.chainRunning()"
+                                [attr.aria-label]="'Expand anyway from ' + e.id"
+                                (click)="expandAnyway(e.id)"
+                            >
+                                Expand anyway
+                            </button>
+                        </li>
+                    }
+                </ul>
+                @if (hubs().length > 50) {
+                    <p class="text-secondary m-0 text-xs">
+                        The first 50 are listed; select another on the canvas to expand through it.
+                    </p>
+                }
+            </section>
+        }
         @if (store.lastStep()?.protected?.length) {
             <inspecto-alert variant="info" title="Kept entities were not excluded">
                 {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.
@@ -350,12 +408,32 @@
                     @if (!selectedInSet().length) {
                         <span class="text-secondary">(not in the Working Set)</span>
                     }
+                    @if (selectedHubs().length) {
+                        <inspecto-chip variant="soft" tone="warning" data-testid="selected-hub-badge">{{
+                            hubBadge()
+                        }}</inspecto-chip>
+                    }
                 </div>
                 <div class="flex flex-wrap gap-1">
                     <button mat-stroked-button [disabled]="store.busy()" (click)="seed()">Seed</button>
-                    <button mat-stroked-button [disabled]="store.busy() || !selectedInSet().length" (click)="expand()">
-                        Expand one hop
-                    </button>
+                    @if (selectedHubs().length && !includeHubs()) {
+                        <button
+                            mat-stroked-button
+                            data-testid="selected-expand-anyway"
+                            [disabled]="store.busy()"
+                            (click)="expandAnyway(selectedHubs()[0])"
+                        >
+                            Expand anyway
+                        </button>
+                    } @else {
+                        <button
+                            mat-stroked-button
+                            [disabled]="store.busy() || !selectedInSet().length"
+                            (click)="expand()"
+                        >
+                            Expand one hop
+                        </button>
+                    }
                     <button
                         mat-stroked-button
                         [disabled]="store.busy() || !selectedInSet().length"

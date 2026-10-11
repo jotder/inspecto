@@ -116,6 +116,7 @@ import {
 } from './link-analysis-advanced-search.dialog';
 import {
     AttachCaseDialogData,
+    AttachCaseResult,
     LinkAnalysisAttachCaseDialog,
     LinkAnalysisSnapshotDialog,
     SnapshotDialogData,
@@ -935,6 +936,10 @@ export class LinkAnalysisComponent implements OnInit {
 
     // ── canvas overlays: legend (kind → colour → count) and the working set tiles ──
     readonly legendItems = computed<LegendItem[]>(() => legendItemsFor(this.displayed(), this.nodeColors()));
+    /** Drawn Working Set entities flagged high connectivity — the legend's ringed-node row. */
+    readonly hubsDrawn = computed(
+        () => this.investigation.canvas()?.nodes.filter((n) => n.data.highConnectivity).length ?? 0,
+    );
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
     readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
     readonly profileOptions = DOMAIN_PROFILES.map((p) => ({ value: p.id, label: p.label, hint: p.description }));
@@ -1416,19 +1421,32 @@ export class LinkAnalysisComponent implements OnInit {
         );
     }
 
-    /** Attach the latest snapshot to a Case — taking one first when the graph has not been frozen yet. */
-    async openAttachToCase(): Promise<void> {
-        const snapshot = this.latestSnapshot() ?? (await this.openSnapshot());
-        if (!snapshot) return;
-        const data: AttachCaseDialogData = { snapshot };
+    /** Why "Attach to Case" is unavailable to this user — empty when it is available. Attaching needs `canManageIncidents`. */
+    readonly attachUnavailable = computed(() =>
+        this.lens.canManageIncidents() ? '' : 'Attaching to a Case needs the Incident management capability.',
+    );
+
+    /** One step: seal what is on screen and attach it to a Case (optionally linking the open Investigation too). */
+    openAttachToCase(): void {
+        if (this.attachUnavailable()) return;
+        const data = this.snapshotData();
+        if (!data) {
+            this.toastr.info('There is nothing on the canvas to attach yet — run a query or open an Investigation.');
+            return;
+        }
         this.dialog
-            .open<LinkAnalysisAttachCaseDialog, AttachCaseDialogData, { caseId: string } | undefined>(
+            .open<LinkAnalysisAttachCaseDialog, AttachCaseDialogData, AttachCaseResult | undefined>(
                 LinkAnalysisAttachCaseDialog,
                 { data, width: '36rem' },
             )
             .afterClosed()
             .subscribe((r) => {
-                if (r) this.toastr.success(`Attached “${snapshot.title}” to ${r.caseId}.`);
+                if (!r) return;
+                this.latestSnapshot.set(r.snapshot);
+                const linked = r.linkedInvestigation ? ` Investigation ${r.linkedInvestigation} is linked to it.` : '';
+                this.toastr.success(
+                    `Sealed “${r.snapshot.title}” (${r.snapshot.manifestHash.slice(0, 12)}…) and attached it to ${r.caseId}.${linked}`,
+                );
             });
     }
 

@@ -728,6 +728,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
                     // sees what the narrower question removed) renders dimmed with a dashed outline.
                     lineDash: (d) => ((d.data as { missing?: boolean }).missing ? [4, 3] : undefined),
+                    // A high-connectivity entity (Link Analysis hub suppression) wears a wide halo in its own colour.
+                    halo: (d) => !!(d.data as { highConnectivity?: boolean }).highConnectivity,
+                    haloStroke: (d) => this.nodeColorOf(d),
+                    haloLineWidth: 10,
+                    haloStrokeOpacity: 0.35,
                     iconSrc: (d) => iconOf(d),
                     iconWidth: 22,
                     iconHeight: 22,

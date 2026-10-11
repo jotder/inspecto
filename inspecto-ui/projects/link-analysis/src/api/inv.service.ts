@@ -313,6 +313,13 @@ export interface ExpandRung {
     candidateDegreeMin?: number | null;
     candidateDegreeMax?: number | null;
     maxFanOut?: number | null;
+    /** Supernode suppression: an endpoint with more distinct contacts is flagged `highConnectivity` (shown, not
+     *  expanded further); absent = the Space's `hub_threshold` (default 500), resolved into the sealed rung. */
+    hubThreshold?: number;
+    /** The analyst's override: expand THROUGH every flagged entity of the frontier. Sealed in the op's params. */
+    includeHubs?: boolean;
+    /** The analyst's override for the named flagged entities only. Sealed in the op's params. */
+    expandHubs?: string[];
 }
 
 /** `POST /inv/investigations` — bound to one Dataset + the projection's columns. */
@@ -512,6 +519,9 @@ export interface WorkingSetEntity {
     admittedBy: number;
     hidden: boolean;
     kept: boolean;
+    /** Supernode suppression: a sealed read flagged it (more contacts than its expand's hub threshold) — shown, not
+     *  expanded further unless an expand overrides it. ABSENT when not flagged. */
+    highConnectivity?: boolean;
 }
 
 export interface WorkingSetLink {

@@ -246,7 +246,7 @@ Dataset.
 |---|---|---|
 | **Save the current view** | The setup: source, mapping, layout, profile, display options, filters | A **view** re-projects *live* data — not evidence. Loadable from **Open saved views**; has version history, comments and tags. |
 | **Save this analysis** | A **sealed snapshot** of exactly what is on screen, with a SHA-256 fingerprint | Choose a Case to attach to, or **create a new Case from graph nodes** — tick the nodes that become the Case's first members (each becomes an Incident; the same entity reused later is reused, not duplicated). What is on screen means the Working Set while an Investigation is open. |
-| **Attach to Case** | Links the current snapshot to an existing Case | Needs the operations module; otherwise the control explains why it is unavailable. |
+| **Attach to Case** | One step: **seals** what is on screen and attaches it to a Case — no separate save first | Pick an existing Case or **create a new Case from the selected nodes**. While an Investigation is open you may also **link the Investigation to the Case**. If a step after the seal fails, the dialog stays open and names the sealed snapshot id; **Retry** resumes from the failed step (never seals twice or creates a second Case). Needs the Incident management capability (`canManageIncidents`); without it the button is disabled and says why. |
 | **Export** | PNG, SVG, JSON, GraphML | For reports and other tools. |
 | **Share / Exchange** | A view can be shared with other Spaces | Comments travel with it. |
 | **Widget** | A view or an Investigation's Working Set can be shown on a Dashboard (§9.11) | |
@@ -280,6 +280,15 @@ A Space may require a stated **purpose** for sensitive steps; when asked, it is 
 Clicking a node while an Investigation is open **selects** it for the next op. Switch *Show the query graph* to pick
 seeds from the wider picture. Pressing *Seed* returns the canvas to the Working Set, so *Expand one hop*, *Keep*,
 *Hide* and *Exclude* act on the entity you just seeded.
+
+**High connectivity (hubs).** An entity flagged *high connectivity* is ringed on the canvas (legend: *Ringed: high
+connectivity*), badged *High connectivity — not expanded* in the panel and in the Working Set rows, and listed under
+**High connectivity**. *Expand next degree* leaves hubs out of its frontier and says how many it left out. To go
+through one anyway, use **Expand anyway** on it (that entity only), or tick **Include hubs** on the expand settings
+(every hub the expand reaches, including the next degree). Either asks you to confirm first, showing the
+Investigation's purpose; the override is sealed in that step and the panel shows *Override recorded at step N*.
+The hub threshold is set per Space in **Settings → Link Analysis → Hub threshold** (a whole number ≥ 1; blank = the
+default, 500; the value in force is shown; editing needs the Workbench authoring capability, read-only otherwise).
 
 ### 9.3 Replay, drift and fork
 

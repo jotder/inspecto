@@ -43,9 +43,12 @@ import {
     PendingInvestigation,
     degreeOutcomeMessage,
     degreeState,
+    hubBadgeText,
     presetsSummary,
     suspectTitle,
 } from './investigate-number';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
@@ -120,6 +123,8 @@ export class LinkAnalysisInvestigationComponent {
     readonly store = inject(InvestigationSessionStore);
     private inv = inject(InvService);
     private widgets = inject(LA_WIDGETS);
+    private confirm = inject(InspectoConfirmService);
+    private laSettings = inject(LinkAnalysisSettingsService);
     /** The shell has a Widget library to pin into (la-app has none: the section is not offered). */
     protected readonly canPin = this.widgets.available !== false;
 
@@ -191,14 +196,56 @@ export class LinkAnalysisInvestigationComponent {
 
     // ── "Expand next degree" ──
     readonly degree = computed(() =>
-        degreeState(this.store.workingSet(), this.maxDegree(), this.store.degreeOutcomes()),
+        degreeState(this.store.workingSet(), this.maxDegree(), this.store.degreeOutcomes(), this.includeHubs()),
     );
+    /** The analyst's "Include hubs" opt-in on the expand rung. */
+    readonly includeHubs = computed(() => this.rungForm()?.includeHubsOn() ?? false);
+
+    // ── supernode suppression: flagged entities, shown but not expanded unless the analyst overrides ──
+    /** Working Set entities a sealed read flagged high connectivity. */
+    readonly hubs = computed(() => (this.store.workingSet()?.entities ?? []).filter((e) => e.highConnectivity));
+    /** The badge: the last step's sealed hub threshold when it ran, else the Space's value in force. */
+    readonly hubBadge = computed(() => {
+        const sealed = this.store.lastStep()?.read?.rung?.['hubThreshold'];
+        return hubBadgeText(typeof sealed === 'number' ? sealed : this.laSettings.limits().hubThresholdInForce);
+    });
+    /** The selected entity's flagged ids — "Expand one hop" would be refused for them; "Expand anyway" is offered. */
+    readonly selectedHubs = computed(() => {
+        const flagged = new Set(this.hubs().map((e) => e.id));
+        return this.selectedInSet().filter((id) => flagged.has(id));
+    });
+
+    /** Ask before an override: what it expands through, that it is sealed, and the purpose it is recorded under. */
+    private confirmOverride(ids: string[]): Promise<boolean> {
+        const purpose = this.store.header()?.purpose;
+        const what =
+            ids.length === 1
+                ? `the high-connectivity entity ${ids[0]}`
+                : `${ids.length} high-connectivity entities (${ids.slice(0, 5).join(', ')}${ids.length > 5 ? ', …' : ''})`;
+        return this.confirm.confirm(
+            `Expand through ${what}? A hub can pull in many unrelated numbers.\n\n` +
+                'The override is sealed in this step of the Investigation log, with your name, and is shown in the log ' +
+                'and the Dossier' +
+                (purpose ? ` under the stated purpose: “${purpose}”.` : '.'),
+            'Expand through high connectivity?',
+        );
+    }
+
+    /** "Expand anyway" on one flagged entity (`expandHubs: [id]`), after the confirmation. */
+    async expandAnyway(id: string): Promise<void> {
+        const form = this.rungForm();
+        const rung = form ? form.rung() : {};
+        if (!rung || !(await this.confirmOverride([id]))) return;
+        if (!(await this.store.expandHub(id, rung))) form?.fail(this.store.error());
+    }
     /** 1 … maxDegree, for the indicator. */
     readonly degreeSteps = computed(() => Array.from({ length: this.maxDegree() }, (_, i) => i + 1));
     readonly outcomeMessage = degreeOutcomeMessage;
 
-    expandNextDegree(): void {
-        void this.store.expandNextDegree(this.degreePresets(), this.maxDegree());
+    async expandNextDegree(): Promise<void> {
+        const held = this.includeHubs() ? this.degree().heldHubs : [];
+        if (held.length && !(await this.confirmOverride(held))) return;
+        await this.store.expandNextDegree(this.degreePresets(), this.maxDegree(), held.length > 0);
     }
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 
@@ -371,10 +418,22 @@ export class LinkAnalysisInvestigationComponent {
         const form = this.rungForm();
         const rung = form ? form.rung() : {};
         if (!rung) return;
+        let scope: string[] = [];
+        if (rung.includeHubs) {
+            // Only an expand that actually reaches a flagged entity is an override worth confirming.
+            const flagged = new Set(this.hubs().map((e) => e.id));
+            scope = all ? [...flagged] : this.selectedInSet().filter((id) => flagged.has(id));
+            if (scope.length && !(await this.confirmOverride(scope))) return;
+        }
         const ok = await this.store.apply(
             all ? { op: 'expand', ...rung } : { op: 'expand', ids: this.selectedInSet(), ...rung },
         );
         if (!ok) form?.fail(this.store.error());
+        else {
+            const step = this.store.lastStep();
+            if (scope.length && step && step.status !== 'pending')
+                this.store.lastOverride.set({ step: step.step, ids: scope });
+        }
     }
 
     mark(op: 'hide' | 'keep'): void {

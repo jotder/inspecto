@@ -16,6 +16,9 @@ export interface G6Node {
         iconSrc?: string;
         color?: string;
         missing?: boolean;
+        /** Link Analysis supernode suppression: an Investigation flagged this entity high connectivity (shown, not
+         *  expanded further). Drawn with a wide halo ring; absent on every other node. */
+        highConnectivity?: boolean;
         /** The Incident/Case this node represents, when the source could resolve one — lights the
          *  detail dialog's "Open record" pivot (ui-design-review R8). Structurally = `ElementObjectRef`. */
         objectRef?: { id: string; type: 'INCIDENT' | 'CASE' };

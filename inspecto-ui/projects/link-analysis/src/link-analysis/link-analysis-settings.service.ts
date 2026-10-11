@@ -45,6 +45,11 @@ export interface LinkAnalysisLimits {
     fourEyesBudgetAbove?: number | null;
     /** LA-19 (D-U7): an expand whose fan-out is above this needs a second pair of eyes; `null` = no threshold. */
     fourEyesFanOutAbove?: number | null;
+    /** Supernode suppression (`hub_threshold`): distinct contacts above which an expand flags an entity
+     *  `highConnectivity` — shown, not expanded further; `null` = the shipped default (500). */
+    hubThreshold?: number | null;
+    /** The hub threshold actually in force — server-computed, read-only. */
+    hubThresholdInForce?: number;
     /** LA-17: distinct values per bound column a merged `expand` may scan; `null` = the shipped default. */
     mergedDistinctCap?: number | null;
     /** LA-17: the merged-expand cap actually in force — server-computed, read-only. */

@@ -11,6 +11,7 @@ import {
     WorkingSet,
 } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LA_FEATURES, LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityProjection } from '@inspecto/core/graph';
@@ -115,11 +116,11 @@ const COVERAGE: InvestigationCoverage = {
 const refused = (message: string) =>
     throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } }));
 
-function create(opts: { noWidgetLibrary?: boolean } = {}) {
+function create(opts: { noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: () => Promise<boolean> } = {}) {
     const inv = {
         createInvestigation: vi.fn(() => of(LOG.header)),
         investigationLog: vi.fn(() => of(LOG)),
-        replayInvestigation: vi.fn(() => of({ workingSet: WS })),
+        replayInvestigation: vi.fn(() => of({ workingSet: opts.ws ?? WS })),
         appendInvestigationOp: vi.fn(() => of({})),
         undoInvestigation: vi.fn(() => of({})),
         reorderInvestigation: vi.fn(() =>
@@ -168,6 +169,7 @@ function create(opts: { noWidgetLibrary?: boolean } = {}) {
             ...(opts.noWidgetLibrary
                 ? [{ provide: LA_WIDGETS, useValue: { available: false, saveWorkingSetWidget: vi.fn() } }]
                 : []),
+            ...(opts.confirm ? [{ provide: InspectoConfirmService, useValue: { confirm: vi.fn(opts.confirm) } }] : []),
             { provide: LensService, useValue: { canManageIncidents: signal(true) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
@@ -661,7 +663,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
 
         const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
         next().click();
-        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4);
+        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4, false);
 
         store.degreeOutcomes.set([
             { degree: 1, admitted: 3, linksAdded: 4, truncated: true, fanOutCapped: 0, budget: 2000 },
@@ -681,5 +683,92 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
             'Degree 1: 3 new entities, 4 links added. The read stopped at its budget of 2,000 rows',
         );
         await expectNoA11yViolations(el);
+    });
+});
+
+describe('LinkAnalysisInvestigationComponent - hub visibility and override (telecom S3)', { timeout: 20_000 }, () => {
+    const HUB_WS: WorkingSet = {
+        entities: [
+            { id: 'a', type: null, hop: 0, seed: 'a', admittedBy: 1, hidden: false, kept: false },
+            { id: 'b', type: null, hop: 1, seed: 'a', admittedBy: 2, hidden: false, kept: false },
+            { id: 'hub', type: null, hop: 1, seed: 'a', admittedBy: 2, hidden: false, kept: false, highConnectivity: true },
+        ],
+        links: [
+            { source: 'a', target: 'b', kind: 'voice', count: 2, admittedBy: 2 },
+            { source: 'a', target: 'hub', kind: 'voice', count: 9, admittedBy: 2 },
+        ],
+        excluded: [],
+        hash: '',
+    };
+    const stepResult = (step: number) =>
+        of({
+            step,
+            op: 'expand',
+            delta: { admitted: [], removed: [], linksAdded: 0, linksRemoved: 0, hidden: [], kept: [], excluded: [] },
+            truncated: false,
+            workingSet: { entities: 3, links: 2, excluded: 0, hash: '' },
+        });
+
+    it('badges the flagged entity, and "Expand anyway" confirms, then sends expandHubs and says it is recorded', async () => {
+        const confirm = vi.fn(async () => true);
+        const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm });
+        await openInv(store);
+        inv.appendInvestigationOp.mockReturnValue(stepResult(3) as never);
+        fixture.detectChanges();
+
+        const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
+        expect(list.textContent).toContain('High connectivity (1)');
+        expect(list.textContent).toContain('High connectivity — not expanded');
+        // The next degree leaves the hub out and says so.
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('left out of the next degree');
+        await expectNoA11yViolations(el);
+
+        (list.querySelector('button[aria-label="Expand anyway from hub"]') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(confirm).toHaveBeenCalledTimes(1);
+        expect(inv.appendInvestigationOp).toHaveBeenCalledWith(
+            'inv-1',
+            expect.objectContaining({ op: 'expand', ids: ['hub'], expandHubs: ['hub'] }),
+        );
+        expect(el.querySelector('[data-testid="hub-override-recorded"]')?.textContent).toContain(
+            'Override recorded at step 3',
+        );
+    });
+
+    it('a declined confirmation sends nothing', async () => {
+        const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm: async () => false });
+        await openInv(store);
+        fixture.detectChanges();
+        (el.querySelector('button[aria-label="Expand anyway from hub"]') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+    });
+
+    it('"Expand next degree" passes through the hub only when "Include hubs" is ticked', async () => {
+        const confirm = vi.fn(async () => true);
+        const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm });
+        await openInv(store);
+        inv.appendInvestigationOp.mockReturnValue(stepResult(3) as never);
+        fixture.detectChanges();
+        const next = () => el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
+
+        next().click(); // not opted in: the hub stays out of the frontier, no override, no confirmation
+        await fixture.whenStable();
+        expect(confirm).not.toHaveBeenCalled();
+        const first = inv.appendInvestigationOp.mock.calls[0] as unknown as [string, Record<string, unknown>];
+        expect(first[1]['ids']).toEqual(['b']);
+        expect(first[1]['includeHubs']).toBeUndefined();
+
+        store.degreeOutcomes.set([]); // the stub admitted nothing; clear it so the degree is not "blocked"
+        (el.querySelector('[data-testid="include-hubs"] input') as HTMLInputElement).click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('“Include hubs” is ticked');
+        next().click();
+        await fixture.whenStable();
+        expect(confirm).toHaveBeenCalledTimes(1);
+        const second = inv.appendInvestigationOp.mock.calls[1] as unknown as [string, Record<string, unknown>];
+        expect(second[1]['ids']).toEqual(['b', 'hub']);
+        expect(second[1]['includeHubs']).toBe(true);
     });
 });

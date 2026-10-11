@@ -191,6 +191,9 @@ export interface DegreeState {
     current: number;
     /** The entities at that hop — what the next degree expands from (hidden entities are left out). */
     frontier: string[];
+    /** Entities at that hop a sealed read flagged high connectivity — left OUT of `frontier` unless the analyst opted
+     *  in (`includeHubs`), because the server refuses a named flagged id that is not overridden (422). */
+    heldHubs: string[];
     maxDegree: number;
     /** Why the next degree cannot be expanded, in the analyst's words; null when it can. */
     blocked: string | null;
@@ -210,6 +213,8 @@ export interface DegreeOutcome {
     /** Hub suppression: high-connectivity entities admitted but not expanded further, and frontier hubs held back. */
     hubsFlagged?: number;
     hubsHeld?: number;
+    /** The analyst opted in: this degree expanded THROUGH this many flagged entities (sealed in the step's params). */
+    hubsOverridden?: number;
     /** D-U7: the expand was held for four-eyes approval — the pending request's id; nothing was read. */
     awaitingApproval?: string;
 }
@@ -223,11 +228,15 @@ export function degreeState(
     ws: WorkingSet | null,
     maxDegree = DEFAULT_MAX_DEGREE,
     outcomes: readonly DegreeOutcome[] = [],
+    includeHubs = false,
 ): DegreeState {
     const visible = (ws?.entities ?? []).filter((e) => !e.hidden);
-    if (!visible.length) return { current: -1, frontier: [], maxDegree, blocked: 'Seed an entity first.' };
+    if (!visible.length)
+        return { current: -1, frontier: [], heldHubs: [], maxDegree, blocked: 'Seed an entity first.' };
     const current = Math.max(...visible.map((e) => e.hop));
-    const frontier = visible.filter((e) => e.hop === current).map((e) => e.id);
+    const outer = visible.filter((e) => e.hop === current);
+    const heldHubs = outer.filter((e) => e.highConnectivity).map((e) => e.id);
+    const frontier = outer.filter((e) => includeHubs || !e.highConnectivity).map((e) => e.id);
     let blocked: string | null = null;
     const last = outcomes.at(-1);
     if (last?.awaitingApproval)
@@ -235,11 +244,15 @@ export function degreeState(
     else if (current >= maxDegree) blocked = `Degree ${maxDegree} reached.`;
     else if (last && last.degree === current + 1 && last.admitted === 0)
         blocked = `Degree ${current + 1} found no new entities — there is nothing further to expand.`;
+    else if (!frontier.length && heldHubs.length)
+        blocked =
+            `Every entity at degree ${current} is flagged high connectivity, so none is expanded. Tick ` +
+            '“Include hubs” or use “Expand anyway” on one of them.';
     else if (frontier.length > MAX_EXPAND_FRONTIER)
         blocked =
             `Degree ${current} has ${frontier.length.toLocaleString('en')} entities; one expand names at most ` +
             `${MAX_EXPAND_FRONTIER.toLocaleString('en')}. Exclude or hide hubs first.`;
-    return { current, frontier, maxDegree, blocked };
+    return { current, frontier, heldHubs, maxDegree, blocked };
 }
 
 const DAY_MS = 86_400_000;
@@ -315,6 +328,20 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
                 `${o.maxFanOut ? `${o.maxFanOut} ` : ''}strongest links.`,
         );
     if (o.hubsFlagged) parts.push(`${plural(o.hubsFlagged, 'high-connectivity number')} shown but not expanded.`);
+    if (o.hubsOverridden)
+        parts.push(
+            `Analyst override: expanded through ${plural(o.hubsOverridden, 'high-connectivity number')} — recorded in the log.`,
+        );
     if (o.hubsHeld) parts.push(`${plural(o.hubsHeld, 'high-connectivity number')} of the frontier not expanded from.`);
     return parts.join(' ');
+}
+
+/**
+ * The high-connectivity badge. `threshold` is the hub threshold the flag was measured against when known (the step's
+ * sealed rung, else the Space's value in force); the entity's own contact count is not served, so it is never guessed.
+ */
+export function hubBadgeText(threshold?: number | null): string {
+    return threshold != null
+        ? `High connectivity — more than ${threshold.toLocaleString('en')} contacts, not expanded`
+        : 'High connectivity — not expanded';
 }
