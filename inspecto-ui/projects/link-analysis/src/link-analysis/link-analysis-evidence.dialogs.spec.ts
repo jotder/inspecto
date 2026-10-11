@@ -392,6 +392,7 @@ describe('LinkAnalysisAttachCaseDialog — one step: seal and attach (telecom S3
         list?: () => unknown;
         attachTo?: () => unknown;
         link?: () => unknown;
+        openCase?: () => unknown;
     }
 
     function create(o: Opts = {}) {
@@ -410,6 +411,7 @@ describe('LinkAnalysisAttachCaseDialog — one step: seal and attach (telecom S3
         });
         const openCaseFromEntities = vi.fn(() => {
             calls.push('case');
+            if (o.openCase) return o.openCase();
             return of({ case: { id: 'CASE-NEW', title: 'Ring', objectType: 'CASE' }, members: [{ id: 'INC-1' }] });
         });
         const linkInvestigationCase = vi.fn((id: string, caseRef: string) => {
@@ -525,6 +527,37 @@ describe('LinkAnalysisAttachCaseDialog — one step: seal and attach (telecom S3
         await fixture.componentInstance.attach();
         expect(calls).toEqual(['seal', 'case', 'attach:CASE-NEW']);
         expect((close.mock.calls[0][0] as { caseId: string }).caseId).toBe('CASE-NEW');
+    });
+
+    it('a Case create with no definite answer is never retried blindly — the analyst picks the Case', async () => {
+        const { fixture, calls, el } = create({
+            openCase: () => throwError(() => new HttpErrorResponse({ status: 504 })),
+        });
+        fixture.componentInstance.form.controls.mode.setValue('new');
+        fixture.detectChanges();
+        await fixture.componentInstance.attach();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="attach-step-error"]')?.textContent).toContain('may have been created');
+        expect(fixture.componentInstance.creatingCase()).toBe(false);
+        const radios = Array.from(el.querySelectorAll<HTMLInputElement>('mat-radio-button input[type="radio"]'));
+        expect(radios[1].disabled).toBe(true);
+        fixture.componentInstance.form.controls.caseId.setValue('CASE-9');
+        await fixture.componentInstance.attach();
+        expect(calls).toEqual(['seal', 'case', 'attach:CASE-9']);
+    });
+
+    it('after the new Case exists, a failed attach keeps the retry pinned to that Case', async () => {
+        let fail = true;
+        const { fixture, calls } = create({
+            attachTo: () => (fail ? throwError(() => new Error('down')) : of(['CASE-NEW'])),
+        });
+        fixture.componentInstance.form.controls.mode.setValue('new');
+        fixture.detectChanges();
+        await fixture.componentInstance.attach();
+        expect(fixture.componentInstance.form.controls.mode.disabled).toBe(true);
+        fail = false;
+        await fixture.componentInstance.attach();
+        expect(calls).toEqual(['seal', 'case', 'attach:CASE-NEW', 'attach:CASE-NEW']);
     });
 
     it('a failed seal attaches nothing and keeps the dialog open', async () => {

@@ -1452,11 +1452,15 @@ export class LinkAnalysisComponent implements OnInit {
             )
             .afterClosed()
             .subscribe((r) => {
-                if (!r) return;
-                this.latestSnapshot.set(r.snapshot);
+                if (!r?.caseId) return;
                 const linked = r.linkedInvestigation ? ` Investigation ${r.linkedInvestigation} is linked to it.` : '';
+                if (!r.snapshot) {
+                    this.toastr.success(`Attached to ${r.caseId}.${linked}`);
+                    return;
+                }
+                this.latestSnapshot.set(r.snapshot);
                 this.toastr.success(
-                    `Sealed “${r.snapshot.title}” (${r.snapshot.manifestHash.slice(0, 12)}…) and attached it to ${r.caseId}.${linked}`,
+                    `Sealed “${r.snapshot.title}” (${r.snapshot.manifestHash?.slice(0, 12) ?? ''}…) and attached it to ${r.caseId}.${linked}`,
                 );
             });
     }

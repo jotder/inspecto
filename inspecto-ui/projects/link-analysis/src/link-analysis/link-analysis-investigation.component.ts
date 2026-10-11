@@ -425,6 +425,8 @@ export class LinkAnalysisInvestigationComponent {
             const flagged = new Set(this.hubs().map((e) => e.id));
             scope = all ? [...flagged] : this.selectedInSet().filter((id) => flagged.has(id));
             if (scope.length && !(await this.confirmOverride(scope))) return;
+            // No flagged entity in reach: nothing was confirmed, so the log must not record an override.
+            if (!scope.length) delete rung.includeHubs;
         }
         const ok = await this.store.apply(
             all ? { op: 'expand', ...rung } : { op: 'expand', ids: this.selectedInSet(), ...rung },

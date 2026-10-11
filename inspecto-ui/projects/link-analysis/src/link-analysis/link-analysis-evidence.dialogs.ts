@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -469,7 +470,7 @@ export interface AttachCaseResult {
                 </mat-form-field>
                 <mat-radio-group formControlName="mode" class="flex flex-col gap-1" aria-label="Which Case">
                     <mat-radio-button value="existing">An existing Case</mat-radio-button>
-                    <mat-radio-button value="new" [disabled]="createUnavailable() !== ''">
+                    <mat-radio-button value="new" [disabled]="createUnavailable() !== '' || createUncertain()">
                         A new Case, from the selected nodes
                     </mat-radio-button>
                 </mat-radio-group>
@@ -594,6 +595,8 @@ export class LinkAnalysisAttachCaseDialog {
     /** Remembered progress: a retry resumes after the last step that succeeded. */
     readonly sealed = signal<GraphSnapshot | null>(null);
     private createdCase: string | null = null;
+    /** A Case create got no definite answer — it may exist, so "new" is not offered again in this dialog. */
+    readonly createUncertain = signal(false);
     private attachedCase: string | null = null;
 
     readonly requestClose = guardDirtyClose(
@@ -662,10 +665,25 @@ export class LinkAnalysisAttachCaseDialog {
                             this.caseMgmt.openFromEntities(v.caseTitle.trim(), undefined, members),
                         );
                         this.createdCase = made.caseId;
+                        // Pinned: a retry attaches to THIS Case; switching to "existing" would leave it empty.
+                        this.form.controls.mode.disable();
                     } catch (e: unknown) {
-                        this.stepError.set(
-                            `The Case was not created: ${reason(e, 'the request failed')}. Retry, or pick an existing Case.`,
-                        );
+                        const refused = e instanceof HttpErrorResponse && e.status >= 400 && e.status < 500;
+                        if (refused) {
+                            this.stepError.set(
+                                `The Case was not created: ${reason(e, 'the request was refused')}. Retry, or pick an existing Case.`,
+                            );
+                        } else {
+                            // No definite answer (timeout, 5xx): the Case may exist. There is no idempotency key on
+                            // this route, so never create again blindly — the analyst checks and picks it.
+                            this.createUncertain.set(true);
+                            this.form.controls.mode.setValue('existing');
+                            this.stepError.set(
+                                `Creating the Case got no definite answer (${reason(e, 'the request failed')}) — it may ` +
+                                    'have been created. Check Cases, then pick it (or another Case) above and Retry; ' +
+                                    'this dialog will not create a second Case.',
+                            );
+                        }
                         return;
                     }
                 }
