@@ -27,6 +27,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { RegulatoryReportDraftDialog, RegulatoryReportDraftData } from './regulatory-report-draft.dialog';
+import { ReportTemplateDialog, ReportTemplateDialogData } from './report-template.dialog';
 
 /** What the pane lists: the reports waiting for a decision, the submission log, or everything. */
 export type RegulatoryReportsFilter = 'waiting' | 'submitted' | 'all';
@@ -84,6 +85,8 @@ export class RegulatoryReportsComponent implements OnInit {
     readonly canDraft = computed(() => this.lens.canWorkIncidents() && this.templates().length > 0);
     readonly canRequestApproval = computed(() => this.lens.canWorkIncidents() && this.selected()?.status === 'draft');
     readonly canDecide = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'pending');
+    /** Authoring a template decides what is filed and where it is dropped: the oversight capability, like approving. */
+    readonly canAuthorTemplates = computed(() => this.lens.canApproveChanges());
     readonly canRetry = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'failed');
 
     // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
@@ -157,6 +160,39 @@ export class RegulatoryReportsComponent implements OnInit {
                 this.templateProblems.set(t.problems);
             },
             error: () => this.templates.set([]),
+        });
+    }
+
+    newTemplate(): void {
+        this.editTemplate();
+    }
+
+    /** Create (no argument) or edit a Report Template; a built-in is saved as this Space's own template of that id. */
+    editTemplate(template?: ReportTemplate): void {
+        const data: ReportTemplateDialogData = { template };
+        this.dialog
+            .open(ReportTemplateDialog, { data, width: '44rem' })
+            .afterClosed()
+            .subscribe((t?: ReportTemplate) => {
+                if (!t) return;
+                this.toastr.success('Report Template saved');
+                this.loadTemplates();
+            });
+    }
+
+    async deleteTemplate(t: ReportTemplate): Promise<void> {
+        const ok = await this.confirm.confirmDestructive(
+            `Delete the Report Template "${t.title}"? Reports already drafted keep their content.`,
+            { title: 'Delete the Report Template?', confirmText: 'Delete' },
+        );
+        if (!ok) return;
+        this.api.deleteTemplate(t.id).subscribe({
+            next: () => {
+                this.toastr.success('Report Template deleted');
+                this.loadTemplates();
+            },
+            // The server's own words, e.g. a regulatory report still uses it.
+            error: (err) => this.toastr.error(apiErrorMessage(err, 'The Report Template could not be deleted')),
         });
     }
 

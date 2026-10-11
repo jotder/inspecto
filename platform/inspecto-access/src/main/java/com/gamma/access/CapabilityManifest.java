@@ -337,6 +337,10 @@ public final class CapabilityManifest {
             new Entry("POST", "/regulatory-reports/([^/]+)/approve", Roles.CAN_APPROVE_CHANGES),
             new Entry("POST", "/regulatory-reports/([^/]+)/decline", Roles.CAN_APPROVE_CHANGES),
             new Entry("POST", "/regulatory-reports/([^/]+)/retry", Roles.CAN_APPROVE_CHANGES),
+            // Report Template authoring: what is filed and where it is dropped - oversight, the same capability as
+            // approve; no filing capability exists (D-RR8).
+            new Entry("PUT", "/regulatory-reports/templates/([^/]+)", Roles.CAN_APPROVE_CHANGES),
+            new Entry("DELETE", "/regulatory-reports/templates/([^/]+)", Roles.CAN_APPROVE_CHANGES),
             // RequirementRoutes
             // ⛔ `POST /requirements` is deliberately NOT here. The route-gating audit called it "an
             // inconsistency, not a judgement call" because its two siblings are gated — that is WRONG, and

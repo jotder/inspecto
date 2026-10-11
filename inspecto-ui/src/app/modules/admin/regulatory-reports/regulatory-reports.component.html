@@ -26,6 +26,46 @@
         </inspecto-alert>
     }
 
+    <section class="bg-card mt-4 rounded-2xl p-4 shadow" aria-labelledby="rr-templates-title">
+        <div class="flex items-center justify-between">
+            <h2 id="rr-templates-title" class="m-0 text-base font-semibold">Report Templates</h2>
+            @if (canAuthorTemplates()) {
+                <button mat-stroked-button (click)="newTemplate()">New template</button>
+            }
+        </div>
+        <ul class="m-0 mt-2 list-none p-0">
+            @for (t of templates(); track t.id) {
+                <li class="flex items-center justify-between gap-2 py-1">
+                    <span class="min-w-0">
+                        {{ t.title }}
+                        <span class="text-secondary text-sm"
+                            >· <span class="font-mono">{{ t.id }}</span> · {{ t.format.toUpperCase() }} ·
+                            {{ t.origin === 'space' ? 'this Space' : 'built-in' }}</span
+                        >
+                    </span>
+                    @if (canAuthorTemplates()) {
+                        <span class="flex shrink-0">
+                            <button mat-icon-button (click)="editTemplate(t)" [attr.aria-label]="'Edit ' + t.title">
+                                <mat-icon [svgIcon]="'heroicons_outline:pencil-square'"></mat-icon>
+                            </button>
+                            @if (t.origin === 'space') {
+                                <button
+                                    mat-icon-button
+                                    (click)="deleteTemplate(t)"
+                                    [attr.aria-label]="'Delete ' + t.title"
+                                >
+                                    <mat-icon [svgIcon]="'heroicons_outline:trash'"></mat-icon>
+                                </button>
+                            }
+                        </span>
+                    }
+                </li>
+            } @empty {
+                <li class="text-secondary text-sm">No Report Templates.</li>
+            }
+        </ul>
+    </section>
+
     <mat-button-toggle-group
         class="mt-4 self-start"
         aria-label="Which regulatory reports to list"

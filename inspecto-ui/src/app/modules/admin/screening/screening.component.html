@@ -5,6 +5,7 @@
         [inset]="false"
     >
         <ng-container actions>
+            <button mat-stroked-button (click)="checkName()">Check a name</button>
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>

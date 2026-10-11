@@ -180,6 +180,18 @@ public final class RegulatoryReports {
         return out;
     }
 
+    /** One AUDIT row for a Report Template authoring act — the id only, never the document. */
+    static void auditTemplate(String actor, String actorType, String action, String message, String templateId) {
+        try {
+            EventLog log = EventLog.current();
+            if (log == null) return;
+            log.emit(Event.builder(EventType.AUDIT).source("audit").message(message).actor(actor).actorType(actorType)
+                    .action(action).actionCategory("config").attr("template", templateId));
+        } catch (RuntimeException ignored) {
+            // best effort, like every audit emit
+        }
+    }
+
     /** A draft or pending report past its {@code expiresAt} becomes {@code expired}. Call under {@link #lock}. */
     static boolean expireIfDue(Path root, Map<String, Object> rec) throws IOException {
         if (invalid(rec) || !(PENDING.equals(rec.get("status")) || DRAFT.equals(rec.get("status")))) return false;

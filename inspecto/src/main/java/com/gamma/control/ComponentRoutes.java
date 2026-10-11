@@ -474,6 +474,7 @@ final class ComponentRoutes implements RouteModule {
             throw new ApiException(409, ErrorCodes.CONFLICT, type + " component '" + id + "' is shared with space(s): "
                     + String.join(", ", consumers) + " — revoke the grant(s) first");
         requireNoStrandedObjects(api, type, current.content(), null);
+        if ("runbook".equals(type)) requireNoLinkingAlertRules(store, id);
         PendingChanges.hold(api, ex, type, id, null, current.content());   // maker-checker: a delete is a change
         boolean removed;
         try {
@@ -494,6 +495,39 @@ final class ComponentRoutes implements RouteModule {
             }
         }
         return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed);
+    }
+
+    /**
+     * A Runbook step link to a Dataset, Query or Dashboard must name a component of this Space (422 naming the step
+     * and target). A {@code case} link names a runtime object, not config, so it is not checked. Direct save only:
+     * bundle / Space-template writers apply in their own order and stay lenient.
+     */
+    private static void requireStepLinkTargets(ComponentStore store, String id, Map<String, Object> content) {
+        List<com.gamma.alert.Runbook.Step> steps = com.gamma.alert.Runbook.fromMap(id, content).steps();
+        for (int i = 0; i < steps.size(); i++) {
+            com.gamma.alert.Runbook.Step s = steps.get(i);
+            if (s.linkKind() == null || "case".equals(s.linkKind())) continue;
+            boolean exists;
+            try {
+                exists = store.exists(s.linkKind(), s.linkId());
+            } catch (IllegalArgumentException e) {
+                exists = false;
+            }
+            if (!exists)
+                throw new IllegalArgumentException("runbook.steps[" + i + "].link names " + s.linkKind() + " '" + s.linkId()
+                        + "', which does not exist in this Space; create it first");
+        }
+    }
+
+    /** 409 when an Alert Rule links the Runbook ({@code runbook:}); names up to 10 of them. */
+    private static void requireNoLinkingAlertRules(ComponentStore store, String id) {
+        List<String> rules = store.list("alert-rule").stream()
+                .filter(c -> id.equals(String.valueOf(c.content().get("runbook")).trim()))
+                .map(ComponentRegistry.Component::name).sorted().toList();
+        if (rules.isEmpty()) return;
+        throw new ApiException(409, ErrorCodes.CONFLICT, "runbook component '" + id + "' is linked by Alert Rule(s): "
+                + String.join(", ", rules.subList(0, Math.min(10, rules.size())))
+                + (rules.size() > 10 ? " (+" + (rules.size() - 10) + " more)" : "") + " — unlink them first");
     }
 
     /** {@code GET /components/{type}/{id}/versions} — prior saved copies, newest first (MET-5); 404 if absent. */
@@ -725,6 +759,8 @@ final class ComponentRoutes implements RouteModule {
             }
             // ASSURE-KPI-DEFINITIONS-1: a KPI's Measure must exist, and be readable by its author, at save.
             if (KpiRoutes.TYPE.equals(type)) KpiRoutes.requireMeasure(api, ex, id, content);
+            // A Runbook's internal step links must exist at a direct save (bulk writers stay lenient: load order).
+            if ("runbook".equals(type)) requireStepLinkTargets(store, id, content);
             // Maker-checker (ASSURE-MAKER-CHECKER-1): after validation, before the tag projection's side effects.
             Map<String, Object> stamped = new LinkedHashMap<>(content);
             stamped.put("name", id);   // what the store persists
