@@ -32,6 +32,8 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
  * The preview box of the Anomaly Model pane (design §13.1): pick an entity → its score now under the SAVED model
  * (`POST /anomaly-scores/preview`, writes nothing), the per-feature table (self z, peer z, cohort shift, reason) and
  * per feature a strip of its baseline — the usual range (median ± 3 MAD), the median and the observed point.
+ * Given a {@link draft} instead of a {@link model}, it scores the host's UNSAVED content (the form dialog): the draft
+ * is read when Preview is pressed, and returns `null` while the form is invalid.
  */
 @Component({
     selector: 'app-anomaly-model-preview',
@@ -56,6 +58,11 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
         @if (missingKey()) {
             <p class="text-warn mt-1 text-xs" role="alert">Enter an entity key to preview.</p>
         }
+        @if (invalidDraft()) {
+            <p class="text-warn mt-1 text-xs" role="alert">
+                Correct the highlighted fields above to preview the draft.
+            </p>
+        }
         @if (error(); as e) {
             <p class="text-warn mt-2 text-sm" role="alert">{{ e }}</p>
         }
@@ -74,6 +81,9 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
                             {{ p.entityKey }} · day {{ p.periodStart }} · Elevated ≥ {{ p.elevatedThreshold }} · High ≥
                             {{ p.highThreshold }}
                         </span>
+                        @if (!p.saved) {
+                            <span class="text-secondary text-xs">Scored under the unsaved draft.</span>
+                        }
                     </div>
                     <table class="mt-3 w-full text-left text-sm">
                         <caption class="sr-only">
@@ -164,12 +174,15 @@ export class AnomalyModelPreviewComponent {
     private api = inject(AnomalyModelsService);
 
     /** The SAVED model to preview. */
-    readonly model = input.required<string>();
+    readonly model = input<string | null>(null);
+    /** Or the host's UNSAVED content, read on Preview; `null` = the form is not valid yet. Wins over `model`. */
+    readonly draft = input<(() => Record<string, unknown> | null) | null>(null);
 
     readonly entityDraft = new FormControl('', { nonNullable: true });
     readonly asOfDraft = new FormControl('', { nonNullable: true });
     readonly running = signal(false);
     readonly missingKey = signal(false);
+    readonly invalidDraft = signal(false);
     readonly error = signal<string | null>(null);
     readonly result = signal<AnomalyScorePreview | null>(null);
     readonly fmt = fmt;
@@ -187,10 +200,18 @@ export class AnomalyModelPreviewComponent {
         const k = this.entityDraft.value.trim();
         this.missingKey.set(!k);
         if (!k) return;
+        const draft = this.draft();
+        const content = draft ? draft() : null;
+        this.invalidDraft.set(!!draft && !content);
+        if (draft && !content) return;
+        const asOf = this.asOfDraft.value || undefined;
         this.running.set(true);
         this.error.set(null);
         this.result.set(null);
-        this.api.preview(this.model(), k, this.asOfDraft.value || undefined).subscribe({
+        const call = content
+            ? this.api.previewContent(content, k, asOf)
+            : this.api.preview(this.model() ?? '', k, asOf);
+        call.subscribe({
             next: (p) => {
                 this.running.set(false);
                 this.result.set(p);

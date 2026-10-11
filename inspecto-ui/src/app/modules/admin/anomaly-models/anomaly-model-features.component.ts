@@ -13,10 +13,25 @@ import {
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { measureError } from 'app/inspecto/query/measure-grammar';
 import { ColumnMeta } from 'app/inspecto/query/query-types';
+import {
+    FEATURE_FILTER_OPS,
+    FeatureFilterDraft,
+    NO_VALUE_OPS,
+    emptyFilter,
+    filterDrafts,
+    unitText,
+    withFeatureFields,
+} from './anomaly-feature-fields';
 
 const measureValidator = (c: AbstractControl) => {
     const e = measureError(String(c.value ?? ''));
     return e ? { measure: e } : null;
+};
+
+/** `AnomalyModel` refuses `unit <= 0`; blank is allowed (no key = the default floor of 1). */
+const unitValidator = (c: AbstractControl) => {
+    const t = String(c.value ?? '').trim();
+    return t === '' || (/^\d*\.?\d+$/.test(t) && Number(t) > 0) ? null : { unit: true };
 };
 
 /** TIMESTAMP / DATE columns only — `requireStorable` refuses any other `time` column. */
@@ -26,7 +41,8 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
  * The Feature row editor of the Anomaly Model form (design §6 / §13.1): one card per Feature with the same Dataset
  * picker and `count | agg(column)` Measure grammar the Risk Score Factor editor uses. Presentational: the host
  * supplies the Dataset choices and a column source, reads {@link value} on save and places server refusals through
- * {@link setRowError}. Keys the editor does not model (`filters`, `unit`) ride through each row untouched.
+ * {@link setRowError}. Each row also edits the Feature's `filters` (`{field, op, value}`, ANDed before the Measure) and
+ * its `unit` (the absolute spread floor); keys the editor does not model ride through each row untouched.
  */
 @Component({
     selector: 'app-anomaly-model-features',
@@ -103,6 +119,75 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                                 <mat-error>Weight must be a number above 0</mat-error>
                             }
                         </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Spread floor (unit)</mat-label>
+                            <input matInput formControlName="unit" inputmode="decimal" placeholder="1" />
+                            <mat-hint>The smallest spread a change is measured against. Blank = 1.</mat-hint>
+                            @if (g.controls['unit'].hasError('unit')) {
+                                <mat-error>Spread floor must be a number above 0</mat-error>
+                            }
+                        </mat-form-field>
+                    </div>
+                    <div class="mt-3" formArrayName="filters">
+                        <p class="text-sm font-semibold">Filters</p>
+                        <p class="text-secondary text-xs">Only rows matching every filter are measured.</p>
+                        @for (fg of filtersOf(g).controls; track fg; let j = $index) {
+                            <div
+                                class="mt-2 grid grid-cols-1 items-start gap-x-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                                role="group"
+                                [formGroupName]="j"
+                                [attr.aria-label]="'Feature ' + (i + 1) + ' filter ' + (j + 1)"
+                            >
+                                <inspecto-option-picker
+                                    label="Column"
+                                    formControlName="field"
+                                    [options]="columnOptions(i)"
+                                ></inspecto-option-picker>
+                                <inspecto-option-picker
+                                    label="Operator"
+                                    formControlName="op"
+                                    [options]="filterOps"
+                                ></inspecto-option-picker>
+                                @if (takesValue(fg)) {
+                                    <mat-form-field subscriptSizing="dynamic">
+                                        <mat-label>Value</mat-label>
+                                        <input
+                                            matInput
+                                            formControlName="value"
+                                            [placeholder]="fg.value['op'] === 'in' ? 'a, b, c' : ''"
+                                        />
+                                        @if (fg.controls['value'].hasError('required')) {
+                                            <mat-error>Value is required</mat-error>
+                                        }
+                                    </mat-form-field>
+                                } @else {
+                                    <span></span>
+                                }
+                                <button
+                                    mat-icon-button
+                                    type="button"
+                                    class="self-center"
+                                    [attr.aria-label]="'Remove filter ' + (j + 1) + ' of feature ' + (i + 1)"
+                                    (click)="removeFilter(g, j)"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                </button>
+                                @if (filterMissing(fg).length) {
+                                    <p class="text-warn text-xs sm:col-span-4" role="alert">
+                                        Choose: {{ filterMissing(fg).join(', ') }}
+                                    </p>
+                                }
+                            </div>
+                        }
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            class="mt-2"
+                            [attr.aria-label]="'Add filter to feature ' + (i + 1)"
+                            (click)="addFilter(g)"
+                        >
+                            Add filter
+                        </button>
                     </div>
                     @if (missing(g).length) {
                         <p class="text-warn mt-1 text-xs" role="alert">Choose: {{ missing(g).join(', ') }}</p>
@@ -143,6 +228,7 @@ export class AnomalyModelFeaturesComponent implements OnInit {
 
     readonly maxFeatures = MAX_FEATURES;
     readonly directions: PickerOption[] = ANOMALY_DIRECTIONS;
+    readonly filterOps: PickerOption[] = FEATURE_FILTER_OPS;
     readonly rows: FormArray<FormGroup> = this.fb.array<FormGroup>([]);
     readonly rowErrors = signal<Record<number, string>>({});
     /** Pickers render their own error only on interaction; a submit shows this line instead (angular-ui §4). */
@@ -163,10 +249,57 @@ export class AnomalyModelFeaturesComponent implements OnInit {
             measure: [f.measure, [Validators.required, measureValidator]],
             direction: [f.direction || 'up', Validators.required],
             weight: [f.weight, [Validators.required, Validators.pattern(/^\s*\d*\.?\d+\s*$/)]],
+            unit: [unitText(f.extra ?? {}), unitValidator],
+            filters: this.fb.array<FormGroup>(filterDrafts(f.extra ?? {}).map((d) => this.filterRow(d))),
             extra: [{ ...(f.extra ?? {}) }],
         });
         g.controls['dataset'].valueChanges.subscribe((d) => this.loadColumns(String(d ?? '')));
         return g;
+    }
+
+    /** One filter row; `value` is required unless the op takes none (isNull / notNull). */
+    private filterRow(d: FeatureFilterDraft): FormGroup {
+        const g = this.fb.group({
+            field: [d.field, Validators.required],
+            op: [d.op, Validators.required],
+            value: [d.value],
+            raw: [d.raw],
+        });
+        const sync = (op: unknown) => {
+            const v = g.controls['value'];
+            v.setValidators(NO_VALUE_OPS.includes(String(op ?? '')) ? null : Validators.required);
+            v.updateValueAndValidity({ emitEvent: false });
+        };
+        sync(d.op);
+        g.controls['op'].valueChanges.subscribe(sync);
+        return g;
+    }
+
+    filtersOf(g: FormGroup): FormArray<FormGroup> {
+        return g.controls['filters'] as FormArray<FormGroup>;
+    }
+
+    takesValue(fg: FormGroup): boolean {
+        return !NO_VALUE_OPS.includes(String(fg.value['op'] ?? ''));
+    }
+
+    /** Filter pickers left blank, named for the submit-time alert line (pickers show no error on submit). */
+    filterMissing(fg: FormGroup): string[] {
+        if (!this.submitted()) return [];
+        const names: Record<string, string> = { field: 'Column', op: 'Operator' };
+        return Object.keys(names)
+            .filter((k) => !fg.controls[k].value)
+            .map((k) => names[k]);
+    }
+
+    addFilter(g: FormGroup): void {
+        this.filtersOf(g).push(this.filterRow(emptyFilter()));
+        this.rows.markAsDirty();
+    }
+
+    removeFilter(g: FormGroup, j: number): void {
+        this.filtersOf(g).removeAt(j);
+        this.rows.markAsDirty();
     }
 
     private loadColumns(dataset: string): void {
@@ -228,7 +361,16 @@ export class AnomalyModelFeaturesComponent implements OnInit {
                 measure: String(v.measure ?? ''),
                 direction: String(v.direction ?? 'up'),
                 weight: String(v.weight ?? ''),
-                extra: (v.extra ?? {}) as Record<string, unknown>,
+                extra: withFeatureFields(
+                    (v.extra ?? {}) as Record<string, unknown>,
+                    ((v.filters ?? []) as Record<string, unknown>[]).map((f) => ({
+                        field: String(f['field'] ?? ''),
+                        op: String(f['op'] ?? ''),
+                        value: String(f['value'] ?? ''),
+                        raw: (f['raw'] ?? {}) as Record<string, unknown>,
+                    })),
+                    String(v.unit ?? ''),
+                ),
             };
         });
     }

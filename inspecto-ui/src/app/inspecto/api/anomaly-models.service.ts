@@ -104,4 +104,20 @@ export class AnomalyModelsService {
             ...(asOf ? { asOf } : {}),
         });
     }
+
+    /**
+     * Preview UNSAVED model content for one entity — the same route with `content` instead of `model`. The server
+     * also requires `canAuthorWorkbench` and runs the save-time checks (422 with the field-led message).
+     */
+    previewContent(
+        content: Record<string, unknown>,
+        entityKey: string,
+        asOf?: string,
+    ): Observable<AnomalyScorePreview> {
+        return this.http.post<AnomalyScorePreview>(apiUrl('/anomaly-scores/preview'), {
+            content,
+            entityKey,
+            ...(asOf ? { asOf } : {}),
+        });
+    }
 }
