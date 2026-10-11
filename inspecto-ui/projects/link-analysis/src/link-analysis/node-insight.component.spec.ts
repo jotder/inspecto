@@ -241,6 +241,26 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(el.textContent).toContain('Waiting for approval');
     });
 
+    it('after a direct add, re-checks membership and never claims no list can take the entity', async () => {
+        const { fixture, el, svc } = make({}, { matched: ['wl'] });
+        await settle(fixture);
+        el.querySelector<HTMLButtonElement>('[data-testid=add-block-bl]')!.click();
+        await settle(fixture);
+        expect(el.textContent).toContain('Added to');
+        expect(svc.match.mock.calls.filter((a) => a[0] === 'bl').length).toBe(2); // re-checked
+        expect(el.querySelector('[data-testid=add-block-bl]')).toBeNull(); // a member now, even if the read lags
+        expect(el.querySelector('[data-testid=lists]')!.textContent).toContain('block: BL');
+        expect(el.querySelector('[data-testid=lists-none]')).toBeNull();
+    });
+
+    it('says no list can take the entity only when none of its type is a watch / block list', async () => {
+        const { fixture, el, svc } = make();
+        svc.entityLists.mockReturnValue(of({ lists: [list('ok', 'allow')], headSeq: 1, headHash: null }));
+        fixture.componentInstance.ngOnInit();
+        await settle(fixture);
+        expect(el.querySelector('[data-testid=lists-none]')).not.toBeNull();
+    });
+
     it('does nothing when the reason prompt is cancelled, and says why a 403 failed', async () => {
         const { fixture, el, svc, c } = make(
             {},

@@ -314,7 +314,7 @@ const LIST_REASON_MAX = 1000;
                 <p class="text-secondary mt-1 text-xs" data-testid="lists-forbidden">
                     Adding to a list needs the Manage incidents capability.
                 </p>
-            } @else if (memberships() && !addTargets().length) {
+            } @else if (memberships() && !eligibleLists().length) {
                 <p class="text-secondary mt-1 text-xs" data-testid="lists-none">
                     No watch or block list can take this entity - create one in Entity Lists.
                 </p>
@@ -391,11 +391,13 @@ export class NodeInsightComponent implements OnInit {
         return '';
     });
     readonly onLists = computed(() => (this.memberships() ?? []).filter((m) => m.matched));
-    readonly addTargets = computed(() =>
-        (this.memberships() ?? [])
-            .filter((m) => !m.matched && (m.list.purpose === 'watch' || m.list.purpose === 'block'))
-            .map((m) => m.list),
+    /** Watch / block lists of this entity's type, whether or not it is already on them. */
+    readonly eligibleLists = computed(() =>
+        (this.memberships() ?? []).filter((m) => m.list.purpose === 'watch' || m.list.purpose === 'block'),
     );
+    readonly addTargets = computed(() => this.eligibleLists().filter((m) => !m.matched).map((m) => m.list));
+    /** Lists this dialog added the entity to: kept as members even if the re-check lags behind the write. */
+    private readonly addedHere = new Set<string>();
 
     private readonly historySvc = inject(CaseHistoryService);
     readonly historyOpen = signal(false);
@@ -521,6 +523,7 @@ export class NodeInsightComponent implements OnInit {
                 });
             } else {
                 this.actionNote.set({ variant: 'success', text: `Added to "${list.title}".` });
+                this.addedHere.add(list.id);
                 await this.loadMemberships();
             }
         } catch (e) {
@@ -553,8 +556,8 @@ export class NodeInsightComponent implements OnInit {
             );
             const checks = lists.map((l) =>
                 this.svc.match(l.id, [c.key]).pipe(
-                    map((r) => ({ list: l, matched: !!r.matches[0]?.matched })),
-                    catchError(() => of({ list: l, matched: false })),
+                    map((r) => ({ list: l, matched: !!r.matches[0]?.matched || this.addedHere.has(l.id) })),
+                    catchError(() => of({ list: l, matched: this.addedHere.has(l.id) })),
                 ),
             );
             this.memberships.set(checks.length ? await firstValueFrom(forkJoin(checks)) : []);
