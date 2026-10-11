@@ -35,7 +35,13 @@ AML function pack (`PACK-AML-1`) builds on it. Vocabulary: `docs/GLOSSARY.md` §
     mean token length, times `0.8 + 0.2·min/max` of the two total token lengths; it applies when the token counts are
     equal or the shorter name has two or more tokens. Joined: Jaro-Winkler of the tokens written together, only when
     the counts differ ("Abdul Rahman" = "Abdulrahman"). Symmetric, 0..1, 4 decimals.
-- **Blocking**: a name is compared only with members sharing the first folded letter of at least one token.
+- **Phonetic reading** (`SCREENING-1` 2): when the plain score is below 0.95 the same score is taken over per-token
+  transliteration skeletons (`dh gh kh`→first letter, `ou oo`→u, `ei ai ay ey`→i, doubled letters collapsed, a token of
+  6+ letters starting q / g read as k) and capped at 0.95; the larger wins. Gaddafi / Qadhafi / Kadhafi / Gadhafi / Khadafi
+  all give `kadafi` (0.95); Hussein / Husain / Hussain give `husin`. Dependency-free, no config (SCR-D2); the 6-letter
+  floor keeps Gamal / Kamal out of the fold (they stay apart unless the plain score already flags them).
+- **Blocking**: a name is compared only with members sharing, for at least one token, the first folded letter OR the
+  first letter of its phonetic skeleton (`NameMatcher.blockKeys`, a superset of the old initials).
 - The golden pairs (`NameMatcherTest`) pin the behaviour at the default threshold **0.85**: variants and transliterations
   match (Mohammed / Muhammad 0.85, Usama bin Ladin / Osama bin Laden 0.91, Vladimir Vladimirovich Putin / Vladimir Putin
   0.90); look-alike spellings fold to exactly 1.0; different people stay below (John / Jane Smith 0.56, Kim Jong Un / Il
@@ -98,7 +104,7 @@ four-eyes on `confirmed` is required) · the Action Requests record pattern rath
 Run refuses a subset. Provenance: `docs/archived-documents/plans-archive/screening-addon-plan.md`.
 
 ## Limits and what is open (`SCREENING-1` residuals in `docs/BACKLOG.md`)
-- Blocking misses a typo in the first letter of **every** token (Gaddafi / Qadhafi alone is never compared); there are no
-  phonetic keys or transliteration tables beyond look-alike folding.
+- Blocking still misses a first-letter difference that is not a known transliteration (a typo in the initial of every
+  token); Muhammad / Mohamed (0.83) stays below the threshold — no vowel-u/o fold yet.
 - A Run lists every hit document to dedupe (no index); fine for thousands of hits, not for millions.
 - No four-eyes on `confirmed`; `check` cannot raise hits; no Space-level threshold default.

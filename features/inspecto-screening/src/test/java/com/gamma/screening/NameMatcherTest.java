@@ -125,4 +125,81 @@ class NameMatcherTest {
         assertEquals(0.8133, NameMatcher.jaroWinkler("dixon", "dicksonx"), 1e-4);
         assertEquals(0.0, NameMatcher.jaroWinkler("abc", "xyz"));
     }
+
+    // ---- SCREENING-1 (2): phonetic / transliteration blocking + second reading ----
+
+    private static final String[][] TRANSLITERATIONS = {
+            {"Gaddafi", "Qadhafi"}, {"Gaddafi", "Kadhafi"}, {"Gaddafi", "Gadhafi"}, {"Gaddafi", "Khadafi"},
+            {"Qadhafi", "Khadafi"}, {"Muammar Gaddafi", "Muammar Qadhafi"},
+            {"Muhammad", "Mohammed"}, {"Muhammed", "Mohammed"},
+            {"Hussein", "Husain"}, {"Hussein", "Hussain"}, {"Husain", "Hussain"},
+            {"Yusuf", "Yousef"},
+    };
+
+    /** Not the same person: the phonetic reading must not pull these over the threshold. */
+    private static final String[][] STILL_DIFFERENT = {
+            {"Hussein", "Hassan"}, {"Gaddafi", "Gandhi"},
+            {"Qasim Hussein", "Kassem Hassan"}, {"Muhammad Ali", "Mustafa Kamal"}, {"Yusuf", "Yaser"},
+    };
+
+    @Test
+    void transliterationVariantsMatchAndShareABlock() {
+        for (String[] p : TRANSLITERATIONS) {
+            assertTrue(NameMatcher.score(p[0], p[1]) >= T, p[0] + " ~ " + p[1] + " = " + NameMatcher.score(p[0], p[1]));
+            var ka = NameMatcher.blockKeys(NameMatcher.tokens(p[0])); var kb = NameMatcher.blockKeys(NameMatcher.tokens(p[1]));
+            assertTrue(ka.stream().anyMatch(kb::contains), p[0] + " / " + p[1] + " share no block");
+        }
+        assertEquals("kadafi", NameMatcher.phonetic("gaddafi"));
+        assertEquals("kadafi", NameMatcher.phonetic("qadhafi"));
+        assertEquals("husin", NameMatcher.phonetic("hussein"));
+    }
+
+    @Test
+    void phoneticReadingDoesNotMatchLookAlikeButDifferentNames() {
+        for (String[] p : STILL_DIFFERENT)
+            assertTrue(NameMatcher.score(p[0], p[1]) < T, p[0] + " vs " + p[1] + " = " + NameMatcher.score(p[0], p[1]));
+        assertTrue(NameMatcher.score("Gaddafi", "Qadhafi") <= NameMatcher.PHONETIC_CAP);
+    }
+
+    /** Blocking exists for cost: the phonetic keys may add candidates, but only a bounded fraction. */
+    @Test
+    void phoneticBlockingKeepsCandidatePairsBounded() {
+        java.util.Random r = new java.util.Random(42);
+        String[] syll = {"ka", "mo", "ha", "sa", "li", "ro", "an", "ben", "dar", "yu", "ga", "qa", "ou", "ei", "dh", "kh", "ma", "ne", "to", "vi"};
+        List<List<String>> names = new java.util.ArrayList<>();
+        for (int i = 0; i < 3000; i++) {
+            StringBuilder n = new StringBuilder();
+            for (int w = 0; w < 2 + r.nextInt(2); w++) {
+                for (int k = 0; k < 2 + r.nextInt(2); k++) n.append(syll[r.nextInt(syll.length)]);
+                n.append(' ');
+            }
+            names.add(NameMatcher.tokens(n.toString()));
+        }
+        java.util.Map<Character, List<Integer>> plain = new java.util.HashMap<>(), phon = new java.util.HashMap<>();
+        for (int i = 0; i < names.size(); i++) {
+            for (String t : names.get(i)) { }
+            for (Character c : initialsOf(names.get(i))) plain.computeIfAbsent(c, x -> new java.util.ArrayList<>()).add(i);
+            for (Character c : NameMatcher.blockKeys(names.get(i))) phon.computeIfAbsent(c, x -> new java.util.ArrayList<>()).add(i);
+        }
+        long before = 0, after = 0;
+        for (int q = 0; q < 300; q++) {
+            before += candidates(plain, initialsOf(names.get(q)));
+            after += candidates(phon, NameMatcher.blockKeys(names.get(q)));
+        }
+        System.out.println("SCREENING-1 candidate pairs (300 subjects x 3000 members): before=" + before + " after=" + after);
+        assertTrue(after >= before);
+        assertTrue(after <= before * 1.5, "before=" + before + " after=" + after);
+    }
+
+    private static java.util.Set<Character> initialsOf(List<String> tokens) {
+        java.util.Set<Character> out = new java.util.LinkedHashSet<>();
+        for (String t : tokens) out.add(t.charAt(0));
+        return out;
+    }
+
+    private static long candidates(java.util.Map<Character, List<Integer>> idx, java.util.Set<Character> keys) {
+        java.util.Set<Integer> out = new java.util.HashSet<>();
+        for (Character c : keys) out.addAll(idx.getOrDefault(c, List.of()));
+        return out.size();
+    }
 }

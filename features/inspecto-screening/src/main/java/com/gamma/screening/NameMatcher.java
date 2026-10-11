@@ -24,6 +24,10 @@ import java.util.regex.Pattern;
  * {@code 0.8 + 0.2·min(lenA, lenB)/max(lenA, lenB)} (total token lengths). It applies when both names have the same number of tokens or the
  * shorter has two or more, so one common token never matches a long name. {@code joined}: Jaro-Winkler of the
  * tokens written together, only when the token counts differ ("Abdul Rahman" is "Abdulrahman").
+ *
+ * <p><b>Phonetic reading (SCREENING-1).</b> When the plain score is below {@link #PHONETIC_CAP}, the same score is
+ * taken over {@link #phonetic} transliteration skeletons and capped at {@link #PHONETIC_CAP}; the larger wins.
+ * {@link #blockKeys} gives Screener's blocking the skeleton initial as well, so Gaddafi / Qadhafi are compared.
  */
 public final class NameMatcher {
 
@@ -100,6 +104,42 @@ public final class NameMatcher {
         return b.toString();
     }
 
+    /** The phonetic score is capped here: a transliteration-equal pair clears the default threshold, never reads 1.0. */
+    static final double PHONETIC_CAP = 0.95;
+
+    /** A token this long (after digraph reduction) may start with a q / g read as k: Gaddafi yes, Gamal no. */
+    private static final int KAF_MIN_LENGTH = 6;
+
+    /**
+     * The transliteration skeleton of one folded token (Arabic-name variants): {@code dh gh kh} read as their first
+     * letter, {@code ou oo} as u, {@code ei ai ay ey} as i, doubled letters collapsed, and a long token's leading
+     * q / g as k — so Gaddafi, Qadhafi, Kadhafi, Gadhafi, Khadafi all give "kadafi" and Hussein, Husain, Hussain
+     * "husin". A token holding a digit is returned as is. Used only by {@link #score(List, List)}'s second reading
+     * and by {@link #blockKeys(List)}.
+     */
+    static String phonetic(String t) {
+        for (int i = 0; i < t.length(); i++) if (Character.isDigit(t.charAt(i))) return t;
+        String s = t.replace("dh", "d").replace("gh", "g").replace("kh", "k").replace("ou", "u").replace("oo", "u")
+                .replace("ei", "i").replace("ai", "i").replace("ay", "i").replace("ey", "i");
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) if (i == 0 || s.charAt(i) != s.charAt(i - 1)) b.append(s.charAt(i));
+        if (b.length() >= KAF_MIN_LENGTH && (b.charAt(0) == 'q' || b.charAt(0) == 'g')) b.setCharAt(0, 'k');
+        return b.toString();
+    }
+
+    /**
+     * The blocking keys of a name's tokens: the first letter of each token AND of its {@link #phonetic} skeleton, so
+     * a pair that differ only by a transliteration (Gaddafi / Qadhafi) share a block. A superset of the plain initials.
+     */
+    public static java.util.Set<Character> blockKeys(List<String> tokens) {
+        java.util.Set<Character> out = new java.util.LinkedHashSet<>();
+        for (String t : tokens) {
+            out.add(t.charAt(0));
+            out.add(phonetic(t).charAt(0));
+        }
+        return out;
+    }
+
     /** The Match Score of two names, 0..1 rounded to 4 decimals; 0 when either folds to nothing. */
     public static double score(String a, String b) {
         return score(tokens(a), tokens(b));
@@ -110,7 +150,18 @@ public final class NameMatcher {
         if (a.isEmpty() || b.isEmpty()) return 0.0;
         double set = a.size() == b.size() || Math.min(a.size(), b.size()) >= 2 ? tokenSet(a, b) : 0.0;
         double joined = a.size() != b.size() ? jaroWinkler(String.join("", a), String.join("", b)) : 0.0;
-        return Math.round(Math.max(set, joined) * 10_000.0) / 10_000.0;
+        double best = Math.max(set, joined);
+        if (best < PHONETIC_CAP) {   // second reading: the same score over transliteration skeletons, capped
+            List<String> pa = a.stream().map(NameMatcher::phonetic).toList(), pb = b.stream().map(NameMatcher::phonetic).toList();
+            if (!pa.equals(a) || !pb.equals(b)) best = Math.max(best, Math.min(PHONETIC_CAP, rawScore(pa, pb)));
+        }
+        return Math.round(best * 10_000.0) / 10_000.0;
+    }
+
+    private static double rawScore(List<String> a, List<String> b) {
+        double set = a.size() == b.size() || Math.min(a.size(), b.size()) >= 2 ? tokenSet(a, b) : 0.0;
+        double joined = a.size() != b.size() ? jaroWinkler(String.join("", a), String.join("", b)) : 0.0;
+        return Math.max(set, joined);
     }
 
     static double tokenSet(List<String> a, List<String> b) {
