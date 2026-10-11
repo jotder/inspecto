@@ -52,6 +52,28 @@ public interface ObjectStore extends AutoCloseable {
                                              int limit);
 
     /**
+     * Objects of any of {@code types} whose ENCODED attribute bag (the compact JSON {@link com.gamma.util.JsonAttributes}
+     * writes) contains {@code fragment}, ignoring case — newest first, at most {@code limit}. A <b>prefilter</b> for the
+     * Entity "case history" lookup ({@code GET /objects/by-entity}): it only narrows, the caller re-checks every row
+     * exactly, so a false positive costs a decode and never a wrong answer.
+     *
+     * <p>⚠ No store indexes the attribute bag (it is portable JSON text), so this is ONE bounded scan of the object
+     * table per call; {@code limit} caps the rows read. Like {@link #findByAttributes} it fails closed (throws).
+     * The default serves stores without a cheaper path (in-memory, test doubles) by filtering {@link #query}.
+     */
+    default List<OperationalObject> findByAttributeFragment(java.util.Collection<com.gamma.workflow.ObjectType> types,
+                                                           String fragment, int limit) {
+        String needle = fragment.toLowerCase(java.util.Locale.ROOT);
+        List<OperationalObject> out = new java.util.ArrayList<>();
+        for (com.gamma.workflow.ObjectType t : types)
+            for (OperationalObject o : query(ObjectQuery.builder().objectType(t).limit(ObjectQuery.MAX_LIMIT).build()))
+                if (com.gamma.util.JsonAttributes.toJson(o.attributes()).toLowerCase(java.util.Locale.ROOT).contains(needle))
+                    out.add(o);
+        out.sort(java.util.Comparator.comparingLong(OperationalObject::createdAt).reversed());
+        return out.size() > limit ? new java.util.ArrayList<>(out.subList(0, limit)) : out;
+    }
+
+    /**
      * Persist a mutated object (status/assignee/timestamps) <b>optimistically</b>: it is written only if the
      * stored row is still at {@code obj.version()} (the version the caller read), and the stored version is
      * bumped by one. Returns the stored object, at its new version. The check and the write are one atomic step

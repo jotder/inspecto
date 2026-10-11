@@ -89,6 +89,11 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- GET /objects/by-entity folds the Entity id with the space's Entity Types (EntityTypes / LinkAnalysisSettings). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
+        </dependency>
         <!-- MODULE-REORG-1 P5a: platform test kit (FakeApiContext + RouteModuleContract TCK) -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>

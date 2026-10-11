@@ -491,6 +491,11 @@ public final class ObjectService {
         return store.query(query);
     }
 
+    /** {@link ObjectStore#findByAttributeFragment} — the prefilter behind an Entity's case history. */
+    public List<OperationalObject> findByAttributeFragment(java.util.Collection<ObjectType> types, String fragment, int limit) {
+        return store.findByAttributeFragment(types, fragment, limit);
+    }
+
     /**
      * EVERY object matching {@code filter}'s constraints — its {@code limit}/{@code offset}/ordering are
      * ignored — lazily, oldest-first, holding one {@link ObjectQuery#MAX_LIMIT} page in memory at a time. The read
