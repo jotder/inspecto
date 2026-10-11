@@ -170,6 +170,10 @@ public final class MultiCollectorProcessor {
                                 return c;
                             });
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
+                        } catch (CommitFence.RunCancelledException e) {
+                            // Cancelled by a closing host: not completed, so counted as not-success — but not an error.
+                            failed.incrementAndGet();
+                            log.info("Source {} cancelled: {}", cfgPath, e.getMessage());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
                             log.error("Source {} had batch failures: {}", cfgPath, e.getMessage());
@@ -260,6 +264,10 @@ public final class MultiCollectorProcessor {
                                 return null;
                             });
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
+                        } catch (CommitFence.RunCancelledException e) {
+                            // Cancelled by a closing host: not completed, so counted as not-success — but not an error.
+                            failed.incrementAndGet();
+                            log.info("Source '{}' cancelled: {}", cfg.identity().pipelineName(), e.getMessage());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
                             log.error("Source '{}' had batch failures: {}",

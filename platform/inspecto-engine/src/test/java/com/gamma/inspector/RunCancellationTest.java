@@ -61,7 +61,8 @@ class RunCancellationTest {
 
         try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
                 () -> CommitFence.State.HELD, () -> true)) {
-            CollectorProcessor.run(cfg);
+            assertThrows(CommitFence.RunCancelledException.class, () -> CollectorProcessor.run(cfg),
+                    "a cancelled run surfaces as cancelled, never as a success");
         }
 
         assertTrue(feed.exists(), "the input stays in the inbox");
@@ -86,7 +87,7 @@ class RunCancellationTest {
 
         try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
                 () -> CommitFence.State.HELD, () -> looks.incrementAndGet() > 1)) {
-            CollectorProcessor.run(cfg);
+            assertThrows(CommitFence.RunCancelledException.class, () -> CollectorProcessor.run(cfg));
         }
 
         assertTrue(looks.get() >= 2, "the run reached the write checkpoint before it was cancelled");
@@ -94,6 +95,55 @@ class RunCancellationTest {
         assertTrue(feed.exists(), "input still in the inbox");
         assertEquals(0, filesUnder(cfg.dirs().quarantine()), "not quarantined");
         assertNull(CommitRetry.recordFor(feed, cfg), "no attempt spent");
+    }
+
+    /**
+     * HA-CANCEL-RESIDUALS-1: one batch is cancelled while another commits. The cancel used to be swallowed per
+     * batch, so the run returned normally — recorded SUCCESS. It must surface once every batch has drained,
+     * with the lost-lease posture intact for the cancelled batch and the other batch's commit kept.
+     */
+    @Test
+    void aRunWithOneCancelledBatchAmongCommittedOnesIsNotASuccess(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTestRef.writePipeline(dir, """
+              batch:
+                max_files: 1
+                max_bytes: 268435456
+            """).toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        for (int i = 0; i < 2; i++)
+            Files.writeString(inbox.resolve("f" + i + ".csv"), "ID,AMT,EVENT_DATE\nr" + i + ",1.0,2020-04-03\n");
+        // Each batch runs on its own worker thread: the first thread to reach a checkpoint is never cancelled,
+        // every other one is - deterministic whatever processing.threads is.
+        java.util.concurrent.atomic.AtomicReference<Thread> first = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.function.BooleanSupplier cancel = () -> {
+            first.compareAndSet(null, Thread.currentThread());
+            return first.get() != Thread.currentThread();
+        };
+        java.util.List<com.gamma.etl.ConsignmentEvent> commits = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
+                () -> CommitFence.State.HELD, cancel)) {
+            assertThrows(CommitFence.RunCancelledException.class, () -> CollectorProcessor.run(cfg, commits::add),
+                    "a partly cancelled run must not complete as a success");
+        }
+
+        assertEquals(1, commits.size(), "the uncancelled batch still committed (drained, not abandoned)");
+        assertEquals(1, filesUnder(cfg.dirs().poll()), "the cancelled batch's input stays in the inbox");
+        assertEquals(1, filesUnder(cfg.dirs().backup()), "only the committed batch was acked");
+        assertEquals(0, filesUnder(cfg.dirs().quarantine()), "a cancel quarantines nothing");
+        try (Stream<Path> left = Files.list(inbox)) {
+            assertNull(CommitRetry.recordFor(left.findFirst().orElseThrow().toFile(), cfg), "no attempt spent");
+        }
+
+        // Through the service-facing entry point the cancel is counted as not completed, not as a success.
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
+                () -> CommitFence.State.HELD, () -> true)) {
+            assertEquals(1, MultiCollectorProcessor.runConfigs(java.util.List.of(cfg), 1, null, true).failed(),
+                    "a cancelled source run is not reported as completed");
+        }
+        assertEquals(0, MultiCollectorProcessor.runConfigs(java.util.List.of(cfg), 1, null, true).failed(),
+                "no cancel: the survivor-style rerun ingests the leftover normally");
+        assertEquals(0, filesUnder(cfg.dirs().poll()));
     }
 
     /** (c): a fence that is never cancelled changes nothing. */

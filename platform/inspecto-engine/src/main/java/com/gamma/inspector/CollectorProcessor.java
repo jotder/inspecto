@@ -255,6 +255,7 @@ public class CollectorProcessor {
         int priority       = cfg.processing().priority();
         String pool        = cfg.processing().pool();
         int failedBatches  = 0;
+        CommitFence.RunCancelledException cancelled = null;
 
         // Propagate the caller's space (MDC) onto each batch worker: the commit listener (the service's event-bus
         // sink), the per-batch metrics and the event log all fire on these threads, so without this their per-space
@@ -295,7 +296,10 @@ public class CollectorProcessor {
                     // HA-GRACEFUL-STOP-LEASE-RELEASE-1: a run the closing host cancelled is not a failed batch —
                     // its files stay in the inbox for the next holder; nothing to count or report as an error.
                     if (e.getCause() instanceof CommitFence.RunCancelledException) {
+                        // ...but neither is it a success: remember it and rethrow once every batch has drained
+                        // (below), or a cancelled run would finish as SUCCESS (HA-CANCEL-RESIDUALS-1).
                         log.info("Consignment processing cancelled: {}", e.getCause().getMessage());
+                        if (cancelled == null) cancelled = (CommitFence.RunCancelledException) e.getCause();
                         continue;
                     }
                     failedBatches++;
@@ -332,6 +336,7 @@ public class CollectorProcessor {
         if (failedBatches > 0) {
             throw new ConsignmentProcessingException(failedBatches, batches.size());
         }
+        if (cancelled != null) throw cancelled;   // a cancelled run is not a successful one
     }
 
     /**
