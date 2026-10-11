@@ -80,7 +80,7 @@ class ExchangeSnapshotMultiPodTest {
         for (String v : List.of(oldLegacy, olderNew, live, peerInFlight)) Files.createDirectories(itemDir.resolve(v));
         Files.writeString(itemDir.resolve(peerInFlight).resolve("snapshot-x.parquet.tmp"), "partial");
 
-        ExchangeSnapshots.prune(itemDir, live, 0, T);
+        ExchangeSnapshots.prune(itemDir, live, 0, T, java.util.Set.of());
 
         assertTrue(Files.exists(itemDir.resolve(live)), "the live version is never pruned");
         assertTrue(Files.exists(itemDir.resolve(peerInFlight)), "a version younger than the grace period survives");
@@ -89,6 +89,26 @@ class ExchangeSnapshotMultiPodTest {
 
         assertTrue(ExchangeSnapshots.compareVersions(olderNew, oldLegacy) > 0);
         assertTrue(ExchangeSnapshots.compareVersions(live, olderNew) > 0, "legacy and suffixed ids order by time");
+    }
+
+    @Test
+    void pruneNeverDeletesAPinnedVersion(@TempDir Path spacesRoot) throws Exception {
+        Exchange ex = Exchange.under(spacesRoot);
+        ex.putOffer(new Offer("dataset", "tax_receipts", "finance", "FY26", Map.of(), "a.rao", 1L));
+        ShareGrant g = ex.request("dataset", "tax_receipts", "finance", "audit", "r.gupta", "audit", null);
+        String pinned = "v" + (T - 10 * 3_600_000L);
+        String stale = "v" + (T - 9 * 3_600_000L);
+        String live = "v" + (T - 8 * 3_600_000L) + "-aaaaaaaa";
+        ex.setPin(g.id(), pinned);
+        Path itemDir = ExchangeSnapshots.itemDir(ex.dir(), "finance", "tax_receipts");
+        for (String v : List.of(pinned, stale, live)) Files.createDirectories(itemDir.resolve(v));
+
+        ExchangeSnapshots.prune(itemDir, live, 0, T,
+                ExchangeSnapshotWriter.pinnedVersions(ex.dir(), "finance", "tax_receipts"));
+
+        assertTrue(Files.exists(itemDir.resolve(pinned)), "a pinned consumer's version survives");
+        assertTrue(Files.exists(itemDir.resolve(live)));
+        assertFalse(Files.exists(itemDir.resolve(stale)));
     }
 
     @Test

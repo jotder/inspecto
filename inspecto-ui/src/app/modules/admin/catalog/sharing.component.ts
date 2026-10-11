@@ -37,10 +37,18 @@ function lastRefreshHtml(last: ExchangeLastRefresh | undefined): string {
     return `<span title="${escapeHtml(last.error ?? '')}">${statusBadgeHtml('failed', 'Failed')}</span>`;
 }
 
-/** Numeric sequence of a `v<n>` snapshot version (mock `v3` or real `v<epochMillis>`), or null if unparseable. */
-function versionSeq(v: string): number | null {
-    const m = /^v(\d+)$/.exec(v);
-    return m ? Number(m[1]) : null;
+/**
+ * Time order of two snapshot versions, mirroring the server's `ExchangeSnapshots.compareVersions`: the
+ * numeric `v<n>` part first (mock `v3`, legacy `v<epochMillis>`, current `v<epochMillis>-<8 hex>`), then the
+ * whole id. Returns null when either id is not a version, so a foreign string never yields a false "Behind".
+ */
+export function compareSnapshotVersions(a: string, b: string): number | null {
+    const pa = /^v(\d+)(?:-[0-9a-z]+)?$/.exec(a);
+    const pb = /^v(\d+)(?:-[0-9a-z]+)?$/.exec(b);
+    if (!pa || !pb) return null;
+    const byTime = Number(pa[1]) - Number(pb[1]);
+    if (byTime !== 0) return Math.sign(byTime);
+    return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /**
@@ -50,9 +58,8 @@ function versionSeq(v: string): number | null {
  */
 function driftVersion(g: ExchangeGrant, current: string | undefined): string | null {
     if (g.status !== 'active' || !g.pin || !current || current === g.pin) return null;
-    const pinned = versionSeq(g.pin);
-    const live = versionSeq(current);
-    return pinned !== null && live !== null && live > pinned ? current : null;
+    const order = compareSnapshotVersions(current, g.pin);
+    return order !== null && order > 0 ? current : null;
 }
 
 /**

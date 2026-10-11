@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Publishes a versioned snapshot of an owner Space's Dataset into the Exchange â€” the S2 "no reprocessing"
+ * Publishes a versioned snapshot of an owner Space's Dataset into the Exchange — the S2 "no reprocessing"
  * data path. It resolves the owner's own Dataset ({@link DatasetRelation}, over the owner's local data
- * root â€” never a shared ref), {@code COPY}s it to a fresh
+ * root — never a shared ref), {@code COPY}s it to a fresh
  * {@code <_shared>/exchange/<owner>/<item>/<version>/snapshot.parquet}, captures its Result Set metadata,
  * then flips {@code current.toon} to the new version ({@link ExchangeSnapshots}). Reuses the
  * stage-and-atomic-reveal discipline of {@code MaterializeTask}, but keyed by {@code <version>/} dirs so
@@ -89,8 +89,18 @@ public final class ExchangeSnapshotWriter {
 
         SnapshotMeta meta = new SnapshotMeta(version, rows, Instant.now().toString(), columns);
         ExchangeSnapshots.writeCurrent(itemDir, meta);        // atomic reveal (never moves backwards)
-        ExchangeSnapshots.prune(itemDir, version, KEEP_VERSIONS, System.currentTimeMillis());
+        ExchangeSnapshots.prune(itemDir, version, KEEP_VERSIONS, System.currentTimeMillis(),
+                pinnedVersions(sharedDir, owner, item));
         return meta;
+    }
+
+    /** Every version a grant of {@code owner/item} currently pins — prune must never delete one. */
+    static java.util.Set<String> pinnedVersions(Path sharedDir, String owner, String item) {
+        java.util.Set<String> pins = new java.util.HashSet<>();
+        for (ShareGrant g : Exchange.under(sharedDir.getParent()).grants())
+            if ("dataset".equals(g.kind()) && owner.equals(g.owner()) && item.equals(g.item()) && g.pin() != null)
+                pins.add(g.pin());
+        return pins;
     }
 
     /** Result Set columns (name, coarse type, analytic role) read from the just-written snapshot's schema. */

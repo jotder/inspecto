@@ -91,7 +91,8 @@ may publish the same due offer at once. There is no distributed lease. Instead, 
 own version dir, and the temp file is `snapshot-<uuid>.parquet.tmp`. Same-millisecond publishes both
 succeed. (2) `writeCurrent` never moves `current.toon` to an older version than it names. (3) `prune` deletes
 a dir only if it is a version id, is neither the caller's version nor the one `current.toon` names, is
-outside the 2 newest, **and** was minted more than `PRUNE_GRACE_MILLIS` (30 min) ago. That last rule spares a
+not pinned by any grant of the item (`ExchangeSnapshotWriter.pinnedVersions`, so a pinned consumer never
+loses its version however old), is outside the 2 newest, **and** was minted more than `PRUNE_GRACE_MILLIS` (30 min) ago. That last rule spares a
 peer's in-flight or not-yet-revealed version: 30 min is far above any publish's duration and below
 the shortest cadence. (4) `last-refresh.toon` is keyed by the attempt's **start** time `at`. An older outcome
 is dropped, and at an equal `at` a failure never replaces a success, so a slow older attempt's failure cannot
@@ -164,7 +165,8 @@ driftVersion(grant, currentVersion) =
   ? currentVersion : null
 ```
 
-`versionSeq` parses the trailing `/^v(\d+)$/` integer; an unparseable version (either side) never
+`compareSnapshotVersions` mirrors the server's `compareVersions`. It orders by the `v<n>` integer, then the
+whole id, and accepts both `v<millis>` and `v<millis>-<hex>`. An unparseable version (either side) never
 triggers a false "Behind". `myGrantRows` (a `computed`) joins each view's grants against a
 `owner~kind~item → freshness.version` map built from the loaded offers. `statusBadgeHtml` gained an
 optional `label` param (`statusBadgeHtml('warning', 'Behind')`) so the string cellRenderer can show

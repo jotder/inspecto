@@ -8,7 +8,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { SharingComponent } from './sharing.component';
+import { compareSnapshotVersions, SharingComponent } from './sharing.component';
 
 const OFFERS: ExchangeOffer[] = [
     {
@@ -236,6 +236,14 @@ describe('SharingComponent', () => {
         expect(fixture.componentInstance.myGrantRows()[0].behind).toBe('v3');
     });
 
+    it('with-me: a pin behind a suffixed v<millis>-<hex> snapshot is flagged as drifted', async () => {
+        const live = 'v1760000000001-aaaaaaaa';
+        const offer: ExchangeOffer = { ...OFFERS[0], freshness: { ...OFFERS[0].freshness!, version: live } };
+        const pinned: ExchangeGrant = { ...GRANTS[0], pin: 'v1760000000000' };
+        const { fixture } = await create('with-me', { offers: () => of([offer]), grants: () => of([pinned]) });
+        expect(fixture.componentInstance.myGrantRows()[0].behind).toBe(live);
+    });
+
     it('with-me: a grant pinned at the current version is not drifted', async () => {
         const pinned: ExchangeGrant = { ...GRANTS[0], pin: 'v3' };
         const { fixture } = await create('with-me', { grants: () => of([pinned]) });
@@ -298,5 +306,29 @@ describe('SharingComponent', () => {
     it('renders with no a11y violations', async () => {
         const { fixture } = await create('with-me');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('compareSnapshotVersions', () => {
+    it('orders suffixed v<millis>-<hex> ids by time, then suffix', () => {
+        expect(compareSnapshotVersions('v1760000000001-aaaaaaaa', 'v1760000000000-ffffffff')).toBe(1);
+        expect(compareSnapshotVersions('v1760000000000-aaaaaaaa', 'v1760000000000-bbbbbbbb')).toBe(-1);
+        expect(compareSnapshotVersions('v1760000000000-aaaaaaaa', 'v1760000000000-aaaaaaaa')).toBe(0);
+    });
+
+    it('orders legacy v<millis> ids numerically', () => {
+        expect(compareSnapshotVersions('v10', 'v9')).toBe(1);
+        expect(compareSnapshotVersions('v1760000000000', 'v1760000000500')).toBe(-1);
+    });
+
+    it('orders mixed legacy and suffixed ids by time', () => {
+        expect(compareSnapshotVersions('v1760000000001-aaaaaaaa', 'v1760000000000')).toBe(1);
+        expect(compareSnapshotVersions('v1760000000002', 'v1760000000001-aaaaaaaa')).toBe(1);
+        expect(compareSnapshotVersions('v1760000000000-aaaaaaaa', 'v1760000000000')).toBe(1);
+    });
+
+    it('refuses to compare a non-version id', () => {
+        expect(compareSnapshotVersions('latest', 'v1')).toBeNull();
+        expect(compareSnapshotVersions('v1', 'v1-')).toBeNull();
     });
 });

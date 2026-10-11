@@ -185,11 +185,11 @@ public final class ExchangeSnapshots {
      * Delete all but the {@code keep} newest version directories - bounds disk growth across refreshes.
      * Safe with several JVMs sharing the store: a directory is deleted only when it is (1) a version id
      * ({@link #versionMillis} &ge; 0 - anything else is left alone), (2) neither {@code keepVersion} nor the
-     * version {@code current.toon} names now, (3) outside the {@code keep} newest by version time, and (4)
+     * version {@code current.toon} names now, nor pinned by any grant ({@code pinned}), (3) outside the {@code keep} newest by version time, and (4)
      * minted more than {@link #PRUNE_GRACE_MILLIS} before {@code nowMillis}. Rule (4) is what spares a peer's
      * in-flight or just-completed (not yet pointed-at) version. Best-effort: a failed delete retries next time.
      */
-    static void prune(Path itemDir, String keepVersion, int keep, long nowMillis) {
+    static void prune(Path itemDir, String keepVersion, int keep, long nowMillis, java.util.Set<String> pinned) {
         List<Path> versions;
         try (Stream<Path> s = Files.list(itemDir)) {
             versions = s.filter(Files::isDirectory)
@@ -204,6 +204,7 @@ public final class ExchangeSnapshots {
         int kept = 0;
         for (Path v : versions) {
             String name = v.getFileName().toString();
+            if (pinned.contains(name)) continue;   // a pinned consumer reads it
             if (name.equals(keepVersion) || name.equals(live) || kept < keep) {
                 kept++;
                 continue;
