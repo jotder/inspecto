@@ -14,6 +14,8 @@ import { entityId } from '@inspecto/core/graph';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { Router } from '@angular/router';
 import { degreeOutcomeMessage, degreeState } from './investigate-number';
+import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
+import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 
 const P: EntityProjection = { datasetId: 'calls', sourceCol: 'A', targetCol: 'B', entityType: 'msisdn' };
 
@@ -66,7 +68,7 @@ function ws(ids: string[]): WorkingSet {
  * A fake server holding ONE mutable log per id — enough to assert what the store shows after each call.
  * `replay` answers the Working Set the test put in `sets`.
  */
-function setup() {
+function setup(extra: unknown[] = []) {
     const logs: Record<string, InvestigationLog> = {};
     const sets: Record<string, WorkingSet> = {};
     const bases: Record<string, number> = {};
@@ -107,7 +109,9 @@ function setup() {
         reorderInvestigation: vi.fn(),
         workingSetRelation: vi.fn((): Observable<{ rows: Record<string, unknown>[] }> => of({ rows: [] })),
     };
-    TestBed.configureTestingModule({ providers: [InvestigationSessionStore, { provide: InvService, useValue: inv }] });
+    TestBed.configureTestingModule({
+        providers: [InvestigationSessionStore, { provide: InvService, useValue: inv }, ...(extra as never[])],
+    });
     return { store: TestBed.inject(InvestigationSessionStore), inv, logs, sets, bases };
 }
 
@@ -755,5 +759,63 @@ describe('InvestigationSessionStore - third live run (la-showcase telecom)', () 
         await store.start(P, 'p', 'Suspect 99979100001');
         expect(store.displayTitle()).toBe('Suspect 99979100001');
         expect(store.boundProfileId()).toBe('telecom');
+    });
+});
+
+describe('InvestigationSessionStore - preset window recovered on reopen', () => {
+    const TELECOM = { expand: { windowDays: 30 } };
+    /** A reopened telecom Investigation with a time column; `rows.sql` answers `latest` (or fails). */
+    function reopenable(entries: InvestigationLogEntry[], latest: { value?: string; error?: string }) {
+        const sql = vi.fn(async () =>
+            latest.error
+                ? { rows: [], columns: [], truncated: false, error: latest.error }
+                : { rows: [{ latest: latest.value }], columns: [], truncated: false },
+        );
+        const ctx = setup([
+            { provide: LA_DATASETS, useValue: { get: () => of({ id: 'calls', name: 'calls', sourceName: 'calls_src' }) } },
+            { provide: DatasetRowsService, useValue: { sql } },
+        ]);
+        ctx.logs['inv-r'] = {
+            header: { ...header('inv-r'), timeCol: 'ts' },
+            entries,
+            total: entries.length,
+            truncated: false,
+        };
+        ctx.sets['inv-r'] = ws(['s']);
+        ctx.store.restore([{ id: 'inv-r', profileId: 'telecom' }]);
+        ctx.inv.appendInvestigationOp.mockImplementation((() => of(step(9, 'expand'))) as never);
+        return { ...ctx, sql };
+    }
+    const sentWindow = (inv: ReturnType<typeof setup>['inv']) =>
+        (inv.appendInvestigationOp.mock.calls.at(-1) as unknown as [string, { window?: unknown }])[1].window;
+
+    it('reopen with a sealed window: the next expand carries the SAME window, the anchor query is not run', async () => {
+        const window = { from: '2026-08-30T12:00:00.000Z', to: '2026-09-29T12:00:01.000Z' };
+        const { store, inv, sql } = reopenable(
+            [entry(1, { op: 'seed' }), entry(2, { op: 'expand', params: { ids: ['s'], window } })],
+            { value: '2026-10-05T00:00:00' },
+        );
+        expect(await store.open('inv-r')).toBe(true);
+        expect(sql).not.toHaveBeenCalled();
+        expect(store.windowEnd()).toBe('2026-09-29T12:00:00.000Z');
+        await store.apply({ op: 'expand', ids: ['s'], ...store.withPresets(TELECOM.expand, {}) });
+        expect(sentWindow(inv)).toEqual(window);
+    });
+
+    it('reopen with no sealed window: the zone-free anchor query sets the end (read as UTC)', async () => {
+        const { store, inv, sql } = reopenable([entry(1, { op: 'seed' })], { value: '2026-09-29T23:30:00' });
+        expect(await store.open('inv-r')).toBe(true);
+        expect(sql).toHaveBeenCalledWith('calls_src', expect.stringContaining('strftime(MAX("ts")'), 1);
+        expect(store.windowEnd()).toBe('2026-09-29T23:30:00.000Z');
+        await store.apply({ op: 'expand', ids: ['s'], ...store.withPresets(TELECOM.expand, {}) });
+        expect(sentWindow(inv)).toEqual({ from: '2026-08-30T23:30:00.000Z', to: '2026-09-29T23:30:01.000Z' });
+    });
+
+    it('when neither works no window is sent (all available data)', async () => {
+        const { store, inv } = reopenable([entry(1, { op: 'seed' })], { error: 'refused' });
+        expect(await store.open('inv-r')).toBe(true);
+        expect(store.windowEnd()).toBeNull();
+        await store.apply({ op: 'expand', ids: ['s'], ...store.withPresets(TELECOM.expand, {}) });
+        expect(sentWindow(inv)).toBeUndefined();
     });
 });

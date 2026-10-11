@@ -175,6 +175,22 @@ export function latestTimeOf(value: unknown): string | null {
     return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
 
+/**
+ * The window end sealed in the latest live (not undone) expand step that carried a window, for a reopened
+ * Investigation: its exclusive `to` less the second `presetRung` adds, else its `from` plus `windowDays`. Null = none.
+ */
+export function sealedWindowEnd(entries: readonly InvestigationLogEntry[], windowDays: number): string | null {
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const e = entries[i];
+        const w = e.op === 'expand' && e.undoneBy == null ? e.params?.window : null;
+        if (!w || typeof w !== 'object') continue;
+        const to = w.to ? Date.parse(w.to) - 1000 : NaN;
+        const t = Number.isFinite(to) ? to : w.from ? Date.parse(w.from) + windowDays * DAY_MS : NaN;
+        if (Number.isFinite(t)) return new Date(t).toISOString();
+    }
+    return null;
+}
+
 /** The presets in words, for the line that says what Start will do. */
 export function presetsSummary(p: DegreePresets, windowEnd?: string | null): string {
     const parts: string[] = [];
