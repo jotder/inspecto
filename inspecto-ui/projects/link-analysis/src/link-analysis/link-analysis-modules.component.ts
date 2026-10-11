@@ -28,7 +28,13 @@ export function isLinkAnalysisModule(id: string): boolean {
             } @else if (!modules()) {
                 <p class="text-secondary text-sm" role="status">Loading...</p>
             } @else {
-                <ul class="flex flex-col gap-1 text-sm" data-testid="modules-list" aria-label="Link Analysis modules">
+                <!-- Opens upward over the canvas: an opaque card above the minimap, or the graph labels bleed through. -->
+                <ul
+                    class="relative z-30 flex flex-col gap-1 rounded border p-2 text-sm"
+                    style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                    data-testid="modules-list"
+                    aria-label="Link Analysis modules"
+                >
                     @for (m of modules(); track m.id) {
                         <li class="flex flex-wrap items-center gap-2">
                             <span class="font-medium">{{ m.title || m.id }}</span>

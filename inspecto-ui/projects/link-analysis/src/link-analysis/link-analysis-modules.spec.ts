@@ -58,6 +58,14 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
         expect(el.querySelector('[data-testid=module-la-store-pg]')!.textContent).toContain('Not installed');
     });
 
+    it('draws the list as an opaque card above the canvas, so graph labels do not bleed through it', () => {
+        const { el, open } = make(() => of({ hostBuildId: 'h', modules: [m('geo-link')] }));
+        open();
+        const list = el.querySelector<HTMLElement>('[data-testid=modules-list]')!;
+        expect(list.getAttribute('style')).toContain('--gamma-bg-card');
+        expect(list.classList.contains('z-30')).toBe(true);
+    });
+
     it('states a failed read instead of an empty list', () => {
         const { el, open } = make(() => throwError(() => new Error('x')));
         open();
