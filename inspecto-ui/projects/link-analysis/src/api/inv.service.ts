@@ -329,6 +329,8 @@ export interface InvestigationCreateRequest {
     timeCol?: string;
     /** The zone a naive TIMESTAMP `timeCol` is in (UTC when absent); refused for a TIMESTAMPTZ column. */
     timeColZone?: string;
+    /** An integer column of event counts (a pre-aggregated Dataset): expand weighs a link by its SUM, not its row count. */
+    eventsCol?: string;
 }
 
 /** A fork's parent (D-E4): the Investigation it was re-ordered from, the order, and the parent's log length. */
@@ -350,6 +352,8 @@ export interface InvestigationHeader {
     linkKindCol: string | null;
     /** LA-13: the bound event-time column; absent on a timeless Investigation. */
     timeCol?: string | null;
+    /** The bound events column; absent when links are weighed by row count. */
+    eventsCol?: string | null;
     createdAt: string;
     /** Always null (D-E3): no version-addressable read exists, so reads are sealed at use, not pinned. */
     datasetVersion: null;

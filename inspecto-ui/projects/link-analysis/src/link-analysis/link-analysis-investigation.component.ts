@@ -175,6 +175,7 @@ export class LinkAnalysisInvestigationComponent {
             purpose: this.purpose.value.trim(),
             title: this.title.value.trim(),
             timeCol: p.timeCol,
+            eventsCol: p.eventsCol,
             seed: p.seed,
             presets: p.presets,
             maxDegree: p.maxDegree,

@@ -162,13 +162,15 @@ export class InvestigationSessionStore {
 
     /** Create an Investigation over the projection's Dataset + columns and open it. `timeCol` binds the event time
      *  windows and the coverage read use — without it `GET …/coverage` answers 422. `timeColZone` is the IANA zone a naive
-     *  TIMESTAMP column is read in (UTC when absent). */
+     *  TIMESTAMP column is read in (UTC when absent). `eventsCol` weighs each link by that column's SUM (a pre-aggregated
+     *  Dataset) instead of its row count. */
     async start(
         p: EntityProjection,
         purpose: string,
         title?: string,
         timeCol?: string,
         timeColZone?: string,
+        eventsCol?: string,
     ): Promise<boolean> {
         return this.run('Could not start the Investigation.', async () => {
             const h = await firstValueFrom(
@@ -182,6 +184,7 @@ export class InvestigationSessionStore {
                     timeCol: timeCol || undefined,
                     // A zone means nothing without a time column (the server refuses it), so it never travels alone.
                     timeColZone: timeCol && timeColZone ? timeColZone : undefined,
+                    eventsCol: eventsCol || undefined,
                 }),
             );
             this.refs.update((all) => [
@@ -251,6 +254,7 @@ export class InvestigationSessionStore {
         purpose: string;
         title: string;
         timeCol?: string;
+        eventsCol?: string;
         seed: string;
         presets: DegreePresets;
         maxDegree: number;
@@ -270,7 +274,7 @@ export class InvestigationSessionStore {
     private async runInvestigateChain(
         req: Parameters<InvestigationSessionStore['investigateNumber']>[0],
     ): Promise<boolean> {
-        if (!(await this.start(req.projection, req.purpose, req.title, req.timeCol))) return false;
+        if (!(await this.start(req.projection, req.purpose, req.title, req.timeCol, undefined, req.eventsCol))) return false;
         const id = this.activeId();
         this.windowEnd.set(req.windowEnd ?? null);
         const entityType = req.projection.entityType;
