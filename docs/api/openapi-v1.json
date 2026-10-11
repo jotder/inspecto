@@ -8549,6 +8549,40 @@
         "x-optional-module" : true
       }
     },
+    "/inv/pending" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/pending — the four-eyes approver inbox",
+        "operationId" : "getInvPending",
+        "description" : "The held Link Analysis requests (sensitive expands, promotes of a Draft carrying one) across the Space's Investigations that the CALLER may decide: each Investigation is judged by the same gate approve/deny open through (membership role, R3, Enterprise PDP), and the caller's own requests are never listed. Gates: canApproveLinkExpansions 403 → write root 503 → no authenticated Subject 403 → bad status/limit 422. Entity ids, titles and purposes are masked per the Space's maskingMode. Audited as LINK_EXPANSION_INBOX_READ. data: {items[{investigationId, title, dataset, purpose, requestId, kind, status, requestedBy, requestedAt, params, sensitivity, summary, draftId?, decidedBy?, decidedAt?, reason?}], total, limit, truncated, status}.",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "pending", "approved", "denied", "all" ],
+            "default" : "pending"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 1000,
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/investigations/{investigationId}/dossier" : {
       "get" : {
         "tags" : [ "inv" ],
