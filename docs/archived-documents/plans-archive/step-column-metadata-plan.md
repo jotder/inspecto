@@ -9,8 +9,13 @@ timestamp: 2026-10-11T00:00:00Z
 
 # Step column metadata (`AUTHORING-REDESIGN-1` (e))
 
-🟡 **DESIGNED 2026-10-11 — STOPPED before building on one operator question (§6 Q1).** Reopened by the
-operator 2026-10-11; the 2026-10-04 deferral was "nothing would READ it". This note adds the reader.
+✅ **BUILT 2026-10-11 and ARCHIVED.** Operator decisions 2026-10-11: **Q1 = (B) additive only**, **Q2 = no
+`type` on Step columns**. **(C) authoritative is NOT built** (filed as a possible future item in the
+BACKLOG row text). As-built facts: [`okf/frontend/features/schema-mapping-authoring.md`](../../okf/frontend/features/schema-mapping-authoring.md) §0.
+Deviations from this note: no `STEP_FIELD_UNKNOWN_KEY` / `STEP_FIELD_BAD_CLASSIFICATION` — one code
+`ERR_STEP_COLUMN_METADATA_INVALID` refuses a non-string value and metadata on a blank/duplicate name;
+unknown other row keys are NOT refused (`fields[]` is opaque and older rows carry extras), and the
+classification vocabulary stays the schema's free text. The editor is not offered in the projection slot.
 
 ## 1. Grounding (verified against code 2026-10-11)
 
