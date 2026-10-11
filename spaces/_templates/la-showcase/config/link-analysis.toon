@@ -1,5 +1,5 @@
 masking_mode: typed
-four_eyes_fan_out_above: 5
+four_eyes_fan_out_above: 2000
 index:
   enabled: true
 drafts:

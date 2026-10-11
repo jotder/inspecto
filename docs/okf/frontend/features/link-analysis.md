@@ -281,7 +281,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 * **An edge is a folded aggregate** (`GROUP BY`, carrying `count`), nodes are implied endpoints with no
   identity service, and **nothing is persisted server-side** — every call re-runs the aggregation. So
   🔴 **a saved view is not evidence**: reopened after the Dataset changed it silently shows a different graph.
-* **Every algorithm of the 28-entry server catalogue is reachable from the toolbox** (`LA-ALGO-UI-PARITY-1`, DR-U11/U12):
+* **Every algorithm of the 29-entry server catalogue is reachable from the toolbox** (`LA-ALGO-UI-PARITY-1`, DR-U11/U12):
   the *All algorithms (server)* group (`link-analysis-server-algorithms.component.ts`) builds its form from the
   catalogue's parameter descriptors, reuses `LinkAnalysisServerRunComponent` and reads any answer by its result kind
   (`graph-run-summary.ts`) - no per-algorithm panel. Every completed answer is also emitted (`resultChange`) to the
@@ -1070,7 +1070,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 
 ## Graph Run (server-side graph analysis — as-built 2026-10-01)
 
-A **Graph Run** is one execution of one of the 28 graph algorithms on the SERVER over an Investigation's Working Set
+A **Graph Run** is one execution of one of the 29 graph algorithms on the SERVER over an Investigation's Working Set
 (LA separation D-4; `GLOSSARY` *Graph Run*). The browser keeps its own copy of the algorithms and runs them under the
 per-Space node caps; a Graph Run is the way past those caps. Both implementations are held equal by the parity fixtures.
 
@@ -1078,7 +1078,7 @@ per-Space node caps; a Graph Run is the way past those caps. Both implementation
 
 | Module | Holds |
 |---|---|
-| `inspecto-la-graph` (pure JDK) | the 28 ported algorithms (six `Graph*` classes) plus `RunControl` / `GraphAborted` (`checkpoint()`, progress, deadline). The old signatures delegate with a no-op `RunControl`, so the parity fixtures are untouched. 17 algorithms are instrumented; the 11 without a `RunControl` overload (paths, ego, neighborhood, components, degree, structure, forest) cannot be cancelled mid-run |
+| `inspecto-la-graph` (pure JDK) | the 29 ported algorithms (six `Graph*` classes) plus `RunControl` / `GraphAborted` (`checkpoint()`, progress, deadline). The old signatures delegate with a no-op `RunControl`, so the parity fixtures are untouched. 17 algorithms are instrumented; the 11 without a `RunControl` overload (paths, ego, neighborhood, components, degree, structure, forest) cannot be cancelled mid-run |
 | `inspecto-la-core` (`com.gamma.la.core`) | `Algorithm` (the catalogue: id = the TS export name, `cost` SYNC/JOB as a hint, `inlineNodeCeiling`, typed `params`, `needsWeights` / `needsSource` / `needsTarget` / `needsNode`, `resultKind`, `resolve(params)`), the `GraphEngine` SPI (`engineId`, `supported`, `run`), `InMemoryGraphEngine` (exhaustive switch, no `default`), `GraphInput`, `WorkingSetGraphInput`, `GraphResult`, `InvalidGraphRequest`, `GraphBudget`, `GraphRunException`, `GraphRunService` |
 | `inspecto-la-api` (`com.gamma.la.api`) | `GraphRunRoutes`, `GraphResultJson` (the one serializer: an exhaustive `switch` over the sealed `Payload`, so a 13th result shape does not compile) |
 

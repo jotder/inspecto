@@ -31,7 +31,7 @@ class LaShowcaseTemplateTest {
     void settingsAreExplicitAndTheHubExpandWaitsForASecondPerson() {
         LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(CFG);
         assertEquals("typed", s.maskingMode());
-        assertEquals(5, s.fourEyesFanOutAbove());
+        assertEquals(2000, s.fourEyesFanOutAbove());
         assertEquals(Boolean.TRUE, s.index().enabled());
         assertEquals(10, s.drafts().maxOpen());
     }

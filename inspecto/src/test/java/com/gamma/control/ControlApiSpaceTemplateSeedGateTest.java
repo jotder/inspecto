@@ -117,6 +117,25 @@ class ControlApiSpaceTemplateSeedGateTest {
         }
     }
 
+    /**
+     * LA-DEMO-POLISH-1 (6): in a bundle the safety roots are only the CALLER's Space, so the staged new Space's relative
+     * {@code dirs.poll} read "outside the allowed roots" (422). Surefire's {@code assist.safety.roots} includes
+     * java.io.tmpdir, which hid it - cleared here so the policy is the deployed one.
+     */
+    @Test
+    void aTemplateWithRelativeDataDirsAppliesWithoutExtraSafetyRoots(@TempDir Path root) throws Exception {
+        copyTree(Path.of("..", "spaces", "_templates", "la-showcase"), root.resolve("_templates").resolve("la-showcase"));
+        String saved = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", "");
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"la\",\"template\":\"la-showcase\"}", ADMIN);
+            assertEquals(200, r.statusCode(), r.body());
+        } finally {
+            if (saved == null) System.clearProperty("assist.safety.roots");
+            else System.setProperty("assist.safety.roots", saved);
+        }
+    }
+
     @Test
     void aTemplatePipelineWithAnUnreadBlockRefusesTheWholeTemplate(@TempDir Path root) throws Exception {
         copyTree(Path.of("..", "spaces", "_templates", "orders-starter"), root.resolve("_templates").resolve("broken"));

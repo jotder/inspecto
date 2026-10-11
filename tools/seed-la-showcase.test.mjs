@@ -100,3 +100,22 @@ test('scaffold stamps updatedBy = owner on the la.index.build Job only (else its
   assert.match(once, /updatedBy: ra\n$/);
   assert.equal(stampIndexBuildOwner(once), once);
 });
+
+test('the Investigation create waits out a 422 while the first ingest has not landed (LA-DEMO-POLISH-1 (7))', async () => {
+  const m = mock(); let refusals = 2; const slept = [];
+  const f = async (url, init) => (url.endsWith('/inv/investigations') && init.method === 'POST' && refusals-- > 0
+    ? { ok: false, status: 422, json: async () => ({ data: { message: 'cannot read the columns' } }) } : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, sleep: async (ms) => { slept.push(ms); } });
+  assert.equal(slept.length, 2);
+  assert.ok(r.done.includes('investigation'));
+  assert.deepEqual(r.failed, []);
+});
+
+test('a 422 that never clears fails after the bounded wait', async () => {
+  const m = mock(); let posts = 0;
+  const f = async (url, init) => (url.endsWith('/inv/investigations') && init.method === 'POST' && ++posts
+    ? { ok: false, status: 422, json: async () => ({ data: {} }) } : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, sleep: async () => {}, ingestWaitTries: 3 });
+  assert.equal(posts, 3);
+  assert.ok(r.failed[0].startsWith('investigation: HTTP 422'));
+});

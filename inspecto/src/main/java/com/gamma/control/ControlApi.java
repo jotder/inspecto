@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -1326,7 +1327,13 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private boolean serveStatic(HttpExchange ex, String path) throws IOException {
         if (uiDir == null) return false;
         String rel = path.equals("/") ? "index.html" : path.substring(1);   // strip leading '/'
-        Path target = uiDir.resolve(rel).normalize();
+        Path target;
+        try {
+            target = uiDir.resolve(rel).normalize();
+        } catch (InvalidPathException e) {      // e.g. a ':' on Windows - not a servable file, so a 404
+            logStaticMiss(ex, "not a valid file path");
+            return false;
+        }
         if (!target.startsWith(uiDir)) { logStaticMiss(ex, "outside the ui root"); return false; }
         if (Files.isRegularFile(target)) { writeFile(ex, target); return true; }
         if (!hasExtension(rel)) {                                            // SPA deep link

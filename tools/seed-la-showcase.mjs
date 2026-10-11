@@ -22,7 +22,7 @@ export function buildPlan() {
   const base = `/inv/investigations/${INV}`;
   const ops = [
     { op: 'seed', ids: ['MULE-HUB-01', 'RELAY-01', 'RELAY-02', 'SMURF-01'], entityType: 'account' },
-    { op: 'expand', direction: 'either', maxFanOut: 5 },   // <= four_eyes_fan_out_above (5): runs now; an unbounded expand goes pending
+    { op: 'expand', direction: 'either', maxFanOut: 5 },   // bounded, under four_eyes_fan_out_above (2000): runs now; an UNBOUNDED expand (no maxFanOut) always goes pending
     { op: 'exclude', ids: ['RELAY-02'], reason: 'second relay repeats the RELAY-01 route' },
     { op: 'annotate', ids: ['MULE-HUB-01'], note: 'hub: 12 sub-1000 cash deposits in, 98% out within hours' },
     { op: 'threshold', min: 1 },
@@ -68,7 +68,8 @@ export function buildPlan() {
 const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, lines }. */
-export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', apply = false, log = () => {} } = {}) {
+export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', apply = false, log = () => {},
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 30 } = {}) {
   const plan = buildPlan();
   const out = { done: [], skipped: [], failed: [] };
   if (!apply) {
@@ -112,7 +113,14 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
       const have = await call(s.as, 'GET', '/inv/entity-identities');
       if (have.status === 200 && JSON.stringify(have.data).includes('ACC-1006')) { out.skipped.push(s.id); continue; }
     }
-    const r = await call(s.as, s.method, p, body);
+    let r = await call(s.as, s.method, p, body);
+    // Right after boot the Dataset's first ingest may not have landed yet: the create answers 422 "cannot read the
+    // columns" (LA-DEMO-POLISH-1 (7)). Wait for it instead of failing the whole seed.
+    for (let i = 1; s.id === 'investigation' && r.status === 422 && i < ingestWaitTries; i++) {
+      log(`  ${s.id}: 422, waiting for the first ingest of ${DATASET} (${i}/${ingestWaitTries - 1})`);
+      await sleep(2000);
+      r = await call(s.as, s.method, p, body);
+    }
     if (s.id === 'case' && r.status < 300) state.case = r.data.case.id;
     if (r.status === 409) out.skipped.push(s.id);                 // already exists (list, template, rule, member, pending)
     else if (r.status < 300) out.done.push(s.id);

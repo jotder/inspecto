@@ -868,7 +868,7 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
 - **Content.** One Collector + Pipeline + Dataset (`mule_transfers`, partition `BOOKED_DATE`, one file per UTC day, `file_template` so a missing
   day is a delivery gap). `data/inbox` carries the three landed days (ingested within one poll after boot); `data/staged` carries
   `TRANSFERS_20260904.csv` (next day) and `TRANSFERS_20260906.csv` (gap day: 0905 missing) with a one-line `README.txt` - copy one into
-  `data/inbox/mule_transfers`. Three saved views (`mule_*`). Settings: `link-analysis.toon` (`masking_mode: typed`, `four_eyes_fan_out_above: 5`,
+  `data/inbox/mule_transfers`. Three saved views (`mule_*`). Settings: `link-analysis.toon` (`masking_mode: typed`, `four_eyes_fan_out_above: 2000`,
   `index.enabled: true` set explicitly, Drafts limits). Jobs: `la_index_build` (`on_signal: pipeline.commit`, guard `$signal.pipeline == mule_transfers &&
   $signal.status == SUCCESS`, `allow_full: "true"`, `owner` is re-stamped to the applier by `TemplateSeedGate`) and `la_detect` (`*/5 * * * *`).
 - **Personas** (`demo-users.toon` + `roles.toon`; an authored role REPLACES a seed role of the same name): `admin` (`admin;fraud-analyst`: Reveal),

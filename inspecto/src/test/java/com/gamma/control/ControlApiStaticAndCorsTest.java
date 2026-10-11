@@ -131,6 +131,17 @@ class ControlApiStaticAndCorsTest {
     }
 
     @Test
+    void pathWithColonIsA404NotA500(@TempDir Path dir) throws Exception {
+        // LA-DEMO-POLISH-1 (5): on Windows Path.resolve threw InvalidPathException for a ':' -> 500
+        try (Ctx c = open(spaDir(dir).toString(), null)) {
+            HttpResponse<String> r = send(c.port, "GET", "/assets/a:b.js");
+            assertEquals(404, r.statusCode());
+            assertTrue(ctype(r).startsWith("application/json"), "a JSON 404, not an error page");
+            assertFalse(r.body().contains("InvalidPathException"), "no exception text leaks");
+        }
+    }
+
+    @Test
     void extensionlessDeepLinkFallsBackToIndex(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
             HttpResponse<String> deep = send(c.port, "GET", "/dashboard/runs");
