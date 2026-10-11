@@ -283,7 +283,9 @@ Entity Type (`all`, or `typed` with a masked type); under that masking a raw key
 same answer as an unknown alias — no oracle). Entity Type = the Investigation header's `entityType`/`sourceType`/`targetType`,
 else `msisdn`. The read is the ops module's own (`ObjectAccess.byEntity` → `EntityHistory.query`, reached through
 `CasePort.history` / `HostCasePort`): same matching, SEC-7d / ABAC post-filter and `truncated`. No key is echoed; under
-masking titles have the raw id replaced by the key as asked and any other 7+ digit number by its exploration alias.
+masking titles are scrubbed fail-closed: the raw id in any spelling (spaces, dashes, dots, parentheses, `+`) becomes the
+key as asked, every other token of 5+ digits `[number]` and an email `[email]` (placeholders, never minted aliases), and
+rows carry only an allowlist of fields.
 Gates: 503 write root → 503 Case management not installed → 422 body → Investigation read gate (404) → 422 unsearchable
 key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTORY_READ` (counts only).
 

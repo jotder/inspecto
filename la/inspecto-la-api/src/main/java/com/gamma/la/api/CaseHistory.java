@@ -35,7 +35,8 @@ import java.util.regex.Pattern;
  * {@code reason}) when the key names nothing this route may look up: an alias the server does not know, an alias for an
  * Entity Type the masking does not cover, or a RAW key the masking hides — answered alike, so the route is no oracle for
  * raw ids. No key is echoed (raw or alias); under masking every spelling of the raw id in a title is replaced by the key
- * as asked, and any other long number by its exploration alias.
+ * as asked (any separators), any other token of 5+ digits by {@code [number]} and an email by {@code [email]}; rows carry
+ * only an allowlist of fields.
  *
  * <p><b>Entity Type</b> — the Investigation's endpoint type (header {@code entityType}, else {@code sourceType}, else
  * {@code targetType}), else {@value #DEFAULT_TYPE} (the telecom profile's type).
@@ -53,8 +54,13 @@ final class CaseHistory {
     static final String DEFAULT_TYPE = "msisdn";
     private static final int MAX_KEY = 256;
     private static final int MAX_LIMIT = 200;
-    /** A digit run this long in a title is treated as an id under masking. */
-    private static final Pattern LONG_NUMBER = Pattern.compile("\\+?\\d{7,}");
+    /** A digit-bearing token: digits with any of {@code space . - ( )} between them, an optional leading {@code +}. */
+    private static final Pattern DIGIT_TOKEN = Pattern.compile("\\+?(?<!\\d)\\d(?:[\\s.\\-()]*\\d)*(?!\\d)");
+    private static final Pattern EMAIL_RE = Pattern.compile("[\\w.+%-]+@[\\w-]+(?:\\.[\\w-]+)+");
+    static final String NUMBER = "[number]";
+    static final String EMAIL = "[email]";
+    private static final String SENTINEL = "\u0000";
+    private static final List<String> ROW_FIELDS = List.of("kind", "id", "title", "status", "severity", "createdAt", "matchedOn", "via");
 
     private CaseHistory() {}
 
@@ -137,14 +143,14 @@ final class CaseHistory {
 
         List<Map<String, Object>> objects = new ArrayList<>();
         boolean remask = alias || covered;
-        ExplorationMasking others = remask ? ExplorationMasking.forced(writeRoot, mode, "case history") : null;
         Object rows = h.get("objects");
         if (rows instanceof List<?> list)
             for (Object o : list)
                 if (o instanceof Map<?, ?> m) {
+                    // an allowlist, so a field the host adds to its rows later cannot leak through here
                     Map<String, Object> row = new LinkedHashMap<>();
-                    m.forEach((k, v) -> row.put(String.valueOf(k), v));
-                    if (remask && row.get("title") instanceof String t) row.put("title", scrub(t, raw, key, others));
+                    for (String f : ROW_FIELDS) if (m.get(f) != null) row.put(f, m.get(f));
+                    if (remask && row.get("title") instanceof String t) row.put("title", scrub(t, raw, key));
                     objects.add(row);
                 }
         int total = h.get("total") instanceof Number n ? n.intValue() : objects.size();
@@ -158,18 +164,27 @@ final class CaseHistory {
         return res;
     }
 
-    /** {@code text} with every spelling of {@code raw} replaced by {@code asked}, and any other long number by its alias. */
-    static String scrub(String text, String raw, String asked, ExplorationMasking others) {
-        String out = text;
-        String digits = raw.replaceAll("\\D", "");
-        if (digits.length() >= 5)   // a number's other spellings first, so a leading + goes with it
-            out = Pattern.compile("\\+?" + Pattern.quote(digits) + "(?!\\d)").matcher(out).replaceAll(Matcher.quoteReplacement(asked));
-        out = Pattern.compile(Pattern.quote(raw), Pattern.CASE_INSENSITIVE).matcher(out).replaceAll(Matcher.quoteReplacement(asked));
-        Matcher m = LONG_NUMBER.matcher(out);
+    /**
+     * {@code text} scrubbed fail-closed: emails become {@value #EMAIL}; a number whose digits are the raw key's (any
+     * separators, a leading {@code +}) becomes {@code asked}, the caller's own alias; every OTHER token of 5+ digits
+     * (separators allowed: a dashed IMEI, {@code AB-123456}) becomes {@value #NUMBER}, a placeholder and never a minted
+     * alias, so no title grows the alias book or makes a third party's number pivotable.
+     */
+    static String scrub(String text, String raw, String asked) {
+        String out = EMAIL_RE.matcher(text).replaceAll(EMAIL);
+        String rawDigits = raw.replaceAll("\\D", "");
+        // a non-numeric key (CELL-0042) by its literal spelling, held as a sentinel so the digit pass leaves the alias alone
+        if (rawDigits.length() < 5)
+            out = Pattern.compile(Pattern.quote(raw), Pattern.CASE_INSENSITIVE).matcher(out).replaceAll(SENTINEL);
+        Matcher m = DIGIT_TOKEN.matcher(out);
         StringBuilder sb = new StringBuilder();
-        while (m.find()) m.appendReplacement(sb, Matcher.quoteReplacement(others.out(m.group())));
+        while (m.find()) {
+            String d = m.group().replaceAll("\\D", "");
+            String rep = d.length() < 5 ? m.group() : d.equals(rawDigits) ? SENTINEL : NUMBER;
+            m.appendReplacement(sb, Matcher.quoteReplacement(rep));
+        }
         m.appendTail(sb);
-        return sb.toString();
+        return sb.toString().replace(SENTINEL, asked);
     }
 
     private static int limit(Object v) {

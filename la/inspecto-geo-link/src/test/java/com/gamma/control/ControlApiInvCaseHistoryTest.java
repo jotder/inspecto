@@ -154,8 +154,40 @@ class ControlApiInvCaseHistoryTest {
 
             JsonNode all = ok(c, "{\"key\":\"" + aliasA + "\"}", false);
             String title = all.at("/objects/1/title").asText();
-            assertTrue(title.startsWith("calls spike " + aliasA + " -> masked:"), "another number in a title is aliased too: " + title);
+            assertEquals("calls spike " + aliasA + " -> [number]", title, "another number is a placeholder, not an alias");
             assertEquals("INC-1", all.at("/objects/0/via").asText());
+        }
+    }
+
+    @Test
+    void titlesAreScrubbedFailClosedAndRowsCarryOnlyAllowlistedFields(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            String aliasA = aliasOfA(c);
+            List<String[]> cases = List.of(
+                    new String[]{"+27 820 000 001 called", aliasA + " called"},
+                    new String[]{"27-820-000-001 called", aliasA + " called"},
+                    new String[]{"27.820.000.001 called", aliasA + " called"},
+                    new String[]{"(27) 820 000001 called", "(" + aliasA + " called"},
+                    new String[]{"+27820000001", aliasA},
+                    new String[]{"imei 35-209900-176148-1", "imei [number]"},
+                    new String[]{"mail ana.k@example.com now", "mail [email] now"},
+                    new String[]{"ref 1234 short", "ref 1234 short"},
+                    new String[]{"longer 127820000001 x", "longer [number] x"},
+                    new String[]{"doc AB-123456", "doc AB-[number]"});
+            List<Map<String, Object>> rows = new java.util.ArrayList<>();
+            for (int i = 0; i < cases.size(); i++)
+                rows.add(Map.of("kind", "incident", "id", "INC-" + i, "title", cases.get(i)[0], "status", "OPEN",
+                        "createdAt", (long) (100 - i), "matchedOn", "key.msisdn", "secret", "leak-" + A));
+            CaseTeamObjectEngine.HISTORY = rows;
+            java.lang.reflect.Field f = Class.forName("com.gamma.la.api.ExplorationMasking").getDeclaredField("BOOK");
+            f.setAccessible(true);
+            int before = ((Map<?, ?>) f.get(null)).size();
+            JsonNode d = ok(c, "{\"key\":\"" + aliasA + "\"}", false);
+            assertEquals(before, ((Map<?, ?>) f.get(null)).size(), "titles mint no aliases");
+            for (int i = 0; i < cases.size(); i++) {
+                assertEquals(cases.get(i)[1], d.at("/objects/" + i + "/title").asText(), cases.get(i)[0]);
+                assertFalse(d.at("/objects/" + i).has("secret"), "only allowlisted fields are copied");
+            }
         }
     }
 
