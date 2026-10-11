@@ -80,10 +80,23 @@ const PREVIEW: AnomalyScorePreview = {
             reason: 'Data (MB) 1000 vs peers 100',
         },
     ],
+    series: {
+        data_mb: {
+            points: [
+                { day: '2026-09-28', value: 100 },
+                { day: '2026-09-29', value: 110 },
+                { day: '2026-09-30', value: 1000 },
+            ],
+            median: 105,
+            low: 60,
+            high: 150,
+            bandSpreads: 3,
+        },
+    },
 };
 
-function create(caps: { author: boolean; work: boolean }) {
-    const preview = vi.fn(() => of(PREVIEW));
+function create(caps: { author: boolean; work: boolean }, payload: AnomalyScorePreview = PREVIEW) {
+    const preview = vi.fn(() => of(payload));
     const remove = vi.fn(() => of({}));
     const open = vi.fn(() => ({ afterClosed: () => of(false) }));
     TestBed.configureTestingModule({
@@ -139,7 +152,27 @@ describe('AnomalyModelsComponent', () => {
         expect(cells).toContain('1.20'); // self z
         expect(box.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toContain('observed 1,000.00');
         expect(box.querySelector('svg circle')).toBeTruthy();
+        const chart = box.querySelector('[data-testid="anomaly-day-chart-data_mb"]')!;
+        expect(chart.querySelector('figcaption')?.textContent).toContain('Data (MB) — day by day');
+        const canvas = chart.querySelector('canvas')!;
+        expect(canvas.getAttribute('role')).toBe('img');
+        expect(canvas.getAttribute('aria-label')).toContain('scored day 1,000');
+        expect(canvas.getAttribute('aria-label')).toContain('usual range 60 to 150');
         await expectNoA11yViolations(el);
+    });
+
+    it('draws no chart when an older server sends no series, and the summary still shows', () => {
+        const { fixture, el } = create({ author: true, work: true }, { ...PREVIEW, series: undefined });
+        (el.querySelector('nav li button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        const input = el.querySelector('app-anomaly-model-preview input') as HTMLInputElement;
+        input.value = 'x';
+        input.dispatchEvent(new Event('input'));
+        (el.querySelector('app-anomaly-model-preview form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+        fixture.detectChanges();
+        const box = el.querySelector('[data-testid="anomaly-preview"]')!;
+        expect(box.textContent).toContain('High');
+        expect(box.querySelector('figure')).toBeNull();
     });
 
     it('hides authoring without canAuthorWorkbench and the preview without canWorkIncidents', async () => {

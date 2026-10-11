@@ -190,6 +190,18 @@ class ControlApiAnomalyScoreTest {
             assertEquals("2026-09-30", d.get("periodStart").asText());
             assertEquals(2, d.get("features").size());
             assertEquals("spike", d.get("entityKey").asText());
+            JsonNode series = d.get("series");
+            assertEquals(2, series.size(), "one per-day series per feature");
+            JsonNode mb = series.get("data_mb");
+            JsonNode pts = mb.get("points");
+            assertTrue(pts.size() >= 28, "the history window plus the scored day");
+            assertEquals("2026-09-30", pts.get(pts.size() - 1).get("day").asText(), "the scored day is last");
+            assertEquals(3000.0, pts.get(pts.size() - 1).get("value").asDouble(), 1e-9);
+            assertTrue(mb.get("low").asDouble() < mb.get("median").asDouble());
+            assertTrue(mb.get("median").asDouble() < mb.get("high").asDouble());
+            assertTrue(pts.get(pts.size() - 1).get("value").asDouble() > mb.get("high").asDouble(),
+                    "the spike sits above the band");
+            assertEquals(3.0, mb.get("bandSpreads").asDouble(), 0);
             assertEquals(before, parquetFiles(c.data), "no scores Dataset is written");
             assertFalse(Files.exists(c.data.resolve("anomaly_scores_usage")));
 
@@ -202,6 +214,29 @@ class ControlApiAnomalyScoreTest {
                     "{\"model\":\"usage\",\"entityKey\":\"nobody\",\"asOf\":\"2026-10-01\"}", "analyst"));
             assertFalse(none.get("found").asBoolean(), "an entity no feature names is not found");
             assertTrue(none.get("score").isNull());
+            assertEquals(0, none.get("series").size(), "no series for an entity no feature names");
+        }
+    }
+
+    @Test
+    void thePreviewCarriesEvidenceRowsMaskedAtWriteTime(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, null)) {
+            new ComponentStore(c.config.resolve("registry")).write("dataset", "usage", Map.of("physicalRef", "usage",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            Map<String, Object> content = AnomalyCorpus.model();
+            for (Object f : (List<?>) content.get("features")) {
+                @SuppressWarnings("unchecked") Map<String, Object> fm = (Map<String, Object>) f;
+                fm.put("evidence", List.of("msisdn", "mb"));
+            }
+            HttpResponse<String> r = send(c.port, "POST", "/spaces/s1/anomaly-scores/preview", JSON.writeValueAsString(
+                    Map.of("content", content, "entityKey", "spike", "asOf", "2026-10-01")), "analyst");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode top = data(r).get("features").get(0);
+            assertTrue(top.get("evidence").size() >= 1);
+            String masked = top.get("evidence").get(0).get("msisdn").asText();
+            assertTrue(masked.startsWith("masked:"), "a classified evidence column is a token in the response");
+            assertFalse(top.toString().contains("\"msisdn\":\"spike\""));
+            assertTrue(top.get("evidence").get(0).has("mb"));
         }
     }
 

@@ -236,7 +236,7 @@ public final class AnomalyScoreRoutes implements RouteModule {
                         .orElseThrow(() -> new IllegalArgumentException("anomaly-model feature names unknown dataset '"
                                 + datasetId + "'"));
                 return DatasetRelation.relationSql(ds, dataRoot, views);
-            }, entityKey, PREVIEW_POLICY);
+            }, entityKey, PREVIEW_POLICY, com.gamma.mask.EvidenceMasker.of(registry, writeRoot, model.datasetIds()));
         } catch (IllegalArgumentException | IllegalStateException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
@@ -257,6 +257,7 @@ public final class AnomalyScoreRoutes implements RouteModule {
         List<Map<String, Object>> features = new ArrayList<>();
         if (s != null) for (AnomalyScorer.FeatureResult f : s.features()) features.add(f.toMap());
         out.put("features", features);
+        out.put("series", s == null ? Map.of() : run.series());
         return out;
     }
 }

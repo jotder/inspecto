@@ -49,7 +49,26 @@ public final class AnomalyScorer {
     public record FeatureResult(String feature, String label, String bucket, Double observed, Baseline baseline,
                                 Baseline peerBaseline, double cohortShift, double unit, double zSelf, double zPeer,
                                 double deviation, String direction, double weight, double contribution, double share,
-                                boolean peersOnly, boolean insufficient, String reason) {
+                                boolean peersOnly, boolean insufficient, String reason,
+                                List<Map<String, Object>> evidence) {
+
+        public FeatureResult {
+            evidence = evidence == null ? List.of() : List.copyOf(evidence);
+        }
+
+        public FeatureResult(String feature, String label, String bucket, Double observed, Baseline baseline,
+                             Baseline peerBaseline, double cohortShift, double unit, double zSelf, double zPeer,
+                             double deviation, String direction, double weight, double contribution, double share,
+                             boolean peersOnly, boolean insufficient, String reason) {
+            this(feature, label, bucket, observed, baseline, peerBaseline, cohortShift, unit, zSelf, zPeer, deviation,
+                    direction, weight, contribution, share, peersOnly, insufficient, reason, List.of());
+        }
+
+        /** This result with the (already masked) origin rows of the scored day. */
+        FeatureResult withEvidence(List<Map<String, Object>> rows) {
+            return new FeatureResult(feature, label, bucket, observed, baseline, peerBaseline, cohortShift, unit, zSelf,
+                    zPeer, deviation, direction, weight, contribution, share, peersOnly, insufficient, reason, rows);
+        }
 
         public Map<String, Object> toMap() {
             Map<String, Object> b = new LinkedHashMap<>();
@@ -89,13 +108,18 @@ public final class AnomalyScorer {
             m.put("share", share);
             m.put("insufficient", insufficient);
             m.put("reason", reason);
+            if (!evidence.isEmpty()) m.put("evidence", evidence);
             return m;
         }
     }
 
     /** One entity's score. */
     public record Scored(String entityKey, double score, String band, double raw, List<FeatureResult> features,
-                         int insufficientCount) {}
+                         int insufficientCount) {
+        Scored withFeatures(List<FeatureResult> replaced) {
+            return new Scored(entityKey, score, band, raw, List.copyOf(replaced), insufficientCount);
+        }
+    }
 
     /**
      * Score one entity; {@code inputs} is in the model's feature order (every feature present). Per feature
