@@ -71,6 +71,10 @@ test computes distances with the HUB as a non-expanded node and pins the ladder 
 | 4 | SIMBOX-01, SIMBOX-06, MULE-01..05 | `card:` of SUBFRAUD-03; `subscriber:CUST-M01` (SUBFRAUD-04's line); `agent:AGT-666` (SUBFRAUD-05) |
 | 5 | SIMBOX-02..05 | shared_device (the gateway IMEIs) |
 
+**Demo order (live walk-through 2026-10-11):** expand degrees 1 → 4 with the hub held, and only then, as the last
+step, show "Expand anyway" on the hub. Overriding the hub first admits its ~650 background contacts; they crowd the
+2000-row expand budget, so degree 4 is truncated before it reaches the `shared_payment` rings (SIMBOX-01, MULE-01..05).
+
 The intended path is suspect →(forwarding) PREMIUM-01 →(voice) IRSF-01 →(shared_identity) SUBFRAUD-03 →(shared_payment,
 card) SIMBOX-01.
 

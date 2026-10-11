@@ -157,10 +157,12 @@ export class LinkAnalysisInvestigationComponent {
             const col = this.timeCol();
             if (this.timeColumn.pristine) this.timeColumn.setValue(col, { emitEvent: false });
         });
-        // A deep link names its suspect: "Suspect <id>", unless the analyst already typed a title.
+        // A deep link names its suspect, unless the analyst already typed a title: "Suspect <id>" only where the Space
+        // is known not to mask — the title is stored and shown as a value, so otherwise it reads "Suspect number".
         effect(() => {
             const p = this.pending();
-            if (p && this.title.pristine) this.title.setValue(suspectTitle(p.seed), { emitEvent: false });
+            const mode = this.inv.masking?.()?.mode;
+            if (p && this.title.pristine) this.title.setValue(suspectTitle(p.seed, mode), { emitEvent: false });
         });
         // A held degree: poll the log modestly until the four-eyes request is decided (the effect re-runs, and the
         // interval is cleared, as soon as the reconciled outcome is no longer waiting).
@@ -201,6 +203,7 @@ export class LinkAnalysisInvestigationComponent {
             degrees: 2,
             windowEnd: p.windowEnd,
             advanced,
+            profileId: p.profileId,
         });
         // Once created the Investigation is open — the pending form is done even when a later expand was refused.
         if (ok || this.store.active()) {
@@ -212,7 +215,13 @@ export class LinkAnalysisInvestigationComponent {
 
     // ── "Expand next degree" ──
     readonly degree = computed(() =>
-        degreeState(this.store.workingSet(), this.maxDegree(), this.store.degreeOutcomes(), this.includeHubs()),
+        degreeState(
+            this.store.workingSet(),
+            this.maxDegree(),
+            this.store.degreeOutcomes(),
+            this.includeHubs(),
+            this.store.overrideSteps(),
+        ),
     );
     /** The analyst's "Include hubs" opt-in on the expand rung. */
     readonly includeHubs = computed(() => this.rungForm()?.includeHubsOn() ?? false);

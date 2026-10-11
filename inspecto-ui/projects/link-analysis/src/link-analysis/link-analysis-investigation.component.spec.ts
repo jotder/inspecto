@@ -631,7 +631,8 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         expect(form.textContent).toContain('Investigate 966501');
         expect(form.textContent).toContain('at least 2 events per link');
         const title = form.querySelector('input') as HTMLInputElement;
-        expect(title.value).toBe('Suspect 966501');
+        // masking not known to be off: the raw number never goes into the title
+        expect(title.value).toBe('Suspect number');
         await expectNoA11yViolations(el);
 
         // no purpose: nothing is created and the error is on screen
@@ -647,7 +648,13 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         form.dispatchEvent(new Event('submit'));
         await fixture.whenStable();
         expect(spy).toHaveBeenCalledWith(
-            expect.objectContaining({ seed: '966501', title: 'Suspect 966501', purpose: 'fraud alert 12', degrees: 2 }),
+            expect.objectContaining({
+                seed: '966501',
+                title: 'Suspect number',
+                profileId: 'telecom',
+                purpose: 'fraud alert 12',
+                degrees: 2,
+            }),
         );
         fixture.detectChanges();
         expect(host.pending()).toBeNull();
