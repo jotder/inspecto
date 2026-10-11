@@ -14,7 +14,7 @@ import java.util.Set;
  * {@code {text, link?}}, where {@code link} is {@code {kind, id}} and {@code kind} is one of {@link #LINK_KINDS}),
  * optional {@code ownerRole} (the role that owns the guidance; not {@code owner}, which is the R3 author stamp) and optional {@code tags}. {@code name} is the id the store
  * stamps. A key outside these is refused unless it is an author's {@code x-} annotation. {@link #fromMap} is the one
- * structural validator; every write door calls it. A step link is checked for shape only, not for existence.
+ * structural validator; every write door calls it. fromMap checks a step link for shape only; its existence is checked at a direct save (ComponentRoutes).
  */
 public record Runbook(String name, String title, String summary, List<Step> steps, String ownerRole, List<String> tags) {
 
