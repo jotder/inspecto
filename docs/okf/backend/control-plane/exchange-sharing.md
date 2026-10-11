@@ -89,8 +89,27 @@ Dataset the approval activated in `snapshot` mode (`publishOnApprove`, reusing t
 path as `POST /exchange/refresh`), skipping Datasets that already have a snapshot and any `live` grant.
 Failure keeps the approval (the grant is already `active`): the response gains an additive
 `snapshots.<dataset>` = `{status:"published",version,rows}` or `{status:"failed",error}` and a WARNING is
-logged; the owner retries with Refresh. A double approve 409s before publishing. A scheduled refresh is
-still open (`SHARE-SNAPSHOT-ON-APPROVE-1` remainder).
+logged; the owner retries with Refresh. A double approve 409s before publishing.
+
+**Scheduled refresh (per-share cadence, 2026-10-11).** A `dataset` offer carries `refresh` =
+`none`|`hourly`|`daily` (`Offer.REFRESH_CADENCES`; default `none`), set through the existing
+`POST /exchange/offers` upsert — no new route. A body that omits `refresh` keeps the stored cadence (so
+re-describing an offer never drops a schedule); an unknown value, or any cadence but `none` on a
+non-`dataset` kind, is **422** (a Widget/View reads its Datasets' snapshots — set the cadence there).
+`ExchangeSnapshotSweep` ticks every 60 s (one per JVM, started by `ExchangeBootHook`) and republishes an offer
+through the same `ExchangeSnapshotWriter.publish` path when (1) it has a cadence, (2) at least one `active`
+**snapshot-mode** grant exists for it (no consumer ⇒ nothing to keep fresh), and (3) a full interval has passed
+since the later of the last attempt and the live snapshot's `refreshedAt`. The tick is module-gated per owning
+Space: background id `exchange-snapshot-refresh` (declared in the module's `provides.background`, checked with
+`ModuleGate.paused` against the owner's config). ⚠ It is NOT in `ModuleGate.GATED_BACKGROUND` — that set is the
+*host's* gated ids and `OpsBackgroundManifestTest` pins it equal to ops' list.
+**Every publish attempt (manual / approve / schedule) records its outcome** in a sibling
+`last-refresh.toon` (`{at, trigger, status: published|failed, version|error}`), surfaced on offer/metadata
+responses as `lastRefresh`. A failure never moves `current.toon`, so `lastRefresh` is the only place it shows;
+a failed scheduled attempt counts as an attempt and waits a full interval (no per-tick retry storm). Scheduled
+publishes emit `EXCHANGE_REFRESHED` with actor `system`. Pinned by `ExchangeSnapshotSweepTest` (due rule,
+failure back-off, no-cadence/live/paused/revoked skip) and `ControlApiExchangeSnapshotTest` (cadence
+set/preserve/422 over real HTTP, `lastRefresh` after a failed approve and a manual refresh).
 
 **Live delivery (S3, opt-in).** `ExchangeRefResolver` routes a `shared/<owner>/<item>` ref straight to
 the owner's Table directory, read-only, through a per-grant jail root — no snapshot, always current, but
@@ -109,7 +128,10 @@ Catalog tab that hosts it (`shared-with-me`/`shared-by-me`, gated on `SessionSer
   Spaces' offers. Actions: request access (`RequestShareDialog`), pin/clear a version
   (`GrantGovernanceDialog`).
 - **by-me** (owner): inbound requests + grants on the active Space's offers (approve/deny/revoke) + its
-  listed offers. Actions: approve/deny/revoke, refresh a dataset's snapshot, set/clear expiry.
+  listed offers. Actions: approve/deny/revoke, refresh a dataset's snapshot, set/clear expiry, set a
+  dataset's **Auto-refresh** cadence (clock action → the shared `OptionPickerDialog`; re-POSTs the offer with
+  its description/resultSet). The offer grid shows `Auto-refresh` and `Last refresh` (a Published/Failed
+  status badge; a failure's error is the tooltip).
 - **Offer flow**: `datasets.component`/`widgets.component` gain an "Offer for sharing" action
   (`OfferShareDialog` → `ExchangeService.offer()`), gated on the same `exchangeEnabled` signal.
 - **Scope badges**: any dataset/widget bound to a `shared/<owner>/<item>` ref renders

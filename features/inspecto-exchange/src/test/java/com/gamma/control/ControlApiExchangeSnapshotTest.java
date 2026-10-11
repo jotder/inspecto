@@ -177,6 +177,54 @@ class ControlApiExchangeSnapshotTest {
         }
     }
 
+    @Test
+    void refreshCadenceIsSetValidatedPreservedAndTheLastOutcomeIsListed(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String id = share(c, root, "ghost", "snapshot", false);
+            JsonNode listed = json(send(c.port, "GET", "/exchange/offers?owner=finance", null)).get(0);
+            assertEquals("none", listed.get("refresh").asText(), "no cadence unless the sharer sets one");
+
+            HttpResponse<String> set = send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"dataset\",\"item\":\"ghost\",\"owner\":\"finance\",\"refresh\":\"daily\"}");
+            assertEquals(200, set.statusCode(), set.body());
+            assertEquals("daily", json(set).get("refresh").asText());
+            // re-offering without the field (e.g. to edit the description) keeps the schedule
+            assertEquals("daily", json(send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"dataset\",\"item\":\"ghost\",\"owner\":\"finance\",\"description\":\"d\"}")).get("refresh").asText());
+
+            HttpResponse<String> bad = send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"dataset\",\"item\":\"ghost\",\"owner\":\"finance\",\"refresh\":\"weekly\"}");
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertEquals("daily", json(send(c.port, "GET", "/exchange/offers?owner=finance", null)).get(0)
+                    .get("refresh").asText(), "a refused cadence leaves the stored one untouched");
+
+            // a failed publish (approve-time here) is listed as the last outcome; a successful refresh replaces it
+            assertEquals(200, send(c.port, "POST", "/exchange/grants/" + id + "/approve", "").statusCode());
+            JsonNode last = json(send(c.port, "GET", "/exchange/offers?owner=finance", null)).get(0).get("lastRefresh");
+            assertEquals("failed", last.get("status").asText());
+            assertEquals("approve", last.get("trigger").asText());
+            assertFalse(last.get("error").asText().isBlank());
+            seedTable(root, "ghost");
+            assertEquals(200, send(c.port, "POST", "/exchange/refresh",
+                    "{\"owner\":\"finance\",\"item\":\"ghost\"}").statusCode());
+            last = json(send(c.port, "GET", "/exchange/datasets/finance/ghost", null)).get("lastRefresh");
+            assertEquals("published", last.get("status").asText());
+            assertEquals("manual", last.get("trigger").asText());
+        }
+    }
+
+    @Test
+    void aCadenceOnANonDatasetOfferIsRefused(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            share(c, root, "tax_receipts", "snapshot", true);
+            assertEquals(200, send(c.port, "POST", "/spaces/finance/components/widget",
+                    "{\"id\":\"w1\",\"dataset\":\"tax_receipts\"}").statusCode());
+            HttpResponse<String> r = send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"widget\",\"item\":\"w1\",\"owner\":\"finance\",\"refresh\":\"hourly\"}");
+            assertEquals(422, r.statusCode(), r.body());
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

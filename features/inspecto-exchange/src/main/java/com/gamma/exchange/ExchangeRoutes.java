@@ -120,7 +120,7 @@ public final class ExchangeRoutes implements RouteModule {
         if (ex.offer(owner, "dataset", item).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no offered dataset " + owner + "/" + item);
         try {
-            return publishSnapshot(api, e, ex, owner, item).toMap();
+            return publishSnapshot(api, e, ex, owner, item, "manual").toMap();
         } catch (ApiException known) {
             throw known;
         } catch (IllegalArgumentException bad) {
@@ -132,14 +132,19 @@ public final class ExchangeRoutes implements RouteModule {
 
     /** The one publish path — the manual refresh route and approve-time publishing both go through it. */
     private static ExchangeSnapshots.SnapshotMeta publishSnapshot(ApiContext api, HttpExchange e, Exchange ex,
-                                                                  String owner, String item) throws Exception {
+                                                                  String owner, String item, String trigger) throws Exception {
         SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(owner))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + owner + "'"));
-        java.nio.file.Path config = ctx.root().config();
-        if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
-        ExchangeSnapshots.SnapshotMeta meta = ExchangeSnapshotWriter.publish(
-                ex.dir(), owner, config.resolve("registry"),
-                java.nio.file.Path.of(ctx.root().dataDir()), ctx.root().base().resolve("views"), item);
+        if (ctx.root().config() == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
+        java.nio.file.Path itemDir = ExchangeSnapshots.itemDir(ex.dir(), owner, item);
+        ExchangeSnapshots.SnapshotMeta meta;
+        try {
+            meta = ExchangeSnapshotSweep.publishFrom(ctx, ex.dir(), owner, item);
+        } catch (Exception fail) {
+            ExchangeSnapshotSweep.recordOutcome(itemDir, trigger, null, fail, System.currentTimeMillis());
+            throw fail;
+        }
+        ExchangeSnapshotSweep.recordOutcome(itemDir, trigger, meta, null, System.currentTimeMillis());
         Event.Builder b = Event.builder(EventType.EXCHANGE_REFRESHED).source("exchange")
                 .message("refreshed dataset " + owner + "/" + item + " → " + meta.version())
                 .actor(ApiContext.actor(e)).actorType("user")
@@ -149,10 +154,14 @@ public final class ExchangeRoutes implements RouteModule {
         return meta;
     }
 
-    /** Merge the live snapshot's freshness into an offer/metadata map, when a snapshot has been published. */
+    /**
+     * Merge the live snapshot's freshness, and the last publish attempt's outcome ({@code lastRefresh} — the only
+     * place a failed refresh shows, since a failure never moves the snapshot), into an offer/metadata map.
+     */
     private static Map<String, Object> withFreshness(Exchange ex, Map<String, Object> out, String owner, String item) {
-        ExchangeSnapshots.readCurrent(ExchangeSnapshots.itemDir(ex.dir(), owner, item))
-                .ifPresent(meta -> out.put("freshness", meta.toMap()));
+        java.nio.file.Path itemDir = ExchangeSnapshots.itemDir(ex.dir(), owner, item);
+        ExchangeSnapshots.readCurrent(itemDir).ifPresent(meta -> out.put("freshness", meta.toMap()));
+        ExchangeSnapshots.readLastRefresh(itemDir).ifPresent(last -> out.put("lastRefresh", last));
         return out;
     }
 
@@ -192,12 +201,32 @@ public final class ExchangeRoutes implements RouteModule {
         @SuppressWarnings("unchecked")
         Map<String, Object> resultSet = body.get("resultSet") instanceof Map<?, ?> rs
                 ? (Map<String, Object>) rs : Map.of();
+        String refresh = refreshCadence(ex, body, kind, owner, item);
         Offer offer = new Offer(kind, item, owner, ApiContext.str(body, "description"),
-                resultSet, ApiContext.actor(e), System.currentTimeMillis(), datasets);
+                resultSet, ApiContext.actor(e), System.currentTimeMillis(), datasets).withRefresh(refresh);
         ex.putOffer(offer);
         signal(e, EventType.EXCHANGE_OFFERED, "offered " + kind + " " + owner + "/" + item,
                 owner, null, kind, item);
-        return offer.toMap();
+        return withFreshness(ex, offer.toMap(), owner, item);
+    }
+
+    /**
+     * The offer's snapshot refresh cadence (SHARE-SNAPSHOT-ON-APPROVE-1): the body's {@code refresh}, or — when the
+     * body omits it — the cadence already on the stored offer, so re-offering to edit a description never silently
+     * drops a schedule. 422 on a value outside {@link Offer#REFRESH_CADENCES}, and on any cadence but {@code none}
+     * for a non-{@code dataset} kind (only a Dataset has a snapshot to refresh; its Widgets/Views read through it).
+     */
+    private static String refreshCadence(Exchange ex, Map<String, Object> body, String kind, String owner, String item) {
+        if (!body.containsKey("refresh") || body.get("refresh") == null)
+            return ex.offer(owner, kind, item).map(Offer::refresh).orElse(Offer.REFRESH_NONE);
+        String refresh = String.valueOf(body.get("refresh")).trim();
+        if (!Offer.REFRESH_CADENCES.containsKey(refresh))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'refresh' must be one of "
+                    + new java.util.TreeSet<>(Offer.REFRESH_CADENCES.keySet()) + ", got '" + refresh + "'");
+        if (!"dataset".equals(kind) && !Offer.REFRESH_NONE.equals(refresh))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "only a dataset offer has a snapshot to "
+                    + "refresh; a " + kind + " reads its Datasets' snapshots, so set the cadence on those");
+        return refresh;
     }
 
     /**
@@ -321,7 +350,7 @@ public final class ExchangeRoutes implements RouteModule {
             if (ExchangeSnapshots.readCurrent(ExchangeSnapshots.itemDir(ex.dir(), g.owner(), ds)).isPresent()) continue;
             Map<String, Object> one = new LinkedHashMap<>();
             try {
-                ExchangeSnapshots.SnapshotMeta meta = publishSnapshot(api, e, ex, g.owner(), ds);
+                ExchangeSnapshots.SnapshotMeta meta = publishSnapshot(api, e, ex, g.owner(), ds, "approve");
                 one.put("status", "published");
                 one.put("version", meta.version());
                 one.put("rows", meta.rows());

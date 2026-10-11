@@ -25,15 +25,43 @@ import java.util.Map;
  * @param payloadKeys for a {@code signal} offer, the payload keys that may cross to a consumer Space — every
  *                    other key is stripped at the boundary. Empty by default, so nothing crosses unless the
  *                    owner names it (cross-Space consequence D5). Empty for every other kind
+ * @param refresh     a {@code dataset} offer's snapshot refresh cadence ({@link #REFRESH_CADENCES}:
+ *                    {@code none}, {@code hourly}, {@code daily}); {@code none} for every other kind
+ *                    (SHARE-SNAPSHOT-ON-APPROVE-1). Read by {@link ExchangeSnapshotSweep}
  */
 public record Offer(String kind, String item, String owner, String description,
                     Map<String, Object> resultSet, String offeredBy, long offeredAt,
-                    List<String> datasets, List<String> payloadKeys) {
+                    List<String> datasets, List<String> payloadKeys, String refresh) {
+
+    /** No scheduled refresh: the snapshot changes only on approve or the manual Refresh. */
+    public static final String REFRESH_NONE = "none";
+
+    /** The accepted refresh cadences, each mapped to its interval in millis ({@code none} has none). */
+    public static final Map<String, Long> REFRESH_CADENCES = Map.of(
+            REFRESH_NONE, 0L, "hourly", 3_600_000L, "daily", 86_400_000L);
 
     public Offer {
+        refresh = refresh == null || refresh.isBlank() ? REFRESH_NONE : refresh;
         resultSet = resultSet == null ? Map.of() : Map.copyOf(resultSet);
         datasets = datasets == null ? List.of() : List.copyOf(datasets);
         payloadKeys = payloadKeys == null ? List.of() : List.copyOf(payloadKeys);
+    }
+
+    /** Any offer with no scheduled refresh. */
+    public Offer(String kind, String item, String owner, String description,
+                 Map<String, Object> resultSet, String offeredBy, long offeredAt,
+                 List<String> datasets, List<String> payloadKeys) {
+        this(kind, item, owner, description, resultSet, offeredBy, offeredAt, datasets, payloadKeys, REFRESH_NONE);
+    }
+
+    /** This offer with its refresh cadence replaced. */
+    public Offer withRefresh(String cadence) {
+        return new Offer(kind, item, owner, description, resultSet, offeredBy, offeredAt, datasets, payloadKeys, cadence);
+    }
+
+    /** The scheduled refresh interval in millis; 0 when this offer has none. */
+    public long refreshIntervalMillis() {
+        return REFRESH_CADENCES.getOrDefault(refresh, 0L);
     }
 
     /** A Dataset / Widget / saved-View offer (no payload allowlist). */
@@ -65,6 +93,7 @@ public record Offer(String kind, String item, String owner, String description,
         m.put("offeredAt", offeredAt);
         m.put("datasets", datasets);
         m.put("payloadKeys", payloadKeys);
+        m.put("refresh", refresh);
         return m;
     }
 
@@ -77,7 +106,8 @@ public record Offer(String kind, String item, String owner, String description,
                 rs instanceof Map ? (Map<String, Object>) rs : Map.of(),
                 Ledger.str(m, "offeredBy"), Ledger.asLong(m.get("offeredAt")), datasetsOf(m),
                 m.get("payloadKeys") instanceof List<?> keys
-                        ? keys.stream().filter(java.util.Objects::nonNull).map(Object::toString).toList() : List.of());
+                        ? keys.stream().filter(java.util.Objects::nonNull).map(Object::toString).toList() : List.of(),
+                Ledger.str(m, "refresh"));
     }
 
     /**

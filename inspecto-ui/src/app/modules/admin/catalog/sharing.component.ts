@@ -4,12 +4,15 @@ import { ColDef } from 'ag-grid-community';
 import {
     apiErrorMessage,
     ExchangeGrant,
+    ExchangeLastRefresh,
     ExchangeOffer,
+    ExchangeRefreshCadence,
     ExchangeService,
     LensService,
     SpacesService,
 } from 'app/inspecto/api';
-import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
+import { OptionPickerDialog, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { escapeHtml, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { ToastrService } from 'ngx-toastr';
@@ -19,6 +22,20 @@ import { RequestShareDialog, RequestShareResult } from './request-share.dialog';
 
 /** A grant row annotated with the current published version when its pin trails it (S3 drift), else null. */
 type GrantRow = ExchangeGrant & { behind: string | null };
+
+/** The refresh cadences a sharer can pick for a snapshot-mode Dataset offer (`Offer.REFRESH_CADENCES`). */
+const REFRESH_OPTIONS: PickerOption[] = [
+    { value: 'none', label: 'None', hint: 'The snapshot changes only on approval or Refresh snapshot.' },
+    { value: 'hourly', label: 'Hourly', hint: 'Republished about once an hour while a snapshot share is active.' },
+    { value: 'daily', label: 'Daily', hint: 'Republished about once a day while a snapshot share is active.' },
+];
+
+/** The last publish attempt as a status badge; a failure carries its error as the tooltip. */
+function lastRefreshHtml(last: ExchangeLastRefresh | undefined): string {
+    if (!last) return '—';
+    if (last.status === 'published') return statusBadgeHtml('success', 'Published');
+    return `<span title="${escapeHtml(last.error ?? '')}">${statusBadgeHtml('failed', 'Failed')}</span>`;
+}
 
 /** Numeric sequence of a `v<n>` snapshot version (mock `v3` or real `v<epochMillis>`), or null if unparseable. */
 function versionSeq(v: string): number | null {
@@ -154,6 +171,20 @@ export class SharingComponent implements OnInit {
             minWidth: 170,
             valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
         },
+        {
+            field: 'refresh',
+            headerName: 'Auto-refresh',
+            minWidth: 120,
+            valueFormatter: (p) =>
+                REFRESH_OPTIONS.find((o) => o.value === (p.value ?? 'none'))?.label ?? String(p.value),
+        },
+        {
+            // SHARE-SNAPSHOT-ON-APPROVE-1: a failed publish never moves the snapshot, so this is where it shows.
+            field: 'lastRefresh',
+            headerName: 'Last refresh',
+            minWidth: 130,
+            cellRenderer: (p: { value: ExchangeLastRefresh | undefined }) => lastRefreshHtml(p.value),
+        },
     ];
 
     /** Owner-side decisions: the by-me view **and** the capability the server enforces. */
@@ -222,6 +253,13 @@ export class SharingComponent implements OnInit {
             visible: (o) => this.view() === 'by-me' && o.kind === 'dataset' && this.lens.canOfferDatasets(),
             onClick: (o) => this.refresh(o),
         },
+        {
+            // Owner sets the scheduled refresh cadence (SHARE-SNAPSHOT-ON-APPROVE-1). Datasets only.
+            icon: 'heroicons_outline:clock',
+            hint: (o) => `Auto-refresh: ${o.refresh ?? 'none'} — change`,
+            visible: (o) => this.view() === 'by-me' && o.kind === 'dataset' && this.lens.canOfferDatasets(),
+            onClick: (o) => this.schedule(o),
+        },
     ];
 
     ngOnInit(): void {
@@ -270,6 +308,34 @@ export class SharingComponent implements OnInit {
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not refresh "${o.item}".`)),
         });
+    }
+
+    private schedule(o: ExchangeOffer): void {
+        this.dialog
+            .open(OptionPickerDialog, {
+                data: { title: `Auto-refresh ${o.item}`, options: REFRESH_OPTIONS, current: o.refresh ?? 'none' },
+            })
+            .afterClosed()
+            .subscribe((picked: string | undefined) => {
+                if (!picked || picked === (o.refresh ?? 'none')) return; // dismissed or unchanged
+                this.exchange
+                    .offer({
+                        kind: o.kind,
+                        owner: o.owner,
+                        item: o.item,
+                        description: o.description,
+                        resultSet: o.resultSet,
+                        refresh: picked as ExchangeRefreshCadence,
+                    })
+                    .subscribe({
+                        next: () => {
+                            this.toastr.success(`Auto-refresh for ${o.item} set to ${picked}.`);
+                            this.reload();
+                        },
+                        error: (e) =>
+                            this.toastr.error(apiErrorMessage(e, `Could not set auto-refresh for "${o.item}".`)),
+                    });
+            });
     }
 
     private govern(g: ExchangeGrant, field: 'pin' | 'expiry'): void {

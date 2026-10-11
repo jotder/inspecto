@@ -16,6 +16,8 @@ public final class ExchangeBootHook implements HostBootHook {
     @Override
     public void afterRoutes(SpaceManager spaces) {
         com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(spaces));
+        // SHARE-SNAPSHOT-ON-APPROVE-1: the per-offer refresh cadence's tick (module-gated per owning Space).
+        ExchangeSnapshotSweep.start(spaces);
         // Cross-Space consequence slice 3: deliver consented Signals between this installation's Spaces.
         ExchangeSignalForwarder.install(spaces);
         // Slice 5: a Decision Rule emit-signal with offerTo asks this before it emits (absent module => refused).
