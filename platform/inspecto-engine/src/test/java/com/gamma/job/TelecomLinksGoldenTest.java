@@ -1,6 +1,15 @@
 package com.gamma.job;
 
+import com.gamma.alert.AlertRule;
+import com.gamma.alert.AlertService;
+import com.gamma.catalog.ConfigSource;
+import com.gamma.catalog.SemanticModel;
+import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.etl.StatusStore;
+import com.gamma.objects.FakeObjectAccess;
+import com.gamma.pipeline.ComponentStore;
+import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.util.DuckDbUtil;
@@ -42,7 +51,7 @@ class TelecomLinksGoldenTest {
     private static final Path TEMPLATE = Path.of("..", "..", "spaces", "_templates", "la-showcase").toAbsolutePath().normalize();
     private static final List<String> FEEDS = List.of("voice_cdr", "sms_cdr", "hlr_eir", "crm_kyc", "recharge", "provisioning",
             "fraud_blocklist", "fraud_alarms");
-    private static final List<String> JOBS = List.of("telecom_links", "telecom_msisdn_indicators");
+    private static final List<String> JOBS = List.of("telecom_links", "telecom_msisdn_indicators", "telecom_typology_counts");
 
     static final String SUSPECT = "99979100001", WANGIRI_B = "99979100002", PREMIUM_01 = "99891000001", HUB = "99970000100";
     static final List<String> IRSF = List.of("99979200001", "99979200002", "99979200003", "99979200004");
@@ -51,13 +60,13 @@ class TelecomLinksGoldenTest {
     static final List<String> MULES = List.of("99979500001", "99979500002", "99979500003", "99979500004", "99979500005");
 
     @TempDir static Path tmp;
-    private static Path data;
+    private static Path data, space;
     private static List<Map<String, Object>> links;
     private static Map<String, Map<String, Object>> indicators;
 
     @BeforeAll
     static void runThePipelinesAndJobs() throws Exception {
-        Path space = tmp.resolve("spaces").resolve("la-showcase");
+        space = tmp.resolve("spaces").resolve("la-showcase");
         try (Stream<Path> w = Files.walk(TEMPLATE)) {
             for (Path p : w.toList()) {
                 Path to = space.resolve(TEMPLATE.relativize(p).toString());
@@ -212,6 +221,65 @@ class TelecomLinksGoldenTest {
             assertTrue(num(indicators.get(m), "indicator_score") >= 25, m + " scores " + indicators.get(m).get("indicator_score"));
         Set<String> loudBackground = select(r -> ((String) r.get("msisdn")).startsWith("99971") && num(r, "indicator_score") >= 15);
         assertEquals(Set.of("99971002000"), loudBackground, "only the stale block-list entry is loud in the background");
+    }
+
+    /**
+     * The three indicator Alert Rules (Wangiri, IRSF, SIM box) the pattern stages cannot express load from the template and
+     * fire on the seed through the production {@link AlertService} and {@link DatasetMeasureProbe}. They read the ONE-row
+     * {@code telecom_typology_counts} Dataset, so each Alert carries a count, never an MSISDN (aggregate-only alerts).
+     */
+    @Test
+    void theTypologyAlertRulesFireOnTheSeedWithCountsOnly() throws Exception {
+        List<Map<String, Object>> counts = rows("SELECT * FROM " + parquet("telecom_typology_counts"));
+        assertEquals(1, counts.size(), "one row of counts");
+        assertEquals(List.of("wangiri_lines", "irsf_lines", "simbox_lines", "scored_lines"), new ArrayList<>(counts.get(0).keySet()),
+                "counts only - no MSISDN column");
+        assertEquals(2L, ((Number) counts.get(0).get("wangiri_lines")).longValue());
+        assertEquals(4L, ((Number) counts.get(0).get("irsf_lines")).longValue());
+        assertEquals(6L, ((Number) counts.get(0).get("simbox_lines")).longValue());
+        assertEquals((long) indicators.size(), ((Number) counts.get(0).get("scored_lines")).longValue());
+
+        Path cfg = space.resolve("config");
+        List<AlertRule> rules = new ComponentStore(cfg.resolve("registry")).list("alert-rule").stream()
+                .map(c -> AlertRule.fromMap(c.content())).toList();
+        assertEquals(Set.of("telecom_wangiri_lines", "telecom_irsf_lines", "telecom_simbox_lines"),
+                new TreeSet<>(rules.stream().map(AlertRule::name).toList()));
+        for (AlertRule r : rules) {
+            assertTrue(r.isMeasureRule(), r.name());
+            assertFalse(r.isGrouped(), r.name() + " is aggregate-only: no by, so no MSISDN in the Alert");
+        }
+        FakeObjectAccess objects = new FakeObjectAccess();
+        AlertService svc = new AlertService(rules, noPipelines(), emptyStore(), objects);
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> data);
+        svc.measureProbe(probe::value);
+        Map<String, String> fired = new TreeMap<>();
+        for (com.gamma.alert.Alert a : svc.evaluateRules()) {
+            fired.put(a.rule(), String.valueOf(a.value()));
+            assertFalse((a.message() + a.evidence()).contains("99979"), "no planted MSISDN in the Alert: " + a);
+        }
+        for (FakeObjectAccess.Opened o : objects.opened) {   // the CRITICAL rules also open an Incident: still counts only
+            assertFalse(o.attributes().keySet().stream().anyMatch(k -> k.startsWith("key")), "no entity key: " + o.attributes());
+            assertFalse(String.valueOf(o.attributes()).contains("99979"), "no planted MSISDN in the Incident: " + o.attributes());
+        }
+        assertEquals(Map.of("telecom_irsf_lines", "4.0", "telecom_simbox_lines", "6.0", "telecom_wangiri_lines", "2.0"), fired);
+    }
+
+    private static ConfigSource noPipelines() {
+        return new ConfigSource() {
+            @Override public List<PipelineConfig> pipelines() { return List.of(); }
+            @Override public List<EnrichmentConfig> enrichments() { return List.of(); }
+            @Override public List<SemanticModel> semantics() { return List.of(); }
+        };
+    }
+
+    private static StatusStore emptyStore() {
+        return new StatusStore() {
+            @Override public Set<String> committedBatches(PipelineConfig c) { return Set.of(); }
+            @Override public List<Map<String, String>> batches(PipelineConfig c) { return List.of(); }
+            @Override public List<Map<String, String>> files(PipelineConfig c) { return List.of(); }
+            @Override public List<Map<String, String>> lineage(PipelineConfig c, String b) { return List.of(); }
+            @Override public List<Map<String, String>> quarantine(PipelineConfig c) { return List.of(); }
+        };
     }
 
     @Test
