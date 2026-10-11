@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -10,7 +11,7 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
 import { InspectoSampleValueDirective } from 'app/inspecto/components/sample-value.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
-import type { PipelineSettings } from 'app/inspecto/api/pipelines.service';
+import type { PipelineReferenceSettings, PipelineSettings } from 'app/inspecto/api/pipelines.service';
 
 export interface PipelineSettingsData {
     id: string;
@@ -78,6 +79,44 @@ export interface PipelineSettingsData {
                             <mat-error>upsert/scd2 requires at least one key column.</mat-error>
                         }
                     </mat-form-field>
+                    @if (form.controls.load.value !== 'replace') {
+                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <mat-label>Order by column</mat-label>
+                            <input matInput formControlName="orderBy" placeholder="e.g. updated_at" />
+                            <mat-hint
+                                >Optional. Within one batch, the row with the greatest value wins for each
+                                key.</mat-hint
+                            >
+                        </mat-form-field>
+                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <mat-label>Delete marker column</mat-label>
+                            <input matInput formControlName="deleteColumn" placeholder="e.g. op" />
+                            <mat-hint
+                                >Optional. A row whose marker matches a delete value removes its key. The marker is not
+                                stored.</mat-hint
+                            >
+                            @if (form.controls.deleteColumn.hasError('required')) {
+                                <mat-error>Name the column that carries the delete marker.</mat-error>
+                            }
+                            @if (form.controls.deleteColumn.hasError('isKey')) {
+                                <mat-error>The delete marker column cannot be a key column.</mat-error>
+                            }
+                        </mat-form-field>
+                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <mat-label>Delete values</mat-label>
+                            <input matInput formControlName="deleteValues" placeholder="e.g. D, DELETE" />
+                            <mat-hint>Comma-separated marker values that mean delete.</mat-hint>
+                            @if (form.controls.deleteValues.hasError('required')) {
+                                <mat-error>Give at least one marker value that means delete.</mat-error>
+                            }
+                        </mat-form-field>
+                        @if (deleteWithoutOrderBy()) {
+                            <inspecto-alert variant="warning">
+                                Without an order by column, an upsert and a delete for the same key in one batch resolve
+                                arbitrarily.
+                            </inspecto-alert>
+                        }
+                    }
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>Refresh seconds</mat-label>
                         <input matInput type="number" min="0" formControlName="refreshSeconds" />
@@ -120,6 +159,18 @@ export class PipelineSettingsDialog {
         load: [this.data.settings.reference?.load ?? 'replace'],
         key: [(this.data.settings.reference?.key ?? []).join(', ')],
         refreshSeconds: [this.data.settings.reference?.refresh_seconds ?? 0],
+        orderBy: [this.data.settings.reference?.order_by ?? ''],
+        deleteColumn: [this.data.settings.reference?.delete?.column ?? ''],
+        // TOON may hold non-string markers (`values: [true]`); the engine compares them as text.
+        deleteValues: [(this.data.settings.reference?.delete?.values ?? []).map(String).join(', ')],
+    });
+
+    private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+
+    /** The validator's WARNING (`reference-delete-without-order-by`), shown before save rather than after. */
+    readonly deleteWithoutOrderBy = computed(() => {
+        const v = this.formValue();
+        return String(v.deleteColumn ?? '').trim() !== '' && String(v.orderBy ?? '').trim() === '';
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
@@ -135,20 +186,58 @@ export class PipelineSettingsDialog {
             return;
         }
         const load = (v.load ?? 'replace') as 'replace' | 'upsert' | 'scd2';
-        const key = String(v.key ?? '')
-            .split(',')
-            .map((k) => k.trim())
-            .filter((k) => k.length > 0);
-        if (load !== 'replace' && key.length === 0) {
+        const key = splitList(v.key);
+        // delete/order_by apply only to upsert/scd2 (the validator refuses them on replace), so a
+        // replace save drops them along with their hidden fields.
+        const versioned = load !== 'replace';
+        const orderBy = versioned ? String(v.orderBy ?? '').trim() : '';
+        const deleteColumn = versioned ? String(v.deleteColumn ?? '').trim() : '';
+        const deleteValues = versioned ? splitList(v.deleteValues) : [];
+        let invalid = false;
+        if (versioned && key.length === 0) {
             this.form.controls.key.setErrors({ required: true });
+            invalid = true;
+        }
+        if (deleteValues.length > 0 && !deleteColumn) {
+            this.form.controls.deleteColumn.setErrors({ required: true });
+            invalid = true;
+        } else if (deleteColumn && key.includes(deleteColumn)) {
+            this.form.controls.deleteColumn.setErrors({ isKey: true });
+            invalid = true;
+        }
+        if (deleteColumn && deleteValues.length === 0) {
+            this.form.controls.deleteValues.setErrors({ required: true });
+            invalid = true;
+        }
+        if (invalid) {
             this.form.markAllAsTouched();
             return;
         }
+        // Keep keys this dialog does not edit: the route replaces the whole block.
+        const {
+            delete: _delete,
+            order_by: _orderBy,
+            ...kept
+        } = this.data.settings.reference ?? ({} as Partial<PipelineReferenceSettings>);
         this.ref.close({
             produces,
-            // Keep keys this dialog does not edit (`delete`, `order_by`): the route replaces the whole block.
-            reference: { ...this.data.settings.reference, load, key, refresh_seconds: Number(v.refreshSeconds) || 0 },
+            reference: {
+                ...kept,
+                load,
+                key,
+                refresh_seconds: Number(v.refreshSeconds) || 0,
+                ...(orderBy ? { order_by: orderBy } : {}),
+                ...(deleteColumn ? { delete: { column: deleteColumn, values: deleteValues } } : {}),
+            },
             description,
         });
     }
+}
+
+/** Split a comma-separated field into trimmed, non-empty entries. */
+function splitList(raw: unknown): string[] {
+    return String(raw ?? '')
+        .split(',')
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0);
 }
