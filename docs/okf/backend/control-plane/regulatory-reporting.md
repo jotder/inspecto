@@ -127,6 +127,7 @@ dirty-guarded dialog (`regulatory-report-draft.dialog.ts`): the Report Template 
 `<inspecto-option-picker>` (subjects from `GET /objects?type=`), one textarea per `input.*` key the template reads —
 required and max length derived from its fields (`requiredInputs`, `inputMaxLength`), labelled as words (`inputLabel`) —
 and the server's render refusal shown in the dialog, which stays open. Picker errors appear only after a submit attempt.
+**Report Templates** section (same pane): the templates with origin, and - with `canApproveChanges` - **New template** / Edit / Delete (a built-in is editable, saved as the Space override, but not deletable). `report-template.dialog.ts` edits the template as JSON beside its id (create only); client-side JSON check, then the server's 422 / 403 / 409 text shown verbatim.
 
 ## Deliberately not built (see `docs/BACKLOG.md` `REGULATORY-REPORTING-1`)
 Regulator acknowledgement ingest (`rejected`, receipts); live regulator

@@ -221,4 +221,47 @@ describe('RegulatoryReportsComponent', () => {
         const { fixture } = await create({}, { work: false, approve: true });
         expect(buttons(fixture.nativeElement)).not.toContain('New report');
     });
+
+    it('offers template authoring only with canApproveChanges; a built-in is editable but not deletable', async () => {
+        const { fixture } = await create({
+            templates: vi.fn(() =>
+                of({ items: [TEMPLATE, { ...TEMPLATE, id: 'mine', title: 'Mine', origin: 'space' }], problems: [] }),
+            ),
+        });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(buttons(el)).toContain('New template');
+        const labels = Array.from(el.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'));
+        expect(labels).toContain('Edit Sample suspicious activity report');
+        expect(labels).not.toContain('Delete Sample suspicious activity report');
+        expect(labels).toContain('Delete Mine');
+        await expectNoA11yViolations(el);
+    });
+
+    it('hides template authoring from a reader without canApproveChanges', async () => {
+        const { fixture } = await create({}, { work: true, approve: false });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(buttons(el)).not.toContain('New template');
+        expect(el.querySelector('button[aria-label^="Edit "]')).toBeNull();
+    });
+
+    it('opens the template dialog and reloads the templates after a save', async () => {
+        const { fixture, api, dialog } = await create();
+        dialog.open.mockReturnValueOnce({ afterClosed: () => of(TEMPLATE) } as unknown as ReturnType<
+            typeof dialog.open
+        >);
+        fixture.componentInstance.editTemplate(TEMPLATE);
+        expect(dialog.open).toHaveBeenCalled();
+        expect(api.templates).toHaveBeenCalledTimes(2);
+    });
+
+    it('deletes a template after confirmation and shows the server refusal verbatim', async () => {
+        const refusal = new HttpErrorResponse({
+            status: 409,
+            error: { error: { message: 'report template mine is used by 1 regulatory report(s)' } },
+        });
+        const { fixture, api, toastr } = await create({ deleteTemplate: vi.fn(() => throwError(() => refusal)) });
+        await fixture.componentInstance.deleteTemplate({ ...TEMPLATE, id: 'mine', origin: 'space' });
+        expect(api.deleteTemplate).toHaveBeenCalledWith('mine');
+        expect(toastr.error).toHaveBeenCalledWith(expect.stringContaining('is used by 1 regulatory report'));
+    });
 });

@@ -31,6 +31,7 @@ export interface ReportTemplate {
     title: string;
     description: string | null;
     format: 'xml' | 'csv' | 'json';
+    rootElement?: string | null;
     origin: 'built-in' | 'space';
     delivery: { kind: string; dir: string };
     /** The `input.*` keys the template reads — the only values a draft may carry. */
@@ -169,6 +170,21 @@ export class RegulatoryReportsService {
 
     retry(id: string): Observable<RegulatoryReportDetail> {
         return this.transition(id, 'retry');
+    }
+
+    /** Author (create or replace) the Space's Report Template `id` — `PUT /regulatory-reports/templates/{id}`. */
+    saveTemplate(id: string, body: Record<string, unknown>): Observable<ReportTemplate & { created: boolean }> {
+        return this.http.put<ReportTemplate & { created: boolean }>(
+            apiUrl(`/regulatory-reports/templates/${encodeURIComponent(id)}`),
+            body,
+        );
+    }
+
+    /** Remove the Space's Report Template `id` — refused (409) while a regulatory report uses it. */
+    deleteTemplate(id: string): Observable<{ id: string; deleted: boolean }> {
+        return this.http.delete<{ id: string; deleted: boolean }>(
+            apiUrl(`/regulatory-reports/templates/${encodeURIComponent(id)}`),
+        );
     }
 
     private transition(
