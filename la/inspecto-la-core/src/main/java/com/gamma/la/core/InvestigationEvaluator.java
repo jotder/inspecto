@@ -90,6 +90,9 @@ import java.util.TreeSet;
  *       excluded (keep still protects), and the members are remembered, so a later expand never admits a raw id
  *       whose key under the member type's sealed normaliser is one of them.</li>
  * </ul>
+ * An endpoint an {@code expand} admits takes the Entity Type its side of the binding declares when the read sealed one
+ * ({@code read.query.sourceType} / {@code targetType}, copied from the Investigation header at append,
+ * ONB-LA-ENDPOINT-TYPE-1); an older read carries neither and admits untyped endpoints, so its hashes are unchanged.
  * An {@code undo} log entry is NOT a vocabulary op — it is a log edit, recorded append-only, naming the step it
  * reverts. Undo always targets the latest effective op, so skipping undone steps is exactly equivalent to
  * popping them: the state after an undo is byte-identical to the state before the undone step.
@@ -558,6 +561,9 @@ public final class InvestigationEvaluator {
                 // LA-17 merged traversal: a member value not admitted yet -> the admitted entity it stands for.
                 Map<String, Object> anchorOf = query.get("merged") instanceof Map<?, ?> mg
                         && mg.get("anchorOf") instanceof Map<?, ?> a ? (Map<String, Object>) a : Map.of();
+                // ONB-LA-ENDPOINT-TYPE-1: the binding's endpoint types sealed into the read (absent on older logs: untyped, as before)
+                String srcType = query.get("sourceType") == null ? null : String.valueOf(query.get("sourceType"));
+                String tgtType = query.get("targetType") == null ? null : String.valueOf(query.get("targetType"));
                 for (Object o : (List<Object>) read.get("rows")) {
                     Map<String, Object> r = (Map<String, Object>) o;
                     String src = String.valueOf(r.get("source")), tgt = String.valueOf(r.get("target"));
@@ -568,12 +574,12 @@ public final class InvestigationEvaluator {
                     Entity from = end == null ? null : s.entities.get(end);
                     if (from == null && end != null) {   // a member value: the same identity as its anchor
                         Entity an = s.entities.get(String.valueOf(anchorOf.get(end)));
-                        from = new Entity(end, null, an.hop(), an.seed(), step);
+                        from = new Entity(end, end.equals(src) ? srcType : tgtType, an.hop(), an.seed(), step);
                         s.entities.put(end, from);
                     }
                     if (from == null) continue;   // the frontier entity left the Working Set (fork re-order)
                     String other = from.id().equals(src) ? tgt : src;
-                    s.entities.putIfAbsent(other, new Entity(other, null, from.hop() + 1, from.seed(), step));
+                    s.entities.putIfAbsent(other, new Entity(other, other.equals(tgt) ? tgtType : srcType, from.hop() + 1, from.seed(), step));
                     String kind = r.get("kind") == null ? null : String.valueOf(r.get("kind"));
                     s.links.putIfAbsent(src + '\u0000' + tgt + '\u0000' + kind,
                             new Link(src, tgt, kind, ((Number) r.get("count")).longValue(), step));

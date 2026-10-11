@@ -195,6 +195,15 @@ Design rules visible in the dependency graph:
   falls back with `read.fallback {reason: rung_not_indexable, details: "...which no index carries as its weightCol"}`
   (never a silently wrong count). Caveat: the index stores `w` as DOUBLE, so an integer count above 2^53 could round. Templates carry `eventsCol` in `roles` only
   when bound; the Dossier names it in the method statement.
+* **Endpoint Entity Type (ONB-LA-ENDPOINT-TYPE-1, 2026-10-11).** `POST /inv/investigations` takes an optional
+  `entityType` (both endpoints) or `sourceType` / `targetType` (each side; never both forms - 422), each an Entity
+  Type in force (case-insensitive, stored as its id; unknown → 422). Sealed in the header ONLY when given. Every expand
+  copies them into `read.rung` (`query.sourceType/targetType`), and the evaluator types each endpoint it admits by the
+  side it was reached on - replay reads the log alone; a read without the keys admits untyped endpoints, so older logs
+  and untyped Investigations keep byte-identical headers, reads and hashes. Before this, only the seed carried a type,
+  so node actions keyed on type (Add to watch list) found nothing for expanded entities. Masking: under `typed`, a
+  masked endpoint type masks that side's ids (unknown type → masked, fail closed). Forks inherit the header; template
+  instantiate does NOT carry the fields yet. Test: `ControlApiInvestigationEndpointTypeTest`.
 
 ### 3.2 InvestigationStore port and its two backends
 

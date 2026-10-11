@@ -882,7 +882,8 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
 - **Runtime state has NO template home** (checked 2026-10-10: no registry kind, `case-link.json` is import-reserved, `TemplateSeedGate` seeds registry
   components only). `tools/seed-la-showcase.mjs` seeds it over HTTP as the right personas: the Investigation `mule-hub-case` (8 ops, owner `fm.analyst`),
   reviewers `ra.analyst`, `fm.manager`, `admin` (`demo.manager` stays a non-member), Entity List `smurf-accounts` (12 members, one prefix range, one
-  expiring entry), one identity assertion, a Case assigned to `fm.manager` and linked, an Investigation Template, and the bound pass-through Alert Rule
+  expiring entry), the msisdn watch list `telecom-watch-msisdn` (the Wangiri suspect and IRSF-01, so the telecom node dialog's
+  *Add to watch list* has a list of its Entity Type), one identity assertion, a Case assigned to `fm.manager` and linked, an Investigation Template, and the bound pass-through Alert Rule
   with standing detection. **Owner is `fm.analyst`, not `admin`**: binding and enabling need the Investigation's owner-and-lead holding Author Alert
   Rules, and the Dataset share must name that owner. Dry run by default; `--apply` writes; re-runs skip what exists.
 - **Operator steps.** (1) `pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth [-Ui la-app]`; (2) launch `inspecto-la-app` (it scaffolds

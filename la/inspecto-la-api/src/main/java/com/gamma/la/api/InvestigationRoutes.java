@@ -255,6 +255,7 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
         String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(body, "timeColZone"));
         requireEventsCol(dataset, relationSql, eventsCol);
+        String[] endpointTypes = endpointTypes(writeRoot, body);
         // LA-24: an optional Case link, checked BEFORE anything is written; stored outside the sealed header.
         Map<String, Object> caseLink = InvestigationCaseRoutes.linkRecord(api, ex, ApiContext.str(body, "caseRef"));
 
@@ -273,6 +274,9 @@ public final class InvestigationRoutes implements RouteModule {
             header.put("timeColZone", timeColZone);
         }
         if (eventsCol != null) header.put("eventsCol", eventsCol);   // absent on an unweighted Investigation: its header is unchanged
+        // ONB-LA-ENDPOINT-TYPE-1: only when given, so an untyped Investigation's header is unchanged
+        if (endpointTypes[0] != null) header.put("sourceType", endpointTypes[0]);
+        if (endpointTypes[1] != null) header.put("targetType", endpointTypes[1]);
         header.put("createdAt", Instant.now().toString());
         // D-E3: no version-addressable read exists, so nothing is pinned — reads are sealed at use instead.
         header.put("datasetVersion", null);
@@ -959,6 +963,9 @@ public final class InvestigationRoutes implements RouteModule {
         q.put("hubThreshold", p.get("hubThreshold") instanceof Number n ? n.intValue()
                 : LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveHubThreshold());
         if (!fr.held().isEmpty()) q.put("hubsHeld", fr.held());
+        // ONB-LA-ENDPOINT-TYPE-1: the header's endpoint types, sealed so replay types admitted endpoints from the log alone
+        if (inv.header().get("sourceType") != null) q.put("sourceType", inv.header().get("sourceType"));
+        if (inv.header().get("targetType") != null) q.put("targetType", inv.header().get("targetType"));
         if (!Boolean.TRUE.equals(p.get("merged"))) return q;
         requireResolution(s, where);
         TreeMap<String, String> groupOf = new TreeMap<>(), anchorOf = new TreeMap<>();
@@ -2563,6 +2570,30 @@ public final class InvestigationRoutes implements RouteModule {
         } catch (IllegalArgumentException escape) {
             throw escapes();
         }
+    }
+
+    /**
+     * ONB-LA-ENDPOINT-TYPE-1: the Entity Types of the binding's endpoints, {@code [sourceType, targetType]} (either null):
+     * {@code entityType} names both, or {@code sourceType} / {@code targetType} each side - never both forms. Each must be
+     * an Entity Type in force in the Space (case-insensitive; stored as its id), else 422. Sealed in the header, then into
+     * every expand's {@code read.query}, so the evaluator types the endpoints it admits without reading the header.
+     */
+    static String[] endpointTypes(Path writeRoot, Map<String, Object> body) {
+        String both = ApiContext.str(body, "entityType");
+        String src = ApiContext.str(body, "sourceType"), tgt = ApiContext.str(body, "targetType");
+        if (both != null && (src != null || tgt != null))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "send 'entityType' (both endpoints) or 'sourceType'/'targetType', not both");
+        if (both != null) src = tgt = both;
+        if (src == null && tgt == null) return new String[2];
+        List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
+        return new String[] {entityTypeId(types, src, "sourceType"), entityTypeId(types, tgt, "targetType")};
+    }
+
+    private static String entityTypeId(List<EntityTypes.EntityType> types, String named, String key) {
+        if (named == null) return null;
+        for (EntityTypes.EntityType t : types) if (t.id().equalsIgnoreCase(named.trim())) return t.id();
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown Entity Type '" + named + "' for " + key + " - one of "
+                + types.stream().map(EntityTypes.EntityType::id).toList());
     }
 
     private static String ident(Map<String, Object> body, String key, boolean required) {
