@@ -92,6 +92,32 @@ class ExchangeSnapshotMultiPodTest {
     }
 
     @Test
+    void anUnreadableGrantsLedgerSkipsPruneButKeepsThePublish(@TempDir Path spacesRoot) throws Exception {
+        Path registry = spacesRoot.resolve("finance").resolve("config").resolve("registry");
+        Path dataRoot = spacesRoot.resolve("finance").resolve("data");
+        Files.createDirectories(dataRoot.resolve("tax_receipts"));
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement s = c.createStatement()) {
+            s.execute("COPY (SELECT 1 AS amount) TO "
+                    + "'" + unix(dataRoot.resolve("tax_receipts").resolve("part.parquet")) + "' (FORMAT PARQUET)");
+        }
+        new ComponentStore(registry).write("dataset", "tax_receipts", Map.of("physicalRef", "tax_receipts"));
+        Path shared = Exchange.under(spacesRoot).dir();
+        Path itemDir = ExchangeSnapshots.itemDir(shared, "finance", "tax_receipts");
+        String old = "v" + (T - 10 * 3_600_000L);
+        Files.createDirectories(itemDir.resolve(old));
+        Files.createDirectories(shared);
+        Files.createDirectory(shared.resolve("grants.toon"));   // a directory: reading the ledger fails
+
+        SnapshotMeta meta = ExchangeSnapshotWriter.publish(shared, "finance", registry, dataRoot,
+                spacesRoot.resolve("finance").resolve("views"), "tax_receipts", T);
+        ExchangeSnapshotSweep.recordOutcome(itemDir, "manual", meta, null, T);
+
+        assertEquals(meta.version(), ExchangeSnapshots.readCurrent(itemDir).orElseThrow().version());
+        assertEquals("published", ExchangeSnapshots.readLastRefresh(itemDir).orElseThrow().get("status"));
+        assertTrue(Files.exists(itemDir.resolve(old)), "no pins known, so nothing is pruned");
+    }
+
+    @Test
     void pruneNeverDeletesAPinnedVersion(@TempDir Path spacesRoot) throws Exception {
         Exchange ex = Exchange.under(spacesRoot);
         ex.putOffer(new Offer("dataset", "tax_receipts", "finance", "FY26", Map.of(), "a.rao", 1L));

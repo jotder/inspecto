@@ -34,6 +34,8 @@ public final class ExchangeSnapshotWriter {
     /** Version directories kept beyond the live one (bounds disk across refreshes). */
     private static final int KEEP_VERSIONS = 2;
 
+    private static final System.Logger LOG = System.getLogger(ExchangeSnapshotWriter.class.getName());
+
     private ExchangeSnapshotWriter() {}
 
     /**
@@ -89,8 +91,17 @@ public final class ExchangeSnapshotWriter {
 
         SnapshotMeta meta = new SnapshotMeta(version, rows, Instant.now().toString(), columns);
         ExchangeSnapshots.writeCurrent(itemDir, meta);        // atomic reveal (never moves backwards)
-        ExchangeSnapshots.prune(itemDir, version, KEEP_VERSIONS, System.currentTimeMillis(),
-                pinnedVersions(sharedDir, owner, item));
+        java.util.Set<String> pinned;
+        try {
+            pinned = pinnedVersions(sharedDir, owner, item);
+        } catch (Exception unreadable) {
+            // The snapshot is already live: an unreadable grants ledger must not turn it into a failure.
+            // Without the pins, pruning could delete a pinned version, so skip pruning for this publish.
+            LOG.log(System.Logger.Level.WARNING, "grants unreadable; skipped pruning old snapshots of "
+                    + owner + "/" + item, unreadable);
+            return meta;
+        }
+        ExchangeSnapshots.prune(itemDir, version, KEEP_VERSIONS, System.currentTimeMillis(), pinned);
         return meta;
     }
 
