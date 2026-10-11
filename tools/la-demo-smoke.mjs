@@ -13,8 +13,9 @@
 // the three telecom pattern packs match >= 1; the three telecom typology Alerts are present with counts only.
 //
 // Always run: 401, 403, 404 (non-member), 404 MODULE_DISABLED, 422, tamper verify fails, route inventory = EXPECTED_LA_ROUTES (derived from the LA module.toon files).
-// With --staged/--inbox: Replay hash unchanged after a file lands in the bound Dataset (it COPIES the staged file; the
-// step is skipped otherwise). With --burst: >20 expensive POSTs -> 429, 19 concurrent Graph Runs -> a 503 (MUTATES the
+// With --staged/--inbox: Replay hash unchanged after a file lands in the bound Dataset (it WRITES a 40-row MULE-HUB-01 file named for a
+// far-future day - the shipped staged files touch no seeded entity, so they cannot drift a re-read - and polls the inbox until
+// the Space ingests it, ~one poll; the step is skipped otherwise). With --burst: >20 expensive POSTs -> 429, 19 concurrent Graph Runs -> a 503, 16 concurrent index builds -> a 503 (queue full) and a duplicate build -> 409 (MUTATES the
 // Space: it starts runs - use a disposable demo). --dry-run prints the probes and sends nothing. Exit 1 on any failed probe.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -75,6 +76,57 @@ export function poolVerdict(statuses, slots = 18) {
   const refused = statuses.filter((s) => s === 503).length;
   if (refused === 0) return `no 503 in ${statuses.length} concurrent runs (${slots} slots)`;
   return null;
+}
+
+/** Distinct edge mappings over the mule Dataset (the live-build guard is per Dataset + mapping, so none of these is a 409):
+ *  kindCol x timeCol x attribute columns = 16. */
+export function indexBurstBodies(dataset = 'mule_transfers_dataset') {
+  const out = [];
+  for (const kindCol of [null, 'CHANNEL']) for (const timeCol of [null, 'BOOKED_AT'])
+    for (const attrCols of [[], ['CHANNEL'], ['BOOKED_AT'], ['CHANNEL', 'BOOKED_AT']])
+      out.push({ dataset, sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT', ...(kindCol && { kindCol }), ...(timeCol && { timeCol }), attrCols });
+  return out;
+}
+
+/** A day (yyyyMMdd) for the drift file: unique per run, years after the seeded days so it never collides with a landed file. */
+export function driftDay(ms) {
+  return new Date(Date.UTC(2027, 0, 1) + (Math.floor(ms / 1000) % 3000) * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+}
+export const driftFileName = (day) => `TRANSFERS_${day}.csv`;
+/** 40 transfers MULE-HUB-01 -> ACC-SMOKE-DRIFT: heavy enough to displace a fan-out-capped neighbourhood read (a 1-row file does not). */
+export function driftCsv(header, day) {
+  const iso = `${day.slice(0, 4)}-${day.slice(4, 6)}-${day.slice(6)}`;
+  const cols = header.split(',');
+  const row = (i) => cols.map((c) => ({ TRANSFER_ID: `TX-DRIFT-${day}-${i}`, PAYER_ACCOUNT: 'MULE-HUB-01', PAYEE_ACCOUNT: 'ACC-SMOKE-DRIFT', CHANNEL: 'card',
+    AMOUNT: '10.00', CURRENCY: 'EUR', PAYER_COUNTRY: 'FR', PAYEE_COUNTRY: 'NL', BOOKED_DATE: iso, BOOKED_AT: `${iso} 10:00:${String(i % 60).padStart(2, '0')}` }[c] ?? '')).join(',');
+  return [header, ...Array.from({ length: 40 }, (_, i) => row(i + 1))].join('\n') + '\n';
+}
+/** Resolves true once `file` no longer exists (the Space ingested it), false at the deadline. */
+export async function waitGone(file, { timeoutMs, pollMs, sleep, now }) {
+  const deadline = now() + timeoutMs;
+  while (fs.existsSync(file)) { if (now() >= deadline) return false; await sleep(pollMs); }
+  return true;
+}
+
+/** Index build burst (1 worker + 4 queued = 5 slots): every answer is 202/409/503, some build is accepted and at least one
+ *  start is refused 503 STORE_BUSY (queue full). A build that finishes quickly frees a slot, so the burst must be wider than 5. */
+export function indexQueueVerdict(statuses, slots = 5) {
+  const odd = statuses.filter((s) => ![202, 409, 503].includes(s));
+  if (odd.length) return `unexpected statuses ${[...new Set(odd)].join(', ')} in ${statuses.length} concurrent builds`;
+  if (!statuses.includes(202)) return `no build accepted in ${statuses.length} starts`;
+  if (!statuses.includes(503)) return `no 503 in ${statuses.length} concurrent builds (${slots} slots)`;
+  return null;
+}
+
+/** The same mapping started twice while the first is live: the second is a 409 (one live build per Dataset + mapping). */
+export function duplicateBuildVerdict(first, dup) {
+  if (first.status !== 202) return `first build not accepted: ${excerpt(first)}`;
+  return dup.status === 409 ? null : `second start of the same mapping: expected 409, got ${dup.status} (the first build may have finished already)`;
+}
+
+/** True when every concurrent run was answered inline (200/202): nothing was queued, so no 503 can happen at this graph size. */
+export function poolInlineOnly(statuses) {
+  return statuses.length > 0 && statuses.every((s) => s === 200 || s === 202);
 }
 
 // ---- telecom probe group (--telecom) ------------------------------------------------------------------------------
@@ -248,7 +300,7 @@ export function buildProbes({ space = 'la-showcase', offSpace = 'la-showcase-off
 
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', offSpace = 'la-showcase-off',
   inbox = null, staged = null, burst = false, telecom = false, presenter = null, fourEyes = 5, telecomTimeoutMs = 180000,
-  dryRun = false, log = () => {} } = {}) {
+  dryRun = false, log = () => {}, landTimeoutMs = 150000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now() } = {}) {
   const results = [];
   const api = `${base}/api/v1`;
   const record = (id, reason) => { results.push({ id, ok: !reason, reason }); log(`${reason ? 'FAIL' : 'PASS'}  ${id}${reason ? '  - ' + reason : ''}`); };
@@ -260,7 +312,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     log(`  admin         GET /spaces/${space}/audit/route-inventory  -> ${EXPECTED_LA_ROUTES} /inv + /geo routes`);
     log(`  fm.analyst    GET dossier, tamper the manifest, POST dossier/verify  -> verified:false`);
     log(`  fm.analyst    replay hash before/after copying a staged file  ${inbox && staged ? '' : '(SKIPPED: no --staged/--inbox)'}`);
-    log(`  burst: 25 POST /inv/projection -> 429; 19 concurrent graph runs -> 503  ${burst ? '' : '(SKIPPED: no --burst)'}`);
+    log(`  burst: 25 POST /inv/projection -> 429; 19 concurrent graph runs -> 503; 16 concurrent index builds -> 503; duplicate build -> 409  ${burst ? '' : '(SKIPPED: no --burst)'}`);
     log(`  telecom (${presenter}): Datasets + link columns; trigger ${TELECOM_JOBS.map(([j]) => j).join(', ')} and wait for rows; `
       + `Investigation seed ${TELECOM_SEED} + expand maxFanOut ${fourEyes}; ${Object.keys(TELECOM_PACKS).join(', ')} >= 1 match; `
       + `Alerts ${TELECOM_ALERT_RULES.join(', ')}  ${telecom ? '' : '(SKIPPED: no --telecom)'}`);
@@ -308,22 +360,46 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     const file = fs.readdirSync(staged).find((f) => /20260904/.test(f));
     if (!file) record('replay hash unchanged after a file lands', `no *20260904* file in ${staged}`);
     else {
-      fs.copyFileSync(path.join(staged, file), path.join(inbox, file));
-      await new Promise((r) => setTimeout(r, 5000));   // let the Space ingest it
-      const after = await hashOf();
-      const reread = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/replay`, { reread: true });
-      record('replay hash unchanged after a file lands', before === after ? null : `${before} -> ${after}`);
-      record('Re-read reports drift after a file lands', reread.status === 200 && reread.data.diverged === true ? null : `HTTP ${reread.status} diverged=${reread.data && reread.data.diverged}`);
+      // The shipped staged files touch none of the seeded Investigation's entities, so they cannot drift a re-read: land a file
+      // that adds many MULE-HUB-01 links instead (header taken from the staged file), then wait for the Space to ingest it.
+      const header = fs.readFileSync(path.join(staged, file), 'utf8').split(/\r?\n/)[0];
+      const day = driftDay(now());
+      fs.writeFileSync(path.join(inbox, driftFileName(day)), driftCsv(header, day));
+      const gone = await waitGone(path.join(inbox, driftFileName(day)), { timeoutMs: landTimeoutMs, pollMs: 3000, sleep, now });
+      if (!gone) record('replay hash unchanged after a file lands', `${driftFileName(day)} was not ingested within ${landTimeoutMs} ms`);
+      else {
+        await sleep(3000);   // pipeline.commit and the Dataset are visible a moment after the file leaves the inbox
+        const after = await hashOf();
+        const reread = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/replay`, { reread: true });
+        record('replay hash unchanged after a file lands', before === after ? null : `${before} -> ${after}`);
+        record('Re-read reports drift after a file lands', reread.status === 200 && reread.data.diverged === true ? null : `HTTP ${reread.status} diverged=${reread.data && reread.data.diverged}`);
+      }
     }
   } else log('skip  replay-vs-drift (no --staged/--inbox)');
 
   if (burst) {
+    // The expensive-route bucket is per subject and SHARED by projection, Graph Runs and Index builds (20 tokens, +1 per 3 s), so
+    // each capacity probe waits for its tokens first; the 429 probe goes last (it only needs a bucket that runs dry).
+    const refill = (tokens) => sleep(tokens * 3000);
+    // distinct params per run: an identical request is answered from the result cache (200 cached:true) and never reaches the pool
+    const runs = await Promise.all(Array.from({ length: 19 }, (_, i) => call('fm.analyst', 'POST', '/inv/graph/runs',
+      { investigationId: INV, algorithm: 'pageRank', params: { iterations: 60 + i } })));
+    const runStatuses = runs.map((r) => r.status);
+    if (poolInlineOnly(runStatuses)) skip('19 concurrent Graph Runs -> a 503', 'every run finished inline (a SYNC algorithm under its node ceiling): the pool is unreachable on a graph this small');
+    else record('19 concurrent Graph Runs -> a 503', poolVerdict(runStatuses));
+    const bodies = indexBurstBodies();
+    await refill(bodies.length);
+    const starts = await Promise.all(bodies.map((b) => call('fm.analyst', 'POST', '/inv/index/builds', b)));
+    record(`${bodies.length} concurrent index builds -> a 503 (queue full)`, indexQueueVerdict(starts.map((r) => r.status)));
+    await refill(2);
+    const dupBody = { ...bodies[0], attrCols: ['AMOUNT'] };   // outside the 16 burst mappings, so the first of the pair cannot itself be a 409
+    const a = await call('fm.analyst', 'POST', '/inv/index/builds', dupBody);
+    const b = await call('fm.analyst', 'POST', '/inv/index/builds', dupBody);
+    record('a second live build of the same mapping -> 409', duplicateBuildVerdict(a, b));
     const seq = [];
     for (let i = 0; i < 25; i++) seq.push((await call('fm.analyst', 'POST', '/inv/projection',
       { dataset: 'mule_transfers_dataset', sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT' })).status);
     record('>20 expensive POSTs -> 429', rateLimitVerdict(seq));
-    const runs = await Promise.all(Array.from({ length: 19 }, () => call('fm.analyst', 'POST', '/inv/graph/runs', { investigationId: INV, algorithm: 'pageRank' })));
-    record('19 concurrent Graph Runs -> a 503', poolVerdict(runs.map((r) => r.status)));
   } else log('skip  burst limits (no --burst)');
 
   if (telecom) await runTelecom({ call, record, skip, presenter, fourEyes, timeoutMs: telecomTimeoutMs });

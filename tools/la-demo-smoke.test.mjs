@@ -219,3 +219,129 @@ test('a 403 trigger FAILs naming persona + canOperateRuns and SKIPs the dependen
   assert.ok(skipped.every((r) => /trigger denied: fm\.analyst lacks canOperateRuns/.test(r.reason)));
   assert.ok(skipped.some((r) => /Alerts/.test(r.id)));
 });
+
+// ---- index burst, duplicate build, replay-vs-drift ------------------------------------------------------------------
+
+import os from 'node:os';
+import { indexBurstBodies, indexQueueVerdict, duplicateBuildVerdict, poolInlineOnly, driftDay, driftCsv, driftFileName, waitGone } from './la-demo-smoke.mjs';
+
+test('indexBurstBodies: 16 DISTINCT mappings (a repeat would be a 409, not a queue slot)', () => {
+  const bodies = indexBurstBodies();
+  assert.equal(bodies.length, 16);
+  assert.equal(new Set(bodies.map((b) => JSON.stringify(b))).size, 16);
+  assert.ok(bodies.every((b) => b.dataset === 'mule_transfers_dataset' && b.sourceCol && b.targetCol));
+});
+
+test('indexQueueVerdict needs an accepted build, a 503, and nothing else', () => {
+  assert.equal(indexQueueVerdict([...Array(5).fill(202), ...Array(11).fill(503)]), null);
+  assert.match(indexQueueVerdict(Array(16).fill(202)), /no 503/);
+  assert.match(indexQueueVerdict(Array(16).fill(503)), /no build accepted/);
+  assert.match(indexQueueVerdict([202, 503, 429]), /unexpected statuses 429/);
+});
+
+test('duplicateBuildVerdict: the repeat of a live mapping is a 409', () => {
+  assert.equal(duplicateBuildVerdict({ status: 202 }, { status: 409 }), null);
+  assert.match(duplicateBuildVerdict({ status: 202 }, { status: 202 }), /expected 409, got 202/);
+  assert.match(duplicateBuildVerdict({ status: 429, body: null }, { status: 409 }), /first build not accepted/);
+});
+
+test('poolInlineOnly: all-inline runs are a skip, a 429 or a 503 is not', () => {
+  assert.equal(poolInlineOnly(Array(19).fill(200)), true);
+  assert.equal(poolInlineOnly([200, 429]), false);
+  assert.equal(poolInlineOnly([200, 503]), false);
+  assert.equal(poolInlineOnly([]), false);
+});
+
+test('driftCsv: header kept, 40 MULE-HUB-01 rows on the drift day, every id unique; driftDay is far-future and per second', () => {
+  const header = 'TRANSFER_ID,PAYER_ACCOUNT,PAYEE_ACCOUNT,CHANNEL,AMOUNT,CURRENCY,PAYER_COUNTRY,PAYEE_COUNTRY,BOOKED_DATE,BOOKED_AT';
+  const day = driftDay(1_700_000_000_000);
+  assert.match(day, /^20(27|28|29|30|31|32|33|34|35)\d{4}$/);
+  assert.notEqual(driftDay(1_700_000_001_000), day);
+  const lines = driftCsv(header, day).trim().split('\n');
+  assert.equal(lines[0], header);
+  assert.equal(lines.length, 41);
+  assert.ok(lines.slice(1).every((l) => l.split(',').length === 10 && l.split(',')[1] === 'MULE-HUB-01'));
+  assert.equal(new Set(lines.slice(1).map((l) => l.split(',')[0])).size, 40);
+  assert.equal(driftFileName(day), `TRANSFERS_${day}.csv`);
+});
+
+test('waitGone: true once the file is gone, false at the deadline', async () => {
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wg-')), 'x.csv');
+  fs.writeFileSync(f, 'x');
+  let t = 0;
+  assert.equal(await waitGone(f, { timeoutMs: 60000, pollMs: 3000, now: () => t, sleep: async (ms) => { t += ms; if (t >= 9000) fs.rmSync(f); } }), true);
+  fs.writeFileSync(f, 'x'); t = 0;
+  assert.equal(await waitGone(f, { timeoutMs: 6000, pollMs: 3000, now: () => t, sleep: async (ms) => { t += ms; } }), false);
+});
+
+/** A stub Space for the --staged/--burst path. `drift` = whether the re-read reports divergence; `queue` = builds accepted before 503. */
+function burstStub({ drift = true, queue = 5 } = {}) {
+  let n = 0, bucket = 20;
+  const dupSeen = new Set();
+  return async (url, init = {}) => {
+    const u = new URL(url); const p = u.pathname.replace(/^\/api\/v1(\/spaces\/[^/]+)?/, ''); const space = (u.pathname.match(/spaces\/([^/]+)/) || [])[1];
+    const who = (init.headers || {}).authorization;
+    const res = (status, body) => ({ ok: status < 400, status, json: async () => body });
+    if (p === '/auth/exchange') return res(200, { data: { accessToken: JSON.parse(init.body).code } });
+    if (!who) return res(401, {});
+    if (who === 'Bearer demo:ra.analyst') return res(403, {});
+    if (who === 'Bearer demo:demo.manager') return res(404, {});
+    if (space === 'la-showcase-off') return res(404, { error: { errorCode: 'MODULE_DISABLED' } });
+    if (p === '/inv/investigations' && init.method === 'POST') return res(422, {});
+    if (p.endsWith('/log')) return res(200, { data: {} });
+    if (p === '/audit/route-inventory') return res(200, { data: { routes: Array.from({ length: EXPECTED_LA_ROUTES }, (_, i) => ({ pattern: `/inv/x${i}` })) } });
+    if (p.endsWith('/dossier')) return res(200, { data: { manifest: { root: 'b'.repeat(64) } } });
+    if (p.endsWith('/dossier/verify')) return res(200, { data: { verified: JSON.parse(init.body).manifest.root === 'b'.repeat(64) } });
+    if (p.endsWith('/replay')) return res(200, { data: JSON.parse(init.body).reread ? { diverged: drift } : { workingSet: { hash: 'h0' } } });
+    if (p === '/inv/graph/runs') return res(200, { data: { status: 'COMPLETED', cached: false } });
+    if (p === '/inv/index/builds') {
+      if (dupSeen.has(init.body)) return res(409, {});
+      dupSeen.add(init.body);
+      return res(!init.body.includes('AMOUNT') && ++n > queue ? 503 : 202, {});   // the burst fills the queue; by the repeat pair it has drained
+    }
+    if (p === '/inv/projection') return res(--bucket >= 0 ? 403 : 429, {});
+    return res(500, {});
+  };
+}
+const fastSleep = async () => {};
+const HEADER = 'TRANSFER_ID,PAYER_ACCOUNT,PAYEE_ACCOUNT,CHANNEL,AMOUNT,CURRENCY,PAYER_COUNTRY,PAYEE_COUNTRY,BOOKED_DATE,BOOKED_AT';
+const dirs = () => {
+  const staged = fs.mkdtempSync(path.join(os.tmpdir(), 'st-')); const inbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ib-'));
+  fs.writeFileSync(path.join(staged, 'TRANSFERS_20260904.csv'), `${HEADER}\nTX-1,A,B,card,1,EUR,FR,NL,2026-09-04,2026-09-04 00:00:00\n`);
+  return { staged, inbox };
+};
+const ingest = (inbox) => async () => { for (const f of fs.readdirSync(inbox)) fs.rmSync(path.join(inbox, f)); };   // the Space ingests on the first poll
+
+test('run() --staged: writes a drift file, waits for the Space to ingest it, then hash unchanged and the re-read drifts', async () => {
+  const { staged, inbox } = dirs();
+  let landed = null;
+  const rs = await run({ fetchFn: burstStub(), staged, inbox, sleep: async () => { landed ??= fs.readdirSync(inbox); await ingest(inbox)(); } });
+  assert.ok(rs.every((r) => r.ok), JSON.stringify(rs.filter((r) => !r.ok)));
+  assert.ok(rs.some((r) => r.id === 'Re-read reports drift after a file lands' && r.ok));
+  assert.equal(landed.length, 1);
+  assert.match(landed[0], /^TRANSFERS_20\d{6}\.csv$/);
+});
+
+test('run() --staged FAILs a file that is never ingested, and a landed file that does not drift the re-read', async () => {
+  const a = dirs(); let t = 0;
+  const stuck = await run({ fetchFn: burstStub(), staged: a.staged, inbox: a.inbox, landTimeoutMs: 6000, now: () => (t += 3000), sleep: fastSleep });
+  assert.ok(stuck.some((r) => !r.ok && /not ingested within 6000 ms/.test(r.reason)), JSON.stringify(stuck));
+  const b = dirs();
+  const noDrift = await run({ fetchFn: burstStub({ drift: false }), staged: b.staged, inbox: b.inbox, sleep: ingest(b.inbox) });
+  assert.ok(noDrift.some((r) => !r.ok && r.id === 'Re-read reports drift after a file lands'));
+});
+
+test('run() --burst: inline Graph Runs are SKIPPED; the 6th index build is a 503, a repeat a 409, the bucket a 429', async () => {
+  const waits = [];
+  const rs = await run({ fetchFn: burstStub(), burst: true, sleep: async (ms) => { waits.push(ms); } });
+  assert.ok(rs.every((r) => r.ok), JSON.stringify(rs.filter((r) => !r.ok)));
+  assert.ok(rs.some((r) => r.skipped && /19 concurrent Graph Runs/.test(r.id)));
+  for (const id of ['16 concurrent index builds -> a 503 (queue full)', 'a second live build of the same mapping -> 409', '>20 expensive POSTs -> 429'])
+    assert.ok(rs.some((r) => r.id === id && r.ok && !r.skipped), id);
+  assert.deepEqual(waits, [16 * 3000, 2 * 3000]);   // each capacity probe waits for its tokens in the shared bucket
+});
+
+test('run() --burst FAILs a queue that never fills', async () => {
+  const wide = await run({ fetchFn: burstStub({ queue: 99 }), burst: true, sleep: fastSleep });
+  assert.ok(wide.some((r) => !r.ok && /index builds/.test(r.id) && /no 503/.test(r.reason)), JSON.stringify(wide.filter((r) => !r.ok)));
+});
