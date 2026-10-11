@@ -194,6 +194,25 @@ class ControlApiInvReferenceRowsTest {
     }
 
     @Test
+    void typedAndCastKeyMatchesReturnTheSameRows(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            String alt = "{\"dataset\":\"ind_ds\",\"keyCol\":\"alt_id\",\"keys\":";
+            // BIGINT key, every key numeric: typed binds
+            JsonNode typed = ok(c, ROUTE, alt + q(ALT, "1") + "}", true);
+            assertEquals(1, typed.get("rows").size(), typed.toString());
+            assertEquals(ALT, typed.at("/rows/0/key").asText());
+            // BIGINT key with a non-numeric / non-canonical key: CAST fallback, never a failure, same row
+            JsonNode cast = ok(c, ROUTE, alt + q(ALT, "not-a-number", "0" + ALT) + "}", true);
+            assertEquals(1, cast.get("rows").size(), cast.toString());
+            assertEquals(typed.at("/rows/0/row"), cast.at("/rows/0/row"), "identical across forms");
+            // VARCHAR key: direct compare
+            JsonNode text = ok(c, ROUTE, ask(q(A, "x")), true);
+            assertEquals(1, text.get("rows").size(), text.toString());
+            assertEquals(typed.at("/rows/0/row"), text.at("/rows/0/row"));
+        }
+    }
+
+    @Test
     void anInvestigationPseudonymResolvesWithItsInvestigationId(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
             JsonNode proj = ok(c, "/inv/projection", "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", false);
