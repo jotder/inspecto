@@ -77,6 +77,7 @@ public record ReportTemplate(String id, String title, String description, String
         m.put("title", title);
         m.put("description", description);
         m.put("format", format);
+        m.put("rootElement", rootElement);
         m.put("origin", origin);
         m.put("delivery", Map.of("kind", deliveryKind, "dir", deliveryDir));
         m.put("inputs", List.copyOf(inputKeys()));
