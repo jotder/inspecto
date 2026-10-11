@@ -22,7 +22,7 @@ export function buildPlan() {
   const base = `/inv/investigations/${INV}`;
   const ops = [
     { op: 'seed', ids: ['MULE-HUB-01', 'RELAY-01', 'RELAY-02', 'SMURF-01'], entityType: 'account' },
-    { op: 'expand', direction: 'either', maxFanOut: 5 },   // <= four_eyes_fan_out_above (5): runs now; an unbounded expand goes pending
+    { op: 'expand', direction: 'either', maxFanOut: 5 },   // bounded, under four_eyes_fan_out_above (2000): runs now; an UNBOUNDED expand (no maxFanOut) always goes pending
     { op: 'exclude', ids: ['RELAY-02'], reason: 'second relay repeats the RELAY-01 route' },
     { op: 'annotate', ids: ['MULE-HUB-01'], note: 'hub: 12 sub-1000 cash deposits in, 98% out within hours' },
     { op: 'threshold', min: 1 },

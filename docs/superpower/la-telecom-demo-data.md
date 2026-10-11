@@ -275,9 +275,10 @@ Use JDK 27 (`JAVA_HOME=C:\sandbox\.graalvm-cache\jdk-27-win`).
    2026-09-29, `subscriber:CUST-M01` 2026-09-20, IRSF `id_doc` 2026-09-12+). Only `first_seen` can predate the window,
    and the window does not filter on it. When the latest time cannot be read, no window is sent and the result line
    says "all available data".
-3. **Four-eyes on the first expand.** `config/link-analysis.toon` sets `four_eyes_fan_out_above: 5`, and the suspect has
-   about 400 neighbours, so the first expand waits for an approver. Either run the persona flow (`fm.analyst` requests,
-   `fm.manager` approves in Oversight), or set `maxFanOut` ≤ 5 on the first step. While a degree waits, the
+3. **Four-eyes on an UNBOUNDED expand.** `config/link-analysis.toon` sets `four_eyes_fan_out_above: 2000` (operator
+   2026-10-11, raised from 5), so a bounded expand of the suspect (about 400 neighbours) runs at once. To show four-eyes,
+   expand with no `maxFanOut` (unbounded always exceeds the threshold): it waits for an approver - `fm.analyst`
+   requests, `fm.manager` approves in Oversight. While a degree waits, the
    Investigation panel re-reads the log every 15 s (and on window focus or reopening the same id) and then shows
    "approved (N new entities admitted / nothing new)" or "denied".
 4. **The Jobs run on a `*/10` cron.** After seeding a Space, press *Run* on `telecom_links` and

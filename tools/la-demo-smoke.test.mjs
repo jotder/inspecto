@@ -173,7 +173,7 @@ test('runTelecom passes every probe on a healthy Space and polls rows', async ()
   assert.ok(results.length >= 11, String(results.length));
   assert.ok(results.every((r) => r.ok), JSON.stringify(results.filter((r) => !r.ok)));
   const expand = calls.find((c) => c.body && c.body.op === 'expand');
-  assert.ok(expand.body.maxFanOut <= 5);
+  assert.ok(expand.body.maxFanOut <= 2000);
   const create = calls.find((c) => c.p === '/inv/investigations');
   assert.equal(create.body.eventsCol, 'events');
   assert.equal(calls.filter((c) => c.p === '/inv/pattern/branching').length, 3);

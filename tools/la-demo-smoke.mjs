@@ -5,7 +5,7 @@
 //
 //   node tools/la-demo-smoke.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--off-space la-showcase-off]
 //                                [--staged <dir with TRANSFERS_20260904.csv> --inbox <Space inbox/mule_transfers dir>]
-//                                [--burst] [--telecom [--presenter fm.manager] [--four-eyes 5] [--telecom-timeout 180]] [--dry-run]
+//                                [--burst] [--telecom [--presenter fm.manager] [--four-eyes 2000] [--telecom-timeout 180]] [--dry-run]
 //
 // With --telecom (MUTATES: triggers the telecom Jobs, creates a smoke-telecom-<ts> Investigation): telecom Datasets + the
 // telecom_links_dataset link columns; the presenter triggers telecom_links / _msisdn_indicators / _typology_counts and their
@@ -214,7 +214,7 @@ export function telecomAlertsVerdict(alerts) {
 }
 
 /** The telecom group (mutates: triggers Jobs, creates an Investigation). `call(user, method, path, body)` as in run(). */
-export async function runTelecom({ call, record, skip = () => {}, presenter = 'fm.manager', fourEyes = 5, timeoutMs = 180000, pollMs = 3000,
+export async function runTelecom({ call, record, skip = () => {}, presenter = 'fm.manager', fourEyes = 2000, timeoutMs = 180000, pollMs = 3000,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now() }) {
   const ds = await call(presenter, 'GET', '/components/dataset');
   record('telecom Datasets listed, telecom_links_dataset columns complete', ds.status === 200 ? telecomRegistryVerdict(ds.data) : excerpt(ds));
@@ -299,7 +299,7 @@ export function buildProbes({ space = 'la-showcase', offSpace = 'la-showcase-off
 }
 
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', offSpace = 'la-showcase-off',
-  inbox = null, staged = null, burst = false, telecom = false, presenter = null, fourEyes = 5, telecomTimeoutMs = 180000,
+  inbox = null, staged = null, burst = false, telecom = false, presenter = null, fourEyes = 2000, telecomTimeoutMs = 180000,
   dryRun = false, log = () => {}, landTimeoutMs = 150000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now() } = {}) {
   const results = [];
   const api = `${base}/api/v1`;
@@ -413,7 +413,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const opt = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
   run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), offSpace: opt('--off-space', 'la-showcase-off'),
     inbox: opt('--inbox', null), staged: opt('--staged', null), burst: args.includes('--burst'),
-    telecom: args.includes('--telecom'), presenter: opt('--presenter', null), fourEyes: Number(opt('--four-eyes', 5)),
+    telecom: args.includes('--telecom'), presenter: opt('--presenter', null), fourEyes: Number(opt('--four-eyes', 2000)),
     telecomTimeoutMs: Number(opt('--telecom-timeout', 180)) * 1000, dryRun: args.includes('--dry-run'), log: console.log })
     .then((rs) => { const bad = rs.filter((r) => !r.ok); console.log(`${rs.length - bad.length}/${rs.length} probes passed`); process.exitCode = bad.length ? 1 : 0; })
     .catch((e) => { console.error(e.message); process.exitCode = 2; });
