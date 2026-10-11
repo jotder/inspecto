@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **58<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 38<!--count:backlog-p3--> × P3** —
+> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 37<!--count:backlog-p3--> × P3** —
+> ⬇ **58 → 57 (P3 38 → 37) on 2026-10-11**: closed P3 `CATEGORY-SORT-ORDER-1` — (1) and (2) had shipped; (3), the stale pager total ("1 to 10 of 104" over 7 rows after a Dataset editor re-run, football pilot 2026-10-09), CLOSED AS NOT REPRODUCIBLE by operator decision after three attempts (two table-level tests, then a full-editor spec with real ag-Grid over server re-run and in-browser `LIMIT 7`; the pager hides at ≤ 10 rows and no path keeps the old total). Reopen with a live repro: compare `paginationGetRowCount()` with the rows shown and check the paging panel's `ag-hidden` class, and note how the 7-row result was produced.
 > ↔ **57 → 57 (P3 38 → 38) on 2026-10-11**: closed P3 `SHARE-SNAPSHOT-ON-APPROVE-1` — a snapshot-shared Dataset Offer takes `refresh: none|hourly|daily`, `ExchangeSnapshotSweep` republishes due offers per owning Space (gate `exchange-snapshot-refresh`), every publish records `lastRefresh`, Catalog ▸ Shared by me sets it and shows the outcome (`bdbacb885`); filed P3 `EXCHANGE-SNAPSHOT-MULTIPOD-1` (its two-pod duplicate publish). Narrowed `HA-CANCEL-RESIDUALS-1`: (1) Job runs cancelled and (5) `GracefulStopHandoverTest` (`597d1893a`), (2) per-file remote-fetch cancel (`839853e3c`), (4) DECLINED as designed; only (3) stays open.
 > ⬆ **57 → 58 (P2 19 → 20) on 2026-10-11**: filed P2 `LA-INDEX-MAX-AGE-1` - the operator decided the index-staleness review (default-on stays; a view-backed Dataset is served from the index only while younger than `index.max_age`); and decided `LA-TELECOM-DEMO-1`'s fan-out question (keep `four_eyes_fan_out_above: 5`, script the approval).
 > ⬇ **58 → 57 (P3 39 → 38) on 2026-10-11**: closed P3 `ONB-IMPORT-RETARGET-1` (Enrichment / Job identity-by-name accepted, `pipeline-identity.md`); replaced P3 `HA-GRACEFUL-STOP-LEASE-RELEASE-1` with `HA-CANCEL-RESIDUALS-1` (cooperative cancellation shipped `e139cfc1b`); narrowed P3 `CATEGORY-SORT-ORDER-1` (sub-items 1–2 shipped) and P3 *Parsing (Stage-1) — residuals* (D9 slice 1 shipped `9c07a0aeb`); recorded the `REGULATORY-REPORTING-1` and bundle-strictness decisions.
@@ -202,10 +203,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 38<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 38<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 58<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 57<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -413,10 +414,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 
 - **P3** · `EXCHANGE-SNAPSHOT-MULTIPOD-1` — **two pods sharing a store can both run a due scheduled snapshot refresh.** `ExchangeSnapshotSweep` (from `SHARE-SNAPSHOT-ON-APPROVE-1`, closed 2026-10-11) has no per-offer lease, so each JVM may publish the same due offer: normally only redundant work, two `EXCHANGE_REFRESHED` events and last-writer-wins on `current.toon`; but two publishes starting in the same millisecond share the `"v"+millis` version dir and the fixed `snapshot.parquet.tmp` name, so one COPY can fail and record `failed` over the other's success, and `prune` can remove a peer's in-flight version. Fix when multi-pod Exchange is supported: a per-offer run lease, or a unique version suffix + temp name. Low risk at hourly/daily cadence. → [`okf/backend/control-plane/exchange-sharing.md`](okf/backend/control-plane/exchange-sharing.md)
-- **P3** · `CATEGORY-SORT-ORDER-1` — **three separate findings from the football pilot (2026-10-09); (1) and (2) shipped, (3) the pager total stays open.**
-  ~~(1) Bar/pie categories sort alphabetically~~ ✅ **SHIPPED 2026-10-11 (`730a4d5ec` backend, `d0bc916e6` UI)**: additive `orderBy:[{field,dir,agg?}]` on `/bi/query` (`agg` min|max, default min when the field is not a grouped Dimension/Measure; a hidden term needs at least one Measure and one groupBy; unknown column 422; a CLASSIFIED hidden column refused 422 via `EvidenceMasker.sensitiveColumns`, lineage included — an inference channel), UI `options.categoryOrder:{field,dir,agg?}` for bar/pie/funnel via `buildXyQuery` (other XY plugins honour a stored value but expose no control), Widget options dialog "Sort categories by" (free-text column field like `tableSort`). Optional follow-up: a Dataset-column picker. → `okf/backend/control-plane/queries.md` § Hidden-aggregate `orderBy`.
-  ~~(2) The Data Browser does not list bound shared Datasets~~ ✅ **RESOLVED 2026-10-11 (`ebcd0812f`) as discoverable + link, UI-only**: the Data Browser "Shared with this Space" section (name, `shared` badge, owner/item, links to the Dataset editor [`canAuthorWorkbench`] and Catalog "Shared with me" [exchange enabled]); no raw-row browsing (decided; `/db/*` cannot read `shared/<owner>/<item>`). → `okf/frontend/features/catalog.md`.
-  (3) **Still open — the Dataset editor pager keeps a stale total** ("1 to 10 of 104" over 7 rows). NOT reproduced in jsdom (two vitest probes at data-table level showed the pager total update; the ag-Grid pager is hidden via `hidePager`). Needs a live repro: run a Dataset returning 104 rows, then re-run returning 7, and compare `paginationGetRowCount()` with `displayRows().length`.
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,
