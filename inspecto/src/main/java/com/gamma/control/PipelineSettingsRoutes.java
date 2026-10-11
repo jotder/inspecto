@@ -246,8 +246,8 @@ final class PipelineSettingsRoutes implements RouteModule {
 
         String displayName = ApiContext.str(body, "name");
         List<String> notes = new ArrayList<>();
-        Map<String, Object> tpl = neutralizeForTemplate(
-                ConfigLoader.filesystem().decode(srcPath.toString()), id,
+        Map<String, Object> srcCfg = ConfigLoader.filesystem().decode(srcPath.toString());
+        Map<String, Object> tpl = neutralizeForTemplate(srcCfg, id,
                 (displayName == null || displayName.isBlank()) ? id : displayName.trim(),
                 srcPath, writeRoot, notes);
 
@@ -260,14 +260,16 @@ final class PipelineSettingsRoutes implements RouteModule {
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
 
-        // Maker-checker (ASSURE-MAKER-CHECKER-1). The schema copy above already landed (the gate judges the
-        // template against it), so a held template takes it back — the approved replay copies it again.
+        // Maker-checker (ASSURE-MAKER-CHECKER-1). The schema copies above already landed (the gate judges the
+        // template against them), so a held template takes them back — the approved replay copies them again.
         try {
             PendingChanges.hold(api, e, "pipeline", id, tpl, null);
         } catch (PendingChanges.Held | ApiException held) {   // held, or an approved replay refused at the hold
             if (tpl.get("processing") instanceof Map<?, ?> proc && proc.get("schema_file") != null
                     && notes.stream().anyMatch(n -> n.startsWith("copied the schema")))
                 Files.deleteIfExists(writeRoot.resolve(String.valueOf(proc.get("schema_file"))).normalize());
+            for (String ref : copiedSegmentRefs(srcCfg, tpl))
+                Files.deleteIfExists(writeRoot.resolve(ref).normalize());
             throw held;
         }
 
@@ -363,6 +365,7 @@ final class PipelineSettingsRoutes implements RouteModule {
         }
 
         copySchemaFile(src, t, id, srcPath, writeRoot, notes);
+        copySegmentSchemas(src, t, id, srcPath, writeRoot, notes);
         return t;
     }
 
@@ -401,5 +404,75 @@ final class PipelineSettingsRoutes implements RouteModule {
         processing.put("schema_file", writeRoot.relativize(schemaTarget).toString().replace('\\', '/'));
         t.put("processing", processing);
         notes.add("copied the schema to " + schemaTarget.getFileName());
+    }
+
+    /** The {@code parsing.plugin.segments} map of a config — empty when absent or not a map. */
+    private static Map<String, Object> pluginSegments(Map<String, Object> cfg) {
+        if (cfg.get("parsing") instanceof Map<?, ?> parsing && parsing.get("plugin") instanceof Map<?, ?> plugin
+                && plugin.get("segments") instanceof Map<?, ?> seg) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            seg.forEach((k, v) -> out.put(String.valueOf(k), v));
+            return out;
+        }
+        return Map.of();
+    }
+
+    /**
+     * Copy each per-segment schema of a plugin parser ({@code parsing.plugin.segments}: key to schema ref)
+     * next to the template as {@code <id>_<key>.toon} and repoint the ref at the copy — the sibling of
+     * {@link #copySchemaFile}, and the same {@code <pipeline>_<segment>} convention the UI's
+     * {@code companionSchemaName} writes and {@code StreamTransferService.exportPipeline} reads, so the
+     * template's export finds them. An unreadable source or an existing target leaves that ref pointing at
+     * the source's schema with a note, exactly like {@code schema_file}.
+     */
+    private static void copySegmentSchemas(Map<String, Object> src, Map<String, Object> t, String id,
+                                           Path srcPath, Path writeRoot, List<String> notes) throws IOException {
+        Map<String, Object> segs = pluginSegments(src);
+        if (segs.isEmpty()) return;
+        Map<String, Object> repointed = new LinkedHashMap<>(segs);
+        for (Map.Entry<String, Object> en : segs.entrySet()) {
+            String key = en.getKey();
+            String ref = String.valueOf(en.getValue());
+            Path from;
+            try {
+                from = PathJail.resolveConfigRef(srcPath.toAbsolutePath().getParent(), ref,
+                        "parsing.plugin.segments." + key);
+            } catch (PathJail.Escape refused) {
+                from = null;
+            }
+            if (from == null || !Files.isReadable(from)) {
+                notes.add("segment schema '" + ref + "' (" + key + ") could not be read, so it still points at the"
+                        + " source's schema — repoint it before editing the segment");
+                continue;
+            }
+            Path target = WriteGates.jail(writeRoot, writeRoot.resolve(segmentSchemaFile(id, key)), "segment schema path");
+            if (Files.exists(target)) {
+                notes.add("segment schema '" + key + "' left as '" + ref + "': " + target.getFileName() + " already exists");
+                continue;
+            }
+            AtomicFiles.write(target, Files.readAllBytes(from), ".sch-");
+            repointed.put(key, writeRoot.relativize(target).toString().replace('\\', '/'));
+            notes.add("copied the segment schema to " + target.getFileName());
+        }
+        Map<String, Object> parsing = new LinkedHashMap<>(mapAt(t, "parsing"));
+        Map<String, Object> plugin = new LinkedHashMap<>(mapAt(parsing, "plugin"));
+        plugin.put("segments", repointed);
+        parsing.put("plugin", plugin);
+        t.put("parsing", parsing);
+    }
+
+    /** {@code <id>_<key>.toon}, sanitised like the UI's {@code companionSchemaName}. */
+    private static String segmentSchemaFile(String id, String key) {
+        return (id + "_" + key).replaceAll("[^A-Za-z0-9_]+", "_") + ".toon";
+    }
+
+    /** The segment-schema files this save copied (template ref differs from the source's) — for rollback on hold. */
+    private static List<String> copiedSegmentRefs(Map<String, Object> src, Map<String, Object> tpl) {
+        Map<String, Object> before = pluginSegments(src);
+        List<String> out = new ArrayList<>();
+        pluginSegments(tpl).forEach((k, v) -> {
+            if (!String.valueOf(v).equals(String.valueOf(before.get(k)))) out.add(String.valueOf(v));
+        });
+        return out;
     }
 }

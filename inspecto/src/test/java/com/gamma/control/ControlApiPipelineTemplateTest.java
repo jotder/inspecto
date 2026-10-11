@@ -163,6 +163,28 @@ class ControlApiPipelineTemplateTest {
     }
 
     @Test
+    void templateCopiesPluginSegmentSchemasUnderItsOwnNames(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            Path srcToon = cfg.resolve("mini_pipeline.toon");
+            Files.writeString(cfg.resolve("mini_receipt.toon"), "raw:\n  name: receipt\n");
+            Map<String, Object> src = new java.util.LinkedHashMap<>(ConfigLoader.filesystem().decode(srcToon.toString()));
+            src.put("parsing", Map.of("frontend", "plugin", "plugin", Map.of(
+                    "ingester", "com.gamma.ingester.XmlRecordIngester",
+                    "segments", Map.of("receipt", "mini_receipt.toon"))));
+            Files.writeString(srcToon, com.gamma.config.io.ConfigCodec.toToon(src));
+
+            HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/save-as-template", "{\"id\":\"seg_tpl\"}");
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(r.body().contains("copied the segment schema to seg_tpl_receipt.toon"), r.body());
+
+            assertEquals("raw:\n  name: receipt\n", Files.readString(root.resolve("seg_tpl_receipt.toon")));
+            Map<String, Object> tpl = ConfigLoader.filesystem().decode(root.resolve("seg_tpl_pipeline.toon").toString());
+            Map<?, ?> segs = (Map<?, ?>) ((Map<?, ?>) ((Map<?, ?>) tpl.get("parsing")).get("plugin")).get("segments");
+            assertEquals("seg_tpl_receipt.toon", String.valueOf(segs.get("receipt")));
+        }
+    }
+
+    @Test
     void templateIsListedAndFlaggedButNotRunnable(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             assertEquals(200, post(c.port, "/pipelines/mini_etl/save-as-template",

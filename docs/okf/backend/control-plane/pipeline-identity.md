@@ -101,7 +101,7 @@ trigger path), and `PipelineScheduler.selectDue` (belt-and-braces skip).
 
 D3 — the isolation guarantee, the ask's actual point (*"running the pipeline should not impact original
 pipeline"*): every environment binding is repointed into `templates/<id>/` — `dirs.*`, `stream`,
-`collector.id`, `output.ducklake.data_path` — and `processing.schema_file` is **copied**, not
+`collector.id`, `output.ducklake.data_path` — and `processing.schema_file` and each plugin `parsing.plugin.segments` schema are **copied**, not
 referenced, so editing the template's schema cannot edit the source's. Companion `*_enrich.toon`/
 `*_job.toon` and anything targeting the source are deliberately **not** copied — promoting a template is
 an explicit act, not a side effect.
