@@ -526,6 +526,28 @@ class ControlApiGraphRunTest {
         }
     }
 
+    /** graph_run.propagated_risk_weights is the Space default a run without weights takes; the resolved list is echoed. */
+    @Test
+    void propagatedRiskTakesTheSpaceDefaultWeightsWhenTheRequestStatesNone(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\ngraph_run:\n  propagated_risk_weights[2]: 1,0.5\n")) {
+            investigation(c);
+            JsonNode d = ok(c, "POST", "/inv/graph/runs", run("propagatedRisk", "\"params\":{\"nodeScores\":{\"n1\":80}}"), ANALYST);
+            assertEquals("space", d.get("propagatedRiskWeights").get("source").asText(), d.toString());
+            assertEquals(2, d.get("propagatedRiskWeights").get("weights").size());
+            assertEquals(0.5, d.get("propagatedRiskWeights").get("weights").get(1).asDouble(), 1e-9);
+            Map<String, JsonNode> by = new java.util.LinkedHashMap<>();
+            for (JsonNode s : d.get("result").get("scores")) by.put(s.get("id").asText(), s);
+            assertEquals(40, by.get("n4").get("score").asDouble(), 1e-9, "2 hops at the Space's 0.5");
+
+            JsonNode stated = ok(c, "POST", "/inv/graph/runs",
+                    run("propagatedRisk", "\"params\":{\"nodeScores\":{\"n1\":80},\"weights\":[1,0.25]}"), ANALYST);
+            assertEquals("request", stated.get("propagatedRiskWeights").get("source").asText());
+            for (JsonNode s : stated.get("result").get("scores"))
+                if ("n4".equals(s.get("id").asText())) assertEquals(20, s.get("score").asDouble(), 1e-9, "the request wins");
+        }
+    }
+
     @Test
     void underMaskingPropagatedRiskTakesPseudonymsAndARawIdNamesNoNode(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
