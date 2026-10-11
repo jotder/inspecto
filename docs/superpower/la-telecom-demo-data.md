@@ -14,7 +14,7 @@ assigned to any real network.
 | 2 `sql.template` Jobs | `config/jobs/telecom_links_job.toon`, `config/jobs/telecom_msisdn_indicators_job.toon` |
 | Dataset registry entries | `config/registry/datasets/telecom_links_dataset.toon`, `telecom_msisdn_indicators_dataset.toon` (MSISDN columns classified `MSISDN`); `crm_kyc_dataset.toon` and `hlr_eir_dataset.toon` over the landed feeds (`physicalRef` `crm_kyc/database`, `hlr_eir/database`; keyed on `msisdn`; `imsi` `IMSI`, `account_holder` `ACCOUNT`, `imei`, `id_doc_hash` and `address_hash` `PII`, `forwarding_to` `MSISDN`; dates and types unclassified) |
 | Saved Link Analysis view | `config/registry/link-analysis-views/telecom_fraud_network.toon` |
-| Telecom pattern packs, typology Alert Rules (§5a) | `config/registry/pattern-packs/telecom-*.toon`, `config/registry/alert-rules/telecom_*_lines.toon`, `config/jobs/telecom_typology_counts_job.toon` |
+| Telecom pattern packs, typology Alert Rules (§5a) | `config/registry/pattern-packs/telecom-*.toon`, `config/registry/alert-rules/telecom_*_lines.toon`, `config/jobs/telecom_typology_counts_job.toon`, `config/jobs/telecom_typology_alerts_job.toon` |
 | Golden test | `platform/inspecto-engine/src/test/java/com/gamma/job/TelecomLinksGoldenTest.java` |
 
 Raw Datasets: `voice_cdr` (a_number, b_number, start_time, duration_s, call_type, redirecting_number, imsi, imei,
@@ -38,6 +38,8 @@ Volumes: 20 342 voice rows, 7 131 SMS, 2 544 HLR/EIR, 2 423 CRM, 4 541 recharges
    `.claude/launch.json` entry. The eight telecom Pipelines ingest their inbox files when the Space boots.
 3. The two Jobs run every 10 minutes. You can also start them now with *Run* on `telecom_links` and
    `telecom_msisdn_indicators`. Each Job rebuilds its whole snapshot, so a re-run gives the same result.
+   *Run* needs `canOperateRuns`, which only `fm.manager` (role `fraud-manager`) holds in this template. Sign in as
+   `fm.manager` to press it: the seed `admin` role administers but does not operate runs, so `admin` gets a 403.
 4. Open the saved view `telecom_fraud_network`, or start an Investigation over `telecom_links_dataset` (source
    `a_msisdn`, target `b_msisdn`, link kind `link_kind`) seeded with the suspect `99979100001`.
 
@@ -206,6 +208,11 @@ runs only after the indicators Job and never reads a missing or older snapshot.
 Each rule is `max(<typology>_lines) gte 1`, with no `by`. So an Alert names a count, never an MSISDN (the
 aggregate-only alert decision), and the lines themselves are found in the Investigation.
 
+The Alerts fire on their own after the counts Job. The `alert.evaluate` Job `telecom_typology_alerts` runs on
+`job.dataset.produced` with `when: "$signal.dataset == telecom_typology_counts"` and evaluates the Alert Rules. You do
+not press *Evaluate*. The boot-time probe of these rules runs before the counts Dataset exists, so it logs "measure
+probe failed … No files found". That is expected: this Job is what fires them.
+
 | Alert Rule | Line counted when | Count on the seed |
 |---|---|---|
 | `telecom_wangiri_lines` (WARNING) | `out_distinct_b ≥ 50` and `avg_dur_s < 5` | 2 |
@@ -217,7 +224,8 @@ count SUBFRAUD-01..05 and two background lines, because it includes ordinary int
 
 Tests: `ControlApiTelecomPatternPacksTest` (inspecto-geo-link) runs each pack's TOON over the built `telecom_links`
 through the real route. `TelecomLinksGoldenTest.theTypologyAlertRulesFireOnTheSeedWithCountsOnly` sweeps the three
-rules with the production `AlertService`.
+rules with the production `AlertService`. `theChainEndsWithTheAlertEvaluateJobFiringTheTypologyAlerts` checks that the
+signal-fired `telecom_typology_alerts` Job fires the three Alerts with counts 2, 4 and 6.
 
 ## 6. Tests
 
@@ -254,7 +262,8 @@ Use JDK 27 (`JAVA_HOME=C:\sandbox\.graalvm-cache\jdk-27-win`).
    about 400 neighbours, so the first expand waits for an approver. Either run the persona flow (`fm.analyst` requests,
    `fm.manager` approves in Oversight), or set `maxFanOut` ≤ 5 on the first step.
 3. **The Jobs run on a `*/10` cron.** After seeding a Space, press *Run* on `telecom_links` and
-   `telecom_msisdn_indicators` rather than waiting up to 10 minutes.
+   `telecom_msisdn_indicators` rather than waiting up to 10 minutes. Sign in as `fm.manager` to do it (only the
+   `fraud-manager` role holds `canOperateRuns`). The counts Job and the typology Alerts then follow on their own.
 
 ## 8. Notes and open points
 

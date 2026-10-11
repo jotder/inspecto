@@ -83,6 +83,12 @@ class LaShowcaseTemplateTest {
         assertTrue(manager.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_MANAGE_INCIDENTS)), manager.toString());
         assertFalse(manager.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
         assertFalse(manager.contains(Roles.CAN_AUTHOR_WORKBENCH), "no silent write access");
+        // D1: POST /jobs/{name}/trigger and POST /alerts/evaluate are gated canOperateRuns; the demo's Run button is
+        // fm.manager's. The seed 'admin' role deliberately lacks it (administering is not operating), and so does
+        // every other persona of this template - least privilege.
+        assertTrue(manager.contains(Roles.CAN_OPERATE_RUNS), "fm.manager presses Run on the demo's Jobs: " + manager);
+        for (String id : List.of("admin", "fm.analyst", "ra.analyst", "demo.manager"))
+            assertFalse(caps.get(id).contains(Roles.CAN_OPERATE_RUNS), id + " does not operate runs");
 
         assertTrue(caps.get("admin").contains(Roles.CAN_REVEAL_LINK_ENTITIES));
         // the read-only personas: nothing that writes anything

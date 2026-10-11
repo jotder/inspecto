@@ -60,6 +60,10 @@ class TelecomLinksGoldenTest {
     static final List<String> MULES = List.of("99979500001", "99979500002", "99979500003", "99979500004", "99979500005");
 
     @TempDir static Path tmp;
+    private static final String ALERT_JOB = "telecom_typology_alerts";
+    /** Every Alert the chained alert.evaluate Job fired (a later signal-fired pass is inside the cooldown). */
+    private static final List<com.gamma.alert.Alert> CHAIN_FIRED = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private static JobRun alertRun;
     private static Path data, space;
     private static List<Map<String, Object>> links;
     private static Map<String, Map<String, Object>> indicators;
@@ -82,18 +86,42 @@ class TelecomLinksGoldenTest {
         data = space.resolve("data");
         List<JobConfig> jobs = new ArrayList<>();
         for (String j : JOBS) jobs.add(JobConfig.load(space.resolve("config/jobs/" + j + "_job.toon").toString()));
+        // The template's alert.evaluate Job, fired by the counts Job's job.dataset.produced signal (never triggered
+        // here), reaching the production AlertService over the template's rules through its 'alerts' grant.
+        jobs.add(JobConfig.load(space.resolve("config/jobs/" + ALERT_JOB + "_job.toon").toString()));
+        Path cfg = space.resolve("config");
+        AlertService svc = new AlertService(new ComponentStore(cfg.resolve("registry")).list("alert-rule").stream()
+                .map(c -> AlertRule.fromMap(c.content())).toList(), noPipelines(), emptyStore(), new FakeObjectAccess());
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> data);
+        svc.measureProbe(probe::value);
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("alerts", com.gamma.alert.AlertAccess.class, () -> {
+            List<com.gamma.alert.Alert> fired = svc.evaluateRules();
+            CHAIN_FIRED.addAll(fired);
+            return fired;
+        });
+        // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
+        for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
+                "notifications", "com.gamma.notify.NotificationAccess", "incidents", "com.gamma.objects.IncidentAccess",
+                "objects", "com.gamma.objects.ObjectAccess", "datasets", "com.gamma.query.DatasetAccess",
+                "schema", "com.gamma.pipeline.SchemaAccess", "link-index", "com.gamma.linkindex.LinkIndexAccess").entrySet())
+            unused(platform, e.getKey(), e.getValue());
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
-                     space.resolve("audit").toString(), null, null, data.toString())) {
+                     space.resolve("audit").toString(), null, null, data.toString(), null, platform)) {
+            // the ledger a Run's signals land in (no space MDC here, so the process one): on_signal Triggers fire as in a Space
+            js.eventLog(com.gamma.event.EventLog.current());
             js.start();
+            // Press Run on the two timed Jobs; the counts Job and then the alert.evaluate Job follow on their signals.
+            // A signal whose `when` does not match records a SKIPPED Run, so wait past those.
             for (String j : JOBS) {
-                assertTrue(js.triggerRun(j, null, Map.of()).isPresent(), j);
-                JobRun r = null;
-                long deadline = System.nanoTime() + 60_000_000_000L;
-                while ((r = js.lastRunOf(j).orElse(null)) == null && System.nanoTime() < deadline) Thread.sleep(50);
+                boolean chained = jobs.stream().anyMatch(c -> c.name().equals(j) && c.hasSignal());
+                if (!chained) assertTrue(js.triggerRun(j, null, Map.of()).isPresent(), j);
+                JobRun r = awaitRun(js, j);
                 assertNotNull(r, j + " never ran");
                 assertEquals("SUCCESS", r.status(), j + " failed: " + r.message());
             }
+            alertRun = awaitRun(js, ALERT_JOB);
         }
         links = rows("SELECT * FROM " + parquet("telecom_links"));
         indicators = new HashMap<>();
@@ -269,6 +297,28 @@ class TelecomLinksGoldenTest {
     }
 
     /**
+     * D4: nothing presses Evaluate in the demo. The template's {@code telecom_typology_alerts} Job ({@code alert.evaluate})
+     * fires on the counts Job's {@code job.dataset.produced} signal and, through the production AlertService, fires the
+     * three typology Alerts with the seed counts 2/4/6 - aggregate only, no MSISDN.
+     */
+    @Test
+    void theChainEndsWithTheAlertEvaluateJobFiringTheTypologyAlerts() throws Exception {
+        JobConfig c = JobConfig.load(space.resolve("config/jobs/" + ALERT_JOB + "_job.toon").toString());
+        assertEquals("alert.evaluate", c.type());
+        assertEquals("job.dataset.produced", c.onSignal());
+        assertEquals("$signal.dataset == telecom_typology_counts", c.when());
+        assertTrue(c.cron() == null || c.cron().isBlank(), "fires on the counts, not on a timer");
+        assertNotNull(alertRun, "the counts Job's signal never fired " + ALERT_JOB);
+        assertEquals("SUCCESS", alertRun.status(), alertRun.message());
+        Map<String, String> fired = new TreeMap<>();
+        for (com.gamma.alert.Alert a : CHAIN_FIRED) {
+            fired.put(a.rule(), String.valueOf(a.value()));
+            assertFalse((a.message() + a.evidence()).contains("99979"), "no planted MSISDN in the Alert: " + a);
+        }
+        assertEquals(Map.of("telecom_irsf_lines", "4.0", "telecom_simbox_lines", "6.0", "telecom_wangiri_lines", "2.0"), fired);
+    }
+
+    /**
      * The crm_kyc and hlr_eir feeds are registered Datasets (the node panel's Enrichment reads {@code crm_kyc} by
      * msisdn): each loads from the template registry, its physicalRef is where the Pipeline lands the Parquet, the
      * landed data has rows, and the sensitive columns carry their classifications.
@@ -338,6 +388,34 @@ class TelecomLinksGoldenTest {
         if (t.equals("BOOLEAN")) return "boolean";
         if (t.matches("(TINYINT|SMALLINT|INTEGER|BIGINT|HUGEINT|U?(TINY|SMALL|BIG)?INT|UINTEGER|DOUBLE|FLOAT|REAL|DECIMAL).*")) return "number";
         return "string";
+    }
+
+    /** The Job's latest non-SKIPPED terminal Run, waiting up to a minute; {@code null} when it never ran. */
+    private static JobRun awaitRun(JobService js, String job) throws InterruptedException {
+        long deadline = System.nanoTime() + 60_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            JobRun r = js.lastRunOf(job).orElse(null);
+            if (r != null && !"SKIPPED".equals(r.status()) && !"RUNNING".equals(r.status())) return r;
+            Thread.sleep(50);
+        }
+        return null;
+    }
+
+    /** Registers a stand-in for a Platform Service this chain never calls (a call fails loudly); skipped when the
+     *  interface is not on this module's classpath. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void unused(PlatformServiceRegistry platform, String id, String iface) {
+        Class type;
+        try {
+            type = Class.forName(iface);
+        } catch (ClassNotFoundException e) {
+            return;
+        }
+        platform.register(id, type, java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class[]{type},
+                (p, m, a) -> {
+                    if (m.getDeclaringClass() == Object.class) return m.invoke(id, a);
+                    throw new UnsupportedOperationException(id + " is not wired in this test");
+                }));
     }
 
     private static ConfigSource noPipelines() {
