@@ -249,6 +249,33 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         return out;
     }
 
+    /** {@inheritDoc} <p>One {@code LOWER(attributes) LIKE ?} scan over the named types, bound parameters only. */
+    @Override
+    public List<OperationalObject> findByAttributeFragment(java.util.Collection<ObjectType> types, String fragment, int limit) {
+        if (types.isEmpty()) return List.of();
+        String in = String.join(", ", java.util.Collections.nCopies(types.size(), "?"));
+        String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE object_type IN (" + in + ")"
+                + " AND LOWER(attributes) LIKE ? ESCAPE '\\' ORDER BY created_at DESC, id DESC LIMIT ?";
+        String like = "%" + fragment.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        List<OperationalObject> out = new ArrayList<>();
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    int i = 1;
+                    for (ObjectType t : types) ps.setString(i++, t.name());
+                    ps.setString(i++, like);
+                    ps.setInt(i, limit);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) out.add(mapRow(rs));
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("object attribute scan failed: " + e.getMessage(), e);
+        }
+        return out;
+    }
+
     // ── schema + helpers ─────────────────────────────────────────────────────────
 
     private void initSchema() {

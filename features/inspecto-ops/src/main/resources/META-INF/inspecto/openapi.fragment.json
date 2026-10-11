@@ -43,6 +43,26 @@
         "x-optional-module" : true
       }
     },
+    "/objects/by-entity" : {
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects/by-entity — an Entity's case history",
+        "operationId" : "getObjectsByEntity",
+        "description" : "The Incidents and Cases that reference an Entity (e.g. an MSISDN), newest first, under the same SEC-7d/ABAC visibility as GET /objects. Each item: {kind: incident|case, id, title, status, severity?, createdAt, matchedOn: key.<column>|entityKey|member, via? (the member Incident, for matchedOn=member)}. 422 on an unknown type, a missing/oversized id, a bad status or limit.",
+        "parameters" : [
+          { "name" : "type", "in" : "query", "required" : true, "schema" : { "type" : "string" }, "description" : "An Entity Type id of the space (e.g. msisdn)." },
+          { "name" : "id", "in" : "query", "required" : true, "schema" : { "type" : "string", "maxLength" : 256 }, "description" : "The Entity value; raw or typed (msisdn:+…, entity:msisdn:+…). Folded with the type's normaliser." },
+          { "name" : "status", "in" : "query", "required" : false, "schema" : { "type" : "string", "enum" : [ "open", "closed", "all" ], "default" : "all" } },
+          { "name" : "limit", "in" : "query", "required" : false, "schema" : { "type" : "integer", "minimum" : 1, "maximum" : 200, "default" : 50 } }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped list (see #/components/schemas/Envelope); metadata.pagination.total is the visible match count before the limit."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/objects/{objectId}/ack" : {
       "post" : {
         "tags" : [ "objects" ],

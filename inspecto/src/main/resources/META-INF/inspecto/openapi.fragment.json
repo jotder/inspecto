@@ -269,6 +269,7 @@
     "/events/{eventId}",
     "/objects",
     "/objects/analytics",
+    "/objects/by-entity",
     "/objects/{objectId}/ack",
     "/objects/{objectId}/resolve",
     "/objects/{objectId}/transition",

@@ -83,6 +83,7 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
     private static final String[][] SURFACE = {
             {"GET", "/objects"},
             {"GET", "/objects/analytics"},
+            {"GET", "/objects/by-entity"},
             {"POST", "/objects"},
             {"POST", "/objects/id1/ack"},
             {"POST", "/objects/id2/resolve"},

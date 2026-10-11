@@ -55,6 +55,9 @@ public final class ObjectRoutes implements RouteModule {
         api.get("/objects", (e, m) -> objectsList(api, e));
         // Registered before the /objects/{id} catch-all so "analytics" is not read as an id (C4).
         api.get("/objects/analytics", (e, m) -> OpsEngine.of(api).analytics(parseObjectType(ApiContext.query(e, "type"))));
+        // An Entity's case history (Link Analysis): the Incidents / Cases referencing an MSISDN etc. Ungated like the
+        // list above, under the same SEC-7d/ABAC post-filter. Registered before the /objects/{id} catch-all.
+        api.get("/objects/by-entity", (e, m) -> EntityHistory.byEntity(api, e));
         api.post("/objects", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> createObject(api, e, api.body(e))));
         // Every by-id route runs behind the SEC-7d data-scope guard: an object whose caseType is outside

@@ -1216,7 +1216,10 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 || path.equals("/db/query") || path.equals("/bi/query")
                 || path.startsWith("/recon/") || path.startsWith("/agent/")
                 || path.startsWith("/public/delivery-status/")
-                || StreamPushRoutes.isPushPath(path);
+                || StreamPushRoutes.isPushPath(path)
+                // An Entity's case history scans the un-indexed object attribute bag (bounded, but a full-table
+                // LIKE) — throttled on the standard bucket like the other scan routes.
+                || (method.equals("GET") && path.equals("/objects/by-entity"));
     }
 
     /** Per-subject (falling back to the caller's IP when unauthenticated) token-bucket throttle for the
