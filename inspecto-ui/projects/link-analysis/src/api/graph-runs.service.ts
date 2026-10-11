@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { EMPTY, Observable, concat, defer, exhaustMap, of, switchMap, takeWhile, timer } from 'rxjs';
 import { apiErrorMessage, apiUrl, toParams } from '@inspecto/core/api/api-base';
+import { limitRefusalMessage } from '@inspecto/link-analysis/link-analysis/limit-refusal';
 
 /**
  * LA separation D-4 step 7 — the server side of graph analysis (`GraphRunRoutes`, as built in `docs/okf/frontend/features/link-analysis.md`
@@ -354,6 +355,9 @@ export function indexRefusalMessage(serverMessage: string): string {
  */
 export function graphRunErrorMessage(err: unknown, fallback: string): string {
     if (!(err instanceof HttpErrorResponse)) return fallback;
+    // DR-D6: the 413 / 429 resource-bound refusals read the same on every Link Analysis surface.
+    const limit = limitRefusalMessage(err);
+    if (limit) return limit;
     const server = apiErrorMessage(err, '');
     switch (err.status) {
         case 403:

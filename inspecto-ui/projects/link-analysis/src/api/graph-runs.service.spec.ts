@@ -207,6 +207,11 @@ describe('graphRunErrorMessage', () => {
     it('404 says the Investigation or run is not visible to the caller', () => {
         expect(graphRunErrorMessage(fail(404), 'x')).toMatch(/not found/);
     });
+    it("429 says how the rate limit works, in an analyst's words (DR-D6)", () => {
+        expect(graphRunErrorMessage(fail(429, 'RATE_LIMITED', 'rate limit exceeded'), 'x')).toMatch(
+            /burst of 20 requests/,
+        );
+    });
     it('409 says the run already finished', () => {
         expect(graphRunErrorMessage(fail(409), 'x')).toMatch(/already finished/);
     });
