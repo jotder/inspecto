@@ -460,7 +460,7 @@
                 </form>
             </mat-menu>
 
-            @if (graph()) {
+            @if (graph() || workingSetCanvas()) {
                 <!-- display options -->
                 <button
                     mat-icon-button
@@ -901,7 +901,7 @@
                                 style="background: var(--gamma-bg-default)"
                                 [graph]="canvasData()"
                                 [omittedLinks]="omittedLinks()"
-                                (nodeSelect)="onNodeClick($event)"
+                                (nodeSelect)="onListNodeSelect($event)"
                             ></inspecto-link-analysis-node-list>
                         }
                     </div>

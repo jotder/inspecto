@@ -764,7 +764,8 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(confirm).toHaveBeenCalledTimes(1);
         expect(inv.appendInvestigationOp).toHaveBeenCalledWith(
             'inv-1',
-            expect.objectContaining({ op: 'expand', ids: ['hub'], expandHubs: ['hub'] }),
+            // D4: the profile's preset budget rides along (it read the server's 2 000 default before)
+            expect.objectContaining({ op: 'expand', ids: ['hub'], expandHubs: ['hub'], budget: 2000 }),
         );
         expect(el.querySelector('[data-testid="hub-override-recorded"]')?.textContent).toContain(
             'Override recorded at step 3',

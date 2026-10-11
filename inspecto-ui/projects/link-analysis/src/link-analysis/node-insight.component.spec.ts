@@ -242,11 +242,13 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
     });
 
     it('after a direct add, re-checks membership and never claims no list can take the entity', async () => {
-        const { fixture, el, svc } = make({}, { matched: ['wl'] });
+        const onListChanged = vi.fn();
+        const { fixture, el, svc } = make({ onListChanged }, { matched: ['wl'] });
         await settle(fixture);
         el.querySelector<HTMLButtonElement>('[data-testid=add-block-bl]')!.click();
         await settle(fixture);
         expect(el.textContent).toContain('Added to');
+        expect(onListChanged).toHaveBeenCalledTimes(1); // the Entity Lists panel re-reads its counts
         expect(svc.match.mock.calls.filter((a) => a[0] === 'bl').length).toBe(2); // re-checked
         expect(el.querySelector('[data-testid=add-block-bl]')).toBeNull(); // a member now, even if the read lags
         expect(el.querySelector('[data-testid=lists]')!.textContent).toContain('block: BL');
@@ -337,6 +339,29 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         select.dispatchEvent(new Event('change'));
         await settle(fixture);
         expect(byEntity).toHaveBeenLastCalledWith('msisdn', '999', 'closed');
+    });
+
+    it('labels a Case row by how it matched: Investigation, sealed snapshot, or Incident member', async () => {
+        const { fixture, el } = make(
+            {},
+            {
+                history: () =>
+                    Promise.resolve({
+                        truncated: false,
+                        items: [
+                            item({ kind: 'case', id: 'c1', title: 'A', via: 'inv-7', matchedOn: 'investigation' }),
+                            item({ kind: 'case', id: 'c2', title: 'B', via: 'snap-3', matchedOn: 'snapshot' }),
+                            item({ kind: 'case', id: 'c3', title: 'C', via: 'i1', matchedOn: 'member' }),
+                        ],
+                    }),
+            },
+        );
+        await settle(fixture);
+        el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
+        await settle(fixture);
+        const via = Array.from(el.querySelectorAll('[data-testid=history-via]')).map((v) => v.textContent!.trim());
+        expect(via).toEqual(expect.arrayContaining(['via Investigation inv-7', 'via sealed snapshot', 'via Incident i1']));
+        expect(via.join(' ')).not.toContain('Incident inv-7');
     });
 
     it("shows the server's own truncation message and total when sent, else the fixed note", async () => {

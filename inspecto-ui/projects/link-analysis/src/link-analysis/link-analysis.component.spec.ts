@@ -1516,6 +1516,34 @@ describe('LinkAnalysisComponent', () => {
             expect(click).toHaveBeenCalledWith('c');
         });
 
+        it('D2: a pure Investigation canvas (no query graph) has the toolbar, lists the Working Set, Enter opens the detail', async () => {
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            const el = fixture.nativeElement as HTMLElement;
+            expect(c.graph()).toBeNull();
+            expect(el.querySelector('[data-testid="graph-list-toggle"]')).toBeNull();
+            openWorkingSet(c, ['ws-a', 'ws-b']);
+            fixture.detectChanges();
+            for (const label of ['Display options (labels, colors, shapes and line styles)', 'Fit the graph to the screen'])
+                expect(el.querySelector(`button[aria-label="${label}"]`)).not.toBeNull();
+            expect(el.querySelector('button[aria-label="View the graph in full screen"]')).not.toBeNull();
+            const toggle = el.querySelector('[data-testid="graph-list-toggle"]') as HTMLButtonElement;
+            toggle.click();
+            fixture.detectChanges();
+            const rows = Array.from(el.querySelectorAll<HTMLElement>('table[role="grid"] tbody tr'));
+            expect(rows.map((r) => r.dataset['nodeId'])).toEqual(c.canvasData()!.nodes.map((n) => n.id));
+            expect(rows).toHaveLength(2);
+            const detail = vi
+                .spyOn(c as unknown as { openNodeDetail: (id: string) => void }, 'openNodeDetail')
+                .mockImplementation(() => undefined);
+            rows[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+            fixture.detectChanges();
+            // ONE Enter on a fresh row picks it AND opens the detail (no second-click convention in the list)
+            expect(c.investigation.selected()?.id).toBe(rows[1].dataset['nodeId']);
+            expect(detail).toHaveBeenCalledWith(rows[1].dataset['nodeId']);
+        });
+
         it('carries the Working Set render-limit notice into the list', async () => {
             const { fixture, c, el, toggle } = await ready();
             openWorkingSet(c, ['x']);

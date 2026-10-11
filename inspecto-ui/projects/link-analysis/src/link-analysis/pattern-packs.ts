@@ -273,7 +273,15 @@ const PROFILE_PACK_CATEGORY: Partial<Record<DomainProfileId, PatternPack['catego
 };
 
 /**
- * The pack the Pattern tool opens on: the first pack of the active profile's category — a Space-authored one
+ * A profile's preferred opening pack, by id, when the Space carries it: the telecom storyboard starts with the
+ * forwarding chain, and the Space packs arrive in name order (Subscription ring could come first).
+ */
+const PROFILE_PREFERRED_PACK: Partial<Record<DomainProfileId, readonly string[]>> = {
+    telecom: ['telecom-forwarding-chain', 'call-forwarding-chain'],
+};
+
+/**
+ * The pack the Pattern tool opens on: the profile's preferred pack when present, else the first pack of the active profile's category — a Space-authored one
  * before a shipped built-in, since it pins that Space's own kinds — else the catalog's first pack.
  */
 export function defaultPatternPack(
@@ -282,6 +290,10 @@ export function defaultPatternPack(
 ): PatternPack | null {
     const category = profileId ? PROFILE_PACK_CATEGORY[profileId] : undefined;
     const matching = category ? packs.filter((p) => p.category === category) : [];
+    for (const id of (profileId && PROFILE_PREFERRED_PACK[profileId]) || []) {
+        const preferred = matching.find((p) => p.id === id);
+        if (preferred) return preferred;
+    }
     return matching.find((p) => !PATTERN_PACKS.includes(p)) ?? matching[0] ?? packs[0] ?? null;
 }
 

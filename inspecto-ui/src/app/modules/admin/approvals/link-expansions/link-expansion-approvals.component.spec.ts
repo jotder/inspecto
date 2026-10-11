@@ -39,18 +39,19 @@ async function create(overrides: Partial<Record<keyof LinkExpansionApprovalsServ
         deny: vi.fn(() => of({})),
         ...overrides,
     } as unknown as LinkExpansionApprovalsService;
+    const confirm = { confirmDestructive: vi.fn(async () => confirmed) };
     TestBed.configureTestingModule({
         imports: [LinkExpansionApprovalsComponent],
         providers: [
             provideNoopAnimations(),
             { provide: LinkExpansionApprovalsService, useValue: api },
             { provide: ToastrService, useValue: toastr },
-            { provide: InspectoConfirmService, useValue: { confirm: vi.fn(async () => confirmed) } },
+            { provide: InspectoConfirmService, useValue: confirm },
         ],
     });
     const fixture = TestBed.createComponent(LinkExpansionApprovalsComponent);
     fixture.detectChanges();
-    return { fixture, api, toastr, el: fixture.nativeElement as HTMLElement };
+    return { fixture, api, toastr, confirm, el: fixture.nativeElement as HTMLElement };
 }
 
 function button(el: HTMLElement, text: string): HTMLButtonElement | undefined {
@@ -70,8 +71,13 @@ describe('LinkExpansionApprovalsComponent', () => {
     });
 
     it('approve confirms, calls the decision route, then reloads', async () => {
-        const { fixture, api, toastr } = await create();
+        const { fixture, api, toastr, confirm } = await create();
         await fixture.componentInstance.approve(HELD);
+        // the confirm button reads "Approve" (not "OK"), and it is not styled as destructive
+        expect(confirm.confirmDestructive).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ confirmText: 'Approve', destructive: false }),
+        );
         expect(api.approve).toHaveBeenCalledWith(HELD);
         expect(toastr.success).toHaveBeenCalled();
         expect(api.inbox).toHaveBeenCalledTimes(2);

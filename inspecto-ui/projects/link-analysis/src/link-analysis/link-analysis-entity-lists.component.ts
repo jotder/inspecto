@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -228,6 +228,14 @@ export class LinkAnalysisEntityListsComponent {
     constructor() {
         // Off the module, every route 503s — no call for an explained absence the page already renders.
         if (this.features.geoLink()) void this.load();
+        // A list changed elsewhere (the node dialog's "Add to list"): re-read, so the member counts are not stale.
+        let seen = this.store.entityListsChanged();
+        effect(() => {
+            const n = this.store.entityListsChanged();
+            if (n === seen) return;
+            seen = n;
+            if (untracked(() => this.features.geoLink())) void this.load();
+        });
     }
 
     async load(): Promise<void> {
