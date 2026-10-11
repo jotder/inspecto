@@ -221,7 +221,9 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    `DEGRADED`, and `GET /health/details` lists each skipped Space with a coded reason under `spaces.skipped`.
    Credentials (URL userinfo and a password, token or secret query parameter) are masked in `/health/details` — no need to put them in the URL.
 2. **A graceful stop does not release a held lease** (above) — restarting the holder costs the full TTL whenever
-   a cycle is in flight.
+   a cycle is in flight. Still open (`HA-GRACEFUL-STOP-LEASE-RELEASE-1`): releasing on an abandoned close is not
+   safe today — the abandoned run thread keeps writing outputs, so a survivor would become a second writer; the
+   options are in `BACKLOG.md`. Until decided, stop the holder between cycles.
 3. **At-least-once on `kill -9`** (above) — root-caused to the output-before-acknowledgement window with
    node-local output trees; not the dedup ledger. Open decision: see `HA-KILL9-DOUBLE-INGEST-1` for the options.
    **Contract until decided: failover delivery is at-least-once unless the output tree is shared or synced (then a
