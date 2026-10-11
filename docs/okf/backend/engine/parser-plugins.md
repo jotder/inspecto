@@ -589,9 +589,17 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
   ⚠ "Give it its own segment" is **not available for ASN.1 today**: `Asn1RecordIngester` keys segments by record
   name only (~:124) and NULLs any `List` (~:189), so those columns load NULL. The "cheaper before C1" window has
   passed (C1–C4 shipped 2026-09-25). The design states no numeric threshold. **Operator decided 2026-10-11 to design it —
-  ✅ **designed, awaiting operator approval of the design:**
-  [`docs/superpower/parsing-repeated-child-design.md`](../../../superpower/parsing-repeated-child-design.md)
-  (closed-vocabulary `derive` select / reduce first, then `children` explode; no expression language).
+  ✅ **designed and operator-approved 2026-10-11; slice 1 SHIPPED** (`derive` select / reduce, backend only):
+  [`docs/superpower/parsing-repeated-child-design.md`](../../../superpower/parsing-repeated-child-design.md).
+  An optional `derive` block under `asn1:` (segment key → column → operation; closed vocabulary, no expression)
+  is compiled by `com.gamma.etl.DeriveSpec` (validated on `DecodeProfile.read` and at config load, `ASN1-DERIVE-*`
+  codes; replaced whole on overlay) and evaluated per record by `Asn1RecordIngester`: VARCHAR derived columns
+  after `raw.fields`, before `EVENT_TYPE`; NULL for missing path / empty list / no match / non-numeric (never 0);
+  row cardinality unchanged; no `derive` = byte-identical rows. ⚠ As-built gotchas: a `SEQUENCE OF X` decodes as
+  `{field: {X: [..]}}`, so the list path is `field.X` (explicit, no auto-unwrap); TOON has no flow syntax, so
+  write `where:` as a nested block and `group_by[1]: leaf` as a TOON array. `max_list_elements` (default 10 000,
+  ceiling 1 000 000) over-cap fails the file. **Still open:** slice 2 `children` explode, slice 3 drawer display,
+  `ASN1-DERIVE-NOT-IN-GRAMMAR`; no editor.
 - **T2 — signer anchoring** (`-Djobs.packs.trustStore`, SEC-7). Not built. D2 made T1 the required gate.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24

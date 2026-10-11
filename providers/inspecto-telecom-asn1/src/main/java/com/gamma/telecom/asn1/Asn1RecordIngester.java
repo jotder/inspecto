@@ -8,6 +8,7 @@ import com.gamma.asn.core.Strictness;
 import com.gamma.asn.facade.Asn1Decoder;
 import com.gamma.asn.facade.RecordMapper;
 import com.gamma.asn.schema.NamedNode;
+import com.gamma.etl.DeriveSpec;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RecordSink;
 import com.gamma.etl.StreamingFileIngester;
@@ -67,6 +68,12 @@ import java.util.Set;
  *       max_value_bytes: 67108864           # optional single-value cap (default 64 MiB)
  * </pre>
  *
+ * <h3>Derived columns (Parsing D9 slice 1)</h3>
+ * An optional {@code ingester_config.derive} block ({@link DeriveSpec}: {@code select} / {@code reduce} over a
+ * repeated child) appends VARCHAR columns after {@code raw.fields} and before {@code EVENT_TYPE}; row
+ * cardinality is unchanged and a segment without {@code derive} is byte-identical to before. A list over
+ * {@code max_list_elements} fails the file (QUARANTINED_UNREADABLE) rather than truncating an aggregate.
+ *
  * <h3>Failure handling</h3>
  * A malformed record makes the reader stop (these framings carry no length prefix, so there is no
  * reliable resync). Rather than silently ingesting the prefix, any parse error fails the file so
@@ -77,6 +84,8 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
 
     /** Public no-arg constructor required for reflective load by {@code ConsignmentIngestor}. */
     public Asn1RecordIngester() {}
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(Asn1RecordIngester.class);
 
     /** The derived column carrying the segment key, appended to every segment. */
     static final String EVENT_TYPE = "EVENT_TYPE";
@@ -111,7 +120,10 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
                     "invalid ASN.1 grammar " + module.label() + ": " + badGrammar.getMessage(), badGrammar);
         }
 
-        Map<String, List<String>> selectorsByKey = declareSegments(cfg, sink);
+        DeriveSpec derive = DeriveSpec.parse(ic.get("derive"), cfg.schemas().segments() == null ? null : cfg.schemas().segments().keySet(),
+                ic.get("max_list_elements"), ic.get("max_derived_columns"));
+        DeriveSpec.Stats deriveStats = new DeriveSpec.Stats();
+        Map<String, List<String>> selectorsByKey = declareSegments(cfg, sink, derive);
 
         List<ParseError> errors = new ArrayList<>();
         try (ByteSource src = ByteSource.map(file.toPath())) {
@@ -127,14 +139,19 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
                     continue;
                 }
                 Map<String, Object> decoded = RecordMapper.toMap(record);
-                Object[] values = new Object[selectors.size() + 1];
+                Object[] derived = derive.evaluate(record.name(), decoded, deriveStats);   // ASN1-DERIVE-LIST-TOO-LARGE fails the file
+                Object[] values = new Object[selectors.size() + derived.length + 1];
                 for (int i = 0; i < selectors.size(); i++) {
                     values[i] = scalar(resolve(decoded, selectors.get(i)));
                 }
-                values[selectors.size()] = record.name();   // trailing EVENT_TYPE
+                System.arraycopy(derived, 0, values, selectors.size(), derived.length);   // derived columns after raw.fields
+                values[values.length - 1] = record.name();   // trailing EVENT_TYPE
                 sink.emit(record.name(), values);
             }
         }
+        if (deriveStats.nonNumeric > 0 || deriveStats.noMatch > 0)
+            LOG.info("{}: derive_non_numeric={} derive_no_match={}", file.getName(),
+                    deriveStats.nonNumeric, deriveStats.noMatch);
         if (!errors.isEmpty()) {
             ParseError first = errors.getFirst();
             throw new IOException("ASN.1 decode failed in " + file.getName() + " at record "
@@ -147,7 +164,8 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
      * return each key's selector list, so the per-record loop never re-walks the config map.
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, List<String>> declareSegments(PipelineConfig cfg, RecordSink sink) throws Exception {
+    private static Map<String, List<String>> declareSegments(PipelineConfig cfg, RecordSink sink, DeriveSpec derive)
+            throws Exception {
         if (cfg.schemas().segments() == null || cfg.schemas().segments().isEmpty())
             throw new IllegalArgumentException("Asn1RecordIngester requires at least one segment");
         Map<String, List<String>> selectorsByKey = new LinkedHashMap<>();
@@ -166,6 +184,8 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
                 columns.add(name);
                 selectors.add(selector);
             }
+            derive.checkClash(key, new ArrayList<>(columns));
+            columns.addAll(derive.columns(key));   // derived columns: after raw.fields, before EVENT_TYPE
             columns.add(EVENT_TYPE);
             sink.define(key, columns);
             selectorsByKey.put(key, selectors);

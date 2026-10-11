@@ -1980,8 +1980,9 @@ final class PipelineConfigParser {
         if (!grammarFile.isEmpty()) ic.put("grammar", grammarFile);
         ic.put("root_type", rootType);
         for (String k : new String[]{"strictness", "file_header_length", "record_header_length",
-                "max_value_bytes"})
+                "max_value_bytes", "derive", "max_list_elements", "max_derived_columns"})
             if (a.get(k) != null) ic.put(k, a.get(k));
+        DecodeProfile.validateDerive(a);   // Parsing D9 slice 1: closed vocabulary, refused at load
         Map<String, Object> plugin = new LinkedHashMap<>();
         plugin.put("ingester", ASN1_INGESTER);
         plugin.put("ingester_config", ic);
