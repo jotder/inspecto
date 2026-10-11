@@ -1,0 +1,7 @@
+name: telecom_wangiri_lines
+dataset: telecom_typology_counts_dataset
+measure: max(wangiri_lines)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "Wangiri: lines ringing 50 or more numbers with an average call under 5 seconds"

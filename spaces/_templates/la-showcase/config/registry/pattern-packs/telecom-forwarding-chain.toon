@@ -1,0 +1,7 @@
+name: telecom-forwarding-chain
+label: Call-forwarding chain
+category: telecom
+description: A line forwards its calls to a second line, which forwards them on to a third (A -> B -> C), the second forward set up after the first and within 48 hours. Mule lines are chained this way to hide where the calls end up. Runs on forwarding links only, over the whole Dataset.
+stages[2]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax,closesToStart}:
+  fan-out,1,forwarding,"",0,false,0,"","","",false
+  fan-out,1,forwarding,"",0,true,48,"","","",false
