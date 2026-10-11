@@ -15,7 +15,8 @@ Space boots; the `telecom_links` and `telecom_msisdn_indicators` sql.template Jo
 
 Numbering (every number is invented; country codes 999/998 are not assigned to any real network):
   99971xxxxxx  home-network background subscribers (2 400, in 100 closed calling clusters of 24)
-  99970000100  HUB - a taxi-dispatch business line called by 650 distinct subscribers (the supernode)
+  99970000100  HUB - a taxi-dispatch business line called by 650 distinct subscribers (the supernode;
+               600 of them call inside the last 30 days, so the 30-day window still sees >= 560 contacts)
   99979xxxxxx  the planted rings (see RINGS below and docs/superpower/la-telecom-demo-data.md)
   9989100xxxx  premium-rate international range (IRSF / Wangiri callback destinations)
   998200xxxxx  ordinary international numbers
@@ -127,9 +128,12 @@ for m in rng.sample(BG, 240):                                # some ordinary int
     for _ in range(rng.randint(1, 3)):
         call(m, n, ts(), rng.randint(60, 900), dest="international")
 hub_callers = rng.sample(BG, 650)                            # the supernode
-for m in hub_callers:
-    for _ in range(rng.randint(1, 2)):
-        call(m, HUB, ts(hr_lo=6, hr_hi=23), rng.randint(15, 90))
+for i, m in enumerate(hub_callers):                         # the first 600 call in the last 30 days (a day < 30 moves
+    for _ in range(rng.randint(1, 2)):                       # up 30), so >= 560 contacts sit in the demo's 30-day window
+        t = ts(hr_lo=6, hr_hi=23)                            # and the hub trips the 500 threshold; rng draws unchanged
+        if i < 600 and t < START + timedelta(days=30):
+            t += timedelta(days=30)
+        call(m, HUB, t, rng.randint(15, 90))
 for m in rng.sample(hub_callers, 80):
     call(HUB, m, ts(hr_lo=6, hr_hi=23), rng.randint(10, 40))
 
