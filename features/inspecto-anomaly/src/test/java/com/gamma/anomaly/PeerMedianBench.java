@@ -46,8 +46,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@code -Dinspecto.bench.timeoutSec=60}, {@code -Dinspecto.bench.sizes=10000,200000,1000000}).
  *
  * <p>Three parts. (1) {@code RobustStats.median + scaledMad} on n values. (2) A grid over entity count N x cohort
- * shape of one Feature's peer side for a whole run: {@link PeerSideMirror} is a line-for-line copy of the private
- * {@code AnomalyScoreEvaluator.PeerSide} (calling the real {@link PeerBaseline}, {@link RobustStats} and
+ * shape of one Feature's peer side for a whole run: the real package-private
+ * {@code AnomalyScoreEvaluator.PeerSide} (with {@link PeerBaseline}, {@link RobustStats} and
  * {@link BaselineStatistics}), driven as pass 2 drives it — once per entity, cached per cohort — next to the self
  * baseline pass of the same entities for scale. 28-day window, one row a day, deterministic values. (3) The real
  * {@link AnomalyScoreEvaluator#evaluate} end to end (DuckDB + JVM, two Features) with and without {@code peers}, to
@@ -122,7 +122,7 @@ class PeerMedianBench {
                 new Shape("cohorts of 1 000", 1_000, 30, false),
                 new Shape("cohorts of 100 000", 100_000, 30, false),
                 new Shape("one cohort of N (worst single cohort)", Integer.MAX_VALUE, 30, false));
-        line("\n## Peer side of one Feature for a whole run (mirror of AnomalyScoreEvaluator.PeerSide), "
+        line("\n## Peer side of one Feature for a whole run (the real AnomalyScoreEvaluator.PeerSide), "
                 + WINDOW + "-day window\n");
         StringBuilder head = new StringBuilder("| shape |"), rule = new StringBuilder("|---|");
         for (int n : sizes) { head.append(" N = %,d |".formatted(n)); rule.append("---|"); }
@@ -148,10 +148,15 @@ class PeerMedianBench {
                 long cohorts = cohortOf.values().stream().distinct().count();
                 AtomicLong progress = new AtomicLong();
                 Result r = time(() -> {
-                    PeerSideMirror ps = new PeerSideMirror(new PeerBaseline(s.minGroupSize, s.fallback), cohortOf,
-                            c.histories, c.observedByFeature, statistic, SCORED, progress);
-                    for (String e : c.histories.keySet()) ps.of("f", e);
-                    return ps.cache.size();
+                    AnomalyScoreEvaluator.PeerSide ps = new AnomalyScoreEvaluator.PeerSide(
+                            new PeerBaseline(s.minGroupSize, s.fallback),
+                            new AnomalyScoreEvaluator.Cohorts(cohortOf, labelsOf(cohortOf)),
+                            c.histories, c.observedByFeature, statistic, SCORED);
+                    AnomalyModel.Feature f = new AnomalyModel.Feature("f", "f", "d", "k", "t", "count", List.of(), null,
+                            1.0, 1.0);
+                    double sum = 0;
+                    for (String e : c.histories.keySet()) sum += ps.of(f, e).shift();
+                    return sum;
                 }, progress, cohorts);
                 if (r.note.contains("timeout")) skip.put(s, true);
                 row.append(' ').append(r.cell()).append(" |");
@@ -190,6 +195,12 @@ class PeerMedianBench {
         }
     }
 
+    private static Map<String, String> labelsOf(Map<String, String> cohortOf) {
+        Map<String, String> out = new LinkedHashMap<>();
+        cohortOf.values().forEach(c -> out.put(c, c));
+        return out;
+    }
+
     private static String key(int i) {
         String s = Integer.toString(i);
         return "e" + "0000000".substring(Math.min(7, s.length())) + s;
@@ -198,61 +209,6 @@ class PeerMedianBench {
     /** Deterministic: a per-entity level plus Weyl-style noise in [-20, 20]. */
     private static double value(int i, int d, int level) {
         return 100 + 10 * level + Math.floorMod(7919L * i + 104729L * d, 41) - 20;
-    }
-
-    /**
-     * COPY of {@code AnomalyScoreEvaluator.PeerSide} at 8e9d54ddb (private there), plus a progress counter. Keep in
-     * step with the evaluator if the bench is re-run after it changes; part (3) runs the real code.
-     */
-    private static final class PeerSideMirror {
-        record Cohort(Baseline baseline, double shift) {}
-
-        private final PeerBaseline peer;
-        private final Map<String, String> cohortOf;
-        private final Map<String, Map<String, Map<LocalDateTime, Double>>> histories;
-        private final Map<String, Map<String, Double>> observedByFeature;
-        private final BaselineStatistic statistic;
-        private final LocalDateTime scoredDay;
-        private final AtomicLong progress;
-        final Map<String, Cohort> cache = new LinkedHashMap<>();
-
-        PeerSideMirror(PeerBaseline peer, Map<String, String> cohortOf,
-                       Map<String, Map<String, Map<LocalDateTime, Double>>> histories,
-                       Map<String, Map<String, Double>> observedByFeature, BaselineStatistic statistic,
-                       LocalDateTime scoredDay, AtomicLong progress) {
-            this.peer = peer;
-            this.cohortOf = cohortOf;
-            this.histories = histories;
-            this.observedByFeature = observedByFeature;
-            this.statistic = statistic;
-            this.scoredDay = scoredDay;
-            this.progress = progress;
-        }
-
-        Cohort of(String feature, String entity) {
-            String cohort = cohortOf.get(entity);
-            return cache.computeIfAbsent(feature + "\u0000" + cohort, k -> compute(feature, cohort));
-        }
-
-        private Cohort compute(String feature, String cohort) {
-            if (Thread.currentThread().isInterrupted()) throw new IllegalStateException("interrupted");
-            progress.incrementAndGet();
-            Baseline b = peer.compute(observedByFeature.get(feature), cohortOf, cohort);
-            if (b.insufficient()) return new Cohort(b, 1.0);
-            boolean population = PeerBaseline.POPULATION.equals(b.basis());
-            Map<LocalDateTime, List<Double>> byDay = new TreeMap<>();
-            histories.forEach((entity, perFeature) -> {
-                if (!population && !cohort.equals(cohortOf.get(entity))) return;
-                perFeature.get(feature).forEach((d, v) -> {
-                    if (v != null && !v.isNaN()) byDay.computeIfAbsent(d, x -> new ArrayList<>()).add(v);
-                });
-            });
-            Map<LocalDateTime, Double> medians = new TreeMap<>();
-            byDay.forEach((d, vs) -> medians.put(d, RobustStats.median(vs)));
-            Baseline usual = statistic.compute(medians, scoredDay);
-            double k = usual.insufficient() || !(usual.median() > 0) ? 1.0 : b.median() / usual.median();
-            return new Cohort(b, k);
-        }
     }
 
     // ---- (3) the real evaluator end to end ---------------------------------------------------------------------

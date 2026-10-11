@@ -28,6 +28,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -181,7 +182,8 @@ public final class AnomalyScoreEvaluator {
             histories.put(e.getKey(), perFeature);
         }
         PeerSide peers = model.peers() == null ? null
-                : new PeerSide(model, cohorts(model, relationSql, policy), histories, observedByFeature, statistic, scoredDay);
+                : new PeerSide(new PeerBaseline(model.peers().minGroupSize(), model.peers().populationFallback()),
+                        cohorts(model, relationSql, policy), histories, observedByFeature, statistic, scoredDay);
         // Pass 2: baselines and the score.
         List<AnomalyScorer.Scored> scored = new ArrayList<>(series.size());
         for (Map.Entry<String, Map<String, Map<LocalDateTime, Double>>> e : histories.entrySet()) {
@@ -209,8 +211,18 @@ public final class AnomalyScoreEvaluator {
      * {@code k}, so a day on which the whole cohort moves (a promotion) does not read as every member's own anomaly,
      * while a member that moves alone still does. {@code k = 1} when the cohort is insufficient or its usual is not > 0.
      */
-    private static final class PeerSide {
+    static final class PeerSide {
         record Cohort(Baseline baseline, double shift) {}
+
+        /** One Feature's grouping, built in a single pass over the population: O(entities x days), not per cohort. */
+        private static final class Grouped {
+            final Map<String, List<Double>> membersByCohort = new HashMap<>();      // usable observations per cohort
+            final Map<String, Map<LocalDateTime, List<Double>>> daysByCohort = new HashMap<>();
+            final List<Double> population = new ArrayList<>();                      // every usable observation
+            final Map<LocalDateTime, List<Double>> populationDays = new TreeMap<>();
+            PeerBaseline.Population populationBaseline;                              // lazy, once per Feature
+            Baseline populationUsual;                                                // lazy, once per Feature
+        }
 
         private final PeerBaseline peer;
         private final Map<String, String> cohortOf;
@@ -219,11 +231,12 @@ public final class AnomalyScoreEvaluator {
         private final Map<String, Map<String, Double>> observedByFeature;
         private final BaselineStatistic statistic;
         private final LocalDateTime scoredDay;
+        private final Map<String, Grouped> grouped = new HashMap<>();
         private final Map<String, Cohort> cache = new LinkedHashMap<>();
 
-        PeerSide(AnomalyModel model, Cohorts cohorts, Map<String, Map<String, Map<LocalDateTime, Double>>> histories,
+        PeerSide(PeerBaseline peer, Cohorts cohorts, Map<String, Map<String, Map<LocalDateTime, Double>>> histories,
               Map<String, Map<String, Double>> observedByFeature, BaselineStatistic statistic, LocalDateTime scoredDay) {
-            this.peer = new PeerBaseline(model.peers().minGroupSize(), model.peers().populationFallback());
+            this.peer = peer;
             this.cohortOf = cohorts.keyOf();
             this.labelOf = cohorts.labelOf();
             this.histories = histories;
@@ -234,23 +247,54 @@ public final class AnomalyScoreEvaluator {
 
         Cohort of(AnomalyModel.Feature f, String entity) {
             String cohort = cohortOf.get(entity);
-            return cache.computeIfAbsent(f.id() + "\u0000" + cohort, k -> compute(f, cohort));
+            return cache.computeIfAbsent(f.id() + " " + cohort, k -> compute(f, cohort));
+        }
+
+        private static boolean usable(Double v) {
+            return v != null && !v.isNaN();
+        }
+
+        private Grouped group(String feature) {
+            return grouped.computeIfAbsent(feature, fid -> {
+                Grouped g = new Grouped();
+                observedByFeature.get(fid).forEach((e, v) -> {
+                    if (!usable(v)) return;
+                    g.population.add(v);
+                    String c = cohortOf.get(e);
+                    if (c != null) g.membersByCohort.computeIfAbsent(c, x -> new ArrayList<>()).add(v);
+                });
+                histories.forEach((entity, perFeature) -> {
+                    String c = cohortOf.get(entity);
+                    Map<LocalDateTime, List<Double>> mine = c == null ? null
+                            : g.daysByCohort.computeIfAbsent(c, x -> new TreeMap<>());
+                    perFeature.get(fid).forEach((d, v) -> {
+                        if (!usable(v)) return;
+                        g.populationDays.computeIfAbsent(d, x -> new ArrayList<>()).add(v);
+                        if (mine != null) mine.computeIfAbsent(d, x -> new ArrayList<>()).add(v);
+                    });
+                });
+                return g;
+            });
         }
 
         private Cohort compute(AnomalyModel.Feature f, String cohort) {
-            Baseline b = peer.compute(observedByFeature.get(f.id()), cohortOf, cohort, labelOf.get(cohort));
+            Grouped g = group(f.id());
+            List<Double> members = cohort == null ? List.of() : g.membersByCohort.getOrDefault(cohort, List.of());
+            Baseline b = peer.compute(members, () -> {
+                if (g.populationBaseline == null) g.populationBaseline = PeerBaseline.Population.of(g.population);
+                return g.populationBaseline;
+            }, labelOf.get(cohort));
             if (b.insufficient()) return new Cohort(b, 1.0);
             boolean population = b.fellBack();   // not basis == "population": a cohort label may read "population"
-            Map<LocalDateTime, List<Double>> byDay = new TreeMap<>();
-            histories.forEach((entity, perFeature) -> {
-                if (!population && !cohort.equals(cohortOf.get(entity))) return;
-                perFeature.get(f.id()).forEach((d, v) -> {
-                    if (v != null && !v.isNaN()) byDay.computeIfAbsent(d, x -> new ArrayList<>()).add(v);
-                });
-            });
-            Map<LocalDateTime, Double> medians = new TreeMap<>();
-            byDay.forEach((d, vs) -> medians.put(d, RobustStats.median(vs)));
-            Baseline usual = statistic.compute(medians, scoredDay);
+            Baseline usual;
+            if (population && g.populationUsual != null) usual = g.populationUsual;   // the same for every fallback
+            else {
+                Map<LocalDateTime, List<Double>> byDay = population ? g.populationDays : g.daysByCohort.get(cohort);
+                Map<LocalDateTime, Double> medians = new TreeMap<>();
+                byDay.forEach((d, vs) -> medians.put(d, RobustStats.median(vs)));
+                usual = statistic.compute(medians, scoredDay);
+                if (population) g.populationUsual = usual;
+            }
             double k = usual.insufficient() || !(usual.median() > 0) ? 1.0 : b.median() / usual.median();
             return new Cohort(b, k);
         }
