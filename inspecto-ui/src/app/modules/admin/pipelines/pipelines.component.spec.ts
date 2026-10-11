@@ -15,6 +15,7 @@ import {
     PipelineNodeType,
     PipelinesService,
 } from 'app/inspecto/api';
+import { GAMMA_CONFIG } from '@gamma/services/config/config.constants';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { BundleTransferService } from 'app/inspecto/transfer';
 import { PipelineEditorComponent } from './pipeline-editor.component';
@@ -56,7 +57,7 @@ const COMBINED: PipelineCombined = {
 
 let combinedCalls = 0;
 
-function build() {
+function build(topology: PipelineCombined = COMBINED) {
     combinedCalls = 0;
     const stub = {
         listWithBroken: () =>
@@ -66,13 +67,14 @@ function build() {
         provenanceBatches: () => of([]),
         combined: () => {
             combinedCalls++;
-            return of(COMBINED);
+            return of(topology);
         },
     } as unknown as PipelinesService;
     TestBed.configureTestingModule({
         imports: [PipelinesComponent],
         providers: [
             provideNoopAnimations(),
+            { provide: GAMMA_CONFIG, useValue: { scheme: 'light' } }, // Topology renders the real grid/graph theme
             { provide: PipelinesService, useValue: stub },
             { provide: ConfigService, useValue: { write: vi.fn(), registerPipeline: vi.fn(), remove: vi.fn() } },
             { provide: ComponentsService, useValue: { list: () => of([]) } },
@@ -122,6 +124,28 @@ describe('PipelinesComponent', () => {
         )!.componentInstance as PipelineEditorComponent;
         expect(editor.readOnly).toBe(false);
         expect(editor.canAuthor()).toBe(true);
+    });
+
+    it('keeps the editor (and its unsaved draft) alive across a Topology round trip', () => {
+        // An empty topology: a populated one mounts a G6 canvas, which jsdom cannot host.
+        const fixture = build({ pipelines: [], nodes: [], edges: [], links: [] });
+        fixture.detectChanges();
+        const find = () =>
+            fixture.debugElement.query((n) => n.componentInstance instanceof PipelineEditorComponent)
+                ?.componentInstance as PipelineEditorComponent | undefined;
+        fixture.componentInstance.setMode('editor');
+        fixture.detectChanges();
+        const editor = find()!;
+        editor.dirty.set(true); // an Applied Step the operator has not saved
+
+        fixture.componentInstance.setMode('topology');
+        fixture.detectChanges();
+        fixture.componentInstance.setMode('editor');
+        fixture.detectChanges();
+
+        // PIPELINE-EDITOR-VIEWSWITCH-LOSS-1: the editor used to be destroyed on Topology, losing the draft.
+        expect(find()).toBe(editor);
+        expect(find()!.dirty()).toBe(true);
     });
 
     it('opens nothing on arrival and offers an accessible way to open something', async () => {
