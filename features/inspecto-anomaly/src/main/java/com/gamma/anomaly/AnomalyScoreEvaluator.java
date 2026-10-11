@@ -247,7 +247,7 @@ public final class AnomalyScoreEvaluator {
 
         Cohort of(AnomalyModel.Feature f, String entity) {
             String cohort = cohortOf.get(entity);
-            return cache.computeIfAbsent(f.id() + " " + cohort, k -> compute(f, cohort));
+            return cache.computeIfAbsent(f.id() + "\0" + cohort, k -> compute(f, cohort));
         }
 
         private static boolean usable(Double v) {
