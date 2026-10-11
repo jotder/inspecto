@@ -74,15 +74,43 @@ final class IncrementalSink {
             if (!day.isBefore(keepFrom) || Files.exists(dir.resolve(SEED_FILE))) continue;
             try {
                 beforePrune.before(dir);
-                try (java.util.stream.Stream<Path> w = Files.walk(dir)) {
-                    for (Path p : w.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
-                }
-                deleted++;
+                if (deleteContained(dir, dir.toRealPath())) deleted++;
+                else log.warn("sql.template incremental: expired partition {} only partly pruned; kept", dir);
             } catch (IOException | RuntimeException e) {
                 log.warn("sql.template incremental: could not prune expired partition {} ({}); kept", dir, e.toString());
             }
         }
         return deleted;
+    }
+
+    /**
+     * Delete {@code p} without ever leaving {@code root} (the partition folder's real path). A link or other
+     * reparse point (a Windows junction is {@code isOther()}, not a symlink, to Java) is never descended: only
+     * the link entry itself is removed. A directory whose real path is outside {@code root} is left, WARN.
+     * @return true when {@code p} is gone
+     */
+    private static boolean deleteContained(Path p, Path root) throws IOException {
+        java.nio.file.attribute.BasicFileAttributes a = Files.readAttributes(p,
+                java.nio.file.attribute.BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        if (a.isSymbolicLink() || a.isOther()) {
+            try { Files.delete(p); return true; }   // removes the link / junction entry, never its target
+            catch (IOException e) {
+                log.warn("sql.template incremental: left link {} in an expired partition ({})", p, e.toString());
+                return false;
+            }
+        }
+        if (!p.toRealPath().startsWith(root)) {
+            log.warn("sql.template incremental: {} resolves outside its partition folder; not deleted", p);
+            return false;
+        }
+        boolean all = true;
+        if (a.isDirectory()) {
+            List<Path> children = new ArrayList<>();
+            try (DirectoryStream<Path> ds = Files.newDirectoryStream(p)) { ds.forEach(children::add); }
+            for (Path c : children) all &= deleteContained(c, root);
+        }
+        if (all) Files.delete(p);
+        return all;
     }
 
     record Outcome(long rows, int days, long dropped) { }

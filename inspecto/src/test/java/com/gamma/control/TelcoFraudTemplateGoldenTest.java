@@ -253,6 +253,14 @@ class TelcoFraudTemplateGoldenTest {
             for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), DAY1).status(), j.name());
 
             assertRaisesExactlyThePlanted(rules, probe, corpus);
+            // The REAL Dataset read (the probe behind Alert Rules / KPIs / the save gates, over DatasetRelation) sees
+            // the day-folder column: DatasetRelation leaves hive_partitioning unset and DuckDB detects window_date=.
+            for (JobConfig j : jobs) {
+                String sink = j.params().get("sink_dataset");
+                List<String> cols = probe.columns(sink);
+                assertEquals("window_date", cols.get(cols.size() - 1), sink + ": the folder column is read back, last");
+                assertEquals("DATE", probe.columnType(sink, "window_date"), sink + ": window_date reads as a DATE");
+            }
             Map<String, Integer> fired = new TreeMap<>();
             for (Alert a : svc.evaluateRules()) fired.merge(a.rule(), 1, Integer::sum);
             assertEquals(EXPECTED, fired, "golden Alert count per typology");

@@ -14,6 +14,7 @@ record IncrementalSpec(String column, int lookback, int retain) {   // retain 0 
 
     static final String PREFIX = "incremental.";
     static final int MAX_LOOKBACK = 366;
+    static final int MAX_RETAIN = 3660;
     private static final Pattern COLUMN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /** The spec, {@code null} when the job declares no {@code incremental:} block; refuses a malformed one. */
@@ -50,8 +51,9 @@ record IncrementalSpec(String column, int lookback, int retain) {   // retain 0 
         if (rawRetain != null) {
             try { m = Integer.parseInt(rawRetain.trim()); }
             catch (NumberFormatException e) { throw new IllegalArgumentException(where + ".retain must be a positive integer >= lookback, got '" + rawRetain + "'"); }
-            if (m < n)
-                throw new IllegalArgumentException(where + ".retain must be a positive integer >= lookback (" + n + "), got " + m);
+            if (m < n || m > MAX_RETAIN)
+                throw new IllegalArgumentException(where + ".retain must be an integer from lookback (" + n + ") to "
+                        + MAX_RETAIN + ", got " + m);
         }
         return new IncrementalSpec(column.trim(), n, m);
     }

@@ -228,7 +228,8 @@ class SqlTemplateIncrementalTest {
                 Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "2"),
                 Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "0"),
                 Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "-5"),
-                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "x"))) {
+                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "x"),
+                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "3661"))) {
             Map<String, Object> j = new HashMap<>(Map.of("name", "x", "type", "sql.template", "sql", SQL,
                     "sink_dataset", "s", "incremental", bad));
             assertThrows(IllegalArgumentException.class, () -> JobConfig.fromMap(Map.of("job", j)), bad.toString());
@@ -245,6 +246,41 @@ class SqlTemplateIncrementalTest {
         JobConfig kept = job(3, 3);   // retain == lookback is the edge
         assertEquals(Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "3"), kept.toMap().get("incremental"));
         assertEquals(kept, JobConfig.fromMap(Map.of("job", kept.toMap())));
+        assertNotNull(job(3, 3660), "the retain cap is legal");
+    }
+
+    /** A junction / symlink inside an expired partition is removed as a link; its TARGET's files survive. */
+    @Test
+    void pruneNeverDeletesThroughAJunctionOrSymlink(@TempDir Path tmp) throws Exception {
+        Path sink = tmp.resolve("sink");
+        Path day = sink.resolve("event_date=2020-01-01");
+        Files.createDirectories(day);
+        Files.writeString(day.resolve("part-a.parquet"), "old");
+        Path target = tmp.resolve("outside");
+        Files.createDirectories(target);
+        Path precious = Files.writeString(target.resolve("precious.txt"), "keep me");
+        boolean anyLink = false;
+        String why = "not Windows";
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+            // cmd splits arguments on '=', so the junction is made beside the sink and renamed into the partition
+            Path made = tmp.resolve("junction");
+            Process p = new ProcessBuilder("cmd", "/c", "mklink", "/J", made.toString(), target.toString())
+                    .redirectErrorStream(true).start();
+            why = new String(p.getInputStream().readAllBytes());
+            if (p.waitFor() == 0) Files.move(made, day.resolve("junction"));
+            anyLink |= Files.exists(day.resolve("junction").resolve("precious.txt"));
+        }
+        try {
+            Files.createSymbolicLink(day.resolve("symlink"), target);
+            anyLink = true;
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            // symlinks need a privilege on Windows; the junction case covers it there
+        }
+        org.junit.jupiter.api.Assumptions.assumeTrue(anyLink, "neither a junction nor a symlink can be created here: " + why);
+        IncrementalSink.prune(sink, "event_date", LocalDate.of(2026, 1, 1));
+        assertTrue(Files.exists(precious), "the link target's file survives the prune");
+        assertEquals("keep me", Files.readString(precious));
+        assertFalse(Files.exists(day.resolve("part-a.parquet")), "the partition's own file is deleted");
     }
 
     private static JobConfig job(int lookback, int retain) {
