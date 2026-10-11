@@ -15,6 +15,7 @@ import {
 import { AnomalyModelsService } from 'app/inspecto/api/anomaly-models.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { ComponentDef } from 'app/inspecto/api/components.service';
+import { LensService } from 'app/inspecto/api/lens.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -24,6 +25,7 @@ import { ColumnMeta } from 'app/inspecto/query/query-types';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { AnomalyModelFeaturesComponent } from './anomaly-model-features.component';
+import { AnomalyModelPreviewComponent } from './anomaly-model-preview.component';
 
 export interface AnomalyModelFormData {
     existing?: ComponentDef;
@@ -44,7 +46,8 @@ export function heldAnomalyChange(res: unknown): AnomalyModelFormResult['held'] 
 /**
  * Create / edit an Anomaly Model (ANOMALY-DETECTION-1 S5, design §13.1): a schema-form for the flat fields (window,
  * seasonality, thresholds, Peer Group, Entity Lists) plus the Feature row editor. Saves through the generic
- * component CRUD — `PUT` with `If-Match` on edit — and lands a 422 on the field its message names, verbatim.
+ * component CRUD — `PUT` with `If-Match` on edit — and lands a 422 on the field its message names, verbatim. The
+ * preview box below scores the UNSAVED content (`POST /anomaly-scores/preview` with `content`), nothing written.
  */
 @Component({
     selector: 'app-anomaly-model-form-dialog',
@@ -56,6 +59,7 @@ export function heldAnomalyChange(res: unknown): AnomalyModelFormResult['held'] 
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
         AnomalyModelFeaturesComponent,
+        AnomalyModelPreviewComponent,
     ],
     template: `
         <h2 mat-dialog-title>{{ isEdit ? 'Edit Anomaly Model — ' + data.existing!.name : 'New Anomaly Model' }}</h2>
@@ -79,6 +83,11 @@ export function heldAnomalyChange(res: unknown): AnomalyModelFormResult['held'] 
                 Derived Datasets (written by the anomaly.score Job, never authored): anomaly_scores_&lt;id&gt; and
                 anomaly_scores_&lt;id&gt;_latest.
             </p>
+            @if (lens.canWorkIncidents()) {
+                <h3 class="mt-4 text-sm font-semibold">Preview the draft</h3>
+                <p class="text-secondary text-xs">Scores one entity under the form as it is now, before saving.</p>
+                <app-anomaly-model-preview [draft]="draftContent"></app-anomaly-model-preview>
+            }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button type="button" (click)="requestClose()">Cancel</button>
@@ -93,6 +102,8 @@ export class AnomalyModelFormDialog implements OnInit {
     private datasetsApi = inject(DatasetsService);
     private rowsApi = inject(DatasetRowsService);
     private confirm = inject(InspectoConfirmService);
+    /** The draft preview is gated like the saved one (`canWorkIncidents`); the server also wants authoring here. */
+    readonly lens = inject(LensService);
 
     @ViewChild(InspectoSchemaFormComponent) schemaForm?: InspectoSchemaFormComponent;
     @ViewChild(AnomalyModelFeaturesComponent) featureEditor?: AnomalyModelFeaturesComponent;
@@ -139,16 +150,25 @@ export class AnomalyModelFormDialog implements OnInit {
         this.datasets.set(readable.filter((x): x is string => !!x).map((id) => ({ value: id, label: id })));
     }
 
-    save(): void {
+    /** The content the form would save now, or `null` (errors shown) while it is invalid — save and draft preview. */
+    private content(): { id: string; body: Record<string, unknown> } | null {
         const form = this.schemaForm;
         const rows = this.featureEditor;
-        if (!form || !rows) return;
+        if (!form || !rows) return null;
         const topOk = form.validate();
         const rowsOk = rows.validate();
-        if (!topOk || !rowsOk) return;
+        if (!topOk || !rowsOk) return null;
         const top = form.value();
         const id = this.isEdit ? this.data.existing!.name : String(top['id'] ?? '').trim();
-        const body = toAnomalyModelContent(id, top, rows.value(), this.data.existing?.content ?? {});
+        return { id, body: toAnomalyModelContent(id, top, rows.value(), this.data.existing?.content ?? {}) };
+    }
+
+    readonly draftContent = (): Record<string, unknown> | null => this.content()?.body ?? null;
+
+    save(): void {
+        const c = this.content();
+        if (!c) return;
+        const { id, body } = c;
         this.saving.set(true);
         this.refusal.set(null);
         const call = this.isEdit ? this.api.update(id, body, this.data.existing!.contentHash) : this.api.create(body);
