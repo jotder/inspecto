@@ -50,18 +50,28 @@ class GracefulStopHandoverTest {
      * until the service's close() has signalled, then probes the run's checkpoint from inside the run.
      */
     private static final class Park implements Consumer<Event> {
-        final CountDownLatch parked = new CountDownLatch(1), resume = new CountDownLatch(1);
+        final CountDownLatch parked = new CountDownLatch(1), signalled = new CountDownLatch(1),
+                resume = new CountDownLatch(1);
         final AtomicBoolean armed = new AtomicBoolean(true);
         final AtomicReference<Throwable> probe = new AtomicReference<>();
         final Predicate<Event> match;
         final Runnable checkpoint;
+        final java.util.function.Supplier<java.util.function.BooleanSupplier> cancelSignal;
 
-        Park(Predicate<Event> match, Runnable checkpoint) { this.match = match; this.checkpoint = checkpoint; }
+        Park(Predicate<Event> match, Runnable checkpoint,
+             java.util.function.Supplier<java.util.function.BooleanSupplier> cancelSignal) {
+            this.match = match; this.checkpoint = checkpoint; this.cancelSignal = cancelSignal;
+        }
 
         @Override public void accept(Event e) {
             if (!match.test(e) || !armed.compareAndSet(true, false)) return;
             parked.countDown();
             try {
+                // Deterministic: wait (on the run thread, which carries the run's Space) until close() has
+                // actually raised the cancel - re-resolved each poll - then tell the test it has signalled.
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                while (!cancelSignal.get().getAsBoolean() && System.nanoTime() < until) Thread.sleep(5);
+                signalled.countDown();
                 resume.await(10, TimeUnit.SECONDS);
                 checkpoint.run();
                 probe.set(new AssertionError("checkpoint passed - the run did not see the cancel"));
@@ -71,10 +81,11 @@ class GracefulStopHandoverTest {
         }
     }
 
-    /** close() in the background; give it time to signal, then let the parked run reach its checkpoint. */
+    /** close() in the background; wait until it has signalled the run, then let the parked run reach its checkpoint. */
     private static CompletableFuture<Void> closeWhileParked(CollectorService svc, Park park) throws Exception {
         CompletableFuture<Void> closing = CompletableFuture.runAsync(svc::close);
-        Thread.sleep(300);   // close() signals first (cancelRuns), then drains: the drain is now waiting on us
+        // close() signals first (cancelRuns), then drains: once the run sees the cancel, the drain waits on us
+        assertTrue(park.signalled.await(10, TimeUnit.SECONDS), "close() raised the run's cancel signal");
         assertFalse(closing.isDone(), "close() drains the in-flight run - it must not finish while the run is parked");
         park.resume.countDown();
         closing.get(10, TimeUnit.SECONDS);
@@ -93,7 +104,8 @@ class GracefulStopHandoverTest {
 
         CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
         Park park = new Park(e -> Thread.currentThread().isVirtual() && name.equalsIgnoreCase(e.pipeline()),
-                () -> CommitFence.checkpoint(CommitFence.Scope.RUN, name));
+                () -> CommitFence.checkpoint(CommitFence.Scope.RUN, name),
+                () -> CommitFence.cancelSignal(CommitFence.Scope.RUN, name));
         svc.eventLog().addSubscriber(park);
         try (DbRunLease survivor = DbRunLease.open(url, null, null, svc.spaceId(), DbRunLease.SCOPE_RUN, "pod-b", TTL)) {
             CompletableFuture<?> run = CompletableFuture.runAsync(() -> svc.runPipelineOffThread(name, false));
@@ -108,6 +120,83 @@ class GracefulStopHandoverTest {
             RunLease.Claim taken = survivor.tryAcquire(name);
             assertNotNull(taken, "the drained run released its claim - the second node takes over");
             taken.close();
+        } finally {
+            svc.eventLog().removeSubscriber(park);
+            svc.close();
+        }
+    }
+
+    /**
+     * A pipeline with two inbox files = two Consignments run one at a time (threads: 1), and a Park on the run
+     * thread's first event - emitted after the FIRST batch commits, so the second batch is still to come and
+     * its checkpoint sees the close.
+     */
+    private static Object[] parkedPipeline(Path dir, CollectorService[] svcOut) throws Exception {
+        System.setProperty("run.lease.backend", leaseUrl(dir));
+        Path pipe = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("cfg")), "");
+        String toon = Files.readString(pipe);
+        assertTrue(toon.contains("threads: 2"));
+        Files.writeString(pipe, toon.replace("threads: 2", "threads: 1"));
+        PipelineConfig cfg = PipelineConfig.load(pipe.toString());
+        String name = cfg.identity().pipelineName();
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        for (int i = 0; i < 2; i++)
+            Files.writeString(inbox.resolve("f" + i + ".csv"), "ID,AMT,EVENT_DATE\nr" + i + ",1.0,2020-04-03\n");
+        CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+        Park park = new Park(e -> Thread.currentThread().isVirtual() && name.equalsIgnoreCase(e.pipeline()),
+                () -> CommitFence.checkpoint(CommitFence.Scope.RUN, name),
+                () -> CommitFence.cancelSignal(CommitFence.Scope.RUN, name));
+        svc.eventLog().addSubscriber(park);
+        svcOut[0] = svc;
+        return new Object[] {name, park, inbox};
+    }
+
+    /** Operator decision 2026-10-11: a cancelled manual pipeline run is recorded CANCELLED, never SUCCESS. */
+    @Test
+    void aManualPipelineRunCancelledByCloseIsRecordedCancelled(@TempDir Path dir) throws Exception {
+        CollectorService[] box = new CollectorService[1];
+        Object[] p = parkedPipeline(dir, box);
+        CollectorService svc = box[0];
+        Park park = (Park) p[1];
+        try {
+            String runId = svc.triggerRunAsync((String) p[0]).orElseThrow();
+            assertTrue(park.parked.await(20, TimeUnit.SECONDS), "the run emitted an event mid-flight");
+            closeWhileParked(svc, park);
+            PipelineRun r = svc.pipelineRunById(runId).orElseThrow();
+            assertEquals("CANCELLED", r.status(), "a cancelled run is not a success: " + r);
+            assertEquals(0, r.failed(), "nor a failure");
+            try (var left = Files.list((Path) p[2])) {
+                assertEquals(1, left.count(), "the uncommitted batch's input stays in the inbox");
+            }
+        } finally {
+            svc.eventLog().removeSubscriber(park);
+            svc.close();
+        }
+    }
+
+    /** ...and a cancelled scheduled run neither counts as failed nor marks the poll failed. */
+    @Test
+    void aScheduledRunCancelledByCloseIsNotAFailure(@TempDir Path dir) throws Exception {
+        CollectorService[] box = new CollectorService[1];
+        Object[] p = parkedPipeline(dir, box);
+        CollectorService svc = box[0];
+        Park park = (Park) p[1];
+        String name = (String) p[0];
+        try {
+            CompletableFuture<com.gamma.inspector.MultiCollectorProcessor.RunResult> cycle =
+                    CompletableFuture.supplyAsync(svc::runAllOnce);
+            assertTrue(park.parked.await(20, TimeUnit.SECONDS), "the run emitted an event mid-flight");
+            closeWhileParked(svc, park);
+            com.gamma.inspector.MultiCollectorProcessor.RunResult res = cycle.get(10, TimeUnit.SECONDS);
+            assertEquals(0, res.failed(), "a cancel is not a failed source run");
+            assertEquals(1, res.cancelled(), "run-all reports the source as cancelled: " + res);
+            assertEquals(0, res.succeeded(), "...not as succeeded");
+            Map<String, Object> row = svc.collectors().stream()
+                    .filter(m -> name.equalsIgnoreCase(String.valueOf(m.get("pipeline")))).findFirst().orElseThrow();
+            assertNull(row.get("lastError"), "the poll is not marked failed: " + row);
+            try (var left = Files.list((Path) p[2])) {
+                assertEquals(1, left.count(), "the uncommitted batch's input stays in the inbox");
+            }
         } finally {
             svc.eventLog().removeSubscriber(park);
             svc.close();
@@ -130,7 +219,8 @@ class GracefulStopHandoverTest {
                     runId.set(id == null ? null : id.toString());
                     return true;
                 },
-                () -> CommitFence.checkpoint(CommitFence.Scope.JOB, runId.get()));
+                () -> CommitFence.checkpoint(CommitFence.Scope.JOB, runId.get()),
+                () -> CommitFence.cancelSignal(CommitFence.Scope.JOB, runId.get()));
         svc.eventLog().addSubscriber(park);
         try (DbRunLease survivor = DbRunLease.open(url, null, null, svc.spaceId(), DbRunLease.SCOPE_JOB, "pod-b", TTL)) {
             var jobs = svc.jobServiceOrCreate();

@@ -2133,9 +2133,13 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 MultiCollectorProcessor.RunResult res =
                         runPipeline(pipelineName, skipPostAction, dryRun, rejects::add)
                                 .orElse(new MultiCollectorProcessor.RunResult(0, 0));
+                // HA-CANCEL-RESIDUALS-1: cancelled by a closing host and nothing genuinely failed => CANCELLED, never
+                // SUCCESS (a genuine failure still wins: it is counted in failed() and keeps the existing record).
+                boolean cancelledOnly = res.cancelled() > 0 && res.failed() == 0;
                 liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start,
-                        LocalDateTime.now().format(RUN_AT_TS), "SUCCESS", res.total(), res.failed(),
-                        res.failed() + " of " + res.total() + " file(s) failed",
+                        LocalDateTime.now().format(RUN_AT_TS), cancelledOnly ? "CANCELLED" : "SUCCESS", res.total(), res.failed(),
+                        cancelledOnly ? "cancelled: the host is closing; inputs stay in the inbox for the next run"
+                                : res.failed() + " of " + res.total() + " file(s) failed",
                         dryRun ? (rejects.isEmpty() ? List.of() : rejects.get(0)) : null));
             } catch (RuntimeException e) {
                 log.error("{} pipeline run '{}' ({}) failed", trigger, pipelineName, runId, e);

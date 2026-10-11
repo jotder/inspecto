@@ -139,6 +139,7 @@ public final class ConsignmentIngestor {
         // is not this Consignment's fault, so it must never spend an X1 attempt (five HA flaps would otherwise
         // quarantine a good file as RETRY_EXHAUSTED) — the file is simply left for the new holder.
         boolean leaseLost = false;
+        CommitFence.RunCancelledException cancelledAtCommit = null;   // rethrown after the audit: a cancel is not a success
 
         if (dryRun) {
             // Every durable tail site in one place, each logged as a would-have. ParkedBranches.drain is
@@ -165,6 +166,7 @@ public final class ConsignmentIngestor {
                     status = "FAILED";
                     error  = e.getMessage();
                     leaseLost = true;
+                    if (e instanceof CommitFence.RunCancelledException rc) cancelledAtCommit = rc;
                     log.warn("Consignment {} not parked: {}", batch.batchId(), e.getMessage());   // no cleanup — see above
                 } catch (Exception e) {
                     status = "FAILED";
@@ -179,6 +181,7 @@ public final class ConsignmentIngestor {
                     status = "FAILED";
                     error  = e.getMessage();   // "lease lost: ..." — distinct from "commit failed: ..."
                     leaseLost = true;
+                    if (e instanceof CommitFence.RunCancelledException rc) cancelledAtCommit = rc;
                     // ⛔ Deliberately NO cleanup of the lost run's outputs, manifest or registry rows: the batch id is
                     // a deterministic hash of the members (ConsignmentId), so the new holder re-plans the same
                     // inbox and mints the SAME id — the same output names, manifest and registry key. By now it
@@ -219,6 +222,7 @@ public final class ConsignmentIngestor {
             else if ("FAILED".equals(status)) CommitRetry.recordFailure(batch, cfg, error);
             else CommitRetry.clear(batch, cfg);
         }
+        if (cancelledAtCommit != null) throw cancelledAtCommit;   // CollectorProcessor reports the run CANCELLED
     }
 
     // ── data-plane provenance (T21 — consignment-chain-plan.md S3) ─────────────
