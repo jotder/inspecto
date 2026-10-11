@@ -101,11 +101,13 @@ function make(
 ) {
     const run = vi.fn((r: unknown) => of(answer(r)));
     const risk = {
-        table: vi.fn(() =>
+        lookup: vi.fn((_ref: unknown, _keys: string[], _inv?: string | null) =>
             Promise.resolve({
-                byKey: new Map([['a', { msisdn: 'a', indicator_score: 70 }]]),
+                byKey: new Map([['a', { msisdn: 'masked:a', indicator_score: 70 }]]),
                 columns: [],
                 truncated: false,
+                unresolved: 0,
+                masked: true,
             }),
         ),
     };
@@ -127,7 +129,7 @@ function make(
             { provide: NodeRiskService, useValue: risk },
             {
                 provide: LinkAnalysisSettingsService,
-                useValue: { limits: signal({ propagatedRiskWeightsInForce: [1, 0.5], maskingModeInForce: 'none' }) },
+                useValue: { limits: signal({ propagatedRiskWeightsInForce: [1, 0.5], maskingModeInForce: 'all' }) },
             },
         ],
     });
@@ -177,7 +179,8 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         await fixture.whenStable();
         await Promise.resolve();
         fixture.detectChanges();
-        expect(risk.table).toHaveBeenCalled();
+        // only the drawn nodes are asked for, with the Investigation (masked Spaces work: the server resolves the ids)
+        expect(risk.lookup).toHaveBeenCalledWith(expect.objectContaining({ keyCol: 'msisdn' }), ['a'], 'inv');
         expect(el.querySelector('[data-testid=param-nodeScores]')!.textContent).toContain('1 of 1 nodes');
         el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
         expect(run).toHaveBeenCalledWith({

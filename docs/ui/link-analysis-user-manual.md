@@ -189,10 +189,12 @@ Besides the node's rows (id, links, neighbours, Datasets, attributes) and its ca
 sections. On an Investigation canvas, click a node once to select it, then click the selected node again to open
 its detail dialog.
 
-While the Space's entity masking mode is anything but `none`, Risk and Enrichment are unavailable: the reference
-Datasets are read through a route that applies no masking (a masking-aware server-side key lookup is the planned
-follow-up). A reference read cut at its row limit is flagged, and Compute risk is then held - an incomplete score map
-would understate risk.
+Risk and Enrichment look up only the entities they need (the node itself, or every drawn node for Compute risk and
+*Fill nodeScores from indicators*), on the server (`POST /inv/reference-rows`, at most 500 keys a call), so they work
+in a masked Space too: identifying values (the entity id, and any column classified MSISDN / IMSI / ACCOUNT / PII or as
+a masked Entity Type; under masking mode `all`, every text value) are shown as aliases and the section says *Entity
+masking is on*, while numeric indicator scores stay readable. A lookup that matched more rows than one read returns is
+flagged, and Compute risk is then held - an incomplete score map would understate risk.
 
 * **Risk** — on a profile that maps an indicators Dataset (Telecom: `telecom_msisdn_indicators` by `msisdn`), the
   node's own **indicator score** and its factor columns. **Compute risk** runs `propagatedRisk` on the server over the

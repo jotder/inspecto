@@ -3,8 +3,8 @@ import { GraphPropagatedRiskView, GraphRunResult } from '@inspecto/link-analysis
 
 /**
  * Node risk + enrichment for the node detail dialog and the *All algorithms* panel (telecom demo S2 UI, storyboard W4 /
- * W11). Framework-free: which reference Datasets a domain reads its per-entity indicators and enrichment from, the SQL
- * reading them, and the words a propagated-risk factor is shown in.
+ * W11). Framework-free: which reference Datasets a domain reads its per-entity indicators and enrichment from, how the
+ * keys asked of them are chunked, and the words a propagated-risk factor is shown in.
  */
 
 /** A reference Dataset keyed by one column: one row per entity. */
@@ -54,26 +54,21 @@ export function riskMappingFor(profile: DomainProfileId | null | undefined): Ris
     return (profile && RISK_MAPPINGS[profile]) || null;
 }
 
-/** The most rows a reference Dataset read takes (the telecom indicators hold 2 423). Above it the read says truncated. */
-export const REFERENCE_ROW_LIMIT = 20_000;
+/** The most keys one `POST /inv/reference-rows` call takes; more are asked in chunks of this size. */
+export const REFERENCE_KEY_CAP = 500;
 
-const quote = (id: string) => `"${id.replace(/"/g, '""')}"`;
-
-/**
- * The SQL reading a whole reference Dataset over `/db/query`. It names identifiers only (double-quoted, embedded quotes
- * doubled): `/db/query` has no bound parameters, so no entity value ever goes into the SQL - lookups are client-side.
- */
-export function referenceSql(ref: KeyedDataset): string {
-    return `SELECT * FROM ${quote(ref.dataset)}`;
+/** Distinct, trimmed, non-blank keys split into chunks of at most `size`. */
+export function keyChunks(keys: string[], size = REFERENCE_KEY_CAP): string[][] {
+    const distinct = [...new Set(keys.map((k) => k.trim()).filter(Boolean))];
+    const out: string[][] = [];
+    for (let i = 0; i < distinct.length; i += size) out.push(distinct.slice(i, i + size));
+    return out;
 }
 
-/** The rows of a reference read indexed by the key column (trimmed text); the first row of a key wins. */
-export function indexByKey(rows: Record<string, unknown>[], keyCol: string): Map<string, Record<string, unknown>> {
+/** `/inv/reference-rows` rows (each tagged with the key AS ASKED) by that key; the first row of a key wins. */
+export function indexByKey(rows: { key: string; row: Record<string, unknown> }[]): Map<string, Record<string, unknown>> {
     const out = new Map<string, Record<string, unknown>>();
-    for (const r of rows) {
-        const k = String(r[keyCol] ?? '').trim();
-        if (k && !out.has(k)) out.set(k, r);
-    }
+    for (const r of rows) if (!out.has(r.key)) out.set(r.key, r.row);
     return out;
 }
 
