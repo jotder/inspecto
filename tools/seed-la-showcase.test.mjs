@@ -49,6 +49,12 @@ test('apply signs in once per persona and acts as the right persona', async () =
   const expiring = m.calls.find((c) => c.body && c.body.expiresAt);
   assert.ok(Date.parse(expiring.body.expiresAt) > Date.now());
   assert.ok(m.calls.find((c) => c.u.endsWith('/standing-detection')));
+  const watch = m.calls.find((c) => c.u === '/spaces/s/entity-lists' && c.body.entityType === 'msisdn');
+  assert.deepEqual([watch.body.id, watch.body.purpose], ['telecom-watch-msisdn', 'watch']);
+  assert.equal(watch.auth, 'Bearer tok-demo:fm.analyst');
+  const watched = m.calls.find((c) => c.u === '/spaces/s/entity-lists/telecom-watch-msisdn/members');
+  assert.deepEqual(watched.body.add, ['99979100001', '99979200001']);
+  assert.ok(watched.body.reason);
 });
 
 test('re-run skips an Investigation that already has its steps and its Case', async () => {

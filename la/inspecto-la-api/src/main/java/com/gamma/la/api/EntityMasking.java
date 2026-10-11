@@ -191,13 +191,24 @@ final class EntityMasking {
                 universe.addAll(strings(q.get("frontier")));
                 universe.addAll(strings(q.get("excluded")));
             }
+            // ONB-LA-ENDPOINT-TYPE-1: an endpoint type sealed into the read masks that side's ids when the type is masked
+            // (or no longer in force - fail closed, as a seed's entityType)
+            Map<?, ?> q = r.get("query") instanceof Map<?, ?> m ? m : Map.of();
+            boolean maskSrc = q.get("sourceType") != null && maskedType(types, String.valueOf(q.get("sourceType")));
+            boolean maskTgt = q.get("targetType") != null && maskedType(types, String.valueOf(q.get("targetType")));
             if (r.get("rows") instanceof List<?> rows)
                 for (Object o : rows)
                     if (o instanceof Map<?, ?> row) {
                         if (row.get("source") != null) universe.add(String.valueOf(row.get("source")));
                         if (row.get("target") != null) universe.add(String.valueOf(row.get("target")));
+                        if (maskSrc && row.get("source") != null) typedSeeds.add(String.valueOf(row.get("source")));
+                        if (maskTgt && row.get("target") != null) typedSeeds.add(String.valueOf(row.get("target")));
                     }
         }
+    }
+
+    private static boolean maskedType(List<EntityTypes.EntityType> types, String named) {
+        return types.stream().filter(t -> t.id().equalsIgnoreCase(named)).findFirst().map(EntityTypes.EntityType::masked).orElse(true);
     }
 
     /**

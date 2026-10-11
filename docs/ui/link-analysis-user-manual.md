@@ -311,6 +311,10 @@ Over a **pre-aggregated** Dataset (one row per pair with an event count, like `t
 as `eventsCol` when the Investigation is created: an expand then counts a link's events as the sum of that column, not
 its rows (an empty count is one event). It must be a whole-number column. The Telecom profile's *Investigate a number*
 binds `events` for you. Without it, each row is one event, as before.
+To have the entities an expand adds carry an **Entity Type** (so node actions such as *Add to watch list* find the
+lists of that type), declare it when the Investigation is created: `entityType` for both columns, or `sourceType` /
+`targetType` for each. Without it only the seed is typed. Under typed masking, a masked type also masks the entities
+it is given to.
 
 ### 9.2 Steps you can take
 

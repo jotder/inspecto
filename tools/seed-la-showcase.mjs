@@ -44,6 +44,12 @@ export function buildPlan() {
       addRanges: [{ prefix: 'SMURF-' }], reason: 'showcase structuring ring' } },
     { id: 'list-smurfs-expiring', as: 'fm.analyst', method: 'POST', path: '/entity-lists/smurf-accounts/members', body: {
       add: ['TILL-06'], expiresAt: '@+30d', reason: '30 day hold on the cash-out till' } },
+    // A watch list of the telecom profile's Entity Type (msisdn), so the node dialog's "Add to watch list" has a target on
+    // the telecom graph; it holds the Wangiri suspect and IRSF-01 only, leaving the rest of the ring to be added live.
+    { id: 'list-msisdn-watch', as: 'fm.analyst', method: 'POST', path: '/entity-lists', body: {
+      id: 'telecom-watch-msisdn', title: 'Telecom numbers under watch', purpose: 'watch', entityType: 'msisdn', reason: 'showcase telecom fraud ring' } },
+    { id: 'list-msisdn-watch-members', as: 'fm.analyst', method: 'POST', path: '/entity-lists/telecom-watch-msisdn/members', body: {
+      add: ['99979100001', '99979200001'], reason: 'Wangiri suspect and IRSF-01 (showcase)' } },
     { id: 'identity', as: 'fm.analyst', method: 'POST', path: '/inv/entity-identities', body: {
       a: 'account:MULE-HUB-01', b: 'account:ACC-1006', reason: 'same KYC document (showcase)' } },
     { id: 'case', as: 'fm.analyst', method: 'POST', path: '/cases/from-entities', body: {
