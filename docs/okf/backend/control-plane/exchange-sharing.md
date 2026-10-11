@@ -84,6 +84,14 @@ every offer/metadata response as `freshness`. Versions are **monotonic**: the se
 `v<System.currentTimeMillis()>`, and any producer must match `/^v(\d+)$/` so versions stay comparable by
 the trailing integer.
 
+**Published on approve.** `POST /exchange/grants/{id}/approve` publishes the first snapshot of every
+Dataset the approval activated in `snapshot` mode (`publishOnApprove`, reusing the same `publishSnapshot`
+path as `POST /exchange/refresh`), skipping Datasets that already have a snapshot and any `live` grant.
+Failure keeps the approval (the grant is already `active`): the response gains an additive
+`snapshots.<dataset>` = `{status:"published",version,rows}` or `{status:"failed",error}` and a WARNING is
+logged; the owner retries with Refresh. A double approve 409s before publishing. A scheduled refresh is
+still open (`SHARE-SNAPSHOT-ON-APPROVE-1` remainder).
+
 **Live delivery (S3, opt-in).** `ExchangeRefResolver` routes a `shared/<owner>/<item>` ref straight to
 the owner's Table directory, read-only, through a per-grant jail root — no snapshot, always current, but
 contends with the owner's workload; revocation must invalidate in-flight query plans. Consumer refs are

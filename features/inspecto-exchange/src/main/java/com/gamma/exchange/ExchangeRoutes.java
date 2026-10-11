@@ -119,26 +119,34 @@ public final class ExchangeRoutes implements RouteModule {
         String item  = requireItem(body);
         if (ex.offer(owner, "dataset", item).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no offered dataset " + owner + "/" + item);
-        SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(owner))
-                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + owner + "'"));
-        java.nio.file.Path config = ctx.root().config();
-        if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
         try {
-            ExchangeSnapshots.SnapshotMeta meta = ExchangeSnapshotWriter.publish(
-                    ex.dir(), owner, config.resolve("registry"),
-                    java.nio.file.Path.of(ctx.root().dataDir()), ctx.root().base().resolve("views"), item);
-            Event.Builder b = Event.builder(EventType.EXCHANGE_REFRESHED).source("exchange")
-                    .message("refreshed dataset " + owner + "/" + item + " → " + meta.version())
-                    .actor(ApiContext.actor(e)).actorType("user")
-                    .attr("owner", owner).attr("kind", "dataset").attr("item", item)
-                    .attr("version", meta.version()).attr("rows", meta.rows());
-            EventLog.current().emit(b);
-            return meta.toMap();
+            return publishSnapshot(api, e, ex, owner, item).toMap();
+        } catch (ApiException known) {
+            throw known;
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (Exception fail) {
             throw com.gamma.control.ServerFaults.internal("snapshot failed", fail);
         }
+    }
+
+    /** The one publish path — the manual refresh route and approve-time publishing both go through it. */
+    private static ExchangeSnapshots.SnapshotMeta publishSnapshot(ApiContext api, HttpExchange e, Exchange ex,
+                                                                  String owner, String item) throws Exception {
+        SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(owner))
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + owner + "'"));
+        java.nio.file.Path config = ctx.root().config();
+        if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
+        ExchangeSnapshots.SnapshotMeta meta = ExchangeSnapshotWriter.publish(
+                ex.dir(), owner, config.resolve("registry"),
+                java.nio.file.Path.of(ctx.root().dataDir()), ctx.root().base().resolve("views"), item);
+        Event.Builder b = Event.builder(EventType.EXCHANGE_REFRESHED).source("exchange")
+                .message("refreshed dataset " + owner + "/" + item + " → " + meta.version())
+                .actor(ApiContext.actor(e)).actorType("user")
+                .attr("owner", owner).attr("kind", "dataset").attr("item", item)
+                .attr("version", meta.version()).attr("rows", meta.rows());
+        EventLog.current().emit(b);
+        return meta;
     }
 
     /** Merge the live snapshot's freshness into an offer/metadata map, when a snapshot has been published. */
@@ -278,12 +286,54 @@ public final class ExchangeRoutes implements RouteModule {
             };
             signal(e, type, action + "d " + g.kind() + " " + g.owner() + "/" + g.item(),
                     g.owner(), g.consumer(), g.kind(), g.item());
-            return g.toMap();
+            Map<String, Object> out = new LinkedHashMap<>(g.toMap());
+            if ("approve".equals(action)) {
+                Map<String, Object> published = publishOnApprove(api, e, ex, g);
+                if (!published.isEmpty()) out.put("snapshots", published);
+            }
+            return out;
         } catch (NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalStateException conflict) {
             throw new ApiException(409, ErrorCodes.CONFLICT, conflict.getMessage());
         }
+    }
+
+    /**
+     * Publish-on-approve (SHARE-SNAPSHOT-ON-APPROVE-1): approving a snapshot-mode share otherwise leaves the
+     * consumer's bound Dataset unreadable until the owner finds "Refresh snapshot". Reuses {@link #publishSnapshot}
+     * (the manual refresh path). Only the Datasets the approval just activated in snapshot mode, and only
+     * those with no snapshot yet — a second consumer of an already-published Dataset must not churn versions.
+     * <b>Fail-open for the approval</b>: the grant is already {@code active} (as with every other approve-time
+     * side effect here, the audit signal has fired); a failed publish is reported per item as
+     * {@code {status:"failed", error}} and logged so the owner retries via {@code POST /exchange/refresh}.
+     * Double-approve never reaches here: {@code Exchange.approve} 409s on a non-requested grant.
+     */
+    private static Map<String, Object> publishOnApprove(ApiContext api, HttpExchange e, Exchange ex, ShareGrant g) {
+        java.util.List<String> items = "dataset".equals(g.kind()) ? java.util.List.of(g.item())
+                : ex.offer(g.owner(), g.kind(), g.item()).map(Offer::datasets).orElse(java.util.List.of());
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (String ds : items) {
+            boolean snapshotMode = ex.grant(ShareGrant.idFor("dataset", ds, g.owner(), g.consumer()))
+                    .filter(x -> ShareGrant.ACTIVE.equals(x.status()) && ShareGrant.SNAPSHOT.equals(x.mode()))
+                    .isPresent();
+            if (!snapshotMode || ex.offer(g.owner(), "dataset", ds).isEmpty()) continue;
+            if (ExchangeSnapshots.readCurrent(ExchangeSnapshots.itemDir(ex.dir(), g.owner(), ds)).isPresent()) continue;
+            Map<String, Object> one = new LinkedHashMap<>();
+            try {
+                ExchangeSnapshots.SnapshotMeta meta = publishSnapshot(api, e, ex, g.owner(), ds);
+                one.put("status", "published");
+                one.put("version", meta.version());
+                one.put("rows", meta.rows());
+            } catch (Exception fail) {
+                System.getLogger(ExchangeRoutes.class.getName()).log(System.Logger.Level.WARNING,
+                        "approve-time snapshot of " + g.owner() + "/" + ds + " failed; retry with POST /exchange/refresh", fail);
+                one.put("status", "failed");
+                one.put("error", String.valueOf(fail.getMessage()));
+            }
+            result.put(ds, one);
+        }
+        return result;
     }
 
     /** Consumer sets/clears a version pin on its grant — snapshot resolution then serves that version (S3). */
