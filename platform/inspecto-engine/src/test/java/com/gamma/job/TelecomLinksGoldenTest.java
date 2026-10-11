@@ -297,6 +297,26 @@ class TelecomLinksGoldenTest {
     }
 
     /**
+     * TELECOM-ALERT-REFIRE-1: live, telecom_msisdn_indicators runs every 10 minutes and re-produces unchanged counts,
+     * so alert.evaluate sweeps again each time. An unchanged breach of a scalar Measure rule must not raise a new
+     * Alert on any later sweep - not even once the rule's cooldown has lapsed (it used to re-fire every cooldown).
+     */
+    @Test
+    void anUnchangedBreachDoesNotReFireOnLaterSweeps() throws Exception {
+        Path cfg = space.resolve("config");
+        List<AlertRule> rules = new ComponentStore(cfg.resolve("registry")).list("alert-rule").stream()
+                .map(c -> AlertRule.fromMap(c.content())).toList();
+        AlertService svc = new AlertService(rules, noPipelines(), emptyStore(), new FakeObjectAccess());
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> data);
+        svc.measureProbe(probe::value);
+        long t0 = System.currentTimeMillis();
+        assertEquals(3, com.gamma.alert.AlertSweeps.at(svc, t0).size(), "the first sweep fires the three typology Alerts");
+        for (int run = 1; run <= 3; run++)   // the next indicator runs, each past the 10-minute cooldown
+            assertEquals(List.of(), com.gamma.alert.AlertSweeps.at(svc, t0 + run * 11 * 60_000L),
+                    "unchanged counts on run " + run + " raise no new Alert");
+    }
+
+    /**
      * D4: nothing presses Evaluate in the demo. The template's {@code telecom_typology_alerts} Job ({@code alert.evaluate})
      * fires on the counts Job's {@code job.dataset.produced} signal and, through the production AlertService, fires the
      * three typology Alerts with the seed counts 2/4/6 - aggregate only, no MSISDN.
