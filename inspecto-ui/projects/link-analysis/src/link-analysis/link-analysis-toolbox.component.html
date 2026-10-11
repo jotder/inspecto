@@ -1035,12 +1035,16 @@
                                     <button
                                         mat-stroked-button
                                         (click)="runPattern()"
-                                        [disabled]="!!browserPatternColumns().blocked"
+                                        [disabled]="
+                                            investigationPatternColumns()
+                                                ? serverPatternBusy() || !!investigationPatternColumns()?.blocked
+                                                : !!browserPatternColumns().blocked
+                                        "
                                     >
                                         <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                                         Find matches
                                     </button>
-                                    @if (graphTruncated() && traversalMappings().length) {
+                                    @if (graphTruncated() && traversalMappings().length && !investigationPatternColumns()) {
                                         <button
                                             mat-stroked-button
                                             (click)="runBranchingOnServer()"
@@ -1052,7 +1056,30 @@
                                     }
                                 </div>
                                 <!-- A pack's kind / time column: pre-filled from the domain profile, or why it cannot run. -->
-                                @if (browserPatternColumns().blocked; as why) {
+                                @if (investigationPatternColumns(); as ic) {
+                                    @if (ic.blocked) {
+                                        <p
+                                            class="m-0 text-sm"
+                                            role="status"
+                                            data-testid="investigation-pattern-columns-blocked"
+                                        >
+                                            {{ ic.blocked }}
+                                        </p>
+                                    } @else if (ic.notice) {
+                                        <p
+                                            class="text-secondary m-0 text-sm"
+                                            role="status"
+                                            data-testid="investigation-pattern-columns-notice"
+                                        >
+                                            {{ ic.notice }}
+                                        </p>
+                                    }
+                                    <p class="text-secondary m-0 text-sm" data-testid="investigation-pattern-scope">
+                                        This pattern runs on the server over the Investigation's whole Dataset
+                                        ({{ investigationPatternTarget()?.dataset }}), not only the Working Set on the
+                                        canvas, so a match can include numbers you have not added yet.
+                                    </p>
+                                } @else if (browserPatternColumns().blocked; as why) {
                                     <p class="m-0 text-sm" role="status" data-testid="pattern-columns-blocked">
                                         {{ why }}
                                     </p>

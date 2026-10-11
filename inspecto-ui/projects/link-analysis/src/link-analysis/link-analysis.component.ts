@@ -197,6 +197,7 @@ import { LinkAnalysisTimelinePlaybackComponent } from './link-analysis-timeline-
 import { TemporalFindingsState, allTemporalSelection, temporalResultToState } from './temporal-findings';
 import {
     FindPathsRequest,
+    InvestigationPatternTarget,
     LinkAnalysisToolboxComponent,
     ServerPatternRequest,
 } from './link-analysis-toolbox.component';
@@ -1433,6 +1434,55 @@ export class LinkAnalysisComponent implements OnInit {
         );
     }
 
+    /**
+     * The open Investigation's binding, while its Working Set is what the canvas draws — so the toolbox runs a pattern
+     * pack on the server over that Dataset with the Investigation's own kind / time columns (its links carry neither).
+     */
+    readonly investigationPatternTarget = computed<InvestigationPatternTarget | null>(() => {
+        if (!this.investigation.canvas()) return null;
+        const h = this.investigation.header();
+        if (!h?.dataset) return null;
+        return {
+            dataset: h.dataset,
+            ...(h.linkKindCol ? { linkKindCol: h.linkKindCol } : {}),
+            ...(h.timeCol ? { timeCol: h.timeCol } : {}),
+        };
+    });
+
+    /**
+     * Run a branching pack over the open Investigation's WHOLE Dataset (`POST /inv/pattern/branching`). Matches are
+     * highlighted where the Working Set draws them; nothing is added to the Investigation (that stays an op).
+     */
+    private async runPatternOverInvestigation(req: ServerPatternRequest): Promise<void> {
+        const h = this.investigation.header();
+        const target = this.investigationPatternTarget();
+        if (!h || !target) return;
+        this.serverPatternBusy.set(true);
+        try {
+            const res = await firstValueFrom(
+                this.inv.branchingPattern({
+                    dataset: target.dataset,
+                    sourceCol: h.sourceCol,
+                    targetCol: h.targetCol,
+                    linkKindCol: req.linkKindCol ?? target.linkKindCol,
+                    timeCol: req.timeCol ?? target.timeCol,
+                    stages: req.stages,
+                }),
+            );
+            const base = this.canvasData() ?? { nodes: [], edges: [] };
+            const { state } = branchingResultToGraph(res, base);
+            this.serverPattern.set(state);
+            const drawn = new Set(base.nodes.map((n) => n.id));
+            const nodeIds = [...new Set(state.matches.flatMap((m) => m.nodeIds))].filter((id) => drawn.has(id));
+            this.emphasis.set(nodeIds.length ? { nodeIds, edgeIds: [] } : null);
+        } catch (err) {
+            this.serverPattern.set(null);
+            this.toastr.error(invErrorMessage(err, 'The server pattern search failed.'));
+        } finally {
+            this.serverPatternBusy.set(false);
+        }
+    }
+
     /** Why "Attach to Case" is unavailable to this user — empty when it is available. Attaching needs `canManageIncidents`. */
     readonly attachUnavailable = computed(() =>
         this.lens.canManageIncidents() ? '' : 'Attaching to a Case needs the Incident management capability.',
@@ -1892,6 +1942,7 @@ export class LinkAnalysisComponent implements OnInit {
      * and highlighted, exactly as LA-11's server paths are.
      */
     async runPatternOnServer(req: ServerPatternRequest): Promise<void> {
+        if (req.overInvestigation) return this.runPatternOverInvestigation(req);
         const target = this.traversalTargets()[req.mapping];
         const g = this.graph();
         if (!target || !g) return;

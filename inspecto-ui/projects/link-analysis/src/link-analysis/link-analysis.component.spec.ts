@@ -1000,6 +1000,79 @@ describe('LinkAnalysisComponent', () => {
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
     });
+    it('evidence: Attach to Case is on the rail with only an Investigation canvas open (no query graph) and seals the Working Set', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        const attach = () =>
+            Array.from(el.querySelectorAll('[data-testid="la-tool-rail"] button')).find((b) =>
+                (b.getAttribute('aria-label') ?? '').startsWith('Attach to Case'),
+            ) as HTMLButtonElement | undefined;
+        expect(c.graph()).toBeNull();
+        expect(attach()).toBeUndefined(); // nothing to seal yet
+
+        c.investigation.activeId.set('inv-3');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'ws-a' }, { id: 'ws-b' }],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        expect(c.graph()).toBeNull();
+        const btn = attach()!;
+        expect(btn).toBeDefined();
+        expect(btn.disabled).toBe(c.attachUnavailable() !== '');
+        if (btn.disabled) expect(btn.getAttribute('aria-label')).toContain(c.attachUnavailable());
+        const open = vi
+            .spyOn(fixture.debugElement.injector.get(MatDialog), 'open')
+            .mockReturnValue({ afterClosed: () => of(undefined) } as never);
+        vi.spyOn(c, 'attachUnavailable').mockReturnValue('');
+        c.openAttachToCase();
+        const data = (open.mock.calls[0] as unknown as [unknown, { data: { graph: G6GraphData; origin: unknown } }])[1]
+            .data;
+        expect(data.graph).toBe(c.canvasData());
+        expect(data.origin).toMatchObject({ sourceId: 'investigation', dataset: 'links-ds' });
+    });
+    it('a pattern pack on the Investigation canvas runs on the server over its Dataset with its kind / time columns', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-4');
+        c.investigation.log.set({
+            header: { dataset: 'telecom_links', sourceCol: 'a', targetCol: 'b', linkKindCol: 'link_kind', timeCol: 'first_seen' },
+            entries: [],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'm1' }, { id: 'm2' }],
+            links: [{ source: 'm1', target: 'm2', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        expect(c.investigationPatternTarget()).toEqual({
+            dataset: 'telecom_links',
+            linkKindCol: 'link_kind',
+            timeCol: 'first_seen',
+        });
+        const inv = fixture.debugElement.injector.get(InvService);
+        const call = vi
+            .spyOn(inv, 'branchingPattern')
+            .mockReturnValue(of({ matches: [], edges: [], truncated: false, legCapped: false }) as never);
+        await c.runPatternOnServer({ mapping: -1, stages: [], overInvestigation: true, timeCol: 'first_seen' });
+        expect(call).toHaveBeenCalledWith(
+            expect.objectContaining({
+                dataset: 'telecom_links',
+                sourceCol: 'a',
+                targetCol: 'b',
+                linkKindCol: 'link_kind',
+                timeCol: 'first_seen',
+            }),
+        );
+        expect(c.serverPattern()).toMatchObject({ matches: [] });
+        expect(c.graph()).toBeNull(); // the query graph is not touched
+    });
     it('the query graph "Truncated" alert shows on the query graph, not over an open Investigation canvas, and returns after', async () => {
         const expand = vi.fn(async () => ({
             nodes: [{ id: 'f', data: { label: 'F', kind: 'entity' } }],
