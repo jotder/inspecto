@@ -224,7 +224,12 @@ class SqlTemplateIncrementalTest {
                 Map.of("by", "week", "column", "event_date", "lookback", "3"),
                 Map.of("by", "day", "column", "no_such_col", "lookback", "3"),
                 Map.of("by", "day", "column", "event_date", "lookback", "3", "extra", "1"),
-                Map.of("by", "day", "lookback", "3"))) {
+                Map.of("by", "day", "lookback", "3"),
+                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "2"),
+                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "0"),
+                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "-5"),
+                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "x"),
+                Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "3661"))) {
             Map<String, Object> j = new HashMap<>(Map.of("name", "x", "type", "sql.template", "sql", SQL,
                     "sink_dataset", "s", "incremental", bad));
             assertThrows(IllegalArgumentException.class, () -> JobConfig.fromMap(Map.of("job", j)), bad.toString());
@@ -238,5 +243,126 @@ class SqlTemplateIncrementalTest {
         assertEquals(Map.of("by", "day", "column", "event_date", "lookback", "366"), ok.toMap().get("incremental"));
         assertFalse(ok.toMap().keySet().stream().anyMatch(k -> k.startsWith("incremental.")));
         assertEquals(ok, JobConfig.fromMap(Map.of("job", ok.toMap())));
+        JobConfig kept = job(3, 3);   // retain == lookback is the edge
+        assertEquals(Map.of("by", "day", "column", "event_date", "lookback", "3", "retain", "3"), kept.toMap().get("incremental"));
+        assertEquals(kept, JobConfig.fromMap(Map.of("job", kept.toMap())));
+        assertNotNull(job(3, 3660), "the retain cap is legal");
+    }
+
+    /** A junction / symlink inside an expired partition is removed as a link; its TARGET's files survive. */
+    @Test
+    void pruneNeverDeletesThroughAJunctionOrSymlink(@TempDir Path tmp) throws Exception {
+        Path sink = tmp.resolve("sink");
+        Path day = sink.resolve("event_date=2020-01-01");
+        Files.createDirectories(day);
+        Files.writeString(day.resolve("part-a.parquet"), "old");
+        Path target = tmp.resolve("outside");
+        Files.createDirectories(target);
+        Path precious = Files.writeString(target.resolve("precious.txt"), "keep me");
+        boolean anyLink = false;
+        String why = "not Windows";
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+            // cmd splits arguments on '=', so the junction is made beside the sink and renamed into the partition
+            Path made = tmp.resolve("junction");
+            Process p = new ProcessBuilder("cmd", "/c", "mklink", "/J", made.toString(), target.toString())
+                    .redirectErrorStream(true).start();
+            why = new String(p.getInputStream().readAllBytes());
+            if (p.waitFor() == 0) Files.move(made, day.resolve("junction"));
+            anyLink |= Files.exists(day.resolve("junction").resolve("precious.txt"));
+        }
+        try {
+            Files.createSymbolicLink(day.resolve("symlink"), target);
+            anyLink = true;
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            // symlinks need a privilege on Windows; the junction case covers it there
+        }
+        org.junit.jupiter.api.Assumptions.assumeTrue(anyLink, "neither a junction nor a symlink can be created here: " + why);
+        IncrementalSink.prune(sink, "event_date", LocalDate.of(2026, 1, 1));
+        assertTrue(Files.exists(precious), "the link target's file survives the prune");
+        assertEquals("keep me", Files.readString(precious));
+        assertFalse(Files.exists(day.resolve("part-a.parquet")), "the partition's own file is deleted");
+    }
+
+    private static JobConfig job(int lookback, int retain) {
+        Map<String, Object> j = new LinkedHashMap<>();
+        j.put("name", "daily");
+        j.put("type", "sql.template");
+        j.put("sql", SQL);
+        j.put("sources", "events");
+        j.put("sink_dataset", "daily_totals");
+        j.put("incremental", Map.of("by", "day", "column", "event_date", "lookback", String.valueOf(lookback),
+                "retain", String.valueOf(retain)));
+        return JobConfig.fromMap(Map.of("job", j));
+    }
+
+    /**
+     * {@code retain: M}: after the replace, under the same lock, day folders older than (run day - M + 1) are
+     * deleted. Only exact {@code <column>=<ISO date>} folders go; a folder holding a {@code seed.parquet} (a
+     * template's zero-row schema seed), other folders, and the marker / lock dot-files are never touched.
+     */
+    @Test
+    void retainPrunesOnlyOldDayFoldersAndKeepsSeedOthersAndMarkers(@TempDir Path tmp) throws Exception {
+        Path dataDir = tmp.resolve("data");
+        Path sink = dataDir.resolve("daily_totals");
+        seed(dataDir, "base.parquet", days(10));
+        Path seedDay = sink.resolve("event_date=1970-01-01");
+        Files.createDirectories(seedDay);
+        Files.writeString(seedDay.resolve("seed.parquet"), "zero-row schema seed");
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(job(10)), new ConsignmentEventBus(), s, null,
+                     tmp.resolve("audit").toString(), null, null, dataDir.toString())) {
+            js.start();
+            String r1 = run(js, "daily", null);
+            assertEquals(11, countDayDirs(sink), "10 days + the seed folder, nothing pruned without retain");
+            js.upsertJob(job(1, 4));
+            run(js, "daily", r1);
+            for (int i = 0; i < 10; i++) {
+                LocalDate d = D.minusDays(i);
+                assertEquals(i < 4, Files.isDirectory(sink.resolve("event_date=" + d)), "day " + d + " (retain 4)");
+            }
+            assertTrue(Files.exists(seedDay.resolve("seed.parquet")), "the seed folder is kept");
+            assertTrue(Files.exists(sink.resolve(IncrementalSink.OWNER_MARKER)), "marker kept");
+            assertTrue(Files.exists(sink.resolve(IncrementalSink.LOCK_FILE)), "lock file kept");
+        }
+    }
+
+    @Test
+    void pruneTouchesOnlyExactDayFolders(@TempDir Path sink) throws Exception {
+        List<String> keep = List.of("event_date=2026-01-01x", "other=2020-01-01", "event_date=20200101", "plain",
+                "event_date=2026-10-01", "event_date=1970-01-01");
+        for (String n : keep) Files.createDirectories(sink.resolve(n));
+        Files.writeString(sink.resolve("event_date=1970-01-01").resolve("seed.parquet"), "seed");
+        Files.createDirectories(sink.resolve("event_date=2020-01-01"));
+        Files.writeString(sink.resolve("event_date=2020-01-01").resolve("part-a.parquet"), "old");
+        Files.writeString(sink.resolve(".sql-template-incremental"), "daily");
+        assertEquals(1, IncrementalSink.prune(sink, "event_date", LocalDate.of(2026, 10, 1)));
+        assertFalse(Files.exists(sink.resolve("event_date=2020-01-01")));
+        for (String n : keep) assertTrue(Files.isDirectory(sink.resolve(n)), n);
+        assertTrue(Files.exists(sink.resolve(".sql-template-incremental")));
+    }
+
+    @Test
+    void aPruneFailureIsLoggedAndDoesNotFailTheReplace(@TempDir Path tmp) throws Exception {
+        Path dataDir = tmp.resolve("data");
+        Path sink = dataDir.resolve("daily_totals");
+        seed(dataDir, "base.parquet", days(5));
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(job(5)), new ConsignmentEventBus(), s, null,
+                     tmp.resolve("audit").toString(), null, null, dataDir.toString())) {
+            js.start();
+            String r1 = run(js, "daily", null);
+            IncrementalSink.beforePrune = dir -> { throw new java.io.IOException("simulated delete failure"); };
+            js.upsertJob(job(1, 2));
+            run(js, "daily", r1);   // asserts SUCCESS
+            assertTrue(Files.isDirectory(sink.resolve("event_date=" + D.minusDays(4))), "the failed prune left it");
+        } finally {
+            IncrementalSink.beforePrune = dir -> { };
+        }
+    }
+
+    private static long countDayDirs(Path sink) throws Exception {
+        try (Stream<Path> l = Files.list(sink)) {
+            return l.filter(p -> Files.isDirectory(p) && p.getFileName().toString().startsWith("event_date=")).count();
+        }
     }
 }

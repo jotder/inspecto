@@ -171,7 +171,7 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   `transform.sql` allow-list), and the connection is sealed to the data root — see
   [Auth & Security](../editions/auth-security.md#the-sqltemplate-job-runs-behind-sqlguard-and-a-sealed-connection-sql-template-sandbox-1-2026-09-24).
   **Incremental mode by per-day partitions (operator, 2026-10-10; `ASSURE-PACK-TELCO-FRAUD-1` (b)).**
-  `incremental: {by: day, column: <date col>, lookback: N}` makes a run replace only the last `N` days
+  `incremental: {by: day, column: <date col>, lookback: N, retain: M}` makes a run replace only the last `N` days
   (ending on the trigger's `day` param, declared for incremental Jobs only, else today UTC) of its sink,
   laid out Hive-style as `<sink>/<column>=YYYY-MM-DD/part-<run>.parquet` with the date column held in the
   folder name only, so the store reader (`hive_partitioning=true`) gives it back as a DATE — as the
@@ -193,10 +193,26 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   3M output rows over 30 days, aggregate SQL that reads the whole source): full snapshot 1.6-1.7 s and
   22.8 MB rewritten per run; incremental `lookback: 1` 0.9-1.0 s and ~0.8 MB (one day) rewritten; the
   30-day backfill took 3.0 s. The read side is unchanged unless the SQL filters its source by the window.
-  ⚠ Not enabled in the shipped packs: the telco-fraud Jobs carry history by reading their own sink and
-  pruning by `retention_days`, their sinks ship a flat zero-row `seed.parquet` (which this gate refuses),
-  and an incremental sink never prunes old days — enabling it would change the golden run, so the
-  templates were left as they are.
+  **Enabled in the telco-fraud pack (2026-10-11):** all 14 detection Jobs run `incremental: {by: day,
+  column: window_date, lookback: 1, retain: 31}` with `day: "$yesterday"` (the same day as `window_start`; a manual or
+  golden run passes `day` beside the literal window), no longer read their own sink, and ship their zero-row
+  schema seed as `data/fraud_<typology>/window_date=1970-01-01/seed.parquet` (a placeholder day the Job
+  never replaces; a flat `seed.parquet` is refused by the layout gate). The Dataset reader leaves
+  `hive_partitioning` unset and DuckDB auto-detects the `window_date=` folders, so `window_date` reaches
+  Alert Rules, KPIs (`timeField: window_date`) and BI as a DATE. Each Job carries `retain: 31` (its old
+  `retention_days` horizon: the window plus 30 earlier days), so evidence still ages out and a key heals on the same day (pinned by the golden test's day-31 and day-32 runs).
+  **Retention: `retain: M` (2026-10-11).** Optional; an integer from `lookback` to 3660, refused 422 at save
+  otherwise; absent = keep every day. After the replace, under the same lock, `IncrementalSink.prune`
+  deletes each `<column>=YYYY-MM-DD` folder dated before `day - (M - 1)` (so M days are kept). Only folders
+  whose name is exactly `<column>=<ISO date>`; a folder holding `seed.parquet` (a template's zero-row
+  schema seed) and every other entry, dot-files (marker, lock) included, are never touched. A failed
+  delete is logged (WARN) and skipped — retention never fails the run. The delete never leaves the
+  partition folder: a symlink or other reparse point (a Windows junction, which Java reports as
+  `isOther()`, not a symlink) is removed as a link and never descended, and an entry whose real path is
+  outside the folder is left (WARN). A reader racing a prune may get a transient file-not-found for an
+  expired day; it is retry-safe and never returns wrong data. Pinned by
+  `SqlTemplateIncrementalTest` (prune, seed / non-matching folders kept, failure tolerated, validation) and
+  `ControlApiIncrementalJobTest` (422).
 * **`caserule.evaluate`** — schedules the auto-grouping tail of the Alert → Incident → Case chain (C5):
   evaluates a saved Case Rule, grouping matching in-window Incidents under a Case via
   `ObjectService.evaluateCaseRule` — the same step `POST /cases/rules/{name}/evaluate` drives — and emits

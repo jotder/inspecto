@@ -48,6 +48,14 @@ class ControlApiIncrementalJobTest {
                 assertTrue(r.body().contains("lookback"), r.body());
                 assertFalse(Files.exists(toon), "nothing was written");
             }
+            // retain (partition retention) must be an integer from lookback to 3660
+            for (String badRetain : new String[] {"0", "2", "x", "3661"}) {
+                HttpResponse<String> r = send(port, "POST", base + "/jobs",
+                        body("daily", "3").replace("\"lookback\":\"3\"", "\"lookback\":\"3\",\"retain\":\"" + badRetain + "\""));
+                assertEquals(422, r.statusCode(), r.body());
+                assertTrue(r.body().contains("retain"), r.body());
+                assertFalse(Files.exists(toon), "nothing was written");
+            }
 
             Path sink = root.resolve("acme").resolve("data").resolve("daily_totals");
             Files.createDirectories(sink);
