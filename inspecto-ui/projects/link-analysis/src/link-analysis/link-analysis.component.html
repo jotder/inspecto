@@ -257,21 +257,20 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
                 </button>
+                <!-- one step: seal what is on screen and attach it; disabled with the reason when not permitted -->
+                <span class="inline-flex" [matTooltip]="attachUnavailable() || 'Seal this analysis and attach it to a Case'">
                 <button
                     mat-icon-button
                     (click)="openAttachToCase()"
-                    [matTooltip]="
-                        latestSnapshot()
-                            ? 'Attach the latest saved analysis to a Case'
-                            : 'Save the analysis first, then attach'
-                    "
-                    aria-label="Attach to Case"
+                    [disabled]="attachUnavailable() !== ''"
+                    [attr.aria-label]="attachUnavailable() ? 'Attach to Case — ' + attachUnavailable() : 'Attach to Case'"
                 >
                     <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
                     @if (snapshots.count(); as n) {
                         <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none">{{ n }}</span>
                     }
                 </button>
+                </span>
                 <span
                     class="my-1 h-px w-6 max-md:mx-1 max-md:my-0 max-md:h-5 max-md:w-px"
                     style="background: var(--gamma-border)"
@@ -846,6 +845,7 @@
                             [hiddenEdgeKinds]="hiddenLinkKinds()"
                             [edgeColors]="edgeColors()"
                             (edgeKindToggle)="toggleLinkKind($event)"
+                            [highConnectivity]="hubsDrawn()"
                             [open]="legendOpen()"
                             (openChange)="legendOpen.set($event)"
                         ></inspecto-link-analysis-legend>

@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -30,6 +32,7 @@ import {
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
+        MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
@@ -121,6 +124,16 @@ import {
                 }
             </mat-form-field>
         </div>
+        <!-- Supernode suppression override: outside the collapsed section, so the opt-in is never hidden. -->
+        <mat-checkbox [formControl]="includeHubs" data-testid="include-hubs">
+            Include hubs — expand through high-connectivity entities
+        </mat-checkbox>
+        @if (includeHubs.value) {
+            <p class="text-secondary m-0 text-xs" data-testid="include-hubs-note">
+                An expand that reaches a flagged entity asks you to confirm first; the override is sealed in that step and
+                shown in the log and the Dossier.
+            </p>
+        }
         @if (error()) {
             <inspecto-alert variant="error" title="Expand refused">{{ error() }}</inspecto-alert>
         }
@@ -143,6 +156,14 @@ export class InvestigationExpandRungComponent {
     /** The rung's own window (`window: {from, to, slot, days, timezone}`), read only while the picker says so. */
     readonly override = windowForm();
     readonly maxKinds = MAX_LINK_KINDS;
+    /** The analyst's opt-in to expand THROUGH flagged entities (`includeHubs: true`) — off by default, every time. */
+    readonly includeHubs = new FormControl(false, { nonNullable: true });
+    /** {@link includeHubs} as a signal, for the host's "Expand next degree" frontier. */
+    readonly includeHubsOn = signal(false);
+
+    constructor() {
+        this.includeHubs.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => this.includeHubsOn.set(v));
+    }
 
     /** The rung to send, or null when a field is out of the server's bounds (the section opens on the errors). */
     rung(): ExpandRung | null {
@@ -154,7 +175,8 @@ export class InvestigationExpandRungComponent {
             this.open.set(true);
             return null;
         }
-        return rungOf(this.form, this.override);
+        const rung = rungOf(this.form, this.override);
+        return this.includeHubs.value ? { ...rung, includeHubs: true } : rung;
     }
 
     /** The server's refusal, verbatim. */

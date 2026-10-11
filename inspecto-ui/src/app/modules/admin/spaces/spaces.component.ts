@@ -13,6 +13,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 import { SpaceTemplateGalleryData, SpaceTemplateGalleryDialog } from './space-template-gallery.dialog';
 import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
+import { SpaceComparisonData, SpaceComparisonDialog } from './space-comparison.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
@@ -142,6 +143,12 @@ export class SpacesComponent implements OnInit {
         if (!go) return;
         this.spaces.selectSpace(s.id);
         window.location.assign('/'); // UIE-7: `/` lands on the Space landing
+    }
+
+    /** Compare the storage growth of two or more hosted Spaces (`POST /space-comparisons`). */
+    compareSpaces(): void {
+        const data: SpaceComparisonData = { spaces: this.spaces.availableSpaces() };
+        this.dialog.open(SpaceComparisonDialog, { data, width: '760px', maxHeight: '90vh' });
     }
 
     createFromBundle(): void {

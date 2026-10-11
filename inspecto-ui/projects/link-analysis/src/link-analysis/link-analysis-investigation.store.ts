@@ -3,6 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { EntityProjection, G6Node } from '@inspecto/core/graph';
 import {
     DraftReplayResult,
+    ExpandRung,
     InvService,
     InvestigationLog,
     InvestigationOpRequest,
@@ -152,6 +153,7 @@ export class InvestigationSessionStore {
         this.error.set('');
         this.degreeOutcomes.set([]);
         this.windowEnd.set(null);
+        this.lastOverride.set(null);
     }
 
     /** Stop remembering an id (e.g. one the server no longer answers for). Nothing is deleted server-side. */
@@ -208,17 +210,22 @@ export class InvestigationSessionStore {
     /**
      * "Expand next degree": one `expand` from the visible entities at the Working Set's outermost hop, with the
      * profile's preset rung. Records the degree's outcome; false (with `error` set) when blocked or refused.
+     *
+     * High-connectivity entities at that hop are left out of the frontier — the server refuses a named flagged id —
+     * unless the analyst opted in (`includeHubs`), and only then does the op carry `includeHubs: true`, which the
+     * server seals in the step's params as the audited override.
      */
-    async expandNextDegree(presets: DegreePresets, maxDegree: number): Promise<boolean> {
+    async expandNextDegree(presets: DegreePresets, maxDegree: number, includeHubs = false): Promise<boolean> {
         if (this.expanding) return false; // one degree at a time: a second click while one runs is ignored
-        const state = degreeState(this.workingSet(), maxDegree, this.degreeOutcomes());
+        const state = degreeState(this.workingSet(), maxDegree, this.degreeOutcomes(), includeHubs);
         if (state.blocked) {
             this.error.set(state.blocked);
             return false;
         }
         const id = this.activeId();
         const end = this.windowEnd();
-        const rung = presetRung(presets, !!this.header()?.timeCol, end);
+        const overriding = includeHubs && state.heldHubs.length > 0;
+        const rung = { ...presetRung(presets, !!this.header()?.timeCol, end), ...(overriding ? { includeHubs: true } : {}) };
         this.expanding = true;
         try {
             if (!(await this.apply({ op: 'expand', ids: state.frontier, ...rung }))) return false;
@@ -232,7 +239,34 @@ export class InvestigationSessionStore {
             : presets.windowDays != null
               ? 'all available data'
               : null;
-        if (step) this.degreeOutcomes.update((all) => [...all, degreeOutcome(state.current + 1, step, rung, range)]);
+        if (step) {
+            const outcome = degreeOutcome(state.current + 1, step, rung, range);
+            if (overriding && step.status !== 'pending') {
+                outcome.hubsOverridden = state.heldHubs.length;
+                this.lastOverride.set({ step: step.step, ids: state.heldHubs });
+            }
+            this.degreeOutcomes.update((all) => [...all, outcome]);
+        }
+        return true;
+    }
+
+    /**
+     * The last hub override this session appended — the step that sealed it and the entities it expanded through —
+     * so the panel can say the override is on record. Null until one runs (and after the Investigation closes).
+     */
+    readonly lastOverride = signal<{ step: number; ids: string[] } | null>(null);
+
+    /**
+     * "Expand anyway": one hop from a flagged entity, overriding the hub suppression for it alone (`expandHubs`).
+     * The caller has already asked the analyst to confirm; the override is sealed in the step's params.
+     */
+    async expandHub(id: string, rung: ExpandRung = {}): Promise<boolean> {
+        const rest: ExpandRung = { ...rung };
+        delete rest.includeHubs; // the override names this entity only
+        delete rest.expandHubs;
+        if (!(await this.apply({ op: 'expand', ids: [id], ...rest, expandHubs: [id] }))) return false;
+        const step = this.lastStep();
+        if (step && step.status !== 'pending') this.lastOverride.set({ step: step.step, ids: [id] });
         return true;
     }
 
@@ -283,6 +317,7 @@ export class InvestigationSessionStore {
         // A held (pending-approval) degree blocks the next one, so the loop stops there - no error, no retry.
         for (let i = 0; i < req.degrees; i++) {
             if (this.activeId() !== id) return false; // closed or switched mid-chain: stop, never act on another one
+            // The chain never opts into hubs: an override is the analyst's own, confirmed decision.
             if (degreeState(this.workingSet(), req.maxDegree, this.degreeOutcomes()).blocked) break;
             if (!(await this.expandNextDegree(req.presets, req.maxDegree))) return false;
         }

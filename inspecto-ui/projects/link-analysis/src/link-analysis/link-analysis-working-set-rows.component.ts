@@ -8,10 +8,20 @@ import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-sta
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { DataTableComponent } from '@inspecto/core/data-table/data-table.component';
 import { investigationErrorMessage } from './investigation-state';
+import { hubBadgeText } from './investigate-number';
 import { RELATION_NOUN } from './working-set-widget';
 
 /** Rows per page — well under the route's 10 000 clamp, so a page stays a page. */
 export const WORKING_SET_PAGE = 200;
+
+/**
+ * An entities row's `highConnectivity` flag in words — a bare `true`/`false` column says nothing about what the flag
+ * means (shown, not expanded further). Unflagged rows read blank; rows of other relations pass unchanged.
+ */
+export function hubRow(r: Record<string, unknown>): Record<string, unknown> {
+    if (!('highConnectivity' in r)) return r;
+    return { ...r, highConnectivity: r['highConnectivity'] === true ? hubBadgeText() : '' };
+}
 
 /**
  * **Link Analysis — Working Set rows** (LA-20, SPA half) over `GET …/working-set`: the Working Set as a derived
@@ -122,7 +132,8 @@ export class LinkAnalysisWorkingSetRowsComponent {
         try {
             const p = await firstValueFrom(this.inv.workingSetRelation(id, { of, offset, limit: WORKING_SET_PAGE }));
             if (id !== this.investigationId() || of !== this.relation()) return; // switched meanwhile
-            this.rows.set(offset === 0 ? p.rows : [...this.rows(), ...p.rows]);
+            const rows = p.rows.map(hubRow);
+            this.rows.set(offset === 0 ? rows : [...this.rows(), ...rows]);
             this.page.set(p);
         } catch (err) {
             this.error.set(investigationErrorMessage(err, 'Could not read the Working Set.'));

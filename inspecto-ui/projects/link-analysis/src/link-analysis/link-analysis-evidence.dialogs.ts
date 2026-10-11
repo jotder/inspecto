@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -14,7 +15,8 @@ import { G6GraphData } from '@inspecto/core/graph';
 import { GraphSnapshot, snapshotGraph } from '@inspecto/link-analysis/graph/graph-snapshot';
 import { LA_CASES } from '@inspecto/link-analysis/la-host';
 import { ConditionGroup } from '@inspecto/core/query/query-types';
-import { of } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
+import { InvService } from '@inspecto/link-analysis/api/inv.service';
 import { MAX_CASE_MEMBERS, caseMemberCandidates } from './case-members';
 import { LinkAnalysisCaseFieldComponent } from './link-analysis-case-field.component';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
@@ -416,19 +418,26 @@ export class LinkAnalysisSnapshotDialog {
     }
 }
 
-export interface AttachCaseDialogData {
-    /** The snapshot to attach (the host creates one first when none exists). */
+/** What the one-step Attach to Case dialog seals: the same on-screen graph the Save dialog would. */
+export type AttachCaseDialogData = SnapshotDialogData;
+
+/** What the dialog closes with: the sealed snapshot, the Case it is attached to, and whether the Investigation was linked. */
+export interface AttachCaseResult {
     snapshot: GraphSnapshot;
+    caseId: string;
+    /** The open Investigation's id when it was linked to the Case (`PUT …/case`); absent when not asked or none open. */
+    linkedInvestigation?: string;
 }
 
 /**
- * **Attach to Case** (plan S1.3). Attaches an analysis that was saved WITHOUT a Case — the save dialog
- * asks for one optionally, so this is the second path rather than the only one. Here the Case genuinely
- * is required: attaching to nothing is not an outcome this action has.
+ * **Attach to Case — one step** (telecom demo S3). ONE action seals the on-screen analysis and attaches it to a
+ * Case: there is no separate "save first". The Case is an existing one (picker) or a NEW one minted from graph
+ * nodes (as in the Save dialog), and while an Investigation is open the analyst may also link the Investigation to
+ * that Case (`PUT /inv/investigations/{id}/case`).
  *
- * The three Case states (ops present / ops absent / lookup failed) live in
- * {@link LinkAnalysisCaseFieldComponent}, shared with the save dialog so they cannot drift.
- * The "saved view only" option is deliberately labelled *not evidence*.
+ * The order is seal → (create the Case) → attach → (link the Investigation), and every step after the seal is
+ * remembered, so a retry never seals twice, never opens a second Case and never re-attaches. ⛔ A failure AFTER the
+ * seal keeps the dialog open and names the sealed snapshot id — the evidence exists and must not look lost.
  */
 @Component({
     standalone: true,
@@ -436,6 +445,7 @@ export interface AttachCaseDialogData {
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
+        MatCheckboxModule,
         MatDialogModule,
         MatFormFieldModule,
         MatInputModule,
@@ -447,48 +457,91 @@ export interface AttachCaseDialogData {
         <h2 mat-dialog-title>Attach to Case</h2>
         <form [formGroup]="form" (ngSubmit)="attach()">
             <mat-dialog-content class="flex flex-col gap-3">
-                <inspecto-link-analysis-case-field
-                    #caseField
-                    formControlName="caseId"
-                    [required]="true"
-                ></inspecto-link-analysis-case-field>
-                @if (form.controls.caseId.touched && form.controls.caseId.invalid && !caseField.loadError()) {
-                    <p class="text-warn text-xs" role="alert">Pick a Case.</p>
-                }
-                <div class="rounded-lg border p-3 text-sm">
-                    <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
-                        What gets attached
-                    </div>
-                    <mat-radio-group formControlName="what" class="flex flex-col gap-1" aria-label="What gets attached">
-                        <mat-radio-button value="snapshot">
-                            <b>Snapshot</b> “{{ data.snapshot.title }}” — frozen graph, predicate, fingerprint
-                            <span class="font-mono text-xs">{{ data.snapshot.manifestHash.slice(0, 12) }}…</span>
-                        </mat-radio-button>
-                        <mat-radio-button value="view">
-                            Saved view only <span class="text-warn text-xs font-semibold">not evidence</span>
-                            <span class="text-secondary">— re-projects live, may change</span>
-                        </mat-radio-button>
-                    </mat-radio-group>
-                </div>
+                <p class="text-secondary m-0 text-sm">
+                    Seals the analysis on screen ({{ frozenNodes }} nodes) as a snapshot with a fingerprint and attaches it
+                    to the Case — one step, no separate save.
+                </p>
                 <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Note for the Case ledger</mat-label>
-                    <textarea matInput formControlName="note" rows="2"></textarea>
+                    <mat-label>Snapshot title</mat-label>
+                    <input matInput formControlName="title" />
+                    @if (form.controls.title.hasError('required')) {
+                        <mat-error>A title is required.</mat-error>
+                    }
                 </mat-form-field>
-                @if (attachError(); as message) {
-                    <inspecto-alert variant="error" title="The attachment was not recorded">
-                        {{ message }} — the snapshot itself is untouched; nothing links it to this Case yet.
+                <mat-radio-group formControlName="mode" class="flex flex-col gap-1" aria-label="Which Case">
+                    <mat-radio-button value="existing">An existing Case</mat-radio-button>
+                    <mat-radio-button value="new" [disabled]="createUnavailable() !== '' || createUncertain()">
+                        A new Case, from the selected nodes
+                    </mat-radio-button>
+                </mat-radio-group>
+                @if (createUnavailable(); as why) {
+                    <p class="text-secondary m-0 text-xs">{{ why }}</p>
+                }
+                <div [hidden]="creatingCase()">
+                    <inspecto-link-analysis-case-field
+                        #caseField
+                        formControlName="caseId"
+                        [required]="true"
+                    ></inspecto-link-analysis-case-field>
+                    @if (submitted() && !creatingCase() && !form.controls.caseId.value && !caseField.loadError()) {
+                        <p class="text-warn m-0 text-xs" role="alert">Pick a Case.</p>
+                    }
+                </div>
+                @if (creatingCase()) {
+                    <mat-form-field subscriptSizing="dynamic" class="w-full">
+                        <mat-label>Case title</mat-label>
+                        <input matInput formControlName="caseTitle" />
+                        @if (form.controls.caseTitle.hasError('required')) {
+                            <mat-error>A Case needs a title.</mat-error>
+                        }
+                    </mat-form-field>
+                    <ul class="m-0 max-h-48 list-none overflow-auto p-0" aria-label="Graph nodes to add to the Case">
+                        @for (c of candidates; track c.nodeId) {
+                            <li>
+                                <mat-checkbox
+                                    [checked]="picked().has(c.nodeId)"
+                                    (change)="toggle(c.nodeId, $event.checked)"
+                                >
+                                    {{ c.label }} <span class="text-secondary text-xs">{{ c.detail }}</span>
+                                </mat-checkbox>
+                            </li>
+                        }
+                    </ul>
+                    <p class="text-secondary m-0 text-xs">
+                        {{ picked().size }} of {{ candidates.length }} picked — each becomes an Incident the new Case
+                        contains (one minted before is reused).
+                    </p>
+                    @if (memberError(); as message) {
+                        <p class="text-warn m-0 text-xs" role="alert">{{ message }}</p>
+                    }
+                }
+                @if (data.investigationId) {
+                    <mat-checkbox formControlName="linkInvestigation" data-testid="link-investigation">
+                        Also link Investigation <code>{{ data.investigationId }}</code> to this Case
+                    </mat-checkbox>
+                }
+                @if (saveError(); as message) {
+                    <inspecto-alert variant="error" title="Nothing was attached">
+                        {{ message }} — nothing has been sealed; your choices are still here.
+                    </inspecto-alert>
+                }
+                @if (stepError(); as message) {
+                    <inspecto-alert variant="warning" title="The analysis is sealed — a later step did not complete">
+                        <span data-testid="attach-step-error"
+                            >Sealed snapshot <code>{{ sealed()?.id }}</code> is saved. {{ message }}</span
+                        >
                     </inspecto-alert>
                 }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
-                <button mat-button type="button" (click)="requestClose()">Cancel</button>
+                <button mat-button type="button" (click)="requestClose()">{{ sealed() ? 'Close' : 'Cancel' }}</button>
                 <button
                     mat-flat-button
                     color="primary"
                     type="submit"
-                    [disabled]="caseField.loadError() !== '' || attaching()"
+                    [disabled]="busy() || (!creatingCase() && caseField.loadError() !== '')"
                 >
-                    {{ attaching() ? 'Attaching…' : 'Attach' }}
+                    {{ busy() ? 'Attaching…' : stepError() ? 'Retry' : 'Seal and attach' }}
                 </button>
             </mat-dialog-actions>
         </form>
@@ -496,55 +549,180 @@ export interface AttachCaseDialogData {
 })
 export class LinkAnalysisAttachCaseDialog {
     readonly data = inject<AttachCaseDialogData>(MAT_DIALOG_DATA);
-    private readonly ref =
-        inject<MatDialogRef<LinkAnalysisAttachCaseDialog, { caseId: string } | undefined>>(MatDialogRef);
+    private readonly ref = inject<MatDialogRef<LinkAnalysisAttachCaseDialog, AttachCaseResult | undefined>>(MatDialogRef);
     private readonly confirm = inject(InspectoConfirmService);
     private readonly store = inject(LinkAnalysisSnapshotsService);
+    private readonly caseMgmt = inject(LA_CASES);
+    private readonly inv = inject(InvService);
     private readonly fb = inject(FormBuilder);
-
-    /** Read in TS only, for the submit guard — the template uses its own `#caseField` reference. */
     private readonly caseFieldRef = viewChild(LinkAnalysisCaseFieldComponent);
 
     readonly form = this.fb.nonNullable.group({
-        caseId: ['', Validators.required],
-        what: ['snapshot' as 'snapshot' | 'view'],
-        note: [''],
+        title: [this.data.suggestedTitle, Validators.required],
+        mode: ['existing' as 'existing' | 'new'],
+        caseId: [this.data.caseId ?? ''],
+        caseTitle: [this.data.suggestedTitle, Validators.required],
+        linkInvestigation: [true],
     });
-    /** Non-empty when the attachment was refused — shown in place; the dialog stays open. */
-    readonly attachError = signal('');
-    readonly attaching = signal(false);
-    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+    private readonly mode = signal<'existing' | 'new'>('existing');
+    readonly creatingCase = computed(() => this.mode() === 'new');
+    readonly frozenNodes = this.data.graph.nodes.filter((n) => !n.data.missing).length;
+    readonly candidates = caseMemberCandidates(this.data.graph, this.data.origin.dataset);
+    readonly picked = signal(
+        new Set(this.candidates.filter((c) => this.data.selectedNodeIds?.includes(c.nodeId)).map((c) => c.nodeId)),
+    );
+    readonly createUnavailable = computed(() =>
+        !this.caseMgmt.available()
+            ? 'Creating a Case needs operational objects, which this bundle does not include (Professional edition and above).'
+            : this.candidates.length === 0
+              ? 'No node on this graph can become a Case member: each must be an Entity with a known source Dataset.'
+              : '',
+    );
+    readonly submitted = signal(false);
+    readonly memberError = computed(() => {
+        if (!this.submitted() || !this.creatingCase()) return '';
+        const n = this.picked().size;
+        if (n === 0) return 'Pick at least one node — a Case contains its members.';
+        if (n > MAX_CASE_MEMBERS) return `Pick at most ${MAX_CASE_MEMBERS} nodes (${n} picked).`;
+        return '';
+    });
 
-    /**
-     * ⛔ Like the save dialog, this does NOT close on failure. An attachment that silently failed would
-     * leave an analyst believing a piece of evidence is linked to a Case when the record says otherwise —
-     * and the whole point of the attachment log is that it can be trusted later.
-     *
-     * ⚠ Attaching the VIEW is still local: a saved view is not evidence (D-S1), so there is nothing sealed
-     * to record server-side, and the close simply reports the chosen Case.
-     */
-    attach(): void {
-        // A caseId reaching the form while the lookup is errored (a deep link, a stale patch) is still
-        // not attachable — nothing offered it, so nothing vouches that the Case exists.
-        if (this.caseFieldRef()?.loadError()) return;
-        this.form.markAllAsTouched();
-        if (this.form.invalid || this.attaching()) return;
-        const { caseId, what } = this.form.getRawValue();
-        if (what !== 'snapshot') {
-            this.ref.close({ caseId });
-            return;
-        }
-        this.attachError.set('');
-        this.attaching.set(true);
-        this.store.attachTo(this.data.snapshot.id, caseId).subscribe({
-            next: () => {
-                this.attaching.set(false);
-                this.ref.close({ caseId });
-            },
-            error: (e: unknown) => {
-                this.attaching.set(false);
-                this.attachError.set(e instanceof Error ? e.message : 'The attachment was not recorded.');
-            },
+    readonly busy = signal(false);
+    /** The seal failed — nothing exists yet. */
+    readonly saveError = signal('');
+    /** A step AFTER the seal failed — the snapshot exists and its id is shown. */
+    readonly stepError = signal('');
+    /** Remembered progress: a retry resumes after the last step that succeeded. */
+    readonly sealed = signal<GraphSnapshot | null>(null);
+    private createdCase: string | null = null;
+    /** A Case create got no definite answer — it may exist, so "new" is not offered again in this dialog. */
+    readonly createUncertain = signal(false);
+    private attachedCase: string | null = null;
+
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () => !this.sealed() && this.form.dirty,
+        this.confirm,
+        // Closing after a partial run hands back what is on record; the store already holds the sealed snapshot.
+        () => {
+            const s = this.sealed();
+            return s && this.attachedCase ? { snapshot: s, caseId: this.attachedCase } : undefined;
+        },
+    );
+
+    constructor() {
+        this.form.controls.mode.valueChanges.subscribe((m) => this.mode.set(m));
+    }
+
+    toggle(nodeId: string, on: boolean): void {
+        this.picked.update((s) => {
+            const next = new Set(s);
+            if (on) next.add(nodeId);
+            else next.delete(nodeId);
+            return next;
         });
     }
+
+    async attach(): Promise<void> {
+        this.form.markAllAsTouched();
+        this.submitted.set(true);
+        if (this.busy()) return;
+        const v = this.form.getRawValue();
+        if (this.form.controls.title.invalid) return;
+        if (this.creatingCase() ? this.form.controls.caseTitle.invalid || this.memberError() : !v.caseId) return;
+        if (!this.creatingCase() && this.caseFieldRef()?.loadError()) return;
+        this.busy.set(true);
+        this.saveError.set('');
+        this.stepError.set('');
+        try {
+            // 1. Seal (once).
+            let snap = this.sealed();
+            if (!snap) {
+                try {
+                    snap = await snapshotGraph({
+                        title: v.title.trim(),
+                        graph: this.data.graph,
+                        predicate: this.data.predicate,
+                        origin: this.data.origin,
+                        viewport: { layout: this.data.layout },
+                        investigationId: this.data.investigationId,
+                    });
+                    await firstValueFrom(this.store.save(snap));
+                } catch (e: unknown) {
+                    this.saveError.set(reason(e, 'The analysis could not be sealed'));
+                    return;
+                }
+                this.sealed.set(snap);
+                this.form.controls.title.disable();
+            }
+            // 2. The Case (created once).
+            let caseId = v.caseId;
+            if (this.creatingCase()) {
+                if (!this.createdCase) {
+                    const members = this.candidates.filter((c) => this.picked().has(c.nodeId)).map((c) => c.member);
+                    try {
+                        const made = await firstValueFrom(
+                            this.caseMgmt.openFromEntities(v.caseTitle.trim(), undefined, members),
+                        );
+                        this.createdCase = made.caseId;
+                        // Pinned: a retry attaches to THIS Case; switching to "existing" would leave it empty.
+                        this.form.controls.mode.disable();
+                    } catch (e: unknown) {
+                        const refused = e instanceof HttpErrorResponse && e.status >= 400 && e.status < 500;
+                        if (refused) {
+                            this.stepError.set(
+                                `The Case was not created: ${reason(e, 'the request was refused')}. Retry, or pick an existing Case.`,
+                            );
+                        } else {
+                            // No definite answer (timeout, 5xx): the Case may exist. There is no idempotency key on
+                            // this route, so never create again blindly — the analyst checks and picks it.
+                            this.createUncertain.set(true);
+                            this.form.controls.mode.setValue('existing');
+                            this.stepError.set(
+                                `Creating the Case got no definite answer (${reason(e, 'the request failed')}) — it may ` +
+                                    'have been created. Check Cases, then pick it (or another Case) above and Retry; ' +
+                                    'this dialog will not create a second Case.',
+                            );
+                        }
+                        return;
+                    }
+                }
+                caseId = this.createdCase;
+            }
+            // 3. Attach (once per Case).
+            if (this.attachedCase !== caseId) {
+                try {
+                    await firstValueFrom(this.store.attachTo(snap.id, caseId));
+                    this.attachedCase = caseId;
+                } catch (e: unknown) {
+                    this.stepError.set(
+                        `It was not attached to ${caseId}: ${reason(e, 'the attachment failed')}. Retry attaches it — nothing is sealed or created again.`,
+                    );
+                    return;
+                }
+            }
+            // 4. Link the open Investigation to the Case, when asked.
+            const invId = this.data.investigationId;
+            const link = !!invId && v.linkInvestigation;
+            if (link) {
+                try {
+                    await firstValueFrom(this.inv.linkInvestigationCase(invId, caseId));
+                } catch (e: unknown) {
+                    this.stepError.set(
+                        `It is attached to ${caseId}, but Investigation ${invId} was not linked to the Case: ` +
+                            `${reason(e, 'the link failed')}. Retry links it, or untick the option and close.`,
+                    );
+                    return;
+                }
+            }
+            this.ref.close({ snapshot: snap, caseId, ...(link ? { linkedInvestigation: invId } : {}) });
+        } finally {
+            this.busy.set(false);
+        }
+    }
+}
+
+/** A server's own message, else a thrown Error's (e.g. no secure context for the hash), else the fallback. */
+function reason(e: unknown, fallback: string): string {
+    return apiErrorMessage(e, e instanceof Error ? e.message : fallback);
 }

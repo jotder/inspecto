@@ -11,6 +11,7 @@ export * from '../auth/auth.interceptor';
 export * from '../auth/auth.guard';
 export * from '../auth/pkce';
 export * from './spaces.service';
+export * from './space-comparison.service';
 export * from './lens.service';
 export * from './parameter-context.service';
 export * from './connectivity.service';
