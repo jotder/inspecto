@@ -53,6 +53,9 @@ backend on :4204.
   synthetic STORE nodes they share. Tabs answer *what is in this pipeline*; topology answers *how do
   these fit together*. ⚠ Mode ids are `view`/`editor`/`topology`; `combined` once meant the
   read-only editor and must not be resurrected.
+  ⚠ **The editor stays mounted (CSS-hidden) while Topology shows** — never `@if`/`@else` it away: it
+  owns every tab's graph + dirty flag, and unmounting dropped an Applied-but-unsaved Step
+  (`PIPELINE-EDITOR-VIEWSWITCH-LOSS-1`, 2026-10-11).
 - **Laziness is the rule.** Arrival fetches only `GET /pipelines` (names + flags) and the Step-type
   catalog. `GET /pipelines/combined` fires on first Topology entry only (Refresh refetches). An Open
   dialog returns the **full desired set** of tabs; a tab's graph is lifted when it first activates.

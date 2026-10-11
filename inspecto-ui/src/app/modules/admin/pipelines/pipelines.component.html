@@ -137,25 +137,31 @@
             }
         </div>
     </div>
-} @else {
-    <!-- The admin shell scrolls at document level — nothing above us is viewport-bounded, so `flex-1`
+}
+<!-- The editor stays MOUNTED while Topology shows (hidden, not `@if`'d): it owns every open tab's unsaved
+     graph and dirty flag, so destroying it on a lens switch silently dropped an Applied-but-unsaved Step
+     (PIPELINE-EDITOR-VIEWSWITCH-LOSS-1). -->
+<!-- The admin shell scrolls at document level — nothing above us is viewport-bounded, so `flex-1`
          alone would let the docks grow the page instead of the canvas yielding space. Bound the shell to
          the viewport minus the classic layout's chrome (64px header + 56px footer); the canvas then
          shrinks for the bottom dock instead of pushing the page taller. -->
-    <div class="flex min-h-0 min-w-0 flex-auto flex-col overflow-hidden" style="height: calc(100dvh - 120px)">
-        <app-pipeline-editor
-            [readOnly]="mode() === 'view'"
-            [guided]="guided()"
-            [openId]="openId()"
-            [focusStage]="focusStage()"
-        >
-            <span toolbarEnd class="flex shrink-0 items-center gap-2">
-                <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
-                <ng-container *ngTemplateOutlet="modeToggle"></ng-container>
-            </span>
-        </app-pipeline-editor>
-    </div>
-}
+<div
+    class="flex min-h-0 min-w-0 flex-auto flex-col overflow-hidden"
+    [class.hidden]="mode() === 'topology'"
+    style="height: calc(100dvh - 120px)"
+>
+    <app-pipeline-editor
+        [readOnly]="mode() === 'view'"
+        [guided]="guided()"
+        [openId]="openId()"
+        [focusStage]="focusStage()"
+    >
+        <span toolbarEnd class="flex shrink-0 items-center gap-2">
+            <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
+            <ng-container *ngTemplateOutlet="modeToggle"></ng-container>
+        </span>
+    </app-pipeline-editor>
+</div>
 
 <!-- One toggle definition for both chromes, so the three modes can never drift apart. -->
 <ng-template #modeToggle>
