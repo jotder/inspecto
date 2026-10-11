@@ -273,9 +273,17 @@ reference:
   rules (it runs the spec, not the parser). The generated accepted-names table in
   [pipeline-config-keys](../pipeline-graph/pipeline-config-keys.md) gained `reference.delete` and
   `reference.order_by`.
-- ⚠ **No UI surface.** Hand-authored only; and the Settings dialog rebuilds `reference` from
-  `load`/`key`/`refresh_seconds` while the route replaces the block wholesale, so a Settings save **drops**
-  both keys (see [onboarding](../../frontend/features/onboarding.md)).
+- **UI surface (2026-10-11, `3581de0cf`):** the Pipeline settings dialog
+  (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-settings.dialog.ts`) edits `reference.order_by`
+  (one column, free text) and `reference.delete` (marker column + comma-separated values). The fields show
+  only for `upsert` / `scd2`; a `replace` save drops both keys, matching ERROR
+  `reference-delete-order-by-require-versioned-load`. On Save the client mirrors ERROR
+  `reference-delete-needs-column-and-values` and `reference-delete-column-not-a-key` as field errors; WARNING
+  `reference-delete-without-order-by` shows inline and does not block. Clearing a field removes its key;
+  unmodelled `reference` keys pass through, because the route replaces the block wholesale. A non-string
+  stored marker value loads and saves as text (the engine compares on the text form anyway). ⚠ The earlier
+  note here — that a Settings save **dropped** both keys — was already stale before this: the dialog had
+  been passing unmodelled keys through untouched. See [onboarding](../../frontend/features/onboarding.md).
 - Tests: `ReferenceVersionStampTest` (+5 — tombstone despite identical payload + marker not persisted/hashed ·
   delete of a non-live key appends nothing · boolean marker · order_by row-order independence + NULL loses ·
   deletes in the ordering + tie → delete) · `PipelineConfigReferenceTest` (+8) · `ConfigSpecsTest` (+4) ·

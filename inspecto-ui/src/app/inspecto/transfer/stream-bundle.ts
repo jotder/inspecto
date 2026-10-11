@@ -227,9 +227,11 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string }): 
 
     // dirs are always re-derived: the source paths name the source space and the source's own
     // pipeline name, so carrying them over would point the draft at directories that do not exist.
-    const home = `data/${name}`;
+    // Off the slug id, like `pipelineScaffold` and the server import (NAME-DIRS-1) — never the display
+    // name, which may carry spaces.
+    const home = `data/${id}`;
     pipeline['dirs'] = {
-        poll: `data/inbox/${name}`,
+        poll: `data/inbox/${id}`,
         database: `${home}/database`,
         backup: `${home}/backup`,
         temp: `${home}/temp`,
@@ -240,6 +242,41 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string }): 
         log_dir: `${home}/logs`,
     };
     notes.push(`Directories are re-derived for "${name}" in this space — the exported paths pointed at the source.`);
+
+    // The bindings that would make the copy SHARE state with its source. Same rule as the server bundle
+    // import (`PipelineBundleRoutes.retargetPipeline`), so both import paths agree: a key the source
+    // carries is re-pointed at the copy UNCONDITIONALLY — a key it does not carry stays absent.
+    const repointed: string[] = [];
+    // An explicit `stream` would join the source's Catalog Stream.
+    if ('stream' in pipeline) {
+        pipeline['stream'] = id;
+        repointed.push('stream');
+    }
+    // The collector's id is the acquisition ledger's dedup key (`source_id`); `source:` is the legacy spelling.
+    const colKey = 'collector' in pipeline || !('source' in pipeline) ? 'collector' : 'source';
+    const col = pipeline[colKey];
+    if (isRecord(col) && 'id' in col) {
+        pipeline[colKey] = { ...col, id };
+        repointed.push(`${colKey}.id`);
+    }
+    // A DuckLake `data_path` would have both pipelines writing one lake.
+    const output = pipeline['output'];
+    if (isRecord(output) && isRecord(output['ducklake']) && 'data_path' in output['ducklake']) {
+        pipeline['output'] = { ...output, ducklake: { ...output['ducklake'], data_path: `${home}/ducklake` } };
+        repointed.push('output.ducklake.data_path');
+    }
+    // A trigger naming the pipeline ITSELF follows it; one naming an upstream pipeline travels verbatim.
+    const triggers = pipeline['triggers'];
+    if (isRecord(triggers) && String(triggers['on_pipeline']).toLowerCase() === bundle.source.name.toLowerCase()) {
+        pipeline['triggers'] = { ...triggers, on_pipeline: id };
+        repointed.push('triggers.on_pipeline');
+    }
+    if (repointed.length) {
+        notes.push(
+            `Re-pointed ${repointed.join(', ')} at this copy — it never shares its source's Catalog Stream, ` +
+                'acquisition ledger or lake.',
+        );
+    }
     notes.push('Imported as an inactive draft — review the stages, then go live when you are ready.');
 
     const plan: StreamImportPlan = { pipeline, segments: [], notes, requires: bundle.requires ?? [] };
@@ -276,9 +313,9 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string }): 
         plan.enrichment = {
             name: companionSchemaName(id, 'enrich'),
             // ⚠ The pipeline's OWN database dir is handed over, not re-derived from a name: an
-            // enrichment reads what the pipeline wrote, so the two must be the same string. `dirs` are
-            // keyed off the display name while identity keys off `id`, and once those two diverge any
-            // second derivation points the enrichment at a directory nothing ever writes to.
+            // enrichment reads what the pipeline wrote, so the two must be the same string. Any second
+            // derivation that drifts from the `dirs` above points the enrichment at a directory nothing
+            // ever writes to.
             config: retargetEnrichment(bundle.enrichment, bundle.source.name, id, `${home}/database`),
         };
     }
@@ -332,8 +369,8 @@ function retargetEnrichment(
 ): Record<string, unknown> {
     const out: Record<string, unknown> = { ...enrichment, name: `${name}_enrich` };
     if (isRecord(out['input'])) {
-        // The pipeline's own `dirs.database`, passed in — ⛔ never re-derived from `name`, which is the
-        // IDENTITY here and no longer the string the directory set is keyed by.
+        // The pipeline's own `dirs.database`, passed in — ⛔ never re-derived here: one derivation, the
+        // pipeline's, so the two can never drift apart.
         out['input'] = { ...out['input'], database: inputDatabase };
     }
     if (isRecord(out['output'])) {

@@ -438,6 +438,15 @@ Onboarding Parsing stage and the Pipelines `parse` node dialog, renamed `ParserC
 `GrammarEditorDialog`; the node label "Configure parser" → "Edit Grammar". See
 `okf/frontend/features/grammar-config.md`.
 
+**Pipeline Template** *(added 2026-10-11)* — A **Pipeline** config saved with `template: true` through the
+pipeline editor's *Save as template…*, listed by `GET /pipelines`, and offered as a starting point by
+onboarding's **Start from a template**. Like every other *Template* here (Space Template, Rule Template,
+Grammar Template) you **copy** from it, never bind to it: the copy drops `template: true` and takes its own
+name wherever a value still carries the template's, and later edits to the template reach nothing started from it. A template is never
+runnable (`template` + `active` is refused). ⛔ Not a **Space Template**, which creates a whole Space; a
+Pipeline Template seeds one Pipeline draft inside the current Space. As built:
+`okf/frontend/features/onboarding.md`.
+
 **Decode Profile** *(operator decision D10, 2026-09-25)* — One vendor's ASN.1 decode settings kept **once**,
 in a satellite `.toon` file whose single top-level block is `asn1:` (the same keys a Pipeline's
 `parsing.asn1` takes: `grammar_file`, `root_type`, `strictness`, framing lengths, `max_value_bytes`,

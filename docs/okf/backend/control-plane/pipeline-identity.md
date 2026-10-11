@@ -303,3 +303,6 @@ named by the id. Until now the UI scaffold derived every `dirs.*` from the raw d
 spaces. **Decided:** `dirs.*` derive from the slug id too — one identity for id, file and paths. Existing
 pipelines are untouched (dirs are stored, not re-derived). Build: `pipelineScaffold` in
 `inspecto-ui/src/app/inspecto/component-model/pipeline-scaffold.ts` + its spec (BACKLOG §3 `NAME-DIRS-1`).
+The client Import plan (`planStreamImport`, `inspecto/transfer/stream-bundle.ts`) follows it too since
+2026-10-11 (`237269fe9`, `ONB-IMPORT-RETARGET-1`): dirs from the slug id, and `stream` / collector `id` /
+ducklake `data_path` re-pointed to the copy like the server's `PipelineBundleRoutes.retargetPipeline`.

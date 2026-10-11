@@ -577,8 +577,20 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
 
 - **D8 — out-of-process parser host (T5).** The only real containment for parser code, deferred until a
   customer requires running parser code nobody has reviewed. Classloader isolation is not a security claim.
-- **D9 — tree operations on repeated children.** Measure first: count repeated fields carrying required
-  columns across the operator's vendor grammars. The corpus is gitignored, so this is a main-checkout task.
+- **D9 — tree operations on repeated children.** **Measured 2026-10-11** (main checkout, read-only; DATA-GOV-1
+  respected: grammars, tx configs and legacy code only, no captures read). 24 of the 31 operator ASN.1 grammars
+  (gitignored `providers/asn-parser/config/`) parse; they hold 1266 repeated-child occurrences (595 distinct
+  element types). In the grammars that keep OPTIONAL, 39% of occurrences have a mandatory component; 7 grammars
+  have OPTIONAL stripped, so the grammar alone cannot say. **Prevalence is many.** Operator use settles it:
+  every vendor family with a real legacy tx config (Ericsson OCC/CCN, GGSN/PGW, Huawei GMSC, Huawei/Aftel IMS,
+  TAP, NRTRDE) derives core columns from a repeated child (subscriber identity ← `servedSubscriptionIDs`,
+  DA charge ← `dedicatedAccounts`, volume / duration ← `usedServiceUnits`, PGW billable volume ←
+  `listOfServiceData` group-by + sum) or runs flatten / reduce / delimit on one (23 directive uses in 9 configs).
+  ⚠ "Give it its own segment" is **not available for ASN.1 today**: `Asn1RecordIngester` keys segments by record
+  name only (~:124) and NULLs any `List` (~:189), so those columns load NULL. The "cheaper before C1" window has
+  passed (C1–C4 shipped 2026-09-25). The design states no numeric threshold. **The decision stays open — operator
+  decision pending:** design a repeated-child operation (explode to its own segment / reduce-by-key /
+  select-where) in the Decode Profile.
 - **T2 — signer anchoring** (`-Djobs.packs.trustStore`, SEC-7). Not built. D2 made T1 the required gate.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24

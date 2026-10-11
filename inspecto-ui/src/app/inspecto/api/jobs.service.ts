@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
-import { JobRun, JobType, JobView } from './models';
+import { JobRun, JobRunStatus, JobType, JobView } from './models';
 
 /** A single scheduled job with its full config (GET /jobs/{name}) — the list `JobView` plus the type-specific
  *  `params`, the trigger guard and the catch-up flag. (List endpoint omits these; they're shown on the
@@ -253,6 +253,25 @@ export interface JobRunRow {
     derivedFrom?: JobRunSource[];
 }
 
+/**
+ * One job run by id (`GET /jobs/runs/{runId}`, `JobRoutes.runById`) — the poll target a `trigger` / ad-hoc run's
+ * `runId` names, `RUNNING` until it lands on a terminal status; 404 once evicted or unknown. ⚠ Not the
+ * {@link JobRunRow} list shape: this route spells the times `startedAt` / `finishedAt` (null while unset).
+ */
+export interface JobRunById {
+    runId: string;
+    job: string;
+    type: string;
+    trigger: string;
+    status: JobRunStatus;
+    startedAt: string | null;
+    finishedAt: string | null;
+    durationMs: number;
+    message: string | null;
+    /** Absent (not `[]`) when the run store is off or recorded no source — see {@link JobRunRow.derivedFrom}. */
+    derivedFrom?: JobRunSource[];
+}
+
 /** One Consignment an at-rest job run read (see {@link JobRunRow.derivedFrom}). */
 export interface JobRunSource {
     consignmentId: string;
@@ -336,6 +355,10 @@ export class JobsService {
     /** v1 async contract (W5): 202 + the submitted run's id; poll `/jobs/runs/{runId}` for status. */
     trigger(name: string): Observable<{ runId: string }> {
         return this.http.post<{ runId: string }>(apiUrl(`/jobs/${encodeURIComponent(name)}/trigger`), {});
+    }
+    /** One run's status by the id {@link trigger} (or an ad-hoc run's 202) returned; 404 once evicted or unknown. */
+    run(runId: string): Observable<JobRunById> {
+        return this.http.get<JobRunById>(apiUrl(`/jobs/runs/${encodeURIComponent(runId)}`));
     }
 
     // ── single job + management ──

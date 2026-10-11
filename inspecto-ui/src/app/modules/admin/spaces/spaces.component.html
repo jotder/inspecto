@@ -13,6 +13,17 @@
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
             <!-- Every create is admin-only: the server refuses POST /spaces without canAdminister. -->
+            <!-- A cross-Space read: the server refuses POST /space-comparisons without canAdminister. -->
+            @if (spaces.multiSpace() && lens.canAdminister() && spaces.availableSpaces().length >= 2) {
+                <button
+                    mat-icon-button
+                    (click)="compareSpaces()"
+                    matTooltip="Compare Spaces"
+                    aria-label="Compare Spaces"
+                >
+                    <mat-icon svgIcon="heroicons_outline:scale"></mat-icon>
+                </button>
+            }
             @if (spaces.multiSpace() && lens.canAdminister()) {
                 <button
                     mat-icon-button

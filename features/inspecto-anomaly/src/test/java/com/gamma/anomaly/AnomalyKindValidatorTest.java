@@ -73,6 +73,57 @@ class AnomalyKindValidatorTest {
         v.validateInSpace(cfg, () -> data, "usage", AnomalyCorpus.model());   // probe: once owned, it is ours
     }
 
+    /** The peer corpus with its Datasets re-declared to carry {@code columns[].classification}. */
+    private static Path peerSpace(Path dir, Map<String, Object> subscribers) throws Exception {
+        Path cfg = dir.resolve("config"), data = dir.resolve("data");
+        AnomalyPeerCorpus.plant(cfg, data);
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subscribers", subscribers);
+        return cfg;
+    }
+
+    private static Map<String, Object> column(String name, String classification) {
+        return Map.of("name", name, "classification", classification);
+    }
+
+    @Test
+    void aClassifiedEntityKeyBesideAnUnclassifiedCohortIsStorable(@TempDir Path dir) throws Exception {
+        Path cfg = peerSpace(dir, Map.of("physicalRef", "subscribers", "columns", List.of(column("msisdn", "MSISDN"))));
+        // probe: the join key stays raw by design (D-P8); only the cohort columns are checked
+        v.validateInSpace(cfg, () -> dir.resolve("data"), AnomalyPeerCorpus.MODEL, AnomalyPeerCorpus.model());
+    }
+
+    @Test
+    void aClassifiedCohortColumnIsRefused(@TempDir Path dir) throws Exception {
+        Path cfg = peerSpace(dir, Map.of("physicalRef", "subscribers", "columns", List.of(column("Plan", "pii"))));
+        refused(() -> v.validateInSpace(cfg, () -> dir.resolve("data"), AnomalyPeerCorpus.MODEL, AnomalyPeerCorpus.model()),
+                "peers.by column(s) [plan] of dataset 'subscribers' are classified");
+    }
+
+    @Test
+    void aCohortColumnClassifiedByASiblingDatasetOverTheSameStoreIsRefused(@TempDir Path dir) throws Exception {
+        Path cfg = peerSpace(dir, Map.of("physicalRef", "subscribers"));
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subscribers_governed",
+                Map.of("physicalRef", "subscribers", "columns", List.of(column("plan", "ACCOUNT"))));
+        refused(() -> v.validateInSpace(cfg, () -> dir.resolve("data"), AnomalyPeerCorpus.MODEL, AnomalyPeerCorpus.model()),
+                "peers.by column(s) [plan] of dataset 'subscribers' are classified");
+    }
+
+    @Test
+    void aViewCohortDatasetOverClassifiedColumnsIsRefusedBecauseItsLineageCannotBeTraced(@TempDir Path dir) throws Exception {
+        Path cfg = dir.resolve("config");
+        ComponentStore store = new ComponentStore(cfg.resolve("registry"));
+        store.write("dataset", "subscribers", Map.of("physicalRef", "subscribers",
+                "columns", List.of(column("msisdn", "MSISDN"))));
+        store.write("dataset", "subscriber_plans", Map.of("view", "subscribers"));
+        Map<String, Object> m = new LinkedHashMap<>(AnomalyPeerCorpus.model());
+        Map<String, Object> peers = new LinkedHashMap<>((Map<String, Object>) m.get("peers"));
+        peers.put("dataset", "subscriber_plans");
+        m.put("peers", peers);
+        AnomalyModel model = AnomalyModel.fromMap(AnomalyPeerCorpus.MODEL, m);
+        refused(() -> AnomalyKindValidator.requireUnclassifiedCohort(cfg, model),
+                "column lineage of dataset 'subscriber_plans' cannot be traced");
+    }
+
     @Test
     void theReservedPrefixIsRefusedForDatasetsAndSinksCaseInsensitivelyOnTheFirstSegment(@TempDir Path dir) throws Exception {
         Path cfg = dir.resolve("config");

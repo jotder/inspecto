@@ -296,6 +296,62 @@ describe('stream-bundle — import plan', () => {
         expect((p.enrichment!.config['input'] as Record<string, unknown>)['database']).toBe(dirs['database']);
     });
 
+    /**
+     * REGRESSION (ONB-IMPORT-RETARGET-1): an import carried an explicit `stream` and `collector.id` over
+     * unchanged, so the copy joined the source's Catalog Stream and shared its acquisition-ledger dedup
+     * key — rows silently deduplicated across the two. Same rule as the server bundle import
+     * (`PipelineBundleRoutes.retargetPipeline`): a carried key is re-pointed at the copy, whatever it held.
+     */
+    it("re-points stream, collector id and lake path at the copy, never the source's", () => {
+        const b = build({
+            pipeline: {
+                ...PIPELINE,
+                stream: 'shared_orders', // not the source's own id — re-pointed anyway, as on the server
+                collector: { ...PIPELINE.collector, id: 'orders_feed' },
+                output: { format: 'parquet', ducklake: { data_path: 'data/orders_feed/ducklake', catalog: 'c' } },
+                triggers: { on_pipeline: 'ORDERS_FEED' },
+            },
+        });
+        const p = planStreamImport(b, { name: 'Orders-Daily' });
+        expect(p.pipeline['stream']).toBe('orders_daily');
+        expect(p.pipeline['collector']).toEqual({ ...PIPELINE.collector, id: 'orders_daily' });
+        expect(p.pipeline['output']).toEqual({
+            format: 'parquet',
+            ducklake: { data_path: 'data/orders_daily/ducklake', catalog: 'c' },
+        });
+        // A trigger naming the source ITSELF follows it (case-insensitive, like the server).
+        expect(p.pipeline['triggers']).toEqual({ on_pipeline: 'orders_daily' });
+        expect(p.notes.join(' ')).toContain(
+            'Re-pointed stream, collector.id, output.ducklake.data_path, triggers.on_pipeline at this copy',
+        );
+    });
+
+    it('re-points the legacy `source:` collector id', () => {
+        const b = build({ pipeline: { name: 'orders_feed', source: { id: 'orders_feed', connector: 'local' } } });
+        expect(planStreamImport(b, { name: 'orders_copy' }).pipeline['source']).toEqual({
+            id: 'orders_copy',
+            connector: 'local',
+        });
+    });
+
+    it('adds no binding the source did not carry, and leaves an upstream trigger alone', () => {
+        const b = build({ pipeline: { ...PIPELINE, triggers: { on_pipeline: 'upstream_feed' } } });
+        const p = planStreamImport(b, { name: 'orders_copy' });
+        expect(p.pipeline).not.toHaveProperty('stream');
+        expect(p.pipeline['collector']).not.toHaveProperty('id');
+        expect(p.pipeline).not.toHaveProperty('output');
+        expect(p.pipeline['triggers']).toEqual({ on_pipeline: 'upstream_feed' });
+        expect(p.notes.join(' ')).not.toContain('Re-pointed');
+    });
+
+    /** NAME-DIRS-1: dirs hang off the slug id, like `pipelineScaffold` and the server import. */
+    it('derives the directories from the stamped id, never a display name with spaces', () => {
+        const dirs = planStreamImport(build(), { name: 'Orders Daily' }).pipeline['dirs'] as Record<string, string>;
+        expect(dirs['poll']).toBe('data/inbox/orders_daily');
+        expect(dirs['database']).toBe('data/orders_daily/database');
+        expect(dirs['log_dir']).toBe('data/orders_daily/logs');
+    });
+
     it('omits satellites the source never had', () => {
         const bare = buildStreamBundle({
             name: 'a',

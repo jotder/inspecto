@@ -25,23 +25,31 @@ public record PeerBaseline(int minGroupSize, boolean populationFallback) {
      * @param cohort   the cohort to baseline
      */
     public Baseline compute(Map<String, Double> observed, Map<String, String> cohortOf, String cohort) {
+        return compute(observed, cohortOf, cohort, cohort);
+    }
+
+    /**
+     * As {@link #compute(Map, Map, String)}, with {@code label} — the cohort as a reader sees it — in place of the
+     * cohort key in the baseline's {@code basis}/{@code requested} and reason text; {@code cohort} is only matched.
+     */
+    public Baseline compute(Map<String, Double> observed, Map<String, String> cohortOf, String cohort, String label) {
         List<Double> members = new ArrayList<>();
         observed.forEach((e, v) -> {
             if (usable(v) && cohort != null && cohort.equals(cohortOf.get(e))) members.add(v);
         });
         if (members.size() >= minGroupSize) {
-            return of(members, cohort, cohort, false, "peers %s, %d entities".formatted(cohort, members.size()));
+            return of(members, label, label, false, "peers %s, %d entities".formatted(label, members.size()));
         }
         if (populationFallback) {
             List<Double> all = observed.values().stream().filter(PeerBaseline::usable).toList();
             if (all.size() >= minGroupSize) {
-                return of(all, POPULATION, cohort, true,
+                return of(all, POPULATION, label, true,
                         "cohort %s has %d < %d entities; fell back to the population (%d)"
-                                .formatted(cohort, members.size(), minGroupSize, all.size()));
+                                .formatted(label, members.size(), minGroupSize, all.size()));
             }
         }
-        return Baseline.insufficient(KIND, members.size(), cohort,
-                "cohort %s has %d < %d entities".formatted(cohort, members.size(), minGroupSize));
+        return Baseline.insufficient(KIND, members.size(), label,
+                "cohort %s has %d < %d entities".formatted(label, members.size(), minGroupSize));
     }
 
     private static boolean usable(Double v) {

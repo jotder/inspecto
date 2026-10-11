@@ -214,16 +214,18 @@ public final class AnomalyScoreEvaluator {
 
         private final PeerBaseline peer;
         private final Map<String, String> cohortOf;
+        private final Map<String, String> labelOf;
         private final Map<String, Map<String, Map<LocalDateTime, Double>>> histories;
         private final Map<String, Map<String, Double>> observedByFeature;
         private final BaselineStatistic statistic;
         private final LocalDateTime scoredDay;
         private final Map<String, Cohort> cache = new LinkedHashMap<>();
 
-        PeerSide(AnomalyModel model, Map<String, String> cohortOf, Map<String, Map<String, Map<LocalDateTime, Double>>> histories,
+        PeerSide(AnomalyModel model, Cohorts cohorts, Map<String, Map<String, Map<LocalDateTime, Double>>> histories,
               Map<String, Map<String, Double>> observedByFeature, BaselineStatistic statistic, LocalDateTime scoredDay) {
             this.peer = new PeerBaseline(model.peers().minGroupSize(), model.peers().populationFallback());
-            this.cohortOf = cohortOf;
+            this.cohortOf = cohorts.keyOf();
+            this.labelOf = cohorts.labelOf();
             this.histories = histories;
             this.observedByFeature = observedByFeature;
             this.statistic = statistic;
@@ -236,9 +238,9 @@ public final class AnomalyScoreEvaluator {
         }
 
         private Cohort compute(AnomalyModel.Feature f, String cohort) {
-            Baseline b = peer.compute(observedByFeature.get(f.id()), cohortOf, cohort);
+            Baseline b = peer.compute(observedByFeature.get(f.id()), cohortOf, cohort, labelOf.get(cohort));
             if (b.insufficient()) return new Cohort(b, 1.0);
-            boolean population = PeerBaseline.POPULATION.equals(b.basis());
+            boolean population = b.fellBack();   // not basis == "population": a cohort label may read "population"
             Map<LocalDateTime, List<Double>> byDay = new TreeMap<>();
             histories.forEach((entity, perFeature) -> {
                 if (!population && !cohort.equals(cohortOf.get(entity))) return;
@@ -254,17 +256,36 @@ public final class AnomalyScoreEvaluator {
         }
     }
 
+    /** The display form of a NULL {@code by} value in a cohort label (the SPA's null marker, recon grain table). */
+    private static final String NULL_COHORT_VALUE = "∅";
+
     /**
-     * Entity → cohort key: ONE grouped statement over the peers Dataset, {@code max(concat_ws('|', by...))} per join
-     * key (a key with several cohort values gets the greatest, deterministically). A key with no cohort value is in
-     * the population only. Fails closed past {@link AnomalyModel#MAX_ENTITIES_CEILING} keys.
+     * Entity → cohort: {@code keyOf} for equality, {@code labelOf} (cohort key → label) for display only. The key is
+     * collision-free whatever the values hold; the label is the values joined with {@code '|'}, NULL shown as
+     * {@link #NULL_COHORT_VALUE}, and may coincide for two distinct keys (a value containing {@code '|'}).
      */
-    private static Map<String, String> cohorts(AnomalyModel model, Function<String, String> relationSql,
-                                               SqlSandboxPolicy policy) {
+    record Cohorts(Map<String, String> keyOf, Map<String, String> labelOf) {}
+
+    /**
+     * Entity → cohort: ONE grouped statement over the peers Dataset. Each {@code by} position contributes a token —
+     * {@code 'n'} for NULL, else {@code 'v' || length || ':' || value} — so NULL is a cohort value of its own in every
+     * position and the concatenated key is injective (no separator a value could contain). A join key with several
+     * cohort values gets the greatest key, deterministically. A key with no row in the Dataset is in the population
+     * only. Fails closed past {@link AnomalyModel#MAX_ENTITIES_CEILING} keys.
+     */
+    private static Cohorts cohorts(AnomalyModel model, Function<String, String> relationSql,
+                                   SqlSandboxPolicy policy) {
         AnomalyModel.Peers p = model.peers();
-        StringBuilder by = new StringBuilder();
-        for (String c : p.by()) by.append(by.isEmpty() ? "" : ", ").append("CAST(").append(q(c)).append(" AS VARCHAR)");
-        String sql = "SELECT CAST(" + q(p.key()) + " AS VARCHAR) AS entity_key, max(concat_ws('|', " + by + ")) AS cohort "
+        StringBuilder key = new StringBuilder(), label = new StringBuilder();
+        for (String c : p.by()) {
+            String v = "CAST(" + q(c) + " AS VARCHAR)";
+            key.append(key.isEmpty() ? "" : " || ").append("CASE WHEN ").append(v).append(" IS NULL THEN 'n' ELSE 'v' || ")
+                    .append("CAST(length(").append(v).append(") AS VARCHAR) || ':' || ").append(v).append(" END");
+            label.append(label.isEmpty() ? "" : " || '|' || ").append("coalesce(").append(v).append(", chr(")
+                    .append(NULL_COHORT_VALUE.codePointAt(0)).append("))");
+        }
+        String sql = "SELECT CAST(" + q(p.key()) + " AS VARCHAR) AS entity_key, max(" + key + ") AS cohort, "
+                + "arg_max(" + label + ", " + key + ") AS label "
                 + "FROM " + q(p.dataset()) + " WHERE " + q(p.key()) + " IS NOT NULL GROUP BY 1";
         QueryExecutor.Result r;
         try {
@@ -278,11 +299,13 @@ public final class AnomalyScoreEvaluator {
         if (r.truncated())
             throw new IllegalStateException("anomaly-model '" + model.id() + "' peers: dataset '" + p.dataset()
                     + "' has more than " + AnomalyModel.MAX_ENTITIES_CEILING + " keys - refusing to score a subset");
-        Map<String, String> out = new LinkedHashMap<>();
-        for (Map<String, Object> row : r.rows())
-            if (row.get("cohort") != null && !String.valueOf(row.get("cohort")).isEmpty())
-                out.put(String.valueOf(row.get("entity_key")), String.valueOf(row.get("cohort")));
-        return out;
+        Map<String, String> keyOf = new LinkedHashMap<>(), labelOf = new LinkedHashMap<>();
+        for (Map<String, Object> row : r.rows()) {
+            String cohort = String.valueOf(row.get("cohort"));
+            keyOf.put(String.valueOf(row.get("entity_key")), cohort);
+            labelOf.put(cohort, String.valueOf(row.get("label")));
+        }
+        return new Cohorts(keyOf, labelOf);
     }
 
     private static String capMessage(AnomalyModel model, AnomalyModel.Feature f, int maxEntities) {
