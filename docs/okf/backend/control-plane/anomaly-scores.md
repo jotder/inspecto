@@ -99,17 +99,22 @@ DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus
 - **Missing buckets (D-AD8):** 0 for count/sum, absent for avg. An entity's history **starts at its first
   bucket in the window** (any Feature) — densifying from the window start scored a two-day-old entity `high`
   (caught by the golden corpus; this reading CONFIRMED by the operator 2026-10-10).
-- **Peer Group** (`PeerBaseline`): ONE grouped cohort statement `max(concat_ws('|', by...))` per key (several
-  values → the greatest; none → population only). The peer baseline is median / MAD of the scored-day values
-  of the cohort's scored entities; a cohort below `minGroupSize` is `insufficient` (D-AD11). Peer medians are
-  computed **in the JVM** from the per-entity series already in memory (not in SQL).
-  ⚠ **NULLs in a multi-column `by` — characterised, policy OPEN (2026-10-11, `bd18b0371`, residual (g)).**
-  `concat_ws` skips NULLs, so ('A', NULL) and (NULL, 'A') both key to cohort `'A'` and are scored as peers — a
-  real collision; an all-NULL row keys to `''`, which the evaluator drops (population only, the same as having
-  no peers row). Untested sibling: a value holding the `|` separator can collide too, e.g. ('A|B', NULL) vs
-  ('A', 'B'). `AnomalyScoreEvaluatorTest` pins today's behaviour, not the intended policy. Recommendation
-  recorded for the operator: exclude rows with a NULL in any `by` column (count them as unscored) and build the
-  key collision-free.
+- **Peer Group** (`PeerBaseline`): ONE grouped cohort statement per key (several values → the greatest key,
+  deterministically; **no row** in the peers Dataset → population only). The peer baseline is median / MAD of
+  the scored-day values of the cohort's scored entities; a cohort below `minGroupSize` is `insufficient`
+  (D-AD11). Peer medians are computed **in the JVM** from the per-entity series already in memory (not in SQL).
+  **NULL is its own cohort value — DECIDED (operator, 2026-10-11; `663ca7df7`, residual (g)).** Each `by`
+  position contributes a token — `'n'` for NULL, else `'v' || length || ':' || value` — and the key is their
+  concatenation: collision-free whatever the values hold (no separator to smuggle). So ('A', NULL), (NULL, 'A')
+  and (NULL, NULL) are three cohorts; ('A', NULL) ≠ ('A', ''); ('A|B', NULL) ≠ ('A', 'B'); and `minGroupSize`
+  applies to a NULL cohort like any other. The key is never displayed: `peerBaseline.cohort` / `basis` and the
+  reason text (`peers %s, …`) carry a **label** — the values joined with `|`, NULL shown as **`∅`** (the SPA's
+  null marker, as in the recon grain table). The label is display only and may read the same for two cohorts
+  (('A|B', 'C') vs ('A', 'B|C') both read `A|B|C`); the explanation shape is unchanged (a string).
+  ⚠ **Behaviour change**: a NULL **single-column** `by` value used to drop the entity to population only; it is
+  now cohort `∅`. An empty-string value is a cohort too (it used to be dropped as well). The fallback test
+  reads `Baseline.fellBack()`, not `basis == "population"`, so a cohort whose value is `population` is not
+  mistaken for the fallback. `AnomalyScoreEvaluatorTest` pins all of this (7 tests).
 - **Cohort shift — CONFIRMED (operator, 2026-10-10).** With a plain `max(|zSelf|, |zPeer|)` a whole cohort
   moving together (a promotion day) goes `high`. So each member's self baseline is scaled by
   `k = peer median today / the cohort's usual daily median` (the usual is the model's own `BaselineStatistic`
@@ -216,11 +221,11 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 Tracked in `ANOMALY-DETECTION-RESIDUALS-1`: the dashboard tile (the Widget layer lacks a Widget-level filter and
 a table row limit, and `/bi/query` does not mask entity keys in scores Datasets — a top-10 Widget stays out of
 templates until BI masks); pack golden extension (needs multi-week corpora); evidence rows; hour buckets; JVM
-peer-median performance unmeasured (D-AD9: full recompute until measured slow); NULLs in a multi-column `by`
-(characterised above, awaiting the operator's policy call); pane: day-by-day chart series (a preview
+peer-median performance unmeasured (D-AD9: full recompute until measured slow); pane: day-by-day chart series (a preview
 response-shape change); the LA panel's Risk Score model gate. Later: an ML scorer behind the same explanation
 shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
-Feature `filters` / `unit` fields; unsaved-content preview.)
+Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
+collision-free key.)
 
 ## Decisions (operator, 2026-10-10)
 
