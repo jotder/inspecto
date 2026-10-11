@@ -22,7 +22,7 @@ import com.gamma.access.WriteGates;
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
- *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, maxInvestigationBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems},
+ *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, maxInvestigationBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems,propagatedRiskWeights},
  *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue},
  *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
@@ -207,8 +207,10 @@ final class SettingsRoutes implements RouteModule {
             run.put("threads", g.threads());
             run.put("queue", g.queue());
             run.put("maxResultItems", g.maxResultItems());
+            run.put("propagatedRiskWeights", g.propagatedRiskWeights());
         }
         m.put("graphRun", run);
+        m.put("propagatedRiskWeightsInForce", s.effectiveGraphRun().propagatedRiskWeightsInForce());
         LinkAnalysisSettings.Index x = s.index();
         Map<String, Object> idx = null;   // D-3: null = every knob inherits the shipped default (enabled = false)
         if (x != null) {
@@ -259,12 +261,27 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun must be an object, got '" + raw + "'");
         Map<String, Object> g = (Map<String, Object>) raw;
         for (String k : g.keySet())
-            if (!List.of("maxNodes", "maxEdges", "timeoutMs", "threads", "queue", "maxResultItems").contains(k))
+            if (!List.of("maxNodes", "maxEdges", "timeoutMs", "threads", "queue", "maxResultItems", "propagatedRiskWeights").contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun has no key '" + k + "'");
         return new LinkAnalysisSettings.GraphRun(boundedInt(g, "maxNodes", "graphRun.maxNodes"),
                 boundedInt(g, "maxEdges", "graphRun.maxEdges"), boundedInt(g, "timeoutMs", "graphRun.timeoutMs"),
                 boundedInt(g, "threads", "graphRun.threads"), boundedInt(g, "queue", "graphRun.queue"),
-                boundedInt(g, "maxResultItems", "graphRun.maxResultItems"));
+                boundedInt(g, "maxResultItems", "graphRun.maxResultItems"), riskWeights(g.get("propagatedRiskWeights")));
+    }
+
+    /** {@code graphRun.propagatedRiskWeights}: null = inherit; else a list of 1..6 numbers in [0,1], refused (422) otherwise. */
+    private static List<Double> riskWeights(Object raw) {
+        if (raw == null) return null;
+        List<Double> out = new java.util.ArrayList<>();
+        boolean numeric = raw instanceof List<?>;
+        if (numeric) for (Object o : (List<?>) raw) {
+            if (o instanceof Number n) out.add(n.doubleValue());
+            else numeric = false;
+        }
+        if (!numeric || !LinkAnalysisSettings.GraphRun.validWeights(out))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "graphRun.propagatedRiskWeights must be a list of 1..6 numbers in [0,1], got '" + raw + "'");
+        return out;
     }
 
     /** The edge/node index knobs (D-3): absent/null = inherit; {@code enabled} must be a JSON boolean, {@code maxDiskBytes}

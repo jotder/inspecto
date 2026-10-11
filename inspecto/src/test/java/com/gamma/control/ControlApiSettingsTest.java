@@ -456,6 +456,28 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** graph_run.propagated_risk_weights: absent = the shipped [1.0,0.6,0.35,0.15] in force; a stated list round-trips; a bad one is 422. */
+    @Test
+    void linkAnalysisPropagatedRiskWeightsRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode before = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertEquals(4, before.get("propagatedRiskWeightsInForce").size());
+            assertEquals(0.35, before.get("propagatedRiskWeightsInForce").get(2).asDouble(), 1e-9);
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"graphRun\":{\"propagatedRiskWeights\":[1,0.5,0.2]}}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("propagated_risk_weights"), toon);
+            JsonNode after = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertEquals(3, after.get("graphRun").get("propagatedRiskWeights").size());
+            assertEquals(0.2, after.get("propagatedRiskWeightsInForce").get(2).asDouble(), 1e-9);
+            for (String bad : java.util.List.of("[]", "[1,1,1,1,1,1,1]", "[1.5]", "[-0.1]", "[\"x\"]", "0.5"))
+                assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                        "{\"graphRun\":{\"propagatedRiskWeights\":" + bad + "}}").statusCode(), bad);
+        }
+    }
+
     /** D-3 step 4: the index knobs are a nested block; absent = inherit, a stated block round-trips and a bad one is 422. */
     @Test
     void linkAnalysisIndexRoundTripsAndRefusesBadValues(@TempDir Path root) throws Exception {

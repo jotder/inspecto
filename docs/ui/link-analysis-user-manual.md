@@ -148,7 +148,10 @@ condition*).
   tool (*Find paths (server)*, *Run on server* for patterns, the Measures panel). The Analysis tab's
   **All algorithms (server)** group lists every algorithm the server offers (28), builds its form from the
   server's parameter list, and runs it on the open Investigation's Working Set whatever its size; the answer is
-  summarised in words with *Highlight on canvas*. The footer's **Installed modules** lists the Link Analysis modules
+  summarised in words with *Highlight on canvas*. **Propagated risk** has its own inputs there: *weights* (per hop,
+  prefilled with the Space default), *seeds* (add canvas nodes; empty = every scored node) and *nodeScores* (**Fill
+  from indicators** reads the profile's indicators Dataset); its answer is a ranked table (score, raw, own,
+  contributors) whose *Factors* expand to the contributing origins. The footer's **Installed modules** lists the Link Analysis modules
   and whether each is active, inert (with the reason), switched off in this Space, or not installed.
 * Very busy hub nodes are folded into a **super-node** so they do not hide everything else.
 * Above 20 links on the canvas, link labels are hidden (shown on hover or click) to keep the picture readable; *All link labels* in the Display menu overrides it.
@@ -179,6 +182,33 @@ condition*).
   the matching entities here, and selecting entities here highlights their points on the map.
 * Click a node to see its details, **Explain node** (why is it interesting?), and **expand** it to pull in its
   neighbours one hop at a time.
+
+#### The node detail dialog
+
+Besides the node's rows (id, links, neighbours, Datasets, attributes) and its canvas actions, the dialog has three
+sections. On an Investigation canvas, click a node once to select it, then click the selected node again to open
+its detail dialog.
+
+While the Space's entity masking mode is anything but `none`, Risk and Enrichment are unavailable: the reference
+Datasets are read through a route that applies no masking (a masking-aware server-side key lookup is the planned
+follow-up). A reference read cut at its row limit is flagged, and Compute risk is then held - an incomplete score map
+would understate risk.
+
+* **Risk** — on a profile that maps an indicators Dataset (Telecom: `telecom_msisdn_indicators` by `msisdn`), the
+  node's own **indicator score** and its factor columns. **Compute risk** runs `propagatedRisk` on the server over the
+  Investigation's Working Set, seeded with every drawn node's indicator score, and then shows the node's propagated
+  score (raw, own, contributors) and its top contributing origins, e.g. *+28 from 99979100001, 3 hops, weight
+  0.35*. The answer is kept per Working Set, so other nodes show it without a new run. Without an open Investigation
+  (or the *Run link graph analysis* capability) the button is held and says why. The weights are the Space default
+  (`graph_run.propagated_risk_weights`, shipped 1.0 / 0.6 / 0.35 / 0.15).
+* **Enrichment** — the node's CRM/KYC row when the profile maps one (Telecom: `crm_kyc` by `msisdn`; if the Space
+  cannot read it, the section says so), and the Entity Lists of its Entity Type it is on. Case history is not shown:
+  no API lists the Incidents or Cases that reference an entity yet.
+* **Actions** — **Add to watch / block list** (one button per watch or block list of the node's Entity Type that does
+  not already hold it) asks for a reason first; a list under four-eyes answers *Waiting for approval* and nothing is
+  written until a second person approves. The buttons need *Manage incidents*; without it they are disabled and the
+  dialog says so. **Hide on canvas** (exploration only) takes the node and its links off the canvas; it changes no
+  query and no Investigation.
 
 ### 5.3 Domain profiles
 

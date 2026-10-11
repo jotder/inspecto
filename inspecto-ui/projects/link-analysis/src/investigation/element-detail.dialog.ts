@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { NgComponentOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Type, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -39,11 +40,23 @@ export interface ElementDetailData {
      *  pivots), excluding the host's own current view. Absent/empty = hidden; only offered when
      *  `objectRef` is set, since the pivot travels the record reference. */
     pivotViews?: PivotView[];
+    /**
+     * Host-supplied sections rendered under the rows (Link Analysis: Risk / Enrichment / Actions). The component may
+     * close the dialog itself (it can inject `MatDialogRef`) with an {@link ElementDetailResult}, e.g. `'hide'`.
+     */
+    extension?: { component: Type<unknown>; inputs?: Record<string, unknown> };
 }
 
 /** What the caller should do next; closing without a choice does nothing. Pivoting to another view
  *  (ui-design-review R8) is handled inside this dialog via `PivotService` and does not surface here. */
-export type ElementDetailResult = 'focus' | 'collapse' | 'expand' | 'open-record' | 'expand-neighbors' | undefined;
+export type ElementDetailResult =
+    | 'focus'
+    | 'collapse'
+    | 'expand'
+    | 'open-record'
+    | 'expand-neighbors'
+    | 'hide'
+    | undefined;
 
 const PIVOT_LABEL: Record<PivotView, string> = { graph: 'View in graph', map: 'View on map' };
 const PIVOT_ICON: Record<PivotView, string> = { graph: 'heroicons_outline:share', map: 'heroicons_outline:map' };
@@ -57,7 +70,7 @@ const PIVOT_ICON: Record<PivotView, string> = { graph: 'heroicons_outline:share'
     selector: 'inspecto-element-detail-dialog',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, MatDialogModule, MatIconModule],
+    imports: [MatButtonModule, MatDialogModule, MatIconModule, NgComponentOutlet],
     template: `
         <h2 mat-dialog-title class="truncate">{{ data.title }}</h2>
         <mat-dialog-content>
@@ -70,6 +83,9 @@ const PIVOT_ICON: Record<PivotView, string> = { graph: 'heroicons_outline:share'
                     </div>
                 }
             </dl>
+            @if (data.extension; as x) {
+                <ng-container *ngComponentOutlet="x.component; inputs: x.inputs ?? {}" />
+            }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             @if (data.branch === 'collapse') {
