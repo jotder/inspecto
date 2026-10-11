@@ -22,6 +22,7 @@ import {
     RowApiModule,
     RowAutoHeightModule,
     RowSelectionModule,
+    RowStyleModule,
     ScrollApiModule,
     SelectEditorModule,
     TextEditorModule,
@@ -60,6 +61,8 @@ ModuleRegistry.registerModules([
     TextEditorModule,
     SelectEditorModule,
     CellStyleModule,
+    // getRowClass on <inspecto-data-table> (every shared table binds it) needs RowStyleModule (ag-Grid error 200 without it).
+    RowStyleModule,
     ...(isDevMode() ? [ValidationModule] : []),
 ]);
 
