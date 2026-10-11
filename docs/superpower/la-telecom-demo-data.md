@@ -12,7 +12,7 @@ assigned to any real network.
 | Raw extracts (one 60-day file per feed, 2026-08-01 to 2026-09-29) | `spaces/_templates/la-showcase/data/inbox/<feed>/<FEED>_20260929.csv` |
 | 8 Collector + Pipeline + schema pairs | `spaces/_templates/la-showcase/config/telecom/<feed>_pipeline.toon`, `<feed>_schema.toon` |
 | 2 `sql.template` Jobs | `config/jobs/telecom_links_job.toon`, `config/jobs/telecom_msisdn_indicators_job.toon` |
-| Dataset registry entries | `config/registry/datasets/telecom_links_dataset.toon`, `telecom_msisdn_indicators_dataset.toon` (MSISDN columns classified `MSISDN`) |
+| Dataset registry entries | `config/registry/datasets/telecom_links_dataset.toon`, `telecom_msisdn_indicators_dataset.toon` (MSISDN columns classified `MSISDN`); `crm_kyc_dataset.toon` and `hlr_eir_dataset.toon` over the landed feeds (`physicalRef` `crm_kyc/database`, `hlr_eir/database`; keyed on `msisdn`; `imsi` `IMSI`, `account_holder` `ACCOUNT`, `imei`, `id_doc_hash` and `address_hash` `PII`, `forwarding_to` `MSISDN`; dates and types unclassified) |
 | Saved Link Analysis view | `config/registry/link-analysis-views/telecom_fraud_network.toon` |
 | Telecom pattern packs, typology Alert Rules (§5a) | `config/registry/pattern-packs/telecom-*.toon`, `config/registry/alert-rules/telecom_*_lines.toon`, `config/jobs/telecom_typology_counts_job.toon` |
 | Golden test | `platform/inspecto-engine/src/test/java/com/gamma/job/TelecomLinksGoldenTest.java` |
