@@ -365,7 +365,7 @@
              Two modules pinned the SAME 1.5.18 literal independently, which is exactly the drift M1
              hoists against. Keep in step with ${slf4j.version} — slf4j is pinned to what logback 1.5.x
              compiles against, so bumping one without the other splits the facade from its binding. -->
-        <logback.version>1.5.18</logback.version>
+        <logback.version>1.5.34</logback.version>
         <!-- opencsv: single-owner (inspecto-util's CSV reader/writer helpers) and pinned literally there
              until ROOT-POM row PARENT-UNMANAGED-CHILD-VERSIONS-1. Hoisted despite the single owner
              because the ${commons-lang3.version} comment above REASONS FROM this number — opencsv drags a

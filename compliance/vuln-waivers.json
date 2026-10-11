@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": "GHSA-p53j-g8pw-4w5f",
+    "package": "net.i2p.crypto:eddsa",
+    "reason": "No fixed version exists (OSV: last_affected 0.3.0, library unmaintained). Runtime-only transitive of sshj 0.39.0 in inspecto-connectors (SFTP Ed25519); signature malleability, MEDIUM. Remove when sshj drops eddsa or a fix ships (ASSURE-OPERABILITY-1).",
+    "expires": "2027-04-11"
+  }
+]

@@ -81,7 +81,7 @@ Drift-prone shared external versions live ONCE in the parent `<dependencyManagem
 (`junit`, `langchain4j`, `eoiagent`, `postgresql`, since S5 `jtoon` + `jackson-databind`, and
 since WS-D `duckdb_jdbc` + `univocity-parsers` + `commons-compress` + `gson`); modules declare those
 artifacts version-free. `opencsv` stayed pinned in fp-util (single-owner after the split — no drift to
-prevent). `logback-classic` is single-owner (fp-engine, pinned 1.5.18). Reactor-internal deps
+prevent). `logback-classic` is single-owner (fp-engine, pinned 1.5.34). Reactor-internal deps
 (`inspecto-api`, `inspecto-util`, `inspecto-config`, `inspecto-sql`,
 `inspecto-engine` — the last also managed as a `test-jar` entry) are parent-managed at
 `${project.version}`. Single-owner deps stay pinned in their one module. JaCoCo's `coverage` profile lives in the parent (`mvn -Pcoverage test`
