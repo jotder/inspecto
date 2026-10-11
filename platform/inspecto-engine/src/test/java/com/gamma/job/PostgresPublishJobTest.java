@@ -562,6 +562,54 @@ class PostgresPublishJobTest {
         assertEquals(List.of("m", "plan", "day"), columnsOf("cust"));
     }
 
+    // ── AUTHORING-REDESIGN-1 (e), operator 2026-10-11 (B): a sql Step's column classification is ADDITIVE only ──
+
+    /** {@link #custStore} with raw MSISDN UNclassified and a sql Step whose {@code label} row carries {@code cls}. */
+    void stepClassifiedStore(String cls) throws Exception {
+        custStore("m, label, day", KEEP_RENAMED, "steps[1]:\n  - sql:\n"
+                + "      sql: \"SELECT m AS m, plan AS label, day AS day FROM input\"\n      fields[3]:\n"
+                + "        - name: m\n          from: m\n          fn: keep\n"
+                + "        - name: label\n          from: plan\n          fn: keep\n          classification: " + cls + "\n"
+                + "        - name: day\n          from: day\n          fn: keep\n");
+        Path pipe = cfg.resolve("cust/cust_pipeline.toon");   // inactive: an active steps: chain needs an output_store
+        Files.writeString(pipe, Files.readString(pipe).replace("active: true", "active: false"));
+        Path schema = cfg.resolve("cust/cust_schema.toon");
+        Files.writeString(schema, Files.readString(schema).replace(",\"MSISDN\"\n", ",\"\"\n"));
+    }
+
+    @Test
+    void aStepClassifiedColumnIsDroppedExactlyLikeASchemaClassifiedOne() throws Exception {
+        stepClassifiedStore("PII");
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of("m", "day"), columnsOf("cust"), "the Step says label is PII");
+    }
+
+    @Test
+    void aStepClassificationNeverRelaxesTheFailClosedRefusal() throws Exception {
+        // raw MSISDN classified + a sql Step: lineage is untraceable, and the Step's declaration does not change that
+        custStore("m, label, day", KEEP_RENAMED, "steps[1]:\n  - sql:\n      sql: \"SELECT m, plan AS label, day FROM input\"\n"
+                + "      fields[1]:\n        - name: m\n          from: m\n          fn: keep\n          classification: \"\"\n");
+        Path pipe = cfg.resolve("cust/cust_pipeline.toon");   // inactive, so the file loads: the refusal is lineage's
+        Files.writeString(pipe, Files.readString(pipe).replace("active: true", "active: false"));
+        PostgresPublishJobType.installAuthority(c -> author("bob"));
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("cannot be traced"), r.message());
+    }
+
+    @Test
+    void strippingAStepClassificationRefusesTheApprovedRun() throws Exception {
+        stepClassifiedStore("PII");
+        assertEquals("SUCCESS", run(Map.of("datasets", "cust")).status());
+        Path pipe = cfg.resolve("cust/cust_pipeline.toon");
+        Files.writeString(pipe, Files.readString(pipe).replace("classification: PII", "classification: \"\""));
+        approve = false;
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("the approved publication changed"), r.message());
+    }
+
     @Test
     void anUnreadablePipelineForTheStoreRefusesTheDataset() throws Exception {
         custStore("m, plan, day", KEEP_RENAMED, "");
