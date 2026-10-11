@@ -579,3 +579,75 @@ describe('Transform pane: accessibility', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });
+
+// AUTHORING-REDESIGN-1 (e): per-output-column metadata on a chain Step, read by the Catalog.
+describe('Transform pane: column metadata', () => {
+    function describeButton(fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>, name: string) {
+        return (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+            `button[aria-label="Describe ${name}"]`,
+        );
+    }
+
+    it('opens one row editor, stores the four schema keys on the row and writes them on Apply', async () => {
+        const fixture = await create(sqlNode(), undefined, ['order_id', 'msisdn']);
+        const btn = describeButton(fixture, 'msisdn')!;
+        expect(btn.getAttribute('aria-expanded')).toBe('false');
+        btn.click();
+        fixture.detectChanges();
+        expect(btn.getAttribute('aria-expanded')).toBe('true');
+        const inputs = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>(
+            '[role="group"] input',
+        );
+        expect(inputs.length).toBe(4);
+        const values = ['Subscriber number', '', 'MSISDN', 'msisdn_alias'];
+        inputs.forEach((el, i) => {
+            el.value = values[i];
+            el.dispatchEvent(new Event('input'));
+        });
+        fixture.detectChanges();
+        const c = comp(fixture);
+        c.submit();
+        const rows = fixture.componentInstance.applied!.config!['fields'] as SqlField[];
+        expect(rows[1]).toMatchObject({
+            name: 'msisdn',
+            description: 'Subscriber number',
+            classification: 'MSISDN',
+            synonym: 'msisdn_alias',
+        });
+        expect('unit' in rows[1]).toBe(false);
+        expect(rows[0].description).toBeUndefined();
+        expect(String(fixture.componentInstance.applied!.config!['sql'])).not.toContain('MSISDN');
+    });
+
+    it('carries metadata through a rename, since it rides the row', async () => {
+        const stored = [field({ name: 'm', from: 'msisdn', fn: 'keep', classification: 'PII' })];
+        const fixture = await create(sqlNode({ sql: 'x', fields: stored }));
+        const c = comp(fixture);
+        expect(c.fields()[0].classification).toBe('PII');
+        c.rename(c.fields()[0].id, 'subscriber');
+        expect(c.fields()[0]).toMatchObject({ name: 'subscriber', classification: 'PII' });
+    });
+
+    it('blanking a value removes the key', async () => {
+        const stored = [field({ name: 'm', from: 'msisdn', fn: 'keep', unit: 's' })];
+        const fixture = await create(sqlNode({ sql: 'x', fields: stored }));
+        const c = comp(fixture);
+        c.setMetadata(c.fields()[0].id, 'unit', '  ');
+        expect('unit' in c.fields()[0]).toBe(false);
+        expect(c.isDescribed(c.fields()[0])).toBe(false);
+    });
+
+    it('is not offered in the projection slot, whose fields[] the Catalog never reads', async () => {
+        const slot: AuthoredNode = { id: 'map', type: 'transform.sql', name: 'Record Transformer', config: {} };
+        const fixture = await create(slot, undefined, ['order_id']);
+        expect(comp(fixture).canDescribe()).toBe(false);
+        expect(describeButton(fixture, 'order_id')).toBeNull();
+    });
+
+    it('has no axe violations with the metadata editor open', async () => {
+        const fixture = await create(sqlNode(), undefined, ['order_id']);
+        describeButton(fixture, 'order_id')!.click();
+        fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});

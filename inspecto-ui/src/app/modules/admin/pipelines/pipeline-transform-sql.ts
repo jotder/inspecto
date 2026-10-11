@@ -28,7 +28,20 @@ export interface SqlField {
     fn: string;
     /** Parameter values by parameter name. Absent keys fall back to the parameter's declared default. */
     args: Record<string, string>;
+    /**
+     * Column metadata — exactly a schema field's (`raw.fields[]`) four keys, AUTHORING-REDESIGN-1 (e). The
+     * Catalog reads them (a STEP node's COLUMN children) and `classification` joins the masking lineage
+     * additively. Absent = not described; the SQL generator never reads them.
+     */
+    description?: string;
+    unit?: string;
+    classification?: string;
+    synonym?: string;
 }
+
+/** The column-metadata keys a {@link SqlField} may carry, in display order. */
+export const FIELD_METADATA_KEYS = ['description', 'unit', 'classification', 'synonym'] as const;
+export type FieldMetadataKey = (typeof FIELD_METADATA_KEYS)[number];
 
 /** What the grid needs to render and validate one row, derived from the catalog. */
 export interface CompiledField {
@@ -165,13 +178,18 @@ export function readFields(stored: unknown): SqlField[] | null {
         const r = raw as Record<string, unknown>;
         const name = typeof r['name'] === 'string' ? r['name'] : '';
         if (!name) continue;
-        out.push({
+        const field: SqlField = {
             id: typeof r['id'] === 'string' && r['id'] ? r['id'] : newFieldId(),
             name,
             from: typeof r['from'] === 'string' ? r['from'] : '',
             fn: typeof r['fn'] === 'string' && r['fn'] ? r['fn'] : legacyVerbToFn(r['verb']),
             args: readArgs(r['args'], r),
-        });
+        };
+        for (const key of FIELD_METADATA_KEYS) {
+            const v = r[key];
+            if (typeof v === 'string' && v.trim()) field[key] = v;
+        }
+        out.push(field);
     }
     return out.length ? out : null;
 }

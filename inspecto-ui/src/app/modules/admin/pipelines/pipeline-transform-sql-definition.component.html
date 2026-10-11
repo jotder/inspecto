@@ -121,7 +121,7 @@
                     <th class="w-56 px-2 py-1">What to do</th>
                     <th class="w-28 px-2 py-1">Comes out as</th>
                     <th class="w-40 px-2 py-1">Sample</th>
-                    <th class="w-8 px-2 py-1"><span class="sr-only">Leave out</span></th>
+                    <th class="w-20 px-2 py-1"><span class="sr-only">Describe or leave out</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -296,18 +296,71 @@
                         </td>
                         <td class="text-secondary truncate px-2 py-1 font-mono text-xs">{{ row.sample }}</td>
                         <td class="px-2 py-1">
-                            @if (!readOnly()) {
-                                <button
-                                    type="button"
-                                    mat-icon-button
-                                    [attr.aria-label]="'Leave out ' + row.field.name"
-                                    (click)="removeField(row.field.id)"
-                                >
-                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
-                                </button>
-                            }
+                            <div class="flex items-center">
+                                @if (canDescribe()) {
+                                    <button
+                                        type="button"
+                                        mat-icon-button
+                                        [attr.aria-label]="'Describe ' + (row.field.name || 'row ' + row.seq)"
+                                        [attr.aria-expanded]="describing() === row.field.id"
+                                        [attr.aria-controls]="'describe-' + row.field.id"
+                                        [title]="isDescribed(row.field) ? 'Described' : 'Describe this column'"
+                                        (click)="toggleDescribe(row.field.id)"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-4"
+                                            [class.text-primary]="isDescribed(row.field)"
+                                            [svgIcon]="
+                                                isDescribed(row.field) ? 'heroicons_solid:tag' : 'heroicons_outline:tag'
+                                            "
+                                        ></mat-icon>
+                                    </button>
+                                }
+                                @if (!readOnly()) {
+                                    <button
+                                        type="button"
+                                        mat-icon-button
+                                        [attr.aria-label]="'Leave out ' + row.field.name"
+                                        (click)="removeField(row.field.id)"
+                                    >
+                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                    </button>
+                                }
+                            </div>
                         </td>
                     </tr>
+                    @if (canDescribe() && describing() === row.field.id) {
+                        <!-- Column metadata: a schema field's four keys, read by the Catalog (STEP node). -->
+                        <tr class="align-top">
+                            <td colspan="7" class="px-2 pb-2">
+                                <div
+                                    [id]="'describe-' + row.field.id"
+                                    role="group"
+                                    [attr.aria-label]="'Metadata for ' + (row.field.name || 'row ' + row.seq)"
+                                    class="grid grid-cols-1 gap-2 rounded-md border border-gray-200 p-2 sm:grid-cols-4 dark:border-gray-700"
+                                >
+                                    @for (key of metadataKeys; track key) {
+                                        <label class="flex flex-col gap-1 text-xs">
+                                            <span class="text-secondary font-semibold">{{ metadataLabel(key) }}</span>
+                                            <input
+                                                type="text"
+                                                class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-2 text-sm dark:border-gray-600"
+                                                [readonly]="readOnly()"
+                                                [placeholder]="metadataPlaceholder(key)"
+                                                [value]="row.field[key] ?? ''"
+                                                (input)="setMetadata(row.field.id, key, $any($event.target).value)"
+                                            />
+                                        </label>
+                                    }
+                                    <p class="text-secondary text-xs sm:col-span-4">
+                                        Shown in the Catalog for this Step's output column. A sensitive classification
+                                        (MSISDN, IMSI, ACCOUNT, PII) also masks the column wherever the pipeline's data
+                                        is published or used as evidence; it never unmasks one.
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                 } @empty {
                     <tr>
                         <td colspan="7" class="text-secondary px-2 py-3 text-center text-sm">

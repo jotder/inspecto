@@ -18,6 +18,8 @@ import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview
 import { SqlCodemirrorComponent } from 'app/inspecto/data-table/sql/sql-codemirror.component';
 import {
     CompiledField,
+    FIELD_METADATA_KEYS,
+    FieldMetadataKey,
     SqlField,
     applyFunction,
     compileFields,
@@ -503,6 +505,51 @@ export class PipelineTransformSqlDefinitionComponent {
 
     setFunction(id: string, fnId: string): void {
         this.patch(id, (f) => applyFunction(f, fnId));
+    }
+
+    // ── column metadata (AUTHORING-REDESIGN-1 (e)) ───────────────────────────────────────────────────
+
+    /** The row whose metadata editor is open, or `null`. One at a time keeps a 600-row grid scannable. */
+    readonly describing = signal<string | null>(null);
+
+    /**
+     * Metadata is offered only on a CHAIN Step: there the Catalog reads it. The projection slot compiles
+     * `fields[]` into `processing.map`, which has no home for it — it would be stored and never read.
+     */
+    readonly canDescribe = computed(() => !isProjectionSlot(this.node()));
+
+    readonly metadataKeys = FIELD_METADATA_KEYS;
+
+    metadataLabel(key: FieldMetadataKey): string {
+        return { description: 'Description', unit: 'Unit', classification: 'Classification', synonym: 'Synonym' }[key];
+    }
+
+    metadataPlaceholder(key: FieldMetadataKey): string {
+        return {
+            description: 'What this column means',
+            unit: 'e.g. seconds',
+            classification: 'e.g. PII',
+            synonym: 'Alias',
+        }[key];
+    }
+
+    toggleDescribe(id: string): void {
+        this.describing.update((open) => (open === id ? null : id));
+    }
+
+    /** Whether a row carries any metadata — drives the Describe button's "described" state. */
+    isDescribed(field: SqlField): boolean {
+        return FIELD_METADATA_KEYS.some((k) => !!field[k]?.trim());
+    }
+
+    /** Set one metadata value; a blank value removes the key, so an emptied row persists as undescribed. */
+    setMetadata(id: string, key: FieldMetadataKey, value: string): void {
+        this.patch(id, (f) => {
+            const next: SqlField = { ...f };
+            if (value.trim()) next[key] = value;
+            else delete next[key];
+            return next;
+        });
     }
 
     setArg(id: string, param: string, value: string): void {
