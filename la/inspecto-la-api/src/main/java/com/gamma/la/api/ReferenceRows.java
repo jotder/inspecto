@@ -144,11 +144,10 @@ final class ReferenceRows {
             StringBuilder sql = new StringBuilder("SELECT ");
             for (String c : cols) sql.append(SqlIdent.q(c)).append(", ");
             sql.append("CAST(").append(SqlIdent.q(keyName)).append(" AS VARCHAR) AS ").append(SqlIdent.q(keyAlias))
-               .append(" FROM ").append(SqlIdent.q(datasetId)).append(" WHERE CAST(").append(SqlIdent.q(keyName))
-               .append(" AS VARCHAR) IN (");
+               .append(" FROM ").append(SqlIdent.q(datasetId)).append(" WHERE ");
             List<String> binds = new ArrayList<>(askedByRaw.keySet());
-            for (int i = 0; i < binds.size(); i++) sql.append(i == 0 ? "?" : ", ?");
-            sql.append(") ORDER BY ").append(SqlIdent.q(keyAlias));
+            sql.append(keyPredicate(SqlIdent.q(keyName), keyType(datasetId, relationSql, keyName), binds));
+            sql.append(" ORDER BY ").append(SqlIdent.q(keyAlias));
             DatasetProvider.Result r;
             try {
                 r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql.toString(),
@@ -193,6 +192,60 @@ final class ReferenceRows {
         res.put("truncated", truncated);
         res.put("masking", describe);
         return res;
+    }
+
+    /** Integer column types a key can be bound as, with their inclusive ranges. */
+    private static final Map<String, java.math.BigInteger[]> INTEGER_RANGES = Map.of(
+            "TINYINT", range(Byte.MIN_VALUE, Byte.MAX_VALUE), "SMALLINT", range(Short.MIN_VALUE, Short.MAX_VALUE),
+            "INTEGER", range(Integer.MIN_VALUE, Integer.MAX_VALUE), "BIGINT", range(Long.MIN_VALUE, Long.MAX_VALUE),
+            "UTINYINT", range(0, 255), "USMALLINT", range(0, 65_535), "UINTEGER", range(0, 4_294_967_295L),
+            "UBIGINT", new java.math.BigInteger[]{java.math.BigInteger.ZERO,
+                    java.math.BigInteger.ONE.shiftLeft(64).subtract(java.math.BigInteger.ONE)});
+
+    private static java.math.BigInteger[] range(long lo, long hi) {
+        return new java.math.BigInteger[]{java.math.BigInteger.valueOf(lo), java.math.BigInteger.valueOf(hi)};
+    }
+
+    /**
+     * The key-match predicate, shaped so DuckDB can prune row groups by min/max: a VARCHAR key column is compared
+     * directly; an integer key column is compared to typed binds when EVERY key is the canonical decimal spelling of a
+     * value in that type's range (so the match is exactly the {@code CAST(.. AS VARCHAR)} match); anything else falls
+     * back to the CAST form, which never fails on a non-numeric key. Keys are always bound, never inlined.
+     */
+    static String keyPredicate(String quotedKey, String keyType, List<String> keys) {
+        String t = keyType == null ? "" : keyType.trim().toUpperCase(Locale.ROOT);
+        String lhs, slot;
+        if ("VARCHAR".equals(t)) {
+            lhs = quotedKey;
+            slot = "?";
+        } else if (INTEGER_RANGES.containsKey(t) && keys.stream().allMatch(k -> canonicalInteger(k, INTEGER_RANGES.get(t)))) {
+            lhs = quotedKey;
+            slot = "CAST(? AS " + t + ")";
+        } else {
+            lhs = "CAST(" + quotedKey + " AS VARCHAR)";
+            slot = "?";
+        }
+        StringBuilder sb = new StringBuilder(lhs).append(" IN (");
+        for (int i = 0; i < keys.size(); i++) sb.append(i == 0 ? "" : ", ").append(slot);
+        return sb.append(')').toString();
+    }
+
+    private static boolean canonicalInteger(String k, java.math.BigInteger[] range) {
+        if (!k.matches("-?(0|[1-9][0-9]{0,39})") || "-0".equals(k)) return false;
+        java.math.BigInteger v = new java.math.BigInteger(k);
+        return v.compareTo(range[0]) >= 0 && v.compareTo(range[1]) <= 0;
+    }
+
+    /** The key column's DuckDB type name ({@code typeof} of one row), or {@code null} when unknown (CAST fallback). */
+    private static String keyType(String datasetId, String relationSql, String keyName) {
+        try {
+            DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql,
+                    "SELECT typeof(" + SqlIdent.q(keyName) + ") AS t FROM " + SqlIdent.q(datasetId) + " LIMIT 1",
+                    1, 0, List.of(), List.of()));
+            return r.rows().isEmpty() ? null : String.valueOf(r.rows().get(0).get("t"));
+        } catch (Exception unknown) {
+            return null;
+        }
     }
 
     /** Under {@code all}: only floating / decimal numbers and booleans are shown unmasked. */
