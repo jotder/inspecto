@@ -1493,8 +1493,12 @@ public final class JobService implements AutoCloseable {
                 }
                 // LEASE-TAKEOVER-JOB-RUNS-1: a claim taken over mid-run fences the run's output registration
                 // (PipelineJobRunner checks Scope.JOB by Run id before each registry/lakehouse write).
+                // HA-CANCEL-RESIDUALS-1 (1): a closing host's cancel rides the same hold, so those checks (and any
+                // CommitFence.checkpoint by Run id) throw RunCancelledException; the claims below are still released
+                // only by this thread, after the run has stopped.
                 try (com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                        com.gamma.inspector.CommitFence.Scope.JOB, runId, () -> worst(arming, authored))) {
+                        com.gamma.inspector.CommitFence.Scope.JOB, runId, () -> worst(arming, authored),
+                        () -> arming.cancelled() || (authored != null && authored.cancelled()))) {
                     // policy-narrowing-design S2b (D8): the Space's effective Safety Policy is resolved ONCE here,
                     // before anything starts, and pinned for the run. An unreadable policy file refuses the run
                     // as a FAILED Run naming the file - never started under "no policy".

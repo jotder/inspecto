@@ -39,6 +39,13 @@ public interface RunClaims {
 
         /** {@link #state()} is {@code HELD}. */
         default boolean isValid() { return state() == com.gamma.inspector.CommitFence.State.HELD; }
+
+        /**
+         * The host is closing and asked this run to stop at its next checkpoint (HA-CANCEL-RESIDUALS-1 (1)) — the
+         * host delegates to its lease's {@code RunLease.Claim#cancelled()}. A signal only: the claim is still held
+         * and is released by the run thread's own {@code finally}, after it stopped. Default: never cancelled.
+         */
+        default boolean cancelled() { return false; }
     }
 
     /**
