@@ -292,6 +292,17 @@ describe('DataTableComponent', () => {
         }
     });
 
+    it('paging re-materializes renderer cells (paginationChanged -> refresh)', async () => {
+        // Regression (live /alerts D3): ag-Grid rebuilds row components on every page change, which hits the
+        // same initial-render skip, so action/badge cells went empty after Next and stayed empty on Back.
+        const f = await create('pro');
+        const spy = vi.spyOn(f.componentInstance, 'refresh').mockImplementation(() => undefined);
+        const ag = f.debugElement.query(By.directive(AgGridAngular)).componentInstance as AgGridAngular;
+        const evt = { api: {} } as never;
+        ag.paginationChanged.emit(evt);
+        expect(spy).toHaveBeenCalledWith(evt);
+    });
+
     it('has no a11y violations (standard)', async () => {
         const f = await create('standard');
         await expectNoA11yViolations(f.nativeElement);
