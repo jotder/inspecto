@@ -449,7 +449,7 @@ class ControlApiInvIndexedExpansionTest {
             // disabled: exactly today's step shape (plus supernode suppression's hubsFlagged)
             settings(c, DISABLED);
             JsonNode off = expand(c, "[\"A\"]", List.of(), "", "");
-            assertEquals(List.of("rowCount", "fingerprint", "readAt", "fanOutCapped", "hubsFlagged", "fallback", "rung"), fieldNames(off.get("read")));
+            assertEquals(List.of("rowCount", "fingerprint", "readAt", "fanOutCapped", "hubsFlagged", "hubs", "hubDegreeSource", "fallback", "rung"), fieldNames(off.get("read")));
             assertEquals("index_disabled", off.at("/read/fallback/reason").asText());
         }
     }

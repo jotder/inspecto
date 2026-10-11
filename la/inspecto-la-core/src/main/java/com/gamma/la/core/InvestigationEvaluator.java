@@ -130,6 +130,11 @@ public final class InvestigationEvaluator {
          * Displayed, but the route leaves them out of a later expand's frontier unless the analyst overrides.
          */
         public final TreeSet<String> highConnectivity = new TreeSet<>();
+        /**
+         * The sealed distinct-contact degree ({@code read.hubs[].degree}) of each flagged entity, from the step that flagged it.
+         * Display only: never part of {@link #toMap()} or {@link #hash()}, so flagged states hash exactly as before.
+         */
+        public final TreeMap<String, Long> hubDegree = new TreeMap<>();
         /** Per-entity notes (LA-19), in step order per entity. They outlive a later exclusion: a note is history. */
         public final TreeMap<String, List<Annotation>> annotations = new TreeMap<>();
         /** Per-link notes (D-U9 remainder), keyed by the link key; like entity notes they outlive a later exclusion. */
@@ -434,6 +439,7 @@ public final class InvestigationEvaluator {
             c.hidden.addAll(hidden);
             c.kept.addAll(kept);
             c.highConnectivity.addAll(highConnectivity);
+            c.hubDegree.putAll(hubDegree);
             annotations.forEach((k, v) -> c.annotations.put(k, new ArrayList<>(v)));
             linkAnnotations.forEach((k, v) -> c.linkAnnotations.put(k, new ArrayList<>(v)));
             c.window = window;
@@ -575,8 +581,10 @@ public final class InvestigationEvaluator {
                 // Supernode suppression: the read sealed which endpoints exceeded the rung's hub threshold (absent on older logs).
                 if (read.get("hubs") instanceof List<?> hubs)
                     for (Object o : hubs)
-                        if (o instanceof Map<?, ?> h && s.entities.containsKey(String.valueOf(h.get("id"))))
-                            s.highConnectivity.add(String.valueOf(h.get("id")));
+                        if (o instanceof Map<?, ?> h && s.entities.containsKey(String.valueOf(h.get("id")))) {
+                            String id = String.valueOf(h.get("id"));
+                            if (s.highConnectivity.add(id) && h.get("degree") instanceof Number d) s.hubDegree.put(id, d.longValue());
+                        }
             }
             case "exclude" -> {
                 String reason = String.valueOf(p.get("reason"));
@@ -782,6 +790,7 @@ public final class InvestigationEvaluator {
         s.entities.remove(id);
         s.hidden.remove(id);
         s.highConnectivity.remove(id);
+        s.hubDegree.remove(id);
         s.links.values().removeIf(l -> l.source().equals(id) || l.target().equals(id));
         s.excluded.put(id, new Exclusion(step, reason));
     }
