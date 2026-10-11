@@ -99,7 +99,12 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
             // minEvents 1: `telecom_links` is pre-aggregated and expand counts rows, so every pair weighs 1 — a higher
             // floor admits nobody (a Wangiri victim has one row). 30 days back from the Dataset's latest `last_seen`
             // keeps every planted ring (their evidence is all after 30 Aug; la-telecom-demo-data.md §7).
-            expand: { windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 },
+            // maxFanOut 500: the suspect has 403 candidate rows (400 Wangiri victims, forwarding, shared_device both
+            // ways) and the cap ranks by events, so a cap below 403 drops the 1-event shared_device link to WANGIRI-B
+            // at degree 1. budget 10000: the seed corpus reads at most ~4 700 rows at any degree of the ladder with the
+            // hub held (2000 truncated degree 4 before the shared_payment rings). Both stay under the showcase's
+            // four-eyes fan-out threshold (2000), so the ladder runs without approval (la-telecom-demo-data.md §3).
+            expand: { windowDays: 30, minEvents: 1, maxFanOut: 500, budget: 10000 },
             maxDegree: 4,
         },
     },

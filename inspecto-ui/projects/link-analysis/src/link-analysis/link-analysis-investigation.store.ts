@@ -32,6 +32,8 @@ import {
     isAwaiting,
     mergeRung,
     overrideSteps,
+    overriddenHubs,
+    sealedHubThreshold,
     presetRung,
     profileForDataset,
     reconcileApprovals,
@@ -156,6 +158,13 @@ export class InvestigationSessionStore {
     );
     /** The "Expand anyway" steps in effect — their hub's contacts are kept out of the next degree's frontier. */
     readonly overrideSteps = computed(() => overrideSteps(this.log()?.entries ?? []));
+    /** The flagged entities an override in effect expanded through (applied, or approved and run) — read from the log. */
+    readonly overriddenHubs = computed(() => {
+        const flagged = new Set((this.workingSet()?.entities ?? []).filter((e) => e.highConnectivity).map((e) => e.id));
+        return overriddenHubs(this.log()?.entries ?? [], flagged);
+    });
+    /** The hub threshold the latest expand in effect sealed — survives a reload, unlike `lastStep`. */
+    readonly sealedHubThreshold = computed(() => sealedHubThreshold(this.log()?.entries ?? []));
     readonly effectiveSteps = computed(() => effectiveOpSteps(this.log()?.entries ?? []));
     readonly truncatedSteps = computed(() => truncatedSteps(this.log()?.entries ?? []));
     /** A Draft's Undo reverts only its OWN steps, so the main-log prefix it forked from never counts. */
@@ -369,7 +378,7 @@ export class InvestigationSessionStore {
         const step = this.lastStep();
         if (step && step.status !== 'pending') this.lastOverride.set({ step: step.step, ids: [id] });
         if (step?.status === 'pending') {
-            const outcome = degreeOutcome(degree, step, rest);
+            const outcome: DegreeOutcome = { ...degreeOutcome(degree, step, rest), override: id };
             this.degreeOutcomes.update((all) => [
                 ...all.filter((o) => o.awaitingApproval !== outcome.awaitingApproval),
                 outcome,

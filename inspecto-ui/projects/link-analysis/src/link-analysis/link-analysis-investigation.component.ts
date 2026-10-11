@@ -236,20 +236,26 @@ export class LinkAnalysisInvestigationComponent {
             .filter((e) => e.highConnectivity)
             .map((e) => (e.contacts == null && sealed.has(e.id) ? { ...e, contacts: sealed.get(e.id)! } : e));
     });
-    /** The hub threshold: the last step's sealed value when it ran, else the Space's value in force. */
+    /** A flagged entity an approved/applied override already expanded through — no second "Expand anyway". */
+    isOverridden(id: string): boolean {
+        return this.store.overriddenHubs().has(id);
+    }
+    /** The hub threshold: the last step's sealed value when it ran, else the log's sealed value (a reload), else the
+     *  Space's value in force. */
     readonly hubThreshold = computed(() => {
         const sealed = this.store.lastStep()?.read?.rung?.['hubThreshold'];
-        return typeof sealed === 'number' ? sealed : this.laSettings.limits().hubThresholdInForce;
+        if (typeof sealed === 'number') return sealed;
+        return this.store.sealedHubThreshold() ?? this.laSettings.limits().hubThresholdInForce;
     });
     /** The badge for one flagged entity: its own sealed count when served, else the threshold wording. */
-    hubBadge(contacts?: number | null): string {
-        return hubBadgeText(this.hubThreshold(), contacts);
+    hubBadge(contacts?: number | null, id?: string): string {
+        return hubBadgeText(this.hubThreshold(), contacts, !!id && this.isOverridden(id));
     }
     /** The selected entity's badge: its own count when it is a single flagged id, else the threshold wording. */
     readonly selectedHubBadge = computed(() => {
         const ids = this.selectedHubs();
         const one = ids.length === 1 ? this.hubs().find((e) => e.id === ids[0]) : undefined;
-        return this.hubBadge(one?.contacts);
+        return this.hubBadge(one?.contacts, one?.id);
     });
     /** The selected entity's flagged ids — "Expand one hop" would be refused for them; "Expand anyway" is offered. */
     readonly selectedHubs = computed(() => {
@@ -264,12 +270,12 @@ export class LinkAnalysisInvestigationComponent {
             ids.length === 1
                 ? `the high-connectivity entity ${ids[0]}`
                 : `${ids.length} high-connectivity entities (${ids.slice(0, 5).join(', ')}${ids.length > 5 ? ', …' : ''})`;
-        return this.confirm.confirm(
+        return this.confirm.confirmDestructive(
             `Expand through ${what}? A hub can pull in many unrelated numbers.\n\n` +
                 'The override is sealed in this step of the Investigation log, with your name, and is shown in the log ' +
                 'and the Dossier' +
                 (purpose ? ` under the stated purpose: “${purpose}”.` : '.'),
-            'Expand through high connectivity?',
+            { title: 'Expand through high connectivity?', confirmText: 'Expand anyway', destructive: false },
         );
     }
 

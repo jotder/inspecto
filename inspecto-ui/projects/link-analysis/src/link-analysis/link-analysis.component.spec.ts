@@ -20,7 +20,13 @@ import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
-import { CANVAS_MIN_PX, FORCE_ATLAS_MAX_NODES, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
+import {
+    CANVAS_MIN_PX,
+    FORCE_ATLAS_MAX_NODES,
+    LinkAnalysisComponent,
+    defaultLayoutFor,
+    snapshotTitle,
+} from './link-analysis.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
@@ -334,9 +340,13 @@ describe('LinkAnalysisComponent', () => {
             eventsCol: 'events',
             windowEnd: '2026-09-29T18:30:00.000Z',
         });
-        expect(rows.sql).toHaveBeenCalledWith('links', 'SELECT MAX("last_seen") AS latest FROM "links"', 1);
+        expect(rows.sql).toHaveBeenCalledWith(
+            'links',
+            `SELECT strftime(MAX("last_seen"), '%Y-%m-%dT%H:%M:%S') AS latest FROM "links"`,
+            1,
+        );
         expect(c.profileId()).toBe('telecom');
-        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
+        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 500, budget: 10000 });
         expect(c.toolboxTab()).toBe('investigation');
         expect(c.investigateIssue()).toBe('');
         expect(navigate).toHaveBeenCalledWith(
@@ -934,9 +944,8 @@ describe('LinkAnalysisComponent', () => {
         expect(c.latestSnapshot()).toBeNull();
         c.openAttachToCase();
         expect(open).toHaveBeenCalledTimes(1); // no separate "save first" dialog
-        const data = (
-            open.mock.calls[0] as unknown as [unknown, { data: { graph: G6GraphData; origin: unknown } }]
-        )[1].data;
+        const data = (open.mock.calls[0] as unknown as [unknown, { data: { graph: G6GraphData; origin: unknown } }])[1]
+            .data;
         expect(data.graph.nodes).toHaveLength(5);
         expect(data.origin).toMatchObject({ sourceId: 'entity-projection', dataset: 'links-ds' });
         expect((data as { investigationId?: string }).investigationId).toBeUndefined(); // none open
@@ -1013,7 +1022,10 @@ describe('LinkAnalysisComponent', () => {
         expect(attach()).toBeUndefined(); // nothing to seal yet
 
         c.investigation.activeId.set('inv-3');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.investigation.workingSet.set({
             entities: [{ id: 'ws-a' }, { id: 'ws-b' }],
             links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
@@ -1043,7 +1055,13 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         c.investigation.activeId.set('inv-4');
         c.investigation.log.set({
-            header: { dataset: 'telecom_links', sourceCol: 'a', targetCol: 'b', linkKindCol: 'link_kind', timeCol: 'first_seen' },
+            header: {
+                dataset: 'telecom_links',
+                sourceCol: 'a',
+                targetCol: 'b',
+                linkKindCol: 'link_kind',
+                timeCol: 'first_seen',
+            },
             entries: [],
         } as never);
         c.investigation.workingSet.set({
