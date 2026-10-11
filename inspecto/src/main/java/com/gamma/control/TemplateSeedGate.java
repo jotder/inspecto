@@ -146,6 +146,15 @@ final class TemplateSeedGate {
      * template's Connections are filled in later, so a missing one is not a defect — a structurally invalid config is.
      */
     private static void requireStructure(Path config) {
+        // LA-DEMO-POLISH-1 (6): the calling thread is bound to the CALLER's Space, whose policy roots do not include
+        // the staged new Space - every relative `dirs.*` resolved there read "outside the allowed roots". Tests never
+        // saw it because surefire adds java.io.tmpdir to assist.safety.roots. Judge against the new Space's own root.
+        com.gamma.config.safety.SafetyPolicy caller = com.gamma.config.safety.SafetyPolicy.defaultPolicy();
+        List<Path> roots = new java.util.ArrayList<>(caller.allowedRoots());
+        roots.add(config.getParent().toAbsolutePath().normalize());
+        com.gamma.config.safety.SafetyPolicy policy = new com.gamma.config.safety.SafetyPolicy(roots,
+                caller.denyRoots(), caller.maxThreads(), caller.maxBatchFiles(), caller.maxBatchBytes(),
+                caller.allowedFormats(), caller.allowedCompression(), caller.advanceState());
         for (Path file : configFiles(config)) {
             String name = file.getFileName().toString();
             Path parent = file.getParent();
@@ -159,7 +168,7 @@ final class TemplateSeedGate {
                 throw refused(type, name, unreadable.getMessage());
             }
             List<com.gamma.config.spec.Finding> findings = SaveGate.check(null, type, draft, config, parent,
-                    SaveGate.Referents.MAY_ARRIVE_LATER);
+                    SaveGate.Referents.MAY_ARRIVE_LATER, policy);
             for (com.gamma.config.spec.Finding f : findings)
                 if (f.severity() == com.gamma.config.spec.Severity.ERROR)
                     throw refused(type, name, f.fieldPath() + ": " + f.message());

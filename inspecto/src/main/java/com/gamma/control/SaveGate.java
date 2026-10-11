@@ -72,8 +72,17 @@ final class SaveGate {
      */
     static List<Finding> check(ApiContext api, String type, Map<String, Object> draft, Path writeRoot,
                                Path configDir, Referents referents) {
+        return check(api, type, draft, writeRoot, configDir, referents, SafetyPolicy.defaultPolicy());
+    }
+
+    /**
+     * {@link #check(ApiContext, String, Map, Path, Path, Referents)} judged against {@code policy} rather than the
+     * calling Space's — for a config whose Space is not hosted yet (a template staged by {@link TemplateSeedGate}).
+     */
+    static List<Finding> check(ApiContext api, String type, Map<String, Object> draft, Path writeRoot,
+                               Path configDir, Referents referents, SafetyPolicy policy) {
         List<Finding> f = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.forType(type), draft));
-        f.addAll(safety(type, draft, writeRoot, configDir));   // the hard-fail safety check (R6)
+        f.addAll(safety(type, draft, writeRoot, configDir, policy));   // the hard-fail safety check (R6)
         // Arming split (SCHEMA-FILE-NAME-1): an ACTIVE pipeline whose schema_file resolves nowhere is
         // refused — it would register and then never load; an inactive draft is warned.
         f.addAll(ConfigRoutes.schemaArmingFindings(type, draft, configDir));
@@ -125,11 +134,12 @@ final class SaveGate {
      * of every key EXCEPT the pipeline runner's two ({@code JOB-PATH-SINGLE-TENANT-GATE-BASE-1}):
      * {@code SpaceConfigRoot.jobPathBase} hands those the config READ root.
      */
-    private static List<Finding> safety(String type, Map<String, Object> draft, Path writeRoot, Path configDir) {
+    private static List<Finding> safety(String type, Map<String, Object> draft, Path writeRoot, Path configDir,
+                                        SafetyPolicy policy) {
         if ("job".equalsIgnoreCase(type))
-            return ConfigSafetyValidator.checkJob(draft, SafetyPolicy.defaultPolicy(),
+            return ConfigSafetyValidator.checkJob(draft, policy,
                     k -> com.gamma.pipeline.SpaceConfigRoot.jobPathBase(k, writeRoot));
-        return ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(), configDir);
+        return ConfigSafetyValidator.check(type, draft, policy, configDir);
     }
 
     /**
