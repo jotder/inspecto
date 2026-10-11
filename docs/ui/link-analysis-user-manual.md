@@ -498,7 +498,7 @@ the Selected line keeps them one entity and marks it *(masked)*. After a server 
 **Settings → Link Analysis** sets per-Space limits: the four-eyes thresholds (large expands wait for a second
 person), the merged-traversal cap and the `seedBy` cap. It also shows and, with the authoring capability, changes the
 **masking mode** (`typed`, `all` or `none`, each explained beside the field, with the mode in force), the **link index**
-(whether reads are served from a fresh index, plus its build workers, waiting line and disk budget), the default
+(whether reads are served from a fresh index, plus its build workers, waiting line and disk budget, and the longest age in hours of an index that may still serve a Dataset whose files cannot be checked for changes - older, the read comes from the Dataset and says so), the default
 **server graph-run budget** (nodes, edges, time, shown with the server's ceilings) and the Draft limits. It lists the
 Entity Types in force and names the active Investigation store (filesystem or PostgreSQL) read only. Without the
 capability every field is read only.

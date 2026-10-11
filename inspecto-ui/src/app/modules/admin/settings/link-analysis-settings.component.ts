@@ -74,6 +74,8 @@ const runValidators = [Validators.min(1), Validators.max(RUN_MAX), Validators.pa
 const IDX_THREADS_MAX = 64;
 const IDX_QUEUE_MAX = 1000;
 const IDX_DISK_MAX = 1_000_000_000_000_000;
+/** SettingsRoutes index.maxAgeHours: 1..8760 hours (one year). */
+const IDX_MAX_AGE_MAX = 8760;
 const draftValidators = (max: number) => [Validators.min(1), Validators.max(max), Validators.pattern('\\d*')];
 
 type RunKey = 'maxNodes' | 'maxEdges' | 'timeoutMs';
@@ -269,6 +271,15 @@ function expiryAfterHibernation(
                                 <mat-error>A whole number of bytes from 0 to {{ idxDiskMax }}, or blank for no limit.</mat-error>
                             }
                         </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Longest age of an index that may serve an uncheckable Dataset (hours)</mat-label>
+                            <input matInput type="number" min="1" [max]="idxMaxAgeMax" formControlName="maxAgeHours"
+                                [readonly]="!canEdit()" [placeholder]="'default ' + (indexInForce()?.maxAgeHours ?? '')" />
+                            <mat-hint>In force: {{ indexInForce()?.maxAgeHours ?? '-' }} hours. A Dataset whose input files cannot be fingerprinted (view-backed) is read from the Dataset, not the index, once the index is older than this.</mat-hint>
+                            @if (form.controls.index.controls.maxAgeHours.invalid) {
+                                <mat-error>A whole number of hours from 1 to {{ idxMaxAgeMax }}, or blank for the default.</mat-error>
+                            }
+                        </mat-form-field>
                     </fieldset>
                     <fieldset formGroupName="graphRun" class="flex flex-col gap-3">
                         <legend class="text-sm font-semibold">Server graph run - default budget</legend>
@@ -351,6 +362,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly idxThreadsMax = IDX_THREADS_MAX;
     readonly idxQueueMax = IDX_QUEUE_MAX;
     readonly idxDiskMax = IDX_DISK_MAX;
+    readonly idxMaxAgeMax = IDX_MAX_AGE_MAX;
     readonly runFields: { key: RunKey; label: string }[] = [
         { key: 'maxNodes', label: 'Graph run: default node budget' },
         { key: 'maxEdges', label: 'Graph run: default edge budget' },
@@ -403,6 +415,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             threads: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_THREADS_MAX), Validators.pattern('\\d*')]),
             queue: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_QUEUE_MAX), Validators.pattern('\\d*')]),
             maxDiskBytes: new FormControl<number | null>(null, [Validators.min(0), Validators.max(IDX_DISK_MAX), Validators.pattern('\\d*')]),
+            maxAgeHours: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_MAX_AGE_MAX), Validators.pattern('\\d*')]),
         }),
         graphRun: new FormGroup({
             maxNodes: new FormControl<number | null>(null, runValidators),
@@ -513,6 +526,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         idx['threads'] = num(v.index.threads);
         idx['queue'] = num(v.index.queue);
         idx['maxDiskBytes'] = num(v.index.maxDiskBytes);
+        idx['maxAgeHours'] = num(v.index.maxAgeHours);
         if (Object.values(idx).some((x) => x !== null && x !== undefined)) body['index'] = idx;
         else delete body['index'];
         const run: Record<string, unknown> = { ...(served.graphRun ?? {}) };
@@ -565,6 +579,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 threads: s.index?.threads ?? null,
                 queue: s.index?.queue ?? null,
                 maxDiskBytes: s.index?.maxDiskBytes ?? null,
+                maxAgeHours: s.index?.maxAgeHours ?? null,
             },
             graphRun: {
                 maxNodes: s.graphRun?.maxNodes ?? null,

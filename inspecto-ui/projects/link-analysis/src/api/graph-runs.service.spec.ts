@@ -182,6 +182,7 @@ describe('indexRefusalMessage', () => {
         ['the edge index cannot serve this run (index_disabled)', /switched off/],
         ['the edge index cannot serve this run (no_index)', /No edge index/],
         ['the edge index cannot serve this run (index_stale_refused: removed)', /stale/],
+        ['the edge index cannot serve this run (stale_unknown: older)', /older than this Space allows/],
         ['hops 3 is over the index cap of 2 hops', /at most 2 hops/],
         ["'seeds' lists 21 nodes; the index cap is 20 keys per level", /at most 20/],
         ['\'at\' cannot be combined with input "index"', /past step/],

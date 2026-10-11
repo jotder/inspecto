@@ -88,7 +88,7 @@ export interface LinkAnalysisLimits {
     propagatedRiskWeightsInForce?: number[];
     /**
      * D-3: the edge/node index knobs stated (`enabled` default false, `maxDiskBytes` 0 = no limit, versions kept, build
-     * workers, waiting line); `null` = every one inherits. The form edits `enabled`, `threads`, `queue` and
+     * workers, waiting line, maxAgeHours); `null` = every one inherits. The form edits `enabled`, `threads`, `queue` and
      * `maxDiskBytes`; `keepVersions` is round-tripped by a save (the PUT replaces).
      */
     index?: {
@@ -97,9 +97,11 @@ export interface LinkAnalysisLimits {
         keepVersions: number | null;
         threads: number | null;
         queue: number | null;
+        /** Hours an index may age and still serve a Dataset whose input files cannot be fingerprinted (LA-INDEX-MAX-AGE-1). */
+        maxAgeHours?: number | null;
     } | null;
     /** The index knobs actually in force (shipped default or stated) - server-computed, read-only. `maxDiskBytes` 0 = no limit. */
-    indexInForce?: { enabled: boolean; maxDiskBytes: number; keepVersions: number; threads: number; queue: number };
+    indexInForce?: { enabled: boolean; maxDiskBytes: number; keepVersions: number; threads: number; queue: number; maxAgeHours: number };
     /** The active InvestigationStore backend (`-Dinvestigations.backend`): `fs` = filesystem, `db` = PostgreSQL. Read-only, not a setting. */
     investigationStoreInForce?: 'fs' | 'db';
 }

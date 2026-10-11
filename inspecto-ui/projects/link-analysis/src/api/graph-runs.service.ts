@@ -317,6 +317,10 @@ export function indexRefusalMessage(serverMessage: string): string {
             'The index is stale and rows it still holds may have been removed from the Dataset, so it was refused. Rebuild the index.',
         ],
         [
+            /stale_unknown/,
+            'The index is older than this Space allows (index.max_age_hours) and the input files of this Dataset cannot be checked for changes. Rebuild the index.',
+        ],
+        [
             /mapping_not_indexed|column_not_indexed/,
             'The index was built over different columns than this run asked for.',
         ],

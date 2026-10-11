@@ -91,16 +91,18 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * {@code enabled} - whether reads may use an index (default ON since 2026-10-10; an explicit {@code false} disables; a read
      * with no fresh published index still falls back to the flat Dataset); {@code maxDiskBytes} - the build refuses an estimate above it (0 or unstated = no limit);
      * {@code keepVersions} - published versions kept per index (default 2); {@code threads} / {@code queue} - the build
-     * workers and waiting line. Every field is optional ({@code null} = the shipped default).
+     * workers and waiting line; {@code maxAgeHours} - the oldest an index may be and still serve a Dataset whose input files cannot be fingerprinted (default 24). Every field is optional ({@code null} = the shipped default).
      */
-    public record Index(Boolean enabled, Long maxDiskBytes, Integer keepVersions, Integer threads, Integer queue) {
-        public static final Index NONE = new Index(null, null, null, null, null);
+    public record Index(Boolean enabled, Long maxDiskBytes, Integer keepVersions, Integer threads, Integer queue,
+                        Integer maxAgeHours) {
+        public static final Index NONE = new Index(null, null, null, null, null, null);
+        public static final int DEFAULT_MAX_AGE_HOURS = 24;
         public static final int DEFAULT_KEEP_VERSIONS = 2;
         public static final int DEFAULT_THREADS = 1;
         public static final int DEFAULT_QUEUE = 4;
 
         boolean isNone() {
-            return enabled == null && maxDiskBytes == null && keepVersions == null && threads == null && queue == null;
+            return enabled == null && maxDiskBytes == null && keepVersions == null && threads == null && queue == null && maxAgeHours == null;
         }
 
         /** Whether reads may use an index: ON unless explicitly {@code false} (operator 2026-10-10; a read still needs a fresh published index). */
@@ -123,6 +125,11 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
         public int queueInForce() {
             return queue != null ? queue : DEFAULT_QUEUE;
+        }
+
+        /** How old (hours since the build) an index may be and still answer a read of a Dataset whose input files cannot be fingerprinted (LA-INDEX-MAX-AGE-1). */
+        public int maxAgeHoursInForce() {
+            return maxAgeHours != null ? maxAgeHours : DEFAULT_MAX_AGE_HOURS;
         }
     }
 
@@ -266,6 +273,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (index.keepVersions() != null) x.put("keep_versions", index.keepVersions());
             if (index.threads() != null) x.put("threads", index.threads());
             if (index.queue() != null) x.put("queue", index.queue());
+            if (index.maxAgeHours() != null) x.put("max_age_hours", index.maxAgeHours());
             m.put("index", x);
         }
         if (drafts != null && !drafts.isNone()) {
@@ -353,7 +361,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                 // unparseable = inherit
             }
         }
-        Index r = new Index(enabled, maxDisk, optInt(g, "keep_versions"), optInt(g, "threads"), optInt(g, "queue"));
+        Index r = new Index(enabled, maxDisk, optInt(g, "keep_versions"), optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_age_hours"));
         return r.isNone() ? null : r;
     }
 

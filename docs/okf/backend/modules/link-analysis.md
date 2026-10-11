@@ -337,7 +337,7 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
   ≤ 20), neighbours, simple Investigation `expand` (byte-identical fingerprint to the flat read; weighted when the
   mapping's `weightCol` is the Investigation's `eventsCol`; the supernode hub degree from the same version when fresh —
   `read.hubDegreeSource`, §3.1), temporal, and Graph
-  Run with `input: "index"`. A response never mixes index and flat answers — with ONE known, documented exception:
+  Run with `input: "index"`. **Age gate (LA-INDEX-MAX-AGE-1, 2026-10-11):** a Dataset whose input files cannot be fingerprinted (view-backed, `fingerprintKnown=false`) is never reported stale, so the index serves it only while younger than the Space setting `index.max_age_hours` (default 24, 1..8760); an older or undated build reads flat with the Reason `stale_unknown` (the 12th closed Reason; listed in the SPA's `index-source.ts`). A fingerprinted Dataset ignores the age (stale-served and flagged, as before). A response never mixes index and flat answers — with ONE known, documented exception:
   an `expand` served from a **stale** index (input files added since the build) takes its rows from the older index
   version but counts the hub degree flat over the CURRENT Dataset (`hubDegreeSource: flat`), so a sealed `hubs[].degree`
   may count links the sealed rows do not show yet. Accepted (the degree is display + flagging only, sealed, outside

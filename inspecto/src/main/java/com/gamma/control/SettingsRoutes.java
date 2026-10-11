@@ -23,7 +23,7 @@ import com.gamma.access.WriteGates;
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
  *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, maxInvestigationBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems,propagatedRiskWeights},
- *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue},
+ *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue,maxAgeHours},
  *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
@@ -60,6 +60,7 @@ final class SettingsRoutes implements RouteModule {
     private static final int MAX_INDEX_KEEP = 100;
     private static final int MAX_INDEX_THREADS = 64;
     private static final int MAX_INDEX_QUEUE = 1_000;
+    private static final int MAX_INDEX_MAX_AGE_HOURS = 8_760;   // one year
     /** Draft lifecycle limits: a thousand open Drafts, a week to hibernate, ten years to expire. */
     private static final int MAX_DRAFTS_OPEN = 1_000;
     private static final int MAX_DRAFTS_HIBERNATE_MINUTES = 10_080;
@@ -220,6 +221,7 @@ final class SettingsRoutes implements RouteModule {
             idx.put("keepVersions", x.keepVersions());
             idx.put("threads", x.threads());
             idx.put("queue", x.queue());
+            idx.put("maxAgeHours", x.maxAgeHours());
         }
         m.put("index", idx);
         LinkAnalysisSettings.Index ix = s.effectiveIndex();   // read-only echo: what the index is doing now, whatever the shipped default is
@@ -229,6 +231,7 @@ final class SettingsRoutes implements RouteModule {
         idxInForce.put("keepVersions", ix.keepVersionsInForce());
         idxInForce.put("threads", ix.threadsInForce());
         idxInForce.put("queue", ix.queueInForce());
+        idxInForce.put("maxAgeHours", ix.maxAgeHoursInForce());
         m.put("indexInForce", idxInForce);
         // Read-only echo of the process-wide -Dinvestigations.backend selection (fs default | db = PostgreSQL); not a setting.
         m.put("investigationStoreInForce", "db".equalsIgnoreCase(System.getProperty("investigations.backend", "fs").trim()) ? "db" : "fs");
@@ -295,7 +298,7 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index must be an object, got '" + raw + "'");
         Map<String, Object> g = (Map<String, Object>) raw;
         for (String k : g.keySet())
-            if (!List.of("enabled", "maxDiskBytes", "keepVersions", "threads", "queue").contains(k))
+            if (!List.of("enabled", "maxDiskBytes", "keepVersions", "threads", "queue", "maxAgeHours").contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index has no key '" + k + "'");
         Boolean enabled = null;
         Object en = g.get("enabled");
@@ -319,7 +322,8 @@ final class SettingsRoutes implements RouteModule {
             maxDisk = v;
         }
         return new LinkAnalysisSettings.Index(enabled, maxDisk, rangedInt(g, "keepVersions", "index.keepVersions", MAX_INDEX_KEEP),
-                rangedInt(g, "threads", "index.threads", MAX_INDEX_THREADS), rangedInt(g, "queue", "index.queue", MAX_INDEX_QUEUE));
+                rangedInt(g, "threads", "index.threads", MAX_INDEX_THREADS), rangedInt(g, "queue", "index.queue", MAX_INDEX_QUEUE),
+                rangedInt(g, "maxAgeHours", "index.maxAgeHours", MAX_INDEX_MAX_AGE_HOURS));
     }
 
     /** The Draft lifecycle knobs (LA-DRAFT-PROMOTE-COST-1): absent/null = inherit; {@code maxOpen} 1..{@code MAX_DRAFTS_OPEN},

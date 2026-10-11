@@ -133,7 +133,7 @@ describe('LinkAnalysisSettingsComponent', () => {
     });
 
     it('sends the index knobs back untouched, an explicit enabled=false included: the PUT replaces', () => {
-        const index = { enabled: false, maxDiskBytes: 5000000000, keepVersions: 3, threads: null, queue: null };
+        const index = { enabled: false, maxDiskBytes: 5000000000, keepVersions: 3, threads: null, queue: null, maxAgeHours: null };
         const { api, submit } = setup({ served: { index } });
         submit();
         expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ index }));
@@ -346,7 +346,7 @@ describe('LinkAnalysisSettingsComponent', () => {
             maskingModeInForce: 'all',
             entityTypesInForce: ET,
             index: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8 },
-            indexInForce: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8 },
+            indexInForce: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8, maxAgeHours: 24 },
             graphRun: { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: 7, maxResultItems: 55 },
             investigationStoreInForce: 'db',
         };
@@ -374,11 +374,12 @@ describe('LinkAnalysisSettingsComponent', () => {
             c.form.controls.maskingMode.setValue('none');
             c.form.controls.index.controls.enabled.setValue(false);
             c.form.controls.index.controls.queue.setValue(null);
+            c.form.controls.index.controls.maxAgeHours.setValue(48);
             c.form.controls.graphRun.controls.maxEdges.setValue(1234);
             submit();
             const body = api.save.mock.calls[0][0] as unknown as Record<string, unknown>;
             expect(body['maskingMode']).toBe('none');
-            expect(body['index']).toEqual({ enabled: false, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: null });
+            expect(body['index']).toEqual({ enabled: false, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: null, maxAgeHours: 48 });
             expect(body['graphRun']).toEqual({ maxNodes: 900, maxEdges: 1234, timeoutMs: 4000, threads: 3, queue: 7, maxResultItems: 55 });
             expect(body['entityTypesInForce']).toBeUndefined();
             expect(body['indexInForce']).toBeUndefined();
@@ -399,6 +400,8 @@ describe('LinkAnalysisSettingsComponent', () => {
             ['index', 'threads', 65],
             ['index', 'queue', 1001],
             ['index', 'maxDiskBytes', -1],
+            ['index', 'maxAgeHours', 0],
+            ['index', 'maxAgeHours', 8761],
             ['graphRun', 'maxNodes', 10000001],
             ['graphRun', 'timeoutMs', 0],
         ])('refuses %s.%s = %s client-side and does not save', (group, key, bad) => {

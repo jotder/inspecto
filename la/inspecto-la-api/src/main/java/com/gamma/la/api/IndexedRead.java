@@ -34,7 +34,7 @@ final class IndexedRead {
     /** Why the flat Dataset answered. The wire value is {@link #name()}. */
     enum Reason {
         index_disabled, no_index, mapping_not_indexed, column_not_indexed, time_zone_not_servable, filter_not_indexed,
-        index_stale_refused, depth_over_index_cap, frontier_over_index_cap, index_read_failed, rung_not_indexable
+        index_stale_refused, depth_over_index_cap, frontier_over_index_cap, index_read_failed, rung_not_indexable, stale_unknown
     }
 
     /** Either the index answered ({@code result} set) or the flat path must ({@code reason} set). */
@@ -199,6 +199,14 @@ final class IndexedRead {
         InputFingerprint input = InputFingerprintCache.get(writeRoot, datasetId, mappingHash,
                 () -> IndexRoutes.currentInput(dataRoot, writeRoot, datasetId));
         IndexStaleness.Result st = IndexStaleness.compute(manifest, IndexBuilder.relationSqlHash(relationSql), input, BucketFunction.NAME, duck);
+        // LA-INDEX-MAX-AGE-1: input files that cannot be fingerprinted are never reported stale, so the index answers only while it is
+        // younger than index.max_age_hours; an older (or undated) build reads flat. A fingerprinted Dataset is unaffected.
+        if (!st.fingerprintKnown()) {
+            int maxHours = LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex().maxAgeHoursInForce();
+            if (!youngerThan(manifest.builtAt(), maxHours))
+                return declined(Outcome.flat(Reason.stale_unknown, "the index was built " + manifest.builtAt() + ", older than index.max_age_hours " + maxHours
+                        + ", and the Dataset's input files cannot be compared"));
+        }
         boolean refuse = st.removedInput()
                 || st.reasons().stream().anyMatch(r -> !r.equals(IndexStaleness.INPUT_FILES_CHANGED) && !r.equals(IndexStaleness.DUCKDB_VERSION_CHANGED));
         if (refuse)
@@ -216,6 +224,14 @@ final class IndexedRead {
         String staleReason = reasonText.isEmpty() ? null : String.join("; ", reasonText);
         return new Selection(null, chosen.dir(), manifest, filterSql, filterBinds, manifest.version(), staleReason != null, staleReason,
                 st.reasons(), st.fingerprintKnown());
+    }
+
+    private static boolean youngerThan(String builtAt, int hours) {
+        try {
+            return java.time.Instant.parse(builtAt).isAfter(java.time.Instant.now().minus(java.time.Duration.ofHours(hours)));
+        } catch (RuntimeException unreadable) {
+            return false;                                                                    // an undated build is not known to be young
+        }
     }
 
     // ── the filter: the request's condition tree rewritten onto the index's column names ─────────────────────────

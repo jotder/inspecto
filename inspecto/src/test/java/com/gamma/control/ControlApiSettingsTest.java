@@ -485,10 +485,10 @@ class ControlApiSettingsTest {
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
             assertTrue(json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("index").isNull(), "absent => inherit");
             HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
-                    "{\"index\":{\"enabled\":false,\"maxDiskBytes\":5000000000,\"keepVersions\":3,\"threads\":2}}");
+                    "{\"index\":{\"enabled\":false,\"maxDiskBytes\":5000000000,\"keepVersions\":3,\"threads\":2,\"maxAgeHours\":48}}");
             assertEquals(200, put.statusCode(), put.body());
             String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
-            assertTrue(toon.contains("index") && toon.contains("max_disk_bytes: 5000000000") && toon.contains("keep_versions: 3")
+            assertTrue(toon.contains("index") && toon.contains("max_disk_bytes: 5000000000") && toon.contains("keep_versions: 3") && toon.contains("max_age_hours: 48")
                     && toon.contains("enabled: false"), toon);
             JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("index");
             assertFalse(got.get("enabled").asBoolean(), "an explicit false survives the round trip");
@@ -496,8 +496,10 @@ class ControlApiSettingsTest {
             assertEquals(3, got.get("keepVersions").asInt());
             assertEquals(2, got.get("threads").asInt());
             assertTrue(got.get("queue").isNull(), "unstated knobs stay unstated");
+            assertEquals(48, got.get("maxAgeHours").asInt());
+            assertEquals(48, json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("indexInForce").get("maxAgeHours").asInt());
             assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"index\":{\"maxDiskBytes\":0}}").statusCode(), "0 = no limit");
-            for (String bad : new String[] {"{\"index\":{\"keepVersions\":0}}", "{\"index\":{\"threads\":65}}", "{\"index\":{\"queue\":1001}}",
+            for (String bad : new String[] {"{\"index\":{\"keepVersions\":0}}", "{\"index\":{\"threads\":65}}", "{\"index\":{\"queue\":1001}}", "{\"index\":{\"maxAgeHours\":0}}", "{\"index\":{\"maxAgeHours\":8761}}",
                     "{\"index\":{\"maxDiskBytes\":-1}}", "{\"index\":{\"enabled\":\"yes\"}}", "{\"index\":{\"bogus\":1}}", "{\"index\":7}"})
                 assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", bad).statusCode(), bad);
         }

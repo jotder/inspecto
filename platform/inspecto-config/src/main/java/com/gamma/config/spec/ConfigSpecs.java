@@ -1316,7 +1316,7 @@ public final class ConfigSpecs {
                         "The edge/node index (D-3): enabled = whether reads may use an index (absent = false, nothing "
                                 + "reads one yet); max_disk_bytes = a build whose estimate is above it is refused up front "
                                 + "(absent or 0 = no limit); keep_versions = published versions kept per index (absent = 2); "
-                                + "{threads, queue} size the build workers and the waiting line; every key absent = the "
+                                + "{threads, queue} size the build workers and the waiting line; max_age_hours = how old (hours) an index may be and still serve a Dataset whose input files cannot be fingerprinted (absent = 24); every key absent = the "
                                 + "shipped default."),
                 FieldSpec.of("drafts", "Draft lifecycle", FieldType.MAP,
                         "The Draft lifecycle (D21, D7-Q5): max_open = the most open Drafts one Space holds (1..1000; absent = 50); "

@@ -24,6 +24,7 @@ const CLOSED_REASONS = [
     'frontier_over_index_cap',
     'index_read_failed',
     'rung_not_indexable',
+    'stale_unknown',
 ];
 
 describe('index source wording (DR-U4)', () => {
