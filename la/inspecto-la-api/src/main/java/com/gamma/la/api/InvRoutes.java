@@ -658,10 +658,9 @@ public final class InvRoutes implements RouteModule {
                     ExplorationMasking.of(writeRoot, ds, Map.of("sourceCol", srcCol, "targetCol", tgtCol))));
         }
         // D-U7, judged on the WHOLE plan before any mapping runs (fail closed, whole call): `limit` applies per
-        // mapping, so the call reads up to limit × mappings rows, and one entity can take up to `limit` links from
-        // each edge mapping.
+        // mapping, so the call reads up to limit × mappings rows (the budget gate); `limit` is a render cap, never a fan-out.
         refuseIfSensitive(writeRoot, "a multi-Dataset projection (limit " + limit + " × " + plan.size()
-                + " mappings)", (long) limit * plan.size(), limit * edgeSpecs.size());
+                + " mappings)", (long) limit * plan.size(), 0);   // limit is a render cap, not a fan-out
 
         List<Map<String, Object>> nodes = new ArrayList<>(), edges = new ArrayList<>(), mappings = new ArrayList<>();
         boolean truncated = false;
@@ -783,9 +782,27 @@ public final class InvRoutes implements RouteModule {
         // rendered BEFORE a single character of the statement is assembled below — an identifier the
         // relation does not have cannot reach SQL, because the render never happens.
         DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), datasetId, relationSql);
-        // D-U7: either read returns at most `limit` links, so no entity can have more — rows and fan-out alike.
+        // D-U7: `limit` is a RENDER CAP, not a fan-out - it is judged only as rows against the budget gate. The fan-out
+        // gate applies where one entity's neighbour expansion is the thing gated: a neighbours read of ONE node is
+        // judged on that node's real counted degree (distinct links), exactly what an Investigation expand holds.
         refuseIfSensitive(writeRoot, (neighborsOf != null ? "a neighbours read" : "a projection")
-                + " (limit " + limit + ")", limit, limit);
+                + " (limit " + limit + ")", limit, 0);
+        if (neighborsOf != null && LinkAnalysisSettings.forRoot(writeRoot).fourEyesFanOutAbove() != null) {
+            String s0 = q(sourceCol), t0 = q(targetCol);
+            List<String> cb = new ArrayList<>(List.of(neighborsOf, neighborsOf));
+            cb.addAll(filter.binds());
+            String countSql = "SELECT COUNT(*) AS n FROM (" + edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols,
+                    " AND (CAST(" + s0 + " AS VARCHAR) = ? OR CAST(" + t0 + " AS VARCHAR) = ?)", filter) + ")";
+            try {
+                List<Map<String, Object>> cr = DatasetProviders.require().run(new DatasetProvider.Request(
+                        datasetId, relationSql, countSql, 1, 0, List.of(), List.of(), cb)).rows();
+                long degree = cr.isEmpty() || !(cr.get(0).get("n") instanceof Number n) ? 0 : n.longValue();
+                refuseIfSensitive(writeRoot, "a neighbours read of one entity (degree " + degree + ")", 0,
+                        (int) Math.min(Integer.MAX_VALUE, degree));
+            } catch (SQLException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            }
+        }
 
         // D-3 step 6: a one-hop neighbours read is answered from the edge index when - and only when - it can answer exactly
         // (IndexedNeighbors). The view gate and the four-eyes refusal above have run; a fallback below is the unchanged flat

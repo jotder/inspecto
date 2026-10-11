@@ -482,11 +482,15 @@ class ControlApiInvestigationOversightTest {
             assertEquals(422, send(c.port, "POST", rp, traversal(null, null).replace("\"caller\"", "\"no_such_col\""),
                     null).statusCode());
 
-            settings(c, "four_eyes_fan_out_above: 5\n");
+            // `limit` is a render cap, not a fan-out: a hub is judged on its real counted degree (here 2 links).
+            settings(c, "four_eyes_fan_out_above: 1\n");
             HttpResponse<String> fan = send(c.port, "POST", nb, neighbours("calls_ds", "caller", 50), null);
             assertEquals(403, fan.statusCode(), fan.body());
-            assertTrue(fan.body().contains("fan-out 50 > 5"), fan.body());
-            assertEquals(2, post(c, nb, neighbours("calls_ds", "caller", 5)).get("rows").size());
+            assertTrue(fan.body().contains("fan-out 2 > 1"), fan.body());
+            settings(c, "four_eyes_fan_out_above: 2\n");
+            assertEquals(2, post(c, nb, neighbours("calls_ds", "caller", 50)).get("rows").size(),
+                    "a degree AT the threshold runs, whatever the limit");
+            settings(c, "four_eyes_fan_out_above: 5\n");
             assertEquals(403, send(c.port, "POST", rp, traversal(2, 6), null).statusCode());
             assertTrue(post(c, rp, traversal(2, 5)).get("paths").size() > 0);
         }
@@ -526,11 +530,10 @@ class ControlApiInvestigationOversightTest {
             assertEquals(404, send(c.port, "POST", mp,
                     multi(60, 2).replaceFirst("calls_ds", "nope"), null).statusCode());
 
+            // The fan-out threshold never gates a stateless projection: its limit is a render cap.
             settings(c, "four_eyes_fan_out_above: 5\n");
-            assertEquals(403, send(c.port, "POST", pj, projection(6), null).statusCode());
-            assertEquals(3, post(c, pj, projection(5)).get("rows").size());
-            assertEquals(403, send(c.port, "POST", mp, multi(3, 2), null).statusCode(), "3 links from each of 2 mappings");
-            assertEquals(3, post(c, mp, multi(5, 1)).get("edges").size());
+            assertEquals(3, post(c, pj, projection(2000)).get("rows").size());
+            assertEquals(6, post(c, mp, multi(2000, 2)).get("edges").size());
         }
     }
 }

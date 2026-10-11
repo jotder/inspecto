@@ -208,7 +208,7 @@ public final class EntityIdentityRoutes implements RouteModule {
         Map<String, Map<String, Object>> classified = InvRoutes.columnTypes(root, datasetId, List.of(aCol, bCol));
         EntityTypes.EntityType aType = columnType(root, body, "aType", aCol, classified);
         EntityTypes.EntityType bType = columnType(root, body, "bType", bCol, classified);
-        InvRoutes.refuseIfSensitive(root, "an identity import (limit " + limit + ")", limit, limit);
+        InvRoutes.refuseIfSensitive(root, "an identity import (limit " + limit + ")", limit, 0);   // a row cap, not a per-entity fan-out
 
         String qa = SqlIdent.q(aCol), qb = SqlIdent.q(bCol);
         String sql = "SELECT DISTINCT CAST(" + qa + " AS VARCHAR) AS a, CAST(" + qb + " AS VARCHAR) AS b FROM "

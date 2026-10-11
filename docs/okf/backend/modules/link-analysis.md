@@ -259,6 +259,12 @@ exploration alias, aliases only) and the SPA matches a selected node to its Work
 bind raw ids. Known gap: an Investigation also masks a seed's explicit `entityType`, which a stateless read does not
 carry, so a column no Entity Type claims is raw on the query graph but seeded ids of a masked `entityType` are aliased in the Working Set.
 
+**Stateless four-eyes semantics (fix 2026-10-11).** A stateless read's `limit` is a RENDER CAP, never a fan-out: `/inv/projection`,
+`/multi` and the identity import are judged only as rows against `four_eyes_budget_above`. `four_eyes_fan_out_above` gates where one
+entity's expansion is the thing read - an Investigation `expand` (held for approval) and `/inv/projection/neighbors` of ONE node, judged
+on that node's real counted degree (distinct links; over the threshold = 403). Traversals still judge their declared `maxEdgeYield`.
+
+
 **Reference rows (`POST /inv/reference-rows`, 2026-10-11).** Body `{dataset, keyCol, keys[1..500], columns?, investigationId?}`
 → `{dataset, keyCol, columns, rows:[{key, row}], matchedKeys, unresolved, rawKeysRefused, truncated, masking{…, maskedColumns}}`. The node
 dialog's Risk / Enrichment and the panel's *Fill nodeScores from indicators* look entities up through it instead of reading a

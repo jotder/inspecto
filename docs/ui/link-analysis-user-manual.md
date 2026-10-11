@@ -345,6 +345,8 @@ Investigation's purpose; the override is sealed in that step and the panel shows
 The hub threshold is set per Space in **Settings → Link Analysis → Hub threshold** (a whole number ≥ 1; blank = the
 default, 500; the value in force is shown; editing needs the Workbench authoring capability, read-only otherwise).
 
+Reading a Dataset's links (Explore a Dataset, Follow the money, saved views) is never held by the fan-out threshold - the row limit only caps what is drawn; only expanding ONE entity whose real link count is above the threshold waits.
+
 **Four-eyes (large expands).** An expand whose budget or fan-out cap is above the Space's four-eyes thresholds
 (**Settings → Link Analysis**) does not run: it answers *Waiting for approval* and is held as a request, one at a time
 per Investigation. Someone **other than you** who holds *Approve link expansions* decides it under **Approvals →
