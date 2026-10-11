@@ -106,7 +106,7 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
                         .orElseThrow(() -> new IllegalArgumentException("anomaly-model '" + modelId
                                 + "' names unknown dataset '" + datasetId + "'"));
                 return DatasetRelation.relationSql(ds, data, views);
-            }, exclusion);
+            }, exclusion, com.gamma.mask.EvidenceMasker.of(store, writeRoot, model.datasetIds()));
             int excluded = run.excluded();
             String version = AnomalyScoreEvaluator.version(content);
             AnomalyScoreEvaluator.write(data, model, version, ctx.runId(), now, run);
@@ -124,7 +124,11 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
                     "high", bands.get("high"), "insufficient", insufficient, "excluded", excluded));
             ctx.log().info("scored entities", "model", modelId, "period", run.period().toString(),
                     "entities", run.scored().size(), "elevated", bands.get("elevated"), "high", bands.get("high"),
-                    "insufficient", insufficient, "excluded", excluded, "modelVersion", version);
+                    "insufficient", insufficient, "excluded", excluded, "modelVersion", version,
+                    "evidenceTruncated", run.evidenceTruncated());
+            if (run.evidenceTruncated())
+                ctx.log().warn("evidence read hit its cap - entities past it carry no evidence (their scores are unaffected)",
+                        "model", modelId, "cap", AnomalyScoreEvaluator.MAX_EVIDENCE_ROWS);
             return JobResult.ok("anomaly.score: " + run.scored().size() + " entit(ies) scored for " + run.period()
                     + ", " + bands.get("high") + " high -> dataset '" + model.scoresDataset() + "'",
                     (System.nanoTime() - t0) / 1_000_000L);

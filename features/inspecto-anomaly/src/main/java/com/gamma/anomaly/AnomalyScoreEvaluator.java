@@ -9,6 +9,7 @@ import com.gamma.anomaly.baseline.BaselineStatistic;
 import com.gamma.anomaly.baseline.BaselineStatistics;
 import com.gamma.anomaly.baseline.PeerBaseline;
 import com.gamma.anomaly.baseline.RobustStats;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -57,6 +58,9 @@ public final class AnomalyScoreEvaluator {
     public static final int MAX_ENTITIES = 200_000;
     public static final String MAX_ENTITIES_PROPERTY = "anomaly.score.maxEntities";
     public static final int MAX_BUCKET_ROWS = 50_000_000;
+    /** Evidence rows read per feature (design section 11), and kept per entity (design section 5). */
+    static final int MAX_EVIDENCE_ROWS = 20_000;
+    static final int EVIDENCE_PER_ENTITY = 3;
 
     private static final ObjectMapper JSON = new ObjectMapper()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
@@ -83,9 +87,17 @@ public final class AnomalyScoreEvaluator {
     }
 
     /** The outcome of a run: the scored day and one score per entity. */
-    public record Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded) {
-        public Run(LocalDate period, List<AnomalyScorer.Scored> scored) { this(period, scored, 0); }
+    public record Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded, boolean evidenceTruncated,
+                      Map<String, Map<String, Object>> series) {
+        public Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded, boolean evidenceTruncated) {
+            this(period, scored, excluded, evidenceTruncated, Map.of());
+        }
+        public Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded) { this(period, scored, excluded, false); }
+        public Run(LocalDate period, List<AnomalyScorer.Scored> scored) { this(period, scored, 0, false); }
     }
+
+    /** Half-width of the preview's band, in spreads: {@code median ± BAND_SPREADS × max(scaled MAD, floor)}. */
+    static final double BAND_SPREADS = 3.0;
 
     /** Score every entity any feature names, for the day before {@code asOf} (a day boundary, UTC). */
     public static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql)
@@ -100,7 +112,18 @@ public final class AnomalyScoreEvaluator {
      */
     public static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql,
                                Predicate<String> excluded) throws SQLException, IOException {
-        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, SqlSandboxPolicy.defaultPolicy(), excluded);
+        return evaluate(model, asOf, relationSql, excluded, null);
+    }
+
+    /**
+     * As above, also reading the origin rows of each entity's top feature when the model's features declare
+     * {@code evidence} columns, masked by {@code masker} BEFORE they are stored (fail closed: a model with evidence
+     * columns and no masker is refused, never stored raw).
+     */
+    public static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql,
+                               Predicate<String> excluded, EvidenceMasker masker) throws SQLException, IOException {
+        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, SqlSandboxPolicy.defaultPolicy(),
+                excluded, null, masker, null, MAX_EVIDENCE_ROWS);
     }
 
     static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
@@ -111,7 +134,8 @@ public final class AnomalyScoreEvaluator {
     static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
                         int maxBucketRows, SqlSandboxPolicy policy, Predicate<String> excluded)
             throws SQLException, IOException {
-        return evaluate(model, asOf, relationSql, maxEntities, maxBucketRows, policy, excluded, null);
+        return evaluate(model, asOf, relationSql, maxEntities, maxBucketRows, policy, excluded, null, null, null,
+                MAX_EVIDENCE_ROWS);
     }
 
     /**
@@ -122,15 +146,35 @@ public final class AnomalyScoreEvaluator {
      */
     static Run preview(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, String entityKey,
                        SqlSandboxPolicy policy) throws SQLException, IOException {
+        return preview(model, asOf, relationSql, entityKey, policy, null);
+    }
+
+    /** As above; classified evidence is masked by {@code masker} exactly as a Job run masks it. */
+    static Run preview(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, String entityKey,
+                       SqlSandboxPolicy policy, EvidenceMasker masker) throws SQLException, IOException {
         if (model.peers() == null)
-            return evaluate(model.forEntity(entityKey), asOf, relationSql, 1, MAX_BUCKET_ROWS, policy, NONE, null);
-        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, policy, NONE, entityKey::equals);
+            return evaluate(model.forEntity(entityKey), asOf, relationSql, 1, MAX_BUCKET_ROWS, policy, NONE, null, masker,
+                    entityKey, EVIDENCE_PER_ENTITY);
+        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, policy, NONE, entityKey::equals,
+                masker, entityKey, EVIDENCE_PER_ENTITY);
+    }
+
+    /** Package-visible so a test can drive a small evidence cap without 20,000 rows. */
+    static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, EvidenceMasker masker,
+                        int maxEvidenceRows) throws SQLException, IOException {
+        return evaluate(model, asOf, relationSql, maxEntities(model), MAX_BUCKET_ROWS, SqlSandboxPolicy.defaultPolicy(),
+                NONE, null, masker, null, maxEvidenceRows);
     }
 
     /** As above; {@code scoreOnly} (null = everyone) limits which entities are SCORED, not which shape the baselines. */
     private static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, int maxEntities,
                                 int maxBucketRows, SqlSandboxPolicy policy, Predicate<String> excluded,
-                                Predicate<String> scoreOnly) throws SQLException, IOException {
+                                Predicate<String> scoreOnly, EvidenceMasker masker, String previewEntity,
+                                int maxEvidenceRows) throws SQLException, IOException {
+        boolean wantsEvidence = model.features().stream().anyMatch(f -> !f.evidence().isEmpty());
+        if (wantsEvidence && masker == null)
+            throw new IllegalStateException("anomaly-model '" + model.id() + "' declares evidence columns but no masker "
+                    + "was supplied - refusing to store evidence unmasked");
         java.util.Set<String> dropped = new java.util.HashSet<>();
         LocalDate period = asOf.minusDays(1);
         LocalDate from = period.minusDays(model.window());
@@ -186,12 +230,15 @@ public final class AnomalyScoreEvaluator {
                         cohorts(model, relationSql, policy), histories, observedByFeature, statistic, scoredDay);
         // Pass 2: baselines and the score.
         List<AnomalyScorer.Scored> scored = new ArrayList<>(series.size());
+        Map<String, Map<String, Object>> daily = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Map<LocalDateTime, Double>>> e : histories.entrySet()) {
             if (scoreOnly != null && !scoreOnly.test(e.getKey())) continue;
             Map<String, AnomalyScorer.Input> inputs = new LinkedHashMap<>();
             for (AnomalyModel.Feature f : model.features()) {
                 Double observed = observedByFeature.get(f.id()).get(e.getKey());
                 Baseline self = statistic.compute(e.getValue().get(f.id()), scoredDay);
+                if (previewEntity != null && previewEntity.equals(e.getKey()))
+                    daily.put(f.id(), dailySeries(e.getValue().get(f.id()), scoredDay, observed, self, f.unit()));
                 if (peers == null) {
                     inputs.put(f.id(), new AnomalyScorer.Input(observed, self));
                 } else {
@@ -201,7 +248,101 @@ public final class AnomalyScoreEvaluator {
             }
             scored.add(AnomalyScorer.score(model, e.getKey(), period.toString(), inputs));
         }
-        return new Run(period, List.copyOf(scored), dropped.size());
+        boolean evidenceTruncated = wantsEvidence
+                && attachEvidence(model, period, asOf, relationSql, policy, masker, previewEntity, maxEvidenceRows, scored);
+        return new Run(period, List.copyOf(scored), dropped.size(), evidenceTruncated, daily);
+    }
+
+    /**
+     * The preview's per-day series of ONE entity and feature: the zero-filled history, then the scored day, and the
+     * self baseline's {@code median} with a band {@code median ± }{@link #BAND_SPREADS}{@code × max(scaled MAD, floor)}.
+     * Numbers only - never a key or evidence value. The baseline is one level for the scored day's slot: with weekday
+     * seasonality it is the median of the same weekday, so the band is a reference line, not a per-day forecast.
+     * {@code median} / {@code low} / {@code high} are null when the baseline is insufficient.
+     */
+    private static Map<String, Object> dailySeries(Map<LocalDateTime, Double> history, LocalDateTime scoredDay,
+                                                   Double observed, Baseline self, double unit) {
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (Map.Entry<LocalDateTime, Double> d : new TreeMap<>(history).entrySet())
+            points.add(point(d.getKey(), d.getValue()));
+        points.add(point(scoredDay, observed));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("points", points);
+        boolean usable = !self.insufficient() && Double.isFinite(self.median());
+        double spread = usable ? Math.max(Double.isFinite(self.scaledMad()) ? self.scaledMad() : 0,
+                RobustStats.floor(self.median(), unit)) : 0;
+        out.put("median", usable ? self.median() : null);
+        out.put("low", usable ? self.median() - BAND_SPREADS * spread : null);
+        out.put("high", usable ? self.median() + BAND_SPREADS * spread : null);
+        out.put("bandSpreads", BAND_SPREADS);
+        return out;
+    }
+
+    private static Map<String, Object> point(LocalDateTime day, Double value) {
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("day", day.toLocalDate().toString());
+        p.put("value", value != null && Double.isFinite(value) ? value : null);
+        return p;
+    }
+
+    /**
+     * Design section 5: for each entity's TOP feature (largest contribution, not insufficient) that declares
+     * {@code evidence} columns, up to {@link #EVIDENCE_PER_ENTITY} origin rows of the scored day. ONE statement per such
+     * feature, read to {@code maxEvidenceRows} (one past it, so truncation is detectable); entities past the cap carry
+     * no evidence and their scores are unaffected. Every value is masked HERE, before anything is stored. Returns
+     * whether a read was truncated.
+     */
+    private static boolean attachEvidence(AnomalyModel model, LocalDate period, LocalDate asOf,
+                                          Function<String, String> relationSql, SqlSandboxPolicy policy,
+                                          EvidenceMasker masker, String previewEntity, int maxEvidenceRows,
+                                          List<AnomalyScorer.Scored> scored) {
+        Map<String, java.util.Set<String>> wanted = new LinkedHashMap<>();   // feature id -> entities it is the top of
+        for (AnomalyScorer.Scored s : scored) {
+            if (s.features().isEmpty()) continue;
+            AnomalyScorer.FeatureResult top = s.features().get(0);
+            if (top.insufficient() || !(top.contribution() > 0)) continue;
+            wanted.computeIfAbsent(top.feature(), x -> new java.util.HashSet<>()).add(s.entityKey());
+        }
+        Map<String, Map<String, List<Map<String, Object>>>> rowsOf = new HashMap<>();   // feature -> entity -> rows
+        boolean truncated = false;
+        for (AnomalyModel.Feature f0 : model.features()) {
+            java.util.Set<String> entities = wanted.get(f0.id());
+            if (f0.evidence().isEmpty() || entities == null) continue;
+            AnomalyModel.Feature f = previewEntity != null ? f0.forEntity(previewEntity) : f0;
+            QueryExecutor.Result ev;
+            try {
+                MeasureCompiler.Compiled sql = MeasureCompiler.compile(
+                        f.evidenceSpec(period + " 00:00:00", asOf + " 00:00:00", maxEvidenceRows + 1));
+                ev = QueryExecutor.run(new QueryExecutor.Request(f.dataset(), relationSql.apply(f.dataset()), sql.sql(),
+                        maxEvidenceRows, 0, List.of(), List.of(), sql.params()), policy, java.time.ZoneId.of("UTC"));
+            } catch (Exception e) {
+                throw new IllegalStateException("anomaly-model '" + model.id() + "' feature '" + f.id() + "': the evidence "
+                        + "query over dataset '" + f.dataset() + "' failed (" + e.getClass().getSimpleName()
+                        + "; details withheld because they may quote source values) - check the column types");
+            }
+            truncated |= ev.truncated();
+            Map<String, List<Map<String, Object>>> mine = rowsOf.computeIfAbsent(f.id(), x -> new HashMap<>());
+            for (Map<String, Object> row : ev.rows()) {
+                Object k = row.get(f.key());
+                if (k == null || !entities.contains(String.valueOf(k))) continue;
+                List<Map<String, Object>> rows = mine.computeIfAbsent(String.valueOf(k), x -> new ArrayList<>());
+                if (rows.size() >= EVIDENCE_PER_ENTITY) continue;
+                Map<String, Object> shown = new LinkedHashMap<>();
+                for (String c : f.evidence()) shown.put(c, masker.mask(f.dataset(), c, row.get(c)));
+                rows.add(shown);
+            }
+        }
+        for (int i = 0; i < scored.size(); i++) {
+            AnomalyScorer.Scored s = scored.get(i);
+            if (s.features().isEmpty()) continue;
+            AnomalyScorer.FeatureResult top = s.features().get(0);
+            List<Map<String, Object>> rows = rowsOf.getOrDefault(top.feature(), Map.of()).get(s.entityKey());
+            if (rows == null || rows.isEmpty()) continue;
+            List<AnomalyScorer.FeatureResult> replaced = new ArrayList<>(s.features());
+            replaced.set(0, top.withEvidence(rows));
+            scored.set(i, s.withFeatures(replaced));
+        }
+        return truncated;
     }
 
     /**

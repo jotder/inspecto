@@ -86,6 +86,51 @@ describe('IncidentGovernanceComponent', () => {
         expect(el.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toContain('IDENTIFIED to LIMBO');
     });
 
+    it('edits the workflow from the state editor into the same form the table uses (no a11y violations)', async () => {
+        const { c, fixture, el, components, button } = setup();
+        const byLabel = (l: string) => el.querySelector<HTMLInputElement>(`[aria-label="${l}"]`)!;
+        const name = byLabel('Name of state RESOLVED');
+        name.value = 'done';
+        name.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        expect(c.transitions.at(0).value.to).toBe('DONE');
+        byLabel('DONE is a terminal state').click();
+        fixture.detectChanges();
+        expect(c.workflow.controls.terminal.value).toBe('ARCHIVED, DONE');
+        // keyboard path: add a state, connect it with the From/To selects
+        const fresh = el.querySelector<HTMLInputElement>('input.w-40')!;
+        fresh.value = 'review';
+        button('Add state')!.click();
+        fixture.detectChanges();
+        const [from, to] = Array.from(el.querySelectorAll<HTMLSelectElement>('select'));
+        from.value = 'REVIEW';
+        from.dispatchEvent(new Event('change'));
+        to.value = 'DONE';
+        to.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        button('Connect states')!.click();
+        fixture.detectChanges();
+        expect(c.transitions.length).toBe(3);
+        expect(c.transitions.at(2).value).toEqual({ from: 'REVIEW', to: 'DONE', action: '' });
+        expect(el.textContent).toContain('transition needs from, to and action');
+        await expectNoA11yViolations(el);
+        c.transitions.at(2).patchValue({ action: 'review' });
+        button('Save workflow')!.click();
+        expect(components.create).toHaveBeenCalledWith(
+            'workflow',
+            expect.objectContaining({
+                terminal: ['ARCHIVED', 'DONE'],
+                transitions: expect.arrayContaining([{ from: 'REVIEW', to: 'DONE', action: 'review' }]),
+            }),
+        );
+    });
+
+    it('offers no editing controls without the administer capability', () => {
+        const { el, button } = setup({ canAdminister: false });
+        expect(button('Add state')).toBeUndefined();
+        expect(el.querySelector<HTMLInputElement>('[aria-label="Name of state RESOLVED"]')!.disabled).toBe(true);
+    });
+
     it('creates the workflow component when none is stored yet', () => {
         const { c, fixture, components, button } = setup();
         c.addTransition();

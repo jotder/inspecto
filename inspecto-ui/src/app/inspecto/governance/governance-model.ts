@@ -264,7 +264,7 @@ export interface WorkflowDiagram {
  * The read-only state diagram's layout: a column per breadth-first distance from the initial state, unreachable
  * states in a final column, rows in first-seen order. Pure — the SVG component only draws it.
  */
-export function workflowDiagram(d: WorkflowDraft): WorkflowDiagram {
+export function workflowDiagram(d: WorkflowDraft, extraStates: readonly string[] = []): WorkflowDiagram {
     const content = workflowContent(d);
     const initial = String(content['initial']);
     const terminal = new Set(content['terminal'] as string[]);
@@ -279,6 +279,7 @@ export function workflowDiagram(d: WorkflowDraft): WorkflowDiagram {
         add(e.to);
     });
     terminal.forEach(add);
+    extraStates.map((x) => x.trim().toUpperCase()).forEach(add);
     const depth = new Map<string, number>();
     if (initial) {
         depth.set(initial, 0);
@@ -303,4 +304,128 @@ export function workflowDiagram(d: WorkflowDraft): WorkflowDiagram {
         return { id, column, row, terminal: terminal.has(id), initial: id === initial, unreachable: !depth.has(id) };
     });
     return { nodes, edges, columns: lost ? lostColumn + 1 : lostColumn };
+}
+
+// ── Graphical state-diagram editor (ASSURE-WORKFLOW-SLA-RESIDUALS-1 b) ───────────────────────────────────────────
+// Edits are pure WorkflowDraft → WorkflowDraft, so the persisted shape is whatever `workflowContent` already writes
+// (states are implicit: initial ∪ terminal ∪ transition endpoints — there is no stored state list or layout).
+
+const norm = (s: string): string => (s ?? '').trim().toUpperCase();
+
+/** Every state the draft names (initial, terminal, transition endpoints), first-seen order. */
+export function workflowStates(d: WorkflowDraft): string[] {
+    return workflowDiagram(d).nodes.map((n) => n.id);
+}
+
+const withTerminal = (d: WorkflowDraft, terminal: string[]): WorkflowDraft => ({ ...d, terminal: terminal.join(', ') });
+
+/** Rename a state everywhere it is named. A blank or already-existing target name is refused (returns `d`). */
+export function renameState(d: WorkflowDraft, from: string, to: string): WorkflowDraft {
+    const a = norm(from);
+    const b = norm(to);
+    if (!a || !b || a === b || workflowStates(d).includes(b)) return d;
+    const swap = (s: string): string => (norm(s) === a ? b : s);
+    return {
+        ...d,
+        initial: swap(d.initial),
+        terminal: splitList(d.terminal).map(swap).join(', '),
+        transitions: d.transitions.map((t) => ({ ...t, from: swap(t.from), to: swap(t.to) })),
+    };
+}
+
+/** Remove a state: its transitions go with it, it leaves the terminal set, and the initial state is cleared if it was it. */
+export function removeState(d: WorkflowDraft, id: string): WorkflowDraft {
+    const a = norm(id);
+    return {
+        ...d,
+        initial: norm(d.initial) === a ? '' : d.initial,
+        terminal: splitList(d.terminal)
+            .filter((s) => s !== a)
+            .join(', '),
+        transitions: d.transitions.filter((t) => norm(t.from) !== a && norm(t.to) !== a),
+    };
+}
+
+export function setInitialState(d: WorkflowDraft, id: string): WorkflowDraft {
+    return { ...d, initial: norm(id) };
+}
+
+export function setTerminalState(d: WorkflowDraft, id: string, on: boolean): WorkflowDraft {
+    const a = norm(id);
+    const rest = splitList(d.terminal).filter((s) => s !== a);
+    return withTerminal(d, on ? [...rest, a] : rest);
+}
+
+/** Connect two states with a new transition; its action is left blank for the author to name (the server requires one). */
+export function connectStates(d: WorkflowDraft, from: string, to: string): WorkflowDraft {
+    return { ...d, transitions: [...d.transitions, { from: norm(from), to: norm(to), action: '' }] };
+}
+
+/**
+ * Live mirror of the server's `Workflow.problems()` / `fromMap` refusals (same wording), so the editor can say what
+ * a save would be refused for. Advisory: the SERVER stays the judge, and its 422 message is shown verbatim on save.
+ */
+export function workflowProblems(d: WorkflowDraft): string[] {
+    const c = workflowContent(d);
+    const initial = String(c['initial']);
+    const terminal = new Set(c['terminal'] as string[]);
+    const moves = c['transitions'] as TransitionRow[];
+    const out: string[] = [];
+    if (!initial) out.push('an initial state is required');
+    if (moves.some((t) => !t.from || !t.to || !t.action)) out.push('transition needs from, to and action');
+    const ts = moves.filter((t) => t.from && t.to && t.action);
+    if (ts.length === 0) out.push('workflow needs at least one transition');
+    if (!initial) return out;
+    const states = new Set<string>([initial, ...terminal]);
+    ts.forEach((t) => {
+        states.add(t.from);
+        states.add(t.to);
+    });
+    if (terminal.size === 0) out.push('declare at least one terminal state');
+    const reachable = new Set<string>([initial]);
+    for (const q = [initial]; q.length; ) {
+        const cur = q.shift() as string;
+        ts.forEach((t) => {
+            if (t.from === cur && !reachable.has(t.to)) {
+                reachable.add(t.to);
+                q.push(t.to);
+            }
+        });
+    }
+    const incident = d.objectType.toUpperCase() === 'INCIDENT';
+    for (const s of states) {
+        if (!reachable.has(s)) out.push(`state ${s} is unreachable from the initial state ${initial}`);
+        if (!terminal.has(s) && !ts.some((t) => t.from === s))
+            out.push(`state ${s} has no way out and is not declared terminal`);
+    }
+    const canFinish = new Set<string>(incident ? ['RESOLVED', 'ARCHIVED'] : terminal);
+    for (let grew = true; grew; ) {
+        grew = false;
+        for (const t of ts) if (canFinish.has(t.to) && !canFinish.has(t.from)) grew = !!canFinish.add(t.from);
+    }
+    for (const s of states)
+        if (!terminal.has(s) && !canFinish.has(s))
+            out.push(
+                `state ${s} can never finish: no path from it reaches ${incident ? 'RESOLVED or ARCHIVED' : 'a terminal state'}`,
+            );
+    const seen = new Set<string>();
+    for (const t of ts) {
+        const key = `${t.from} ${t.action}`;
+        if (seen.has(key)) out.push(`two transitions leave ${t.from} by action '${t.action}'`);
+        seen.add(key);
+    }
+    if (incident) {
+        if (!states.has('RESOLVED'))
+            out.push(
+                'an Incident workflow needs a RESOLVED state — it is where the resolution gate records the outcome',
+            );
+        if (states.has('ARCHIVED') && !terminal.has('ARCHIVED'))
+            out.push('ARCHIVED must be terminal in an Incident workflow');
+        for (const t of ts)
+            if (terminal.has(t.to) && t.to !== 'ARCHIVED' && t.to !== 'RESOLVED' && t.from !== 'RESOLVED')
+                out.push(
+                    `transition ${t.from} -${t.action}-> ${t.to} finishes an Incident around RESOLVED, skipping the Disposition and postmortem gate`,
+                );
+    }
+    return out;
 }

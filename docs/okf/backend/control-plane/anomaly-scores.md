@@ -133,6 +133,27 @@ DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus
   logged and signalled. No list = `AnomalyScoreEvaluator.NONE`, no extra statement. Proven by
   `AnomalyPeerGoldenCorpusTest#anExcludedHeavyEntityDoesNotShapeItsCohortMedian` and
   `#excludedKeysDoNotCountAgainstTheEntityCap`.
+- **Evidence rows (2026-10-11, `7b6fc02c5`, residual (c)):** a Feature opts in with `evidence: [columns]` (max 8,
+  checked against the Dataset's Schema like any referenced column). After scoring, each entity's TOP feature (largest
+  `contribution`, > 0, not insufficient) that declares evidence gets up to 3 origin rows: ONE statement per such
+  Feature over the scored day `[period, asOf)` under the Feature's filters, `GROUP BY` the key plus the evidence
+  columns (so rows are DISTINCT value combinations, in column order), read to 20 000 rows + 1 (truncation →
+  `evidenceTruncated` in the run log; entities past the cap carry none, their scores are unaffected). Every value goes
+  through `EvidenceMasker.mask(dataset, column, value)` BEFORE the score is stored, so a classified column
+  (MSISDN / IMSI / ACCOUNT / PII, lineage and the unknown-lineage fail-closed included) is a `masked:` token;
+  `evaluate` with evidence columns and NO masker throws — never stored raw. Only the top feature's element carries
+  `evidence`, and there is no key at all when none is declared, so stored explanations and the golden corpora are
+  unchanged and `AnomalyScorer.recompute` ignores it. The preview returns the same masked rows. Pinned by
+  `AnomalyEvidenceTest` and `ControlApiAnomalyScoreTest#thePreviewCarriesEvidenceRowsMaskedAtWriteTime`. ⚠ To confirm:
+  the read is not narrowed to non-normal entities (as Risk Score), so on a wide population most entities lose
+  evidence past the cap.
+- **Preview day series (2026-10-11, `5f76026ee`, residual (h)):** `POST /anomaly-scores/preview` adds `series`
+  (additive; `{}` when the entity is not found): per feature id `{points[{day, value}], median, low, high,
+  bandSpreads}` — the entity's zero-filled history then the scored day (last), the self baseline's median and the band
+  `median ± 3 × max(scaled MAD, floor)` (null while the baseline is insufficient). The band is ONE level for the
+  scored day's slot (weekday seasonality = that weekday's median), a reference not a per-day forecast. The pane draws
+  one `<inspecto-chart>` per feature (`inspecto/anomaly/anomaly-day-series.ts`). Pinned by `ControlApiAnomalyScoreTest`
+  and the pane spec (incl. the older-server no-`series` case).
 - **Writes:** history parquet + `_latest` swap (`*.tmp` + atomic move), columns `model, entity_type,
   entity_key, period_start, score, band, raw, features (JSON), insufficient_count, model_version, run_id,
   scored_at`; then the watch-list feed (`high` entities, `job:anomaly.score:<id>`); then the Signal
@@ -220,8 +241,7 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 
 Tracked in `ANOMALY-DETECTION-RESIDUALS-1`: the dashboard tile (the Widget layer lacks a Widget-level filter and
 a table row limit, and `/bi/query` does not mask entity keys in scores Datasets — a top-10 Widget stays out of
-templates until BI masks); pack golden extension (needs multi-week corpora); evidence rows; hour buckets; pane: day-by-day chart series (a preview
-response-shape change); the LA panel's Risk Score model gate. Later: an ML scorer behind the same explanation
+templates until BI masks); pack golden extension (needs multi-week corpora); hour buckets; the LA panel's Risk Score model gate. Later: an ML scorer behind the same explanation
 shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
 collision-free key.)

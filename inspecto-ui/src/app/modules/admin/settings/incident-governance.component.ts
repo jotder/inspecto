@@ -23,7 +23,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 import { validateGroup } from 'app/inspecto/query/condition-rules';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
 import { emptyGroup } from 'app/inspecto/query/query-types';
-import { WorkflowDiagramComponent } from './workflow-diagram.component';
+import { WorkflowStateEditorComponent } from './workflow-state-editor.component';
 import {
     ESCALATION_CONTEXT_COLUMNS,
     EscalationRuleDraft,
@@ -62,7 +62,7 @@ import {
         InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
         QueryConditionGroupComponent,
-        WorkflowDiagramComponent,
+        WorkflowStateEditorComponent,
     ],
     template: `
         <div class="flex flex-col gap-6 p-6">
@@ -162,8 +162,11 @@ import {
                                 </tbody>
                             </table>
                             <div class="flex flex-col gap-1 overflow-x-auto">
-                                <h3 class="text-sm font-semibold">State diagram (read-only)</h3>
-                                <inspecto-workflow-diagram [draft]="workflowDraftView()" />
+                                <inspecto-workflow-state-editor
+                                    [draft]="workflowDraftView()"
+                                    [canEdit]="canEdit()"
+                                    (draftChange)="applyDraft($event)"
+                                />
                             </div>
                         </div>
                         <div class="flex gap-2">
@@ -566,6 +569,15 @@ export class IncidentGovernanceComponent implements OnInit {
 
     toggleDay(d: string, on: boolean): void {
         this.days.update((ds) => (on ? [...ds.filter((x) => x !== d), d] : ds.filter((x) => x !== d)));
+    }
+
+    /** An edit made on the state diagram: written back into the form, so the table and the save path are one. */
+    applyDraft(d: WorkflowDraft): void {
+        this.workflow.patchValue({ initial: d.initial, terminal: d.terminal });
+        this.transitions.clear();
+        d.transitions.forEach((t) => this.transitions.push(this.fb.nonNullable.group(t)));
+        this.workflow.markAsDirty();
+        this.syncDiagram();
     }
 
     addTransition(): void {

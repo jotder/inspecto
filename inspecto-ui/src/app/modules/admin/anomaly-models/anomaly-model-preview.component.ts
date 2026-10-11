@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { dayChartData, dayChartLabel, dayChartOptions } from 'app/inspecto/anomaly/anomaly-day-series';
 import { BaselineStrip, baselineStrip } from 'app/inspecto/anomaly/anomaly-model-form';
 import {
     AnomalyFeatureResult,
@@ -8,6 +9,7 @@ import {
     AnomalyScorePreview,
 } from 'app/inspecto/api/anomaly-models.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
+import { InspectoChartComponent } from 'app/inspecto/components/chart.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 
@@ -31,7 +33,8 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
 /**
  * The preview box of the Anomaly Model pane (design §13.1): pick an entity → its score now under the SAVED model
  * (`POST /anomaly-scores/preview`, writes nothing), the per-feature table (self z, peer z, cohort shift, reason) and
- * per feature a strip of its baseline — the usual range (median ± 3 MAD), the median and the observed point.
+ * per feature a strip of its baseline — the usual range (median ± 3 MAD), the median and the observed point — and a
+ * day-by-day chart of the entity's observed value against the median and band (the response's `series`).
  * Given a {@link draft} instead of a {@link model}, it scores the host's UNSAVED content (the form dialog): the draft
  * is read when Preview is pressed, and returns `null` while the form is invalid.
  */
@@ -39,7 +42,7 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
     selector: 'app-anomaly-model-preview',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, StatusBadgeComponent],
+    imports: [ReactiveFormsModule, MatButtonModule, StatusBadgeComponent, InspectoChartComponent],
     template: `
         <form class="mt-2 flex flex-wrap items-end gap-2" (submit)="$event.preventDefault(); run()">
             <label class="flex flex-col text-sm">
@@ -165,6 +168,22 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
                         Baseline: the shaded band is the usual range (median ± 3 MAD of the window), the bar its median
                         and the dot the observed day.
                     </p>
+                    @for (c of charts(); track c.feature) {
+                        <figure class="mt-4" [attr.data-testid]="'anomaly-day-chart-' + c.feature">
+                            <figcaption class="text-sm font-semibold">{{ c.title }} — day by day</figcaption>
+                            <inspecto-chart
+                                class="!h-48"
+                                type="line"
+                                [data]="c.data"
+                                [options]="chartOptions"
+                                [ariaLabel]="c.label"
+                            ></inspecto-chart>
+                            <p class="text-secondary text-xs">
+                                The last point is the scored day. The dashed line and band are the baseline's usual
+                                level and range for that day; they are a reference, not a day-by-day forecast.
+                            </p>
+                        </figure>
+                    }
                 }
             </div>
         }
@@ -187,6 +206,18 @@ export class AnomalyModelPreviewComponent {
     readonly result = signal<AnomalyScorePreview | null>(null);
     readonly fmt = fmt;
     readonly badge = bandBadge;
+    readonly chartOptions = dayChartOptions();
+    /** One chart per feature that has a series with a value; built once per result, never per change-detection pass. */
+    readonly charts = computed(() => {
+        const p = this.result();
+        if (!p?.found || !p.series) return [];
+        return p.features.flatMap((f) => {
+            const s = p.series?.[f.feature];
+            const data = dayChartData(s);
+            const title = f.label || f.feature;
+            return s && data ? [{ feature: f.feature, title, data, label: dayChartLabel(title, s) }] : [];
+        });
+    });
 
     constructor() {
         effect(() => {

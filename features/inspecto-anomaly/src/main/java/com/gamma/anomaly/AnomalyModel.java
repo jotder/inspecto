@@ -33,7 +33,8 @@ import java.util.regex.Pattern;
  * peers: {by[1..3]: cohort columns, dataset (default the first feature's), key (default the first feature's key),
  *         minGroupSize (default 30), fallback: population (opt-in, D-AD11 b)}
  * features[n]: {id, label, dataset, key, time, measure (count | agg(field)), filters, direction (up|down|both),
- *               weight, unit (the absolute spread floor, default 1)}
+ *               weight, unit (the absolute spread floor, default 1),
+ *               evidence (optional, at most 8 columns: origin rows of the scored day shown beside the feature)}
  * </pre>
  *
  * Validated fail closed: every problem is an {@link IllegalArgumentException} naming the field (422 at the route).
@@ -67,7 +68,9 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     private static final Set<String> PEER_KEYS = Set.of("by", "dataset", "key", "minGroupSize", "fallback");
     public static final int MAX_PEER_COLUMNS = 3;
     private static final Set<String> FEATURE_KEYS = Set.of("id", "label", "dataset", "key", "time", "measure",
-            "filters", "direction", "weight", "unit");
+            "filters", "direction", "weight", "unit", "evidence");
+    /** Evidence columns per feature (as a Risk Score factor's). */
+    public static final int MAX_EVIDENCE = 8;
 
     public enum Direction { UP, DOWN, BOTH }
 
@@ -82,7 +85,15 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
 
     /** One feature: a Measure over one Dataset, grouped by its key column and by the day of its {@code time} column. */
     public record Feature(String id, String label, String dataset, String key, String time, String measure,
-                          List<Map<String, Object>> filters, Direction direction, double weight, double unit) {
+                          List<Map<String, Object>> filters, Direction direction, double weight, double unit,
+                          List<String> evidence) {
+
+        public Feature { evidence = evidence == null ? List.of() : List.copyOf(evidence); }
+
+        public Feature(String id, String label, String dataset, String key, String time, String measure,
+                       List<Map<String, Object>> filters, Direction direction, double weight, double unit) {
+            this(id, label, dataset, key, time, measure, filters, direction, weight, unit, List.of());
+        }
 
         public MeasureCompiler.Measure compiledMeasure() {
             Map<String, Object> m = MeasureCompiler.splitShorthand(List.of(measure), null).get(0);
@@ -99,7 +110,27 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
         public Feature forEntity(String entityKey) {
             List<Map<String, Object>> narrowed = new ArrayList<>(filters);
             narrowed.add(Map.of("field", key, "op", "=", "value", entityKey));
-            return new Feature(id, label, dataset, key, time, measure, List.copyOf(narrowed), direction, weight, unit);
+            return new Feature(id, label, dataset, key, time, measure, List.copyOf(narrowed), direction, weight, unit, evidence);
+        }
+
+        /**
+         * The evidence rows' spec: the key plus the evidence columns of the rows in {@code [from, to)} of {@code time},
+         * under the same filters, in a fixed order (so a run is reproducible).
+         */
+        public MeasureCompiler.Spec evidenceSpec(String from, String to, int limit) {
+            List<Map<String, Object>> fl = new ArrayList<>(filters);
+            fl.add(Map.of("field", time, "op", ">=", "value", from));
+            fl.add(Map.of("field", time, "op", "<", "value", to));
+            List<String> cols = new ArrayList<>();
+            cols.add(key);
+            for (String e : evidence) if (!cols.contains(e)) cols.add(e);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("dataset", dataset);
+            body.put("measures", List.of());
+            body.put("groupBy", cols);
+            body.put("filters", fl);
+            body.put("orderBy", cols.stream().map(c -> (Object) Map.of("field", c)).toList());
+            return MeasureCompiler.parse(body, limit, limit);
         }
 
         /**
@@ -146,6 +177,7 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
             cols.add(f.time());
             if (f.compiledMeasure().field() != null) cols.add(f.compiledMeasure().field());
             for (Map<String, Object> flt : f.filters()) cols.add(String.valueOf(flt.get("field")));
+            cols.addAll(f.evidence());
         }
         if (peers != null) {
             Set<String> cols = out.computeIfAbsent(peers.dataset(), d -> new LinkedHashSet<>());
@@ -298,10 +330,22 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
                 filters.add(copy);
             }
         }
+        List<String> evidence = new ArrayList<>();
+        if (fm.get("evidence") != null) {
+            if (!(fm.get("evidence") instanceof List<?> el))
+                throw new IllegalArgumentException(at + ".evidence must be a list of column names");
+            for (Object o : el) {
+                String c = ident(o, at + ".evidence");
+                if (!evidence.contains(c)) evidence.add(c);
+            }
+            if (evidence.size() > MAX_EVIDENCE)
+                throw new IllegalArgumentException(at + ".evidence: at most " + MAX_EVIDENCE + " columns");
+        }
         Feature f = new Feature(id, Values.trimToNull(fm.get("label")), dataset, key, time, measure,
-                List.copyOf(filters), direction, weight, unit);
+                List.copyOf(filters), direction, weight, unit, evidence);
         try {
             MeasureCompiler.render(f.bucketSpec("2000-01-01", "2000-01-02", 1));
+            if (!evidence.isEmpty()) MeasureCompiler.render(f.evidenceSpec("2000-01-01", "2000-01-02", 1));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(at + ": " + e.getMessage(), e);
         }

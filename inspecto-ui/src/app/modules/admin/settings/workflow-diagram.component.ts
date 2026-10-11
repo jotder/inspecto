@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, HostListener, input, output } from '@angular/core';
 
 import { WorkflowDiagram, WorkflowDraft, workflowDiagram } from 'app/inspecto/governance/governance-model';
 
@@ -16,8 +16,9 @@ interface DrawnEdge {
 }
 
 /**
- * Read-only state diagram of a workflow (ASSURE-WORKFLOW-SLA-1 b). Draws what the transitions table says and
- * nothing else; the table stays the accessible, editable equivalent, so the SVG is a described image.
+ * State diagram of a workflow (ASSURE-WORKFLOW-SLA-1 b). Draws what the transitions table says and nothing else;
+ * the table and the state editor stay the accessible, editable equivalent, so the SVG is a described image. A click on
+ * a state is only a pointer shortcut ({@link stateClick}) for what the state editor's keyboard controls also do.
  */
 @Component({
     selector: 'inspecto-workflow-diagram',
@@ -69,12 +70,15 @@ interface DrawnEdge {
                 }
                 @for (n of positioned(); track n.id) {
                     <rect
+                        [attr.data-state]="n.id"
+                        [class.cursor-pointer]="pickable()"
                         [attr.x]="n.x"
                         [attr.y]="n.y"
                         [attr.width]="w"
                         [attr.height]="h"
                         rx="8"
-                        fill="none"
+                        [attr.fill]="n.id === selected() ? 'currentColor' : 'none'"
+                        [attr.fill-opacity]="n.id === selected() ? 0.15 : null"
                         stroke="currentColor"
                         [attr.stroke-width]="n.terminal ? 4 : 1.5"
                         [attr.stroke-dasharray]="n.unreachable ? '5 4' : null"
@@ -85,6 +89,7 @@ interface DrawnEdge {
                         text-anchor="middle"
                         font-size="12"
                         fill="currentColor"
+                        class="pointer-events-none"
                     >
                         {{ n.id }}{{ n.initial ? ' (start)' : '' }}
                     </text>
@@ -98,10 +103,24 @@ interface DrawnEdge {
 })
 export class WorkflowDiagramComponent {
     readonly draft = input.required<WorkflowDraft>();
+    /** States with no transition yet (drawn so a just-added state is visible). */
+    readonly extraStates = input<readonly string[]>([]);
+    /** The state highlighted as the pending end of a connection. */
+    readonly selected = input<string | null>(null);
+    /** Set when a click should pick a state (the editor is writable). */
+    readonly pickable = input(false);
+    readonly stateClick = output<string>();
     readonly w = W;
     readonly h = H;
 
-    readonly diagram = computed<WorkflowDiagram>(() => workflowDiagram(this.draft()));
+    readonly diagram = computed<WorkflowDiagram>(() => workflowDiagram(this.draft(), this.extraStates()));
+    /** A pointer shortcut only (the host element, so no click handler sits on a non-interactive SVG node). */
+    @HostListener('click', ['$event'])
+    clicked(e: Event): void {
+        const id = this.pickable() ? (e.target as Element).closest('[data-state]')?.getAttribute('data-state') : null;
+        if (id) this.stateClick.emit(id);
+    }
+
     readonly positioned = computed(() =>
         this.diagram().nodes.map((n) => ({ ...n, x: PAD + n.column * (W + GAP_X), y: PAD + n.row * (H + GAP_Y) })),
     );
