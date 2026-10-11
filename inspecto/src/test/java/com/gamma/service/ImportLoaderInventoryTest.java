@@ -62,7 +62,7 @@ class ImportLoaderInventoryTest {
     static final Map<String, String> ALLOWED = new TreeMap<>();
 
     static {
-        for (String p : List.of("exchange", "current.toon", "snapshot.parquet", "snapshot.parquet.tmp"))
+        for (String p : List.of("exchange", "current.toon", "last-refresh.toon", "snapshot.parquet"))
             ALLOWED.put(p, SHARED);
         for (String p : List.of("template.toon"))
             ALLOWED.put(p, "the shipped Space template catalog under <spaces-root>/_templates/ — outside every Space");
