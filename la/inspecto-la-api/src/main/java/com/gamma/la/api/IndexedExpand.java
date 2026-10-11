@@ -44,7 +44,7 @@ final class IndexedExpand {
 
     record Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> frontier,
                    List<String> excluded, List<String> kinds, String direction, long minEvents, Integer fanOut, int budget,
-                   boolean windowed, boolean minDays, boolean degreeBounded, boolean merged) { }
+                   boolean windowed, boolean minDays, boolean degreeBounded, boolean merged, boolean weighted) { }
 
     /** {@code rows} are {@code {source, target, kind, count}}; {@code capped} is how many eligible links the fan-out cap cut. */
     record Result(List<Map<String, Object>> rows, boolean truncated, long capped) { }
@@ -59,6 +59,8 @@ final class IndexedExpand {
         if (rq.minDays()) return "the rung has minDistinctDays";
         if (rq.degreeBounded()) return "the rung bounds candidate degree";
         if (rq.merged()) return "the rung is a merged traversal";
+        // the index folds ROWS; an Investigation bound to an eventsCol weighs a pair by SUM(eventsCol), which the index does not carry
+        if (rq.weighted()) return "the Investigation weighs links by an events column, which the index does not carry";
         if (rq.frontier().size() > FRONTIER_CAP) return "the frontier has " + rq.frontier().size() + " entities (the index serves at most " + FRONTIER_CAP + ")";
         if (new HashSet<>(rq.frontier()).size() != rq.frontier().size()) return "the frontier repeats an entity";
         if (rq.kinds() != null && (rq.kinds().isEmpty() || rq.kindCol() == null)) return "linkKinds cannot be applied";

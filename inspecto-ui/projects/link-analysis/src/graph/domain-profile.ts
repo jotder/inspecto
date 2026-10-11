@@ -32,6 +32,8 @@ export interface InvestigateMapping {
     targetCol: string;
     linkKindCol?: string;
     timeCol?: string;
+    /** An integer column counting the events a pre-aggregated row stands for: expand then weighs a link by its SUM. */
+    eventsCol?: string;
 }
 
 /** The rung every "Expand next degree" sends (`expand` op options). */
@@ -90,10 +92,10 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
                 targetCol: 'b_msisdn',
                 linkKindCol: 'link_kind',
                 timeCol: 'last_seen',
+                // `telecom_links` is pre-aggregated (one row per pair + kind): a link weighs its `events`, not its row count
+                eventsCol: 'events',
             },
-            // minEvents 1, not 2: expand counts ROWS per (source, target, kind) and `telecom_links` is pre-aggregated (one row
-            // per pair + kind), so 2 would drop every link. Back to 2 once expand can weight by an events column (planned).
-            expand: { windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 },
+            expand: { windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 },
             maxDegree: 4,
         },
     },

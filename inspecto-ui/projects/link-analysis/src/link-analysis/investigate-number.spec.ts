@@ -101,7 +101,8 @@ describe('investigate-number - the telecom binding', () => {
             entityType: 'msisdn',
         });
         expect(b.timeCol).toBe('last_seen');
-        expect(b.presets).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
+        expect(b.eventsCol).toBe('events');
+        expect(b.presets).toEqual({ windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 });
         expect(b.maxDegree).toBe(4);
         expect(b.presets).toBe(domainProfile('telecom').investigate!.expand); // ONE home for the presets
     });
@@ -164,7 +165,7 @@ describe('investigate-number - next degree', () => {
         const p = domainProfile('telecom').investigate!.expand;
         expect(presetRung(p, true, '2026-09-29T18:30:00.000Z')).toEqual({
             budget: 2000,
-            minEvents: 1,
+            minEvents: 2,
             maxFanOut: 50,
             window: { from: '2026-08-30T18:30:00.000Z', to: '2026-09-29T18:30:01.000Z' },
         });
@@ -193,8 +194,8 @@ describe('investigate-number - next degree', () => {
 
     it('checks a named Dataset for the mapped columns and a deep-link seed for the MSISDN shape', () => {
         const b = investigateBinding({ seed: '966501', entityType: 'msisdn', dataset: 'x' })!;
-        expect(missingMappedColumns(b, ['A_MSISDN', 'b_msisdn', 'link_kind', 'last_seen'])).toEqual([]);
-        expect(missingMappedColumns(b, ['a_msisdn', 'b_msisdn'])).toEqual(['link_kind', 'last_seen']);
+        expect(missingMappedColumns(b, ['A_MSISDN', 'b_msisdn', 'link_kind', 'last_seen', 'EVENTS'])).toEqual([]);
+        expect(missingMappedColumns(b, ['a_msisdn', 'b_msisdn'])).toEqual(['link_kind', 'last_seen', 'events']);
         expect(seedError({ seed: '12ab', entityType: 'msisdn' })).toBe(
             'A number is 6 to 15 digits, optionally starting with +.',
         );

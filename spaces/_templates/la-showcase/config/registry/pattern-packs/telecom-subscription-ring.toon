@@ -1,0 +1,6 @@
+name: telecom-subscription-ring
+label: Subscription ring (shared identity)
+category: telecom
+description: Five or more lines registered on the same identity document or address within one week. Start from any line in the ring - each one is linked to all the others. Lower the count for smaller households only with care, since families and two-line customers share an address too.
+stages[1]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax,closesToStart}:
+  fan-in,5,shared_identity,"",168,false,0,"","","",false

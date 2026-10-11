@@ -1,0 +1,7 @@
+name: telecom-payment-ring
+label: Shared top-up evidence
+category: telecom
+description: A line that shares top-up evidence (the same voucher, card or agent) with two or more other lines. A rogue agent or cloned vouchers show up this way, but so can a family or a shop topping up several lines with one card. Shared-payment links run both ways, so the closing step is always met and adds no proof of a ring - check the via keys before acting.
+stages[2]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax,closesToStart}:
+  fan-out,2,shared_payment,"",0,false,0,"","","",false
+  fan-in,2,shared_payment,"",0,false,0,"","","",true

@@ -1,0 +1,9 @@
+physicalRef: telecom_typology_counts
+description: "Telecom Link Analysis showcase - ONE row of counts: how many MSISDNs in telecom_msisdn_indicators meet the Wangiri, IRSF and SIM-box indicator rules. Counts only, no MSISDN, so the Alert Rules over it stay aggregate-only. Built by the telecom_typology_counts Job; rules in docs/superpower/la-telecom-demo-data.md. Synthetic."
+owner: fm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,fm.analyst,view
+  user,fm.manager,view
+  user,ra.analyst,view
+  user,demo.manager,view

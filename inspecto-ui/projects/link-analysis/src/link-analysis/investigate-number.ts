@@ -88,6 +88,8 @@ export interface PendingInvestigation {
     profileId: DomainProfileId;
     projection: EntityProjection;
     timeCol?: string;
+    /** The events column a pre-aggregated Dataset weighs links by (`eventsCol` on create); absent = rows are counted. */
+    eventsCol?: string;
     presets: DegreePresets;
     maxDegree: number;
     /** The Dataset's latest event time (ISO) — the preset window ends there, not today; absent = no window is sent. */
@@ -114,6 +116,7 @@ export function investigateBinding(req: InvestigateRequest): PendingInvestigatio
             entityType: req.entityType,
         },
         ...(m.timeCol ? { timeCol: m.timeCol } : {}),
+        ...(m.eventsCol ? { eventsCol: m.eventsCol } : {}),
         presets: inv.expand,
         maxDegree: inv.maxDegree,
     };
@@ -170,7 +173,7 @@ export function presetsSummary(p: DegreePresets, windowEnd?: string | null): str
 export function missingMappedColumns(b: PendingInvestigation, columns: readonly string[]): string[] {
     const have = new Set(columns.map((c) => c.toLowerCase()));
     const p = b.projection;
-    return [p.sourceCol, p.targetCol, p.linkKindCol, b.timeCol].filter(
+    return [p.sourceCol, p.targetCol, p.linkKindCol, b.timeCol, b.eventsCol].filter(
         (c): c is string => !!c && !have.has(c.toLowerCase()),
     );
 }

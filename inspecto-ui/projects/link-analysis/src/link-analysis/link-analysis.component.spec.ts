@@ -308,7 +308,7 @@ describe('LinkAnalysisComponent', () => {
         for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r));
         return navigate;
     }
-    const ROWS = (latest: unknown, columns = ['a_msisdn', 'b_msisdn', 'link_kind', 'last_seen']) => ({
+    const ROWS = (latest: unknown, columns = ['a_msisdn', 'b_msisdn', 'link_kind', 'last_seen', 'events']) => ({
         sql: vi.fn(async () => ({ rows: [{ latest }], columns: [], truncated: false })),
         columns: vi.fn(async () => columns.map((name) => ({ name, type: 'string' as const }))),
     });
@@ -331,11 +331,12 @@ describe('LinkAnalysisComponent', () => {
                 linkKindCol: 'link_kind',
             },
             timeCol: 'last_seen',
+            eventsCol: 'events',
             windowEnd: '2026-09-29T18:30:00.000Z',
         });
         expect(rows.sql).toHaveBeenCalledWith('links', 'SELECT MAX("last_seen") AS latest FROM "links"', 1);
         expect(c.profileId()).toBe('telecom');
-        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
+        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 });
         expect(c.toolboxTab()).toBe('investigation');
         expect(c.investigateIssue()).toBe('');
         expect(navigate).toHaveBeenCalledWith(
@@ -366,7 +367,7 @@ describe('LinkAnalysisComponent', () => {
         await consume(fixture);
         const c = fixture.componentInstance;
         expect(c.pendingInvestigation()).toBeNull();
-        expect(c.investigateIssue()).toContain('has no column a_msisdn, b_msisdn, link_kind, last_seen');
+        expect(c.investigateIssue()).toContain('has no column a_msisdn, b_msisdn, link_kind, last_seen, events');
     });
 
     it('?seed= that is not an MSISDN is refused with the starter card message, nothing queued', async () => {
