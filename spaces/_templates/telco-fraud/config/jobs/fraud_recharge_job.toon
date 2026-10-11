@@ -13,6 +13,7 @@ job:
     by: day
     column: window_date
     lookback: 1
+    retain: 30
   small_amount: "5"
   min_candidate_topups: "3"
   enabled: true

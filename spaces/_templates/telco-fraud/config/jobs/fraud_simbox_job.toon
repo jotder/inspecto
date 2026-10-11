@@ -13,6 +13,7 @@ job:
     by: day
     column: window_date
     lookback: 1
+    retain: 30
   max_cells: "1"
   min_candidate_targets: "10"
   exempt_msisdns: "99970001119"

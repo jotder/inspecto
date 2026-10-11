@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
  * {@link JobConfig#toMap} re-nests it; {@link #parse} is the pure, fail-closed shape check every save path and
  * the boot loader run through.
  */
-record IncrementalSpec(String column, int lookback) {
+record IncrementalSpec(String column, int lookback, int retain) {   // retain 0 = keep every day
 
     static final String PREFIX = "incremental.";
     static final int MAX_LOOKBACK = 366;
@@ -26,7 +26,7 @@ record IncrementalSpec(String column, int lookback) {
         if (!SqlTemplateJobType.DESCRIPTOR.id().equals(type))
             throw new IllegalArgumentException(where + " is supported only on sql.template Jobs, not '" + type + "'");
         for (String k : params.keySet())
-            if (k.startsWith(PREFIX) && !Map.of("incremental.by", 1, "incremental.column", 1, "incremental.lookback", 1).containsKey(k))
+            if (k.startsWith(PREFIX) && !Map.of("incremental.by", 1, "incremental.column", 1, "incremental.lookback", 1, "incremental.retain", 1).containsKey(k))
                 throw new IllegalArgumentException(where + " has an unknown key '" + k.substring(PREFIX.length()) + "'");
         String by = params.get("incremental.by");
         if (!"day".equals(by == null ? null : by.trim()))
@@ -44,6 +44,15 @@ record IncrementalSpec(String column, int lookback) {
         catch (NumberFormatException e) { throw new IllegalArgumentException(where + ".lookback must be an integer 1.." + MAX_LOOKBACK + ", got '" + raw + "'"); }
         if (n < 1 || n > MAX_LOOKBACK)
             throw new IllegalArgumentException(where + ".lookback must be 1.." + MAX_LOOKBACK + ", got " + n);
-        return new IncrementalSpec(column.trim(), n);
+        // retain: M (2026-10-11): keep the last M days, delete older day folders after each replace.
+        String rawRetain = params.get("incremental.retain");
+        int m = 0;
+        if (rawRetain != null) {
+            try { m = Integer.parseInt(rawRetain.trim()); }
+            catch (NumberFormatException e) { throw new IllegalArgumentException(where + ".retain must be a positive integer >= lookback, got '" + rawRetain + "'"); }
+            if (m < n)
+                throw new IllegalArgumentException(where + ".retain must be a positive integer >= lookback (" + n + "), got " + m);
+        }
+        return new IncrementalSpec(column.trim(), n, m);
     }
 }

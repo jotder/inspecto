@@ -278,6 +278,23 @@ class TelcoFraudTemplateGoldenTest {
                 rs.next();
                 assertEquals(2, rs.getLong(1), "the sink holds both windows (day 2 has one reversal-less payment)");
             }
+
+            // Retention (incremental retain: 30): the run for day 31 prunes day 1's partition, so every day-1
+            // offender's evidence ages out and its key heals; the zero-row seed partition is kept.
+            for (JobConfig j : jobs) assertEquals("30", j.params().get("incremental.retain"), j.name());
+            Map<String, String> day31 = window(java.time.LocalDate.of(2026, 7, 31));
+            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), day31).status(), j.name() + " day 31");
+            for (JobConfig j : jobs) {
+                Path sink = data.resolve(j.params().get("sink_dataset"));
+                assertFalse(Files.exists(sink.resolve("window_date=2026-07-01")), j.name() + ": day 1 aged out");
+                assertTrue(Files.exists(sink.resolve("window_date=1970-01-01").resolve("seed.parquet")), j.name() + ": seed kept");
+            }
+            for (AlertRule r : rules)
+                assertEquals(List.of(), probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(), r.threshold(),
+                        r.stormCap()).orElseThrow().keys(), r.name() + ": every day-1 key healed once its evidence aged out");
+            assertEquals(TOTAL, svc.openAlerts().size(), "day 1's Alerts are open before the evaluation");
+            assertEquals(List.of(), svc.evaluateRules(), "ageing out raises nothing");
+            assertEquals(List.of(), svc.openAlerts(), "the aged-out keys resolve their Alerts");
         }
     }
 

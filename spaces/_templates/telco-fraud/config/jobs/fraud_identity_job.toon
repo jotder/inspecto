@@ -13,5 +13,6 @@ job:
     by: day
     column: window_date
     lookback: 1
+    retain: 30
   exempt_doc_prefixes: "CORP-"
   enabled: true

@@ -3,9 +3,9 @@
 One runbook per typology in this Space Template. Each typology section below is also a Runbook component (`config/registry/runbooks/fraud_<typology>.toon`), linked from its Alert Rule by `runbook:`, so the Incident page shows it; edit the component, and keep this file for the shared guidance. Each Alert Rule `fraud_<typology>` is per-entity: it
 raises one Alert and one Incident per offender (`by` = the offender key), with the Measure taken as the
 `max` over every retained window. An offender seen on several days is one Alert. A key heals only when all its
-evidence is removed from the sink (see *Sizing and retention*); that resolves its Alert but never its Incident. A
+evidence ages out of retention (`retain`, default 30 days); that resolves its Alert but never its Incident. A
 person records the Disposition. `stormCap` is 500 per rule: above that many retained offenders one storm Alert
-stands for them all, so keep `stormCap` above the days kept x the expected daily offenders.
+stands for them all, so keep `stormCap` above `retain` x the expected daily offenders.
 
 **Relapse.** The Measure is the `max` over retained windows, so a line that sits under the threshold every day
 stays silent however many days it recurs (a `sum` would add the days up and false-alert). An offender who
@@ -35,18 +35,17 @@ empty it (`none`), before relying on this typology. Matching the exemptions agai
 loaded as a Reference Dataset will be built when a customer supplies such a register; until then the
 prefix-spoof risk stays pinned and documented here.
 
-**Scaling.** A run writes one day of candidate rows; the sink keeps every day. Keep the candidates few: `fraud_simbox` keeps only lines with at
+**Scaling.** A run writes one day of candidate rows; the sink keeps the last `retain` days. Keep the candidates few: `fraud_simbox` keeps only lines with at
 least `min_candidate_targets` voice targets (default 10). `fraud_identity`, `fraud_dealer`, `fraud_voucher` and
 `fraud_reversal` still keep one row per document, dealer, serial or paying line, so their sinks grow with the
 subscriber base.
 
-**Sizing and retention.** Nothing prunes the sinks: every day folder stays until you delete it. Size storage
-by subscriber count x days kept: for the entity-keyed sinks (`fraud_identity`, `fraud_dealer`, `fraud_voucher`,
-`fraud_reversal`) plan for about one row per active entity per day, that is up to (active subscribers,
-documents, dealers, serials or paying lines) x days kept. The traffic sinks are bounded by daily candidates x
-days kept. To retire old evidence, delete whole `window_date=YYYY-MM-DD` folders older than your window (never
-the `window_date=1970-01-01` seed folder, and never the dot-files at the sink root). Keep at least as many days
-as an offender should stay alerted, since a key heals only when its evidence is gone.
+**Sizing and retention.** Each Job's `incremental.retain` (default 30) keeps that many days: after every run
+the day folders older than that are deleted. Size storage by subscriber count x `retain`: for the entity-keyed
+sinks (`fraud_identity`, `fraud_dealer`, `fraud_voucher`, `fraud_reversal`) plan for about one row per active
+entity per day, that is up to (active subscribers, documents, dealers, serials or paying lines) x `retain` rows.
+The traffic sinks are bounded by daily candidates x `retain`. Shorten `retain` to cut the sink size; keep it at
+least as long as an offender should stay alerted, since a key heals when its evidence ages out.
 
 **Number formats.** Subscriber numbers are E.164 digits with no `+`. Dialled numbers may be `+<E.164>`,
 `00<E.164>`, national `0<NSN>` or bare E.164. The Jobs normalise all four (`home_cc` supplies the country

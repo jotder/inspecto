@@ -50,6 +50,41 @@ final class IncrementalSink {
     /** Test seam: runs after a day's live files are hidden and before the reveal (crash simulation). */
     static volatile Runnable afterHide = () -> { };
 
+    /** Test seam: runs before each expired day folder is deleted (delete-failure simulation). */
+    interface PruneHook { void before(Path dir) throws IOException; }
+    static volatile PruneHook beforePrune = dir -> { };
+
+    /** A template's zero-row schema seed; a day folder holding it is never pruned. */
+    static final String SEED_FILE = "seed.parquet";
+
+    /**
+     * Delete every {@code <column>=YYYY-MM-DD} folder dated before {@code keepFrom} (retention, 2026-10-11).
+     * Only exact ISO-date folder names; a folder holding {@link #SEED_FILE} and every other entry (dot-files
+     * included) are left alone. A failed delete is logged and skipped — retention never fails the run.
+     * @return the number of folders deleted
+     */
+    static int prune(Path sink, String column, LocalDate keepFrom) throws IOException {
+        int deleted = 0;
+        for (Path dir : list(sink, column + "=*")) {
+            String n = dir.getFileName().toString();
+            String d = n.substring(column.length() + 1);
+            if (!Files.isDirectory(dir) || !DAY.matcher(d).matches()) continue;
+            LocalDate day;
+            try { day = LocalDate.parse(d); } catch (java.time.format.DateTimeParseException e) { continue; }
+            if (!day.isBefore(keepFrom) || Files.exists(dir.resolve(SEED_FILE))) continue;
+            try {
+                beforePrune.before(dir);
+                try (java.util.stream.Stream<Path> w = Files.walk(dir)) {
+                    for (Path p : w.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
+                }
+                deleted++;
+            } catch (IOException | RuntimeException e) {
+                log.warn("sql.template incremental: could not prune expired partition {} ({}); kept", dir, e.toString());
+            }
+        }
+        return deleted;
+    }
+
     record Outcome(long rows, int days, long dropped) { }
 
     private IncrementalSink() { }
@@ -122,6 +157,15 @@ final class IncrementalSink {
                     }
                     swapDay(dir, tmp, part);
                     rows += n;
+                }
+                if (inc.retain() > 0) {
+                    try {
+                        int pruned = prune(sink, inc.column(), day.minusDays(inc.retain() - 1L));
+                        if (pruned > 0) log.info("sql.template incremental: pruned {} day partition(s) of {} older than {} day(s)",
+                                pruned, sink.getFileName(), inc.retain());
+                    } catch (IOException e) {
+                        log.warn("sql.template incremental: retention prune of {} skipped ({})", sink.getFileName(), e.toString());
+                    }
                 }
                 return new Outcome(rows, inc.lookback(), dropped);
             }

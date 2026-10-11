@@ -171,7 +171,7 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   `transform.sql` allow-list), and the connection is sealed to the data root — see
   [Auth & Security](../editions/auth-security.md#the-sqltemplate-job-runs-behind-sqlguard-and-a-sealed-connection-sql-template-sandbox-1-2026-09-24).
   **Incremental mode by per-day partitions (operator, 2026-10-10; `ASSURE-PACK-TELCO-FRAUD-1` (b)).**
-  `incremental: {by: day, column: <date col>, lookback: N}` makes a run replace only the last `N` days
+  `incremental: {by: day, column: <date col>, lookback: N, retain: M}` makes a run replace only the last `N` days
   (ending on the trigger's `day` param, declared for incremental Jobs only, else today UTC) of its sink,
   laid out Hive-style as `<sink>/<column>=YYYY-MM-DD/part-<run>.parquet` with the date column held in the
   folder name only, so the store reader (`hive_partitioning=true`) gives it back as a DATE — as the
@@ -194,15 +194,21 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   22.8 MB rewritten per run; incremental `lookback: 1` 0.9-1.0 s and ~0.8 MB (one day) rewritten; the
   30-day backfill took 3.0 s. The read side is unchanged unless the SQL filters its source by the window.
   **Enabled in the telco-fraud pack (2026-10-11):** all 14 detection Jobs run `incremental: {by: day,
-  column: window_date, lookback: 1}` with `day: "$yesterday"` (the same day as `window_start`; a manual or
+  column: window_date, lookback: 1, retain: 30}` with `day: "$yesterday"` (the same day as `window_start`; a manual or
   golden run passes `day` beside the literal window), no longer read their own sink, and ship their zero-row
   schema seed as `data/fraud_<typology>/window_date=1970-01-01/seed.parquet` (a placeholder day the Job
   never replaces; a flat `seed.parquet` is refused by the layout gate). The Dataset reader leaves
   `hive_partitioning` unset and DuckDB auto-detects the `window_date=` folders, so `window_date` reaches
-  Alert Rules, KPIs (`timeField: window_date`) and BI as a DATE. ⚠ **An incremental sink never prunes
-  old days** and no maintenance task prunes `<column>=` folders (`partition_prune` knows only
-  `year=/month=/day=`), so `retention_days` is gone from these Jobs and history grows until an operator
-  deletes old day folders by hand.
+  Alert Rules, KPIs (`timeField: window_date`) and BI as a DATE. Each Job carries `retain: 30` (its old
+  `retention_days`), so evidence still ages out and a key heals (pinned by the golden test's day-31 run).
+  **Retention: `retain: M` (2026-10-11).** Optional; a positive integer `>= lookback`, refused 422 at save
+  otherwise; absent = keep every day. After the replace, under the same lock, `IncrementalSink.prune`
+  deletes each `<column>=YYYY-MM-DD` folder dated before `day - (M - 1)` (so M days are kept). Only folders
+  whose name is exactly `<column>=<ISO date>`; a folder holding `seed.parquet` (a template's zero-row
+  schema seed) and every other entry, dot-files (marker, lock) included, are never touched. A failed
+  delete is logged (WARN) and skipped — retention never fails the run. Pinned by
+  `SqlTemplateIncrementalTest` (prune, seed / non-matching folders kept, failure tolerated, validation) and
+  `ControlApiIncrementalJobTest` (422).
 * **`caserule.evaluate`** — schedules the auto-grouping tail of the Alert → Incident → Case chain (C5):
   evaluates a saved Case Rule, grouping matching in-window Incidents under a Case via
   `ObjectService.evaluateCaseRule` — the same step `POST /cases/rules/{name}/evaluate` drives — and emits
