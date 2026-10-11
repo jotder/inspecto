@@ -188,6 +188,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     // behaviour is byte-identical; -Drun.lease.backend=db makes the exclusion cross-process.
     private final RunLease runGuard;
 
+    /** The Job leases {@link #wireJobClaims} opened (arming + authored), held so {@link #close()} can cancel
+     *  in-flight Job runs the same way as pipeline runs (HA-CANCEL-RESIDUALS-1 (1)). */
+    private final List<RunLease> jobLeases = new java.util.concurrent.CopyOnWriteArrayList<>();
+
     /** The acquisition lease, held here so {@link #close()} can cancel in-flight fetches too (the scheduler uses it). */
     private final RunLease acquireGuard;
     /** Serialises registry mutation ({@link #registry} + {@link ConfigRegistry#rebuild}) against a cycle's
@@ -1629,8 +1633,12 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * authored-pipeline fix (two differently-named jobs on one flow no longer overlap) without a DB.
      */
     private void wireJobClaims(JobService target) {
-        target.armingClaims(claimsOver(ServiceStores.openRunLease(root, DbRunLease.SCOPE_JOB)));
-        target.authoredClaims(claimsOver(ServiceStores.openRunLease(root, DbRunLease.SCOPE_AUTHORED)));
+        RunLease arming = ServiceStores.openRunLease(root, DbRunLease.SCOPE_JOB);
+        RunLease authored = ServiceStores.openRunLease(root, DbRunLease.SCOPE_AUTHORED);
+        jobLeases.add(arming);     // held so close() can cancel in-flight Job runs (HA-CANCEL-RESIDUALS-1 (1))
+        jobLeases.add(authored);
+        target.armingClaims(claimsOver(arming));
+        target.authoredClaims(claimsOver(authored));
     }
 
     /** Adapt a {@link RunLease} onto the engine-side {@code RunClaims} seam — see that interface's class
@@ -1642,6 +1650,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             return new com.gamma.job.RunClaims.Claim() {   // LEASE-TAKEOVER-JOB-RUNS-1: validity delegates to the lease
                 @Override public void close() { claim.close(); }
                 @Override public com.gamma.inspector.CommitFence.State state() { return claim.state(); }
+                @Override public boolean cancelled() { return claim.cancelled(); }   // HA-CANCEL-RESIDUALS-1 (1)
             };
         };
     }
@@ -2191,6 +2200,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Idempotent (a second close just re-sets it). Nothing here releases a lease: see RunLease#cancelRuns.
         runGuard.cancelRuns();
         acquireGuard.cancelRuns();
+        jobLeases.forEach(RunLease::cancelRuns);   // Job runs too, before jobs.close() drains them (HA-CANCEL-RESIDUALS-1 (1))
         if (watcher != null) { watcher.close(); watcher = null; }   // stop push triggers before draining runs
         assistSlot.close();                            // release agent resources first
         intelligenceSlot.close();
