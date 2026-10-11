@@ -122,6 +122,11 @@ Rules; subscription ring, forwarding chain, payment ring = TOON pattern packs; n
    Set" when entities were only flagged; Draft/fork/template paths validate `expandHubs` less strictly than append.
 5. **Browser smoke** of §2 on the seeded `la-showcase` Space (never driven on screen yet).
 
+**Update 2026-10-11 (later):** items 1-4 above are SHIPPED (events weighting, node panel Risk / Enrichment / Case
+history / actions over masked `POST /inv/reference-rows`, hub override + real contact counts, one-step attach,
+telecom pattern packs with pre-filled columns, `GET /objects/by-entity`). What is left is tracked as backlog row
+`LA-TELECOM-DEMO-1` (`docs/BACKLOG.md` §3.12): the live browser walk-through and the operator questions.
+
 Open operator question: keep `four_eyes_fan_out_above: 5` in the showcase (first suspect expand waits for
 `fm.manager`; the UI shows "waiting for approval") or raise it for the telecom demo.
 
