@@ -560,13 +560,18 @@ Incidents and Cases that reference one Entity (an MSISDN, …), newest first:
 `[{kind: incident|case, id, title, status, severity?, createdAt, matchedOn, via?}]`, `metadata.pagination.total` = the
 visible match count. `id` and every stored value are folded with the space's Entity Type normaliser
 (`EntityTypes.normalise`; typed spellings `msisdn:+…` / `entity:msisdn:+…` accepted; under `e164` a leading `+` is not
-significant). `matchedOn`: `key.<column>` (a keyed Alert Rule attribute whose column contains the type id — the
-Incident page's "Investigate in Link Analysis" rule — or `key.entity_key`, the Risk / Anomaly Score rules),
-`entityKey` (an Incident minted from a Link Analysis Entity), `member` (a Case CONTAINING a matched Incident; `via`
+significant; an `id` typed as a DIFFERENT known Entity Type is a 422; the folded key must be ≥ 5 digits for a number
+type, ≥ 2 characters otherwise). `matchedOn`: `key.<column>` (a keyed Alert Rule attribute one of whose `_ . -`
+tokens IS the type id — `caller_msisdn` names msisdn, `excellent` does not name cell — or `key.entity_key`, the Risk / Anomaly Score rules),
+`entityKey` (an Incident minted from a Link Analysis Entity; a prefix counts as a type only when it is a KNOWN Entity
+Type id, so `entity:host:8080` matches as untyped), `member` (a Case CONTAINING a matched Incident; `via`
 names it). Ungated like `GET /objects`, under the same SEC-7d / ABAC post-filter: a hidden object — and a Case reached
 only through it — is absent and uncounted. 422 on an unknown type, missing / oversized / empty-folding `id`, bad
 `status` or `limit`. ⚠ Cost: the attribute bag is un-indexed JSON, so each call is one bounded
-`LOWER(attributes) LIKE ?` scan (`ObjectStore.findByAttributeFragment`, ≤ 2 000 rows); a stored value with
+`LOWER(attributes) LIKE ?` scan (`ObjectStore.findByAttributeFragment`, newest 2 000 candidate rows, the same
+`createdAt DESC, id DESC` window on every store). When the scan hits that cap, `metadata.pagination` carries
+`truncated: true` + a `message` and the response the `X-Inspecto-Truncated: true` header (`total` is then a lower
+bound). The route is on the standard per-subject rate-limit bucket (`ControlApi.isRateLimited`, 429 `RATE_LIMITED`); a stored value with
 separators inside the digits is not found. Not covered: an LA Investigation linked to a Case
 (`PUT /inv/investigations/{id}/case`) — that link lives in the Professional LA module, which `inspecto-ops` cannot see.
 No read audit (no object read is audited today).
@@ -1007,7 +1012,8 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `ControlApiFindingsSpecTest` | `GET /findings/{type}`, the `422` value gate, frontend-only keys refused |
 | `ControlApiFindingsImpactFieldTest` | The built-in Case Findings Impact field: 422 on a dropped / re-keyed / retyped / re-tiered / required spec (generic and per-type), a relabel accepted; a Findings save writes `Impact.confirmed` (rest kept, never in the blob, audited) and `objects/analytics` sums it; 403 without `canWorkIncidents` on a change, 200 on an unchanged re-send; 422 with no currency or a negative amount; the PATCH refuses it |
 | `ControlApiImpactTest` | `PUT /objects/{id}/impact`: 401 / 403 `business` (before existence-hiding) / 400 / 422 (ten invalid bodies, an Alert) / 409 `ARCHIVED` then writable after `reopen` / 404; `outstanding` derived and never stored; audit `before`/`after` under the Subject; per-currency analytics. The Personal 503 is `NoOperationalObjectsShipInThePersonalBuildTest` |
-| `ControlApiObjectsByEntityTest` | `GET /objects/by-entity`: 401, 422 per bad input, empty result, every `matchedOn` path, status filter, scope hiding |
+| `ControlApiObjectsByEntityTest` | `GET /objects/by-entity`: 401, 422 per bad input, empty result, every `matchedOn` path, token-boundary columns, unknown prefixes, status filter, scope hiding, the truncation flag, 429 |
+| `FindByAttributeFragmentParityTest` | in-memory and DuckDB stores scan the same newest-first capped window |
 | `ControlApiObjectsTest` · `ControlApiObjectsPageTest` · `ControlApiScopedObjectsTest` | the create contract (≥1 link, `400`/`404`), paging, SEC-7d data scopes |
 | `ControlApiNoteRoutesTest` · `ControlApiTagRoutesTest` · `TagRuleTest` · `ObjectTagProjectionTest` · `TagAssignmentCoreTest` | Annotations: notes, tags as a projection, Tag Rules |
 | `IncidentPurgeTaskTest` · `RetentionSweepSeamTest` | `retention_days` required, dry-run, legal hold, dependents first |

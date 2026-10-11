@@ -69,7 +69,9 @@ public interface ObjectStore extends AutoCloseable {
             for (OperationalObject o : query(ObjectQuery.builder().objectType(t).limit(ObjectQuery.MAX_LIMIT).build()))
                 if (com.gamma.util.JsonAttributes.toJson(o.attributes()).toLowerCase(java.util.Locale.ROOT).contains(needle))
                     out.add(o);
-        out.sort(java.util.Comparator.comparingLong(OperationalObject::createdAt).reversed());
+        // createdAt DESC, id DESC before the cap — the same window DbObjectStore's ORDER BY ... LIMIT scans.
+        out.sort(java.util.Comparator.comparingLong(OperationalObject::createdAt)
+                .thenComparing(OperationalObject::id).reversed());
         return out.size() > limit ? new java.util.ArrayList<>(out.subList(0, limit)) : out;
     }
 

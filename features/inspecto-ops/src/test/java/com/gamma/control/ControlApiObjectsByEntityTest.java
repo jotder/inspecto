@@ -89,7 +89,9 @@ class ControlApiObjectsByEntityTest {
         try (Ctx c = open(dir)) {
             for (String q : List.of("type=planet&id=1", "id=256700123456", "type=msisdn", "type=msisdn&id=%2B",
                     "type=msisdn&id=1&status=pending", "type=msisdn&id=1&limit=0", "type=msisdn&id=1&limit=abc",
-                    "type=msisdn&id=1&limit=201", "type=msisdn&id=" + "9".repeat(257))) {
+                    "type=msisdn&id=1&limit=201", "type=msisdn&id=" + "9".repeat(257),
+                    "type=msisdn&id=1234", "type=msisdn&id=%2B12-34", "type=cell&id=a",
+                    "type=msisdn&id=imei:356938035643809", "type=msisdn&id=entity:imei:356938035643809")) {
                 HttpResponse<String> r = get(c.port, "/objects/by-entity?" + q, "all");
                 assertEquals(422, r.statusCode(), q + " → " + r.body());
             }
@@ -166,6 +168,51 @@ class ControlApiObjectsByEntityTest {
 
             assertEquals(3, JSON.readTree(get(c.port, "/objects/by-entity?type=msisdn&id=256700123456", "all")
                     .body()).get("data").size(), "the unscoped caller sees all three");
+        }
+    }
+
+    @Test
+    void columnTokensAndUnknownPrefixesMatchExactly(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            OperationalObject token = incident(c, "token", attrs("key.cell_id", "ab-12"));
+            incident(c, "substring only", attrs("key.excellent", "AB-12"));
+            OperationalObject host = incident(c, "untyped", attrs("entityKey", "entity:host:8080", "entityDataset", "d"));
+            JsonNode cell = JSON.readTree(get(c.port, "/objects/by-entity?type=cell&id=AB-12", "all").body()).get("data");
+            assertEquals(List.of(token.id()), cell.findValuesAsText("id"), "cell_id names cell; excellent does not");
+            JsonNode h = JSON.readTree(get(c.port, "/objects/by-entity?type=handset&id=host:8080", "all").body()).get("data");
+            assertEquals(List.of(host.id()), h.findValuesAsText("id"), "an unknown prefix is part of the value");
+        }
+    }
+
+    @Test
+    void aScanThatHitsItsCapSaysSo(@TempDir Path dir) throws Exception {
+        java.lang.reflect.Field cap = com.gamma.opsapi.ObjectRoutes.class.getClassLoader()
+                .loadClass("com.gamma.opsapi.EntityHistory").getDeclaredField("SCAN_CAP");
+        cap.setAccessible(true);
+        int was = cap.getInt(null);
+        try (Ctx c = open(dir)) {
+            for (int i = 0; i < 3; i++) incident(c, "n" + i, attrs("key.msisdn", "256700123456"));
+            HttpResponse<String> full = get(c.port, "/objects/by-entity?type=msisdn&id=256700123456", "all");
+            assertFalse(JSON.readTree(full.body()).get("metadata").get("pagination").has("truncated"));
+            assertTrue(full.headers().firstValue("X-Inspecto-Truncated").isEmpty());
+            cap.setInt(null, 2);
+            HttpResponse<String> r = get(c.port, "/objects/by-entity?type=msisdn&id=256700123456", "all");
+            JsonNode p = JSON.readTree(r.body()).get("metadata").get("pagination");
+            assertTrue(p.get("truncated").asBoolean());
+            assertTrue(p.get("message").asText().contains("older references"));
+            assertEquals("true", r.headers().firstValue("X-Inspecto-Truncated").orElse(null));
+        } finally {
+            cap.setInt(null, was);
+        }
+    }
+
+    @Test
+    void aBurstIsRateLimited(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            boolean throttled = false;
+            for (int i = 0; i < 30 && !throttled; i++)
+                throttled = get(c.port, "/objects/by-entity?type=msisdn&id=256700123456", "all").statusCode() == 429;
+            assertTrue(throttled, "the standard scan-route bucket answers 429 past its burst");
         }
     }
 

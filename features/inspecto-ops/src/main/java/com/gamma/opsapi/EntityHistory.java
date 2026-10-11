@@ -45,8 +45,12 @@ final class EntityHistory {
     static final int DEFAULT_LIMIT = 50;
     static final int MAX_LIMIT = 200;
     /** Rows the attribute prefilter may read per call — the bounded cost of an un-indexable attribute bag. */
-    static final int SCAN_CAP = 2_000;
+    static int SCAN_CAP = 2_000;   // not final: a test lowers it to exercise truncation
     private static final int MAX_ID_LENGTH = 256;
+    /** A folded key shorter than this would match a large share of the store — refused (422), not scanned. */
+    static final int MIN_DIGITS = 5;
+    static final int MIN_CHARS = 2;
+    static final String TRUNCATED_HEADER = "X-Inspecto-Truncated";
     private static final List<ObjectType> KINDS = List.of(ObjectType.INCIDENT, ObjectType.CASE);
 
     static Object byEntity(ApiContext api, HttpExchange ex) {
@@ -67,8 +71,11 @@ final class EntityHistory {
         EntityTypes.EntityType et = types.stream().filter(t -> t.id().equals(type)).findFirst()
                 .orElseThrow(() -> invalid("unknown Entity Type '" + type + "' — one of "
                         + types.stream().map(EntityTypes.EntityType::id).toList()));
-        String key = canonical(et.normaliser(), EntityTypes.normalise(et.normaliser(), stripTyped(rawId, type)));
-        if (key.isEmpty()) throw invalid("'id' folds to an empty " + type + " key");
+        java.util.Set<String> known = types.stream().map(EntityTypes.EntityType::id).collect(java.util.stream.Collectors.toSet());
+        String key = canonical(et.normaliser(), EntityTypes.normalise(et.normaliser(), stripTyped(rawId, type, known)));
+        int min = digitsOnly(et.normaliser()) ? MIN_DIGITS : MIN_CHARS;
+        if (key.length() < min)
+            throw invalid("'id' must fold to at least " + min + " characters as a " + type + " key, got '" + key + "'");
 
         ObjectService svc = OpsEngine.of(api);
         // The longest literal both raw and folded forms share: the digits for a number, else the folded key.
@@ -78,7 +85,7 @@ final class EntityHistory {
         Map<String, Map<String, Object>> hits = new LinkedHashMap<>();
         List<OperationalObject> matchedIncidents = new ArrayList<>();
         for (OperationalObject o : scanned) {
-            String on = matchedOn(o, et, key);
+            String on = matchedOn(o, et, key, known);
             if (on == null || !ObjectRoutes.visibleTo(ex, o)) continue;
             hits.put(o.id(), row(o, on, null));
             if (o.objectType() == ObjectType.INCIDENT) matchedIncidents.add(o);
@@ -99,21 +106,31 @@ final class EntityHistory {
                 .toList();
         out.forEach(r -> r.remove("_closed"));
         ApiContext.pagination(ex, null, null, limit, out.size());
+        if (scanned.size() >= SCAN_CAP) {
+            // The scan stopped at its cap: older references may exist, so `total` is a lower bound — say so.
+            if (ApiContext.attr(ex, ApiContext.ATTR_PAGINATION) instanceof Map<?, ?> p) {
+                @SuppressWarnings("unchecked") Map<String, Object> pm = (Map<String, Object>) p;
+                pm.put("truncated", true);
+                pm.put("message", "only the newest " + SCAN_CAP + " candidate objects were scanned; older references"
+                        + " to this Entity may exist and are not counted in total");
+            }
+            ex.getResponseHeaders().set(TRUNCATED_HEADER, "true");
+        }
         return out.size() > limit ? out.subList(0, limit) : out;
     }
 
     /** Which attribute names the Entity, or null. */
-    private static String matchedOn(OperationalObject o, EntityTypes.EntityType et, String key) {
+    private static String matchedOn(OperationalObject o, EntityTypes.EntityType et, String key, java.util.Set<String> known) {
         for (Map.Entry<String, String> a : o.attributes().entrySet()) {
             String k = a.getKey(), v = a.getValue();
             if (v == null || v.isBlank() || "NULL".equals(v)) continue;
             if (k.startsWith("key.")) {
                 String column = k.substring(4).toLowerCase(Locale.ROOT);
-                if ((column.contains(et.id()) || column.equals("entity_key")) && same(et, v, key)) return k;
+                if ((namesType(column, et.id()) || column.equals("entity_key")) && same(et, v, key)) return k;
             } else if (k.equals(ObjectService.ATTR_ENTITY_KEY)) {
                 String rest = v.startsWith("entity:") ? v.substring("entity:".length()) : v;
                 if (rest.startsWith(et.id() + ":")) rest = rest.substring(et.id().length() + 1);
-                else if (rest.matches("[a-z][a-z0-9_]{0,31}:.+")) continue;   // typed as another Entity Type
+                else if (typedAsKnown(rest, known)) continue;   // typed as another KNOWN Entity Type
                 if (same(et, rest, key)) return k;
             }
         }
@@ -133,10 +150,25 @@ final class EntityHistory {
         return "e164".equals(normaliser) || "digits".equals(normaliser);
     }
 
-    /** Accept the typed node-id spellings too: {@code entity:msisdn:+…} and {@code msisdn:+…}. */
-    private static String stripTyped(String id, String type) {
+    /** Accept the typed node-id spellings too ({@code entity:msisdn:+…}, {@code msisdn:+…}); an id typed as a
+     *  DIFFERENT known Entity Type is a 422. An unknown prefix ({@code host:8080}) is part of the value. */
+    private static String stripTyped(String id, String type, java.util.Set<String> known) {
         String s = id.startsWith("entity:") ? id.substring("entity:".length()) : id;
-        return s.startsWith(type + ":") ? s.substring(type.length() + 1) : s;
+        if (s.startsWith(type + ":")) return s.substring(type.length() + 1);
+        if (typedAsKnown(s, known))
+            throw invalid("'id' is typed as '" + s.substring(0, s.indexOf(':')) + "', not '" + type + "'");
+        return s;
+    }
+
+    private static boolean typedAsKnown(String s, java.util.Set<String> known) {
+        int i = s.indexOf(':');
+        return i > 0 && known.contains(s.substring(0, i));
+    }
+
+    /** A key column names the type when one of its {@code _ . -} separated tokens IS the type id
+     *  ({@code caller_msisdn} names msisdn; {@code zip} / {@code ship_to} do not name ip). */
+    private static boolean namesType(String column, String typeId) {
+        return List.of(column.split("[_.-]")).contains(typeId);
     }
 
     private static Map<String, Object> row(OperationalObject o, String matchedOn, String via) {
