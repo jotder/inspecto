@@ -7,13 +7,21 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, apiErrorMessage } from 'app/inspecto/api';
+import { ConfigService, PipelineSummary, PipelinesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { configPipelineId, pipelineScaffold } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
-import { StreamBundle, parseStreamBundle, planStreamImport } from 'app/inspecto/transfer/stream-bundle';
+import {
+    StreamBundle,
+    StreamImportPlan,
+    parseStreamBundle,
+    planStreamImport,
+} from 'app/inspecto/transfer/stream-bundle';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
+import { planTemplateCopy } from './onboarding-template';
 
 export interface OnboardingCreateData {
     kind: 'stream' | 'reference';
@@ -54,6 +62,14 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
  * INACTIVE, and anything that cannot travel (a Connection's credentials, masked secrets) is listed
  * as work still to do. Kind comes from the file and the toggle is locked — a Reference imported as a
  * Stream would silently change its load semantics.
+ *
+ * **Start from a template (2026-10-11)** is Import with the file read off this server: the gallery
+ * lists the pipeline templates (`template: true`, the editor's *Save as template*) from
+ * `GET /pipelines`, and picking one exports it through the same stream-bundle seam Duplicate uses
+ * (`StreamTransferService.exportPipeline`). From there it is the Import path — same preview, same
+ * name-asked-here rule, same writes — except {@link planTemplateCopy} also clears the template's own
+ * stamps so the copy is a runnable pipeline of its own. Nothing is held client-side beyond the
+ * preview: the draft is written once, at Create, exactly as for a blank or imported start.
  */
 @Component({
     selector: 'app-onboarding-create-dialog',
@@ -68,6 +84,8 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         MatIconModule,
         MatInputModule,
         InspectoAlertComponent,
+        InspectoEmptyStateComponent,
+        InspectoSkeletonComponent,
     ],
     template: `
         <h2 mat-dialog-title>Onboard {{ kind() === 'reference' ? 'Reference' : 'Stream' }}</h2>
@@ -85,6 +103,16 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     <mat-icon svgIcon="heroicons_outline:arrow-up-tray" class="icon-size-4"></mat-icon>
                     <span class="ml-1">{{ imported() ? 'Choose another file' : 'Import configuration' }}</span>
                 </button>
+                <button
+                    mat-stroked-button
+                    type="button"
+                    aria-controls="onboarding-templates"
+                    [attr.aria-expanded]="templatesOpen()"
+                    (click)="toggleTemplates()"
+                >
+                    <mat-icon svgIcon="heroicons_outline:square-3-stack-3d" class="icon-size-4"></mat-icon>
+                    <span class="ml-1">Start from a template</span>
+                </button>
                 <input
                     #fileInput
                     type="file"
@@ -97,6 +125,38 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     <span class="text-secondary text-sm">Or fill in the fields below to start fresh.</span>
                 }
             </div>
+
+            @if (templatesOpen()) {
+                <div id="onboarding-templates" class="mb-4">
+                    @if (templates(); as list) {
+                        @if (list.length === 0) {
+                            <inspecto-empty-state
+                                icon="heroicons_outline:square-3-stack-3d"
+                                title="No pipeline templates yet"
+                                message="Save a pipeline as a template from the pipeline editor's menu, then start new Streams and References from it here."
+                            />
+                        } @else {
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                @for (t of list; track t.name) {
+                                    <button
+                                        type="button"
+                                        class="bg-card flex flex-col items-start gap-1 rounded-2xl p-4 text-left shadow transition-shadow hover:shadow-md"
+                                        [disabled]="!!picking()"
+                                        (click)="chooseTemplate(t)"
+                                    >
+                                        <span class="font-semibold">{{ t.displayName ?? t.name }}</span>
+                                        @if (t.description) {
+                                            <span class="text-secondary text-sm">{{ t.description }}</span>
+                                        }
+                                    </button>
+                                }
+                            </div>
+                        }
+                    } @else {
+                        <inspecto-skeleton [lines]="2" height="3rem" />
+                    }
+                </div>
+            }
 
             @if (importErrors().length) {
                 <inspecto-alert class="mb-4 block" variant="error" title="That file cannot be imported">
@@ -113,12 +173,16 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     class="mb-4 block"
                     variant="info"
                     icon="heroicons_outline:document-arrow-up"
-                    title="Importing a configuration"
+                    [title]="fromTemplate() ? 'Starting from a template' : 'Importing a configuration'"
                 >
                     <p class="m-0">
-                        From <span class="font-semibold">{{ b.source.name }}</span>
-                        @if (b.source.space) {
-                            <span> (space {{ b.source.space }})</span>
+                        @if (fromTemplate(); as tpl) {
+                            From template <span class="font-semibold">{{ tpl.label }}</span>
+                        } @else {
+                            From <span class="font-semibold">{{ b.source.name }}</span>
+                            @if (b.source.space) {
+                                <span> (space {{ b.source.space }})</span>
+                            }
                         }
                         — {{ importSummary() }}.
                     </p>
@@ -206,7 +270,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         <mat-dialog-actions align="end">
             <button mat-button type="button" (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" [disabled]="creating() || writesDisabled()" (click)="create()">
-                {{ imported() ? 'Create from import' : 'Create draft' }}
+                {{ fromTemplate() ? 'Create from template' : imported() ? 'Create from import' : 'Create draft' }}
             </button>
         </mat-dialog-actions>
     `,
@@ -217,6 +281,7 @@ export class OnboardingCreateDialog {
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
     private transfer = inject(StreamTransferService);
+    private pipelinesApi = inject(PipelinesService);
     private ref = inject(MatDialogRef<OnboardingCreateDialog, OnboardingCreateResult>);
     readonly data = inject<OnboardingCreateData>(MAT_DIALOG_DATA);
 
@@ -228,6 +293,13 @@ export class OnboardingCreateDialog {
     /** A parsed configuration file, when the operator chose to import one. */
     readonly imported = signal<StreamBundle | null>(null);
     readonly importErrors = signal<string[]>([]);
+
+    /** Start from a template: the gallery's visibility, its list (`null` while loading) and the
+     *  template being read. `fromTemplate` marks the loaded {@link imported} bundle as a template's. */
+    readonly templatesOpen = signal(false);
+    readonly templates = signal<PipelineSummary[] | null>(null);
+    readonly picking = signal<string | null>(null);
+    readonly fromTemplate = signal<{ label: string; missing: string[] } | null>(null);
 
     /** What the file carries, in the operator's words — so "Create" is not a blind action. */
     readonly importSummary = computed(() => {
@@ -245,12 +317,21 @@ export class OnboardingCreateDialog {
     readonly importNotes = computed<string[]>(() => {
         const b = this.imported();
         if (!b) return [];
-        return planStreamImport(b, { name: this.plannedName() }).notes;
+        return this.planFor(b, this.plannedName()).notes;
     });
 
     private readonly nameValue = signal('');
     private plannedName(): string {
-        return this.nameValue().trim() || this.imported()?.source.name || 'the new stream';
+        // A template's id is not a name suggestion — the operator names the copy.
+        return this.nameValue().trim() || (this.fromTemplate() ? '' : this.imported()?.source.name) || 'the new stream';
+    }
+
+    /** The write plan for the loaded bundle — a template's copy also sheds the template's own stamps. */
+    private planFor(bundle: StreamBundle, name: string): StreamImportPlan {
+        const tpl = this.fromTemplate();
+        return tpl
+            ? planTemplateCopy(bundle, { name, label: tpl.label, missing: tpl.missing })
+            : planStreamImport(bundle, { name });
     }
 
     readonly form = this.fb.group({
@@ -282,6 +363,41 @@ export class OnboardingCreateDialog {
         });
     }
 
+    /** Show / hide the template gallery; the list is read once, on first open. */
+    toggleTemplates(): void {
+        this.templatesOpen.set(!this.templatesOpen());
+        if (!this.templatesOpen() || this.templates()) return;
+        this.pipelinesApi.list().subscribe({
+            next: (rows) => this.templates.set(rows.filter((r) => r.template === true)),
+            error: (e) => {
+                this.templatesOpen.set(false);
+                this.toastr.error(apiErrorMessage(e, 'Could not load the pipeline templates.'));
+            },
+        });
+    }
+
+    /** Read a template off this server into the Import preview. Nothing is written here. */
+    chooseTemplate(t: PipelineSummary): void {
+        this.picking.set(t.name);
+        this.transfer.exportPipeline(t.name).subscribe({
+            next: ({ bundle, missing }) => {
+                this.picking.set(null);
+                this.importErrors.set([]);
+                this.fromTemplate.set({ label: t.displayName ?? t.name, missing });
+                this.imported.set(bundle);
+                this.kind.set(bundle.kind); // the template's own kind, locked — the same rule as a file
+                this.templatesOpen.set(false);
+                const desc = bundle.pipeline['description'];
+                if (typeof desc === 'string' && desc && !this.form.controls.description.value)
+                    this.form.controls.description.setValue(desc);
+            },
+            error: (e) => {
+                this.picking.set(null);
+                this.toastr.error(apiErrorMessage(e, 'Could not read that template.'));
+            },
+        });
+    }
+
     /** Read + validate a picked file. Nothing is written here — this only loads the preview. */
     onFilePicked(event: Event): void {
         const input = event.target as HTMLInputElement;
@@ -289,6 +405,7 @@ export class OnboardingCreateDialog {
         input.value = ''; // allow re-picking the same file after a failed parse
         if (!file) return;
         this.imported.set(null);
+        this.fromTemplate.set(null);
         this.importErrors.set([]);
         file.text().then(
             (text) => {
@@ -375,7 +492,7 @@ export class OnboardingCreateDialog {
         if (!bundle) return;
         const v = this.form.getRawValue();
         const name = String(v.name ?? '').trim();
-        const plan = planStreamImport(bundle, { name });
+        const plan = this.planFor(bundle, name);
 
         // The Advanced fields still win if the operator touched them — same contract as a fresh create.
         const dirs = plan.pipeline['dirs'] as Record<string, string>;
@@ -395,10 +512,11 @@ export class OnboardingCreateDialog {
                         : null,
                     plan.enrichment ? 'enrichment' : null,
                 ].filter(Boolean);
+                const verb = this.fromTemplate() ? 'Created' : 'Imported';
                 this.toastr.success(
                     extras.length
-                        ? `Imported "${name}" with ${extras.join(', ')} — review the stages, then go live.`
-                        : `Imported "${name}" — review the stages, then go live.`,
+                        ? `${verb} "${name}" with ${extras.join(', ')} — review the stages, then go live.`
+                        : `${verb} "${name}" — review the stages, then go live.`,
                 );
                 // Same rule as a fresh create: redirect by the identity, not the display name. An
                 // imported bundle may carry its own `id:`, which is why this reads the plan's config.
