@@ -153,4 +153,10 @@ public final class FindingCodes {
      *  markers + duplicate_check, windowed {@code transform.dedup}, a job's {@code incremental_column}) saved
      *  into a Space whose effective Safety Policy has {@code permit.advance_state: false} (policy-narrowing D9). */
     public static final String ERR_SAFETY_STATE_ADVANCE_REFUSED = "ERR_SAFETY_STATE_ADVANCE_REFUSED";
+
+    /** A {@code sql} Step's {@code fields[]} row carrying column metadata ({@code description}/{@code unit}/
+     *  {@code classification}/{@code synonym}) that is not a plain string, or that names no distinct output
+     *  column (blank or duplicate {@code name}) — the Catalog and the masking lineage read it
+     *  ({@code AUTHORING-REDESIGN-1} (e)). Always ERROR: a classification nothing can attach is a silent loss. */
+    public static final String ERR_STEP_COLUMN_METADATA_INVALID = "ERR_STEP_COLUMN_METADATA_INVALID";
 }

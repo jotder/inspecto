@@ -126,6 +126,7 @@ export const NODE_KIND_COLORS: Record<NodeKind, string> = {
     STREAM: '#5B8FF9',
     SCHEMA: '#61DDAA',
     RAW_SCHEMA: '#61DDAA',
+    STEP: '#3BA272',
     TABLE: '#65789B',
     COLUMN: '#F6BD16',
     DERIVED_TABLE: '#1E9493',

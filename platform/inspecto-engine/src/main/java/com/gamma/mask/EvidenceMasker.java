@@ -195,7 +195,9 @@ public final class EvidenceMasker {
      * it takes the STRICTEST class ({@link ColumnClassification}, operator 2026-10-04). Fails closed to
      * {@link #UNKNOWN_LINEAGE} when a matching pipeline cannot be loaded, its mapping cannot be read, or it has a
      * step that rewrites the columns (summarize, sql, lookup, join, route) while a raw column is classified. A store
-     * no pipeline claims (a Job output, a sidecar) contributes nothing.
+     * no pipeline claims (a Job output, a sidecar) contributes nothing. A {@code sql} Step's own
+     * {@code fields[].classification} (AUTHORING-REDESIGN-1 (e)) is merged in ADDITIVELY: it classifies the
+     * output column it names and never clears the fail-closed marker.
      */
     public static Map<String, String> schemaClassification(Path configRoot, Set<String> stores, Predicate<String> masked) {
         Map<String, String> out = new java.util.TreeMap<>();
@@ -203,6 +205,13 @@ public final class EvidenceMasker {
             int slash = store.indexOf('/');
             PipelineSchemas.Found f = PipelineSchemas.forStore(configRoot, slash < 0 ? store : store.substring(0, slash));
             if (f.unreadable()) out.put(UNKNOWN_LINEAGE, "UNKNOWN");
+            // AUTHORING-REDESIGN-1 (e), operator 2026-10-11 (B) ADDITIVE ONLY: a sql Step's own column
+            // classification is merged in, strictest wins. It can only ever mask MORE - it never clears
+            // UNKNOWN_LINEAGE, which the raw-schema pass below still sets for a reshaped pipeline.
+            for (com.gamma.catalog.SchemaProjection.Column c : f.stepColumns()) {
+                String cl = ColumnClassification.normalise(c.classification());
+                if (cl != null && masked.test(cl)) put(out, c.name().trim().toLowerCase(Locale.ROOT), cl, masked);
+            }
             for (PipelineSchemas.Entry e : f.entries()) {
                 Map<String, String> sensitiveRaw = new java.util.LinkedHashMap<>();
                 if (e.schema().get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fields)

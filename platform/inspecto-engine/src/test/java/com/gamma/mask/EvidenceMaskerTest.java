@@ -113,6 +113,47 @@ class EvidenceMaskerTest {
         assertTrue(String.valueOf(m.mask("cust", "plan", "gold")).startsWith("masked:"), "even an unrelated column");
     }
 
+    // ── AUTHORING-REDESIGN-1 (e), operator 2026-10-11 (B): a sql Step's column classification is ADDITIVE only ──
+
+    /** A sql Step after the mapping whose fields[] row {@code label} carries {@code stepClass}. */
+    static String sqlStep(String stepClass) {
+        return "steps[1]:\n  - sql:\n      sql: \"SELECT m AS m, plan AS label FROM input\"\n      fields[2]:\n"
+                + "        - name: m\n          from: m\n          fn: keep\n"
+                + "        - name: label\n          from: plan\n          fn: keep\n          classification: " + stepClass + "\n";
+    }
+
+    /** {@link #custMasker} with a sql Step, kept INACTIVE: an active steps: chain needs an output_store to load. */
+    private static EvidenceMasker stepMasker(Path config, String rawClass, String stepClass) throws Exception {
+        custMasker(config, rawClass, sqlStep(stepClass));
+        Path pipe = config.resolve("cust/cust_pipeline.toon");
+        Files.writeString(pipe, Files.readString(pipe).replace("active: true", "active: false"));
+        return EvidenceMasker.of(new ComponentStore(config.resolve("registry")), config, List.of("cust"));
+    }
+
+    @Test
+    void aStepClassifiedColumnIsMaskedExactlyLikeASchemaClassifiedOne(@TempDir Path space) throws Exception {
+        EvidenceMasker m = stepMasker(Files.createDirectories(space.resolve("config")), "", "pii");
+        assertTrue(String.valueOf(m.mask("cust", "label", "gold")).startsWith("masked:"), "the Step says label is PII");
+        assertEquals("9198", m.mask("cust", "m", "9198"), "an unclassified Step column stays raw");
+        assertEquals(List.of("cust.label"), m.maskedColumns());
+    }
+
+    @Test
+    void aStepClassificationNeverClearsTheFailClosedRule(@TempDir Path space) throws Exception {
+        // raw MSISDN classified + a sql Step that rewrites the columns ⇒ UNKNOWN lineage, everything masked —
+        // the Step's own (unclassified m, PII label) declaration must not unmask anything.
+        EvidenceMasker m = stepMasker(Files.createDirectories(space.resolve("config")), "MSISDN", "pii");
+        assertTrue(String.valueOf(m.mask("cust", "m", "9198")).startsWith("masked:"), "m stays masked");
+        assertTrue(String.valueOf(m.mask("cust", "plan", "gold")).startsWith("masked:"), "even an unrelated column");
+    }
+
+    @Test
+    void aNonSensitiveStepClassificationMasksNothing(@TempDir Path space) throws Exception {
+        EvidenceMasker m = stepMasker(Files.createDirectories(space.resolve("config")), "", "internal");
+        assertEquals("gold", m.mask("cust", "label", "gold"));
+        assertEquals(List.of(), m.maskedColumns());
+    }
+
     // ── strictest wins (operator 2026-10-04): several classified inputs feed one computed column ──
 
     /** A pipeline "subs" with raw IMSI (class IMSI), MSISDN (class MSISDN) and PLAN, and one mapping rule

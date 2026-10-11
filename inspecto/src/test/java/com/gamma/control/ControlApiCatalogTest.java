@@ -51,6 +51,40 @@ class ControlApiCatalogTest {
         return client.send(b.method("GET", BodyPublishers.noBody()).build(), BodyHandlers.ofString());
     }
 
+    /** AUTHORING-REDESIGN-1 (e): a sql Step's fields[] metadata is read back over HTTP as a STEP node + columns. */
+    @Test
+    void aSqlStepsDescribedColumnsAreReadableOverHttp(@TempDir Path dir) throws Exception {
+        Path pipe = PipelineConfigBatchTest.writePipeline(dir, """
+                steps[1]:
+                  - sql:
+                      sql: "SELECT ID AS REF FROM input"
+                      fields[1]:
+                        - name: REF
+                          from: ID
+                          fn: keep
+                          description: Booking reference
+                          classification: PII
+                """, false);
+        CollectorService svc = new CollectorService(List.of(pipe), List.of(), List.of(), List.of(), 3600, 1, null);
+        ControlApi api = new ControlApi(svc, 0);
+        api.start();
+        try (Ctx c = new Ctx(svc, api, api.port())) {
+            HttpResponse<String> r = get(c.port, "/catalog/graph?from=step:mini_etl/step1&depth=1&direction=both");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode g = V1Body.of(r.body());
+            JsonNode col = null, step = null;
+            for (JsonNode n : g.get("nodes")) {
+                if ("col:mini_etl/step1/REF".equals(n.get("id").asText())) col = n;
+                if ("step:mini_etl/step1".equals(n.get("id").asText())) step = n;
+            }
+            assertNotNull(step, g.toString());
+            assertEquals("STEP", step.get("kind").asText());
+            assertNotNull(col, "the Step's column is a neighbour: " + g);
+            assertEquals("PII", col.get("attrs").get("classification").asText());
+            assertTrue(col.toString().contains("Booking reference"), col.toString());
+        }
+    }
+
     @Test
     void catalogListsEmittedTables(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

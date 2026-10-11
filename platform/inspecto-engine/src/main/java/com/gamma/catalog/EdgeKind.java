@@ -10,11 +10,11 @@ package com.gamma.catalog;
 public enum EdgeKind {
     /** SOURCE → TABLE: the source emits this partitioned event table. */
     EMITS,
-    /** SOURCE → RAW_SCHEMA: the source declares this input schema. */
+    /** SOURCE → RAW_SCHEMA (or → STEP): the source declares this input schema / column-describing Step. */
     DECLARES,
-    /** RAW_SCHEMA → COLUMN: the schema describes this column. */
+    /** RAW_SCHEMA (or STEP) → COLUMN: the schema / sql Step describes this column. */
     DESCRIBES,
-    /** RAW_SCHEMA → TABLE: the raw schema is partitioned/materialized into this event table. */
+    /** RAW_SCHEMA (or the last sql STEP) → TABLE: materialized into this event table. */
     MATERIALIZES,
     /** TABLE → DERIVED_TABLE (or DERIVED → DERIVED): data lineage / feeds. */
     FEEDS,

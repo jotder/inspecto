@@ -203,7 +203,7 @@ edge.
 
 | Vocabulary | Values |
 |---|---|
-| `NodeKind` (11) | ETL half — `STREAM · RAW_SCHEMA · COLUMN · TABLE · DERIVED_TABLE · REFERENCE_DATASET`; semantic — `KPI · REPORT`; Studio BI — `DATASET · WIDGET · DASHBOARD` (⚠ this row read "(7)" and omitted `REPORT` until 2026-09-13) |
+| `NodeKind` (12) | ETL half — `STREAM · RAW_SCHEMA · STEP · COLUMN · TABLE · DERIVED_TABLE · REFERENCE_DATASET` (`STEP` = a `sql` Step describing its output columns, 2026-10-11, [schema-mapping-authoring §0](../../frontend/features/schema-mapping-authoring.md)); semantic — `KPI · REPORT`; Studio BI — `DATASET · WIDGET · DASHBOARD` (⚠ this row read "(7)" and omitted `REPORT` until 2026-09-13) |
 | `EdgeKind` (9, the P2 lineage plane) | `EMITS · DECLARES · DESCRIBES · MATERIALIZES · FEEDS · JOINS_INTO · COMPUTED_FROM · CONSUMES · BINDS_TO` |
 | `IdScheme` tokens | `stream:` · `schema:` · `event:` · `col:` · `xform:` · `ref:<enrich>/<ref>` · `ref:<pipeline>` (a produced Reference) · `kpi:` · `report:` · `dataset:` · `widget:` · `dashboard:` |
 
@@ -316,8 +316,8 @@ spellings are now styled identically, pinned by a spec so a palette de-duplicati
 One G6 `GraphViewComponent` renders every plane.
 
 **Node styling — `colour names the layer, shape names the structural role`** (operator decision
-2026-09-14, `CATALOG-KIND-STYLING-1`). All eleven wire kinds now carry a colour, a shape and a GLOSSARY
-label: `DERIVED_TABLE` displays as **Matrix**, `REFERENCE_DATASET` as **Reference Dataset**, and the
+2026-09-14, `CATALOG-KIND-STYLING-1`). All twelve wire kinds now carry a colour, a shape and a GLOSSARY
+label (`STEP`, added 2026-10-11, is a green triangle labelled **Step**): `DERIVED_TABLE` displays as **Matrix**, `REFERENCE_DATASET` as **Reference Dataset**, and the
 three Studio BI kinds (`DATASET` / `WIDGET` / `DASHBOARD`) share one magenta family separated by shape
 (rect / hexagon / star), so the BI layer reads as a layer. ⛔ `ENRICHMENT` is left **deliberately
 unlabelled** — GLOSSARY §5 D-4 retires the user-facing term ("author no new user-facing 'Enrichment'

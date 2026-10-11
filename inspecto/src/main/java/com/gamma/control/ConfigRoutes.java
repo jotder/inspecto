@@ -430,6 +430,67 @@ final class ConfigRoutes {
         return out;
     }
 
+    /** The column metadata a {@code sql} Step's {@code fields[]} row may carry — exactly a schema field's. */
+    static final List<String> STEP_COLUMN_METADATA = List.of("description", "unit", "classification", "synonym");
+
+    /**
+     * {@code AUTHORING-REDESIGN-1} (e): a {@code sql} Step's {@code fields[]} rows may carry the schema's column
+     * metadata ({@link #STEP_COLUMN_METADATA}). The Catalog projects it and the masking lineage merges its
+     * classification, so it is judged here: every value must be a plain string, and a row carrying any must
+     * name a distinct output column ({@code fields[].name} IS the output column — the grid generates the
+     * SELECT from the rows). Always ERROR, active or not. Walks route-branch sub-chains too.
+     */
+    static List<Finding> stepColumnMetadataFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type) || !(draft.get("steps") instanceof List<?> steps)) return List.of();
+        List<Finding> out = new ArrayList<>();
+        walkStepColumnMetadata(steps, "steps", out);
+        return out;
+    }
+
+    private static void walkStepColumnMetadata(List<?> steps, String prefix, List<Finding> out) {
+        for (int i = 0; i < steps.size(); i++) {
+            if (!(steps.get(i) instanceof Map<?, ?> entry) || entry.size() != 1) continue;
+            String kind = String.valueOf(entry.keySet().iterator().next());
+            if (!(entry.values().iterator().next() instanceof Map<?, ?> cfg)) continue;
+            String at = prefix + "[" + i + "]." + kind;
+            if (cfg.get("branches") instanceof List<?> branches)
+                for (int b = 0; b < branches.size(); b++)
+                    if (branches.get(b) instanceof Map<?, ?> br && br.get("steps") instanceof List<?> sub)
+                        walkStepColumnMetadata(sub, at + ".branches[" + b + "].steps", out);
+            if (!PipelineConfig.Step.SQL.equals(kind) || !(cfg.get("fields") instanceof List<?> rows)) continue;
+            Map<String, Integer> names = new java.util.HashMap<>();
+            for (Object o : rows)
+                if (o instanceof Map<?, ?> r && r.get("name") != null && !String.valueOf(r.get("name")).isBlank())
+                    names.merge(String.valueOf(r.get("name")).trim().toUpperCase(java.util.Locale.ROOT), 1, Integer::sum);
+            for (int f = 0; f < rows.size(); f++) {
+                if (!(rows.get(f) instanceof Map<?, ?> row)) continue;
+                String field = at + ".fields[" + f + "]";
+                boolean carries = false;
+                for (String key : STEP_COLUMN_METADATA) {
+                    Object v = row.get(key);
+                    if (v == null) continue;
+                    carries = true;
+                    if (v instanceof Map<?, ?> || v instanceof List<?>)
+                        out.add(metadataFinding(field + "." + key, "transform.sql column metadata '" + key
+                                + "' must be a plain string, not " + (v instanceof Map<?, ?> ? "a map" : "a list")));
+                }
+                if (!carries) continue;
+                String name = row.get("name") == null ? "" : String.valueOf(row.get("name")).trim();
+                if (name.isEmpty())
+                    out.add(metadataFinding(field + ".name",
+                            "transform.sql column metadata on a row with no output column name - it describes no column"));
+                else if (names.getOrDefault(name.toUpperCase(java.util.Locale.ROOT), 0) > 1)
+                    out.add(metadataFinding(field + ".name", "transform.sql column metadata on '" + name
+                            + "', which more than one row outputs - it cannot name one column"));
+            }
+        }
+    }
+
+    private static Finding metadataFinding(String field, String message) {
+        return new Finding(Severity.ERROR, field, message, FindingCodes.ERR_STEP_COLUMN_METADATA_INVALID,
+                "Give the row a unique output column name and plain-text metadata, or remove the metadata.");
+    }
+
     /**
      * Adds the schema's {@code mapping.fields[]} output names to the raw columns: the steps see the MAPPED
      * row, so a derived column (a {@code custom} expression such as the shipped filter_step's {@code GROSS})

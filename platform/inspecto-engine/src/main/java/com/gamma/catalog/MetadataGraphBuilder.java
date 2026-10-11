@@ -83,6 +83,7 @@ final class MetadataGraphBuilder {
 
             for (PipelineSchemas.Entry e : PipelineSchemas.entries(cfg))
                 addSchemaAndEvent(originId, pipeline, e.key(), e.schema(), e.table(), dbRoot, outFormat, nodes, edges);
+            addStepOutputs(originId, pipeline, cfg, nodes, edges);
         }
 
         // ── grouped Stream membership (P4): stamp members[] only where a Stream groups >1 pipeline,
@@ -407,6 +408,40 @@ final class MetadataGraphBuilder {
                 Description.EMPTY, evAttrs));
         edges.add(new MetadataEdge(sourceId, eventId, EdgeKind.EMITS));
         edges.add(new MetadataEdge(schemaId, eventId, EdgeKind.MATERIALIZES));
+    }
+
+    /**
+     * {@code AUTHORING-REDESIGN-1} (e): a {@link NodeKind#STEP} per {@code sql} Step whose {@code fields[]} declare
+     * output columns ({@code origin -DECLARES-> step}), its columns as {@link NodeKind#COLUMN} children
+     * ({@code DESCRIBES}) carrying the same attrs a schema column does minus {@code type} (not known statically),
+     * and {@code MATERIALIZES} from the LAST such Step to the pipeline's event tables — its columns are what lands.
+     */
+    private static void addStepOutputs(String originId, String pipeline, PipelineConfig cfg,
+                                       Map<String, MetadataNode> nodes, List<MetadataEdge> edges) {
+        List<PipelineSchemas.StepOutput> outs = PipelineSchemas.stepOutputs(cfg);
+        for (int i = 0; i < outs.size(); i++) {
+            PipelineSchemas.StepOutput so = outs.get(i);
+            String stepId = IdScheme.step(pipeline, so.key());
+            Map<String, Object> attrs = new LinkedHashMap<>();
+            attrs.put("source", pipeline);
+            attrs.put("kind", PipelineConfig.Step.SQL);
+            attrs.put("index", i + 1);
+            nodes.put(stepId, new MetadataNode(stepId, NodeKind.STEP, "sql #" + (i + 1), Description.EMPTY, attrs));
+            edges.add(new MetadataEdge(originId, stepId, EdgeKind.DECLARES));
+            for (SchemaProjection.Column c : so.columns()) {
+                String colId = IdScheme.column(pipeline, so.key(), c.name());
+                Map<String, Object> cattrs = new LinkedHashMap<>();
+                if (!c.unit().isBlank()) cattrs.put("unit", c.unit());
+                if (!c.classification().isBlank()) cattrs.put("classification", c.classification());
+                if (!c.synonym().isBlank()) cattrs.put("synonym", c.synonym());
+                nodes.put(colId, new MetadataNode(colId, NodeKind.COLUMN, c.name(), c.description(), cattrs));
+                edges.add(new MetadataEdge(stepId, colId, EdgeKind.DESCRIBES));
+            }
+            if (i == outs.size() - 1)
+                for (MetadataNode n : List.copyOf(nodes.values()))
+                    if (n.kind() == NodeKind.TABLE && pipeline.equals(n.attrs().get("source")))
+                        edges.add(new MetadataEdge(stepId, n.id(), EdgeKind.MATERIALIZES));
+        }
     }
 
     private static boolean linkSourceEvents(String pipeline, String xid,

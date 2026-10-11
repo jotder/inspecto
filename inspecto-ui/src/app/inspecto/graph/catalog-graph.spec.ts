@@ -78,6 +78,7 @@ describe('nodeKindLabel', () => {
         expect(nodeKindLabel('REFERENCE_DATASET')).toBe('Reference Dataset');
         expect(nodeKindLabel('RAW_SCHEMA')).toBe('Schema');
         expect(nodeKindLabel('DASHBOARD')).toBe('Dashboard');
+        expect(nodeKindLabel('STEP')).toBe('Step');
     });
 
     // KPI is the single kind whose canonical GLOSSARY term IS its enum token, so it is the only
@@ -100,6 +101,16 @@ describe('toG6Data', () => {
     it('carries id/label/kind into node data', () => {
         const { nodes } = toG6Data([node('t1', 'TABLE', 'Orders')], []);
         expect(nodes).toEqual([{ id: 't1', data: { label: 'Orders', kind: 'TABLE' } }]);
+    });
+
+    // AUTHORING-REDESIGN-1 (e): the backend now emits a STEP kind; it must render styled, not as a fallback.
+    it('renders a STEP node and its described column with their own shape, colour and label', () => {
+        const nodes = [node('step:p/step1', 'STEP', 'sql #1'), node('col:p/step1/REF', 'COLUMN', 'REF')];
+        const g = toG6Data(nodes, [edge('step:p/step1', 'col:p/step1/REF', 'DESCRIBES')]);
+        expect(g.nodes[0].data).toEqual({ label: 'sql #1', kind: 'STEP' });
+        expect(nodeShape('STEP')).toBe('triangle');
+        expect(nodeColor('STEP')).not.toBe(NODE_KIND_FALLBACK);
+        expect(legendFor(nodes).map((l) => l.label)).toEqual(['Step', 'Column']);
     });
 
     it('maps from/to to source/target and keeps the edge kind', () => {

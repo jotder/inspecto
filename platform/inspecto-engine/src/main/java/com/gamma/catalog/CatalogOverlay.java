@@ -55,7 +55,7 @@ public final class CatalogOverlay implements MetadataGraphService.OverlaySource 
     public OperationalOverlay overlayFor(MetadataNode node) {
         if (node == null) return OperationalOverlay.NONE;
         return switch (node.kind()) {
-            case STREAM, RAW_SCHEMA, TABLE, COLUMN -> stage1(node);
+            case STREAM, RAW_SCHEMA, STEP, TABLE, COLUMN -> stage1(node);
             case DERIVED_TABLE -> stage2(node);
             case REFERENCE_DATASET, KPI, REPORT, DATASET, WIDGET, DASHBOARD -> OperationalOverlay.NONE;
         };

@@ -13,11 +13,14 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
 import { SqlCodemirrorComponent } from 'app/inspecto/data-table/sql/sql-codemirror.component';
 import {
     CompiledField,
+    FIELD_METADATA_KEYS,
+    FieldMetadataKey,
     SqlField,
     applyFunction,
     compileFields,
@@ -103,6 +106,7 @@ export interface FieldRow extends CompiledField {
 })
 export class PipelineTransformSqlDefinitionComponent {
     private components = inject(ComponentsService);
+    private readonly confirm = inject(InspectoConfirmService);
 
     readonly node = input.required<AuthoredNode>();
     /** The rows the tab's sample thread parsed — seeds a NEW step and feeds "Try it on the sample". */
@@ -505,6 +509,51 @@ export class PipelineTransformSqlDefinitionComponent {
         this.patch(id, (f) => applyFunction(f, fnId));
     }
 
+    // ── column metadata (AUTHORING-REDESIGN-1 (e)) ───────────────────────────────────────────────────
+
+    /** The row whose metadata editor is open, or `null`. One at a time keeps a 600-row grid scannable. */
+    readonly describing = signal<string | null>(null);
+
+    /**
+     * Metadata is offered only on a CHAIN Step: there the Catalog reads it. The projection slot compiles
+     * `fields[]` into `processing.map`, which has no home for it — it would be stored and never read.
+     */
+    readonly canDescribe = computed(() => !isProjectionSlot(this.node()));
+
+    readonly metadataKeys = FIELD_METADATA_KEYS;
+
+    metadataLabel(key: FieldMetadataKey): string {
+        return { description: 'Description', unit: 'Unit', classification: 'Classification', synonym: 'Synonym' }[key];
+    }
+
+    metadataPlaceholder(key: FieldMetadataKey): string {
+        return {
+            description: 'What this column means',
+            unit: 'e.g. seconds',
+            classification: 'e.g. PII',
+            synonym: 'Alias',
+        }[key];
+    }
+
+    toggleDescribe(id: string): void {
+        this.describing.update((open) => (open === id ? null : id));
+    }
+
+    /** Whether a row carries any metadata — drives the Describe button's "described" state. */
+    isDescribed(field: SqlField): boolean {
+        return FIELD_METADATA_KEYS.some((k) => !!field[k]?.trim());
+    }
+
+    /** Set one metadata value; a blank value removes the key, so an emptied row persists as undescribed. */
+    setMetadata(id: string, key: FieldMetadataKey, value: string): void {
+        this.patch(id, (f) => {
+            const next: SqlField = { ...f };
+            if (value.trim()) next[key] = value;
+            else delete next[key];
+            return next;
+        });
+    }
+
     setArg(id: string, param: string, value: string): void {
         this.patch(id, (f) => ({ ...f, args: { ...f.args, [param]: value } }));
     }
@@ -649,8 +698,33 @@ export class PipelineTransformSqlDefinitionComponent {
             });
     }
 
+    /**
+     * Apply. From the SQL view the Step is saved as `fields: []` (see {@link apply}), which drops every row's
+     * column metadata — so when any row is described the author confirms first, and Cancel leaves the grid and
+     * the SQL exactly as they were (AUTHORING-REDESIGN-1 (e)).
+     */
     submit(): void {
         if (!this.canApply()) return;
+        const described = this.view() === 'sql' ? this.fields().filter((f) => this.isDescribed(f)).length : 0;
+        if (!described) {
+            this.apply();
+            return;
+        }
+        const columns = described === 1 ? '1 described column' : `${described} described columns`;
+        void this.confirm
+            .confirmDestructive(
+                `Applying from the SQL view saves this Step as SQL only, so ${columns} will lose their ` +
+                    'description, unit, classification and synonym. A classification also masks its column ' +
+                    'wherever this data is published or used as evidence, so dropping it removes that masking. ' +
+                    'Switch back to Fields to keep them.',
+                { title: 'Drop column metadata?', confirmText: 'Apply and drop' },
+            )
+            .then((ok) => {
+                if (ok) this.apply();
+            });
+    }
+
+    private apply(): void {
         const n = this.node();
         // `fields` is the authoring artifact; `sql` is what the engine reads. Rows are persisted only
         // when they were authored: a Step applied from the SQL view writes `fields: []` and reopens as

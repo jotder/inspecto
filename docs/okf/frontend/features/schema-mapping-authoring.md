@@ -136,18 +136,40 @@ catalog and by persisting `fields[]`.
   SELECT and hand the sink two columns of the same name.
 - **Row order is the output order** — ▲/▼ per row reorder `fields[]`, and `generateSql` emits in that
   order.
-- **Not built, on purpose:** the "Describe the fields" metadata section (description · unit ·
-  sensitivity) — the backend does not carry column metadata on a `transform.sql` node; until it lands
-  (BACKLOG (e)), metadata rides through the Parse pane's by-selector carry-through
-  ([grammar-config.md](grammar-config.md)). ⚠ **Re-grounded 2026-09-24: the missing half is the
-  READER, not the store.** Storing it is trivial — `fields[]` already rides the `steps:` chain opaquely
-  (`sql: {sql, fields}`), so a `description`/`unit`/`classification` per row would round-trip today. But
-  nothing would read it: the catalog's column metadata comes ONLY from a schema's `raw.fields[]`
-  (`SchemaProjection.columns` ← `MetadataGraphBuilder`, per pipeline schema), and the metadata graph has
-  no node for a Stage-2 Step's output columns at all (its Stage-2 nodes are enrichments, with no column
-  children). A node attribute + contract entry without that projection would be a written-never-read key,
-  so (e) is not a contained change: it needs a decision on WHERE a Step's output metadata surfaces (the
-  output store's Dataset columns?) and the catalog projection for it.
+- **Column metadata (AUTHORING-REDESIGN-1 (e), BUILT 2026-10-11).** Each row of a CHAIN Step's grid has a
+  **Describe** toggle (`aria-expanded`, one row open at a time) with the schema field's four keys —
+  description · unit · classification · synonym — and nothing else. Durable facts:
+  - **Stored on the `fields[]` row** (`SqlField.description?/unit?/classification?/synonym?`), so a rename
+    carries it and a removed row takes it along; a blanked value deletes the key. `fields[].name` is the
+    authoritative output column (the grid generates the SELECT). A Step applied from the **SQL view** writes
+    `fields: []`, so it carries no metadata, and neither does a raw-SQL Step — when any row is described,
+    that Apply first asks (`InspectoConfirmService.confirmDestructive`, "Drop column metadata?", naming the
+    count and the masking loss); Cancel leaves the grid and the SQL untouched.
+  - ⛔ **Not offered in the projection slot** (`isProjectionSlot`): its `fields[]` compile into
+    `processing.map`, which the Catalog never reads, so the metadata would be dead config.
+  - **Save gate:** `ConfigRoutes.stepColumnMetadataFindings` (via `SaveGate`, so `/config/write`, patch and
+    the graph PUT) refuses with **`ERR_STEP_COLUMN_METADATA_INVALID`**, always ERROR, when a value is a map or
+    list, or when a row carrying metadata has a blank name or a name another row also outputs
+    (case-insensitive). Route-branch sub-chains are walked too. Proof: `ControlApiStepColumnMetadataTest`.
+    The classification vocabulary is the schema's: free text, normalised upper-case.
+  - **The reader — Catalog:** `PipelineSchemas.stepOutputs` → `MetadataGraphBuilder.addStepOutputs` adds a
+    **`NodeKind.STEP`** node `step:<pipeline>/step<n>` (n counts `sql` Steps with `fields[]`, depth first,
+    branches included; label `sql #n`), `origin -DECLARES-> step`, `step -DESCRIBES-> col:<pipeline>/step<n>/<NAME>`
+    (same attrs as a schema column, minus `type`, which is not known statically), and `MATERIALIZES` from the
+    LAST such Step to the pipeline's event tables. `CatalogOverlay` treats STEP as stage 1. UI: shape
+    `triangle`, colour token `STEP`, label "Step" (`catalog-graph.ts`, `CATALOG_NODE_KINDS`). Proof:
+    `MetadataGraphServiceTest`, `ControlApiCatalogTest.aSqlStepsDescribedColumnsAreReadableOverHttp`,
+    `catalog-graph.spec.ts`.
+  - **The reader — masking (operator decision 2026-10-11, option B, ADDITIVE ONLY):** a Step column's
+    sensitive classification is merged into `EvidenceMasker.schemaClassification` strictest-wins — the one
+    resolver evidence masking, `publish.postgres`, publication approval, `transform.mask` and Link Analysis
+    share. ⛔ It never clears `UNKNOWN_LINEAGE`: a `sql` Step plus a classified raw column still fails
+    closed. Proof: `EvidenceMaskerTest`, `PostgresPublishJobTest` (Step-classified column dropped; stripping it
+    breaks the approval; fail-closed unchanged). ⚠ The lineage reader loads pipelines with
+    `loadForValidation`, so an ACTIVE `steps:` pipeline without `output_store:` (which does not load) still
+    reads as unreadable → fail closed.
+  - **Not built:** option (C) — the Step's declaration REPLACING the fail-closed rule (it would let an
+    omission unmask a column); see BACKLOG `AUTHORING-REDESIGN-1` (e).
 - **"Sample resolves to"** (AUTHORING-REDESIGN-1 (i)) shipped on the **Parse** pane's property rows, not
   this grid — the grid's own **Sample** column already shows each row's value from a Test run. See
   [grammar-config.md](grammar-config.md) § *The sectioned Parse pane*.

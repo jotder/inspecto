@@ -37,9 +37,53 @@ public final class PipelineSchemas {
      * @param entries    the schemas of every matching pipeline
      * @param reshaped   a matching pipeline has a step that rewrites the column set (summarize, sql, lookup, join, route, running, explode, unpivot)
      * @param unreadable a pipeline that may be this origin's could not be loaded, so its schema is unknown
+     * @param stepColumns the output columns every matching pipeline's {@code sql} Steps describe ({@link #stepOutputs})
      */
-    public record Found(List<Entry> entries, boolean reshaped, boolean unreadable) {
+    public record Found(List<Entry> entries, boolean reshaped, boolean unreadable, List<SchemaProjection.Column> stepColumns) {
+        public Found(List<Entry> entries, boolean reshaped, boolean unreadable) {
+            this(entries, reshaped, unreadable, List.of());
+        }
         public boolean matched() { return !entries.isEmpty() || unreadable; }
+    }
+
+    /**
+     * One {@code sql} Step that describes its output columns ({@code AUTHORING-REDESIGN-1} (e)).
+     *
+     * @param key     the Step's Catalog key, {@code step<n>} — n counts {@code sql} Steps 1-based, depth first,
+     *                route-branch sub-chains included
+     * @param columns its {@code fields[]} rows projected exactly like a schema's {@code raw.fields[]}
+     *                ({@link SchemaProjection#columns}); {@code type} is always blank — a Step's types are not
+     *                known statically
+     */
+    public record StepOutput(String key, List<SchemaProjection.Column> columns) {}
+
+    /**
+     * The {@code sql} Steps of {@code cfg} whose {@code fields[]} declare output columns, in chain order. A Step
+     * authored as raw SQL (no {@code fields[]}) has no static output columns and is absent.
+     */
+    public static List<StepOutput> stepOutputs(PipelineConfig cfg) {
+        List<StepOutput> out = new ArrayList<>();
+        walkSteps(cfg.steps(), out);
+        return out;
+    }
+
+    private static void walkSteps(List<PipelineConfig.Step> steps, List<StepOutput> out) {
+        for (PipelineConfig.Step st : steps) {
+            if (PipelineConfig.Step.SQL.equals(st.kind()) && st.config().get("fields") instanceof List<?> rows) {
+                List<Object> typeless = new ArrayList<>();
+                for (Object o : rows) {
+                    if (!(o instanceof Map<?, ?> r)) continue;
+                    Map<Object, Object> copy = new java.util.LinkedHashMap<>(r);
+                    copy.remove("type");
+                    typeless.add(copy);
+                }
+                List<SchemaProjection.Column> cols = SchemaProjection.columns(Map.of("raw", Map.of("fields", typeless)));
+                out.add(new StepOutput("step" + (out.size() + 1), cols));
+            }
+            if (PipelineConfig.Step.ROUTE.equals(st.kind()) && st.config().get("branches") instanceof List<?> branches)
+                for (Object b : branches)
+                    if (b instanceof Map<?, ?> bm) walkSteps(PipelineConfig.Step.branchSteps(bm), out);
+        }
     }
 
     /** Step kinds that change which columns the output has; any of them makes column lineage untraceable here. */
@@ -74,6 +118,7 @@ public final class PipelineSchemas {
      */
     public static Found forStore(Path configRoot, String origin) {
         List<Entry> entries = new ArrayList<>();
+        List<SchemaProjection.Column> stepColumns = new ArrayList<>();
         boolean reshaped = false, unreadable = false;
         if (origin == null || origin.isBlank() || configRoot == null || !Files.isDirectory(configRoot))
             return new Found(entries, false, false);
@@ -99,8 +144,9 @@ public final class PipelineSchemas {
             entries.addAll(entries(cfg));
             for (PipelineConfig.Step st : cfg.steps())
                 if (RESHAPING.contains(st.kind())) reshaped = true;
+            for (StepOutput so : stepOutputs(cfg)) stepColumns.addAll(so.columns());
         }
-        return new Found(entries, reshaped, unreadable);
+        return new Found(entries, reshaped, unreadable, List.copyOf(stepColumns));
     }
 
     private static String firstNonBlank(String... vals) {

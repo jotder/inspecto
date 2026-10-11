@@ -51,6 +51,11 @@ public final class IdScheme {
         return "col:" + pipeline + "/" + keyOrTable + "/" + column;
     }
 
+    /** A pipeline {@code sql} Step that describes its output columns; {@code stepKey} is {@code step<n>}. */
+    public static String step(String pipeline, String stepKey) {
+        return "step:" + pipeline + "/" + stepKey;
+    }
+
     public static String xform(String enrichName) {
         return "xform:" + enrichName;
     }
@@ -101,6 +106,7 @@ public final class IdScheme {
             case DATASET -> "dataset";
             case WIDGET -> "widget";
             case DASHBOARD -> "dashboard";
+            case STEP -> "step";
         };
     }
 
