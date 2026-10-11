@@ -228,7 +228,10 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    single-file batch is idempotent).**
 4. `GET /health/details` shows `live.runLease.run` UP on the survivor while the dead holder's lease row is still
    held — nothing surfaces "lease held by an owner that has stopped renewing", so an operator watching only
-   `/health/details` sees no takeover wait.
+   `/health/details` sees no takeover wait. **Fixed 2026-10-11 (`HA-LEASE-HOLDER-HEALTH-1`):** the `detail` of
+   `live.runLease.<scope>` now appends `; held by <owner>: '<pipeline>' (last renewed Ns ago, expires in Ns)` for each
+   unexpired lease another owner holds (max 5). Status stays UP (a held lease is not a fault, and `/ready` is
+   unchanged); a renewal age that keeps growing is the dead-holder signal, and the suffix disappears when it frees.
 
 Filed as backlog rows (2026-10-10): finding 1 `HA-RUNLEASE-DB-CREDENTIALS-1`, finding 2 `HA-GRACEFUL-STOP-LEASE-RELEASE-1`, finding 3 `HA-KILL9-DOUBLE-INGEST-1`, finding 4 `HA-LEASE-HOLDER-HEALTH-1`.
 

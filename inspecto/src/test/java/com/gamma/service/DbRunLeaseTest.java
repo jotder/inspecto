@@ -739,6 +739,47 @@ class DbRunLeaseTest {
         }
     }
 
+    /**
+     * HA-LEASE-HOLDER-HEALTH-1: a survivor surfaces a lease held by an owner that stopped renewing — holder, last
+     * renewal age and time to expiry — while the status stays UP; the suffix is gone once the lease is free.
+     */
+    @Test
+    void aSurvivorSurfacesTheHolderTheRenewalAgeAndTheTimeToExpiry(@TempDir Path dir) throws Exception {
+        assertEquals("; held by pod-a: 'orders' (last renewed 45s ago, expires in 15s)",
+                DbRunLease.describeHolder("orders", "pod-a", 75_000L, 60_000L, 60_000L));
+        String url = urlIn(dir);
+        String space = "holder-" + System.nanoTime();
+        DbRunLease dead = lease(url, space, "pod-dead");
+        RunLease.Claim held = dead.tryAcquire("orders");
+        assertNotNull(held);
+        dead.close();   // heartbeat stops, the claim is NOT released: the row stays held until its TTL
+        try (DbRunLease survivor = lease(url, space, "pod-b")) {
+            long deadline = System.nanoTime() + 5_000_000_000L;
+            String detail = "";
+            while (System.nanoTime() < deadline && !detail.contains("pod-dead")) {
+                var r = com.gamma.util.StoreHealth.liveOf(space).get("runLease.run");
+                detail = r == null ? "" : r.detail();
+                Thread.sleep(50);
+            }
+            assertTrue(detail.contains("held by pod-dead: 'orders' (last renewed "), detail);
+            assertTrue(detail.contains("expires in "), detail);
+            assertEquals(com.gamma.util.StoreHealth.Status.UP,
+                    com.gamma.util.StoreHealth.liveOf(space).get("runLease.run").status());
+            expire(url, space, "orders");
+            awaitDetail(space, "lease database answered");
+        }
+    }
+
+    private static void awaitDetail(String space, String exact) throws InterruptedException {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            var r = com.gamma.util.StoreHealth.liveOf(space).get("runLease.run");
+            if (r != null && exact.equals(r.detail())) return;
+            Thread.sleep(50);
+        }
+        fail("live detail never became '" + exact + "': " + com.gamma.util.StoreHealth.liveOf(space));
+    }
+
     private static void awaitLive(String space, com.gamma.util.StoreHealth.Status want) throws InterruptedException {
         long deadline = System.nanoTime() + 10_000_000_000L;
         while (System.nanoTime() < deadline) {
