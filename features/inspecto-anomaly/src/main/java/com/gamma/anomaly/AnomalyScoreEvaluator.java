@@ -288,7 +288,8 @@ public final class AnomalyScoreEvaluator {
     /**
      * Design section 5: for each entity's TOP feature (largest contribution, not insufficient) that declares
      * {@code evidence} columns, up to {@link #EVIDENCE_PER_ENTITY} origin rows of the scored day. ONE statement per such
-     * feature, read to {@code maxEvidenceRows} (one past it, so truncation is detectable); entities past the cap carry
+     * feature, restricted to the ELEVATED / HIGH entities (band not normal; the key set is bound into the statement, so the
+     * cap is spent only on them), read to {@code maxEvidenceRows} (one past it, so truncation is detectable); entities past the cap carry
      * no evidence and their scores are unaffected. Every value is masked HERE, before anything is stored. Returns
      * whether a read was truncated.
      */
@@ -298,7 +299,7 @@ public final class AnomalyScoreEvaluator {
                                           List<AnomalyScorer.Scored> scored) {
         Map<String, java.util.Set<String>> wanted = new LinkedHashMap<>();   // feature id -> entities it is the top of
         for (AnomalyScorer.Scored s : scored) {
-            if (s.features().isEmpty()) continue;
+            if (s.features().isEmpty() || "normal".equals(s.band())) continue;   // only elevated / high entities
             AnomalyScorer.FeatureResult top = s.features().get(0);
             if (top.insufficient() || !(top.contribution() > 0)) continue;
             wanted.computeIfAbsent(top.feature(), x -> new java.util.HashSet<>()).add(s.entityKey());
@@ -308,7 +309,7 @@ public final class AnomalyScoreEvaluator {
         for (AnomalyModel.Feature f0 : model.features()) {
             java.util.Set<String> entities = wanted.get(f0.id());
             if (f0.evidence().isEmpty() || entities == null) continue;
-            AnomalyModel.Feature f = previewEntity != null ? f0.forEntity(previewEntity) : f0;
+            AnomalyModel.Feature f = previewEntity != null ? f0.forEntity(previewEntity) : f0.forEntities(entities);
             QueryExecutor.Result ev;
             try {
                 MeasureCompiler.Compiled sql = MeasureCompiler.compile(
