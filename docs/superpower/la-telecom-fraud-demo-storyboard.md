@@ -122,6 +122,8 @@ Rules; subscription ring, forwarding chain, payment ring = TOON pattern packs; n
    Set" when entities were only flagged; Draft/fork/template paths validate `expandHubs` less strictly than append.
 5. **Browser smoke** of §2 on the seeded `la-showcase` Space (never driven on screen yet).
 
+**Update 2026-10-11 (end of 2nd shift):** three live browser walk-throughs run; the storyboard now works end to end except UI polish (forwarding-chain time column, hub badge after reopen, reload state, big-graph layout). Status and next steps: backlog row `LA-TELECOM-DEMO-1`.
+
 **Update 2026-10-11 (later):** items 1-4 above are SHIPPED (events weighting, node panel Risk / Enrichment / Case
 history / actions over masked `POST /inv/reference-rows`, hub override + real contact counts, one-step attach,
 telecom pattern packs with pre-filled columns, `GET /objects/by-entity`). What is left is tracked as backlog row
