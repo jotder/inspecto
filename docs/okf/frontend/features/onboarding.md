@@ -44,15 +44,20 @@ draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOS
    Picking one reuses the Duplicate export seam (`StreamTransferService.exportPipeline`) and the existing
    Import preview ("Create from template"). The pure helper `planTemplateCopy`
    (`modules/admin/catalog/onboarding/onboarding-template.ts`) drops `template: true` (the parser refuses
-   `template` + `active`, so a kept flag would make the copy un-runnable) and retargets `stream`,
-   `collector.id` (or legacy `source.id`) and a `data/templates/<tplId>/` ducklake `data_path` to the new
-   name — **only where the value still carries the template's stamp**, so a value the author set on purpose
-   travels as authored. The name is still typed in the dialog and the draft is written once, at Create
+   `template` + `active`, so a kept flag would make the copy un-runnable); the identity retarget is
+   `planStreamImport`'s (below), so a hand-set binding on a template is re-pointed too (behaviour change,
+   `237269fe9`). The name is still typed in the dialog and the draft is written once, at Create
    (⛔ no client-side name deferral). ⚠ Save-as-template does not copy segment schemas, and
    `exportPipeline` reads them by the `<pipeline>_<segment>` naming rule, so a plugin-parser template (like
    Duplicate) loses `parsing.plugin.segments`; the dialog states which parts it could not read.
-   ⚠ Import and Duplicate (`planStreamImport`) do **not** retarget `stream` / `collector.id` — two copies
-   can then share one Catalog Stream and one ledger dedup key (BACKLOG `ONB-IMPORT-RETARGET-1`).
+   **Import retarget (`ONB-IMPORT-RETARGET-1`, shipped 2026-10-11, `237269fe9`).** `planStreamImport`
+   (`inspecto/transfer/stream-bundle.ts`) mirrors the server's `PipelineBundleRoutes.retargetPipeline`:
+   whenever the key is present it re-points `stream`, the collector `id` (legacy `source.id`) and
+   `output.ducklake.data_path` to the copy, and `triggers.on_pipeline` only when it names the source itself;
+   every rewrite is listed as a note in the Import preview. So two copies no longer share a Catalog Stream or a
+   ledger dedup key. `dirs.*` derive from the slug id (`NAME-DIRS-1`, the client Import path had still used the
+   display name; decision in `pipeline-identity.md`). Duplicate never used `planStreamImport` (it goes through
+   the server bundle, since 2026-09-02).
 
 ## The stage model (now the editor's checklist chips)
 

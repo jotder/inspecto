@@ -10,7 +10,11 @@ timestamp: 2026-06-28T00:00:00Z
 # Jobs
 
 Route `/jobs` (Operations nav group). Scheduled jobs in **standard** [data-tables](../design-system/data-table.md)
-(`autoHeight`); a **job-runs dialog** shows run history. Backed by `JobsService`.
+(`autoHeight`); a **job-runs dialog** shows run history. Backed by `JobsService`. Since 2026-10-11 (`5158ebe94`)
+`JobsService.run(runId)` / `JobRunById` type `GET /jobs/runs/{runId}` (fields `startedAt` / `finishedAt`, unlike the
+list row `JobRunRow`'s `startTime` / `endTime`). ⚠ Known gap (BACKLOG `JOB-RUN-DETAIL-DERIVEDFROM-1`):
+`job-run-detail.dialog.ts` shows `derivedFrom`, but `jobs.component.ts` `openRunDetail` passes the list row, which
+never carries it, so the section never appears; the fix is to fetch via `JobsService.run` and map the field names.
 
 ## System jobs are badged and read-only (DUCKLE-C1, 2026-09-25)
 

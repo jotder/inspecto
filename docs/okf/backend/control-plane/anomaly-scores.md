@@ -181,8 +181,8 @@ factor (`measure: max(score)`) — a documented pattern, no code.
   `count | agg(column)` grammar). A 422 lands on the field or Feature row it names (`mapAnomalyRefusal`).
   Since 2026-10-11 (`a8c4c14f7`, residual (h)) the Feature row also edits `filters` (operators = the
   `MeasureCompiler.filterTerm` set: `=` `!=` `>` `>=` `<` `<=` `in` `like` `isNull` `notNull`;
-  `anomaly-feature-fields.ts`) and `unit` (> 0). ⚠ Both still travel in the draft's `extra`; moving them into
-  `FEATURE_MODELLED` in `inspecto/anomaly/anomaly-model-form.ts` would be cleaner (follow-up note).
+  `FEATURE_MODELLED`) and `unit` (> 0). Both are modelled fields in `inspecto/anomaly/anomaly-model-form.ts`
+  (`5269b514b`; the pane-local `anomaly-feature-fields.ts` is gone).
   The preview box (gated `canWorkIncidents`) scores a saved model for one key: badge, per-Feature table and an
   SVG strip of the baseline (median ± 3 MAD, observed point) with a text alternative. The form dialog's
   **Preview the draft** box scores the **unsaved** content through `AnomalyModelsService.previewContent`
@@ -220,8 +220,8 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 
 Tracked in `ANOMALY-DETECTION-RESIDUALS-1`: the dashboard tile (the Widget layer lacks a Widget-level filter and
 a table row limit, and `/bi/query` does not mask entity keys in scores Datasets — a top-10 Widget stays out of
-templates until BI masks); pack golden extension (needs multi-week corpora); evidence rows; hour buckets; JVM
-peer-median performance unmeasured (D-AD9: full recompute until measured slow); pane: day-by-day chart series (a preview
+templates until BI masks); pack golden extension (needs multi-week corpora); evidence rows; hour buckets; peer
+side grouping (`ANOMALY-PEER-GROUPING-1`, below); pane: day-by-day chart series (a preview
 response-shape change); the LA panel's Risk Score model gate. Later: an ML scorer behind the same explanation
 shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
@@ -233,5 +233,18 @@ D-AD1 names (Anomaly Model / Anomaly Score / Feature / Peer Group) · D-AD2 robu
 weighted RMS · D-AD3 a new kind, not a Risk Score factor type · D-AD4 optional module, Professional+ · D-AD5
 shared pieces extracted to the engine · D-AD6 0–100 via `1 − exp(−raw/3)` · D-AD7 `afterScore: {kind, model}` ·
 D-AD8 missing = 0 for count/sum, absent for avg/ratio · D-AD9 full recompute now, incremental when measured
-slow · D-AD10 cap + fail · D-AD11 small cohort `insufficient`, opt-in `fallback: population` · D-AD12 peer-only
+slow (**measured 2026-10-11**, below) · D-AD10 cap + fail · D-AD11 small cohort `insufficient`, opt-in `fallback: population` · D-AD12 peer-only
 score for entities without self history, flagged.
+
+**D-AD9 closure — measured 2026-10-11** (`PeerMedianBench`, `18e3b4d68`; `@Tag("bench")`, runs only with
+`-Dinspecto.bench=true`, skipped by default). `RobustStats` is sort-based (O(n log n); 1M values: 97 ms) and is
+not the cost. `AnomalyScoreEvaluator.PeerSide` rescans every entity once per cohort, O(cohorts × entities):
+fine for few or large cohorts (one 1M cohort: 3 s) but ~7 s at 200k entities in cohorts of 1,000, minutes at
+cohorts of 10 (timed out; ~199 s extrapolated), and 37 s (9.5 GB allocated) at 10k entities in cohorts of 10
+with `fallback: population`. The threshold used was > ~10 s at the 200k default cap (D-AD9 states none). A single
+grouping pass fixes it: group once per Feature into a cohort → values map and compute the population baseline
+once (cached), optionally quickselect; it touches `PeerSide` and `PeerBaseline.compute`, so it is sequenced after
+the NULL-cohort change. **Not built** — filed as P3 `ANOMALY-PEER-GROUPING-1`.
+⚠ Separate finding from the same session: at the default 1 GB sandbox memory cap the anomaly bucket query ran
+out of memory at ~20k entities × 29 days (it needed `-Dassist.sql.memory_limit=8GB`) and hit the 30 s sandbox
+timeout at 100k entities even with no peers. Not checked whether production sets the property.
