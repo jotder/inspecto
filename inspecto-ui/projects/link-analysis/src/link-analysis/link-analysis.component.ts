@@ -68,7 +68,6 @@ import {
     seedError,
     parseInvestigateParams,
     sameInvestigateRequest,
-    hubBadgeText,
 } from './investigate-number';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
@@ -929,6 +928,11 @@ export class LinkAnalysisComponent implements OnInit {
      */
     get caps(): { projection: number; analysis: number } {
         return { projection: projectionNodeCapValue(), analysis: analysisNodeCapValue() };
+    }
+
+    /** A flagged node's Connectivity row — the same threshold, count and override state the Investigation panel shows. */
+    hubBadgeFor(serverId: string, contacts?: number | null): string {
+        return this.investigation.hubBadge(serverId, contacts, this.limits.limits().hubThresholdInForce);
     }
 
     /** D-4 step 7: the server's hard ceiling on a graph run (null until `GET /inv/graph/algorithms` answers). */
@@ -1945,7 +1949,7 @@ export class LinkAnalysisComponent implements OnInit {
                         },
                         // The legend's ringed node, with its sealed contact count when served.
                         ...(node.data.highConnectivity
-                            ? [{ label: 'Connectivity', value: hubBadgeText(null, node.data.contacts) }]
+                            ? [{ label: 'Connectivity', value: this.hubBadgeFor(ids?.serverNode(id) ?? id, node.data.contacts) }]
                             : []),
                         // LA-08: which Datasets this (possibly merged) entity was projected from.
                         ...(node.data.provenance?.length

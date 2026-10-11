@@ -819,3 +819,46 @@ describe('InvestigationSessionStore - preset window recovered on reopen', () => 
         expect(sentWindow(inv)).toBeUndefined();
     });
 });
+
+describe('InvestigationSessionStore - walk-through 6', () => {
+    it('D3: a reopen rebuilds the per-degree lines from the log, not just "Degree N reached."', async () => {
+        const { store, logs, sets } = setup();
+        const at = (id: string, hop: number, admittedBy: number) => ({ ...ws([id]).entities[0], hop, admittedBy });
+        logs['inv-7'] = {
+            header: header('inv-7'),
+            entries: [
+                entry(1, { op: 'seed', params: { ids: ['s'] } }),
+                entry(2, { op: 'expand', params: { ids: ['s'], window: 'full' } }),
+            ],
+            total: 2,
+            truncated: false,
+        };
+        sets['inv-7'] = { ...ws([]), entities: [at('s', 0, 1), at('a', 1, 2), at('b', 1, 2)] };
+        expect(await store.open('inv-7')).toBe(true);
+        expect(store.degreeOutcomes().map(degreeOutcomeMessage)).toEqual([
+            'Degree 1 (all available data): 2 new entities, 0 links added.',
+        ]);
+    });
+
+    it('D1: the node dialog / Working Set rows badge names the sealed threshold, the count and the override', async () => {
+        const { store, logs, sets } = setup();
+        logs['inv-8'] = {
+            header: header('inv-8'),
+            entries: [
+                entry(1, { op: 'seed', params: { ids: ['s'] } }),
+                entry(2, { op: 'expand', params: { ids: ['s'], hubThreshold: 500 } }),
+                entry(3, { op: 'expand', params: { ids: ['h'], expandHubs: ['h'] } }),
+            ],
+            total: 3,
+            truncated: false,
+        };
+        sets['inv-8'] = {
+            ...ws([]),
+            entities: [{ ...ws(['h']).entities[0], hop: 1, admittedBy: 2, highConnectivity: true, contacts: 628 }],
+        };
+        await store.open('inv-8');
+        expect(store.hubBadge('h', null, 999)).toBe(
+            'High connectivity — 628 contacts (threshold 500), expanded through override',
+        );
+    });
+});

@@ -646,7 +646,11 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         form.dispatchEvent(new Event('submit'));
         fixture.detectChanges();
         expect(inv.createInvestigation).not.toHaveBeenCalled();
-        expect(form.querySelector('mat-error')?.textContent).toContain('State the purpose');
+        const required = form.querySelector('[data-testid="investigate-purpose-required"]');
+        expect(required?.textContent).toContain('A purpose is required to start an Investigation');
+        expect(required?.getAttribute('role')).toBe('alert');
+        expect(document.activeElement).toBe(form.querySelector('[data-testid="investigate-purpose"]'));
+        await expectNoA11yViolations(el);
 
         const spy = vi.spyOn(store, 'investigateNumber').mockResolvedValue(true);
         const purpose = form.querySelector('[data-testid="investigate-purpose"]') as HTMLInputElement;
@@ -670,6 +674,8 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
     it('"Expand next degree" shows the degree, the per-degree result, and stops at degree 4', async () => {
         const { fixture, el, store } = create();
         await openInv(store);
+        // The fixture log's expand (step 2) admitted nobody, so its rebuilt line would block the ladder; start fresh.
+        store.degreeOutcomes.set([]);
         fixture.detectChanges();
         const next = () => el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
         expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('Degree 0 of 4');

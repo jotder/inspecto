@@ -131,14 +131,27 @@
                 </mat-form-field>
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Purpose / legal basis</mat-label>
-                    <input matInput required [formControl]="purpose" data-testid="investigate-purpose" />
+                    <input
+                        #pendingPurpose
+                        matInput
+                        required
+                        [formControl]="purpose"
+                        data-testid="investigate-purpose"
+                    />
                     <mat-hint>Recorded with the Investigation and shown in its Dossier.</mat-hint>
                     @if (purpose.hasError('maxlength')) {
                         <mat-error>At most 1000 characters.</mat-error>
-                    } @else if (purpose.invalid) {
-                        <mat-error>State the purpose — every Investigation records why it was opened.</mat-error>
                     }
                 </mat-form-field>
+                @if (pendingTried() && purpose.invalid && !purpose.hasError('maxlength')) {
+                    <p
+                        class="text-warn m-0 text-xs"
+                        role="alert"
+                        data-testid="investigate-purpose-required"
+                    >
+                        A purpose is required to start an Investigation.
+                    </p>
+                }
                 <div class="flex flex-wrap gap-1">
                     <button
                         mat-flat-button

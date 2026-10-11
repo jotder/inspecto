@@ -28,6 +28,9 @@ import { DegreePresets, DomainProfileId, domainProfile } from '@inspecto/link-an
 import {
     DegreeOutcome,
     degreeOutcome,
+    degreeOutcomesFromLog,
+    hubBadgeText,
+    oneHopFrom,
     degreeState,
     hubContactsFromRows,
     investigationTitle,
@@ -171,6 +174,21 @@ export class InvestigationSessionStore {
     });
     /** The hub threshold the latest expand in effect sealed — survives a reload, unlike `lastStep`. */
     readonly sealedHubThreshold = computed(() => sealedHubThreshold(this.log()?.entries ?? []));
+    /**
+     * One flagged entity's badge, from the same sources as the Investigation panel: the last step's sealed threshold,
+     * else the log's, else `fallbackThreshold` (the Space's value in force); its contacts from the row, the session's
+     * reads or the Working Set; and whether an override expanded through it. Node dialog and Working Set rows use it.
+     */
+    hubBadge(id: string, contacts?: number | null, fallbackThreshold?: number | null): string {
+        const sealed = this.lastStep()?.read?.rung?.['hubThreshold'];
+        const threshold = typeof sealed === 'number' ? sealed : (this.sealedHubThreshold() ?? fallbackThreshold ?? null);
+        const count =
+            contacts ??
+            this.hubContacts().get(id) ??
+            this.workingSet()?.entities.find((e) => e.id === id)?.contacts ??
+            null;
+        return hubBadgeText(threshold, count, this.overriddenHubs().has(id));
+    }
     readonly effectiveSteps = computed(() => effectiveOpSteps(this.log()?.entries ?? []));
     readonly truncatedSteps = computed(() => truncatedSteps(this.log()?.entries ?? []));
     /** A Draft's Undo reverts only its OWN steps, so the main-log prefix it forked from never counts. */
@@ -484,6 +502,7 @@ export class InvestigationSessionStore {
             return this.run('Could not open the Investigation.', () => this.refresh(id));
         this.close();
         this.activeId.set(id);
+        this.rebuildOutcomes = true; // the session's degree lines are gone: rebuild them from the sealed log
         const ok = await this.run('Could not open the Investigation.', () => this.refresh(id));
         if (ok) await this.recoverWindowEnd(id);
         return ok;
@@ -690,7 +709,19 @@ export class InvestigationSessionStore {
         this.log.set(l.log);
         this.workingSet.set(l.workingSet);
         this.draftBaseStep.set(l.baseStep);
-        this.degreeOutcomes.set(reconcileApprovals(this.degreeOutcomes(), l.log.pending, l.workingSet));
+        const base = this.rebuildOutcomes ? degreeOutcomesFromLog(l.log.entries, l.workingSet) : this.degreeOutcomes();
+        this.rebuildOutcomes = false;
+        this.degreeOutcomes.set(reconcileApprovals(base, l.log.pending, l.workingSet));
+    }
+
+    private rebuildOutcomes = false;
+
+    /** A held expand from the panel is one hop from what it named — never the ladder's next degree. */
+    markOneHop(requestId: string, ids: readonly string[] | undefined): void {
+        const oneHop = oneHopFrom(ids);
+        this.degreeOutcomes.update((all) =>
+            all.map((o) => (o.awaitingApproval === requestId && !o.override ? { ...o, oneHop } : o)),
+        );
     }
 
     /** Remember the sealed contact counts a step's read answered for its flagged entities. */

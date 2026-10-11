@@ -348,6 +348,75 @@ export interface DegreeOutcome {
     reason?: string;
     /** "Expand anyway" through this flagged entity — an override, not a degree of the ladder. */
     override?: string;
+    /** A one-hop expand from the panel (not the ladder's next degree): what it expanded from, in words. */
+    oneHop?: string;
+}
+
+/** What a non-ladder expand named, in words: the one entity, a count, or every entity (no ids). */
+export function oneHopFrom(ids: readonly string[] | null | undefined): string {
+    if (!ids?.length) return 'every entity';
+    return ids.length === 1 ? ids[0] : `${ids.length.toLocaleString('en')} entities`;
+}
+
+/**
+ * True when an expand naming `ids` is NOT the ladder's next degree: it expands every entity (no ids), or names an
+ * entity short of the Working Set's outermost visible hop. A lone seed's expand reads as the ladder (it is degree 1).
+ */
+export function isOneHop(ws: WorkingSet | null, ids: readonly string[] | null | undefined): boolean {
+    if (!ids?.length) return true;
+    const visible = (ws?.entities ?? []).filter((e) => !e.hidden);
+    if (!visible.length) return false;
+    const outer = Math.max(...visible.map((e) => e.hop));
+    const hops = new Map(visible.map((e) => [e.id, e.hop]));
+    return ids.some((id) => hops.has(id) && hops.get(id)! < outer);
+}
+
+/** A sealed expand window in words (`30 days to 29 Sep 2026`, `all available data`); null when none was sealed. */
+export function sealedRangeLabel(w: NonNullable<InvestigationLogEntry['params']>['window']): string | null {
+    if (w === 'full') return 'all available data';
+    if (!w || typeof w !== 'object' || !w.from || !w.to) return null;
+    const from = Date.parse(w.from);
+    const to = Date.parse(w.to);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+    // The preset window ends one second past the Dataset's latest event; the day named is that event's.
+    return `${Math.round((to - from) / DAY_MS)} days to ${dayLabel(to - 1000)}`;
+}
+
+/**
+ * The degree outcome list rebuilt from the sealed log after a reopen (the session's own list is gone): one line per
+ * expand step still in effect — what it admitted from the Working Set rows (`admittedBy`), the window from its params,
+ * the truncation from its read. A step the rows do not place at a hop takes the next degree after the last line.
+ */
+export function degreeOutcomesFromLog(entries: readonly InvestigationLogEntry[], ws: WorkingSet | null): DegreeOutcome[] {
+    const out: DegreeOutcome[] = [];
+    for (const e of entries) {
+        if (e.kind !== 'op' || e.op !== 'expand' || e.undoneBy != null) continue;
+        const p = e.params ?? {};
+        const range = sealedRangeLabel(p.window);
+        const override = p.expandHubs?.[0];
+        out.push({
+            degree: admittedHop(ws, e.step) ?? (out.at(-1)?.degree ?? 0) + 1,
+            admitted: (ws?.entities ?? []).filter((x) => x.admittedBy === e.step).length,
+            linksAdded: (ws?.links ?? []).filter((x) => x.admittedBy === e.step).length,
+            truncated: e.read?.truncated ?? false,
+            fanOutCapped: 0,
+            ...(p.budget != null ? { budget: p.budget } : {}),
+            ...(p.maxFanOut != null ? { maxFanOut: p.maxFanOut } : {}),
+            ...(range ? { range } : {}),
+            ...(override ? { override } : isOneHopStep(e, ws) ? { oneHop: oneHopFrom(p.ids) } : {}),
+        });
+    }
+    return out;
+}
+
+/** A sealed expand step that was not a ladder degree: it named entities admitted short of the hop it then filled. */
+function isOneHopStep(e: InvestigationLogEntry, ws: WorkingSet | null): boolean {
+    const ids = e.params?.ids;
+    if (!ids?.length) return true;
+    const hop = admittedHop(ws, e.step);
+    if (hop == null) return false;
+    const hops = new Map((ws?.entities ?? []).map((x) => [x.id, x.hop]));
+    return ids.some((id) => hops.has(id) && hops.get(id)! < hop - 1);
 }
 
 /** True while a held degree is still waiting for its four-eyes decision. */
@@ -395,8 +464,10 @@ export function reconcileApprovals(
         const ids = Array.isArray(named) ? named.filter((v): v is string => typeof v === 'string') : [];
         const hubs = p.params?.['expandHubs'];
         const override = Array.isArray(hubs) && typeof hubs[0] === 'string' ? hubs[0] : undefined;
+        const oneHop = !override && Array.isArray(named) && isOneHop(ws, ids) ? oneHopFrom(ids) : undefined;
         next.push({
             ...(override ? { override } : {}),
+            ...(oneHop ? { oneHop } : {}),
             degree: requestedDegree(ws, ids) ?? current + 1,
             admitted: 0,
             linksAdded: 0,
@@ -532,7 +603,9 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
     // is never read as the ladder's own next degree.
     const head = o.override
         ? `Expand anyway through ${o.override} (admits at degree ${o.degree})`
-        : `Degree ${o.degree}`;
+        : o.oneHop
+          ? `Expand one hop from ${o.oneHop}`
+          : `Degree ${o.degree}`;
     if (o.decision === 'approved')
         return `${head}: approved (request ${o.awaitingApproval}) — ${
             o.admitted ? `${plural(o.admitted, 'new entity', 'new entities')} admitted.` : 'nothing new was found.'
@@ -542,7 +615,7 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
     if (o.awaitingApproval)
         return `${head}: waiting for approval — this expand exceeds the Space's four-eyes limit, so it runs once a second person approves request ${o.awaitingApproval}.`;
     const parts = [
-        `Degree ${o.degree}${o.range ? ` (${o.range})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
+        `${o.override || o.oneHop ? head : `Degree ${o.degree}`}${o.range ? ` (${o.range})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
     ];
     if (o.truncated)
         parts.push(
