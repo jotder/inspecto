@@ -161,6 +161,32 @@ class ControlApiRegulatoryTemplatesTest {
         }
     }
 
+    /**
+     * Armed-Authenticator coverage for the authgate guard ({@code tools/check-authgate-coverage.mjs} reads quoted
+     * path LITERALS, so this method spells them out rather than using {@link #T}). A Subject lacking
+     * {@code canApproveChanges} gets 403 and nothing is written / removed; one holding it succeeds.
+     */
+    @Test
+    void templateWritesRequireCanApproveChanges() throws Exception {
+        try (Ctx c = open(true)) {
+            Path file = c.root.resolve("regulatory-report-templates/armed-test.toon");
+            status(send(c, "PUT", "/regulatory-reports/templates/armed-test", template("Armed", "out/armed"), OPS),
+                    403, "canApproveChanges");
+            assertFalse(Files.exists(file), "a denied PUT writes nothing");
+
+            assertTrue(data(send(c, "PUT", "/regulatory-reports/templates/armed-test", template("Armed", "out/armed"), ADMIN), 200)
+                    .get("created").asBoolean());
+            assertTrue(Files.isRegularFile(file));
+
+            status(send(c, "DELETE", "/regulatory-reports/templates/armed-test", null, OPS), 403, "canApproveChanges");
+            assertTrue(Files.isRegularFile(file), "a denied DELETE removes nothing");
+
+            assertTrue(data(send(c, "DELETE", "/regulatory-reports/templates/armed-test", null, ADMIN), 200)
+                    .get("deleted").asBoolean());
+            assertFalse(Files.exists(file));
+        }
+    }
+
     @Test
     void anAuthoredTemplateDraftsAReportAndIsThenInUse() throws Exception {
         try (Ctx c = open(true)) {
