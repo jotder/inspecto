@@ -332,6 +332,10 @@ public final class PatternRoutes implements RouteModule {
         String timeCol = ident(body, "timeCol", false);
         List<Stage> stages = PatternQueryCompiler.parseStages(body.get("stages"));
         int limit = body.get("limit") instanceof Number n ? Math.max(1, Math.min(MAX_MATCHES, n.intValue())) : DEFAULT_MATCHES;
+        // Run on an Investigation canvas: the Investigation read gate (non-member 404), and the ids leave under that
+        // Investigation's pseudonyms (the Working Set's), not the Space's exploration aliases.
+        String investigationId = ApiContext.str(body, "investigationId");
+        InvestigationRoutes.Inv inv = investigationId == null ? null : InvestigationRoutes.openForRead(api, ex, investigationId);
 
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, datasetId);
         List<String> columns = InvRoutes.relationColumns(datasetId, relationSql);
@@ -361,12 +365,31 @@ public final class PatternRoutes implements RouteModule {
             Map<String, String> label = new LinkedHashMap<>();
             Map<String, Map<String, Object>> legOut = new LinkedHashMap<>();
             // DR-D2: the engine runs on the aliases when the Space masks them (a bijection, so the match is the same)
-            ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+            ExplorationMasking mask = inv != null ? null : ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+            EntityMasking invMask = null;
+            if (inv != null) {
+                Set<String> raw = new LinkedHashSet<>();
+                for (Map<String, Object> row : r.rows()) {
+                    raw.add(String.valueOf(row.get("s")));
+                    raw.add(String.valueOf(row.get("t")));
+                }
+                invMask = EntityMasking.of(inv, raw);
+            }
             for (Map<String, Object> row : r.rows()) {
                 int stage = ((Number) row.get("stage")).intValue();
-                String s = mask.out(String.valueOf(row.get("s"))), t = mask.out(String.valueOf(row.get("t")));
-                label.putIfAbsent(s, mask.active() ? s : String.valueOf(row.get("sl")));
-                label.putIfAbsent(t, mask.active() ? t : String.valueOf(row.get("tl")));
+                String rs = String.valueOf(row.get("s")), rt = String.valueOf(row.get("t"));
+                String s, t;
+                if (invMask != null) {
+                    s = invMask.hidesRaw(rs) ? invMask.tokenOf(rs) : rs;
+                    t = invMask.hidesRaw(rt) ? invMask.tokenOf(rt) : rt;
+                    label.putIfAbsent(s, invMask.hidesRaw(rs) ? s : String.valueOf(row.get("sl")));
+                    label.putIfAbsent(t, invMask.hidesRaw(rt) ? t : String.valueOf(row.get("tl")));
+                } else {
+                    s = mask.out(rs);
+                    t = mask.out(rt);
+                    label.putIfAbsent(s, mask.active() ? s : String.valueOf(row.get("sl")));
+                    label.putIfAbsent(t, mask.active() ? t : String.valueOf(row.get("tl")));
+                }
                 Map<String, Object> legAttrs = new LinkedHashMap<>();
                 if (timeCol != null) legAttrs.put(timeCol, row.get("tr"));
                 for (int i = 0; i < attrs.size(); i++) legAttrs.put(attrs.get(i), row.get("r_" + i));
@@ -397,7 +420,7 @@ public final class PatternRoutes implements RouteModule {
             }
             boolean truncated = res.truncated() || r.truncated();
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("masking", mask.describe());
+            out.put("masking", invMask != null ? invMask.describe() : mask.describe());
             out.put("matches", matches);
             out.put("edges", edges);
             out.put("truncated", truncated);

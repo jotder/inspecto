@@ -166,6 +166,8 @@ export interface BranchingPatternRequest {
     stages: BranchStage[];
     filter?: ConditionGroup;
     limit?: number;
+    /** Run on this Investigation's canvas: member-gated, ids answered as its pseudonyms (the Working Set's). */
+    investigationId?: string;
 }
 
 /** The browser matcher's `BranchingResult` shape, with RAW node values and the matched legs spelled out. */

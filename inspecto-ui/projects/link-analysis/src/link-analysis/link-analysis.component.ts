@@ -1537,11 +1537,14 @@ export class LinkAnalysisComponent implements OnInit {
     private async runPatternOverInvestigation(req: ServerPatternRequest): Promise<void> {
         const h = this.investigation.header();
         const target = this.investigationPatternTarget();
-        if (!h || !target) return;
+        const investigationId = this.investigation.activeId();
+        if (!h || !target || !investigationId) return;
         this.serverPatternBusy.set(true);
         try {
             const res = await firstValueFrom(
                 this.inv.branchingPattern({
+                    // the ids come back as this Investigation's pseudonyms, so they line up with the canvas
+                    investigationId,
                     dataset: target.dataset,
                     sourceCol: h.sourceCol,
                     targetCol: h.targetCol,
