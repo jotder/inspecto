@@ -73,6 +73,16 @@ reads go through each store's own live connection (`BrowsableStore` — DuckDB f
 SQL is `SqlGuard`-checked server-side. ⛔ There is no offline path — the `db-browser` mock handler that
 served one was deleted 2026-08-31.
 
+**Shared with this Space (2026-10-11, `CATEGORY-SORT-ORDER-1` sub-item 2 — resolved as discoverable + link, UI-only).**
+The left nav also lists the Space's *bound shared Datasets* (Dataset components whose `physicalRef` is
+`shared/<owner>/<item>`, via `ComponentsService.list('dataset')` + `parseSharedRef`) under their own heading,
+each with a `shared` badge, the owner / item, and an explanatory line. ⛔ They are **never browsable as raw rows**
+here: `/db/*` cannot read a `shared/` ref (`isJailedStore`) — it resolves only through the grant-checked Exchange
+resolver — so an entry has no select handler and fires no `/db/table`/`/db/query`. Each entry links out to
+**Open in Dataset editor** (`/catalog/datasets/<id>`, gated on `canAuthorWorkbench`; the editor loads any dataset
+by id and Run goes through the resolver) and **Shared with me** (`/catalog?tab=shared-with-me`, only when
+`SessionService.exchangeEnabled()`). Section hidden when none are bound or the list call fails (no Exchange ⇒ no errors).
+
 ## Decision 2026-09-06 — a blank `output_table` batch still gets a Catalog link, resolved by pipeline
 
 The 2026-08-14 refusal stands for what it refused: never synthesise a store/`table` attribute. What it did
