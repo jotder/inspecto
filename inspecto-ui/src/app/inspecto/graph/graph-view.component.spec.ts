@@ -314,6 +314,17 @@ describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
         comp.data = { nodes: [], edges: edges.slice(0, 20) } as unknown as G6GraphData;
         expect(comp.edgesToReveal('hub', 'node')).toEqual([]); // sparse: nothing hidden to reveal
     });
+
+    it("names a ringed node's contact count in its hover text, and only when served", () => {
+        const comp = create(null).componentInstance as unknown as { tooltipHtml(items: unknown[]): string };
+        const node = (data: object) => [{ id: 'h', data: { label: 'H', kind: 'entity', ...data } }];
+        expect(comp.tooltipHtml(node({ highConnectivity: true, contacts: 650 }))).toContain('High connectivity — 650 contacts');
+        expect(comp.tooltipHtml(node({ highConnectivity: true, contacts: 1 }))).toContain('— 1 contact');
+        const bare = comp.tooltipHtml(node({ highConnectivity: true }));
+        expect(bare).toContain('High connectivity');
+        expect(bare).not.toContain('contact');
+        expect(comp.tooltipHtml(node({}))).not.toContain('High connectivity');
+    });
 });
 
 describe('graph text alternative and canvas tabindex (LA-A11Y-AUDIT-1)', () => {

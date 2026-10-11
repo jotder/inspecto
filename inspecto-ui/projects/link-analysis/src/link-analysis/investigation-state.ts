@@ -85,9 +85,16 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
         }
     }
     // Supernode suppression: a node any of whose Working Set ids is flagged is drawn ringed (legend: High connectivity).
-    const flagged = new Set(ws.entities.filter((e) => e.highConnectivity).map((e) => e.id));
+    // The flagged entity's own sealed `contacts` rides along for the hover text (null/absent → no count).
+    const flagged = new Map(ws.entities.filter((e) => e.highConnectivity).map((e) => [e.id, e.contacts ?? null]));
     if (flagged.size)
-        for (const n of g.nodes) if (rawIdsOf(n).some((raw) => flagged.has(raw))) n.data.highConnectivity = true;
+        for (const n of g.nodes) {
+            const hits = rawIdsOf(n).filter((raw) => flagged.has(raw));
+            if (!hits.length) continue;
+            n.data.highConnectivity = true;
+            const counts = hits.map((raw) => flagged.get(raw)).filter((c): c is number => typeof c === 'number');
+            if (counts.length) n.data.contacts = Math.max(...counts);
+        }
     const hidden = new Set(ws.entities.filter((e) => e.hidden).map((e) => e.id));
     const done = (out: ProjectedGraph): ProjectedGraph => {
         if (out.edges.length <= WORKING_SET_LINK_RENDER_CEILING) return out;

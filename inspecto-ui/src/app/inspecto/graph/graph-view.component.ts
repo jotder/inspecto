@@ -554,7 +554,13 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private tooltipHtml(items: ElementDatum[]): string {
         const d = items[0];
         if (!d) return '';
-        const data = (d.data ?? {}) as { label?: string; kind?: string; provenance?: string[] };
+        const data = (d.data ?? {}) as {
+            label?: string;
+            kind?: string;
+            provenance?: string[];
+            highConnectivity?: boolean;
+            contacts?: number;
+        };
         // LA-08: a multi-Dataset projection names the Datasets an element came from.
         const from = data.provenance?.length ? `<br/>from ${esc(data.provenance.join(', '))}` : '';
         if ('source' in d && 'target' in d) {
@@ -563,7 +569,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             return `<b>${esc(data.kind)}</b><br/>${esc(label((d as EdgeData).source))} → ${esc(label((d as EdgeData).target))}${from}`;
         }
         const degree = this.data?.edges.filter((e) => e.source === d.id || e.target === d.id).length ?? 0;
-        return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}${from}`;
+        // The ringed (high-connectivity) node names its sealed contact count when served — the legend's "shown, not expanded".
+        const hub = data.highConnectivity
+            ? `<br/>High connectivity${typeof data.contacts === 'number' ? ` — ${data.contacts.toLocaleString('en')} contact${data.contacts === 1 ? '' : 's'}` : ''}`
+            : '';
+        return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}${hub}${from}`;
     }
 
     /** Tear the live instance down, sweeping any tooltip card its own cleanup left orphaned. */

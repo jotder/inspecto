@@ -48,4 +48,27 @@ describe('CaseHistoryService', () => {
         expect((await boom).error).toContain('Case history could not be read');
         http.verify();
     });
+
+    it('reads truncated / message / total from the v1 envelope metadata when the server sends it', async () => {
+        const { svc, http } = make();
+        const ok = svc.byEntity('msisdn', '+256700000001', 'all');
+        await flushNext();
+        const req = http.expectOne((r) => r.url.endsWith('/objects/by-entity'));
+        req.flush({
+            data: [{ kind: 'case', id: 'c1' }],
+            metadata: {
+                apiVersion: 'v1',
+                timestamp: 't',
+                pagination: { total: 1240, truncated: true, message: 'Scanned the newest 500 of 1,240 objects.' },
+            },
+            diagnostics: { correlationId: 'x' },
+        });
+        expect(await ok).toEqual({
+            items: [{ kind: 'case', id: 'c1' }],
+            truncated: true,
+            truncatedMessage: 'Scanned the newest 500 of 1,240 objects.',
+            total: 1240,
+        });
+        http.verify();
+    });
 });
