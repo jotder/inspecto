@@ -3509,6 +3509,34 @@
         "tags" : [ "bi" ],
         "summary" : "POST /bi/query (generated skeleton)",
         "operationId" : "postBiQuery",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "dataset" ],
+                "properties" : {
+                  "dataset" : { "type" : "string" },
+                  "measures" : { "type" : "array", "items" : { "type" : "object" } },
+                  "groupBy" : { "type" : "array", "items" : { "type" : "string" } },
+                  "orderBy" : {
+                    "type" : "array",
+                    "description" : "ORDER BY terms. A term over a result column (a grouped Dimension or a Measure id) orders by it. A term carrying agg, or naming a Dataset column that is not in the result, orders by that column wrapped in a hidden aggregate (default min) while grouping stays unchanged. The column must be a real, unclassified Dataset column and the spec needs a measure and a groupBy, else 422.",
+                    "items" : {
+                      "type" : "object",
+                      "required" : [ "field" ],
+                      "properties" : {
+                        "field" : { "type" : "string" },
+                        "dir" : { "type" : "string", "enum" : [ "asc", "desc" ] },
+                        "agg" : { "type" : "string", "enum" : [ "min", "max" ] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
         "responses" : {
           "default" : {

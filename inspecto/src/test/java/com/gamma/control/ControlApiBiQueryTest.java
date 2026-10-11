@@ -274,4 +274,62 @@ class ControlApiBiQueryTest {
             assertTrue(unsafe.body().contains("findings"), unsafe.body());
         }
     }
+
+    /** A view-backed dataset of stages with an ordinal column that is NOT grouped; {@code classify} tags it MSISDN. */
+    private void seedStages(Ctx c, boolean declareColumns, boolean classify) throws Exception {
+        new ViewStore(c.root.resolve("views")).write(new ViewDefinition("stages_view", "flow-x", List.of(),
+                "SELECT * FROM (VALUES ('Final',3),('Final',3),('Group',1),('Semi',2)) AS t(stage,stage_order)",
+                "2026-07-08T00:00:00Z"));
+        Map<String, Object> ds = new java.util.HashMap<>(Map.of("view", "stages_view"));
+        if (declareColumns)
+            ds.put("columns", List.of(Map.of("name", "stage"),
+                    classify ? Map.of("name", "stage_order", "classification", "MSISDN") : Map.of("name", "stage_order")));
+        new ComponentStore(c.root.resolve("registry")).write("dataset", "stages_ds", ds);
+    }
+
+    private static List<String> col(JsonNode rows, String name) {
+        List<String> out = new java.util.ArrayList<>();
+        rows.forEach(r -> out.add(r.get(name).asText()));
+        return out;
+    }
+
+    private static String stageBody(String orderBy) {
+        return "{\"dataset\":\"stages_ds\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"stage\"],\"orderBy\":" + orderBy + "}";
+    }
+
+    /** CATEGORY-SORT-ORDER-1: order categories by a hidden aggregate of an ungrouped column; result columns are unchanged. */
+    @Test
+    void hiddenAggregateOrdersCategoriesByAnUngroupedColumn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedStages(c, true, false);
+            JsonNode asc = V1Body.of(biQuery(c.port, stageBody("[{\"field\":\"stage_order\"}]")).body());
+            assertEquals(List.of("Group", "Semi", "Final"), col(asc.get("rows"), "stage"));
+            assertEquals(2, asc.get("resultSet").get("columns").size(), "the hidden column is not returned");
+            JsonNode desc = V1Body.of(biQuery(c.port, stageBody("[{\"field\":\"stage_order\",\"agg\":\"max\",\"dir\":\"desc\"}]")).body());
+            assertEquals(List.of("Final", "Semi", "Group"), col(desc.get("rows"), "stage"));
+            JsonNode plain = V1Body.of(biQuery(c.port, stageBody("[{\"field\":\"stage\"}]")).body());
+            assertEquals(List.of("Final", "Group", "Semi"), col(plain.get("rows"), "stage"), "absent agg on a result column is unchanged");
+        }
+    }
+
+    @Test
+    void hiddenAggregateRejectsUnknownColumnAndBadAgg(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedStages(c, true, false);
+            HttpResponse<String> unknown = biQuery(c.port, stageBody("[{\"field\":\"nope\"}]"));
+            assertEquals(422, unknown.statusCode(), unknown.body());
+            assertTrue(unknown.body().contains("nope"), unknown.body());
+            assertEquals(422, biQuery(c.port, stageBody("[{\"field\":\"stage_order\",\"agg\":\"sum\"}]")).statusCode());
+        }
+    }
+
+    @Test
+    void hiddenAggregateRefusesAClassifiedColumn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedStages(c, true, true);
+            HttpResponse<String> r = biQuery(c.port, stageBody("[{\"field\":\"stage_order\"}]"));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("classified"), r.body());
+        }
+    }
 }
