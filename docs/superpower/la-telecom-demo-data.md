@@ -180,16 +180,23 @@ toolbox adds them to the built-in packs. They are branching packs, so they run o
 |---|---|---|
 | `telecom-subscription-ring` | fan-in ≥ 5 on `shared_identity`, all within 168 hours | exactly IRSF-01 and SUBFRAUD-01..05. Background households and two-line customers reach at most 3. |
 | `telecom-forwarding-chain` | fan-out ≥ 1 on `forwarding`, then fan-out ≥ 1 on `forwarding` after the first and within 48 hours | exactly MULE-01 → MULE-02 → MULE-03. Background forwards are single hops. |
-| `telecom-payment-ring` | fan-out ≥ 2 on `shared_payment`, then a closing fan-in ≥ 2 back to the start | exactly MULE-01..05 and SUBFRAUD-05 (`agent:AGT-666`, cloned vouchers). Background shares one card per pair. |
+| `telecom-payment-ring` ("Shared top-up evidence") | fan-out ≥ 2 on `shared_payment`, then a closing fan-in ≥ 2 back to the start | exactly MULE-01..05 and SUBFRAUD-05 (`agent:AGT-666`, cloned vouchers). Background shares one card per pair. |
 
 The built-in `forwarding-relay` pack is still there as the generic A → B → C motif with blank kinds.
 `telecom-forwarding-chain` is its kind-pinned, time-ordered version for this corpus. Shared kinds are emitted in both
-directions, so the payment ring's closing step is always met by the mirror rows. In practice the pack finds "a line
-sharing top-up evidence with two or more others".
+directions, so the payment pack's closing step is always met by the mirror rows. The pack means "a line sharing top-up
+evidence (voucher, agent or card) with two or more other lines", and claims no ring. On real data a family or a shop
+topping up several lines with one card or voucher will match too, so read the `via` keys before acting.
+
+To run these packs from the SPA, set the link kind column to `link_kind` and the time column to `first_seen`. The SPA
+sends the projection's kind column and the free-text time field. With a blank time field the windowed and ordered packs
+(subscription ring, forwarding chain) fail. Pre-binding the two columns in the UI is a follow-up.
 
 Wangiri, IRSF and SIM box are per-MSISDN ratios, and pattern stages cannot express them. Three Alert Rules in
 `config/registry/alert-rules/` cover them instead. They read the one-row Dataset `telecom_typology_counts_dataset`,
 which the Job `telecom_typology_counts` builds from `telecom_msisdn_indicators` (rule thresholds are Job parameters).
+That Job has no cron. It runs on `job.dataset.produced` with `when: "$signal.dataset == telecom_msisdn_indicators"`, so it
+runs only after the indicators Job and never reads a missing or older snapshot.
 Each rule is `max(<typology>_lines) gte 1`, with no `by`. So an Alert names a count, never an MSISDN (the
 aggregate-only alert decision), and the lines themselves are found in the Investigation.
 

@@ -1,11 +1,12 @@
 job:
   name: telecom_typology_counts
   type: sql.template
-  description: "One row of counts over the latest telecom_msisdn_indicators snapshot: wangiri_lines (out_distinct_b at least wangiri_min_called and avg_dur_s under wangiri_max_avg_dur_s), irsf_lines (premium_destination_share at least irsf_min_premium_share and avg_dur_s at least irsf_min_avg_dur_s), simbox_lines (imei_per_msisdn and msisdn_per_imei at least simbox_min_imeis and out_in_ratio at least simbox_min_out_in) and scored_lines. No MSISDN leaves this Job: the Alert Rules over it name counts, and the lines are found in the Investigation. docs/superpower/la-telecom-demo-data.md."
+  description: "Runs each time the telecom_msisdn_indicators Job produces its Dataset (never on a timer, so it never reads a missing or older indicators snapshot). One row of counts over that telecom_msisdn_indicators snapshot: wangiri_lines (out_distinct_b at least wangiri_min_called and avg_dur_s under wangiri_max_avg_dur_s), irsf_lines (premium_destination_share at least irsf_min_premium_share and avg_dur_s at least irsf_min_avg_dur_s), simbox_lines (imei_per_msisdn and msisdn_per_imei at least simbox_min_imeis and out_in_ratio at least simbox_min_out_in) and scored_lines. No MSISDN leaves this Job: the Alert Rules over it name counts, and the lines are found in the Investigation. docs/superpower/la-telecom-demo-data.md."
   sql: "SELECT count(*) FILTER (WHERE out_distinct_b >= CAST($wangiri_min_called AS INTEGER) AND avg_dur_s < CAST($wangiri_max_avg_dur_s AS DOUBLE)) AS wangiri_lines, count(*) FILTER (WHERE premium_destination_share >= CAST($irsf_min_premium_share AS DOUBLE) AND avg_dur_s >= CAST($irsf_min_avg_dur_s AS DOUBLE)) AS irsf_lines, count(*) FILTER (WHERE imei_per_msisdn >= CAST($simbox_min_imeis AS INTEGER) AND msisdn_per_imei >= CAST($simbox_min_imeis AS INTEGER) AND out_in_ratio >= CAST($simbox_min_out_in AS DOUBLE)) AS simbox_lines, count(*) AS scored_lines FROM telecom_msisdn_indicators"
   sources: telecom_msisdn_indicators
   sink_dataset: telecom_typology_counts
-  cron: "*/10 * * * *"
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == telecom_msisdn_indicators"
   wangiri_min_called: "50"
   wangiri_max_avg_dur_s: "5"
   irsf_min_premium_share: "0.8"

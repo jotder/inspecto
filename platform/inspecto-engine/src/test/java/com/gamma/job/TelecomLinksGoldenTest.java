@@ -240,6 +240,10 @@ class TelecomLinksGoldenTest {
         assertEquals((long) indicators.size(), ((Number) counts.get(0).get("scored_lines")).longValue());
 
         Path cfg = space.resolve("config");
+        JobConfig counter = JobConfig.load(cfg.resolve("jobs/telecom_typology_counts_job.toon").toString());
+        assertEquals("job.dataset.produced", counter.onSignal(), "runs after the indicators, never on its own timer");
+        assertEquals("$signal.dataset == telecom_msisdn_indicators", counter.when());
+        assertTrue(counter.cron() == null || counter.cron().isBlank(), "no cron: it must never read a missing or older snapshot");
         List<AlertRule> rules = new ComponentStore(cfg.resolve("registry")).list("alert-rule").stream()
                 .map(c -> AlertRule.fromMap(c.content())).toList();
         assertEquals(Set.of("telecom_wangiri_lines", "telecom_irsf_lines", "telecom_simbox_lines"),
