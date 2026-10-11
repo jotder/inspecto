@@ -19,6 +19,16 @@ export interface EntityHistoryItem {
 
 export type EntityHistoryStatus = 'open' | 'closed' | 'all';
 
+/** `POST /inv/case-history` (the payload under `data`): never echoes the key. */
+interface CaseHistoryResult {
+    entityType: string;
+    resolved: boolean;
+    reason?: string;
+    objects?: EntityHistoryItem[];
+    total?: number;
+    truncated?: boolean;
+}
+
 /** The history of one Entity, or why it could not be read (in words an analyst can act on). */
 export interface EntityHistory {
     items: EntityHistoryItem[];
@@ -39,6 +49,33 @@ export interface EntityHistory {
 @Injectable({ providedIn: 'root' })
 export class CaseHistoryService {
     private readonly http = inject(HttpClient);
+
+    /**
+     * The history of a MASKED key (an alias or Investigation pseudonym): `POST /inv/case-history` resolves it on the
+     * server, picks the Entity Type (the Investigation's endpoint type, else msisdn) and answers titles re-masked, so no
+     * raw number reaches the browser. A key the server cannot resolve (it restarted, or the masking hides a raw id) is
+     * reported as an `error` in words, never as an empty history.
+     */
+    async byMaskedKey(key: string, investigationId: string | null, status: EntityHistoryStatus): Promise<EntityHistory> {
+        try {
+            const body: Record<string, unknown> = { key, status };
+            if (investigationId) body['investigationId'] = investigationId;
+            const r = await firstValueFrom(this.http.post<CaseHistoryResult>(apiUrl('/inv/case-history'), body));
+            if (!r.resolved)
+                return {
+                    items: [],
+                    truncated: false,
+                    error: 'The server no longer knows this masked number (it may have restarted). Run the query again, then reopen the node.',
+                };
+            const out: EntityHistory = { items: r.objects ?? [], truncated: !!r.truncated };
+            if (typeof r.total === 'number') out.total = r.total;
+            return out;
+        } catch (e) {
+            if (e instanceof HttpErrorResponse && e.status === 503)
+                return { items: [], truncated: false, error: 'Case history needs Case management, which is not installed here.' };
+            return { items: [], truncated: false, error: historyErrorMessage(e) };
+        }
+    }
 
     async byEntity(type: string, id: string, status: EntityHistoryStatus): Promise<EntityHistory> {
         try {

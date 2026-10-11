@@ -208,8 +208,9 @@ flagged, and Compute risk is then held - an incomplete score map would understat
 * **Case history** — collapsed; opening it reads the Incidents and Cases that reference the node's entity (Telecom:
   by `msisdn`), newest first: kind, title (a link to the Incident or Case), status, severity and date, and *via
   Incident …* for a Case found through an Incident it contains. *Show* filters all / open / closed. When the server
-  searched only its newest objects the section warns that older ones may be missing. A masked node (an alias) has no
-  case history here; an id too short or of another Entity Type, a busy server (*Too many lookups*) or any other
+  searched only its newest objects the section warns that older ones may be missing. A masked node (an alias) is
+  looked up on the server (`POST /inv/case-history`), which resolves the alias itself and never shows the number:
+  titles show the alias instead; an alias the server no longer knows (it restarted) says so; an id too short or of another Entity Type, a busy server (*Too many lookups*) or any other
   failure is stated in the section, and reopening it tries again.
 * **Actions** — **Add to watch / block list** (one button per watch or block list of the node's Entity Type that does
   not already hold it) asks for a reason first; a list under four-eyes answers *Waiting for approval* and nothing is

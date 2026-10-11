@@ -206,6 +206,55 @@ class ControlApiObjectsByEntityTest {
         }
     }
 
+    /** {@code ObjectAccess.byEntity} (Link Analysis's masked case history) answers exactly what the route does —
+     *  same rows, same order, same visible total, same truncation — for the same caller. */
+    @Test
+    void theEngineSeamAnswersExactlyWhatTheRouteDoes(@TempDir Path dir) throws Exception {
+        java.lang.reflect.Field cap = com.gamma.opsapi.EntityHistory.class.getDeclaredField("SCAN_CAP");
+        cap.setAccessible(true);
+        int was = cap.getInt(null);
+        try (Ctx c = open(dir)) {
+            var engine = TestOpsEngine.of(c.svc);
+            OperationalObject billing = incident(c, "billing", attrs("key.msisdn", "256700123456",
+                    com.gamma.opsapi.ObjectRoutes.ATTR_CASE_TYPE, "billing"));
+            incident(c, "fraud", attrs("key.msisdn", "256700123456", com.gamma.opsapi.ObjectRoutes.ATTR_CASE_TYPE, "fraud"));
+            incident(c, "minted", attrs("entityKey", "entity:msisdn:+256700123456"));
+            Thread.sleep(5);
+            OperationalObject kase = engine.open(ObjectType.CASE, "case", "d", "HIGH", null, null, null, null, Map.of());
+            engine.link(kase.id(), billing.id(), "CONTAINS", "sys");
+            var seam = c.svc.objects().orElseThrow();
+
+            for (String who : List.of("fraud", "all"))
+                for (String q : List.of("", "&limit=1", "&status=open")) {
+                    JsonNode http = JSON.readTree(get(c.port, "/objects/by-entity?type=msisdn&id=256700123456" + q, who).body());
+                    var ex = new com.gamma.spi.auth.SweepExchange("/objects/by-entity");
+                    com.gamma.spi.auth.RequestAttrs.attr(ex, com.gamma.spi.auth.RequestAttrs.ATTR_SUBJECT,
+                            "fraud".equals(who) ? new Subject("ana", Set.of(), Set.of("fraud")) : new Subject("root", Set.of()));
+                    try {
+                        Map<String, Object> r = seam.byEntity(null, ex, "msisdn", "+256700123456",
+                                q.contains("open") ? "open" : null, q.contains("limit") ? 1 : 50);
+                        @SuppressWarnings("unchecked") List<Map<String, Object>> rows = (List<Map<String, Object>>) r.get("objects");
+                        assertEquals(http.get("data").findValuesAsText("id"), rows.stream().map(m -> (String) m.get("id")).toList(), who + q);
+                        assertEquals(http.get("data").findValuesAsText("matchedOn"),
+                                rows.stream().map(m -> (String) m.get("matchedOn")).toList(), who + q);
+                        assertEquals(http.get("metadata").get("pagination").get("total").asInt(), r.get("total"), who + q);
+                        assertEquals(false, r.get("truncated"));
+                    } finally {
+                        com.gamma.spi.auth.RequestAttrs.REQUEST_SCOPES.remove(ex);
+                    }
+                }
+
+            cap.setInt(null, 2);
+            var ex = new com.gamma.spi.auth.SweepExchange("/objects/by-entity");
+            assertEquals(true, seam.byEntity(null, ex, "msisdn", "256700123456", null, 50).get("truncated"),
+                    "the scan cap reports truncated through the seam too");
+            assertThrows(com.gamma.spi.auth.ApiException.class, () -> seam.byEntity(null, ex, "msisdn", "1234", null, 50),
+                    "the route's 422s hold");
+        } finally {
+            cap.setInt(null, was);
+        }
+    }
+
     @Test
     void aBurstIsRateLimited(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

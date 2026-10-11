@@ -189,6 +189,20 @@
         "x-optional-module" : true
       }
     },
+    "/inv/case-history" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "The Incidents and Cases referencing one Entity, for a key that may be a masking alias",
+        "operationId" : "postInvCaseHistory",
+        "description" : "Body {key, investigationId?, status?: open|closed|all, limit?: 1..200} -> {entityType, resolved, reason?, objects:[{kind, id, title, status, severity?, createdAt, matchedOn, via?}], total, truncated, masking:{mode, masked}}. The key (alias, Investigation pseudonym or raw id) is resolved server-side with the /inv/reference-rows rules: an alias only for an Entity Type the masking covers; under that masking a raw key names nothing (resolved=false, no oracle). The Entity Type is the Investigation's endpoint type, else msisdn. Same matching and visibility as GET /objects/by-entity; no key is echoed and titles are re-masked. Gates: 503 write root, 503 Case management not installed, 422 body, 404/403 Investigation, 422 unsearchable key.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/schema/overlap-profile" : {
       "post" : {
         "tags" : [ "inv" ],

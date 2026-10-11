@@ -53,6 +53,11 @@ public final class LinkEventTypes {
      *  {@code truncated} carry the reach; the keys themselves are never recorded (they may be raw ids). */
     public static final String LINK_REFERENCE_READ = "LINK_REFERENCE_READ";
 
+    /** An Entity's case history was read from Link Analysis ({@code POST /inv/case-history}): the node dialog's Case
+     *  history for a key it may hold only as an alias. {@code resolved}/{@code objects}/{@code total}/{@code truncated}
+     *  carry the reach; the key is never recorded (raw or alias). */
+    public static final String LINK_CASE_HISTORY_READ = "LINK_CASE_HISTORY_READ";
+
     /** A Link Analysis evidence snapshot was SEALED ({@code POST /inv/snapshots}, LA-03).
      *  {@code snapshotId}, {@code nodes} and {@code edges} carry what was frozen. A distinct act from
      *  {@link #LINK_PROJECTED}: that one records what an analyst LOOKED AT, this one records what they

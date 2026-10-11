@@ -38,7 +38,7 @@ import java.util.Map;
  * SEC-7d / ABAC visibility is the same post-filter {@code GET
  * /objects} applies, so a hidden object (and a Case reached only through one) is simply absent, never counted.
  */
-final class EntityHistory {
+public final class EntityHistory {
 
     private EntityHistory() {}
 
@@ -54,18 +54,46 @@ final class EntityHistory {
     private static final List<ObjectType> KINDS = List.of(ObjectType.INCIDENT, ObjectType.CASE);
 
     static Object byEntity(ApiContext api, HttpExchange ex) {
-        String type = trim(ApiContext.query(ex, "type"));
-        String rawId = trim(ApiContext.query(ex, "id"));
-        String status = trim(ApiContext.query(ex, "status"));
+        Result r = query(api.writeRoot(), OpsEngine.of(api), ex, ApiContext.query(ex, "type"), ApiContext.query(ex, "id"),
+                ApiContext.query(ex, "status"), ApiContext.query(ex, "limit"));
+        ApiContext.pagination(ex, null, null, r.limit(), r.total());
+        if (r.truncated()) {
+            // The scan stopped at its cap: older references may exist, so `total` is a lower bound — say so.
+            if (ApiContext.attr(ex, ApiContext.ATTR_PAGINATION) instanceof Map<?, ?> p) {
+                @SuppressWarnings("unchecked") Map<String, Object> pm = (Map<String, Object>) p;
+                pm.put("truncated", true);
+                pm.put("message", truncatedMessage());
+            }
+            ex.getResponseHeaders().set(TRUNCATED_HEADER, "true");
+        }
+        return r.objects();
+    }
+
+    static String truncatedMessage() {
+        return "only the newest " + SCAN_CAP + " candidate objects were scanned; older references"
+                + " to this Entity may exist and are not counted in total";
+    }
+
+    /** One history read: the page of rows, the TRUE count of matches, the limit applied, and whether the scan hit its cap. */
+    public record Result(List<Map<String, Object>> objects, int total, int limit, boolean truncated) {}
+
+    /**
+     * The whole read behind {@code GET /objects/by-entity} — validation (422s), matching and the SEC-7d / ABAC
+     * visibility post-filter against {@code ex}'s caller — shared by the route and {@code ObjectAccess.byEntity}
+     * (Link Analysis's masked case history), so the two cannot disagree. {@code status}/{@code limit} may be null.
+     */
+    public static Result query(Path root, ObjectService svc, HttpExchange ex, String typeIn, String idIn, String statusIn, String limitIn) {
+        String type = trim(typeIn);
+        String rawId = trim(idIn);
+        String status = trim(statusIn);
         status = status == null ? "all" : status.toLowerCase(Locale.ROOT);
         if (!List.of("open", "closed", "all").contains(status))
             throw invalid("status must be one of open, closed, all, got '" + status + "'");
-        int limit = parseLimit(ApiContext.query(ex, "limit"));
+        int limit = parseLimit(limitIn);
         if (type == null) throw invalid("'type' (an Entity Type id) is required");
         if (rawId == null) throw invalid("'id' (the Entity's value) is required");
         if (rawId.length() > MAX_ID_LENGTH) throw invalid("'id' may be at most " + MAX_ID_LENGTH + " characters");
 
-        Path root = api.writeRoot();
         List<EntityTypes.EntityType> types = (root == null ? LinkAnalysisSettings.EMPTY
                 : LinkAnalysisSettings.read(root.resolve(LinkAnalysisSettings.FILE))).effectiveEntityTypes();
         EntityTypes.EntityType et = types.stream().filter(t -> t.id().equals(type)).findFirst()
@@ -77,7 +105,6 @@ final class EntityHistory {
         if (key.length() < min)
             throw invalid("'id' must fold to at least " + min + " characters as a " + type + " key, got '" + key + "'");
 
-        ObjectService svc = OpsEngine.of(api);
         // The longest literal both raw and folded forms share: the digits for a number, else the folded key.
         String fragment = digitsOnly(et.normaliser()) ? key : key.toLowerCase(Locale.ROOT);
         List<OperationalObject> scanned = svc.findByAttributeFragment(KINDS, fragment, SCAN_CAP);
@@ -105,18 +132,7 @@ final class EntityHistory {
                         .thenComparing(r -> (String) r.get("id")).reversed())
                 .toList();
         out.forEach(r -> r.remove("_closed"));
-        ApiContext.pagination(ex, null, null, limit, out.size());
-        if (scanned.size() >= SCAN_CAP) {
-            // The scan stopped at its cap: older references may exist, so `total` is a lower bound — say so.
-            if (ApiContext.attr(ex, ApiContext.ATTR_PAGINATION) instanceof Map<?, ?> p) {
-                @SuppressWarnings("unchecked") Map<String, Object> pm = (Map<String, Object>) p;
-                pm.put("truncated", true);
-                pm.put("message", "only the newest " + SCAN_CAP + " candidate objects were scanned; older references"
-                        + " to this Entity may exist and are not counted in total");
-            }
-            ex.getResponseHeaders().set(TRUNCATED_HEADER, "true");
-        }
-        return out.size() > limit ? out.subList(0, limit) : out;
+        return new Result(out.size() > limit ? out.subList(0, limit) : out, out.size(), limit, scanned.size() >= SCAN_CAP);
     }
 
     /** Which attribute names the Entity, or null. */

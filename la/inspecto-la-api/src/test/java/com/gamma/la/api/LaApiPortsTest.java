@@ -102,6 +102,10 @@ class LaApiPortsTest {
                 return Optional.ofNullable(byRef.get(ref));
             }
             @Override public boolean visibleTo(HttpExchange ex, Map<String, Object> summary) { return visible; }
+            @Override public Map<String, Object> history(com.gamma.spi.http.ApiContext api, HttpExchange ex, String type,
+                                                         String key, String status, int limit) {
+                return Map.of("objects", List.of(), "total", 0, "truncated", false);
+            }
         };
     }
 

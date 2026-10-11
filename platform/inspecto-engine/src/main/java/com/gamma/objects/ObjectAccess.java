@@ -2,6 +2,9 @@ package com.gamma.objects;
 
 import com.gamma.workflow.ObjectType;
 import com.gamma.api.PublicApi;
+import com.sun.net.httpserver.HttpExchange;
+
+import java.nio.file.Path;
 
 import java.util.List;
 import java.util.Map;
@@ -171,4 +174,22 @@ public interface ObjectAccess {
      * ({@code AlertMigration}); {@link #findByStatus} is the flat SEC-7d projection and deliberately omits these.
      */
     default List<Map<String, Object>> activeDetail(String rawType) { return List.of(); }
+
+    /**
+     * An Entity's case history — exactly what {@code GET /objects/by-entity?type=&id=&status=&limit=} answers: the
+     * Incidents and Cases referencing {@code key} as an Entity of Entity Type {@code type} (folded with that type's
+     * normaliser), newest first, after the SEC-7d / ABAC visibility post-filter judged for {@code ex}'s caller. The
+     * map is {@code {objects: List<Map>, total: int, truncated: boolean}}: {@code objects} at most {@code limit} rows,
+     * {@code total} every visible match, {@code truncated} when the bounded candidate scan hit its cap (total is
+     * then a lower bound). {@code status} is {@code open|closed|all} (null = all). Throws the route's own 422s
+     * ({@code ApiException}) for an unknown type, a too-short key, or a bad status/limit.
+     *
+     * <p>⚠ {@code writeRoot} (the Space's config root, where its Entity Types live) rather than {@code ApiContext}:
+     * that type sits in {@code inspecto-http-spi}, which this module does not depend on. The exchange is a JDK type.
+     * Added for Link Analysis's masked case history ({@code POST /inv/case-history}), which resolves an alias
+     * server-side and must not reimplement the matching. The default (no ops module) is unsupported.
+     */
+    default Map<String, Object> byEntity(Path writeRoot, HttpExchange ex, String type, String key, String status, int limit) {
+        throw new UnsupportedOperationException("case history needs the ops module");
+    }
 }

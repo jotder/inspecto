@@ -33,6 +33,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/index/builds"},
             {"POST", "/inv/projection"},
             {"POST", "/inv/reference-rows"},
+            {"POST", "/inv/case-history"},
     };
 
     /** Everything else: Investigation / draft / member / case / alert-rule / identity / Entity List CRUD and

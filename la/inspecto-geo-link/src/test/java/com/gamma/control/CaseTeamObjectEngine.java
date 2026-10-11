@@ -22,6 +22,11 @@ public final class CaseTeamObjectEngine implements ObjectEngineProvider {
     /** Armed by a test: case id → the flat summary map. Null = ops absent. */
     static volatile Map<String, Map<String, Object>> CASES;
 
+    /** Case history the stand-in answers ({@code ObjectAccess.byEntity}), and every {@code type|key|status|limit} asked. */
+    static volatile List<Map<String, Object>> HISTORY;
+    static volatile boolean HISTORY_TRUNCATED;
+    static final List<String> ASKED = new java.util.concurrent.CopyOnWriteArrayList<>();
+
     static Map<String, Map<String, Object>> arm() {
         CASES = new ConcurrentHashMap<>();
         return CASES;
@@ -51,6 +56,16 @@ public final class CaseTeamObjectEngine implements ObjectEngineProvider {
             public List<String> tagsOf(String k, String i) { return List.of(); }
             public List<String> targetIdsForTag(String t, String k) { return List.of(); }
             public List<Map<String, Object>> findByStatus(ObjectType kind, String status) { return List.of(); }
+            /** Case history: records what was asked (RAW key), answers {@link #HISTORY}; a short key is the host's 422. */
+            public Map<String, Object> byEntity(Path writeRoot, com.sun.net.httpserver.HttpExchange ex, String type,
+                                                String key, String status, int limit) {
+                ASKED.add(type + "|" + key + "|" + status + "|" + limit);
+                if (key.length() < 5)
+                    throw new com.gamma.spi.auth.ApiException(422, "'id' must fold to at least 5 characters, got '" + key + "'");
+                List<Map<String, Object>> rows = HISTORY == null ? List.of() : HISTORY;
+                return Map.of("objects", rows.size() > limit ? rows.subList(0, limit) : rows, "total", rows.size(),
+                        "truncated", HISTORY_TRUNCATED);
+            }
         };
         return new ObjectEngine() {
             public ObjectAccess access() { return access; }

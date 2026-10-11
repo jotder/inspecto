@@ -187,4 +187,18 @@ public final class ObjectServiceAccess implements ObjectAccess {
         return service.query(ObjectQuery.builder().objectType(kind).status(status).build())
                 .stream().map(ObjectServiceAccess::flatten).toList();
     }
+
+    /** {@code GET /objects/by-entity}'s own read ({@link com.gamma.opsapi.EntityHistory#query}): same matching, same
+     *  visibility post-filter, same truncation — so Link Analysis's masked case history cannot drift from the route. */
+    @Override
+    public Map<String, Object> byEntity(java.nio.file.Path writeRoot, com.sun.net.httpserver.HttpExchange ex,
+                                        String type, String key, String status, int limit) {
+        com.gamma.opsapi.EntityHistory.Result r = com.gamma.opsapi.EntityHistory.query(writeRoot, service, ex, type, key,
+                status, String.valueOf(limit));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("objects", r.objects());
+        out.put("total", r.total());
+        out.put("truncated", r.truncated());
+        return out;
+    }
 }
