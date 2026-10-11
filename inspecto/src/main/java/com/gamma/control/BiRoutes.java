@@ -33,7 +33,7 @@ import com.gamma.access.WriteGates;
  *
  * <ul>
  *   <li>{@code POST /bi/query} — {@code {dataset, measures[{agg,field}], groupBy[], filters[],
- *       orderBy[], limit}} → compiled by {@link MeasureCompiler} (validated identifiers + typed
+ *       orderBy[{field,dir,agg?}], limit}} → compiled by {@link MeasureCompiler} (validated identifiers + typed
  *       literals only), SqlGuard-checked, executed in the same ephemeral DuckDB sandbox as
  *       {@code /queries/{id}/run}, returning the same Result Set contract.</li>
  * </ul>
@@ -96,6 +96,8 @@ final class BiRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
+        vetHiddenOrderColumns(spec, dataset, store, new ViewStore(writeRoot.resolve("views")));
+
         // 4. QUERY-BOUND-WIDGET-1: a Widget bound to a saved Query aggregates over THAT query's result, so the
         //    query's own filtering reaches the Widget. Its text is read and rendered NOW (parameter defaults
         //    + session context), never baked at save time, and the whole statement is re-guarded.
@@ -120,6 +122,32 @@ final class BiRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: "
                     + ServerFaults.sqlMessage(e.getMessage(), api));
         }
+    }
+
+    /**
+     * CATEGORY-SORT-ORDER-1: a hidden-aggregate {@code orderBy} column must be a real Dataset column (when the Dataset
+     * declares its columns) and must NOT be classified — ordering by a masked column is an inference channel
+     * (the row order leaks the values' rank). Lineage that cannot be traced fails closed, as it does for masking.
+     */
+    private static void vetHiddenOrderColumns(MeasureCompiler.Spec spec, Map<String, Object> dataset,
+                                              ComponentStore store, ViewStore views) {
+        List<String> hidden = MeasureCompiler.hiddenOrderColumns(spec);
+        if (hidden.isEmpty()) return;
+        if (dataset.get("columns") instanceof List<?> cols && !cols.isEmpty()) {
+            java.util.Set<String> known = new java.util.HashSet<>();
+            for (Object o : cols)
+                if (o instanceof Map<?, ?> c && c.get("name") != null)
+                    known.add(String.valueOf(c.get("name")).trim().toLowerCase(java.util.Locale.ROOT));
+            for (String h : hidden)
+                if (!known.contains(h.toLowerCase(java.util.Locale.ROOT)))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                            "orderBy column '" + h + "' is not a column of dataset '" + spec.dataset() + "'");
+        }
+        java.util.Set<String> sensitive = com.gamma.mask.EvidenceMasker.sensitiveColumns(store, views, spec.dataset());
+        for (String h : hidden)
+            if (sensitive.contains(h.toLowerCase(java.util.Locale.ROOT)) || sensitive.contains(com.gamma.mask.EvidenceMasker.UNKNOWN_LINEAGE))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "orderBy column '" + h + "' is classified (or its lineage is untraceable); ordering by it would leak its values");
     }
 
     /** The reserved CTE name a bound query's result is aggregated from. */

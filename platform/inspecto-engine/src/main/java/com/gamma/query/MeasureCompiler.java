@@ -47,8 +47,24 @@ public final class MeasureCompiler {
     /** One filter term; {@code op} ∈ = != > >= < <= in like isNull notNull. */
     public record Filter(String field, String op, Object value) {}
 
-    /** One ORDER BY term. */
-    public record Sort(String field, boolean descending) {}
+    /**
+     * One ORDER BY term. {@code agg} non-null marks a <b>hidden aggregate</b> term (CATEGORY-SORT-ORDER-1): the
+     * {@code field} is a Dataset column that is NOT in the result, ordered as {@code agg(field)} while the
+     * grouping stays unchanged. {@code null} = an ordinary term over a result column (a grouped Dimension or a Measure id).
+     */
+    public record Sort(String field, boolean descending, String agg) {
+        public Sort(String field, boolean descending) { this(field, descending, null); }
+
+        public boolean hidden() { return agg != null; }
+    }
+
+    /** The aggregates a hidden {@code orderBy} term may carry; {@code min} is the default. Closed vocabulary. */
+    static final List<String> ORDER_AGGS = List.of("min", "max");
+
+    /** The Dataset columns a spec orders by WITHOUT returning them — what the route must vet (existence, classification). */
+    public static List<String> hiddenOrderColumns(Spec spec) {
+        return spec.orderBy().stream().filter(Sort::hidden).map(Sort::field).distinct().toList();
+    }
 
     /**
      * The parsed spec: at least one measure or one dimension; {@code dataset} is resolved by the route.
@@ -169,8 +185,20 @@ public final class MeasureCompiler {
         if (body.get("orderBy") instanceof List<?> os)
             for (Object o : os)
                 if (o instanceof Map<?, ?> s)
-                    orderBy.add(new Sort(safeIdent(trimToNull(s.get("field")), "orderBy field"),
-                            "desc".equalsIgnoreCase(trimToNull(s.get("dir")))));
+                {
+                    String field = safeIdent(trimToNull(s.get("field")), "orderBy field");
+                    boolean desc = "desc".equalsIgnoreCase(trimToNull(s.get("dir")));
+                    String agg = trimToNull(s.get("agg"));
+                    if (agg != null && !ORDER_AGGS.contains(agg))
+                        throw new IllegalArgumentException("unknown orderBy agg '" + agg + "' (one of " + ORDER_AGGS + ")");
+                    boolean inResult = groupBy.contains(field) || measures.stream().anyMatch(m -> m.id().equals(field));
+                    // An explicit agg, or a field that is not a result column, orders by a hidden aggregate of the Dataset column.
+                    if (agg == null && !inResult) agg = "min";
+                    if (agg != null && (measures.isEmpty() || groupBy.isEmpty()))
+                        throw new IllegalArgumentException("orderBy '" + field + "' (hidden " + agg
+                                + ") needs at least one measure and one groupBy column");
+                    orderBy.add(new Sort(field, desc, agg));
+                }
 
         Map<String, Object> when = null;
         if (body.get("when") != null) {
@@ -262,7 +290,9 @@ public final class MeasureCompiler {
                     spec.groupBy().stream().map(d -> dimExpression(d, spec.grains())).toList()));
         if (!spec.orderBy().isEmpty()) {
             List<String> terms = new ArrayList<>();
-            for (Sort s : spec.orderBy()) terms.add(q(s.field()) + (s.descending() ? " DESC" : " ASC"));
+            for (Sort s : spec.orderBy())
+                terms.add((s.hidden() ? s.agg().toUpperCase() + "(" + q(s.field()) + ")" : q(s.field()))
+                        + (s.descending() ? " DESC" : " ASC"));
             sql.append(" ORDER BY ").append(String.join(", ", terms));
         } else if (!spec.groupBy().isEmpty() && spec.limit() < Integer.MAX_VALUE) {
             // BI-QUERY-TRUNCATION-1: DuckDB promises no order, so a LIMIT with no ORDER BY returned an ARBITRARY

@@ -162,4 +162,35 @@ class MeasureCompilerTest {
         String sql = MeasureCompiler.render(spec);
         assertTrue(sql.contains("\"x\" IS NULL") && sql.contains("\"y\" IS NOT NULL"), sql);
     }
+
+    /** CATEGORY-SORT-ORDER-1: a Dataset column outside the result orders by a hidden aggregate; grouping is unchanged. */
+    @Test
+    void aHiddenAggregateOrdersByAColumnOutsideTheResult() {
+        Map<String, Object> base = Map.of("dataset", "g", "measures", List.of(Map.of("agg", "count")),
+                "groupBy", List.of("stage"));
+        java.util.function.Function<Map<String, Object>, String> sql = o -> {
+            Map<String, Object> b = new java.util.HashMap<>(base);
+            b.put("orderBy", List.of(o));
+            return MeasureCompiler.render(parse(b));
+        };
+        assertEquals("SELECT \"stage\", COUNT(*) AS \"count\" FROM \"g\" GROUP BY \"stage\" ORDER BY MIN(\"stage_order\") ASC LIMIT 500",
+                sql.apply(Map.of("field", "stage_order")), "default agg is min");
+        assertTrue(sql.apply(Map.of("field", "stage_order", "agg", "max", "dir", "desc")).contains("ORDER BY MAX(\"stage_order\") DESC"));
+        assertTrue(sql.apply(Map.of("field", "count", "dir", "desc")).contains("ORDER BY \"count\" DESC"), "result column unchanged");
+        assertTrue(sql.apply(Map.of("field", "stage")).contains("ORDER BY \"stage\" ASC"), "grouped dimension unchanged");
+        assertEquals(List.of("stage_order"), MeasureCompiler.hiddenOrderColumns(parse(Map.of("dataset", "g",
+                "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("stage"),
+                "orderBy", List.of(Map.of("field", "stage_order"), Map.of("field", "count"))))));
+    }
+
+    @Test
+    void aHiddenAggregateIsValidated() {
+        Map<String, Object> m = Map.of("agg", "count");
+        assertThrows(IllegalArgumentException.class, () -> parse(Map.of("dataset", "g", "measures", List.of(m),
+                "groupBy", List.of("a"), "orderBy", List.of(Map.of("field", "b", "agg", "sum")))), "closed vocabulary");
+        assertThrows(IllegalArgumentException.class, () -> parse(Map.of("dataset", "g", "measures", List.of(m),
+                "groupBy", List.of("a"), "orderBy", List.of(Map.of("field", "b; DROP", "agg", "min")))), "unsafe identifier");
+        assertThrows(IllegalArgumentException.class, () -> parse(Map.of("dataset", "g", "measures", List.of(m),
+                "orderBy", List.of(Map.of("field", "b", "agg", "min")))), "needs a groupBy");
+    }
 }

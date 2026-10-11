@@ -154,3 +154,14 @@ A widget's time bucket is part of the query, not a client-side afterthought:
   sandbox rather than string-comparing it.
 * `SqlGuard` passes the bucketed statement unchanged — neither `STRFTIME` nor `DATE_TRUNC` is a
   file/extension surface — and the route re-checks it as always.
+
+## Hidden-aggregate `orderBy` (`CATEGORY-SORT-ORDER-1` sub-item 1, shipped 2026-10-11)
+
+An `orderBy` entry `{field, dir, agg?}` may name a **Dataset column that is not in the result** (an ungrouped ordinal
+such as `stage_order`): `MeasureCompiler` emits `ORDER BY MIN("stage_order") ASC` while `GROUP BY` and the returned
+columns stay unchanged. `agg` is the closed set `min` (default) | `max`; an entry with `agg`, or whose `field` is not a
+grouped Dimension / Measure id, is a hidden term (`Sort.hidden()`). It needs at least one Measure and one `groupBy`
+(else 422). `BiRoutes.vetHiddenOrderColumns` then 422s a column the Dataset's declared `columns` do not list, and
+**refuses a classified column** (`EvidenceMasker.sensitiveColumns`, incl. fail-closed untraceable lineage) because the
+row order would leak the values' rank. Absent `agg` over a result column is exactly the old behaviour. UI side:
+Widget `options.categoryOrder:{field,dir,agg?}` read by `buildXyQuery`.
