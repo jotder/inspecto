@@ -279,7 +279,10 @@ export class LinkAnalysisValueMeasuresComponent {
                       sourceCol: h.sourceCol,
                       targetCol: h.targetCol,
                       linkKindCol: h.linkKindCol ?? '',
-                      ...(untracked(this.timeCol) ? { timeCol: untracked(this.timeCol) } : {}),
+                      // The page's bound time column, else the Investigation's own (a deep link opens it with no graph loaded).
+                      ...(untracked(this.timeCol) || h.timeCol
+                          ? { timeCol: untracked(this.timeCol) || h.timeCol }
+                          : {}),
                   }
                 : {}),
         };

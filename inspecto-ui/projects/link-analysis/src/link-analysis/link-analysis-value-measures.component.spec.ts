@@ -268,6 +268,12 @@ describe('Value Measures form (DR-D4)', () => {
         });
     });
 
+    it("prefills the Time column from the Investigation's own bound time column when the page has none", async () => {
+        const { c, fixture } = setup({ investigation: { ...HEADER, timeCol: 'booked_at' } });
+        await fixture.whenStable();
+        expect(c.form().form.value).toMatchObject({ timeCol: 'booked_at' });
+    });
+
     it('uses date pickers for the fixed window, not free text', () => {
         const { el } = setup();
         expect(el.querySelector('input[data-test="vm-from"]')!.getAttribute('type')).toBe('date');
