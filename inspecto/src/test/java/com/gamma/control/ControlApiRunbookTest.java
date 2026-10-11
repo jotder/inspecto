@@ -111,9 +111,16 @@ class ControlApiRunbookTest {
                  "severity":"WARNING"%s}""".formatted(name, runbook == null ? "" : ",\"runbook\":\"" + runbook + "\"");
     }
 
+    private static final String DATASET = "{\"id\":\"fraud_irsf\",\"name\":\"fraud_irsf\"}";
+
+    private void seedLinkTargets(Ctx c) throws Exception {
+        assertEquals(200, send(c, "POST", "/components/dataset", DATASET, ALICE).statusCode());
+    }
+
     @Test
     void aRunbookIsCreatedReadUpdatedVersionedAndDeleted(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
+            seedLinkTargets(c);
             JsonNode saved = data(send(c, "POST", "/components/runbook", RUNBOOK, ALICE), 200);
             assertEquals("IRSF runbook", saved.at("/content/title").asText());
             assertEquals("alice", saved.at("/content/owner").asText(), "R3 author stamp, apart from ownerRole");
@@ -138,6 +145,7 @@ class ControlApiRunbookTest {
     @Test
     void writesAreGatedOnCanAuthorWorkbench(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
+            seedLinkTargets(c);
             assertEquals(401, send(c, "POST", "/components/runbook", RUNBOOK, null).statusCode());
             assertEquals(403, send(c, "POST", "/components/runbook", RUNBOOK, BUSINESS).statusCode());
             assertFalse(new ComponentStore(root.resolve("registry")).exists("runbook", "irsf"), "nothing written");
@@ -167,11 +175,41 @@ class ControlApiRunbookTest {
             assertFalse(new ComponentStore(root.resolve("registry")).exists("alert-rule", "r1"), "nothing written");
 
             // The same body saves once the Runbook exists, and the link round-trips.
+            seedLinkTargets(c);
             data(send(c, "POST", "/components/runbook", RUNBOOK, ALICE), 200);
             data(send(c, "POST", "/alerts/rules", rule("r1", "irsf"), ALICE), 200);
             assertEquals("irsf", new ComponentStore(root.resolve("registry")).get("alert-rule", "r1").orElseThrow()
                     .content().get("runbook"));
             data(send(c, "POST", "/alerts/rules", rule("r2", null), ALICE), 200);   // a link is optional
+        }
+    }
+
+    @Test
+    void aStepLinkToAMissingComponentIsRefusedAndAnExistingOneSaves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String msg = error(send(c, "POST", "/components/runbook", RUNBOOK, ALICE), 422);
+            assertTrue(msg.contains("steps[0]") && msg.contains("dataset 'fraud_irsf'"), msg);
+            assertFalse(new ComponentStore(root.resolve("registry")).exists("runbook", "irsf"));
+            // a case link names a runtime object: never existence-checked
+            assertEquals(200, send(c, "POST", "/components/runbook",
+                    RUNBOOK.replace("\"dataset\"", "\"case\"").replace("\"irsf\"", "\"irsf2\""), ALICE).statusCode());
+            seedLinkTargets(c);
+            assertEquals(200, send(c, "POST", "/components/runbook", RUNBOOK, ALICE).statusCode());
+        }
+    }
+
+    @Test
+    void aRunbookLinkedByAnAlertRuleCannotBeDeleted(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedLinkTargets(c);
+            data(send(c, "POST", "/components/runbook", RUNBOOK, ALICE), 200);
+            data(send(c, "POST", "/components/runbook", RUNBOOK.replace("\"irsf\"", "\"free\""), ALICE), 200);
+            data(send(c, "POST", "/alerts/rules", rule("r1", "irsf"), ALICE), 200);
+            data(send(c, "POST", "/alerts/rules", rule("r2", "irsf"), ALICE), 200);
+            String msg = error(send(c, "DELETE", "/components/runbook/irsf", null, ALICE), 409);
+            assertTrue(msg.contains("r1") && msg.contains("r2"), msg);
+            assertTrue(new ComponentStore(root.resolve("registry")).exists("runbook", "irsf"));
+            assertEquals(200, send(c, "DELETE", "/components/runbook/free", null, ALICE).statusCode());
         }
     }
 }
