@@ -279,11 +279,17 @@ class TelcoFraudTemplateGoldenTest {
                 assertEquals(2, rs.getLong(1), "the sink holds both windows (day 2 has one reversal-less payment)");
             }
 
-            // Retention (incremental retain: 30): the run for day 31 prunes day 1's partition, so every day-1
-            // offender's evidence ages out and its key heals; the zero-row seed partition is kept.
-            for (JobConfig j : jobs) assertEquals("30", j.params().get("incremental.retain"), j.name());
+            // Retention (incremental retain: 31) = the pre-migration horizon: the old SQL kept the current window plus
+            // every window_date >= window_start - retention_days (30), so day 1 (07-01) survived the 07-31 run and
+            // aged out on the 08-01 run. Same here: the 07-31 run keeps day 1 (no heal), the 08-01 run prunes it.
+            for (JobConfig j : jobs) assertEquals("31", j.params().get("incremental.retain"), j.name());
             Map<String, String> day31 = window(java.time.LocalDate.of(2026, 7, 31));
             for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), day31).status(), j.name() + " day 31");
+            assertRaisesExactlyThePlanted(rules, probe, corpus);
+            assertEquals(List.of(), svc.evaluateRules(), "day 31 still holds day 1: nothing raised or healed");
+            assertEquals(TOTAL, svc.openAlerts().size(), "day 1's Alerts stay open on day 31");
+            Map<String, String> day32 = window(java.time.LocalDate.of(2026, 8, 1));
+            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), day32).status(), j.name() + " day 32");
             for (JobConfig j : jobs) {
                 Path sink = data.resolve(j.params().get("sink_dataset"));
                 assertFalse(Files.exists(sink.resolve("window_date=2026-07-01")), j.name() + ": day 1 aged out");

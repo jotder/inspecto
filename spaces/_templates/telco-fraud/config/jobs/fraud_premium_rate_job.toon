@@ -13,7 +13,7 @@ job:
     by: day
     column: window_date
     lookback: 1
-    retain: 30
+    retain: 31
   premium_prefixes: "999900,999909"
   home_cc: "999"
   enabled: true

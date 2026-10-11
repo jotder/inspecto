@@ -438,14 +438,14 @@ precede it. Dealer activations look for traffic up to `traffic_grace_hours` past
 are not idle.
 
 ⚠ **Each Job is partition-incremental by `window_date` (2026-10-11, `ASSURE-PACK-TELCO-FRAUD-1` (b)).** Every
-detection Job declares `incremental: {by: day, column: window_date, lookback: 1, retain: 30}` and `day: "$yesterday"`, so a run
+detection Job declares `incremental: {by: day, column: window_date, lookback: 1, retain: 31}` and `day: "$yesterday"`, so a run
 replaces only its own window's `data/fraud_<typology>/window_date=YYYY-MM-DD/` folder and never opens the others
 (→ `okf/backend/control-plane/jobs.md`); the Jobs no longer read their own sink (until then they re-emitted every
 other `window_date` within `retention_days` in their SQL). A manual run passes `day` beside the literal window, or its
 rows fall outside the lookback and are dropped. A same-window re-run replaces that window, never duplicates it; a later
-window's run neither raises nor heals an earlier offender's Alert. **Retention:** `retain: 30` (the old
-`retention_days`) makes each run delete the day folders older than 30 days (never the seed folder), so a key heals
-when all its evidence ages out (its Incident stays open — D-P11); the golden test's day-31 run pins it. ⚠ **The storm
+window's run neither raises nor heals an earlier offender's Alert. **Retention:** `retain: 31` (the old
+`retention_days` horizon: the window plus 30 earlier days) makes each run delete older day folders (never the seed folder), so a key heals
+when all its evidence ages out (its Incident stays open — D-P11); the golden test pins the heal day (kept on day 31, healed on day 32). ⚠ **The storm
 cap counts every retained breaching key**: `AlertService.evaluateGrouped` collapses a rule into ONE storm Alert once
 the total exceeds `stormCap`, and no new offender gets its own Alert until it drops back. A first cut keyed on
 offender + `window_date` with `stormCap: 50` hit that around day 11 at the corpus rate; keying on the offender bounds

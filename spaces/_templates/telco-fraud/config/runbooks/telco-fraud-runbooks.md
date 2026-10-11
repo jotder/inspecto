@@ -3,7 +3,7 @@
 One runbook per typology in this Space Template. Each typology section below is also a Runbook component (`config/registry/runbooks/fraud_<typology>.toon`), linked from its Alert Rule by `runbook:`, so the Incident page shows it; edit the component, and keep this file for the shared guidance. Each Alert Rule `fraud_<typology>` is per-entity: it
 raises one Alert and one Incident per offender (`by` = the offender key), with the Measure taken as the
 `max` over every retained window. An offender seen on several days is one Alert. A key heals only when all its
-evidence ages out of retention (`retain`, default 30 days); that resolves its Alert but never its Incident. A
+evidence ages out of retention (`retain: 31`, the window plus 30 earlier days); that resolves its Alert but never its Incident. A
 person records the Disposition. `stormCap` is 500 per rule: above that many retained offenders one storm Alert
 stands for them all, so keep `stormCap` above `retain` x the expected daily offenders.
 
@@ -40,7 +40,7 @@ least `min_candidate_targets` voice targets (default 10). `fraud_identity`, `fra
 `fraud_reversal` still keep one row per document, dealer, serial or paying line, so their sinks grow with the
 subscriber base.
 
-**Sizing and retention.** Each Job's `incremental.retain` (default 30) keeps that many days: after every run
+**Sizing and retention.** Each Job's `incremental.retain` (31: the window plus 30 earlier days) keeps that many days: after every run
 the day folders older than that are deleted. Size storage by subscriber count x `retain`: for the entity-keyed
 sinks (`fraud_identity`, `fraud_dealer`, `fraud_voucher`, `fraud_reversal`) plan for about one row per active
 entity per day, that is up to (active subscribers, documents, dealers, serials or paying lines) x `retain` rows.

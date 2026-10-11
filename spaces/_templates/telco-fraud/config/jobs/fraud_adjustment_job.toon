@@ -13,6 +13,6 @@ job:
     by: day
     column: window_date
     lookback: 1
-    retain: 30
+    retain: 31
   exempt_agents: "BILLING-DESK"
   enabled: true

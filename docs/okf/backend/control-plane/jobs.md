@@ -194,13 +194,13 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   22.8 MB rewritten per run; incremental `lookback: 1` 0.9-1.0 s and ~0.8 MB (one day) rewritten; the
   30-day backfill took 3.0 s. The read side is unchanged unless the SQL filters its source by the window.
   **Enabled in the telco-fraud pack (2026-10-11):** all 14 detection Jobs run `incremental: {by: day,
-  column: window_date, lookback: 1, retain: 30}` with `day: "$yesterday"` (the same day as `window_start`; a manual or
+  column: window_date, lookback: 1, retain: 31}` with `day: "$yesterday"` (the same day as `window_start`; a manual or
   golden run passes `day` beside the literal window), no longer read their own sink, and ship their zero-row
   schema seed as `data/fraud_<typology>/window_date=1970-01-01/seed.parquet` (a placeholder day the Job
   never replaces; a flat `seed.parquet` is refused by the layout gate). The Dataset reader leaves
   `hive_partitioning` unset and DuckDB auto-detects the `window_date=` folders, so `window_date` reaches
-  Alert Rules, KPIs (`timeField: window_date`) and BI as a DATE. Each Job carries `retain: 30` (its old
-  `retention_days`), so evidence still ages out and a key heals (pinned by the golden test's day-31 run).
+  Alert Rules, KPIs (`timeField: window_date`) and BI as a DATE. Each Job carries `retain: 31` (its old
+  `retention_days` horizon: the window plus 30 earlier days), so evidence still ages out and a key heals on the same day (pinned by the golden test's day-31 and day-32 runs).
   **Retention: `retain: M` (2026-10-11).** Optional; a positive integer `>= lookback`, refused 422 at save
   otherwise; absent = keep every day. After the replace, under the same lock, `IncrementalSink.prune`
   deletes each `<column>=YYYY-MM-DD` folder dated before `day - (M - 1)` (so M days are kept). Only folders
