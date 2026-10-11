@@ -225,8 +225,12 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    in-flight runs cooperatively (they stop at their next checkpoint, writing nothing more), and each run releases
    its own lease only after its thread has stopped. Measured in `CancelRunsLeaseTest`: cancel to survivor holding
    the lease about 25 ms (TTL 60 s). If a run does not stop within the 10 s close deadline the node logs a WARN and
-   the lease is deliberately kept until its TTL expires (releasing it would allow two writers). Job runs and a single
-   long uninterruptible write/fetch can still delay release up to that deadline.
+   the lease is deliberately kept until its TTL expires (releasing it would allow two writers). Job runs are cancelled
+   the same way since 2026-10-11 (`HA-CANCEL-RESIDUALS-1` (1), `597d1893a`): a Job run stops at its next `Scope.JOB`
+   fence check and releases its arming / authored claims once its thread ends; a Job type whose body never reaches a
+   fence check runs to completion inside that deadline. `GracefulStopHandoverTest` drives the whole handover (close
+   mid-run → run cancelled → lease released → second node claims) for a pipeline run and a Job run. A single long
+   uninterruptible write/fetch can still delay release up to that deadline.
 3. **At-least-once on `kill -9`** (above) — root-caused to the output-before-acknowledgement window with
    node-local output trees; not the dedup ledger. Open decision: see `HA-KILL9-DOUBLE-INGEST-1` for the options.
    **Contract until decided: failover delivery is at-least-once unless the output tree is shared or synced (then a
