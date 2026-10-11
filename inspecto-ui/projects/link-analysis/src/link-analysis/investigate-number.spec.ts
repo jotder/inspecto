@@ -5,7 +5,11 @@ import { domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     DegreeOutcome,
     MAX_EXPAND_FRONTIER,
+    admittedHop,
     degreeOutcome,
+    isAwaiting,
+    mergeRung,
+    reconcileApprovals,
     degreeOutcomeMessage,
     degreeState,
     hubBadgeText,
@@ -103,7 +107,7 @@ describe('investigate-number - the telecom binding', () => {
         });
         expect(b.timeCol).toBe('last_seen');
         expect(b.eventsCol).toBe('events');
-        expect(b.presets).toEqual({ windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 });
+        expect(b.presets).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
         expect(b.maxDegree).toBe(4);
         expect(b.presets).toBe(domainProfile('telecom').investigate!.expand); // ONE home for the presets
     });
@@ -201,7 +205,7 @@ describe('investigate-number - next degree', () => {
         const p = domainProfile('telecom').investigate!.expand;
         expect(presetRung(p, true, '2026-09-29T18:30:00.000Z')).toEqual({
             budget: 2000,
-            minEvents: 2,
+            minEvents: 1,
             maxFanOut: 50,
             window: { from: '2026-08-30T18:30:00.000Z', to: '2026-09-29T18:30:01.000Z' },
         });
@@ -290,5 +294,45 @@ describe('investigate-number - next degree', () => {
         expect(degreeOutcomeMessage({ ...o, admitted: 1, linksAdded: 1, truncated: false, fanOutCapped: 0 })).toBe(
             'Degree 2: 1 new entity, 1 link added.',
         );
+    });
+});
+
+describe('investigate-number - live-run fixes', () => {
+    it('the Advanced rung wins over the preset rung field by field; the hub opt-in never rides along', () => {
+        expect(
+            mergeRung(
+                { minEvents: 2, maxFanOut: 50, budget: 2000 },
+                { minEvents: 1, includeHubs: true, expandHubs: ['h'] },
+            ),
+        ).toEqual({ minEvents: 1, maxFanOut: 50, budget: 2000 });
+        expect(mergeRung({ budget: 5 }, null)).toEqual({ budget: 5 });
+    });
+
+    it('a degree is the outermost hop its step admitted, not the count of steps', () => {
+        const set = ws(entity('s', 0), { ...entity('x', 3), admittedBy: 9 });
+        expect(admittedHop(set, 9)).toBe(3);
+        expect(admittedHop(set, 4)).toBeNull();
+        const r = { step: 9, op: 'expand', delta: { admitted: ['x'], linksAdded: 1 }, truncated: false } as never;
+        expect(degreeOutcome(2, r, {}, null, set).degree).toBe(3);
+        expect(degreeOutcome(2, r, {}).degree).toBe(2);
+    });
+
+    it('reconciles a held degree with the log: unchanged while pending, then approved or denied', () => {
+        const held: DegreeOutcome = {
+            degree: 1,
+            admitted: 0,
+            linksAdded: 0,
+            truncated: false,
+            fanOutCapped: 0,
+            awaitingApproval: 'p2',
+        };
+        const req = (status: 'pending' | 'approved' | 'denied', step?: number) => [{ id: 'p2', status, step }] as never;
+        const outcomes = [held];
+        expect(reconcileApprovals(outcomes, req('pending'), ws())).toBe(outcomes);
+        expect(isAwaiting(held)).toBe(true);
+        const approved = reconcileApprovals(outcomes, req('approved', 4), ws({ ...entity('a', 1), admittedBy: 4 }));
+        expect(approved[0]).toMatchObject({ decision: 'approved', admitted: 1, degree: 1 });
+        expect(isAwaiting(approved[0])).toBe(false);
+        expect(reconcileApprovals(outcomes, req('denied'), ws())[0].decision).toBe('denied');
     });
 });

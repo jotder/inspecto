@@ -295,7 +295,7 @@
             >
                 Expand next degree
             </button>
-            @if (degree().blocked; as why) {
+            @if (blockedNote(); as why) {
                 <p class="text-secondary m-0 text-xs" data-testid="degree-blocked">{{ why }}</p>
             }
             @if (degree().heldHubs.length) {

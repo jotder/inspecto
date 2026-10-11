@@ -265,11 +265,22 @@ Use JDK 27 (`JAVA_HOME=C:\sandbox\.graalvm-cache\jdk-27-win`).
 
 1. **Expand counts rows, not `events`.** Investigation expand aggregates `COUNT(*)` per (s, t, k)
    (`InvestigationRoutes.java:1126`). `telecom_links` is already aggregated, so every pair counts as 1. Keep
-   `minEvents` at 1, and expect ranking to ignore `events` until a platform fix lands (being planned).
-2. **Four-eyes on the first expand.** `config/link-analysis.toon` sets `four_eyes_fan_out_above: 5`, and the suspect has
+   `minEvents` at 1, and expect ranking to ignore `events` until a platform fix lands (being planned). The telecom
+   profile's "Investigate a number" preset therefore sends `minEvents: 1` (it sent 2, which admitted nobody at degree 1:
+   a Wangiri victim has one row; API repro with `maxFanOut` 5 gave 5 rows plain and 0 with `minEvents` 2). The
+   Advanced "Minimum events per link" field, when set, overrides the preset on "Expand next degree" and auto-expand.
+2. **The preset window is 30 days on `last_seen`, ending at the Dataset's latest `last_seen` (2026-09-29), not today.**
+   It keeps every planted ring: for the shared kinds `first_seen`/`last_seen` span both numbers' evidence, and every
+   degree 1–4 link's `last_seen` is on or after 2026-09-02 (card `5d80…` SUBFRAUD-03/SIMBOX-01 2026-09-19, `agent:AGT-666`
+   2026-09-29, `subscriber:CUST-M01` 2026-09-20, IRSF `id_doc` 2026-09-12+). Only `first_seen` can predate the window,
+   and the window does not filter on it. When the latest time cannot be read, no window is sent and the result line
+   says "all available data".
+3. **Four-eyes on the first expand.** `config/link-analysis.toon` sets `four_eyes_fan_out_above: 5`, and the suspect has
    about 400 neighbours, so the first expand waits for an approver. Either run the persona flow (`fm.analyst` requests,
-   `fm.manager` approves in Oversight), or set `maxFanOut` ≤ 5 on the first step.
-3. **The Jobs run on a `*/10` cron.** After seeding a Space, press *Run* on `telecom_links` and
+   `fm.manager` approves in Oversight), or set `maxFanOut` ≤ 5 on the first step. While a degree waits, the
+   Investigation panel re-reads the log every 15 s (and on window focus or reopening the same id) and then shows
+   "approved (N new entities admitted / nothing new)" or "denied".
+4. **The Jobs run on a `*/10` cron.** After seeding a Space, press *Run* on `telecom_links` and
    `telecom_msisdn_indicators` rather than waiting up to 10 minutes. Sign in as `fm.manager` to do it (only the
    `fraud-manager` role holds `canOperateRuns`). The counts Job and the typology Alerts then follow on their own.
 

@@ -336,7 +336,7 @@ describe('LinkAnalysisComponent', () => {
         });
         expect(rows.sql).toHaveBeenCalledWith('links', 'SELECT MAX("last_seen") AS latest FROM "links"', 1);
         expect(c.profileId()).toBe('telecom');
-        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 });
+        expect(c.degreePresets()).toEqual({ windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 });
         expect(c.toolboxTab()).toBe('investigation');
         expect(c.investigateIssue()).toBe('');
         expect(navigate).toHaveBeenCalledWith(

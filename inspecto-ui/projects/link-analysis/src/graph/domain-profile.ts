@@ -96,7 +96,10 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
                 // `telecom_links` is pre-aggregated (one row per pair + kind): a link weighs its `events`, not its row count
                 eventsCol: 'events',
             },
-            expand: { windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 },
+            // minEvents 1: `telecom_links` is pre-aggregated and expand counts rows, so every pair weighs 1 — a higher
+            // floor admits nobody (a Wangiri victim has one row). 30 days back from the Dataset's latest `last_seen`
+            // keeps every planted ring (their evidence is all after 30 Aug; la-telecom-demo-data.md §7).
+            expand: { windowDays: 30, minEvents: 1, maxFanOut: 50, budget: 2000 },
             maxDegree: 4,
         },
     },
