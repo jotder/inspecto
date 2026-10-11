@@ -1,0 +1,10 @@
+SYNTH-REPEATED DEFINITIONS IMPLICIT TAGS ::= BEGIN
+Record ::= [APPLICATION 2] SEQUENCE
+{
+  id    [0] INTEGER,
+  ids   [1] SEQUENCE OF IdEntry OPTIONAL,
+  usage [2] SEQUENCE OF Usage
+}
+IdEntry ::= SEQUENCE { idType [0] INTEGER, idValue [1] IA5String }
+Usage ::= SEQUENCE { group [0] INTEGER, up [1] INTEGER, down [2] INTEGER }
+END
