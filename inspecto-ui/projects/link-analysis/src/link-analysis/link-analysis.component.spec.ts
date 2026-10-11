@@ -1035,6 +1035,7 @@ describe('LinkAnalysisComponent', () => {
             .data;
         expect(data.graph).toBe(c.canvasData());
         expect(data.origin).toMatchObject({ sourceId: 'investigation', dataset: 'links-ds' });
+        fixture.destroy(); // the Working Set canvas mounted G6; tear it down before jsdom's null 2D context is touched
     });
     it('a pattern pack on the Investigation canvas runs on the server over its Dataset with its kind / time columns', async () => {
         const { fixture } = create();
