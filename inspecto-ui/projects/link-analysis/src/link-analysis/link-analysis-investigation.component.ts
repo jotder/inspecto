@@ -1,6 +1,7 @@
 import {
     ChangeDetectionStrategy,
     Component,
+    ElementRef,
     computed,
     effect,
     inject,
@@ -185,6 +186,10 @@ export class LinkAnalysisInvestigationComponent {
         return p ? presetsSummary(p.presets, p.windowEnd) : '';
     });
 
+    /** "Investigate <id>" was pressed with the purpose missing — the required message shows until it is filled. */
+    readonly pendingTried = signal(false);
+    private readonly pendingPurpose = viewChild<ElementRef<HTMLInputElement>>('pendingPurpose');
+
     /** "Investigate <id>": create, seed, then expand two degrees. Asks for the purpose like every Investigation. */
     async investigatePending(): Promise<void> {
         const p = this.pending();
@@ -192,6 +197,9 @@ export class LinkAnalysisInvestigationComponent {
         if (this.title.invalid || this.purpose.invalid) {
             this.title.markAsTouched();
             this.purpose.markAsTouched();
+            // The button stays enabled (house pattern): the press says what is missing and lands on the field.
+            this.pendingTried.set(true);
+            if (this.purpose.invalid) this.pendingPurpose()?.nativeElement.focus();
             return;
         }
         const form = this.rungForm();
@@ -215,6 +223,7 @@ export class LinkAnalysisInvestigationComponent {
         if (ok || this.store.active()) {
             this.title.reset('');
             this.purpose.reset('');
+            this.pendingTried.set(false);
             this.pendingDone.emit();
         }
     }
@@ -491,12 +500,12 @@ export class LinkAnalysisInvestigationComponent {
             // No flagged entity in reach: nothing was confirmed, so the log must not record an override.
             if (!scope.length) delete rung.includeHubs;
         }
-        const ok = await this.store.apply(
-            all ? { op: 'expand', ...rung } : { op: 'expand', ids: this.selectedInSet(), ...rung },
-        );
+        const ids = all ? undefined : this.selectedInSet();
+        const ok = await this.store.apply(ids ? { op: 'expand', ids, ...rung } : { op: 'expand', ...rung });
         if (!ok) form?.fail(this.store.error());
         else {
             const step = this.store.lastStep();
+            if (step?.status === 'pending' && step.pending?.id) this.store.markOneHop(step.pending.id, ids);
             if (scope.length && step && step.status !== 'pending')
                 this.store.lastOverride.set({ step: step.step, ids: scope });
         }

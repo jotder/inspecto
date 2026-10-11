@@ -14,6 +14,13 @@ import {
 } from './link-analysis-working-set-rows.component';
 
 describe('hubRow (telecom S3)', () => {
+    it('walk-through 6 D1: names the threshold and the override through the store-backed badge', () => {
+        const badge = (id: string, contacts: number | null) => `${id}:${contacts}`;
+        expect(hubRow({ entityId: 'h', highConnectivity: true, contacts: 628 }, badge)['highConnectivity']).toBe(
+            'h:628',
+        );
+    });
+
     it('words an entities row flag as the badge, blanks an unflagged one, and passes other relations through', () => {
         expect(hubRow({ entityId: 'h', highConnectivity: true })['highConnectivity']).toBe(
             'High connectivity — not expanded',

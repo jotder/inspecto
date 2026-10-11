@@ -9,6 +9,8 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { DataTableComponent } from '@inspecto/core/data-table/data-table.component';
 import { investigationErrorMessage } from './investigation-state';
 import { hubBadgeText } from './investigate-number';
+import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { RELATION_NOUN } from './working-set-widget';
 
 /** Rows per page — well under the route's 10 000 clamp, so a page stays a page. */
@@ -18,10 +20,14 @@ export const WORKING_SET_PAGE = 200;
  * An entities row's `highConnectivity` flag in words — a bare `true`/`false` column says nothing about what the flag
  * means (shown, not expanded further); the row's own sealed `contacts` is named when served. Unflagged rows read blank; rows of other relations pass unchanged.
  */
-export function hubRow(r: Record<string, unknown>): Record<string, unknown> {
+export function hubRow(
+    r: Record<string, unknown>,
+    badge: (id: string, contacts: number | null) => string = (_id, contacts) => hubBadgeText(null, contacts),
+): Record<string, unknown> {
     if (!('highConnectivity' in r)) return r;
     const contacts = typeof r['contacts'] === 'number' ? r['contacts'] : null;
-    return { ...r, highConnectivity: r['highConnectivity'] === true ? hubBadgeText(null, contacts) : '' };
+    const id = typeof r['entityId'] === 'string' ? r['entityId'] : '';
+    return { ...r, highConnectivity: r['highConnectivity'] === true ? badge(id, contacts) : '' };
 }
 
 /**
@@ -91,6 +97,9 @@ export function hubRow(r: Record<string, unknown>): Record<string, unknown> {
 })
 export class LinkAnalysisWorkingSetRowsComponent {
     private inv = inject(InvService);
+    /** The open Investigation's store, when hosted under the canvas: the badge then names threshold + override. */
+    private store = inject(InvestigationSessionStore, { optional: true });
+    private laSettings = inject(LinkAnalysisSettingsService);
 
     readonly investigationId = input.required<string>();
     /** Bumped by the host whenever the log moves (an op or an undo) — a new head is a full refetch. */
@@ -133,7 +142,11 @@ export class LinkAnalysisWorkingSetRowsComponent {
         try {
             const p = await firstValueFrom(this.inv.workingSetRelation(id, { of, offset, limit: WORKING_SET_PAGE }));
             if (id !== this.investigationId() || of !== this.relation()) return; // switched meanwhile
-            const rows = p.rows.map(hubRow);
+            const store = this.store;
+            const threshold = this.laSettings.limits().hubThresholdInForce;
+            const rows = p.rows.map((r) =>
+                store ? hubRow(r, (eid, c) => store.hubBadge(eid, c, threshold)) : hubRow(r),
+            );
             this.rows.set(offset === 0 ? rows : [...this.rows(), ...rows]);
             this.page.set(p);
         } catch (err) {

@@ -7,6 +7,8 @@ import {
     MAX_EXPAND_FRONTIER,
     admittedHop,
     degreeOutcome,
+    degreeOutcomesFromLog,
+    isOneHop,
     isAwaiting,
     mergeRung,
     reconcileApprovals,
@@ -495,5 +497,53 @@ describe('investigate-number - fourth live run fixes', () => {
             ws(entity('s', 0), entity('h', 2)),
         );
         expect(r[0]).toMatchObject({ override: 'h', degree: 3, awaitingApproval: 'r2' });
+    });
+});
+
+describe('investigate-number - walk-through 6 fixes', () => {
+    const at = (id: string, hop: number, step: number): WorkingSetEntity => ({ ...entity(id, hop), admittedBy: step });
+
+    it('D3: rebuilds the per-degree lines from the sealed log after a reopen', () => {
+        const set: WorkingSet = {
+            entities: [at('s', 0, 1), at('a', 1, 2), at('b', 1, 2), at('c', 2, 3)],
+            links: [
+                { admittedBy: 2 } as never,
+                { admittedBy: 2 } as never,
+                { admittedBy: 3 } as never,
+            ],
+            excluded: [],
+            hash: '',
+        };
+        const window = { from: '2026-08-30T23:57:59.000Z', to: '2026-09-29T23:58:00.000Z' };
+        const entries = [
+            { step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['s'] } },
+            { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['s'], window, budget: 5000 } },
+            { step: 3, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['a', 'b'], window: 'full' }, read: { truncated: true } },
+            { step: 4, kind: 'op', op: 'expand', undoneBy: 5, params: { ids: ['c'] } },
+        ] as never;
+        const out = degreeOutcomesFromLog(entries, set);
+        expect(out.map(degreeOutcomeMessage)).toEqual([
+            'Degree 1 (30 days to 29 Sep 2026): 2 new entities, 2 links added.',
+            'Degree 2 (all available data): 1 new entity, 1 link added. The read stopped at its budget — some neighbours are missing.',
+        ]);
+        expect(out[0].budget).toBe(5000);
+    });
+
+    it('labels a held one-hop expand by what it expands from, never as the ladder degree', () => {
+        const set = ws(entity('s', 0), entity('a', 1), entity('b', 2));
+        expect(isOneHop(set, ['s'])).toBe(true);
+        expect(isOneHop(set, ['b'])).toBe(false);
+        expect(isOneHop(set, undefined)).toBe(true);
+        const r = reconcileApprovals(
+            [],
+            [{ id: 'r9', status: 'pending', params: { ids: ['s'] } }] as never,
+            set,
+        );
+        expect(degreeOutcomeMessage(r[0])).toMatch(/^Expand one hop from s: waiting for approval/);
+        const approved: DegreeOutcome = { ...r[0], decision: 'approved', admitted: 3 };
+        expect(degreeOutcomeMessage(approved)).toMatch(/^Expand one hop from s: approved \(request r9\)/);
+        // the ladder keeps its own line
+        const ladder = reconcileApprovals([], [{ id: 'r8', status: 'pending', params: { ids: ['b'] } }] as never, set);
+        expect(degreeOutcomeMessage(ladder[0])).toMatch(/^Degree 3: waiting for approval/);
     });
 });
