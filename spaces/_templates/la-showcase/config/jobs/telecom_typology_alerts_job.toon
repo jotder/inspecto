@@ -1,0 +1,7 @@
+job:
+  name: telecom_typology_alerts
+  type: alert.evaluate
+  description: "Evaluates the Alert Rules each time the telecom_typology_counts Job produces its Dataset, so the telecom_wangiri_lines, telecom_irsf_lines and telecom_simbox_lines rules see the new counts without anyone pressing Evaluate. The boot-time probe ran before the counts existed; this Job is what fires them. Each Alert names a count, never an MSISDN. docs/superpower/la-telecom-demo-data.md."
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == telecom_typology_counts"
+  enabled: true

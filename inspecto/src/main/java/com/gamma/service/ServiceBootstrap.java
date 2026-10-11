@@ -186,8 +186,14 @@ public final class ServiceBootstrap {
             try {
                 com.gamma.alert.AlertRule r = com.gamma.alert.AlertRule.fromMap(c.content());
                 rules.add(r);
-                log.info("Armed alert rule '{}' ({} {} {} over {}) from the registry",
-                        r.name(), r.metric(), r.comparator(), r.threshold(), r.window());
+                // A measure rule (BI-5) has no metric/window — it names a Dataset measure instead, so log
+                // that shape; printing metric/window for it read "null gte 1.0 over null".
+                if (r.isMeasureRule())
+                    log.info("Armed alert rule '{}' ({} {} {} over Dataset {}) from the registry",
+                            r.name(), r.measure(), r.comparator(), r.threshold(), r.dataset());
+                else
+                    log.info("Armed alert rule '{}' ({} {} {} over {}) from the registry",
+                            r.name(), r.metric(), r.comparator(), r.threshold(), r.window());
             } catch (Exception e) {
                 log.warn("Could not load alert rule '{}': {}", c.name(), e.getMessage());
             }
