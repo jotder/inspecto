@@ -302,6 +302,44 @@ class TelecomLinksGoldenTest {
         }
     }
 
+    /**
+     * Every registered telecom Dataset declares EXACTLY the columns its Job or Pipeline produces, in order and with a
+     * matching coarse type — the UI's mapped-column check (link_kind, last_seen, events...) and the Query panel read
+     * the declaration, so a missing column refuses the Dataset.
+     */
+    @Test
+    void everyTelecomDatasetDeclaresTheColumnsItsProducerWrites() throws Exception {
+        Map<String, Map<String, Object>> byName = new HashMap<>();
+        for (var c : new ComponentStore(space.resolve("config/registry")).list("dataset")) byName.put(c.name(), c.content());
+        Map<String, String> globs = new LinkedHashMap<>();
+        for (String j : JOBS) globs.put(j + "_dataset", data.resolve(j).toString().replace('\\', '/') + "/*.parquet");
+        for (String f : List.of("crm_kyc", "hlr_eir"))
+            globs.put(f + "_dataset", data.resolve(f).resolve("database").toString().replace('\\', '/') + "/**/*.parquet");
+        for (var e : globs.entrySet()) {
+            Map<String, Object> ds = byName.get(e.getKey());
+            assertNotNull(ds, e.getKey() + " is registered");
+            List<String> declared = new ArrayList<>();
+            Object cols = ds.get("columns");
+            if (cols instanceof List<?> l) for (Object col : l) {
+                Map<?, ?> m = (Map<?, ?>) col;
+                declared.add(m.get("name") + ":" + m.get("type"));
+            }
+            List<String> produced = new ArrayList<>();
+            for (Map<String, Object> r : rows("DESCRIBE SELECT * FROM read_parquet('" + e.getValue() + "')"))
+                produced.add(r.get("column_name") + ":" + coarse(String.valueOf(r.get("column_type"))));
+            assertEquals(produced, declared, e.getKey() + " declared columns");
+        }
+    }
+
+    private static String coarse(String duckType) {
+        String t = duckType.toUpperCase();
+        if (t.startsWith("TIMESTAMP")) return "timestamp";
+        if (t.equals("DATE")) return "date";
+        if (t.equals("BOOLEAN")) return "boolean";
+        if (t.matches("(TINYINT|SMALLINT|INTEGER|BIGINT|HUGEINT|U?(TINY|SMALL|BIG)?INT|UINTEGER|DOUBLE|FLOAT|REAL|DECIMAL).*")) return "number";
+        return "string";
+    }
+
     private static ConfigSource noPipelines() {
         return new ConfigSource() {
             @Override public List<PipelineConfig> pipelines() { return List.of(); }

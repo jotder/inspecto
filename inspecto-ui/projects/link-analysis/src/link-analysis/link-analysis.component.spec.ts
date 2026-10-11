@@ -381,12 +381,12 @@ describe('LinkAnalysisComponent', () => {
     });
 
     it('?seed= over a Dataset the Space lacks: says so, queues the number, creates nothing', async () => {
-        // telecom_links is absent from this Space
+        // telecom_links_dataset is absent from this Space
         const { fixture } = create({ queryParams: { seed: '966501', entityType: 'msisdn' }, rows: ROWS(null) });
         await consume(fixture);
         const c = fixture.componentInstance;
         expect(c.pendingInvestigation()).toBeNull();
-        expect(c.investigateIssue()).toContain('The Dataset telecom_links is not in this Space');
+        expect(c.investigateIssue()).toContain('The Dataset telecom_links_dataset is not in this Space');
         expect(c.investigation.queuedSeeds()).toEqual([{ id: '966501', label: '966501', ids: ['966501'] }]);
     });
 

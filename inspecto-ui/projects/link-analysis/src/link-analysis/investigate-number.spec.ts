@@ -95,7 +95,7 @@ describe('investigate-number - the telecom binding', () => {
         const b = investigateBinding({ seed: '966501', entityType: 'msisdn' })!;
         expect(b.profileId).toBe('telecom');
         expect(b.projection).toEqual({
-            datasetId: 'telecom_links',
+            datasetId: 'telecom_links_dataset',
             sourceCol: 'a_msisdn',
             targetCol: 'b_msisdn',
             linkKindCol: 'link_kind',

@@ -125,7 +125,7 @@ function make(
     const svc = {
         lookup: vi.fn((ref: { dataset: string }, _keys: string[], _inv?: string | null) =>
             Promise.resolve({
-                ...(ref.dataset === 'crm_kyc' ? CRM : INDICATORS),
+                ...(ref.dataset === 'crm_kyc_dataset' ? CRM : INDICATORS),
                 truncated: !!opts.truncated,
                 masked: !!opts.masked,
             }),
@@ -201,10 +201,10 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         await settle(fixture);
         // seeded with every drawn node's positive indicator score; 222 has none
         // the cache key carries the weights in force, so a weights change never reads a stale answer
-        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'telecom_msisdn_indicators' }), ['999'], 'inv');
-        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'crm_kyc' }), ['999'], 'inv');
+        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'telecom_msisdn_indicators_dataset' }), ['999'], 'inv');
+        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'crm_kyc_dataset' }), ['999'], 'inv');
         expect(svc.lookup).toHaveBeenCalledWith(
-            expect.objectContaining({ dataset: 'telecom_msisdn_indicators' }),
+            expect.objectContaining({ dataset: 'telecom_msisdn_indicators_dataset' }),
             ['999', '111', '222'],
             'inv',
         );

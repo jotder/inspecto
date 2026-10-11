@@ -687,7 +687,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         t.fixture.componentRef.setInput('graphTruncated', true);
         t.fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'links: A → B' }]);
         t.fixture.componentRef.setInput('indexMappings', [
-            { dataset: 'telecom_links', sourceCol: 'a_msisdn', targetCol: 'b_msisdn', kindCol, label: 'links: A → B' },
+            { dataset: 'telecom_links_dataset', sourceCol: 'a_msisdn', targetCol: 'b_msisdn', kindCol, label: 'links: A → B' },
         ]);
         t.c.tab.set('pattern');
         t.c.loadPatternPack('telecom-subscription-ring');

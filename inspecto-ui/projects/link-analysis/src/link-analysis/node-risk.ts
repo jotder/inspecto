@@ -26,13 +26,14 @@ export interface RiskMapping {
 }
 
 /**
- * The telecom profile's mapping (`docs/superpower/la-telecom-demo-data.md` §5). `crm_kyc` is a raw store of the demo
- * Space, not a registered Dataset: when the Space cannot read it the Enrichment section says so and nothing else fails.
+ * The telecom profile's mapping (`docs/superpower/la-telecom-demo-data.md` §5). The ids are the Space's Dataset
+ * COMPONENT ids (`POST /inv/reference-rows` resolves `dataset` as a component id), not the stores they read. When the
+ * Space cannot read one the section says so and nothing else fails.
  */
 const RISK_MAPPINGS: Partial<Record<DomainProfileId, RiskMapping>> = {
     telecom: {
         indicators: {
-            dataset: 'telecom_msisdn_indicators',
+            dataset: 'telecom_msisdn_indicators_dataset',
             keyCol: 'msisdn',
             scoreCol: 'indicator_score',
             factorCols: [
@@ -45,7 +46,7 @@ const RISK_MAPPINGS: Partial<Record<DomainProfileId, RiskMapping>> = {
                 'one_way_ratio',
             ],
         },
-        enrichment: { dataset: 'crm_kyc', keyCol: 'msisdn' },
+        enrichment: { dataset: 'crm_kyc_dataset', keyCol: 'msisdn' },
     },
 };
 
