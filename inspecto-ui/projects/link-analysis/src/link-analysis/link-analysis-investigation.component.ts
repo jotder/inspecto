@@ -46,6 +46,7 @@ import {
     hubBadgeText,
     presetsSummary,
     suspectTitle,
+    windowLabel,
 } from './investigate-number';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
@@ -172,6 +173,11 @@ export class LinkAnalysisInvestigationComponent {
             onCleanup(() => clearInterval(timer));
         });
     }
+
+    /** The window the next expand reads, in words (`30 days to 29 Sep 2026` / `all available data`); null = no window preset. */
+    readonly windowNote = computed(() =>
+        this.store.header()?.timeCol ? windowLabel(this.degreePresets(), this.store.windowEnd()) : null,
+    );
 
     /** What the pending investigation's Start will do, in words. */
     readonly pendingSummary = computed(() => {

@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { EntityProjection, G6Node } from '@inspecto/core/graph';
@@ -21,6 +21,8 @@ import {
     workingSetToGraph,
 } from './investigation-state';
 import { ProjectedGraph } from './entity-projection';
+import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
+import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { QueuedSeed } from './la-starter';
 import { DegreePresets, DomainProfileId, domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 import {
@@ -35,6 +37,9 @@ import {
     overriddenHubs,
     sealedHubThreshold,
     presetRung,
+    latestTimeOf,
+    latestTimeSql,
+    sealedWindowEnd,
     profileForDataset,
     reconcileApprovals,
     requestedDegree,
@@ -81,6 +86,7 @@ function fromDraftReplay(id: string, r: DraftReplayResult): InvestigationReplayR
 @Injectable()
 export class InvestigationSessionStore {
     private inv = inject(InvService);
+    private injector = inject(Injector);
     private router = inject(Router, { optional: true });
     private route = inject(ActivatedRoute, { optional: true });
 
@@ -478,7 +484,38 @@ export class InvestigationSessionStore {
             return this.run('Could not open the Investigation.', () => this.refresh(id));
         this.close();
         this.activeId.set(id);
-        return this.run('Could not open the Investigation.', () => this.refresh(id));
+        const ok = await this.run('Could not open the Investigation.', () => this.refresh(id));
+        if (ok) await this.recoverWindowEnd(id);
+        return ok;
+    }
+
+    /**
+     * A reopened Investigation (incl. the `?investigation=` restore after a reload) has no window end — recover it so
+     * its expands keep the preset window: first the window sealed in the latest live expand step that carried one (the
+     * analyst continues on the same window), else the bound Dataset's latest event time read with the same zone-free
+     * anchor query "Investigate a number" uses. Neither → stays null ("all available data", truthful).
+     */
+    private async recoverWindowEnd(id: string): Promise<void> {
+        const presets = domainProfile(this.boundProfileId()).investigate?.expand;
+        const timeCol = this.header()?.timeCol;
+        if (presets?.windowDays == null || !timeCol) return;
+        const end = sealedWindowEnd(this.log()?.entries ?? [], presets.windowDays) ?? (await this.latestTime(timeCol));
+        if (end && this.activeId() === id && !this.windowEnd()) this.windowEnd.set(end);
+    }
+
+    /** The bound Dataset's latest event time over `/db/query`; null when it cannot be read. */
+    private async latestTime(timeCol: string): Promise<string | null> {
+        const dataset = this.header()?.dataset;
+        if (!dataset) return null;
+        try {
+            const ds = await firstValueFrom(this.injector.get(LA_DATASETS).get(dataset));
+            if (!ds.sourceName) return null;
+            const rows = this.injector.get(DatasetRowsService);
+            const res = await rows.sql(ds.sourceName, latestTimeSql(ds.sourceName, timeCol), 1);
+            return res.error ? null : latestTimeOf(res.rows[0]?.['latest']);
+        } catch {
+            return null;
+        }
     }
 
     /**

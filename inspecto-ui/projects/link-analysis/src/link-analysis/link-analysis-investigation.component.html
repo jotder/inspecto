@@ -295,6 +295,9 @@
             >
                 Expand next degree
             </button>
+            @if (windowNote(); as w) {
+                <p class="text-secondary m-0 text-xs" data-testid="degree-window">Window: {{ w }}</p>
+            }
             @if (blockedNote(); as why) {
                 <p class="text-secondary m-0 text-xs" data-testid="degree-blocked">{{ why }}</p>
             }
