@@ -135,6 +135,26 @@ public final class SnapshotStore {
         return out;
     }
 
+    /**
+     * The NEWEST {@code max} attachment records, verbatim JSON lines, newest first (case history reads them). Sets
+     * {@code truncatedOut[0]} when older records were left out.
+     */
+    public List<String> recentAttachments(int max, boolean[] truncatedOut) throws IOException {
+        Path f = dir.resolve(ATTACHMENTS);
+        if (!Files.isRegularFile(f)) return List.of();
+        java.util.ArrayDeque<String> tail = new java.util.ArrayDeque<>();
+        boolean dropped = false;
+        try (java.io.BufferedReader r = Files.newBufferedReader(f, StandardCharsets.UTF_8)) {
+            for (String line; (line = r.readLine()) != null; ) {
+                if (line.isBlank()) continue;
+                tail.addFirst(line);
+                if (tail.size() > max) { tail.removeLast(); dropped = true; }
+            }
+        }
+        if (truncatedOut != null && truncatedOut.length > 0) truncatedOut[0] = dropped;
+        return new ArrayList<>(tail);
+    }
+
     /** Minimal JSON string escaping — ids are already constrained, but a Case id is caller text. */
     private static String quote(String v) {
         StringBuilder b = new StringBuilder("\"");

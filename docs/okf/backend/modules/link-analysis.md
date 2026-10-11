@@ -292,6 +292,15 @@ else `msisdn`. The read is the ops module's own (`ObjectAccess.byEntity` → `En
 masking titles are scrubbed fail-closed: the raw id in any spelling (spaces, dashes, dots, parentheses, `+`) becomes the
 key as asked, every other token of 5+ digits `[number]` and an email `[email]` (placeholders, never minted aliases), and
 rows carry only an allowlist of fields.
+**Attached Cases (fix, 2026-10-11).** Attach to Case (seal → `POST /inv/snapshots/attach` → `PUT …/case`) registers no
+entity reference on the host, so the host's read alone missed the very Case the analyst attached the graph to. The route
+now also lists, deduplicated against the host rows, each Case linked to an Investigation whose current Working Set
+contains the entity (`matchedOn:"investigation"`, `via` = Investigation id) and each Case a sealed snapshot holding the
+entity among its `nodes` was attached to (`matchedOn:"snapshot"`, `via` = snapshot id; alias / pseudonym node ids are
+resolved server-side). Fail closed: only Investigations the caller can read (`openForRead`; a snapshot is judged by the
+Investigation it is anchored to, an unanchored one is never listed) and only an existing Case the caller may see
+(`CasePort.summary` + `visibleTo`); same status filter, title scrub and field allowlist. Bounded: at most 100 Case-linked
+Investigations and the newest 500 attachment records are read; beyond that `truncated:true`.
 Gates: 503 write root → 503 Case management not installed → 422 body → Investigation read gate (404) → 422 unsearchable
 key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTORY_READ` (counts only).
 
