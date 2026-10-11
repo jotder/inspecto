@@ -12076,6 +12076,46 @@
         "x-generated" : true
       }
     },
+    "/regulatory-reports/templates/{templateId}" : {
+      "put" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "Author (create or replace) a Space Report Template",
+        "operationId" : "putRegulatoryReportsTemplatesByTemplateId",
+        "description" : "Body is the template as JSON ({title, format, rootElement, delivery:{kind,dir}, fields:[{name,source,required,maxLength}]}). Gates: canApproveChanges, write root 503, invalid template 422 (every problem named), jail 403, atomic write. A Space template of a built-in id overrides it.",
+        "parameters" : [ {
+          "name" : "templateId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): the template view plus created."
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "Delete a Space Report Template",
+        "operationId" : "deleteRegulatoryReportsTemplatesByTemplateId",
+        "description" : "Gates: canApproveChanges, write root 503, unsafe id 422, jail 403, no Space template 404, built-in only 409, still referenced by a regulatory report 409.",
+        "parameters" : [ {
+          "name" : "templateId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): {id, deleted}."
+          }
+        }
+      }
+    },
     "/regulatory-reports/{regulatoryreportId}" : {
       "get" : {
         "tags" : [ "regulatory-reports" ],

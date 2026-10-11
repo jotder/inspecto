@@ -64,6 +64,8 @@ to the SAME file name. `rejected` is reserved for a regulator's refusal (nothing
 | `GET /regulatory-reports/templates` | reader | templates + load problems |
 | `GET /regulatory-reports[?status=&template=&caseId=&incidentId=]` | reader | newest first, capped 500, `truncated` + true `total`; no content |
 | `GET /regulatory-reports/{id}` | reader | the record with its content; live `sourceChanged` (draft / pending) and `approverCheck` (pending) |
+| `PUT /regulatory-reports/templates/{id}` | `canApproveChanges` | author (create / replace) a Space template from its JSON body; a Space template of a built-in id overrides it |
+| `DELETE /regulatory-reports/templates/{id}` | `canApproveChanges` | remove a Space template; 409 if built-in-only or still referenced by a report |
 | `POST /regulatory-reports` | `canWorkIncidents` | draft `{template, caseId|incidentId, inputs, reason}` |
 | `POST /regulatory-reports/{id}/request-approval` | `canWorkIncidents` | draft → pending (`requestedBy` becomes a maker) |
 | `POST /regulatory-reports/{id}/approve` | `canApproveChanges` | pending → approved → submitted / failed |
@@ -125,8 +127,19 @@ dirty-guarded dialog (`regulatory-report-draft.dialog.ts`): the Report Template 
 `<inspecto-option-picker>` (subjects from `GET /objects?type=`), one textarea per `input.*` key the template reads —
 required and max length derived from its fields (`requiredInputs`, `inputMaxLength`), labelled as words (`inputLabel`) —
 and the server's render refusal shown in the dialog, which stays open. Picker errors appear only after a submit attempt.
+**Report Templates** section (same pane): the templates with origin, and - with `canApproveChanges` - **New template** / Edit / Delete (a built-in is editable, saved as the Space override, but not deletable). `report-template.dialog.ts` edits the template as JSON beside its id (create only); client-side JSON check, then the server's 422 / 403 / 409 text shown verbatim.
 
 ## Deliberately not built (see `docs/BACKLOG.md` `REGULATORY-REPORTING-1`)
-Template authoring routes; regulator acknowledgement ingest (`rejected`, receipts); live regulator
+Regulator acknowledgement ingest (`rejected`, receipts); live regulator
 delivery (SFTP / HTTPS through a Connection); nested repeating groups; sealing / signing the delivered file; a
 dedicated filing capability (RBAC capability contribution is declined, P1-D3).
+
+## Template authoring (shipped 2026-10-11)
+`PUT` / `DELETE /regulatory-reports/templates/{id}` write `<write root>/regulatory-report-templates/<id>.toon` (the
+Space store `ReportTemplate.load` already reads; `ConfigCodec.toToon`, `AtomicFiles`). Gates, in order: capability
+(`canApproveChanges` - the oversight capability reused; a template decides what is filed and where it is dropped, and no
+filing capability exists) -> write root 503 -> unsafe id / id differing from the path / `ReportTemplate.parse` problems
+422 (all named) -> file or `delivery.dir` outside the jail 403 -> DELETE: no Space template 404, built-in with no
+override 409, referenced by any report 409 -> atomic write / delete under the store lock. AUDIT rows
+`regulatory-report-template.created|updated|deleted` carry the id only. Not routed through `PendingChanges.hold`
+(rows in `ConfigWriteFunnelTest` `NO_SAVE_GATE` / `NO_HOLD`: the kind is not governable).

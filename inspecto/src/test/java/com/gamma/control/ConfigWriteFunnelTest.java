@@ -78,6 +78,9 @@ class ConfigWriteFunnelTest {
             + "setting validated by ApproverRosterRoutes (canAdminister) — the egress allowlist's shape and reason";
     private static final String JOBS = "JobRoutes runs its own job gate (the job spec + ConfigSafetyValidator.checkJob, "
             + "the two checks SaveGate's job arm runs) rather than the whole SaveGate list";
+    private static final String REPORT_TEMPLATE = "a Report Template (REGULATORY-REPORTING-1, optional inspecto-regulatory-reporting): a Space TOON document under "
+            + "regulatory-report-templates/, validated by ReportTemplate.parse (every problem named) and gated by canApproveChanges - "
+            + "ConfigSpecs has no report-template type, ApprovalPolicy.GOVERNABLE excludes it; every report pins its rendered content at draft";
 
     /**
      * TOON-writing routes that deliberately do NOT run {@link SaveGate}, each with its reason — they write a
@@ -93,6 +96,7 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /jobs", JOBS), Map.entry("PUT /jobs/([^/]+)", JOBS),
             Map.entry("POST /jobs/([^/]+)/enable", JOBS), Map.entry("POST /jobs/([^/]+)/disable", JOBS),
             Map.entry("POST /jobs/([^/]+)/reschedule", JOBS),
+            Map.entry("PUT /regulatory-reports/templates/([^/]+)", REPORT_TEMPLATE),
             Map.entry("PUT /settings/egress", EGRESS),
             Map.entry("PUT /settings/approvers", APPROVERS),
             Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),
@@ -120,6 +124,7 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /decision-rules/([^/]+)/simulate", RESULT_STAMP),
             Map.entry("POST /expectations/evaluate", RESULT_STAMP),
             Map.entry("POST /expectations/([^/]+)/evaluate", RESULT_STAMP),
+            Map.entry("PUT /regulatory-reports/templates/([^/]+)", REPORT_TEMPLATE),
             Map.entry("PUT /settings/egress", EGRESS),
             Map.entry("PUT /settings/approvers", APPROVERS),
             Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),

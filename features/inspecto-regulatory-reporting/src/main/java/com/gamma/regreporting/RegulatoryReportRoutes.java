@@ -2,6 +2,8 @@ package com.gamma.regreporting;
 
 import com.gamma.access.Roles;
 import com.gamma.access.WriteGates;
+import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.AtomicFiles;
 import com.gamma.audit.EventLevel;
 import com.gamma.control.ApproverCheck;
 import com.gamma.control.ApproverRoster;
@@ -23,6 +25,8 @@ import com.gamma.spi.http.RouteModule;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -46,7 +50,15 @@ import java.util.Set;
  *   POST /regulatory-reports/{id}/approve                      four-eyes approve → submitted|failed (canApproveChanges)
  *   POST /regulatory-reports/{id}/decline                      four-eyes decline                    (canApproveChanges)
  *   POST /regulatory-reports/{id}/retry                        re-submit a failed one, same bytes   (canApproveChanges)
+ *   PUT  /regulatory-reports/templates/{id}                    author (create / replace) a Space template (canApproveChanges)
+ *   DELETE /regulatory-reports/templates/{id}                  remove a Space template             (canApproveChanges)
  * </pre>
+ *
+ * <p><b>Template authoring gates, in order</b>: the capability (the route; the oversight capability reused - a template
+ * decides what is filed and where it is dropped, and no filing capability exists, D-RR8) → write root 503 → an unsafe
+ * id, a body id that is not the path id, or a template failing {@link ReportTemplate#parse} 422 (every problem named) →
+ * the file or {@code delivery.dir} escaping the jail 403 → (DELETE only) no Space template 404, a built-in with no Space
+ * override 409, a Report still referencing the template 409 → atomic write / delete, under the store lock.
  *
  * <p><b>Draft gates, in order</b>: {@code canWorkIncidents} (the route) → write root 503 → an unknown body key 422 →
  * the template unknown or failing to load 422 → not exactly one of {@code caseId} / {@code incidentId} 422 → an input
@@ -80,6 +92,10 @@ public final class RegulatoryReportRoutes implements RouteModule {
         api.get("/regulatory-reports/templates", (e, m) -> templates(api, e));
         api.get("/regulatory-reports", (e, m) -> list(api, e));
         api.get("/regulatory-reports/([^/]+)", (e, m) -> one(api, e, ApiContext.name(m)));
+        api.put("/regulatory-reports/templates/([^/]+)", ApiContext.withCapability("canApproveChanges",
+                (e, m) -> putTemplate(api, e, ApiContext.name(m), api.body(e))));
+        api.delete("/regulatory-reports/templates/([^/]+)", ApiContext.withCapability("canApproveChanges",
+                (e, m) -> deleteTemplate(api, e, ApiContext.name(m))));
         api.post("/regulatory-reports", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> create(api, e, api.body(e))));
         api.post("/regulatory-reports/([^/]+)/request-approval", ApiContext.withCapability("canWorkIncidents",
@@ -90,6 +106,72 @@ public final class RegulatoryReportRoutes implements RouteModule {
                 (e, m) -> decide(api, e, ApiContext.name(m), false, api.body(e))));
         api.post("/regulatory-reports/([^/]+)/retry", ApiContext.withCapability("canApproveChanges",
                 (e, m) -> retry(api, e, ApiContext.name(m), api.body(e))));
+    }
+
+    // ── template authoring ───────────────────────────────────────────────────────────────────────
+
+    private static Path templateFile(Path root, String id) {
+        if (id == null || !ReportTemplate.SAFE_ID.matcher(id).matches())
+            throw invalid("template id must match " + ReportTemplate.SAFE_ID.pattern());
+        Path abs = root.toAbsolutePath().normalize();
+        return WriteGates.jail(abs, abs.resolve(ReportTemplate.SPACE_DIR).resolve(id + ".toon"), "report template");
+    }
+
+    /** Create or replace the Space's template {@code id}. The body is the template as JSON (the TOON document's shape). */
+    private Object putTemplate(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "report template");
+        Path f = templateFile(root, id);   // 422 on an unsafe id, 403 on an escape
+        Map<String, Object> doc = new LinkedHashMap<>(body);
+        Object bodyId = doc.putIfAbsent("id", id);
+        if (bodyId != null && !id.equals(String.valueOf(bodyId)))
+            throw invalid("'id' is '" + bodyId + "' but the path names '" + id + "'");
+        String toon;
+        ReportTemplate t;
+        try {
+            toon = ConfigCodec.toToon(doc);
+            t = ReportTemplate.parse(toon, id, "space");
+        } catch (ReportTemplate.Invalid bad) {
+            throw invalid("report template '" + id + "' is invalid: " + String.join("; ", bad.problems()));
+        } catch (RuntimeException unencodable) {
+            throw invalid("report template '" + id + "' is invalid: " + unencodable.getMessage());
+        }
+        try {
+            FileDrop.resolve(root, t.deliveryDir());
+        } catch (IllegalArgumentException refused) {
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "delivery.dir is refused: " + refused.getMessage());
+        }
+        boolean created;
+        synchronized (RegulatoryReports.lock()) {
+            created = !Files.exists(f);
+            Files.createDirectories(f.getParent());
+            AtomicFiles.write(f, toon.getBytes(StandardCharsets.UTF_8), ".rt-");
+        }
+        RegulatoryReports.auditTemplate(ApiContext.actor(ex), ApiContext.actorType(ex),
+                created ? "regulatory-report-template.created" : "regulatory-report-template.updated",
+                "report template '" + id + "' " + (created ? "created" : "replaced"), id);
+        Map<String, Object> out = new LinkedHashMap<>(t.view());
+        out.put("created", created);
+        return out;
+    }
+
+    private Object deleteTemplate(ApiContext api, HttpExchange ex, String id) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "report template");
+        Path f = templateFile(root, id);   // 422 / 403
+        synchronized (RegulatoryReports.lock()) {
+            if (!Files.isRegularFile(f)) {
+                if (ReportTemplate.BUILT_INS.contains(id))
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "report template '" + id + "' is built in and has "
+                            + "no Space template to remove");
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no Space report template '" + id + "'");
+            }
+            long users = RegulatoryReports.list(root).stream().filter(r -> id.equals(r.get("template"))).count();
+            WriteGates.conflictIf(users > 0, "report template '" + id + "' is used by " + users
+                    + " regulatory report(s) and cannot be deleted");
+            Files.delete(f);
+        }
+        RegulatoryReports.auditTemplate(ApiContext.actor(ex), ApiContext.actorType(ex),
+                "regulatory-report-template.deleted", "report template '" + id + "' deleted", id);
+        return Map.of("id", id, "deleted", true);
     }
 
     // ── reads ────────────────────────────────────────────────────────────────────────────────────
