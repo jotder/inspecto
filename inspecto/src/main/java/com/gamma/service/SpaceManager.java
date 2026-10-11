@@ -260,7 +260,9 @@ public final class SpaceManager implements AutoCloseable {
             wire(ctx);
         } catch (Exception e) {
             DiscoveredRoots.unregister(root.id());   // a space that never joined must not leave a root behind
-            log.warn("Skipping space dir {} — failed to load: {}", dir, e.getMessage());
+            // ERROR, not WARN (ASSURE-OPERABILITY-1): a configured Space that did not boot is a node serving less
+            // than it was configured for - the 2026-10-10 drill's node came up with 0 Spaces behind a WARN.
+            log.error("Skipping space dir {} — failed to load: {}", dir, e.getMessage());
             String name = dir.getFileName().toString();
             skipped.put(name, e instanceof OperationalDb.SchemaCreateException
                     ? new SkippedSpace(name, "SPACE_SCHEMA_CREATE_FAILED",
