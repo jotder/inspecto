@@ -96,6 +96,87 @@ class ControlApiExchangeSnapshotTest {
         }
     }
 
+    private void seedTable(Path root, String name) throws Exception {
+        Path table = root.resolve("finance").resolve("data").resolve(name);
+        Files.createDirectories(table);
+        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:"); Statement s = conn.createStatement()) {
+            s.execute("COPY (SELECT * FROM (VALUES (1,'a'),(2,'b'),(3,'c')) t(amount,label)) TO "
+                    + "'" + table.resolve("part.parquet").toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+        }
+    }
+
+    private String share(Ctx c, Path root, String item, String mode, boolean seed) throws Exception {
+        assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"finance\"}").statusCode());
+        assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"audit\"}").statusCode());
+        if (seed) seedTable(root, item);
+        assertEquals(200, send(c.port, "POST", "/spaces/finance/components/dataset",
+                "{\"id\":\"" + item + "\",\"physicalRef\":\"" + item + "\"}").statusCode());
+        assertEquals(200, send(c.port, "POST", "/exchange/offers",
+                "{\"kind\":\"dataset\",\"item\":\"" + item + "\",\"owner\":\"finance\"}").statusCode());
+        return json(send(c.port, "POST", "/exchange/requests",
+                "{\"kind\":\"dataset\",\"item\":\"" + item + "\",\"owner\":\"finance\",\"consumer\":\"audit\""
+                        + (mode == null ? "" : ",\"mode\":\"" + mode + "\"") + "}")).get("id").asText();
+    }
+
+    @Test
+    void approvingASnapshotSharepublishesWithoutRefreshAndDoubleApproveIsRefused(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String id = share(c, root, "tax_receipts", "snapshot", true);
+            assertTrue(json(send(c.port, "GET", "/exchange/datasets/finance/tax_receipts", null)).path("freshness").isMissingNode());
+
+            JsonNode approved = json(send(c.port, "POST", "/exchange/grants/" + id + "/approve", ""));
+            assertEquals("active", approved.get("status").asText());
+            assertEquals("published", approved.get("snapshots").get("tax_receipts").get("status").asText());
+
+            JsonNode meta = json(send(c.port, "GET", "/exchange/datasets/finance/tax_receipts?consumer=audit", null));
+            assertEquals(3, meta.get("freshness").get("rows").asInt());
+            Path snap = root.resolve("_shared").resolve("exchange").resolve("finance").resolve("tax_receipts")
+                    .resolve(meta.get("freshness").get("version").asText()).resolve("snapshot.parquet");
+            try (Connection conn = DriverManager.getConnection("jdbc:duckdb:"); Statement s = conn.createStatement();
+                 java.sql.ResultSet rs = s.executeQuery("SELECT count(*) FROM read_parquet('"
+                         + snap.toString().replace('\\', '/') + "')")) {
+                rs.next();
+                assertEquals(3, rs.getLong(1));
+            }
+
+            // double approve: refused, nothing republished
+            assertEquals(409, send(c.port, "POST", "/exchange/grants/" + id + "/approve", "").statusCode());
+            assertEquals(meta.get("freshness").get("version").asText(),
+                    json(send(c.port, "GET", "/exchange/datasets/finance/tax_receipts", null)).get("freshness").get("version").asText());
+        }
+    }
+
+    @Test
+    void approvingALiveShareOrDenyingPublishesNothing(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String id = share(c, root, "tax_receipts", "live", true);
+            JsonNode approved = json(send(c.port, "POST", "/exchange/grants/" + id + "/approve", ""));
+            assertEquals("active", approved.get("status").asText());
+            assertFalse(approved.has("snapshots"));
+            assertFalse(Files.exists(root.resolve("_shared").resolve("exchange").resolve("finance")
+                    .resolve("tax_receipts").resolve("current.toon")));
+        }
+    }
+
+    @Test
+    void failedPublishKeepsTheApprovalAndReportsItSoRefreshCanRetry(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            // dataset points at a table that does not exist -> publish fails
+            String id = share(c, root, "ghost", "snapshot", false);
+            HttpResponse<String> r = send(c.port, "POST", "/exchange/grants/" + id + "/approve", "");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode d = json(r);
+            assertEquals("active", d.get("status").asText());
+            assertEquals("failed", d.get("snapshots").get("ghost").get("status").asText());
+            assertFalse(d.get("snapshots").get("ghost").get("error").asText().isBlank());
+
+            // the owner fixes the data and retries through the existing Refresh route
+            seedTable(root, "ghost");
+            assertEquals(200, send(c.port, "POST", "/exchange/refresh",
+                    "{\"owner\":\"finance\",\"item\":\"ghost\"}").statusCode());
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
