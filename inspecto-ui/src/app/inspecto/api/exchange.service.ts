@@ -27,6 +27,20 @@ export interface ExchangeFreshness {
     columns: Array<Record<string, unknown>>;
 }
 
+/** A Dataset offer's scheduled snapshot refresh (`Offer.REFRESH_CADENCES`); `none` = Refresh by hand only. */
+export type ExchangeRefreshCadence = 'none' | 'hourly' | 'daily';
+
+/** The outcome of an offered Dataset's most recent publish attempt (`last-refresh.toon`). */
+export interface ExchangeLastRefresh {
+    /** Epoch millis of the attempt. */
+    at: number;
+    trigger: 'manual' | 'approve' | 'schedule';
+    status: 'published' | 'failed';
+    version?: string;
+    /** Why it failed — the snapshot (and `freshness`) stays on the previous version. */
+    error?: string;
+}
+
 /** One shareable-catalog entry (`Offer.toMap()` + optional freshness). */
 export interface ExchangeOffer {
     kind: ExchangeKind;
@@ -42,7 +56,10 @@ export interface ExchangeOffer {
      * A widget binds exactly one; a saved view may read several. Empty for a Dataset offer.
      */
     datasets: string[];
+    /** Dataset offers: the scheduled refresh cadence (always `none` for other kinds). */
+    refresh?: ExchangeRefreshCadence;
     freshness?: ExchangeFreshness;
+    lastRefresh?: ExchangeLastRefresh;
 }
 
 /** One grant of read-only use, owner→consumer (`ShareGrant.toMap()`). */
@@ -114,6 +131,8 @@ export class ExchangeService {
         item: string;
         description?: string;
         resultSet?: Record<string, unknown>;
+        /** Omitted = keep the offer's current cadence. 422 on an unknown value or a non-dataset kind. */
+        refresh?: ExchangeRefreshCadence;
     }): Observable<ExchangeOffer> {
         return this.http.post<ExchangeOffer>(apiUrl('/exchange/offers'), req);
     }

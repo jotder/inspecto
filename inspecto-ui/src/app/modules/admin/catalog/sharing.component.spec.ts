@@ -93,6 +93,7 @@ async function create(
         refresh: vi.fn(() => of({ version: 'v4', rows: 10, refreshedAt: '', columns: [] })),
         pin: vi.fn(() => of(GRANTS[0])),
         expiry: vi.fn(() => of(GRANTS[0])),
+        offer: vi.fn(() => of(OFFERS[2])),
         ...exchange,
     } as unknown as ExchangeService;
     const dialog = { open: () => ({ afterClosed: () => of(dialogResult) }) };
@@ -250,6 +251,48 @@ describe('SharingComponent', () => {
         const pinned: ExchangeGrant = { ...GRANTS[0], pin: 'v2', status: 'revoked' };
         const { fixture } = await create('with-me', { grants: () => of([pinned]) });
         expect(fixture.componentInstance.myGrantRows()[0].behind).toBeNull();
+    });
+
+    it('by-me: the auto-refresh action sets the picked cadence on the offer, keeping its metadata', async () => {
+        const { fixture, api } = await create('by-me', {}, 'daily');
+        const c = fixture.componentInstance;
+        const schedule = c.offerActions.find((a) => a.icon === 'heroicons_outline:clock')!;
+        const myOffer = c.myOffers()[0]; // default/billing_summary
+        expect(schedule.visible!(myOffer)).toBe(true);
+        expect(schedule.visible!({ ...myOffer, kind: 'widget' })).toBe(false);
+        schedule.onClick(myOffer);
+        expect(api.offer).toHaveBeenCalledWith({
+            kind: 'dataset',
+            owner: 'default',
+            item: 'billing_summary',
+            description: 'Billing',
+            resultSet: {},
+            refresh: 'daily',
+        });
+    });
+
+    it('by-me: a dismissed or unchanged cadence pick writes nothing', async () => {
+        const { fixture, api } = await create('by-me', {}, 'none');
+        const c = fixture.componentInstance;
+        c.offerActions.find((a) => a.icon === 'heroicons_outline:clock')!.onClick(c.myOffers()[0]);
+        expect(api.offer).not.toHaveBeenCalled();
+    });
+
+    it('by-me: a failed last refresh is shown as a Failed badge with its error', async () => {
+        const failing: ExchangeOffer = {
+            ...OFFERS[2],
+            refresh: 'hourly',
+            lastRefresh: { at: 1, trigger: 'schedule', status: 'failed', error: 'no table <x>' },
+        };
+        const { fixture } = await create('by-me', { offers: () => of([failing]) });
+        const col = fixture.componentInstance.offerColumns.find((x) => x.field === 'lastRefresh')!;
+        const html = (col.cellRenderer as (p: unknown) => string)({ value: failing.lastRefresh });
+        expect(html).toContain('Failed');
+        expect(html).toContain('no table &lt;x&gt;');
+        const ok = (col.cellRenderer as (p: unknown) => string)({
+            value: { at: 1, trigger: 'manual', status: 'published', version: 'v9' },
+        });
+        expect(ok).toContain('Published');
     });
 
     it('renders with no a11y violations', async () => {

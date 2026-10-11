@@ -91,6 +91,37 @@ public final class ExchangeSnapshots {
         }
     }
 
+    private static Path lastRefreshFile(Path itemDir) {
+        return itemDir.resolve("last-refresh.toon");
+    }
+
+    /**
+     * The outcome of the item's most recent publish attempt — {@code at} (epoch millis), {@code trigger}
+     * ({@code manual}|{@code approve}|{@code schedule}), {@code status} ({@code published}|{@code failed}) and
+     * {@code version} or {@code error}. Empty when nothing was ever attempted. A failure never moves
+     * {@code current.toon}, so this is the only place a failed refresh is visible.
+     */
+    public static Optional<Map<String, Object>> readLastRefresh(Path itemDir) {
+        Path file = lastRefreshFile(itemDir);
+        if (!Files.exists(file)) return Optional.empty();
+        try {
+            return Optional.of(new LinkedHashMap<>(ToonHelper.load(file.toString())));
+        } catch (IOException e) {
+            return Optional.empty();   // a torn sidecar only loses the outcome, never the snapshot
+        }
+    }
+
+    /** Record a publish attempt's outcome (atomic; best-effort — never fails the publish it describes). */
+    static void writeLastRefresh(Path itemDir, Map<String, Object> outcome) {
+        try {
+            Files.createDirectories(itemDir);
+            AtomicFiles.write(lastRefreshFile(itemDir),
+                    JToon.encode(outcome).getBytes(StandardCharsets.UTF_8), ".last-");
+        } catch (IOException ignore) {
+            // best-effort
+        }
+    }
+
     /**
      * Delete all but the {@code keep} newest version directories (and never the live {@code keepVersion}) —
      * bounds disk growth across refreshes. Best-effort: a version still being read is simply retried next time.
