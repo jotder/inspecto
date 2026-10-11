@@ -13,6 +13,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
 import { SqlCodemirrorComponent } from 'app/inspecto/data-table/sql/sql-codemirror.component';
@@ -105,6 +106,7 @@ export interface FieldRow extends CompiledField {
 })
 export class PipelineTransformSqlDefinitionComponent {
     private components = inject(ComponentsService);
+    private readonly confirm = inject(InspectoConfirmService);
 
     readonly node = input.required<AuthoredNode>();
     /** The rows the tab's sample thread parsed — seeds a NEW step and feeds "Try it on the sample". */
@@ -696,8 +698,33 @@ export class PipelineTransformSqlDefinitionComponent {
             });
     }
 
+    /**
+     * Apply. From the SQL view the Step is saved as `fields: []` (see {@link apply}), which drops every row's
+     * column metadata — so when any row is described the author confirms first, and Cancel leaves the grid and
+     * the SQL exactly as they were (AUTHORING-REDESIGN-1 (e)).
+     */
     submit(): void {
         if (!this.canApply()) return;
+        const described = this.view() === 'sql' ? this.fields().filter((f) => this.isDescribed(f)).length : 0;
+        if (!described) {
+            this.apply();
+            return;
+        }
+        const columns = described === 1 ? '1 described column' : `${described} described columns`;
+        void this.confirm
+            .confirmDestructive(
+                `Applying from the SQL view saves this Step as SQL only, so ${columns} will lose their ` +
+                    'description, unit, classification and synonym. A classification also masks its column ' +
+                    'wherever this data is published or used as evidence, so dropping it removes that masking. ' +
+                    'Switch back to Fields to keep them.',
+                { title: 'Drop column metadata?', confirmText: 'Apply and drop' },
+            )
+            .then((ok) => {
+                if (ok) this.apply();
+            });
+    }
+
+    private apply(): void {
         const n = this.node();
         // `fields` is the authoring artifact; `sql` is what the engine reads. Rows are persisted only
         // when they were authored: a Step applied from the SQL view writes `fields: []` and reopens as

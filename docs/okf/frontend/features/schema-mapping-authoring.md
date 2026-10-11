@@ -142,7 +142,9 @@ catalog and by persisting `fields[]`.
   - **Stored on the `fields[]` row** (`SqlField.description?/unit?/classification?/synonym?`), so a rename
     carries it and a removed row takes it along; a blanked value deletes the key. `fields[].name` is the
     authoritative output column (the grid generates the SELECT). A Step applied from the **SQL view** writes
-    `fields: []`, so it carries no metadata, and neither does a raw-SQL Step.
+    `fields: []`, so it carries no metadata, and neither does a raw-SQL Step — when any row is described,
+    that Apply first asks (`InspectoConfirmService.confirmDestructive`, "Drop column metadata?", naming the
+    count and the masking loss); Cancel leaves the grid and the SQL untouched.
   - ⛔ **Not offered in the projection slot** (`isProjectionSlot`): its `fields[]` compile into
     `processing.map`, which the Catalog never reads, so the metadata would be dead config.
   - **Save gate:** `ConfigRoutes.stepColumnMetadataFindings` (via `SaveGate`, so `/config/write`, patch and

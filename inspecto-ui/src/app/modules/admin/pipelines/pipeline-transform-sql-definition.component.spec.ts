@@ -651,3 +651,72 @@ describe('Transform pane: column metadata', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });
+
+// Applying from the SQL view writes `fields: []` — it must not drop described columns' metadata silently.
+describe('Transform pane: SQL-view apply over described columns', () => {
+    const settle = async (fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>) => {
+        for (let i = 0; i < 5; i++) {
+            fixture.detectChanges();
+            await fixture.whenStable();
+            await new Promise((r) => setTimeout(r, 0));
+        }
+    };
+    const dialog = () => document.querySelector<HTMLElement>('mat-dialog-container');
+    const dialogButton = (text: string) =>
+        [...(dialog()?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+            (b) => b.textContent?.trim() === text,
+        );
+
+    async function inSqlView(stored: SqlField[]) {
+        const fixture = await create(sqlNode({ sql: 'x', fields: stored }));
+        const c = comp(fixture);
+        c.showSqlView();
+        c.onSqlEdited(c.sqlText() + ' ');
+        fixture.detectChanges();
+        return { fixture, c };
+    }
+
+    const described = [
+        field({ name: 'm', from: 'msisdn', fn: 'keep', classification: 'PII' }),
+        field({ name: 'p', from: 'plan', fn: 'keep', description: 'Plan' }),
+    ];
+
+    it('applies at once, with no dialog, when no row is described', async () => {
+        const { fixture, c } = await inSqlView([field({ name: 'm', from: 'msisdn', fn: 'keep' })]);
+        c.submit();
+        await settle(fixture);
+        expect(dialog()).toBeNull();
+        expect(fixture.componentInstance.applied!.config!['fields']).toEqual([]);
+    });
+
+    it('asks first, naming the count and the masking; Cancel changes nothing', async () => {
+        const { fixture, c } = await inSqlView(described);
+        const before = { fields: c.fields(), sql: c.sqlText(), view: c.view() };
+        c.submit();
+        await settle(fixture);
+        expect(dialog()!.textContent).toContain('2 described columns');
+        expect(dialog()!.textContent).toContain('masks');
+        dialogButton('Cancel')!.click();
+        await settle(fixture);
+        expect(fixture.componentInstance.applied).toBeUndefined();
+        expect({ fields: c.fields(), sql: c.sqlText(), view: c.view() }).toEqual(before);
+    });
+
+    it('Apply and drop applies as SQL only, so the metadata is gone', async () => {
+        const { fixture, c } = await inSqlView(described);
+        c.submit();
+        await settle(fixture);
+        dialogButton('Apply and drop')!.click();
+        await settle(fixture);
+        expect(fixture.componentInstance.applied!.config!['fields']).toEqual([]);
+    });
+
+    it('the confirm dialog has no axe violations', async () => {
+        const { fixture, c } = await inSqlView(described);
+        c.submit();
+        await settle(fixture);
+        await expectNoA11yViolations(dialog()!);
+        dialogButton('Cancel')!.click();
+        await settle(fixture);
+    });
+});
