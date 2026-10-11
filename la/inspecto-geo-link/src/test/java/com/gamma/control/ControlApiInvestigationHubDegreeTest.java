@@ -3,6 +3,8 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.la.api.InputFingerprintCache;
+import com.gamma.util.DuckDbUtil;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -283,6 +286,69 @@ class ControlApiInvestigationHubDegreeTest {
             assertEquals("rung_not_indexable", bounded.at("/read/fallback/reason").asText());
             assertEquals("flat", bounded.at("/read/hubDegreeSource").asText());
             assertEquals("[{\"degree\":4,\"id\":\"b\"},{\"degree\":8,\"id\":\"h\"}]", bounded.at("/read/hubs").toString());
+        }
+    }
+
+    /** A Parquet file of {@code (who, other)} rows with a pinned mtime (the clock never decides). */
+    private static void parquet(Path file, long mtime, String values) throws Exception {
+        Files.createDirectories(file.getParent());
+        DuckDbUtil.loadDriver();
+        java.io.File db = DuckDbUtil.tempDbFile("hub_stale_");
+        try (java.sql.Connection conn = DuckDbUtil.openConnection(db); java.sql.Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES " + values + ") t(who,other)) TO '" + file.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(mtime));
+    }
+
+    /**
+     * The KNOWN inconsistency of a stale-served rung (link-analysis.md section 4): the rows come from the older index version,
+     * but the hub degree is counted flat over the CURRENT Dataset ({@code hubDegreeSource: flat}) - so a file added since the
+     * build already raises the sealed degree while the rows do not yet show its links.
+     */
+    @Test
+    void aStaleServedRungCountsTheHubDegreeFlatOverTheCurrentDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String store = "hub_stale_" + System.nanoTime();
+        Path dir = Path.of("database").resolve(store);
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        AtomicLong now = new AtomicLong(1_000L);
+        InputFingerprintCache.forTest(now::get, 30_000L);
+        long t0 = 1_700_000_000_000L;
+        try (Ctx c = open(cfg, root)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "files_ds", Map.of("physicalRef", store));
+            parquet(dir.resolve("p1.parquet"), t0, "('a','h'),('h','x1'),('h','x2'),('h','x3')");
+            build(c, "{\"dataset\":\"files_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}");
+            settings(c, ENABLED);
+            String create = "{\"purpose\":\"test\",\"dataset\":\"files_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\",\"id\":\"";
+
+            String fresh = "i" + seq.incrementAndGet();
+            data(send(c, "POST", "/inv/investigations", create + fresh + "\"}"), 200);
+            op(c, fresh, "{\"op\":\"seed\",\"ids\":[\"a\"]}");
+            JsonNode f = op(c, fresh, "{\"op\":\"expand\",\"hubThreshold\":3}");
+            assertFalse(f.at("/read/index/stale").asBoolean(), f.get("read").toString());
+            assertEquals("index", f.at("/read/hubDegreeSource").asText());
+            assertEquals("[{\"degree\":4,\"id\":\"h\"}]", f.at("/read/hubs").toString());
+
+            parquet(dir.resolve("p2.parquet"), t0 + 1_000, "('h','x4'),('h','x5')");   // an addition: served stale, not refused
+            now.addAndGet(31_000L);
+            String stale = "i" + seq.incrementAndGet();
+            data(send(c, "POST", "/inv/investigations", create + stale + "\"}"), 200);
+            op(c, stale, "{\"op\":\"seed\",\"ids\":[\"a\"]}");
+            JsonNode s = op(c, stale, "{\"op\":\"expand\",\"hubThreshold\":3}");
+            assertEquals(1, s.at("/read/index/version").asInt(), "served from the older version: " + s.get("read"));
+            assertTrue(s.at("/read/index/stale").asBoolean(), s.get("read").toString());
+            assertEquals(f.at("/read/fingerprint"), s.at("/read/fingerprint"), "the rows are the older version's");
+            assertEquals("flat", s.at("/read/hubDegreeSource").asText());
+            assertEquals("[{\"degree\":6,\"id\":\"h\"}]", s.at("/read/hubs").toString(), "the degree is the current Dataset's");
+            assertEquals(6, contacts(c, stale).get("h").asLong());
+            assertTrue(replay(c, stale, false).get("equivalent").asBoolean(), "replay reads the sealed degree");
+        } finally {
+            InputFingerprintCache.forTest(null, 0);
+            if (Files.isDirectory(dir)) try (var w = Files.walk(dir)) {
+                w.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+            if (!hadDatabase) Path.of("database").toFile().delete();
         }
     }
 
