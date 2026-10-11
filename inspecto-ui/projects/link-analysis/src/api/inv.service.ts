@@ -338,6 +338,8 @@ export interface InvestigationCreateRequest {
     timeColZone?: string;
     /** An integer column of event counts (a pre-aggregated Dataset): expand weighs a link by its SUM, not its row count. */
     eventsCol?: string;
+    /** The Entity Type of both endpoints (e.g. `msisdn`); admitted entities carry it. Must be in force in the Space. */
+    entityType?: string;
 }
 
 /** A fork's parent (D-E4): the Investigation it was re-ordered from, the order, and the parent's log length. */

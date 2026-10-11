@@ -223,7 +223,7 @@ neither key, and the rule takes the scalar path below. How it runs:
   the dialog ([alerts feature](../../frontend/features/alerts.md)).
 
 **Scalar Measure heal** (`ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1` (2), 2026-09-28). A Dataset Measure rule without
-`by` keeps its cooldown-throttled firing, and gains the heal of one `by` key: `AlertService.openMeasures`
+`by` fires ONCE per open breach (an unchanged breach raises nothing new on later sweeps; `TELECOM-ALERT-REFIRE-1`, 2026-10-11 — it used to re-fire every cooldown), and gains the heal of one `by` key: `AlertService.openMeasures`
 (`<rule>|<dataset>` → breached at the last readable sweep; seeded on the rule's first sweep from a still-active
 ALERT, so a restart still heals) is the edge detector. On the breached → healthy edge `healMeasure` emits
 `ALERT_CLEARED` + an INFO `alert-rule.cleared` Signal (correlation `alert:<rule>|<dataset>`, the fired Signal's),
@@ -1038,7 +1038,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `AlertRuleTest` | `inspecto-engine` | both record shapes parse; `when` scoping |
 | `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules`; a `by` column outside the Dataset's Schema refused at both save doors; `/components/alert-rule` refuses every shape `/alerts/rules` refuses |
 | `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → 40 Incidents, re-fire → 0, restart seeding, a healed key resolves only its own Alert and never its Incident, storm cap → one Alert, unknown never heals, no-`by` unchanged |
-| `MeasureAlertTest` | `inspecto-engine` | scalar Measure rules: fire, cooldown, the heal edge (all-clear once, cooldown reset so a relapse fires at once), unknown never heals |
+| `MeasureAlertTest` | `inspecto-engine` | scalar Measure rules: fire once per open breach (no re-fire while still breached), the heal edge (all-clear once, cooldown reset so a relapse fires at once), unknown never heals |
 | `ScalarMeasureAlertObjectsTest` | `inspecto-ops` | the real workflow for a no-`by` Measure rule: heal resolves the Alert never the Incident, relapse links / re-opens, restart seeding, retire on a Dataset change |
 | `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: a heal never resolves the Incident, even with a complete postmortem; a relapse after an operator's resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
 | `AlertPurgeStoreTest` · `AlertPurgeTaskTest` · `AlertRetentionPinTest` | `inspecto-engine` | `alert_purge`: old resolved deleted, recent / exact-boundary / no-close-time kept, `OPEN` and `ACKNOWLEDGED` never touched, dry run counts only, window 0/blank refused, DuckDB file reopened shows no resurrected row, the live history drops purged entries, the AUDIT row |

@@ -82,8 +82,8 @@ class MeasureAlertTest {
         assertEquals(750.0, (double) fired.get(0).get("value"), 1e-9);
         assertEquals("sum(amount)", fired.get(0).get("metric"), "labelled by its measure");
 
-        // Still breached moments later — the cooldown suppresses a duplicate but the probe still runs.
-        assertEquals(0, svc.evaluateAll().size(), "cooldown suppresses an immediate re-fire");
+        // Still breached moments later — an open breach raises nothing new, but the probe still runs.
+        assertEquals(0, svc.evaluateAll().size(), "an open breach does not re-fire");
         assertEquals(2, probed.get());
     }
 

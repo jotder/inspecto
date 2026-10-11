@@ -44,7 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <h3>Re-fire suppression</h3>
  * A rule that stays breached would otherwise fire on every batch; a per-rule+pipeline cooldown of
  * the rule's window length (10 minutes for batch-count windows, minimum 1 minute) suppresses
- * duplicates while the condition persists.
+ * duplicates while the condition persists. Dataset Measure rules are edge-triggered instead: a scalar rule fires once
+ * per open breach and only a heal re-arms it ({@code openMeasures}); a {@code by} rule does the same per key.
  *
  * <p>Fired alerts live in a bounded in-memory ring (newest first, like the diagnosis store);
  * process lifetime, capacity {@value #DEFAULT_CAPACITY}.

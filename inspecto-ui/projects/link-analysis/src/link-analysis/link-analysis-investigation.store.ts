@@ -193,6 +193,7 @@ export class InvestigationSessionStore {
         timeCol?: string,
         timeColZone?: string,
         eventsCol?: string,
+        entityType?: string,
     ): Promise<boolean> {
         return this.run('Could not start the Investigation.', async () => {
             const h = await firstValueFrom(
@@ -207,6 +208,8 @@ export class InvestigationSessionStore {
                     // A zone means nothing without a time column (the server refuses it), so it never travels alone.
                     timeColZone: timeCol && timeColZone ? timeColZone : undefined,
                     eventsCol: eventsCol || undefined,
+                    // Types the admitted endpoints (e.g. msisdn) so Entity Lists and masking know what they are.
+                    entityType: entityType || undefined,
                 }),
             );
             this.refs.update((all) => [
@@ -347,7 +350,7 @@ export class InvestigationSessionStore {
     private async runInvestigateChain(
         req: Parameters<InvestigationSessionStore['investigateNumber']>[0],
     ): Promise<boolean> {
-        if (!(await this.start(req.projection, req.purpose, req.title, req.timeCol, undefined, req.eventsCol))) return false;
+        if (!(await this.start(req.projection, req.purpose, req.title, req.timeCol, undefined, req.eventsCol, req.projection.entityType))) return false;
         const id = this.activeId();
         this.windowEnd.set(req.windowEnd ?? null);
         const entityType = req.projection.entityType;
