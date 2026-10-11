@@ -75,4 +75,20 @@ describe('SpacesComponent', () => {
         expect(text).toContain('New space');
         expect(text).toContain('New from template');
     });
+
+    it('offers "Compare Spaces" only to canAdminister with at least two Spaces — the server refuses it otherwise', () => {
+        const q = '[aria-label="Compare Spaces"]';
+        expect((create(true, SPACES, true).nativeElement as HTMLElement).querySelector(q)).not.toBeNull();
+    });
+
+    it('hides "Compare Spaces" without canAdminister', () => {
+        expect(
+            (create(true, SPACES, false).nativeElement as HTMLElement).querySelector('[aria-label="Compare Spaces"]'),
+        ).toBeNull();
+    });
+
+    it('hides "Compare Spaces" when fewer than two Spaces are hosted', () => {
+        const el = create(true, SPACES.slice(0, 1), true).nativeElement as HTMLElement;
+        expect(el.querySelector('[aria-label="Compare Spaces"]')).toBeNull();
+    });
 });
