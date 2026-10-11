@@ -250,27 +250,28 @@ public final class IndexReader implements AutoCloseable {
         Map<String, Long> out = new LinkedHashMap<>();
         if (keys.isEmpty()) return out;
         if (kinds != null && kinds.isEmpty()) throw new IllegalArgumentException("kinds must not be empty");
-        StringBuilder arms = new StringBuilder();
+        // Bounded statement: the keys and exclusions travel as one bind each; the key buckets (at most {@code buckets}) prune.
         List<String> binds = new ArrayList<>();
-        for (String key : keys) {
-            int bucket = BucketFunction.bucketOf(key, buckets);
-            for (Side side : Side.values()) {
-                String own = side == Side.OUT ? "src" : "dst", other = side == Side.OUT ? "dst" : "src";
-                if (!arms.isEmpty()) arms.append(" UNION ALL ");
-                arms.append("SELECT ").append(own).append(" AS k, ").append(other).append(" AS n FROM e_")
-                        .append(side == Side.OUT ? "out" : "in").append(" WHERE bucket = ").append(bucket).append(" AND ").append(own).append(" = ?");
-                binds.add(key);
-                if (kinds != null) {
-                    arms.append(" AND kind IN (").append(String.join(",", java.util.Collections.nCopies(kinds.size(), "?"))).append(')');
-                    binds.addAll(kinds);
-                }
+        java.util.TreeSet<Integer> bucketSet = new java.util.TreeSet<>();
+        for (String key : keys) bucketSet.add(BucketFunction.bucketOf(key, buckets));
+        String bucketList = bucketSet.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        String keyRel = idRelation(new java.util.LinkedHashSet<>(keys), binds);
+        StringBuilder sql = new StringBuilder("WITH ks AS ").append(keyRel);
+        if (!excluded.isEmpty()) sql.append(", xs AS ").append(idRelation(new java.util.LinkedHashSet<>(excluded), binds));
+        sql.append(" SELECT k, COUNT(DISTINCT n) FROM (");
+        for (Side side : Side.values()) {
+            String own = side == Side.OUT ? "src" : "dst", other = side == Side.OUT ? "dst" : "src";
+            if (side != Side.OUT) sql.append(" UNION ALL ");
+            sql.append("SELECT ").append(own).append(" AS k, ").append(other).append(" AS n FROM e_")
+               .append(side == Side.OUT ? "out" : "in").append(" WHERE bucket IN (").append(bucketList).append(") AND ")
+               .append(own).append(" IN (SELECT id FROM ks)");
+            if (kinds != null) {
+                sql.append(" AND kind IN (").append(String.join(",", java.util.Collections.nCopies(kinds.size(), "?"))).append(')');
+                binds.addAll(kinds);
             }
         }
-        StringBuilder sql = new StringBuilder("SELECT k, COUNT(DISTINCT n) FROM (").append(arms).append(") u");
-        if (!excluded.isEmpty()) {
-            sql.append(" WHERE n NOT IN (").append(String.join(",", java.util.Collections.nCopies(excluded.size(), "?"))).append(')');
-            binds.addAll(excluded);
-        }
+        sql.append(") u");
+        if (!excluded.isEmpty()) sql.append(" WHERE n NOT IN (SELECT id FROM xs)");
         sql.append(" GROUP BY k");
         try (PreparedStatement ps = sandbox.preparedStatement(sql.toString())) {
             for (int i = 0; i < binds.size(); i++) ps.setString(i + 1, binds.get(i));
@@ -279,6 +280,21 @@ public final class IndexReader implements AutoCloseable {
             }
         }
         return out;
+    }
+
+    /**
+     * A one-column relation ({@code id}) over {@code values} with ONE bind however many there are - the values joined on
+     * U+001F and split back by the engine - so a large candidate or exclusion set never grows the statement. Falls back to a
+     * {@code VALUES} list only when a value itself carries U+001F.
+     */
+    public static String idRelation(java.util.Collection<String> values, List<String> binds) {
+        for (String v : values)
+            if (v.indexOf('') >= 0) {
+                binds.addAll(values);
+                return "(SELECT * FROM (VALUES " + String.join(",", java.util.Collections.nCopies(values.size(), "(?)")) + ") v(id))";
+            }
+        binds.add(String.join("", values));
+        return "(SELECT unnest(string_split(?, chr(31))) AS id)";
     }
 
     /** One edge row of the {@code out} copy for a temporal scan: {@code ms} is the event time as epoch milliseconds, null when the row has none. */

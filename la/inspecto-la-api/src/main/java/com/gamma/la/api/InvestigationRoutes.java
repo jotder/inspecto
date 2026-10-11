@@ -1270,9 +1270,8 @@ public final class InvestigationRoutes implements RouteModule {
         candidates.removeAll(admitted);
         List<Map<String, Object>> out = new ArrayList<>();
         if (candidates.isEmpty()) return out;
-        List<String> binds = new ArrayList<>(candidates);
-        StringBuilder sql = new StringBuilder("WITH c(id) AS (VALUES ")
-                .append(String.join(",", Collections.nCopies(candidates.size(), "(?)"))).append(")");
+        List<String> binds = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("WITH c AS ").append(com.gamma.la.storage.IndexReader.idRelation(candidates, binds));
         appendEvents(sql, binds, inv.header(), inv.dataset(), kinds, excluded, window, timed);
         sql.append(" SELECT id, COUNT(DISTINCT o) AS d FROM (SELECT s AS id, t AS o FROM ev WHERE s IN (SELECT id FROM c) "
                 + "UNION ALL SELECT t AS id, s AS o FROM ev WHERE t IN (SELECT id FROM c)) u GROUP BY id "
@@ -1321,11 +1320,11 @@ public final class InvestigationRoutes implements RouteModule {
             binds.addAll(kinds);
         }
         if (!excluded.isEmpty()) {
-            String out = String.join(",", Collections.nCopies(excluded.size(), "?"));
-            sql.append(" AND CAST(").append(src).append(" AS VARCHAR) NOT IN (").append(out)
-               .append(") AND CAST(").append(tgt).append(" AS VARCHAR) NOT IN (").append(out).append(")");
-            binds.addAll(excluded);
-            binds.addAll(excluded);
+            // One bind per side however long the exclusion list: the statement stays bounded.
+            sql.append(" AND CAST(").append(src).append(" AS VARCHAR) NOT IN ");
+            sql.append(com.gamma.la.storage.IndexReader.idRelation(excluded, binds));
+            sql.append(" AND CAST(").append(tgt).append(" AS VARCHAR) NOT IN ");
+            sql.append(com.gamma.la.storage.IndexReader.idRelation(excluded, binds));
         }
         sql.append(")");
         if (timed) {

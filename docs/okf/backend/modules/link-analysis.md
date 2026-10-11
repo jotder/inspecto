@@ -174,8 +174,8 @@ Design rules visible in the dependency graph:
   request). One "nothing to expand" refusal names the held hubs everywhere; an approval whose frontier is all newly
   flagged says so (409) rather than "left the Working Set".
   *Degree surfaced + from the index (2026-10-11, as built):* the sealed degree now reaches the client, always from the
-  SEALED read, never recomputed: the evaluator keeps `State.hubDegree` (id → `read.hubs[].degree` of the step that
-  flagged it; dropped with the entity on exclude) OUTSIDE `toMap()`/`hash()`, so hashes are unchanged; the Working Set
+  SEALED read, never recomputed: the evaluator keeps `State.hubDegree` (id → `read.hubs[].degree` of the LATEST step that
+  sealed it — a later read re-flagging it supersedes the first; dropped with the entity on exclude) OUTSIDE `toMap()`/`hash()`, so hashes are unchanged; the Working Set
   entities relation gains column `contacts` (the degree when `highConnectivity`, else null; numeric for measures); the
   step result's `read` and the log view's `read` summary carry `hubs [{id, degree}]` (ids masked like every other id).
   The read also seals `hubDegreeSource: index|flat` (beside `hubs`, not in the rung, so a reread's rung is unchanged).
@@ -312,7 +312,17 @@ and any column whose registry/lineage class is claimed by a masked Entity Type o
   ≤ 20), neighbours, simple Investigation `expand` (byte-identical fingerprint to the flat read; weighted when the
   mapping's `weightCol` is the Investigation's `eventsCol`; the supernode hub degree from the same version when fresh —
   `read.hubDegreeSource`, §3.1), temporal, and Graph
-  Run with `input: "index"`. A response never mixes index and flat answers.
+  Run with `input: "index"`. A response never mixes index and flat answers — with ONE known, documented exception:
+  an `expand` served from a **stale** index (input files added since the build) takes its rows from the older index
+  version but counts the hub degree flat over the CURRENT Dataset (`hubDegreeSource: flat`), so a sealed `hubs[].degree`
+  may count links the sealed rows do not show yet. Accepted (the degree is display + flagging only, sealed, outside
+  the hash; `read.index.stale` says so); pinned by `ControlApiInvestigationHubDegreeTest
+  .aStaleServedRungCountsTheHubDegreeFlatOverTheCurrentDataset`.
+* **Bounded degree statements:** `IndexReader.distinctCounterparties` and the flat `hubs()` check pass their
+  candidate and excluded ids as ONE bind each (`IndexReader.idRelation`: joined on U+001F, `unnest(string_split(..))`;
+  a `VALUES` fallback only when an id itself carries U+001F) and prune the index by the candidates' bucket set, so a
+  large exclusion list or candidate set never grows the statement (parity: `IndexReaderTest`, 2,300 keys × 5,000
+  exclusions).
 * **Scheduled builds:** the `la.index.build` Job → `link-index` Platform Service → `ScheduledLinkIndexBuilder`
   (geo-link) → `ScheduledIndexBuild` (la-api), principal `index-build:<job>` holding only `canBuildLinkIndex`,
   authority = the Job's stamped `owner`, re-decided every run; runs the plan's advice only (`full` needs

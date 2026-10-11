@@ -583,7 +583,9 @@ public final class InvestigationEvaluator {
                     for (Object o : hubs)
                         if (o instanceof Map<?, ?> h && s.entities.containsKey(String.valueOf(h.get("id")))) {
                             String id = String.valueOf(h.get("id"));
-                            if (s.highConnectivity.add(id) && h.get("degree") instanceof Number d) s.hubDegree.put(id, d.longValue());
+                            s.highConnectivity.add(id);
+                            // The LATEST sealed degree wins (a later, wider read re-flagging it supersedes the first); display only.
+                            if (h.get("degree") instanceof Number d) s.hubDegree.put(id, d.longValue());
                         }
             }
             case "exclude" -> {

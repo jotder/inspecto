@@ -47,6 +47,42 @@ class IndexReaderTest {
         return out;
     }
 
+    /**
+     * The distinct-counterparty degree stays one bounded statement however many keys and exclusions: 2,300 keys (2,000 with
+     * no edge, one carrying U+001F for the fallback relation) and 5,000 excluded ids give exactly the count a plain Java
+     * fold of the same rows gives, with and without a kind list.
+     */
+    @Test
+    void distinctCounterpartiesOverManyKeysAndALargeExclusionListEqualsAPlainFold(@TempDir Path tmp) throws Exception {
+        String rel = "SELECT 'K' || CAST(i % 300 AS VARCHAR) AS s, 'N' || CAST(i % 7000 AS VARCHAR) AS t, "
+                + "CASE WHEN i % 2 = 0 THEN 'call' ELSE 'sms' END AS k, CAST(NULL AS TIMESTAMP) AS ts, CAST(NULL AS DOUBLE) AS w "
+                + "FROM range(20000) r(i)";
+        IndexMapping m = new IndexMapping("s", "t", "k", "ts", null, "w", List.of());
+        IndexBuilder.Result built = IndexBuilder.build(new IndexBuilder.Request("g", m, rel, new IndexStore(tmp, "g", m.hash()), "fp", null));
+        List<String> keys = new ArrayList<>();
+        for (int j = 0; j < 300; j++) keys.add("K" + j);
+        for (int j = 0; j < 2000; j++) keys.add("absent" + j);
+        List<String> excluded = new ArrayList<>();
+        for (int j = 0; j < 5000; j++) excluded.add("N" + j);
+        java.util.Set<String> ex = new java.util.HashSet<>(excluded);
+        for (List<String> kinds : java.util.Arrays.asList(null, List.of("call"))) {
+            Map<String, java.util.Set<String>> fold = new java.util.TreeMap<>();
+            for (int i = 0; i < 20000; i++) {
+                String n = "N" + (i % 7000);
+                if (ex.contains(n) || (kinds != null && i % 2 != 0)) continue;
+                fold.computeIfAbsent("K" + (i % 300), x -> new java.util.TreeSet<>()).add(n);
+            }
+            Map<String, Long> expected = new java.util.TreeMap<>();
+            fold.forEach((k, v) -> expected.put(k, (long) v.size()));
+            try (IndexReader r = open(built)) {
+                assertEquals(expected, new java.util.TreeMap<>(r.distinctCounterparties(keys, kinds, excluded)), "kinds " + kinds);
+                List<String> odd = new ArrayList<>(keys);
+                odd.add("K\u001Fx");   // the VALUES fallback: same answer
+                assertEquals(expected, new java.util.TreeMap<>(r.distinctCounterparties(odd, kinds, excluded)), "fallback, kinds " + kinds);
+            }
+        }
+    }
+
     @Test
     void outAndInReadsReturnEveryParallelEdgeWithItsTimeAndWeight(@TempDir Path tmp) throws Exception {
         IndexBuilder.Result built = build(tmp);
