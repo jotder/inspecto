@@ -110,6 +110,16 @@ public final class CommitFence {
         if (c != null && c.getAsBoolean()) throw cancelled(scope, pipeline);
     }
 
+    /**
+     * The registered cancel signal itself (never {@code null}; "never cancelled" when none), resolved NOW on the
+     * calling thread's Space. For a loop that must stop between units without throwing, and for handing to worker
+     * threads that do not carry the caller's MDC Space (HA-CANCEL-RESIDUALS-1 (2), the remote fetch).
+     */
+    public static BooleanSupplier cancelSignal(Scope scope, String pipeline) {
+        BooleanSupplier c = CANCELS.get(key(scope, pipeline));
+        return c != null ? c : () -> false;
+    }
+
     private static RunCancelledException cancelled(Scope scope, String pipeline) {
         log.info("Run '{}' ({}) cancelled — the host is closing; stopping without committing, the files stay in "
                 + "the inbox and the claim is released once this run has stopped", pipeline, scope);
