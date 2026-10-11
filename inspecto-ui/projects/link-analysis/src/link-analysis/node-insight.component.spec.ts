@@ -315,6 +315,28 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(byEntity).toHaveBeenLastCalledWith('msisdn', '999', 'closed');
     });
 
+    it("shows the server's own truncation message and total when sent, else the fixed note", async () => {
+        const { fixture, el } = make(
+            {},
+            {
+                history: () =>
+                    Promise.resolve({
+                        truncated: true,
+                        truncatedMessage: 'Scanned the newest 500 objects.',
+                        total: 1240,
+                        items: [item({ id: 'i1' })],
+                    }),
+            },
+        );
+        await settle(fixture);
+        el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
+        await settle(fixture);
+        const note = el.querySelector('[data-testid=history-truncated]')!.textContent!;
+        expect(note).toContain('Scanned the newest 500 objects.');
+        expect(note).toContain('1,240 in all');
+        expect(note).not.toContain('Only the newest objects were searched');
+    });
+
     it('shows the empty state for the chosen status', async () => {
         const { fixture, el, c } = make();
         c.historyStatus.set('open');

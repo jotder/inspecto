@@ -31,7 +31,16 @@ export interface V1EnvelopeMetadata {
     apiVersion: 'v1';
     durationMs?: number;
     etag?: string;
-    pagination?: { cursor?: string; nextCursor?: string; pageSize?: number; total?: number };
+    pagination?: {
+        cursor?: string;
+        nextCursor?: string;
+        pageSize?: number;
+        total?: number;
+        /** The server returned only part of the result (e.g. scanned only its newest candidates). */
+        truncated?: boolean;
+        /** The server's own words for a truncated result. */
+        message?: string;
+    };
     warnings?: { code: string; message: string; sunset?: string }[];
 }
 

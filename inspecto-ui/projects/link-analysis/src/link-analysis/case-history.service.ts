@@ -1,7 +1,7 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { V1_FULL_ENVELOPE, apiErrorMessage, isV1Envelope } from '@inspecto/core/api';
 import { apiUrl } from '@inspecto/core/api/api-base';
 
 /** One Incident or Case that references an Entity (`GET /objects/by-entity`). */
@@ -24,12 +24,17 @@ export interface EntityHistory {
     items: EntityHistoryItem[];
     /** The server scanned only its newest candidates: older references may be missing. */
     truncated: boolean;
+    /** The server's own truncation message (`metadata.pagination.message`), when it sent one. */
+    truncatedMessage?: string;
+    /** How many references the server counted in all (`metadata.pagination.total`), when it sent it. */
+    total?: number;
     error?: string;
 }
 
 /**
- * The node detail dialog's Case history read. The envelope's `metadata` is unwrapped away by the v1 interceptor, so
- * the truncation flag is read from the `X-Inspecto-Truncated` header the route sets alongside it.
+ * The node detail dialog's Case history read. It opts into the whole v1 envelope ({@link V1_FULL_ENVELOPE}) so the
+ * server's `metadata.pagination` (`truncated` / `message` / `total`) reaches the dialog; the `X-Inspecto-Truncated`
+ * header stays the fallback for a reply that carries no pagination (or no envelope at all).
  */
 @Injectable({ providedIn: 'root' })
 export class CaseHistoryService {
@@ -38,12 +43,22 @@ export class CaseHistoryService {
     async byEntity(type: string, id: string, status: EntityHistoryStatus): Promise<EntityHistory> {
         try {
             const r = await firstValueFrom(
-                this.http.get<EntityHistoryItem[]>(apiUrl('/objects/by-entity'), {
+                this.http.get<unknown>(apiUrl('/objects/by-entity'), {
                     params: { type, id, status },
                     observe: 'response',
+                    context: new HttpContext().set(V1_FULL_ENVELOPE, true),
                 }),
             );
-            return { items: r.body ?? [], truncated: r.headers.get('X-Inspecto-Truncated') === 'true' };
+            const env = isV1Envelope(r.body) ? r.body : null;
+            const items = ((env ? env.data : r.body) as EntityHistoryItem[] | null) ?? [];
+            const page = env?.metadata.pagination;
+            const out: EntityHistory = {
+                items,
+                truncated: page?.truncated ?? r.headers.get('X-Inspecto-Truncated') === 'true',
+            };
+            if (page?.message) out.truncatedMessage = page.message;
+            if (typeof page?.total === 'number') out.total = page.total;
+            return out;
         } catch (e) {
             return { items: [], truncated: false, error: historyErrorMessage(e) };
         }

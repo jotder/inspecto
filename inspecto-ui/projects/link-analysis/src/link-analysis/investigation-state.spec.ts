@@ -68,6 +68,28 @@ describe('LA-10 investigation-state', () => {
         expect(g.nodes.filter((n) => n.data.highConnectivity).map((n) => n.id)).toEqual([entityId('msisdn', 'hub')]);
     });
 
+    it("carries a flagged entity's contacts onto its canvas node; null contacts carry no count", () => {
+        const ws: WorkingSet = {
+            entities: [
+                entity('a'),
+                entity('hub', { hop: 1, highConnectivity: true, contacts: 650 }),
+                entity('hub2', { hop: 1, highConnectivity: true, contacts: null }),
+            ],
+            links: [
+                { source: 'a', target: 'hub', kind: 'call', count: 1, admittedBy: 2 },
+                { source: 'a', target: 'hub2', kind: 'call', count: 1, admittedBy: 2 },
+            ],
+            excluded: [],
+            hash: 'h',
+        };
+        const g = workingSetToGraph(ws, P);
+        const byId = (raw: string) => g.nodes.find((n) => n.id === entityId('msisdn', raw))!.data;
+        expect(byId('hub').contacts).toBe(650);
+        expect(byId('hub2').highConnectivity).toBe(true);
+        expect(byId('hub2').contacts).toBeUndefined();
+        expect(byId('a').contacts).toBeUndefined();
+    });
+
     it('draws EVERY link among a Working Set above the projection node cap (1 200 entities / 1 501 links)', () => {
         const ids = Array.from({ length: 1200 }, (_, i) => `e${i}`);
         const links = [

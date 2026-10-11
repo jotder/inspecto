@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse, provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../../environments/environment';
 import { apiErrorMessage } from './api-base';
-import { v1Interceptor } from './v1.interceptor';
+import { V1_FULL_ENVELOPE, v1Interceptor } from './v1.interceptor';
 
 const url = `${environment.apiBaseUrl}/v1/pipelines`;
 
@@ -29,6 +29,24 @@ describe('v1Interceptor', () => {
             diagnostics: { correlationId: 'c-1' },
         });
         expect(body).toEqual([{ name: 'mini_etl' }]);
+        mock.verify();
+    });
+
+    it('returns the whole envelope only to a request that opts in with V1_FULL_ENVELOPE', () => {
+        const envelope = {
+            data: [{ id: 'i1' }],
+            metadata: { timestamp: 't', apiVersion: 'v1', pagination: { total: 9, truncated: true, message: 'm' } },
+            diagnostics: { correlationId: 'c-2' },
+        };
+        let full: unknown;
+        let plain: unknown;
+        http.get(url, { context: new HttpContext().set(V1_FULL_ENVELOPE, true) }).subscribe((b) => (full = b));
+        http.get(url).subscribe((b) => (plain = b));
+        const reqs = mock.match(url);
+        expect(reqs.length).toBe(2);
+        reqs.forEach((r) => r.flush(envelope));
+        expect(full).toEqual(envelope);
+        expect(plain).toEqual([{ id: 'i1' }]);
         mock.verify();
     });
 

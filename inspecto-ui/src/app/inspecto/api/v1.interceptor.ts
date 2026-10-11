@@ -1,6 +1,13 @@
-import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
+import { HttpContextToken, HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { map } from 'rxjs/operators';
 import { envelopeVersionSkew, isV1Envelope } from './v1';
+
+/**
+ * Opt-in: a request carrying this token (`context: new HttpContext().set(V1_FULL_ENVELOPE, true)`) receives the WHOLE
+ * v1 envelope (`{data, metadata, …}`) instead of `data`, so the one caller that needs `metadata` (e.g. pagination
+ * `total` / `truncated` / `message`) can read it. Default `false` — every other caller is unaffected.
+ */
+export const V1_FULL_ENVELOPE = new HttpContextToken<boolean>(() => false);
 
 /**
  * Unwraps the `/api/v1` success envelope (`{data, metadata, diagnostics}` → `data`) at the one
@@ -17,7 +24,8 @@ export const v1Interceptor: HttpInterceptorFn = (req, next) =>
     next(req).pipe(
         map((event) => {
             if (!(event instanceof HttpResponse)) return event;
-            if (isV1Envelope(event.body)) return event.clone({ body: event.body.data });
+            if (isV1Envelope(event.body))
+                return req.context.get(V1_FULL_ENVELOPE) ? event : event.clone({ body: event.body.data });
             // An envelope-shaped body we did NOT unwrap is a version skew between this bundle and the
             // server that answered. Say so here, once, naming the request — otherwise the raw envelope
             // reaches a feature service and fails far from the cause. See `envelopeVersionSkew`.

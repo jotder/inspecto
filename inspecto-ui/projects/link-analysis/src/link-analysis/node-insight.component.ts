@@ -242,10 +242,17 @@ const LIST_REASON_MAX = 1000;
                                 <inspecto-alert variant="warning" data-testid="history-error">{{ h.error }}</inspecto-alert>
                             } @else {
                                 @if (h.truncated) {
-                                    <inspecto-alert variant="warning" data-testid="history-truncated"
-                                        >Only the newest objects were searched: older Incidents or Cases may be
-                                        missing.</inspecto-alert
-                                    >
+                                    <inspecto-alert variant="warning" data-testid="history-truncated">
+                                        @if (h.truncatedMessage) {
+                                            {{ h.truncatedMessage }}
+                                        } @else {
+                                            Only the newest objects were searched: older Incidents or Cases may be
+                                            missing.
+                                        }
+                                        @if (h.total != null) {
+                                            ({{ h.total.toLocaleString('en') }} in all)
+                                        }
+                                    </inspecto-alert>
                                 }
                                 @if (historyItems().length) {
                                     <ul class="mt-1 flex flex-col gap-1" data-testid="history-list">

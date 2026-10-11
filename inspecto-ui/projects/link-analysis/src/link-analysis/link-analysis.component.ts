@@ -67,6 +67,7 @@ import {
     seedError,
     parseInvestigateParams,
     sameInvestigateRequest,
+    hubBadgeText,
 } from './investigate-number';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
@@ -1799,6 +1800,10 @@ export class LinkAnalysisComponent implements OnInit {
                                 neighbors.slice(0, 8).join(', ') +
                                 (neighbors.length > 8 ? ` … +${neighbors.length - 8}` : ''),
                         },
+                        // The legend's ringed node, with its sealed contact count when served.
+                        ...(node.data.highConnectivity
+                            ? [{ label: 'Connectivity', value: hubBadgeText(null, node.data.contacts) }]
+                            : []),
                         // LA-08: which Datasets this (possibly merged) entity was projected from.
                         ...(node.data.provenance?.length
                             ? [{ label: 'Datasets', value: node.data.provenance.join(', ') }]
