@@ -116,6 +116,15 @@ export interface ServerPatternRequest {
     /** The link kind / time column for this run — the mapping's own, or pre-filled from the domain profile. */
     linkKindCol?: string;
     timeCol?: string;
+    /** Run over the open Investigation's bound Dataset (its Working Set canvas) instead of a query edge mapping. */
+    overInvestigation?: boolean;
+}
+
+/** The open Investigation's binding, when its Working Set is what the canvas draws (null = a query graph). */
+export interface InvestigationPatternTarget {
+    dataset: string;
+    linkKindCol?: string;
+    timeCol?: string;
 }
 
 type AnalysisTab =
@@ -296,6 +305,11 @@ export class LinkAnalysisToolboxComponent {
     /** LA-14b: the last server pattern search, mapped onto the graph by the host (null = none yet). */
     readonly serverPattern = input<ServerPatternState | null>(null);
     readonly serverPatternBusy = input(false);
+    /**
+     * The open Investigation's Dataset + kind / time columns, set only while the canvas draws its Working Set. Its
+     * links carry no `link_kind` / `first_seen` attrs, so a branching pack runs on the server over that Dataset.
+     */
+    readonly investigationPatternTarget = input<InvestigationPatternTarget | null>(null);
 
     /**
      * D-4 step 7: the Investigation whose Working Set the canvas draws (null = the canvas shows a query graph, so a
@@ -467,6 +481,8 @@ export class LinkAnalysisToolboxComponent {
         const timeAttr = this.timeAttr();
         const pack = this.loadedPack();
         if (!pack) return { timeAttr };
+        // On the Investigation canvas a branching pack runs on the server — judged by investigationPatternColumns.
+        if (this.investigationPatternColumns()) return { timeAttr };
         const needs = this.patternNeeds();
         const defaults = PATTERN_PACK_COLUMNS[this.profileId() ?? 'generic'] ?? {};
         const blocked: string[] = [];
@@ -491,6 +507,33 @@ export class LinkAnalysisToolboxComponent {
             ...(blocked.length ? { blocked: blocked.join(' ') } : {}),
         };
     });
+    /**
+     * The kind / time columns for a branching pack run over the open Investigation's Dataset: the Investigation's
+     * own binding first, then the domain profile's (telecom: `link_kind` / `first_seen`). Null = not that case
+     * (no Investigation canvas, or a linear motif, which keeps the browser matcher).
+     */
+    readonly investigationPatternColumns = computed<PatternColumnPlan | null>(() => {
+        const target = this.investigationPatternTarget();
+        const pack = this.loadedPack();
+        if (!target || !pack || !this.branchStages()) return null;
+        const needs = this.patternNeeds();
+        const plan = resolvePatternColumns(
+            needs,
+            { kindCol: target.linkKindCol, timeCol: target.timeCol || this.timeAttr() },
+            this.profileId(),
+        );
+        const used = [
+            ...(needs.kind && plan.kindCol ? [plan.kindCol] : []),
+            ...(needs.time && plan.timeCol ? [plan.timeCol] : []),
+        ];
+        return {
+            ...(plan.kindCol ? { kindCol: plan.kindCol } : {}),
+            ...(plan.timeCol ? { timeCol: plan.timeCol } : {}),
+            ...(plan.blocked ? { blocked: plan.blocked } : {}),
+            ...(used.length ? { notice: `Using ${used.join(' / ')} for this pack.` } : {}),
+        };
+    });
+
     /**
      * LA-14b — the loaded BRANCHING motif (a copy, editable), or null when the builder holds a linear one.
      * Its thresholds are rendered as editable fields so the band a match depends on is never hidden.
@@ -1057,6 +1100,23 @@ export class LinkAnalysisToolboxComponent {
         if (!g) return;
         this.analysisError.set('');
         this.clearServerNotices();
+        const inv = this.investigationPatternColumns();
+        const invStages = this.branchStages();
+        if (inv && invStages) {
+            this.patternMatches.set([]);
+            if (inv.blocked) {
+                this.analysisError.set(inv.blocked);
+                return;
+            }
+            this.runPatternOnServer.emit({
+                mapping: -1,
+                stages: invStages,
+                overInvestigation: true,
+                ...(inv.kindCol ? { linkKindCol: inv.kindCol } : {}),
+                ...(inv.timeCol ? { timeCol: inv.timeCol } : {}),
+            });
+            return;
+        }
         const cols = this.browserPatternColumns();
         if (cols.blocked) {
             this.patternMatches.set([]);

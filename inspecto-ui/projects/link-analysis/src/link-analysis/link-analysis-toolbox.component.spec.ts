@@ -742,6 +742,54 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         await expectNoA11yViolations(el);
     });
 
+    it('on the Investigation canvas: takes the Investigation columns, says so, and runs on the server over its Dataset', () => {
+        const t = make(GRAPH, [ringPack]);
+        t.c.tab.set('pattern');
+        t.c.loadPatternPack('telecom-subscription-ring');
+        t.fixture.componentRef.setInput('investigationPatternTarget', {
+            dataset: 'telecom_links',
+            linkKindCol: 'link_kind',
+            timeCol: 'first_seen',
+        });
+        t.fixture.detectChanges();
+        const el = t.fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="pattern-columns-blocked"]')).toBeNull();
+        expect(el.querySelector('[data-testid="investigation-pattern-columns-notice"]')?.textContent).toContain(
+            'Using link_kind / first_seen for this pack',
+        );
+        expect(el.querySelector('[data-testid="investigation-pattern-scope"]')?.textContent).toContain(
+            'not only the Working Set',
+        );
+        const find = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Find matches'))!;
+        expect(find.disabled).toBe(false);
+        const asked: unknown[] = [];
+        t.c.runPatternOnServer.subscribe((r) => asked.push(r));
+        find.click();
+        expect(asked).toEqual([
+            {
+                mapping: -1,
+                stages: t.c.branchStages(),
+                overInvestigation: true,
+                linkKindCol: 'link_kind',
+                timeCol: 'first_seen',
+            },
+        ]);
+    });
+
+    it('on the Investigation canvas: blank binding columns are pre-filled from the telecom profile', () => {
+        const t = make(GRAPH, [ringPack]);
+        t.c.tab.set('pattern');
+        t.c.loadPatternPack('telecom-subscription-ring');
+        t.fixture.componentRef.setInput('profileId', 'telecom');
+        t.fixture.componentRef.setInput('investigationPatternTarget', { dataset: 'telecom_links' });
+        t.fixture.detectChanges();
+        expect(t.c.investigationPatternColumns()).toEqual({
+            kindCol: 'link_kind',
+            timeCol: 'first_seen',
+            notice: 'Using link_kind / first_seen for this pack.',
+        });
+    });
+
     it('telecom profile without the canvas carrying first_seen: the browser run names the column to set', () => {
         const { fixture, c } = telecom('link_kind');
         fixture.componentRef.setInput('profileId', 'telecom');
