@@ -85,3 +85,18 @@ test('scaffold lays down both Spaces once and is idempotent', () => {
 test('plan never grants demo.manager anything', () => {
   assert.ok(!JSON.stringify(buildPlan()).includes('demo.manager'));
 });
+
+import { stampIndexBuildOwner } from './seed-la-showcase.mjs';
+
+test('scaffold stamps updatedBy = owner on the la.index.build Job only (else its commit-triggered runs are REJECTED)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seed-stamp-'));
+  scaffold(root);
+  const job = fs.readFileSync(path.join(root, 'la-showcase', 'config', 'jobs', 'la_index_build_job.toon'), 'utf8');
+  assert.match(job, /^ {2}owner: admin$/m);
+  assert.match(job, /^ {2}updatedBy: admin$/m);
+  const other = 'job:\n  name: x\n  type: sql.template\n  owner: admin\n';
+  assert.equal(stampIndexBuildOwner(other), other);
+  const once = stampIndexBuildOwner('job:\n  name: x\n  type: la.index.build\n  owner: "ra"\n');
+  assert.match(once, /updatedBy: ra\n$/);
+  assert.equal(stampIndexBuildOwner(once), once);
+});

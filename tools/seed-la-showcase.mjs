@@ -123,6 +123,14 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   return out;
 }
 
+/** SpaceManager's TemplateSeedGate re-stamps a la.index.build Job to its applier; a file copy does not, and the run authority then
+ *  REJECTS every commit-triggered build ("last editor (none recorded)"). Stamp `updatedBy` = the named owner, as a save would. */
+export function stampIndexBuildOwner(text) {
+  const owner = /^ {2}owner: *"?([^"\r\n]+?)"?\s*$/m.exec(text);
+  if (!/^ {2}type: *la\.index\.build\b/m.test(text) || !owner || /^ {2}updatedBy:/m.test(text)) return text;
+  return `${text.replace(/\s*$/, '')}\n  updatedBy: ${owner[1]}\n`;
+}
+
 /** Offline: lay the showcase Space folders (and the template gallery) under a spaces root, as SpaceManager.createFromTemplate does. */
 export function scaffold(spacesRoot, templatesDir = path.join(here, '..', 'spaces', '_templates')) {
   const made = [];
@@ -131,7 +139,7 @@ export function scaffold(spacesRoot, templatesDir = path.join(here, '..', 'space
     for (const e of fs.readdirSync(src, { withFileTypes: true })) {
       const s = path.join(src, e.name), d = path.join(dst, e.name);
       if (e.isDirectory()) copy(s, d, id);
-      else if (id && e.name.endsWith('.toon')) fs.writeFileSync(d, fs.readFileSync(s, 'utf8').replaceAll('${SPACE}', id));
+      else if (id && e.name.endsWith('.toon')) fs.writeFileSync(d, stampIndexBuildOwner(fs.readFileSync(s, 'utf8').replaceAll('${SPACE}', id)));
       else fs.copyFileSync(s, d);
     }
   };
