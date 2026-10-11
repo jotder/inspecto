@@ -83,6 +83,12 @@ final class ExplorationMasking {
         }
     }
 
+    /** An ACTIVE masking under the Space's key whatever the column rule says - for a read whose caller already holds
+     *  aliases, or a classified non-endpoint column ({@code /inv/reference-rows}). */
+    static ExplorationMasking forced(Path writeRoot, String mode, String basis) {
+        return new ExplorationMasking(writeRoot, mode, true, basis);
+    }
+
     boolean active() {
         return active;
     }

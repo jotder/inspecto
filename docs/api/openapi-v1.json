@@ -12022,6 +12022,20 @@
         }
       }
     },
+    "/inv/reference-rows" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Reference Dataset rows for at most 500 entity keys, masked under the Space's maskingMode",
+        "operationId" : "postInvReferenceRows",
+        "description" : "Body {dataset, keyCol, keys[1..500], columns?, investigationId?} -> {dataset, keyCol, columns, rows:[{key, row}], matchedKeys, unresolved (unknown aliases), rawKeysRefused, truncated, masking}. Keys may be aliases/pseudonyms (resolved server-side); under masking a raw key names nothing. Gates: 503 write root, 422 body/columns, 413 > 500 keys, 404/403 Investigation, 404 Dataset not viewable.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/regulatory-reports" : {
       "get" : {
         "tags" : [ "regulatory-reports" ],

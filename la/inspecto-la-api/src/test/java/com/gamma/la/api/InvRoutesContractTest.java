@@ -18,6 +18,7 @@ class InvRoutesContractTest extends RouteModuleContract {
                 "POST /inv/projection/neighbors", "read-shaped: computes neighbours from the body",
                 "POST /inv/projection/multi", "read-shaped: multi-dataset projection; persists nothing",
                 "POST /inv/schema/overlap-profile", "read-shaped: profiles column cardinality/overlap; persists nothing",
-                "POST /inv/traversal/recursive-paths", "read-shaped: walks paths over a Dataset; persists nothing");
+                "POST /inv/traversal/recursive-paths", "read-shaped: walks paths over a Dataset; persists nothing",
+                "POST /inv/reference-rows", "read-shaped: looks up reference rows for at most 500 keys; persists nothing");
     }
 }

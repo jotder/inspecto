@@ -402,24 +402,17 @@ export class LinkAnalysisServerAlgorithmsComponent {
         const m = this.riskMapping();
         const ids = this.serverIds();
         if (!m) return;
-        // /db/query applies no entity masking: under any mode but `none` (or an unknown one) no reference row is read
-        if (this.settings.limits()?.maskingModeInForce !== 'none') {
-            this.scoreNote.update((n) => ({
-                ...n,
-                [p.name]: 'Scores are unavailable while entity masking is on.',
-            }));
-            return;
-        }
         this.filling.set(true);
         try {
-            const table = await this.risk.table(m.indicators);
+            const serverIds = this.nodeOptions()
+                .map((n) => ids?.serverNode(n.id))
+                .filter((x): x is string => !!x);
+            // only the drawn nodes' rows, masked by the server like every Link Analysis read (POST /inv/reference-rows)
+            const table = await this.risk.lookup(m.indicators, serverIds, this.investigationId());
             if (table.error) {
                 this.scoreNote.update((n) => ({ ...n, [p.name]: `The indicators could not be read: ${table.error}` }));
                 return;
             }
-            const serverIds = this.nodeOptions()
-                .map((n) => ids?.serverNode(n.id))
-                .filter((x): x is string => !!x);
             const r = nodeScoresFor(serverIds, table.byKey, m.indicators.scoreCol, p.maxSize);
             this.setNodeScores(p.name, r.scores);
             this.scoreNote.update((n) => ({
@@ -427,7 +420,8 @@ export class LinkAnalysisServerAlgorithmsComponent {
                 [p.name]:
                     `${r.matched} of ${serverIds.length} nodes have a score in ${m.indicators.dataset}` +
                     (r.dropped ? ` (${r.dropped} left out at the ${p.maxSize}-entry cap).` : '.') +
-                    (table.truncated ? ' The Dataset was only partly read: some scores may be missing.' : ''),
+                    (table.truncated ? ' More rows matched than one read returns: some scores may be missing.' : '') +
+                    (table.unresolved ? ` ${table.unresolved} node ids could not be resolved by the server.` : ''),
             }));
         } finally {
             this.filling.set(false);

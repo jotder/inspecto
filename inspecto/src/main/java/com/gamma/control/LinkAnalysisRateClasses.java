@@ -32,6 +32,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/graph/runs"},
             {"POST", "/inv/index/builds"},
             {"POST", "/inv/projection"},
+            {"POST", "/inv/reference-rows"},
     };
 
     /** Everything else: Investigation / draft / member / case / alert-rule / identity / Entity List CRUD and

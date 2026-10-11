@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { factorLine, indexByKey, nodeScoresFor, parseWeights, referenceSql, riskMappingFor } from './node-risk';
+import { factorLine, indexByKey, keyChunks, nodeScoresFor, parseWeights, riskMappingFor } from './node-risk';
 
 describe('node-risk', () => {
     it('maps the telecom profile to its indicators Dataset and nothing for the generic one', () => {
@@ -11,11 +11,15 @@ describe('node-risk', () => {
         expect(riskMappingFor('generic')).toBeNull();
     });
 
-    it('reads a reference Dataset by quoted identifier only - no entity value in the SQL', () => {
-        expect(referenceSql({ dataset: 'a"b', keyCol: 'msisdn' })).toBe('SELECT * FROM "a""b"');
-        const by = indexByKey([{ msisdn: ' 1 ' }, { msisdn: '1', x: 2 }, { msisdn: null }], 'msisdn');
-        expect([...by.keys()]).toEqual(['1']);
-        expect(by.get('1')).toEqual({ msisdn: ' 1 ' });
+    it('asks distinct trimmed keys in chunks of the server cap and indexes rows by the key as asked', () => {
+        const keys = Array.from({ length: 1001 }, (_, i) => `k${i}`);
+        expect(keyChunks([...keys, ' k0 ', '']).map((c) => c.length)).toEqual([500, 500, 1]);
+        const by = indexByKey([
+            { key: 'masked:a', row: { msisdn: 'masked:a', s: 1 } },
+            { key: 'masked:a', row: { msisdn: 'masked:a', s: 2 } },
+        ]);
+        expect([...by.keys()]).toEqual(['masked:a']);
+        expect(by.get('masked:a')).toEqual({ msisdn: 'masked:a', s: 1 });
     });
 
     it('builds nodeScores from positive scores, capped at 100 and at the entry cap', () => {

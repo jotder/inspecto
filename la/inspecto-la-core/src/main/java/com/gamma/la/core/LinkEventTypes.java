@@ -48,6 +48,11 @@ public final class LinkEventTypes {
      *  {@code truncated} carry the sweep's reach and whether the pair budget cut it short. */
     public static final String LINK_OVERLAP_PROFILED = "LINK_OVERLAP_PROFILED";
 
+    /** Reference rows were read for a small set of entity keys ({@code POST /inv/reference-rows}): the node dialog's
+     *  Risk / Enrichment lookups and "Fill nodeScores from indicators". {@code keys}/{@code matchedKeys}/{@code rows} and
+     *  {@code truncated} carry the reach; the keys themselves are never recorded (they may be raw ids). */
+    public static final String LINK_REFERENCE_READ = "LINK_REFERENCE_READ";
+
     /** A Link Analysis evidence snapshot was SEALED ({@code POST /inv/snapshots}, LA-03).
      *  {@code snapshotId}, {@code nodes} and {@code edges} carry what was frozen. A distinct act from
      *  {@link #LINK_PROJECTED}: that one records what an analyst LOOKED AT, this one records what they

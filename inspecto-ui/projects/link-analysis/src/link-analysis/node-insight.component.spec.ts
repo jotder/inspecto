@@ -11,7 +11,6 @@ import { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { InvService } from '@inspecto/link-analysis/api/inv.service';
 import { signal } from '@angular/core';
 
 const list = (id: string, purpose: EntityListSummary['purpose'], over: Partial<EntityListSummary> = {}) =>
@@ -35,11 +34,15 @@ const INDICATORS: ReferenceTable = {
     ]),
     columns: ['msisdn', 'indicator_score', 'on_blocklist', 'alarms_recent'],
     truncated: false,
+    unresolved: 0,
+    masked: false,
 };
 const CRM: ReferenceTable = {
     byKey: new Map([['999', { msisdn: '999', subscriber_type: 'prepaid', kyc_complete: false }]]),
     columns: [],
     truncated: false,
+    unresolved: 0,
+    masked: false,
 };
 
 const CTX: NodeInsightContext = {
@@ -98,7 +101,7 @@ function make(
         add?: () => unknown;
         reason?: string | undefined;
         matched?: string[];
-        masking?: string;
+        masked?: boolean;
         truncated?: boolean;
     } = {},
 ) {
@@ -106,10 +109,11 @@ function make(
     const computeRisk = vi.fn(() => of({ ...riskView(), status: 'RUNNING' } as GraphRunView, riskView()));
     const addMember = vi.fn(opts.add ?? (() => of({ changed: 1 })));
     const svc = {
-        table: vi.fn((ref: { dataset: string }) =>
+        lookup: vi.fn((ref: { dataset: string }, _keys: string[], _inv?: string | null) =>
             Promise.resolve({
                 ...(ref.dataset === 'crm_kyc' ? CRM : INDICATORS),
                 truncated: !!opts.truncated,
+                masked: !!opts.masked,
             }),
         ),
         cachedRisk: vi.fn(() => null),
@@ -144,12 +148,10 @@ function make(
                 provide: LinkAnalysisSettingsService,
                 useValue: {
                     limits: signal({
-                        maskingModeInForce: opts.masking ?? 'none',
                         propagatedRiskWeightsInForce: [1, 0.5],
                     }),
                 },
             },
-            { provide: InvService, useValue: { masking: signal(null) } },
         ],
     });
     TestBed.overrideComponent(NodeInsightComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
@@ -183,6 +185,13 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         await settle(fixture);
         // seeded with every drawn node's positive indicator score; 222 has none
         // the cache key carries the weights in force, so a weights change never reads a stale answer
+        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'telecom_msisdn_indicators' }), ['999'], 'inv');
+        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'crm_kyc' }), ['999'], 'inv');
+        expect(svc.lookup).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'telecom_msisdn_indicators' }),
+            ['999', '111', '222'],
+            'inv',
+        );
         expect(svc.computeRisk).toHaveBeenCalledWith('inv:h1|w=1,0.5', 'inv', { '999': 40, '111': 80 });
         expect(svc.cachedRisk).toHaveBeenCalledWith('inv:h1|w=1,0.5');
         const p = el.querySelector('[data-testid=risk-propagated]')!.textContent!;
@@ -235,13 +244,14 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(close).toHaveBeenCalledWith('hide');
     });
 
-    it('reads no reference Dataset while entity masking is on, and holds Compute risk', async () => {
-        const { fixture, el, svc } = make({}, { masking: 'typed' });
+    it('works in a masked Space: reads the node by its key, notes the masking, and still offers Compute risk', async () => {
+        const { fixture, el, svc } = make({}, { masked: true });
         await settle(fixture);
-        expect(svc.table).not.toHaveBeenCalled();
-        expect(el.querySelector('[data-testid=risk-masked]')!.textContent).toContain('entity masking is on');
+        expect(svc.lookup).toHaveBeenCalled();
+        expect(el.querySelector('[data-testid=risk-own]')!.textContent).toContain('40');
+        expect(el.querySelector('[data-testid=risk-masked]')!.textContent).toContain('Entity masking is on');
         expect(el.querySelector('[data-testid=enrich-masked]')).not.toBeNull();
-        expect(el.querySelector('[data-testid=compute-risk]')).toBeNull();
+        expect(el.querySelector<HTMLButtonElement>('[data-testid=compute-risk]')!.disabled).toBe(false);
     });
 
     it('warns in both sections on a truncated read and blocks Compute risk with the reason', async () => {
@@ -257,6 +267,6 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         const { fixture, el, svc } = make({ profileId: 'generic' });
         await settle(fixture);
         expect(el.querySelector('[data-testid=risk-unmapped]')).not.toBeNull();
-        expect(svc.table).not.toHaveBeenCalled();
+        expect(svc.lookup).not.toHaveBeenCalled();
     });
 });

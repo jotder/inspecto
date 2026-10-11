@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { Observable, firstValueFrom, tap } from 'rxjs';
+import { apiErrorMessage } from '@inspecto/core/api';
 import { apiUrl } from '@inspecto/core/api/api-base';
-import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { GraphRunResult, GraphRunView, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import {
     EntityListHeld,
@@ -10,13 +10,31 @@ import {
     EntityListMembersResult,
     InvService,
 } from '@inspecto/link-analysis/api/inv.service';
-import { KeyedDataset, REFERENCE_ROW_LIMIT, indexByKey, referenceSql } from './node-risk';
+import { KeyedDataset, indexByKey, keyChunks } from './node-risk';
 
-/** A reference Dataset read once: its rows by key, or why it could not be read. */
+/** `POST /inv/reference-rows` → the rows of the keys asked, masked under the Space's masking mode. */
+export interface ReferenceRowsResult {
+    dataset: string;
+    keyCol: string;
+    columns: string[];
+    rows: { key: string; row: Record<string, unknown> }[];
+    matchedKeys: number;
+    unresolved: string[];
+    rawKeysRefused: number;
+    truncated: boolean;
+    masking: { mode: string; masked: boolean; basis: string; maskedColumns: string[] };
+}
+
+/** A reference lookup for a set of keys: their rows by the key as asked, or why it could not be read. */
 export interface ReferenceTable {
     byKey: Map<string, Record<string, unknown>>;
     columns: string[];
+    /** A chunk matched more rows than the server returns: some keys' rows may be missing. */
     truncated: boolean;
+    /** Keys the server could not resolve (an alias it no longer knows, or a raw id masking hides). */
+    unresolved: number;
+    /** Some value was masked (the Space masks entity ids or a column is classified sensitive). */
+    masked: boolean;
     error?: string;
 }
 
@@ -30,37 +48,44 @@ export interface EntityListMatch {
 
 /**
  * The reads and writes behind the node detail dialog's Risk / Enrichment / actions sections and the panel's "fill from
- * indicators". A reference Dataset is read WHOLE once per session over the analyst-allowed `/db/query` (so no entity
- * value is ever put in SQL) and looked up client-side; a propagated-risk answer is cached per graph (Investigation +
- * Working Set hash).
+ * indicators". Reference rows are looked up for the keys needed only (`POST /inv/reference-rows`, chunked at the
+ * server's key cap): the server resolves aliases / pseudonyms, binds the keys and masks the answer as every other Link
+ * Analysis read does. A propagated-risk answer is cached per graph (Investigation + Working Set hash).
  */
 @Injectable({ providedIn: 'root' })
 export class NodeRiskService {
-    private readonly rows = inject(DatasetRowsService);
     private readonly runs = inject(GraphRunsService);
     private readonly inv = inject(InvService);
     private readonly http = inject(HttpClient);
 
-    private readonly tables = new Map<string, Promise<ReferenceTable>>();
     private readonly risk = new Map<string, GraphRunResult>();
 
-    /** The whole reference Dataset, indexed by its key column; a failed read is not cached (the next ask retries). */
-    table(ref: KeyedDataset): Promise<ReferenceTable> {
-        const key = `${ref.dataset}\u0000${ref.keyCol}`;
-        let p = this.tables.get(key);
-        if (!p) {
-            p = this.rows.sql(ref.dataset, referenceSql(ref), REFERENCE_ROW_LIMIT).then((r) => {
-                if (r.error) this.tables.delete(key);
-                return {
-                    byKey: indexByKey(r.rows, ref.keyCol),
-                    columns: r.columns.map((c) => c.name),
-                    truncated: r.truncated,
-                    ...(r.error ? { error: r.error } : {}),
-                };
-            });
-            this.tables.set(key, p);
+    /** One reference-rows call (at most the key cap). */
+    referenceRows(ref: KeyedDataset, keys: string[], investigationId?: string | null): Observable<ReferenceRowsResult> {
+        return this.http.post<ReferenceRowsResult>(apiUrl('/inv/reference-rows'), {
+            dataset: ref.dataset,
+            keyCol: ref.keyCol,
+            keys,
+            ...(investigationId ? { investigationId } : {}),
+        });
+    }
+
+    /** The rows of `keys` in a reference Dataset, chunk by chunk; any failed chunk makes the whole lookup an error. */
+    async lookup(ref: KeyedDataset, keys: string[], investigationId?: string | null): Promise<ReferenceTable> {
+        const out: ReferenceTable = { byKey: new Map(), columns: [], truncated: false, unresolved: 0, masked: false };
+        try {
+            for (const chunk of keyChunks(keys)) {
+                const r = await firstValueFrom(this.referenceRows(ref, chunk, investigationId));
+                for (const [k, row] of indexByKey(r.rows)) if (!out.byKey.has(k)) out.byKey.set(k, row);
+                out.columns = r.columns;
+                out.truncated ||= r.truncated;
+                out.unresolved += r.unresolved.length + r.rawKeysRefused;
+                out.masked ||= r.masking.masked;
+            }
+        } catch (e) {
+            out.error = apiErrorMessage(e, 'the reference rows could not be read');
         }
-        return p;
+        return out;
     }
 
     /** The propagated-risk answer already computed for this graph, or null. */

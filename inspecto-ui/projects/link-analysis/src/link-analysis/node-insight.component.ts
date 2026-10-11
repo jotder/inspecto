@@ -12,7 +12,7 @@ import {
     GraphRunResult,
     graphRunErrorMessage,
 } from '@inspecto/link-analysis/api/graph-runs.service';
-import { EntityListSummary, InvService, isHeldListChange } from '@inspecto/link-analysis/api/inv.service';
+import { EntityListSummary, isHeldListChange } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { factorLine, nodeScoresFor, numberOf, riskMappingFor, riskOf, round1 } from './node-risk';
@@ -69,14 +69,15 @@ const LIST_REASON_MAX = 1000;
                 <p class="text-secondary text-sm" data-testid="risk-unmapped">
                     No indicators Dataset is mapped for this domain profile.
                 </p>
-            } @else if (maskingOn()) {
-                <p class="text-secondary text-sm" data-testid="risk-masked">{{ maskedNote }}</p>
             } @else {
                 @if (indicators()?.truncated) {
                     <inspecto-alert variant="warning" data-testid="risk-truncated"
-                        >{{ mapping()!.indicators.dataset }} holds more rows than were read: scores may be
+                        >{{ mapping()!.indicators.dataset }} matched more rows than one read returns: scores may be
                         missing.</inspecto-alert
                     >
+                }
+                @if (indicators()?.masked) {
+                    <p class="text-secondary text-xs" data-testid="risk-masked">{{ maskedNote }}</p>
                 }
                 @if (indicators(); as t) {
                     @if (t.error) {
@@ -149,13 +150,14 @@ const LIST_REASON_MAX = 1000;
 
         <section class="mt-4" aria-labelledby="ni-enrich">
             <h3 id="ni-enrich" class="text-base font-semibold">Enrichment</h3>
-            @if (maskingOn() && mapping()?.enrichment) {
-                <p class="text-secondary text-sm" data-testid="enrich-masked">{{ maskedNote }}</p>
-            } @else if (mapping()?.enrichment; as e) {
+            @if (mapping()?.enrichment; as e) {
                 @if (enrichment()?.truncated) {
                     <inspecto-alert variant="warning" data-testid="enrich-truncated"
-                        >{{ e.dataset }} holds more rows than were read: this row may be missing.</inspecto-alert
+                        >{{ e.dataset }} matched more rows than one read returns: this row may be missing.</inspecto-alert
                     >
+                }
+                @if (enrichment()?.masked) {
+                    <p class="text-secondary text-xs" data-testid="enrich-masked">{{ maskedNote }}</p>
                 }
                 @if (enrichment(); as t) {
                     @if (t.error) {
@@ -235,18 +237,9 @@ const LIST_REASON_MAX = 1000;
 export class NodeInsightComponent implements OnInit {
     private readonly svc = inject(NodeRiskService);
     private readonly settings = inject(LinkAnalysisSettingsService);
-    private readonly inv = inject(InvService);
 
-    readonly maskedNote = 'Risk and enrichment are unavailable while entity masking is on.';
-    /**
-     * Reference Datasets are read over `/db/query`, which applies no entity masking - so under any masking mode but
-     * `none` (or while the mode is unknown: fail closed) nothing is read. The Space setting wins; the last exploration
-     * read's note (the query panel's Masking badge) is the fallback.
-     */
-    readonly maskingOn = computed(() => {
-        const mode = this.settings.limits()?.maskingModeInForce ?? this.inv.masking()?.mode;
-        return mode !== 'none';
-    });
+    /** Reference rows come back masked under the Space's masking mode, like every other Link Analysis read. */
+    readonly maskedNote = 'Entity masking is on: identifying values are shown as aliases.';
     /** The per-hop weights a run without `weights` takes; part of the risk cache key. */
     private readonly weights = computed(() =>
         (this.settings.limits()?.propagatedRiskWeightsInForce ?? [1, 0.6, 0.35, 0.15]).join(','),
@@ -301,7 +294,6 @@ export class NodeInsightComponent implements OnInit {
         if (!c.investigationId || !c.graphKey)
             return 'Propagated risk runs on the server over an Investigation: open one to compute it.';
         if (!c.canRunGraph) return 'You are not allowed to run graph analysis on the server.';
-        if (this.maskingOn()) return this.maskedNote;
         if (this.indicators()?.error) return 'The indicator scores could not be read.';
         if (this.indicators()?.truncated)
             return 'The indicators were only partly read: an incomplete score map would understate risk.';
@@ -319,9 +311,10 @@ export class NodeInsightComponent implements OnInit {
     ngOnInit(): void {
         const c = this.ctx();
         const m = this.mapping();
-        if (m && !this.maskingOn()) {
-            void this.svc.table(m.indicators).then((t) => this.indicators.set(t));
-            if (m.enrichment) void this.svc.table(m.enrichment).then((t) => this.enrichment.set(t));
+        if (m) {
+            void this.svc.lookup(m.indicators, [c.key], c.investigationId).then((t) => this.indicators.set(t));
+            if (m.enrichment)
+                void this.svc.lookup(m.enrichment, [c.key], c.investigationId).then((t) => this.enrichment.set(t));
         }
         if (c.graphKey) this.riskResult.set(this.svc.cachedRisk(this.cacheKey(c.graphKey)));
         void this.loadMemberships();
@@ -334,7 +327,16 @@ export class NodeInsightComponent implements OnInit {
         this.computing.set(true);
         this.riskError.set('');
         try {
-            const table = this.indicators() ?? (await this.svc.table(m.indicators));
+            // every drawn node's indicators, looked up by its server id (the server resolves aliases / pseudonyms)
+            const table = await this.svc.lookup(m.indicators, c.serverNodeIds, c.investigationId);
+            if (table.error) {
+                this.riskError.set(`The indicator scores could not be read: ${table.error}`);
+                return;
+            }
+            if (table.truncated) {
+                this.riskError.set('The indicators were only partly read: an incomplete score map would understate risk.');
+                return;
+            }
             const { scores } = nodeScoresFor(c.serverNodeIds, table.byKey, m.indicators.scoreCol);
             const graphKey = this.cacheKey(c.graphKey);
             await new Promise<void>((resolve) =>
