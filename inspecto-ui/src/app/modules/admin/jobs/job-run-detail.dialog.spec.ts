@@ -2,8 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
+import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { JobRunRow } from 'app/inspecto/api';
+import { JobRunById, JobRunRow, JobsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobRunDetailDialog } from './job-run-detail.dialog';
 
@@ -19,7 +20,19 @@ const RUN: JobRunRow = {
     message: 'ok',
 };
 
-function create(run: JobRunRow = RUN) {
+const BY_ID: JobRunById = {
+    runId: 'r-100',
+    job: 'rollup',
+    type: 'ENRICH',
+    trigger: 'schedule',
+    status: 'SUCCESS',
+    startedAt: '2026-06-17 10:00:00',
+    finishedAt: '2026-06-17 10:00:01',
+    durationMs: 1500,
+    message: 'ok',
+};
+
+function create(run: JobRunRow = RUN, byId: Observable<JobRunById> = of(BY_ID)) {
     const ref = { close: vi.fn() };
     TestBed.configureTestingModule({
         imports: [JobRunDetailDialog],
@@ -28,6 +41,7 @@ function create(run: JobRunRow = RUN) {
             provideRouter([]),
             { provide: MAT_DIALOG_DATA, useValue: run },
             { provide: MatDialogRef, useValue: ref },
+            { provide: JobsService, useValue: { run: vi.fn(() => byId) } },
         ],
     });
     const fixture = TestBed.createComponent(JobRunDetailDialog);
@@ -52,6 +66,28 @@ describe('JobRunDetailDialog', () => {
         expect(section?.textContent).toContain('c-b');
         const links = Array.from(section!.querySelectorAll('a'));
         expect(links.map((a) => a.textContent?.trim())).toEqual(['open cdr_etl']);
+    });
+
+    it('shows derived-from once the by-id read provides it (the list row never carries it)', () => {
+        const { fixture } = create(
+            RUN,
+            of({ ...BY_ID, derivedFrom: [{ consignmentId: 'c-z', pipeline: 'cdr_etl', tableName: 'cdr' }] }),
+        );
+        fixture.detectChanges();
+        const section = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="derived-from"]');
+        expect(section?.textContent).toContain('1 Consignment');
+        expect(section?.textContent).toContain('c-z');
+    });
+
+    it('keeps the row, with no error, when the by-id read fails', () => {
+        const { fixture } = create(
+            RUN,
+            throwError(() => new Error('404')),
+        );
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[data-testid="derived-from"]')).toBeNull();
+        expect(el.textContent).toContain('r-100');
     });
 
     it('shows no derived-from section on a run that read nothing', () => {

@@ -666,7 +666,7 @@ Test: `ControlApiJobAuthorityTest` (stamping at four doors, revocation, legacy r
   the run-by-id read was untyped — ✅ closed 2026-10-11 (`5158ebe94`): `JobsService.run(runId)` /
   `JobRunById` type `GET /jobs/runs/{runId}` (fields `startedAt` / `finishedAt`, unlike the list row
   `JobRunRow`'s `startTime` / `endTime`), Compare Spaces polls through it and `SpaceComparisonService.run` is
-  gone. Filed `JOB-RUN-DETAIL-DERIVEDFROM-1` (the run-detail dialog's `derivedFrom` never shows). The structured result lives only in the Signal ledger (persisting
+  gone. The run-detail dialog now reads this route for `derivedFrom` (`JOB-RUN-DETAIL-DERIVEDFROM-1`, shipped). The structured result lives only in the Signal ledger (persisting
   it is decision (c)); no axis list is served, so the axes filter is free text; the 202 body and `Location`
   are not described in the OpenAPI.
 ### `incident_purge` — the archived-Incident retention sweep (MNT-14, shipped 2026-07-27)

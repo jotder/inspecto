@@ -1,8 +1,9 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
-import { JobRunRow } from 'app/inspecto/api';
+import { JobRunRow, JobRunSource, JobsService } from 'app/inspecto/api';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { fmtDuration } from './jobs.component';
 
@@ -45,15 +46,13 @@ import { fmtDuration } from './jobs.component';
                  single-run read and only for runs that read a store; a source whose producer pipeline the
                  registry did not know is listed but NOT linked — the UI opens a Consignment by its
                  (pipeline, id) pair and never guesses the pipeline from the id. -->
-            @if (data.derivedFrom?.length) {
+            @if (derivedFrom().length) {
                 <div data-testid="derived-from">
                     <div class="text-secondary mb-1 text-sm font-medium">
-                        derived from ({{ data.derivedFrom!.length }} Consignment{{
-                            data.derivedFrom!.length === 1 ? '' : 's'
-                        }})
+                        derived from ({{ derivedFrom().length }} Consignment{{ derivedFrom().length === 1 ? '' : 's' }})
                     </div>
                     <ul class="space-y-1 text-xs">
-                        @for (src of data.derivedFrom; track src.consignmentId) {
+                        @for (src of derivedFrom(); track src.consignmentId) {
                             <li class="flex flex-wrap items-baseline gap-x-2">
                                 <span class="font-mono">{{ src.consignmentId }}</span>
                                 <span class="text-secondary">from {{ src.tableName }}</span>
@@ -84,5 +83,21 @@ import { fmtDuration } from './jobs.component';
 })
 export class JobRunDetailDialog {
     readonly data = inject<JobRunRow>(MAT_DIALOG_DATA);
+    private readonly api = inject(JobsService);
+    /** Starts as the list row's (absent) value; filled once the by-id read returns — the list never carries it. */
+    readonly derivedFrom = signal<JobRunSource[]>(this.data.derivedFrom ?? []);
     fmt = fmtDuration;
+
+    constructor() {
+        // Enrich only: the dialog is usable from the row at once, and a failed read leaves it as is.
+        this.api
+            .run(this.data.runId)
+            .pipe(takeUntilDestroyed(inject(DestroyRef)))
+            .subscribe({
+                next: (run) => {
+                    if (run.derivedFrom?.length) this.derivedFrom.set(run.derivedFrom);
+                },
+                error: () => undefined,
+            });
+    }
 }
