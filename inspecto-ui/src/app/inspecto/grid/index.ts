@@ -235,8 +235,11 @@ export class InspectoActionsCell implements ICellRendererAngularComp {
 /**
  * Workaround: ag-grid-angular 35 + this Angular 21 shell silently skips Angular cell-renderer
  * creation on the *initial* row render (cells stay empty, no error); a forced refresh of the
- * column materializes them reliably. Bind to the grid's `(firstDataRendered)` and
- * `(rowDataUpdated)` events on every grid that uses {@link actionsColumn}.
+ * column materializes them reliably. Bind to the grid's `(firstDataRendered)`, `(rowDataUpdated)` and
+ * `(paginationChanged)` events on every grid that uses {@link actionsColumn}. Paging counts as an initial
+ * render: ag-Grid destroys the leaving page's row components and builds fresh ones for the arriving page
+ * (paging BACK included), so without `paginationChanged` every renderer cell after page 1, and page 1
+ * itself on return, stays empty (live /alerts D3).
  * TODO: re-test when bumping ag-grid / Angular and drop if fixed upstream.
  */
 export function refreshActionsCells(e: { api: GridApi }): void {

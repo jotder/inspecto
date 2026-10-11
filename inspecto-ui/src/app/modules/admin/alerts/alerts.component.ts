@@ -153,7 +153,7 @@ export class AlertsComponent implements OnInit {
 
     readonly ruleColumnDefs: ColDef<AlertRule>[] = [
         { field: 'name', headerName: 'Rule', flex: 1, minWidth: 160 },
-        { headerName: 'Metric', flex: 1, minWidth: 140, valueGetter: (p) => (p.data ? ruleMetricText(p.data) : '') },
+        { headerName: 'Metric / Measure', flex: 1, minWidth: 140, valueGetter: (p) => (p.data ? ruleMetricText(p.data) : '') },
         { headerName: 'Condition', minWidth: 170, valueGetter: (p) => (p.data ? ruleConditionText(p.data) : '') },
         {
             field: 'severity',
@@ -440,7 +440,7 @@ export function alertRuleSeed(q: ParamMap): Partial<AlertRule> {
     return seed;
 }
 
-/** The Metric cell: a ledger metric, else a Dataset rule's Measure "on" its Dataset (per `by` keys when set). */
+/** The "Metric / Measure" cell: a ledger (observability) Metric, else a Dataset rule's Measure "on" its Dataset (per `by` keys when set). */
 export function ruleMetricText(r: AlertRule): string {
     if (r.metric) return r.metric;
     if (!r.measure) return r.dataset ?? '';
