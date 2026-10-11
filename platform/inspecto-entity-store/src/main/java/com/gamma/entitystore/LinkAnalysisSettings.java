@@ -55,14 +55,34 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * the DEFAULT budget a run takes for a field its request leaves unstated, and the worker / waiting-queue sizes. Every
      * field is optional ({@code null} = the service's shipped default). A default above the hard server ceiling is
      * clamped by the service, and the clamp is echoed - the ceilings themselves are not a setting.
+     * {@code propagatedRiskWeights} is the Space's default per-hop weight list of {@code propagatedRisk} (1..6 values in
+     * [0,1]) used when a run states no {@code weights}; {@code null} = {@link #DEFAULT_PROPAGATED_RISK_WEIGHTS}.
      */
     public record GraphRun(Integer maxNodes, Integer maxEdges, Integer timeoutMs, Integer threads, Integer queue,
-                           Integer maxResultItems) {
-        public static final GraphRun NONE = new GraphRun(null, null, null, null, null, null);
+                           Integer maxResultItems, List<Double> propagatedRiskWeights) {
+        public static final GraphRun NONE = new GraphRun(null, null, null, null, null, null, null);
+        /** The shipped per-hop weights of {@code propagatedRisk} (the algorithm's own default). */
+        public static final List<Double> DEFAULT_PROPAGATED_RISK_WEIGHTS = List.of(1.0, 0.6, 0.35, 0.15);
+
+        public GraphRun {
+            propagatedRiskWeights = propagatedRiskWeights == null ? null : List.copyOf(propagatedRiskWeights);
+        }
 
         boolean isNone() {
             return maxNodes == null && maxEdges == null && timeoutMs == null && threads == null && queue == null
-                    && maxResultItems == null;
+                    && maxResultItems == null && propagatedRiskWeights == null;
+        }
+
+        /** The per-hop weights in force: the stated list, else {@link #DEFAULT_PROPAGATED_RISK_WEIGHTS}. */
+        public List<Double> propagatedRiskWeightsInForce() {
+            return propagatedRiskWeights != null ? propagatedRiskWeights : DEFAULT_PROPAGATED_RISK_WEIGHTS;
+        }
+
+        /** Whether {@code w} is a valid weight list: 1..6 finite values, each in [0,1]. */
+        public static boolean validWeights(List<Double> w) {
+            if (w == null || w.isEmpty() || w.size() > 6) return false;
+            for (Double d : w) if (d == null || !Double.isFinite(d) || d < 0 || d > 1) return false;
+            return true;
         }
     }
 
@@ -236,6 +256,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (graphRun.threads() != null) g.put("threads", graphRun.threads());
             if (graphRun.queue() != null) g.put("queue", graphRun.queue());
             if (graphRun.maxResultItems() != null) g.put("max_result_items", graphRun.maxResultItems());
+            if (graphRun.propagatedRiskWeights() != null) g.put("propagated_risk_weights", graphRun.propagatedRiskWeights());
             m.put("graph_run", g);
         }
         if (index != null && !index.isNone()) {
@@ -284,8 +305,21 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (!(raw instanceof Map<?, ?>)) return null;
         Map<String, Object> g = (Map<String, Object>) raw;
         GraphRun r = new GraphRun(optInt(g, "max_nodes"), optInt(g, "max_edges"), optInt(g, "timeout_ms"),
-                optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_result_items"));
+                optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_result_items"),
+                weights(g.get("propagated_risk_weights")));
         return r.isNone() ? null : r;
+    }
+
+    /** A stored weight list that is valid, else {@code null} = inherit the shipped default. */
+    private static List<Double> weights(Object raw) {
+        if (!(raw instanceof List<?> l)) return null;
+        List<Double> out = new java.util.ArrayList<>();
+        try {
+            for (Object o : l) out.add(Double.parseDouble(String.valueOf(o).trim()));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return GraphRun.validWeights(out) ? out : null;
     }
 
     /**

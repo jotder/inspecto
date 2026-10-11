@@ -1309,6 +1309,8 @@ public final class ConfigSpecs {
                                 + "GET /inv/graph/algorithms); {threads, queue} size the workers and the waiting line; "
                                 + "max_result_items caps each list of a run's result on the way out (cut lists say "
                                 + "truncated/total/limit; absent = 10000, hard ceiling 1000000); "
+                                + "propagated_risk_weights = the Space's default per-hop weights of propagatedRisk when a run "
+                                + "states none (a list of 1..6 numbers in [0,1]; absent = [1.0, 0.6, 0.35, 0.15]); "
                                 + "every key absent = the shipped default."),
                 FieldSpec.of("index", "Edge/node index", FieldType.MAP,
                         "The edge/node index (D-3): enabled = whether reads may use an index (absent = false, nothing "

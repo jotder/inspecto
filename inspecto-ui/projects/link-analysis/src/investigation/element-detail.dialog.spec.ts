@@ -1,3 +1,4 @@
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -33,7 +34,24 @@ function create(data = DATA) {
     return { fixture, ref, pivotService };
 }
 
+@Component({
+    selector: 'inspecto-test-extension',
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
+    template: `<section data-testid="ext">Risk for {{ who() }}</section>`,
+})
+class TestExtension {
+    readonly who = input('');
+}
+
 describe('ElementDetailDialog', () => {
+    it('renders host-supplied sections under the rows with their inputs', async () => {
+        const { fixture } = create({ ...DATA, extension: { component: TestExtension, inputs: { who: 'CELL-101' } } });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid=ext]')!.textContent).toContain('Risk for CELL-101');
+        await expectNoA11yViolations(el);
+    });
+
     it('renders the detail rows and closes with the chosen branch / focus action', () => {
         const { fixture, ref } = create();
         const el = fixture.nativeElement as HTMLElement;

@@ -1,0 +1,7 @@
+name: telecom_simbox_lines
+dataset: telecom_typology_counts_dataset
+measure: max(simbox_lines)
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "SIM box: lines rotating across 3 or more handsets shared with 3 or more lines, making 50 times more calls than they receive"

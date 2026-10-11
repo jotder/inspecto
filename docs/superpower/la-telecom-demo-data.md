@@ -14,6 +14,7 @@ assigned to any real network.
 | 2 `sql.template` Jobs | `config/jobs/telecom_links_job.toon`, `config/jobs/telecom_msisdn_indicators_job.toon` |
 | Dataset registry entries | `config/registry/datasets/telecom_links_dataset.toon`, `telecom_msisdn_indicators_dataset.toon` (MSISDN columns classified `MSISDN`) |
 | Saved Link Analysis view | `config/registry/link-analysis-views/telecom_fraud_network.toon` |
+| Telecom pattern packs, typology Alert Rules (§5a) | `config/registry/pattern-packs/telecom-*.toon`, `config/registry/alert-rules/telecom_*_lines.toon`, `config/jobs/telecom_typology_counts_job.toon` |
 | Golden test | `platform/inspecto-engine/src/test/java/com/gamma/job/TelecomLinksGoldenTest.java` |
 
 Raw Datasets: `voice_cdr` (a_number, b_number, start_time, duration_s, call_type, redirecting_number, imsi, imei,
@@ -168,6 +169,49 @@ How each typology stands out on the shipped corpus:
 All 17 Wangiri, IRSF, subscription-fraud and SIM-box lines score at least 25. The only background line scoring 15 or
 more is the stale block-list entry `99971002000`. The background median is 0 and its 99th percentile is 6.0. The `indicator_score` column carries no classification in the
 registry.
+
+## 5a. Pattern packs and Alert Rules
+
+Three telecom pattern packs ship as authored config in `config/registry/pattern-packs/` (category `telecom`). The
+toolbox adds them to the built-in packs. They are branching packs, so they run over the whole Dataset through
+`POST /inv/pattern/branching` (link kind `link_kind`, time `first_seen`), not over the 2 000-link projection.
+
+| Pack | Stages | Finds on the seed |
+|---|---|---|
+| `telecom-subscription-ring` | fan-in ≥ 5 on `shared_identity`, all within 168 hours | exactly IRSF-01 and SUBFRAUD-01..05. Background households and two-line customers reach at most 3. |
+| `telecom-forwarding-chain` | fan-out ≥ 1 on `forwarding`, then fan-out ≥ 1 on `forwarding` after the first and within 48 hours | exactly MULE-01 → MULE-02 → MULE-03. Background forwards are single hops. |
+| `telecom-payment-ring` ("Shared top-up evidence") | fan-out ≥ 2 on `shared_payment`, then a closing fan-in ≥ 2 back to the start | exactly MULE-01..05 and SUBFRAUD-05 (`agent:AGT-666`, cloned vouchers). Background shares one card per pair. |
+
+The built-in `forwarding-relay` pack is still there as the generic A → B → C motif with blank kinds.
+`telecom-forwarding-chain` is its kind-pinned, time-ordered version for this corpus. Shared kinds are emitted in both
+directions, so the payment pack's closing step is always met by the mirror rows. The pack means "a line sharing top-up
+evidence (voucher, agent or card) with two or more other lines", and claims no ring. On real data a family or a shop
+topping up several lines with one card or voucher will match too, so read the `via` keys before acting.
+
+To run these packs from the SPA, set the link kind column to `link_kind` and the time column to `first_seen`. The SPA
+sends the projection's kind column and the free-text time field. With a blank time field the windowed and ordered packs
+(subscription ring, forwarding chain) fail. Pre-binding the two columns in the UI is a follow-up.
+
+Wangiri, IRSF and SIM box are per-MSISDN ratios, and pattern stages cannot express them. Three Alert Rules in
+`config/registry/alert-rules/` cover them instead. They read the one-row Dataset `telecom_typology_counts_dataset`,
+which the Job `telecom_typology_counts` builds from `telecom_msisdn_indicators` (rule thresholds are Job parameters).
+That Job has no cron. It runs on `job.dataset.produced` with `when: "$signal.dataset == telecom_msisdn_indicators"`, so it
+runs only after the indicators Job and never reads a missing or older snapshot.
+Each rule is `max(<typology>_lines) gte 1`, with no `by`. So an Alert names a count, never an MSISDN (the
+aggregate-only alert decision), and the lines themselves are found in the Investigation.
+
+| Alert Rule | Line counted when | Count on the seed |
+|---|---|---|
+| `telecom_wangiri_lines` (WARNING) | `out_distinct_b ≥ 50` and `avg_dur_s < 5` | 2 |
+| `telecom_irsf_lines` (CRITICAL) | `premium_destination_share ≥ 0.8` and `avg_dur_s ≥ 600` | 4 |
+| `telecom_simbox_lines` (CRITICAL) | `imei_per_msisdn ≥ 3`, `msisdn_per_imei ≥ 3` and `out_in_ratio ≥ 50` | 6 |
+
+IRSF uses `premium_destination_share` (premium-rate calls only), not `premium_share`. `premium_share ≥ 0.8` would also
+count SUBFRAUD-01..05 and two background lines, because it includes ordinary international calls.
+
+Tests: `ControlApiTelecomPatternPacksTest` (inspecto-geo-link) runs each pack's TOON over the built `telecom_links`
+through the real route. `TelecomLinksGoldenTest.theTypologyAlertRulesFireOnTheSeedWithCountsOnly` sweeps the three
+rules with the production `AlertService`.
 
 ## 6. Tests
 

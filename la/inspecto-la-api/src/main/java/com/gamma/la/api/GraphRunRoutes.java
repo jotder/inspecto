@@ -248,7 +248,13 @@ public final class GraphRunRoutes implements RouteModule {
             if (params.get(node) instanceof String s)
                 // a RAW id the masking hides is treated as a node that does not exist, so the answer cannot tell whether it is in the Working Set
                 params.put(node, mask.hidesRaw(s) ? ABSENT_NODE + node : mask.resolve(List.of(s)).get(0));
-        if (algorithm == Algorithm.PROPAGATED_RISK) unmaskNodeKeyed(params, mask);
+        String riskWeightsSource = null;
+        if (algorithm == Algorithm.PROPAGATED_RISK) {
+            unmaskNodeKeyed(params, mask);
+            riskWeightsSource = params.containsKey("weights") ? "request" : "space";
+            if (!params.containsKey("weights"))                                              // the Space default (graph_run.propagated_risk_weights)
+                params.put("weights", new java.util.ArrayList<>(LinkAnalysisSettings.forRoot(writeRoot).effectiveGraphRun().propagatedRiskWeightsInForce()));
+        }
 
         GraphInput input;
         String relationKey;
@@ -321,6 +327,12 @@ public final class GraphRunRoutes implements RouteModule {
             inputNote.put("at", headStep);
         }
         out.put("input", inputNote);
+        if (riskWeightsSource != null) {                                                      // the resolved per-hop weights, echoed
+            Map<String, Object> rw = new LinkedHashMap<>();
+            rw.put("weights", params.get("weights"));
+            rw.put("source", riskWeightsSource);
+            out.put("propagatedRiskWeights", rw);
+        }
         if (v.status().terminal()) return out;                                                // 200
         ex.getResponseHeaders().set("Location", "/api/v1/inv/graph/runs/" + v.id());
         return ApiContext.respondJson(ex, 202, out);

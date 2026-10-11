@@ -1,0 +1,7 @@
+name: telecom_irsf_lines
+dataset: telecom_typology_counts_dataset
+measure: max(irsf_lines)
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "IRSF: lines sending 80 % or more of their calls to premium international numbers, averaging 10 minutes or more"
