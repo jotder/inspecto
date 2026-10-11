@@ -1,0 +1,131 @@
+<section class="mt-8" aria-labelledby="link-expansions-heading">
+    <div class="flex flex-wrap items-center gap-3">
+        <h2 id="link-expansions-heading" class="text-lg font-semibold">Link expansions</h2>
+        <mat-button-toggle-group
+            class="ml-auto"
+            aria-label="Which requests to show"
+            [value]="filter()"
+            (change)="setFilter($event.value)"
+        >
+            <mat-button-toggle value="pending">Waiting</mat-button-toggle>
+            <mat-button-toggle value="all">All decisions</mat-button-toggle>
+        </mat-button-toggle-group>
+        @if (loading()) {
+            <mat-spinner diameter="20" aria-label="Loading link expansion requests"></mat-spinner>
+        }
+        <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh link expansion requests">
+            <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
+        </button>
+    </div>
+    <p class="text-secondary mt-1 text-sm">
+        A Link Analysis expand above the Space's four-eyes thresholds waits here until someone other than the analyst
+        decides it. Approving runs it as the analyst's step; denying reads nothing. Your own requests are never listed.
+    </p>
+
+    @if (unavailable()) {
+        <inspecto-alert class="mt-4" variant="info" title="Link expansion approvals are not available here">
+            Link Analysis is not installed on this deployment, or the control plane is read-only. Nothing is waiting for
+            review and nothing is broken.
+        </inspecto-alert>
+    } @else if (requests().length === 0 && !loading()) {
+        <inspecto-empty-state
+            class="mt-4"
+            title="No link expansions waiting"
+            message="When an analyst's expand crosses the Space's four-eyes thresholds, the request appears here for you to decide."
+        />
+    } @else {
+        <ul class="mt-4 flex flex-col gap-3" aria-label="Link expansion requests">
+            @for (r of requests(); track key(r)) {
+                <li class="bg-card rounded-lg border p-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="font-medium">{{ r.title || r.investigationId }}</h3>
+                        <inspecto-status-badge [value]="r.status" />
+                        <span class="text-secondary text-sm">{{ r.kind }} · {{ r.requestId }}</span>
+                    </div>
+                    <p class="mt-2">{{ r.summary }}</p>
+                    @if (r.sensitivity?.exceeded?.length) {
+                        <p class="text-secondary mt-1 text-sm">
+                            Held because: {{ r.sensitivity.exceeded!.join(', ') }}
+                        </p>
+                    }
+                    <dl class="text-secondary mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                        <div>
+                            <dt class="inline font-medium">Requested by</dt>
+                            <dd class="inline">{{ r.requestedBy || '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="inline font-medium">Requested</dt>
+                            <dd class="inline">{{ fmt(r.requestedAt) }}</dd>
+                        </div>
+                        <div>
+                            <dt class="inline font-medium">Investigation</dt>
+                            <dd class="inline">{{ r.investigationId }}</dd>
+                        </div>
+                        <div>
+                            <dt class="inline font-medium">Dataset</dt>
+                            <dd class="inline">{{ r.dataset }}</dd>
+                        </div>
+                        @if (r.purpose) {
+                            <div class="sm:col-span-2">
+                                <dt class="inline font-medium">Purpose</dt>
+                                <dd class="inline">{{ r.purpose }}</dd>
+                            </div>
+                        }
+                        @if (r.decidedBy) {
+                            <div class="sm:col-span-2">
+                                <dt class="inline font-medium">Decided</dt>
+                                <dd class="inline">
+                                    by {{ r.decidedBy }} {{ fmt(r.decidedAt) }}
+                                    @if (r.reason) {
+                                        — {{ r.reason }}
+                                    }
+                                </dd>
+                            </div>
+                        }
+                    </dl>
+
+                    @if (r.status === 'pending') {
+                        @if (denying() === key(r)) {
+                            <form class="mt-3 flex flex-wrap items-start gap-2" (ngSubmit)="deny(r)">
+                                <mat-form-field class="min-w-64 flex-auto" subscriptSizing="dynamic">
+                                    <mat-label>Reason (optional)</mat-label>
+                                    <input matInput [formControl]="reason" maxlength="200" />
+                                    @if (reason.hasError('maxlength')) {
+                                        <mat-error>At most 200 characters.</mat-error>
+                                    }
+                                </mat-form-field>
+                                <button mat-flat-button color="warn" type="submit" [disabled]="busy() === key(r)">
+                                    Deny
+                                </button>
+                                <button mat-button type="button" (click)="cancelDeny()">Cancel</button>
+                            </form>
+                        } @else {
+                            <div class="mt-3 flex gap-2">
+                                <button
+                                    mat-flat-button
+                                    color="primary"
+                                    type="button"
+                                    [disabled]="busy() === key(r)"
+                                    (click)="approve(r)"
+                                >
+                                    Approve
+                                </button>
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    [disabled]="busy() === key(r)"
+                                    (click)="openDeny(r)"
+                                >
+                                    Deny…
+                                </button>
+                            </div>
+                        }
+                    }
+                </li>
+            }
+        </ul>
+        @if (total() > requests().length) {
+            <p class="text-secondary mt-2 text-sm">Showing {{ requests().length }} of {{ total() }}.</p>
+        }
+    }
+</section>

@@ -42,4 +42,9 @@
             />
         </div>
     }
+
+    <!-- Link Analysis four-eyes (D-U7): only an approver has anything to do here. -->
+    @if (lens.canApproveLinkExpansions()) {
+        <app-link-expansion-approvals />
+    }
 </div>

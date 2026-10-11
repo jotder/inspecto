@@ -340,6 +340,16 @@ Investigation's purpose; the override is sealed in that step and the panel shows
 The hub threshold is set per Space in **Settings → Link Analysis → Hub threshold** (a whole number ≥ 1; blank = the
 default, 500; the value in force is shown; editing needs the Workbench authoring capability, read-only otherwise).
 
+**Four-eyes (large expands).** An expand whose budget or fan-out cap is above the Space's four-eyes thresholds
+(**Settings → Link Analysis**) does not run: it answers *Waiting for approval* and is held as a request, one at a time
+per Investigation. Someone **other than you** who holds *Approve link expansions* decides it under **Approvals →
+Link expansions**: each request shows the Investigation, who asked and when, its purpose, why it was held and, in
+plain words, what it will read (frontier, Dataset, direction, link kinds, budget). **Approve** runs it at once as
+your step, sealed with who approved it; **Deny…** takes an optional reason (at most 200 characters) and reads
+nothing. You never see your own requests there, and the server refuses you deciding them. Where the Investigation
+has members (§9.12) only a lead or reviewer may decide, so only they see it; an owner-only Investigation can be
+decided by any approver. *All decisions* lists the ones already approved or denied.
+
 ### 9.3 Replay, drift and fork
 
 * **Replay** re-checks that the log still produces the recorded Working Set. **Re-read** re-runs each recorded query

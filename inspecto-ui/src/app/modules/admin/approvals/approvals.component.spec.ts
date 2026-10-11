@@ -32,7 +32,7 @@ const APPROVED: AgentApproval = {
 
 async function create(
     overrides: Partial<Record<keyof ApprovalsService, unknown>> = {},
-    { canAdminister = true, canOperate = true, confirmed = true } = {},
+    { canAdminister = true, canOperate = true, confirmed = true, canApproveLinks = false } = {},
 ) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
@@ -53,7 +53,11 @@ async function create(
             },
             {
                 provide: LensService,
-                useValue: { canAdminister: () => canAdminister, canOperateRuns: () => canOperate },
+                useValue: {
+                    canAdminister: () => canAdminister,
+                    canOperateRuns: () => canOperate,
+                    canApproveLinkExpansions: () => canApproveLinks,
+                },
             },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
@@ -147,6 +151,11 @@ describe('ApprovalsComponent', () => {
         expect(c.approvals()).toEqual([]);
         expect(c.unavailable()).toBe(false);
         expect(toastr.error).toHaveBeenCalled();
+    });
+
+    it('the Link expansions section renders only for a holder of canApproveLinkExpansions', async () => {
+        const { fixture } = await create({}, { canApproveLinks: false });
+        expect(fixture.nativeElement.querySelector('app-link-expansion-approvals')).toBeNull();
     });
 
     it('renders the loaded state with no a11y violations', async () => {
