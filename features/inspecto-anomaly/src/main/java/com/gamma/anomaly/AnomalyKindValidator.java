@@ -1,14 +1,17 @@
 package com.gamma.anomaly;
 
 import com.gamma.alert.ScoreOutputDirs;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.spi.http.ComponentKindValidator;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -32,7 +35,9 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
     }
 
     @Override public void validateInSpace(Path writeRoot, Supplier<Path> dataRoot, String id, Map<String, Object> content) {
-        requireStorable(writeRoot, dataRoot, AnomalyModel.fromMap(id, content));
+        AnomalyModel model = AnomalyModel.fromMap(id, content);
+        requireStorable(writeRoot, dataRoot, model);
+        requireUnclassifiedCohort(writeRoot, model);
         requireLists(com.gamma.entitylist.WatchListFeed.installed(), writeRoot, AnomalyLists.of(content));
     }
 
@@ -54,6 +59,29 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
         } catch (java.io.IOException e) {
             throw new IllegalArgumentException("anomaly-model lists cannot be checked: the Entity List log is unreadable", e);
         }
+    }
+
+    /**
+     * Design §10, fail closed at save: no {@code peers.by} column may be classified ({@link EvidenceMasker#SENSITIVE}),
+     * because the cohort value is stored raw in every score's explanation ({@code peerBaseline.cohort}) and quoted in
+     * its {@code reason}. The classification is the one Risk Score evidence masking reads
+     * ({@link EvidenceMasker#sensitiveColumns}): the Dataset's own {@code columns[].classification} plus its lineage.
+     * A peers Dataset whose lineage cannot be traced while classified columns are in play is refused too.
+     */
+    static void requireUnclassifiedCohort(Path writeRoot, AnomalyModel model) {
+        if (model.peers() == null) return;
+        String dataset = model.peers().dataset();
+        Set<String> sensitive = EvidenceMasker.sensitiveColumns(new ComponentStore(writeRoot.resolve("registry")),
+                new ViewStore(writeRoot.resolve("views")), dataset);
+        if (sensitive.contains(EvidenceMasker.UNKNOWN_LINEAGE))
+            throw new IllegalArgumentException("anomaly-model peers.by cannot be checked for classified columns: the "
+                    + "column lineage of dataset '" + dataset + "' cannot be traced and it reads classified columns");
+        List<String> classified = model.peers().by().stream()
+                .filter(c -> sensitive.contains(c.toLowerCase(Locale.ROOT))).toList();
+        if (!classified.isEmpty())
+            throw new IllegalArgumentException("anomaly-model peers.by column(s) " + classified + " of dataset '"
+                    + dataset + "' are classified " + new java.util.TreeSet<>(EvidenceMasker.SENSITIVE)
+                    + "; a cohort value is stored raw in every score, so a classified column cannot be a cohort");
     }
 
     @Override public void requireNotReserved(Path writeRoot, String type, String id, Map<String, Object> content) {
