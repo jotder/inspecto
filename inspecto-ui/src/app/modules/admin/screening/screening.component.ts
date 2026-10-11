@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -21,6 +22,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
+import { CheckNameDialog } from './check-name.dialog';
 
 /** Which Screening Hits the pane lists. */
 export type ScreeningFilter = 'open' | 'escalated' | 'all';
@@ -73,6 +75,7 @@ export function scorePercent(score: number | null | undefined): string {
 export class ScreeningComponent implements OnInit {
     private readonly api = inject(ScreeningService);
     private readonly toastr = inject(ToastrService);
+    private readonly dialog = inject(MatDialog);
     protected readonly lens = inject(LensService);
 
     readonly filter = signal<ScreeningFilter>('open');
@@ -130,6 +133,11 @@ export class ScreeningComponent implements OnInit {
 
     ngOnInit(): void {
         this.load();
+    }
+
+    /** Opens the read-only Check a name dialog; it raises no Screening Hit. */
+    checkName(): void {
+        this.dialog.open(CheckNameDialog, { autoFocus: 'first-tabbable' });
     }
 
     setFilter(f: ScreeningFilter): void {

@@ -92,7 +92,8 @@ so it hides when `/bootstrap` `features.screening` is not `true`. Open / Escalat
 success), and a detail card with the score, subject, source run and history. The decision row (Escalate / Dismiss /
 Confirm match, a required reason, the hit's `version` sent with it) shows only with `LensService.canWorkIncidents()`,
 only for the decisions the state still allows, and never on a record whose integrity check failed. A 503 from the list
-is latched into an explained notice, not a toast. Specs: `screening.component.spec.ts` (axe included) and the
+is latched into an explained notice, not a toast.
+**Check a name** (header button, `check-name.dialog.ts`, shown to every viewer: `POST /screening/check` is a read-shaped exemption with no capability gate): one name per line (1..1000, 512 chars each), Entity List checkboxes from `GET /entity-lists` (active lists only; 1..20), optional threshold (0.5..1, blank = 0.85) and most-matches (1..20, blank = 5), results as a read-only table (name, Entity List, matched entry, method, Match Score) under a persistent *nothing is raised — this check does not create Hits* notice; server 422 text is shown verbatim, and an absent `inspecto-entity-list` module explains itself in the list area. Raising a hit from a check stays open (`SCREENING-1` item 5). Specs: `screening.component.spec.ts` (axe included) and the
 `navigation.service.spec.ts` case for the feature flag; proved end to end in the preview over a seeded Space.
 
 ## Decisions (SCR-D1 … SCR-D14, lane 2026-10-09, operator away)
