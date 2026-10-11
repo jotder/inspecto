@@ -1,7 +1,12 @@
 // Unit test for the pure assertion helpers of tools/la-demo-smoke.mjs, plus a stub-server run. node --test tools/la-demo-smoke.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expectStatus, countLaRoutes, tamperManifest, rateLimitVerdict, poolVerdict, buildProbes, run, EXPECTED_LA_ROUTES } from './la-demo-smoke.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expectStatus, countLaRoutes, tamperManifest, rateLimitVerdict, poolVerdict, buildProbes, run, EXPECTED_LA_ROUTES,
+  TELECOM_DATASETS, TELECOM_LINK_COLUMNS, TELECOM_ALERT_RULES, TELECOM_HUB, TELECOM_PACKS, telecomRegistryVerdict, triggerVerdict,
+  expandVerdict, patternVerdict, telecomAlertsVerdict, runTelecom } from './la-demo-smoke.mjs';
 
 test('expectStatus checks the status and, when asked, the error code', () => {
   assert.equal(expectStatus({ status: 404, body: { error: { errorCode: 'MODULE_DISABLED' } } }, { status: 404, code: 'MODULE_DISABLED' }), null);
@@ -76,4 +81,114 @@ test('run() against a stub server passes every probe, and fails a wrong status',
   assert.ok(ok.some((r) => r.id.includes(String(EXPECTED_LA_ROUTES))));
   const bad = await run({ fetchFn: stub(true) });
   assert.ok(bad.some((r) => !r.ok && r.id === '401 no token'));
+});
+
+// ---- telecom group -------------------------------------------------------------------------------------------------
+
+const fullCols = TELECOM_LINK_COLUMNS.map((name) => ({ name }));
+const dsList = (cols = fullCols) => TELECOM_DATASETS.map((name) => ({ name, content: { columns: name === 'telecom_links_dataset' ? cols : [] } }));
+
+test('telecomRegistryVerdict catches a missing Dataset and an incomplete telecom_links_dataset', () => {
+  assert.equal(telecomRegistryVerdict(dsList()), null);
+  assert.match(telecomRegistryVerdict(dsList().filter((d) => d.name !== 'hlr_eir_dataset')), /hlr_eir_dataset/);
+  assert.match(telecomRegistryVerdict(dsList([{ name: 'a_msisdn' }, { name: 'b_msisdn' }, { name: 'via' }])), /link_kind, first_seen, last_seen, events/);
+});
+
+test('triggerVerdict passes 2xx and names canOperateRuns on 403', () => {
+  assert.equal(triggerVerdict({ status: 202, body: {} }), null);
+  assert.match(triggerVerdict({ status: 403, body: { error: { errorCode: 'FORBIDDEN' } } }), /canOperateRuns.*FORBIDDEN/);
+});
+
+test('expandVerdict: entities admitted, hub flagged when reached, held is a FAIL', () => {
+  const step = { status: 200, data: { delta: { admitted: ['msisdn:99979100002'] } } };
+  const ws = (flag) => ({ status: 200, data: { rows: [{ entityId: `msisdn:${TELECOM_HUB}`, highConnectivity: flag }] } });
+  assert.equal(expandVerdict(step, ws(true)), null);
+  assert.equal(expandVerdict(step, { status: 200, data: { rows: [] } }), null);
+  assert.match(expandVerdict(step, ws(false)), /not flagged/);
+  assert.match(expandVerdict({ status: 200, data: { delta: { admitted: [] } } }, ws(true)), /no entity/);
+  assert.match(expandVerdict({ status: 202, data: { pending: true } }, null), /held/);
+});
+
+test('patternVerdict needs >= 1 match and no refusal', () => {
+  assert.equal(patternVerdict({ status: 200, data: { matches: [{}] } }), null);
+  assert.match(patternVerdict({ status: 200, data: { matches: [] } }), /0 matches/);
+  assert.match(patternVerdict({ status: 200, data: { matches: [], refusal: { reason: 'x' } } }), /refused/);
+  assert.match(patternVerdict({ status: 404, body: {} }), /404/);
+});
+
+test('telecomAlertsVerdict needs all three rules and no MSISDN', () => {
+  const a = TELECOM_ALERT_RULES.map((rule) => ({ rule, value: 3, message: `${rule}: 3 lines` }));
+  assert.equal(telecomAlertsVerdict(a), null);
+  assert.match(telecomAlertsVerdict(a.slice(1)), /telecom_wangiri_lines/);
+  assert.match(telecomAlertsVerdict([...a.slice(1), { rule: TELECOM_ALERT_RULES[0], message: 'line 99979100001' }]), /MSISDN/);
+});
+
+test('TELECOM_PACKS mirrors the template pattern packs', () => {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'spaces', '_templates', 'la-showcase', 'config', 'registry', 'pattern-packs');
+  for (const [pack, stages] of Object.entries(TELECOM_PACKS)) {
+    const rows = fs.readFileSync(path.join(dir, `${pack}.toon`), 'utf8').split(/\r?\n/).filter((l) => /^\s+fan-(in|out),/.test(l))
+      .map((l) => l.trim().split(','));
+    assert.equal(rows.length, stages.length, pack);
+    rows.forEach(([shape, minBranches, edgeKind, , windowHours, afterPrevious, maxGapHours, , , , closesToStart], i) => {
+      const want = { shape, minBranches: +minBranches, edgeKind };
+      if (+windowHours > 0) want.windowHours = +windowHours;
+      if (afterPrevious === 'true') { want.afterPrevious = true; if (+maxGapHours > 0) want.maxGapHours = +maxGapHours; }
+      if (closesToStart === 'true') want.closesToStart = true;
+      assert.deepEqual(stages[i], want, `${pack} stage ${i}`);
+    });
+  }
+});
+
+/** A fake telecom Space: `faults` switches individual defects on. */
+const telecomCall = (faults = {}) => {
+  const calls = [];
+  let rowsPolls = 0;
+  const call = async (user, method, p, body) => {
+    calls.push({ user, method, p, body });
+    const r = (status, data) => ({ status, body: { data }, data });
+    if (p === '/components/dataset') return r(200, dsList(faults.cols));
+    if (p.startsWith('/jobs/')) return faults.forbidden ? { status: 403, body: { error: { errorCode: 'FORBIDDEN', message: 'canOperateRuns' } }, data: null } : r(202, { runId: 'x' });
+    if (p.startsWith('/datasets/')) return r(200, { rows: faults.noRows || rowsPolls++ % 2 === 0 ? [] : [{ n: 1 }] });
+    if (p === '/inv/investigations') return r(201, { id: body.id });
+    if (p.endsWith('/ops')) return body.op === 'seed' ? r(200, {}) : r(200, { delta: { admitted: ['msisdn:99979100002', `msisdn:${TELECOM_HUB}`] } });
+    if (p.includes('/working-set')) return r(200, { rows: [{ entityId: `msisdn:${TELECOM_HUB}`, highConnectivity: !faults.unflagged }] });
+    if (p === '/inv/pattern/branching') return r(200, { matches: faults.noMatch ? [] : [{ layers: [] }] });
+    if (p.startsWith('/alerts')) return r(200, TELECOM_ALERT_RULES.map((rule) => ({ rule, value: 2 })));
+    return r(500, null);
+  };
+  return { call, calls };
+};
+const runT = async (faults) => {
+  const results = [];
+  const { call, calls } = telecomCall(faults);
+  let t = 0;
+  await runTelecom({ call, record: (id, reason) => results.push({ id, ok: !reason, reason }), timeoutMs: 10, pollMs: 1,
+    sleep: async () => { t += 5; }, now: () => t });
+  return { results, calls };
+};
+
+test('runTelecom passes every probe on a healthy Space and polls rows', async () => {
+  const { results, calls } = await runT({});
+  assert.ok(results.length >= 11, String(results.length));
+  assert.ok(results.every((r) => r.ok), JSON.stringify(results.filter((r) => !r.ok)));
+  const expand = calls.find((c) => c.body && c.body.op === 'expand');
+  assert.ok(expand.body.maxFanOut <= 5);
+  const create = calls.find((c) => c.p === '/inv/investigations');
+  assert.equal(create.body.eventsCol, 'events');
+  assert.equal(calls.filter((c) => c.p === '/inv/pattern/branching').length, 3);
+});
+
+test('runTelecom FAILs each telecom defect', async () => {
+  const failed = async (f) => (await runT(f)).results.filter((r) => !r.ok).map((r) => r.id + ' ' + r.reason).join('\n');
+  assert.match(await failed({ cols: [{ name: 'a_msisdn' }] }), /lacks columns/);
+  assert.match(await failed({ forbidden: true }), /403 \(canOperateRuns/);
+  assert.match(await failed({ noRows: true }), /no rows after/);
+  assert.match(await failed({ unflagged: true }), /not flagged/);
+  assert.match(await failed({ noMatch: true }), /pattern pack telecom-.* 0 matches/);
+});
+
+test('the dry run lists the telecom group as skipped without --telecom', async () => {
+  const lines = [];
+  await run({ dryRun: true, log: (l) => lines.push(l) });
+  assert.ok(lines.some((l) => /telecom.*SKIPPED/.test(l)));
 });
