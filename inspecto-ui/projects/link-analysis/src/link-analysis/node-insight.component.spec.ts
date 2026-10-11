@@ -12,6 +12,18 @@ import { NodeInsightComponent, NodeInsightContext } from './node-insight.compone
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { signal } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { CaseHistoryService, EntityHistory, EntityHistoryItem } from './case-history.service';
+
+const item = (over: Partial<EntityHistoryItem>): EntityHistoryItem => ({
+    kind: 'incident',
+    id: 'i1',
+    title: 'Wangiri burst',
+    status: 'OPEN',
+    createdAt: '2026-10-01T10:00:00Z',
+    matchedOn: 'key.caller_msisdn',
+    ...over,
+});
 
 const list = (id: string, purpose: EntityListSummary['purpose'], over: Partial<EntityListSummary> = {}) =>
     ({
@@ -103,8 +115,10 @@ function make(
         matched?: string[];
         masked?: boolean;
         truncated?: boolean;
+        history?: (type: string, id: string, status: string) => Promise<EntityHistory>;
     } = {},
 ) {
+    const byEntity = vi.fn(opts.history ?? (() => Promise.resolve({ items: [], truncated: false } as EntityHistory)));
     const close = vi.fn();
     const computeRisk = vi.fn(() => of({ ...riskView(), status: 'RUNNING' } as GraphRunView, riskView()));
     const addMember = vi.fn(opts.add ?? (() => of({ changed: 1 })));
@@ -141,6 +155,8 @@ function make(
         imports: [NodeInsightComponent],
         providers: [
             provideNoopAnimations(),
+            provideRouter([]),
+            { provide: CaseHistoryService, useValue: { byEntity } },
             { provide: NodeRiskService, useValue: svc },
             { provide: MatDialog, useValue: dialog },
             { provide: MatDialogRef, useValue: { close } },
@@ -158,7 +174,7 @@ function make(
     const fixture = TestBed.createComponent(NodeInsightComponent);
     fixture.componentRef.setInput('ctx', { ...CTX, ...ctx });
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, svc, dialog, close };
+    return { fixture, c: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, svc, dialog, close, byEntity };
 }
 
 const settle = async (f: { detectChanges(): void; whenStable(): Promise<unknown> }) => {
@@ -261,6 +277,77 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(el.querySelector('[data-testid=enrich-truncated]')).not.toBeNull();
         expect(el.querySelector<HTMLButtonElement>('[data-testid=compute-risk]')!.disabled).toBe(true);
         expect(el.querySelector('[data-testid=compute-blocked]')!.textContent).toContain('understate risk');
+    });
+
+    it('reads case history only when opened: Incidents and Cases newest first, linked, with via and the truncation note', async () => {
+        const { fixture, el, byEntity } = make(
+            {},
+            {
+                history: () =>
+                    Promise.resolve({
+                        truncated: true,
+                        items: [
+                            item({ id: 'i1', severity: 'HIGH' }),
+                            item({ kind: 'case', id: 'c9', title: 'Ring 7', createdAt: '2026-10-05T10:00:00Z', via: 'i1', matchedOn: 'member' }),
+                        ],
+                    }),
+            },
+        );
+        await settle(fixture);
+        expect(byEntity).not.toHaveBeenCalled();
+        el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
+        await settle(fixture);
+        expect(byEntity).toHaveBeenCalledWith('msisdn', '999', 'all');
+        const rows = Array.from(el.querySelectorAll('[data-testid=history-list] li'));
+        expect(rows.map((r) => r.textContent)).toEqual([expect.stringContaining('Ring 7'), expect.stringContaining('Wangiri')]);
+        expect(rows[0].textContent).toContain('Case');
+        expect(rows[0].textContent).toContain('via Incident i1');
+        expect(rows[1].textContent).toContain('HIGH');
+        const hrefs = Array.from(el.querySelectorAll('[data-testid=history-list] a')).map((a) => a.getAttribute('href'));
+        expect(hrefs).toEqual(['/cases/c9', '/incidents/i1', '/incidents/i1']);
+        expect(el.querySelector('[data-testid=history-truncated]')).not.toBeNull();
+        await expectNoA11yViolations(el);
+
+        const select = el.querySelector<HTMLSelectElement>('[data-testid=history-status]')!;
+        select.value = 'closed';
+        select.dispatchEvent(new Event('change'));
+        await settle(fixture);
+        expect(byEntity).toHaveBeenLastCalledWith('msisdn', '999', 'closed');
+    });
+
+    it('shows the empty state for the chosen status', async () => {
+        const { fixture, el, c } = make();
+        c.historyStatus.set('open');
+        c.toggleHistory();
+        await settle(fixture);
+        expect(el.querySelector('[data-testid=history-empty]')!.textContent).toContain('No open Incident or Case references 999');
+        await expectNoA11yViolations(el);
+    });
+
+    it('never sends a masked pseudonym: says case history is unavailable', async () => {
+        const { fixture, el, byEntity } = make({ key: 'masked:0123456789abcdef', label: 'masked:0123…' });
+        el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
+        await settle(fixture);
+        expect(byEntity).not.toHaveBeenCalled();
+        expect(el.querySelector('[data-testid=history-unavailable]')!.textContent).toContain(
+            'Case history is unavailable for a masked number.',
+        );
+        await expectNoA11yViolations(el);
+    });
+
+    it('states a failed read in plain language and retries on the next open', async () => {
+        const { fixture, el, c, byEntity } = make(
+            {},
+            { history: () => Promise.resolve({ items: [], truncated: false, error: 'Too many lookups just now.' }) },
+        );
+        c.toggleHistory();
+        await settle(fixture);
+        expect(el.querySelector('[data-testid=history-error]')!.textContent).toContain('Too many lookups');
+        await expectNoA11yViolations(el);
+        c.toggleHistory();
+        c.toggleHistory();
+        await settle(fixture);
+        expect(byEntity).toHaveBeenCalledTimes(2);
     });
 
     it('says when the profile maps no indicators Dataset', async () => {

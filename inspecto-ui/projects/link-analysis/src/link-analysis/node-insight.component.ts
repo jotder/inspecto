@@ -2,6 +2,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom, forkJoin, of, catchError, map } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -17,6 +19,7 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { factorLine, nodeScoresFor, numberOf, riskMappingFor, riskOf, round1 } from './node-risk';
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
+import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
 
 /** What the node detail dialog's insight sections know about the clicked node and the graph around it. */
 export interface NodeInsightContext {
@@ -55,13 +58,14 @@ const LIST_REASON_MAX = 1000;
  * Risk: the node's own indicator score and factor columns from the profile's indicators Dataset, plus - on demand - its
  * propagated score and top contributing origins from a `propagatedRisk` run over the Working Set seeded with those
  * scores. Enrichment: the mapped CRM/KYC row and Entity List membership. Actions: add to a watch / block list (reason
- * required, four-eyes aware) and hide on the canvas. Case history is not shown: no API lists Incidents / Cases by entity.
+ * required, four-eyes aware) and hide on the canvas. Case history: the Incidents and Cases that reference the node's
+ * entity (`GET /objects/by-entity`), read only when the section is opened; a masked pseudonym is never sent.
  */
 @Component({
     selector: 'inspecto-la-node-insight',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, InspectoAlertComponent, ChipComponent],
+    imports: [MatButtonModule, InspectoAlertComponent, ChipComponent, RouterLink, DatePipe],
     template: `
         <section class="mt-4" aria-labelledby="ni-risk">
             <h3 id="ni-risk" class="text-base font-semibold">Risk</h3>
@@ -202,6 +206,85 @@ const LIST_REASON_MAX = 1000;
             </div>
         </section>
 
+        <section class="mt-4" aria-labelledby="ni-history">
+            <h3 id="ni-history" class="text-base font-semibold">
+                <button
+                    type="button"
+                    class="flex items-center gap-1"
+                    data-testid="history-toggle"
+                    aria-controls="ni-history-body"
+                    [attr.aria-expanded]="historyOpen()"
+                    (click)="toggleHistory()"
+                >
+                    <span aria-hidden="true">{{ historyOpen() ? '▾' : '▸' }}</span> Case history
+                </button>
+            </h3>
+            @if (historyOpen()) {
+                <div id="ni-history-body" class="mt-1 text-sm">
+                    @if (historyBlocked(); as why) {
+                        <p class="text-secondary" data-testid="history-unavailable">{{ why }}</p>
+                    } @else {
+                        <label class="text-secondary text-xs">
+                            Show
+                            <select
+                                class="ml-1"
+                                data-testid="history-status"
+                                [value]="historyStatus()"
+                                (change)="setHistoryStatus($any($event.target).value)"
+                            >
+                                <option value="all">all</option>
+                                <option value="open">open</option>
+                                <option value="closed">closed</option>
+                            </select>
+                        </label>
+                        @if (history(); as h) {
+                            @if (h.error) {
+                                <inspecto-alert variant="warning" data-testid="history-error">{{ h.error }}</inspecto-alert>
+                            } @else {
+                                @if (h.truncated) {
+                                    <inspecto-alert variant="warning" data-testid="history-truncated"
+                                        >Only the newest objects were searched: older Incidents or Cases may be
+                                        missing.</inspecto-alert
+                                    >
+                                }
+                                @if (historyItems().length) {
+                                    <ul class="mt-1 flex flex-col gap-1" data-testid="history-list">
+                                        @for (o of historyItems(); track o.kind + o.id) {
+                                            <li class="flex flex-wrap items-baseline gap-2">
+                                                <inspecto-chip [tone]="o.kind === 'case' ? 'primary' : 'neutral'">{{
+                                                    o.kind === 'case' ? 'Case' : 'Incident'
+                                                }}</inspecto-chip>
+                                                <a [routerLink]="[o.kind === 'case' ? '/cases' : '/incidents', o.id]">{{
+                                                    o.title || o.id
+                                                }}</a>
+                                                <span>{{ o.status }}</span>
+                                                @if (o.severity) {
+                                                    <span class="text-secondary">{{ o.severity }}</span>
+                                                }
+                                                <span class="text-secondary text-xs">{{ o.createdAt | date: 'medium' }}</span>
+                                                @if (o.via) {
+                                                    <span class="text-secondary text-xs"
+                                                        >via <a [routerLink]="['/incidents', o.via]">Incident {{ o.via }}</a></span
+                                                    >
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                } @else {
+                                    <p class="text-secondary mt-1" data-testid="history-empty">
+                                        No {{ historyStatus() === 'all' ? '' : historyStatus() + ' ' }}Incident or Case
+                                        references {{ ctx().label }}.
+                                    </p>
+                                }
+                            }
+                        } @else {
+                            <p class="text-secondary mt-1" role="status">Reading case history…</p>
+                        }
+                    }
+                </div>
+            }
+        </section>
+
         <section class="mt-4" aria-labelledby="ni-actions">
             <h3 id="ni-actions" class="text-base font-semibold">Actions</h3>
             <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -306,7 +389,44 @@ export class NodeInsightComponent implements OnInit {
             .map((m) => m.list),
     );
 
+    private readonly historySvc = inject(CaseHistoryService);
+    readonly historyOpen = signal(false);
+    readonly historyStatus = signal<EntityHistoryStatus>('all');
+    readonly history = signal<EntityHistory | null>(null);
+    /** Newest first (the server orders so too; kept explicit so the list never depends on it). */
+    readonly historyItems = computed(() =>
+        [...(this.history()?.items ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    );
+    /** Why no lookup is possible: a masking pseudonym the route cannot resolve, or no Entity Type to look up as. */
+    readonly historyBlocked = computed(() => {
+        const c = this.ctx();
+        if (c.key.startsWith('masked:')) return 'Case history is unavailable for a masked number.';
+        if (!c.entityType) return 'Case history needs an Entity Type, and this domain profile names none.';
+        return '';
+    });
+
     round = round1;
+
+    toggleHistory(): void {
+        const open = !this.historyOpen();
+        this.historyOpen.set(open);
+        // read lazily on first open; a failed read is retried on the next open
+        if (open && (!this.history() || this.history()!.error)) void this.loadHistory();
+    }
+
+    setHistoryStatus(status: EntityHistoryStatus): void {
+        this.historyStatus.set(status);
+        void this.loadHistory();
+    }
+
+    private async loadHistory(): Promise<void> {
+        const c = this.ctx();
+        if (this.historyBlocked() || !c.entityType) return;
+        this.history.set(null);
+        const status = this.historyStatus();
+        const h = await this.historySvc.byEntity(c.entityType, c.key, status);
+        if (status === this.historyStatus()) this.history.set(h);
+    }
 
     ngOnInit(): void {
         const c = this.ctx();
