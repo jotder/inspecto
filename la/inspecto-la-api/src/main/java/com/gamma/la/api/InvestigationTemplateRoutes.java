@@ -177,9 +177,11 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         doc.put("createdAt", Instant.now().toString());
         doc.put("derivedFrom", ordered("investigation", invId, "steps", log.size(),
                 "workingSetHash", state.hash()));
-        doc.put("roles", ordered("dataset", h.get("dataset"), "sourceCol", h.get("sourceCol"),
+        Map<String, Object> roles = ordered("dataset", h.get("dataset"), "sourceCol", h.get("sourceCol"),
                 "targetCol", h.get("targetCol"), "linkKindCol", h.get("linkKindCol"), "timeCol", h.get("timeCol"),
-                "timeColZone", h.get("timeColZone")));
+                "timeColZone", h.get("timeColZone"));
+        if (h.get("eventsCol") != null) roles.put("eventsCol", h.get("eventsCol"));   // only when bound: an unweighted template is unchanged
+        doc.put("roles", roles);
         doc.put("parameters", parameters);
         doc.put("ops", ops);
         doc.put("dropped", dropped);
@@ -235,6 +237,10 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         for (String key : List.of("dataset", "sourceCol", "targetCol", "linkKindCol", "timeCol", "timeColZone")) {
             String override = ApiContext.str(body, key);
             header.put(key, override != null && roles.get(key) != null ? override : roles.get(key));
+        }
+        if (roles.get("eventsCol") != null) {   // a weighted template stays weighted: the column may be renamed, not dropped
+            String override = ApiContext.str(body, "eventsCol");
+            header.put("eventsCol", override != null ? override : roles.get("eventsCol"));
         }
         header.put("template", ordered("id", templateId));
 

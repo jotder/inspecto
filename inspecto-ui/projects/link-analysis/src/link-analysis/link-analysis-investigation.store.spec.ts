@@ -424,6 +424,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
             purpose: 'fraud alert 12',
             title: 'Suspect s',
             timeCol: 'last_seen',
+            eventsCol: 'events',
             seed: 's',
             presets: { windowDays: 30, minEvents: 2, maxFanOut: 50, budget: 2000 },
             maxDegree: 4,
@@ -432,7 +433,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
         });
         expect(ok).toBe(true);
         expect(inv.createInvestigation).toHaveBeenCalledWith(
-            expect.objectContaining({ title: 'Suspect s', purpose: 'fraud alert 12', timeCol: 'last_seen' }),
+            expect.objectContaining({ title: 'Suspect s', purpose: 'fraud alert 12', timeCol: 'last_seen', eventsCol: 'events' }),
         );
         const ops = inv.appendInvestigationOp.mock.calls.map((c) => (c as unknown[])[1] as Record<string, unknown>);
         expect(ops.map((o) => [o['op'], o['ids']])).toEqual([

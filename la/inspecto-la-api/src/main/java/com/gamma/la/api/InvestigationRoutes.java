@@ -225,7 +225,9 @@ public final class InvestigationRoutes implements RouteModule {
 
     /**
      * {@code POST /inv/investigations} — body {@code {id?, title?, purpose, dataset, sourceCol, targetCol, linkKindCol?,
-     * timeCol?, timeColZone?}}. {@code purpose} (D-U5) is the stated purpose / legal basis — required, recorded in
+     * timeCol?, timeColZone?, eventsCol?}}. {@code eventsCol} binds an integer column holding how many events a row stands
+     * for (a pre-aggregated Dataset): an expand then weighs each pair by {@code SUM(eventsCol)} instead of counting rows -
+     * see {@link #appendEvents}. {@code purpose} (D-U5) is the stated purpose / legal basis — required, recorded in
      * the sealed header and shown in the Dossier, not enforced. {@code timeCol} (LA-13) binds the event time every window reads; see
      * {@link InvestigationTime} for the timezone contract {@code timeColZone} is part of.
      * Gates: write root 503 → a missing/unsafe field (incl. {@code purpose}) 422 → unknown or not-viewable Dataset 404 → a column the
@@ -244,13 +246,15 @@ public final class InvestigationRoutes implements RouteModule {
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
         String timeCol = ident(body, "timeCol", false);
+        String eventsCol = ident(body, "eventsCol", false);
 
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);
         List<String> columns = relationColumns(dataset, relationSql);
-        for (String col : java.util.Arrays.asList(sourceCol, targetCol, kindCol, timeCol))
+        for (String col : java.util.Arrays.asList(sourceCol, targetCol, kindCol, timeCol, eventsCol))
             if (col != null && columns.stream().noneMatch(col::equalsIgnoreCase))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
         String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(body, "timeColZone"));
+        requireEventsCol(dataset, relationSql, eventsCol);
         // LA-24: an optional Case link, checked BEFORE anything is written; stored outside the sealed header.
         Map<String, Object> caseLink = InvestigationCaseRoutes.linkRecord(api, ex, ApiContext.str(body, "caseRef"));
 
@@ -268,6 +272,7 @@ public final class InvestigationRoutes implements RouteModule {
             header.put("timeCol", timeCol);
             header.put("timeColZone", timeColZone);
         }
+        if (eventsCol != null) header.put("eventsCol", eventsCol);   // absent on an unweighted Investigation: its header is unchanged
         header.put("createdAt", Instant.now().toString());
         // D-E3: no version-addressable read exists, so nothing is pinned — reads are sealed at use instead.
         header.put("datasetVersion", null);
@@ -400,10 +405,7 @@ public final class InvestigationRoutes implements RouteModule {
                         throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' in 'expandHubs' is not in the Working Set");
                 Frontier fr = frontier(ids, params, before, true);
                 List<String> frontier = fr.ids();
-                if (frontier.isEmpty() && !fr.held().isEmpty())
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — every entity in the Working Set is flagged "
-                            + "high connectivity; name the ones to expand through in 'expandHubs' (or send 'includeHubs': true)");
-                if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — the Working Set is empty");
+                if (frontier.isEmpty()) throw nothingToExpand("", fr);
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER
                             + " entities; name them with 'ids'");
@@ -412,7 +414,7 @@ public final class InvestigationRoutes implements RouteModule {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this expand is sensitive " + sensitive.get("exceeded")
                             + " - four-eyes approval applies to the main log, so a Draft cannot hold it; lower the budget / fan-out or ask a lead to expand");
                 if (sensitive != null) return masked(inv, requestExpansion(ex, inv, params, sensitive, before));
-                entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, "")));
+                entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet()));
             }
             return masked(inv, commit(ex, inv, log, entry, before));
         });
@@ -456,13 +458,15 @@ public final class InvestigationRoutes implements RouteModule {
             e.put("groups", groups);
         }
         if (op.equals("expand")) {
+            for (String i : strings(params.get("expandHubs")))   // the same check an append runs
+                if (!state.entities.containsKey(i))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' in 'expandHubs' is no longer in the Working Set");
             Frontier fr = frontier(ids, params, state, true);
             List<String> frontier = fr.ids();
-            if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand - the Working Set is empty"
-                    + (fr.held().isEmpty() ? "" : " of entities not flagged high connectivity"));
+            if (frontier.isEmpty()) throw nothingToExpand("", fr);
             if (frontier.size() > MAX_FRONTIER)
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
-            e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, state, ""), pins == null ? Map.of() : pins));
+            e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, state, ""), pins == null ? Map.of() : pins, state.entities.keySet()));
         }
         return e;
     }
@@ -586,7 +590,7 @@ public final class InvestigationRoutes implements RouteModule {
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
                 Frontier fr = frontier(strings(p.get("ids")), p, state, false);
-                e.put("read", read(api, ex, parent, expandRung(api, ex, parent, p, fr, state, "fork step " + step + ": ")));
+                e.put("read", read(api, ex, parent, expandRung(api, ex, parent, p, fr, state, "fork step " + step + ": "), null, state.entities.keySet()));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -625,7 +629,7 @@ public final class InvestigationRoutes implements RouteModule {
         requireSafeId(id);
         String dataset = String.valueOf(header.get("dataset"));
         List<String> cols = new ArrayList<>();
-        for (String key : List.of("sourceCol", "targetCol", "linkKindCol", "timeCol")) {
+        for (String key : List.of("sourceCol", "targetCol", "linkKindCol", "timeCol", "eventsCol")) {
             String col = ident(header, key, key.equals("sourceCol") || key.equals("targetCol"));
             if (col != null) cols.add(col);
         }
@@ -636,6 +640,8 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
         String timeCol = ident(header, "timeCol", false);
         String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(header, "timeColZone"));
+        String eventsCol = ident(header, "eventsCol", false);
+        requireEventsCol(dataset, relationSql, eventsCol);
         InvestigationStore store = InvestigationStores.of(writeRoot);
         if (store.header(id).isPresent()) throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
 
@@ -647,6 +653,8 @@ public final class InvestigationRoutes implements RouteModule {
             h.put("timeCol", timeCol);
             h.put("timeColZone", timeColZone);
         }
+        h.remove("eventsCol");
+        if (eventsCol != null) h.put("eventsCol", eventsCol);
         h.put("owner", ApiContext.actor(ex));
         h.put("createdAt", Instant.now().toString());
         h.put("datasetVersion", null);   // D-E3, as create
@@ -675,8 +683,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (op.equals("expand")) {
                 Frontier fr = frontier(List.of(), params, state, false);
                 List<String> frontier = fr.ids();
-                if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " expands an empty Working Set"
-                        + (fr.held().isEmpty() ? "" : " (every entity is flagged high connectivity)"));
+                if (frontier.isEmpty()) throw nothingToExpand("template step " + step + ": ", fr);
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " would expand " + frontier.size()
                             + " entities; an expand frontier is capped at " + MAX_FRONTIER);
@@ -688,7 +695,7 @@ public final class InvestigationRoutes implements RouteModule {
                             + " — four-eyes applies and a template names no frontier to approve; save the template "
                             + "with a smaller budget/fan-out and expand further from the Investigation, where the "
                             + "step can be approved");
-                e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, state, "template step " + step + ": ")));
+                e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, state, "template step " + step + ": "), null, state.entities.keySet()));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -997,6 +1004,14 @@ public final class InvestigationRoutes implements RouteModule {
         return q;
     }
 
+    /** The one refusal for an expand whose frontier came out empty: every candidate held as high connectivity, or none at all. */
+    private static ApiException nothingToExpand(String where, Frontier fr) {
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + (fr.held().isEmpty()
+                ? "nothing to expand — the Working Set is empty"
+                : "nothing to expand — every entity in the frontier is flagged high connectivity " + fr.held()
+                        + "; name the ones to expand through in 'expandHubs' (or send 'includeHubs': true)"));
+    }
+
     /** An expand's frontier ({@code ids}) and the flagged entities it left out ({@code held}), both sorted. */
     record Frontier(List<String> ids, List<String> held) { }
 
@@ -1074,7 +1089,7 @@ public final class InvestigationRoutes implements RouteModule {
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> query) {
-        return read(api, ex, inv, query, null);
+        return read(api, ex, inv, query, null, Set.of());   // a reread: only the rows' fingerprint is compared
     }
 
     /** The versions a Draft pinned ({@code mappingHash -> version}), from its header; null for the main log (CURRENT). D7-5: a Draft's expand reads these. */
@@ -1094,7 +1109,8 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> query, Map<String, Long> pinsOverride) {
+    private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> query, Map<String, Long> pinsOverride,
+                                     Set<String> admitted) {
         Map<String, Long> pins = pinsOverride != null ? pinsOverride : draftPins(inv);
         String dataset = inv.dataset();
         String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on EVERY read
@@ -1125,7 +1141,7 @@ public final class InvestigationRoutes implements RouteModule {
                     String.valueOf(hdr.get("sourceCol")), String.valueOf(hdr.get("targetCol")),
                     hdr.get("linkKindCol") == null ? null : String.valueOf(hdr.get("linkKindCol")), frontier, excluded, kinds,
                     direction, ((Number) query.get("minEvents")).longValue(), fanOut, budget, window != null, minDays != null,
-                    degMin != null || degMax != null, query.get("merged") != null), InvRoutes.traversalPolicy(), pins);
+                    degMin != null || degMax != null, query.get("merged") != null, hdr.get("eventsCol") != null), InvRoutes.traversalPolicy(), pins);
             if (indexed.served()) {
                 rows = new ArrayList<>(indexed.result().rows());
                 truncated = indexed.result().truncated();
@@ -1143,7 +1159,8 @@ public final class InvestigationRoutes implements RouteModule {
                 binds.add(groupOf.get(f) == null ? f : String.valueOf(groupOf.get(f)));
             }
             appendEvents(sql, binds, h, dataset, kinds, excluded, window, timed);
-            sql.append(", pairs AS (SELECT s, t, k, COUNT(*) AS cnt, ")
+            // eventsCol: a pair weighs the SUM of its rows' event counts; without one (every Investigation before it) a row is one event
+            sql.append(", pairs AS (SELECT s, t, k, ").append(h.get("eventsCol") != null ? "CAST(SUM(w) AS BIGINT)" : "COUNT(*)").append(" AS cnt, ")
                .append(timed ? "COUNT(DISTINCT CAST(lt AS DATE))" : "0").append(" AS days FROM ev GROUP BY s, t, k)");
             boolean degree = degMin != null || degMax != null;
             if (degree)
@@ -1215,7 +1232,7 @@ public final class InvestigationRoutes implements RouteModule {
         else if (indexed != null) read.put("fallback", indexed.readFallback());   // why the flat Dataset answered; never in the fingerprint
         // Supernode suppression: sealed beside the rows (absent on a rung with no hubThreshold - every read before it existed)
         if (query.get("hubThreshold") instanceof Number t)
-            read.put("hubs", hubs(inv, relationSql, rows, frontier, kinds, excluded, window, timed, t.intValue()));
+            read.put("hubs", hubs(inv, relationSql, rows, frontier, admitted, kinds, excluded, window, timed, t.intValue()));
         return read;
     }
 
@@ -1224,9 +1241,12 @@ public final class InvestigationRoutes implements RouteModule {
      * {@code threshold}, as {@code [{id, degree}]} sorted by id. The degree is counted exactly as {@code candidateDegreeMax}
      * counts it (distinct counterparties over the rung's events: both directions, allowed link kinds, excluded entities
      * pruned, inside the window) by one flat statement over the Dataset, whichever source answered the rows; the rows and
-     * their fingerprint are untouched.
+     * their fingerprint are untouched. Only entities THIS step adds are candidates: one {@code admitted} before the step (a
+     * seed outside the frontier included) is never newly flagged by another frontier's rows. The evaluator still flags every
+     * sealed id in the Working Set, so logs sealed before this rule replay to their recorded hashes.
      */
     private static List<Map<String, Object>> hubs(Inv inv, String relationSql, List<Map<String, Object>> rows, List<String> frontier,
+                                                  Set<String> admitted,
                                                   List<String> kinds, List<String> excluded, Map<String, Object> window, boolean timed,
                                                   int threshold) {
         TreeSet<String> candidates = new TreeSet<>();
@@ -1234,6 +1254,7 @@ public final class InvestigationRoutes implements RouteModule {
             for (String end : List.of("source", "target"))
                 if (r.get(end) != null) candidates.add(String.valueOf(r.get(end)));
         candidates.removeAll(frontier);
+        candidates.removeAll(admitted);
         List<Map<String, Object>> out = new ArrayList<>();
         if (candidates.isEmpty()) return out;
         List<String> binds = new ArrayList<>(candidates);
@@ -1274,6 +1295,8 @@ public final class InvestigationRoutes implements RouteModule {
         sql.append(", ev0 AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt)
            .append(" AS VARCHAR) AS t, ").append(kind == null ? "CAST(NULL AS VARCHAR)" : "CAST(" + kind + " AS VARCHAR)")
            .append(" AS k");
+        if (h.get("eventsCol") != null)   // a pre-aggregated row stands for this many events; a NULL count is one row's worth
+            sql.append(", COALESCE(CAST(").append(SqlIdent.q(String.valueOf(h.get("eventsCol")))).append(" AS BIGINT), 1) AS w");
         if (timed) sql.append(", ").append(InvestigationTime.instantExpr(
                 SqlIdent.q(String.valueOf(h.get("timeCol"))),
                 h.get("timeColZone") == null ? null : String.valueOf(h.get("timeColZone")), binds)).append(" AS ts");
@@ -1792,6 +1815,26 @@ public final class InvestigationRoutes implements RouteModule {
      * takes {@code timeColZone} (UTC when absent, recorded explicitly); a {@code TIMESTAMP WITH TIME ZONE} is an
      * instant and refuses one. Anything else is not an event time. Returns the zone to record, or null.
      */
+    private static final Set<String> INTEGER_TYPES = Set.of("TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
+            "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT", "UHUGEINT");
+
+    /** {@code eventsCol}, when bound, must be an INTEGER-family column (an event count); 422 otherwise. */
+    private static void requireEventsCol(String dataset, String relationSql, String eventsCol) {
+        if (eventsCol == null) return;
+        String type;
+        try {
+            DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(dataset, relationSql,
+                    "SELECT typeof(x) AS t FROM ((SELECT " + SqlIdent.q(eventsCol) + " AS x FROM " + SqlIdent.q(dataset)
+                            + " LIMIT 0) UNION ALL (SELECT NULL)) u", 1, 0, List.of(), List.of()));
+            type = String.valueOf(r.rows().get(0).get("t")).toUpperCase(java.util.Locale.ROOT);
+        } catch (Exception unusable) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "cannot read the type of '" + eventsCol + "': " + unusable.getMessage());
+        }
+        if (!INTEGER_TYPES.contains(type))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'eventsCol' must be an integer column (an event count); '" + eventsCol
+                    + "' is " + type);
+    }
+
     private static String timeColZone(String dataset, String relationSql, String timeCol, String zone) {
         if (timeCol == null) {
             if (zone != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'timeColZone' needs a 'timeCol'");
@@ -2347,8 +2390,10 @@ public final class InvestigationRoutes implements RouteModule {
             Frontier fr = frontier(strings(params.get("ids")), params, before, false);
             List<String> frontier = fr.ids();
             if (frontier.isEmpty())
-                throw new ApiException(409, ErrorCodes.CONFLICT, "nothing left to expand — the entities this request names have left the "
-                        + "Working Set since it was made; deny it instead");
+                throw new ApiException(409, ErrorCodes.CONFLICT, fr.held().isEmpty()
+                        ? "nothing left to expand — the entities this request names have left the Working Set since it was made; deny it instead"
+                        : "nothing left to expand — the entities this request names " + fr.held() + " have been flagged high connectivity "
+                                + "since it was made, and it does not override that; deny it and request an expand naming them in 'expandHubs'");
             if (frontier.size() > MAX_FRONTIER)
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
             Map<String, Object> entry = entry(log.size() + 1, "op", ex);
@@ -2356,7 +2401,7 @@ public final class InvestigationRoutes implements RouteModule {
             entry.put("op", "expand");
             entry.put("params", params);
             entry.put("approval", approval);
-            entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, "")));
+            entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet()));
             return (Map<String, Object>) commit(ex, inv, log, entry, before);
                 });
             } catch (IOException | RuntimeException failed) {

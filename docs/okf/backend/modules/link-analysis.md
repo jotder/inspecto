@@ -164,6 +164,25 @@ Design rules visible in the dependency graph:
   without it is a 422. The degree check is one extra flat statement over the Dataset even when the index answered the
   rows (rows and fingerprint untouched). Overriding is not a four-eyes trigger of its own: the budget / fan-out
   thresholds already bound what it can admit.
+  *Follow-ups (2026-10-11):* only entities a step ADDS are hub candidates — one already in the Working Set (a seed
+  outside the frontier included) is never newly flagged by another frontier's rows; this is decided when the read is
+  sealed (`hubs()` drops the pre-step Working Set), and the evaluator is unchanged, so logs sealed before it replay to
+  their recorded hashes. `expandHubs` ids are checked against the Working Set on append (a Draft append is the same
+  code), and on a Draft promote/rebase re-seal (422 → a `blocked` conflict). Fork, template and approval do not
+  refuse an absent `expandHubs` id: an override only lifts a hold, an absent id has nothing to hold, so ignoring it
+  cannot widen the read (fork and template ops were validated when first appended; an approval's were validated at
+  request). One "nothing to expand" refusal names the held hubs everywhere; an approval whose frontier is all newly
+  flagged says so (409) rather than "left the Working Set". The hub degree is still a flat statement when the index
+  answered the rows — the index's folded buckets would serve it, but that read has not been added.
+* **Events weighting (2026-10-11).** Optional header binding `eventsCol` (create / template instantiate; an
+  INTEGER-family column, 422 otherwise; key absent when unbound, so an unweighted header and every older one is
+  byte-identical). When set, the expand CTE's pair weight is `CAST(SUM(COALESCE(CAST(eventsCol AS BIGINT), 1)) AS
+  BIGINT)` instead of `COUNT(*)` — a NULL count is one row's worth — and that weight drives `minEvents`, the
+  `maxFanOut` rank, the budget order and the sealed `count`. `minDistinctDays` and the degree checks
+  (`candidateDegree*`, hub degree: distinct counterparties) are unchanged. The edge index folds rows, so a weighted
+  rung always falls back to the flat read with `read.fallback {reason: rung_not_indexable, details: "...events
+  column..."}` (when an index exists; never a silently wrong count). Templates carry `eventsCol` in `roles` only
+  when bound; the Dossier names it in the method statement.
 
 ### 3.2 InvestigationStore port and its two backends
 

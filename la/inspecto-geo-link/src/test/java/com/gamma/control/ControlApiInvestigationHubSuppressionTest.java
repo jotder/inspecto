@@ -193,6 +193,21 @@ class ControlApiInvestigationHubSuppressionTest {
     }
 
     @Test
+    void anEntityAlreadyInTheWorkingSetIsNotNewlyFlaggedByAnotherFrontier(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seeded(c, "p");
+            op(c, "p", "{\"op\":\"seed\",\"ids\":[\"b\"]}");   // b: a seed, degree 2 (a, c), outside the next frontier
+            JsonNode step = op(c, "p", "{\"op\":\"expand\",\"ids\":[\"a\"],\"hubThreshold\":1}");
+            assertEquals(Set.of("h"), admitted(step));
+            assertEquals(1, step.at("/read/hubsFlagged").asInt(), step.toString());
+            Map<String, Boolean> f = flags(c, "p");
+            assertTrue(f.get("h"), "h is added by this step and above the threshold: " + f);
+            assertFalse(f.get("b"), "b was in the Working Set before this step, so a's rows do not flag it: " + f);
+            assertTrue(data(send(c, "POST", "/inv/investigations/p/replay", "{\"reread\":true}")).get("equivalent").asBoolean());
+        }
+    }
+
+    @Test
     void theSpaceSettingIsTheDefaultThreshold(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seeded(c, "d");

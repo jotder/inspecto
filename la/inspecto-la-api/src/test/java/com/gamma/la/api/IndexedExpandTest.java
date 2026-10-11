@@ -15,7 +15,7 @@ class IndexedExpandTest {
     private static IndexedExpand.Request rung(List<String> frontier, List<String> kinds, Integer fanOut,
                                               boolean windowed, boolean minDays, boolean degree, boolean merged) {
         return new IndexedExpand.Request("ds", "s", "t", "kind", frontier, List.of(), kinds, "both", 1, fanOut, 100,
-                windowed, minDays, degree, merged);
+                windowed, minDays, degree, merged, false);
     }
 
     private static List<String> ids(int n) {
@@ -40,5 +40,7 @@ class IndexedExpandTest {
         assertNotNull(IndexedExpand.notIndexable(rung(List.of("a", "a"), null, null, false, false, false, false)));
         assertNotNull(IndexedExpand.notIndexable(rung(ids(2), List.of(), null, false, false, false, false)));
         assertNotNull(IndexedExpand.notIndexable(rung(ids(2), null, 0, false, false, false, false)));
+        assertTrue(IndexedExpand.notIndexable(new IndexedExpand.Request("ds", "s", "t", "kind", ids(2), List.of(), null, "both", 1, null,
+                100, false, false, false, false, true)).contains("events column"));
     }
 }
