@@ -4,14 +4,48 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, SpacesService } from 'app/inspecto/api';
+import { ConfigService, PipelineSummary, PipelinesService, SpacesService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { STREAM_BUNDLE_FORMAT, StreamBundle } from 'app/inspecto/transfer/stream-bundle';
 import { OnboardingCreateData, OnboardingCreateDialog } from './onboarding-create.dialog';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 
-function create(data: OnboardingCreateData, api: Partial<ConfigService> = {}) {
+/** `GET /pipelines` rows: one pipeline template among ordinary pipelines. */
+const PIPELINES: PipelineSummary[] = [
+    { name: 'orders_feed', active: true, nodeCount: 3, edgeCount: 2, produces: [], consumes: [] },
+    {
+        name: 'orders_tpl',
+        displayName: 'Orders template',
+        description: 'Daily order drops',
+        template: true,
+        active: false,
+        nodeCount: 3,
+        edgeCount: 2,
+        produces: [],
+        consumes: [],
+    },
+];
+
+/** The template's config as `save-as-template` wrote it — read by the export half of the pick. */
+const TEMPLATE_CONFIG = {
+    name: 'Orders template',
+    id: 'orders_tpl',
+    template: true,
+    active: false,
+    stream: 'orders_tpl',
+    produces: 'reference',
+    description: 'Daily order drops',
+    collector: { id: 'orders_tpl' },
+    dirs: { poll: 'data/templates/orders_tpl/inbox', database: 'data/templates/orders_tpl/database' },
+    processing: { threads: 2 },
+};
+
+function create(
+    data: OnboardingCreateData,
+    api: Partial<ConfigService> = {},
+    pipelines: PipelineSummary[] = PIPELINES,
+) {
     const ref = { close: vi.fn(), disableClose: false };
     TestBed.configureTestingModule({
         imports: [OnboardingCreateDialog],
@@ -24,9 +58,16 @@ function create(data: OnboardingCreateData, api: Partial<ConfigService> = {}) {
                 useValue: {
                     write: vi.fn(() => of({ path: 'x.toon', name: 'x' })),
                     registerPipeline: vi.fn(() => of({ registered: true })),
+                    // Only the template's pipeline config exists; every satellite read 404s (absent).
+                    read: vi.fn((type: string, name: string) =>
+                        type === 'pipeline' && name === 'orders_tpl'
+                            ? of({ config: structuredClone(TEMPLATE_CONFIG) })
+                            : throwError(() => ({ status: 404 })),
+                    ),
                     ...api,
                 },
             },
+            { provide: PipelinesService, useValue: { list: vi.fn(() => of(pipelines)) } },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'demo' } },
             { provide: ToastrService, useValue: TOASTR },
         ],
@@ -231,6 +272,79 @@ describe('OnboardingCreateDialog', () => {
     it('has no a11y violations with an import loaded', async () => {
         const { fixture } = create({ kind: 'stream' });
         load(fixture);
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // ── Start from a template ─────────────────────────────────────────────────
+
+    function openGallery(fixture: ReturnType<typeof create>['fixture']) {
+        const el = fixture.nativeElement as HTMLElement;
+        const toggle = Array.from(el.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('Start from a template'),
+        )!;
+        toggle.click();
+        fixture.detectChanges();
+        return { el, toggle };
+    }
+
+    it('lists only the pipeline templates, read once on first open', () => {
+        const { fixture } = create({ kind: 'stream' });
+        const { el, toggle } = openGallery(fixture);
+        expect(toggle.getAttribute('aria-expanded')).toBe('true');
+        const gallery = el.querySelector('#onboarding-templates')!;
+        expect(gallery.textContent).toContain('Orders template');
+        expect(gallery.textContent).toContain('Daily order drops');
+        expect(gallery.textContent).not.toContain('orders_feed'); // an ordinary pipeline is not offered
+        toggle.click(); // close
+        toggle.click(); // reopen — no second read
+        expect(TestBed.inject(PipelinesService).list).toHaveBeenCalledTimes(1);
+    });
+
+    it('explains how to make a template when the server has none', () => {
+        const { fixture } = create({ kind: 'stream' }, {}, [PIPELINES[0]]);
+        const { el } = openGallery(fixture);
+        expect(el.querySelector('#onboarding-templates')?.textContent).toContain('No pipeline templates yet');
+    });
+
+    it('picking a template loads the preview, locks its kind, and leaves the name to the operator', () => {
+        const { fixture, api } = create({ kind: 'stream' });
+        const c = fixture.componentInstance;
+        c.chooseTemplate(PIPELINES[1]);
+        fixture.detectChanges();
+        expect(api.read).toHaveBeenCalledWith('pipeline', 'orders_tpl');
+        expect(api.write).not.toHaveBeenCalled(); // nothing is written until Create
+        expect(c.templatesOpen()).toBe(false);
+        expect(c.kind()).toBe('reference'); // the template's kind, not the caller's
+        expect(c.form.controls.name.value).toBe('');
+        expect(c.form.controls.description.value).toBe('Daily order drops');
+        const text = fixture.nativeElement.textContent as string;
+        expect(text).toContain('Starting from a template');
+        expect(text).toContain('From template Orders template');
+        expect(text).toContain('Create from template');
+        expect(c.importNotes()[0]).toContain('a copy, not a link');
+    });
+
+    it('creates a runnable copy: no template flag, its own Stream and collector id', () => {
+        const { fixture, ref, api } = create({ kind: 'stream' });
+        const c = fixture.componentInstance;
+        c.chooseTemplate(PIPELINES[1]);
+        c.form.controls.name.setValue('orders_eu');
+        c.create();
+        const pipeline = (api.write as ReturnType<typeof vi.fn>).mock.calls.find((call) => call[0] === 'pipeline')![1];
+        expect(pipeline['template']).toBeUndefined();
+        expect(pipeline['active']).toBe(false);
+        expect(pipeline['id']).toBe('orders_eu');
+        expect(pipeline['stream']).toBe('orders_eu');
+        expect(pipeline['collector']).toEqual({ id: 'orders_eu' });
+        expect(pipeline['produces']).toBe('reference');
+        expect((pipeline['dirs'] as Record<string, string>)['poll']).toBe('data/inbox/orders_eu');
+        expect(ref.close).toHaveBeenCalledWith({ name: 'orders_eu' });
+        expect(TOASTR.success).toHaveBeenCalledWith(expect.stringContaining('Created "orders_eu"'));
+    });
+
+    it('has no a11y violations with the template gallery open', async () => {
+        const { fixture } = create({ kind: 'stream' });
+        openGallery(fixture);
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });
