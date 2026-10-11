@@ -37,13 +37,32 @@ public record PeerBaseline(int minGroupSize, boolean populationFallback) {
         observed.forEach((e, v) -> {
             if (usable(v) && cohort != null && cohort.equals(cohortOf.get(e))) members.add(v);
         });
+        return compute(members, () -> Population.of(observed.values().stream().filter(PeerBaseline::usable).toList()),
+                label);
+    }
+
+    /** The whole population's usable observations, summarised once so every falling-back cohort can share it. */
+    public record Population(int size, double median, double scaledMad) {
+        public static Population of(List<Double> usableValues) {
+            if (usableValues.isEmpty()) return new Population(0, Double.NaN, Double.NaN);
+            double m = RobustStats.median(usableValues);
+            return new Population(usableValues.size(), m, RobustStats.scaledMad(usableValues, m));
+        }
+    }
+
+    /**
+     * The grouped form of {@link #compute(Map, Map, String, String)}: {@code members} are the cohort's usable values;
+     * {@code population} is asked for only when the cohort is insufficient and the fallback is on, so the caller can
+     * cache it across cohorts. Same results, reasons and flags.
+     */
+    public Baseline compute(List<Double> members, java.util.function.Supplier<Population> population, String label) {
         if (members.size() >= minGroupSize) {
             return of(members, label, label, false, "peers %s, %d entities".formatted(label, members.size()));
         }
         if (populationFallback) {
-            List<Double> all = observed.values().stream().filter(PeerBaseline::usable).toList();
+            Population all = population.get();
             if (all.size() >= minGroupSize) {
-                return of(all, POPULATION, label, true,
+                return new Baseline(KIND, all.median(), all.scaledMad(), all.size(), POPULATION, label, true, false,
                         "cohort %s has %d < %d entities; fell back to the population (%d)"
                                 .formatted(label, members.size(), minGroupSize, all.size()));
             }
