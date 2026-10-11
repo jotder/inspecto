@@ -71,6 +71,56 @@ class MetadataGraphServiceTest {
         return g.edges().stream().anyMatch(e -> e.from().equals(from) && e.to().equals(to) && e.kind() == kind);
     }
 
+    /** AUTHORING-REDESIGN-1 (e): a sql Step's fields[] metadata is READ — a STEP node with COLUMN children. */
+    @Test
+    void aSqlStepsOutputColumnsSurfaceAsAStepNodeWithDescribedColumns(@TempDir Path dir) throws Exception {
+        Fixture f = new Fixture();
+        f.pipelines.add(PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, """
+                steps[1]:
+                  - sql:
+                      sql: "SELECT ID AS ID, ID AS REF FROM input"
+                      fields[2]:
+                        - name: ID
+                          from: ID
+                          fn: keep
+                        - name: REF
+                          from: ID
+                          fn: keep
+                          description: Booking reference
+                          unit: none
+                          classification: PII
+                          synonym: booking_ref
+                """, false).toString()));
+        MetadataGraph g = new MetadataGraphService(f).structural();
+        MetadataNode step = g.nodes().stream().filter(n -> n.id().equals("step:mini_etl/step1")).findFirst().orElseThrow();
+        assertEquals(NodeKind.STEP, step.kind());
+        assertEquals("sql #1", step.label());
+        assertTrue(hasEdge(g, "stream:mini_etl", "step:mini_etl/step1", EdgeKind.DECLARES));
+        assertTrue(hasEdge(g, "step:mini_etl/step1", "col:mini_etl/step1/REF", EdgeKind.DESCRIBES));
+        assertTrue(g.edges().stream().anyMatch(e -> e.from().equals("step:mini_etl/step1")
+                && e.to().startsWith("event:mini_etl/") && e.kind() == EdgeKind.MATERIALIZES), "the last Step lands");
+        MetadataNode ref = g.nodes().stream().filter(n -> n.id().equals("col:mini_etl/step1/REF")).findFirst().orElseThrow();
+        assertEquals("Booking reference", ref.description().text());
+        assertEquals(Provenance.MANUAL, ref.description().provenance());
+        assertEquals("PII", ref.attrs().get("classification"));
+        assertEquals("none", ref.attrs().get("unit"));
+        assertEquals("booking_ref", ref.attrs().get("synonym"));
+        assertFalse(ref.attrs().containsKey("type"), "a Step column's type is not known statically");
+        MetadataNode id = g.nodes().stream().filter(n -> n.id().equals("col:mini_etl/step1/ID")).findFirst().orElseThrow();
+        assertEquals(Provenance.NONE, id.description().provenance());
+    }
+
+    @Test
+    void aRawSqlStepWithNoFieldsHasNoStepNode(@TempDir Path dir) throws Exception {
+        Fixture f = new Fixture();
+        f.pipelines.add(PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, """
+                steps[1]:
+                  - sql:
+                      sql: "SELECT ID FROM input"
+                """, false).toString()));
+        assertTrue(new MetadataGraphService(f).structural().nodes().stream().noneMatch(n -> n.kind() == NodeKind.STEP));
+    }
+
     @Test
     void assemblesAllNodeKinds(@TempDir Path dir) throws Exception {
         MetadataGraphService svc = new MetadataGraphService(fullFixture(dir));

@@ -29,6 +29,8 @@ export function nodeShape(kind: NodeKind): string {
             return 'rect';
         case 'REFERENCE_DATASET':
             return 'rect';
+        case 'STEP':
+            return 'triangle'; // a transform that describes columns, like the editor's transform glyph
         case 'COLUMN':
             return 'ellipse';
         case 'KPI':
@@ -70,6 +72,7 @@ const NODE_KIND_LABELS: Partial<Record<NodeKind, string>> = {
     STREAM: 'Stream',
     SCHEMA: 'Schema',
     RAW_SCHEMA: 'Schema',
+    STEP: 'Step',
     COLUMN: 'Column',
     TABLE: 'Table',
     DERIVED_TABLE: 'Matrix',
@@ -95,6 +98,7 @@ const NODE_KIND_LABELS: Partial<Record<NodeKind, string>> = {
 export const CATALOG_NODE_KINDS: readonly NodeKind[] = [
     'STREAM',
     'RAW_SCHEMA',
+    'STEP',
     'COLUMN',
     'TABLE',
     'DERIVED_TABLE',

@@ -39,5 +39,8 @@ public enum NodeKind {
     /** A Studio Widget ({@code widget:<name>}) — a Visualization Type bound to a {@link #DATASET}. */
     WIDGET,
     /** A Studio Dashboard ({@code dashboard:<name>}) — tiles, each naming a {@link #WIDGET}. */
-    DASHBOARD
+    DASHBOARD,
+    /** A pipeline {@code sql} Step that describes its output columns ({@code step:<pipeline>/step<n>});
+     *  parent of {@link #COLUMN} nodes like a {@link #RAW_SCHEMA} ({@code AUTHORING-REDESIGN-1} (e)). */
+    STEP
 }

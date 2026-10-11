@@ -274,6 +274,8 @@ export type NodeKind =
     // editor's SYNTHETIC visual kind (`categoryVisualKind`: PARSE → SCHEMA), never a wire value.
     | 'SCHEMA'
     | 'RAW_SCHEMA'
+    // A pipeline `sql` Step that describes its output columns (AUTHORING-REDESIGN-1 (e)); parent of COLUMNs.
+    | 'STEP'
     | 'COLUMN'
     | 'TABLE'
     | 'DERIVED_TABLE'
