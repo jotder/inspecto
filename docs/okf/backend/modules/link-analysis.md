@@ -244,12 +244,12 @@ dialog's Risk / Enrichment and the panel's *Fill nodeScores from indicators* loo
 whole Dataset over `/db/query` (which masks nothing). Gates: 503 write root → 422 body (`keyCol`/`columns` safe identifiers)
 → 413 over 500 keys → with `investigationId` the Investigation read gate (404) → `relationFor` R3 (404) → four-eyes row
 budget on the key count (403) → 422 for a column the relation lacks. Identifiers are quoted; keys are bound `?` parameters
-(`WHERE CAST(key AS VARCHAR) IN (?, …)`), at most 2 000 rows (`truncated`). Keys IN: an Investigation pseudonym
+(`WHERE CAST(key AS VARCHAR) IN (?, …)`), at most 2 000 rows (`truncated`). Keys IN (only when the exploration rule masks `keyCol` - otherwise an alias is unresolved, so it cannot be matched against an arbitrary column as a membership oracle): an Investigation pseudonym
 (`EntityMasking.reveal`) or an exploration alias (the book) resolves; under masking a RAW key names nothing (counted in
 `rawKeysRefused`, never echoed, like `/inv/graph/runs`' hidden raw id), so the route is no raw-id oracle. Rows carry the key AS ASKED. Values
 OUT, `none` shows raw; otherwise the key column is masked when the exploration rule masks `keyCol` or any key was an alias,
 and any column whose registry/lineage class is claimed by a masked Entity Type or is `ColumnClassification.SENSITIVE`
-(MSISDN/IMSI/ACCOUNT/PII) is masked, and under `all` every text value (numbers/booleans pass), to the Space's exploration alias; untraceable lineage masks every column. Audited as
+(MSISDN/IMSI/ACCOUNT/PII) is masked, and under `all` every value but fractional numbers and booleans (an integral column may be an unclassified id), to the Space's exploration alias; untraceable lineage masks every column. Audited as
 `LINK_REFERENCE_READ` (counts only, never the keys).
 
 ### 3.5 Entity store (identity data)

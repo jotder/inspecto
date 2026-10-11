@@ -57,7 +57,9 @@ import java.util.TreeSet;
  * the key column is masked whenever the exploration rule masks {@code keyCol} or any asked key was an alias/pseudonym (the
  * caller is not entitled to the raw value it stands for), and every other column is masked when its registry or lineage
  * classification is claimed by a masked Entity Type or is one of {@link ColumnClassification#SENSITIVE}, and under
- * {@code all} every TEXT value is masked too (numbers and booleans — indicator scores — pass); an untraceable
+ * {@code all} every value is masked too except fractional numbers and booleans (indicator scores) — an integral column
+ * may be an unclassified id; an alias resolves only when the exploration rule covers {@code keyCol}, so it cannot be
+ * matched against an arbitrary column as a membership oracle; an untraceable
  * lineage masks every column (fail closed). A masked value is the Space's exploration alias, the same one every other
  * exploration read shows for that id.
  */
@@ -65,7 +67,7 @@ final class ReferenceRows {
 
     static final int MAX_KEYS = 500;
     static final int MAX_ROWS = 2_000;
-    private static final String KEY_ALIAS = "__ref_key";
+    private static final String KEY_ALIAS_BASE = "__ref_key";
 
     private ReferenceRows() {}
 
@@ -90,6 +92,9 @@ final class ReferenceRows {
 
         List<String> relationCols = InvRoutes.relationColumns(datasetId, relationSql);
         String keyName = canonical(relationCols, keyCol);
+        // the internal key column must not shadow a real one: suffix until it names no column of the relation
+        String keyAlias = KEY_ALIAS_BASE;
+        for (int i = 1; InvRoutes.containsIgnoreCase(relationCols, keyAlias); i++) keyAlias = KEY_ALIAS_BASE + "_" + i;
         List<String> cols = new ArrayList<>();
         for (String w : wanted.isEmpty() ? relationCols : wanted) {
             String c = canonical(relationCols, w);
@@ -110,8 +115,12 @@ final class ReferenceRows {
             String raw = null;
             if (k.startsWith(MaskTokens.TOKEN_PREFIX)) {
                 aliasAsked = true;
-                if (invMask != null) raw = invMask.reveal(k);
-                if (raw == null) raw = ExplorationMasking.lookup(writeRoot, k);
+                // an alias resolves only against a key column the masking rule covers: matched against any other column,
+                // the raw value behind it would answer "is this entity in that column?" without ever being shown
+                if (explore.active()) {
+                    if (invMask != null) raw = invMask.reveal(k);
+                    if (raw == null) raw = ExplorationMasking.lookup(writeRoot, k);
+                }
             } else if (!(invMask != null && invMask.hidesRaw(k)) && !explore.active()) {
                 raw = k;
             }
@@ -134,12 +143,12 @@ final class ReferenceRows {
         if (!askedByRaw.isEmpty()) {
             StringBuilder sql = new StringBuilder("SELECT ");
             for (String c : cols) sql.append(SqlIdent.q(c)).append(", ");
-            sql.append("CAST(").append(SqlIdent.q(keyName)).append(" AS VARCHAR) AS ").append(SqlIdent.q(KEY_ALIAS))
+            sql.append("CAST(").append(SqlIdent.q(keyName)).append(" AS VARCHAR) AS ").append(SqlIdent.q(keyAlias))
                .append(" FROM ").append(SqlIdent.q(datasetId)).append(" WHERE CAST(").append(SqlIdent.q(keyName))
                .append(" AS VARCHAR) IN (");
             List<String> binds = new ArrayList<>(askedByRaw.keySet());
             for (int i = 0; i < binds.size(); i++) sql.append(i == 0 ? "?" : ", ?");
-            sql.append(") ORDER BY ").append(SqlIdent.q(KEY_ALIAS));
+            sql.append(") ORDER BY ").append(SqlIdent.q(keyAlias));
             DatasetProvider.Result r;
             try {
                 r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql.toString(),
@@ -150,12 +159,13 @@ final class ReferenceRows {
             }
             truncated = r.truncated();
             for (Map<String, Object> row : r.rows()) {
-                String raw = String.valueOf(row.get(KEY_ALIAS));
+                String raw = String.valueOf(row.get(keyAlias));
                 Map<String, Object> shown = new LinkedHashMap<>();
                 for (String c : cols) {
                     Object v = row.get(c);
-                    // `all` masks every id: any text value is one until proven otherwise; numbers and flags pass
-                    boolean hide = maskedCols.contains(c) || "all".equals(mode) && v instanceof CharSequence;
+                    // `all` masks every id: text and integral values (an unclassified BIGINT msisdn / imsi) are ids until
+                    // proven otherwise; only fractional numbers and flags - indicator scores - pass
+                    boolean hide = maskedCols.contains(c) || "all".equals(mode) && v != null && !passesUnderAll(v);
                     shown.put(c, hide ? colMask.out(v) : v);
                 }
                 for (String asked : askedByRaw.getOrDefault(raw, List.of())) {
@@ -183,6 +193,11 @@ final class ReferenceRows {
         res.put("truncated", truncated);
         res.put("masking", describe);
         return res;
+    }
+
+    /** Under {@code all}: only floating / decimal numbers and booleans are shown unmasked. */
+    private static boolean passesUnderAll(Object v) {
+        return v instanceof Boolean || v instanceof Double || v instanceof Float || v instanceof java.math.BigDecimal;
     }
 
     /** The relation's own spelling of {@code name}, or 422 naming it. */

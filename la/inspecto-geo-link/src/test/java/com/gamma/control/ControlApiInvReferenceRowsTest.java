@@ -41,7 +41,8 @@ class ControlApiInvReferenceRowsTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String A = "27820000001", B = "27820000002", C = "27820000003";
-    private static final List<String> RAW = List.of(A, B, C);
+    private static final String ALT = "27829990001", CLASH = "real-column-value";
+    private static final List<String> RAW = List.of(A, B, C, ALT);
     private static final String ROUTE = "/inv/reference-rows";
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -71,12 +72,17 @@ class ControlApiInvReferenceRowsTest {
                         "SELECT caller, callee FROM (VALUES ('" + A + "','" + B + "'),('" + B + "','" + C + "')) AS t(caller,callee)",
                         "2026-10-11T00:00:00Z"));
                 views.write(new ViewDefinition("ind_view", "flow-x", List.of(),
-                        "SELECT msisdn, score, owner_name FROM (VALUES ('" + A + "',80,'Alice'),('" + B + "',10,'Bob'),('"
-                                + C + "',0,'Carol')) AS t(msisdn,score,owner_name)", "2026-10-11T00:00:00Z"));
+                        "SELECT msisdn, score, owner_name, alt_id FROM (VALUES ('" + A + "',80.5,'Alice',CAST(" + ALT + " AS BIGINT)),('"
+                                + B + "',10.0,'Bob',NULL),('" + C + "',0.0,'Carol',NULL)) AS t(msisdn,score,owner_name,alt_id)",
+                        "2026-10-11T00:00:00Z"));
+                views.write(new ViewDefinition("clash_view", "flow-x", List.of(),
+                        "SELECT msisdn, '" + CLASH + "' AS __ref_key FROM (VALUES ('" + A + "'),('" + B + "')) AS t(msisdn)",
+                        "2026-10-11T00:00:00Z"));
                 ComponentStore reg = new ComponentStore(writeRoot.resolve("registry"));
                 reg.write("dataset", "calls_ds", Map.of("view", "calls_view"));
                 reg.write("dataset", "ind_ds", Map.of("view", "ind_view",
                         "columns", List.of(Map.of("name", "owner_name", "classification", "PII"))));
+                reg.write("dataset", "clash_ds", Map.of("view", "clash_view"));
             }
             return new Ctx(svc, api, api.port(), writeRoot);
         } finally {
@@ -142,11 +148,48 @@ class ControlApiInvReferenceRowsTest {
             assertEquals(aliasA, d.at("/rows/0/key").asText(), "rows carry the key AS ASKED");
             assertEquals(aliasA, d.at("/rows/0/row/msisdn").asText(), "the key column shows the same Space alias");
             assertTrue(d.at("/rows/0/row/owner_name").asText().startsWith("masked:"), "a PII column is masked");
-            assertTrue(d.at("/rows/0/row/score").isNumber(), "an unclassified indicator stays a number");
+            assertTrue(d.at("/rows/0/row/score").isNumber(), "a fractional indicator score stays a number");
+            assertTrue(d.at("/rows/0/row/alt_id").asText().startsWith("masked:"),
+                    "under `all` an unclassified BIGINT may be an id: masked like text, never raw");
             assertEquals(List.of("masked:0000000000000000"), names(d.get("unresolved")), "an unknown alias names nothing");
             assertEquals(1, d.get("rawKeysRefused").asInt(), "a raw key names nothing under masking, and is counted, not echoed");
             assertTrue(d.at("/masking/masked").asBoolean());
             assertTrue(names(d.at("/masking/maskedColumns")).contains("owner_name"));
+        }
+    }
+
+    @Test
+    void typedModeResolvesAnAliasOnlyAgainstAKeyColumnTheMaskingCovers(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: typed\n")) {
+            ComponentStore reg = new ComponentStore(root.resolve("registry"));
+            reg.write("dataset", "calls_ds", Map.of("view", "calls_view", "columns", List.of(
+                    Map.of("name", "caller", "classification", "MSISDN"), Map.of("name", "callee", "classification", "MSISDN"))));
+            JsonNode proj = ok(c, "/inv/projection", "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", false);
+            String aliasA = proj.at("/rows/0/source").asText();
+            assertTrue(aliasA.startsWith("masked:"));
+
+            // ind_ds.msisdn is unclassified: matching the alias's raw value there would be a yes/no membership oracle
+            JsonNode oracle = ok(c, ROUTE, ask(q(aliasA)), false);
+            assertEquals(0, oracle.get("rows").size(), oracle.toString());
+            assertEquals(List.of(aliasA), names(oracle.get("unresolved")));
+
+            // positive twin: once the key column is one the masking covers, the same alias resolves
+            reg.write("dataset", "ind_ds", Map.of("view", "ind_view", "columns", List.of(
+                    Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "owner_name", "classification", "PII"),
+                    Map.of("name", "alt_id", "classification", "IMSI"))));   // typed masks what is classified (an IMSI)
+            JsonNode covered = ok(c, ROUTE, ask(q(aliasA)), false);
+            assertEquals(1, covered.get("rows").size(), covered.toString());
+            assertEquals(aliasA, covered.at("/rows/0/row/msisdn").asText());
+        }
+    }
+
+    @Test
+    void aRealColumnNamedLikeTheInternalKeyAliasIsNeitherShadowedNorBreaksTheMatch(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            JsonNode d = ok(c, ROUTE, "{\"dataset\":\"clash_ds\",\"keyCol\":\"msisdn\",\"keys\":" + q(A) + "}", true);
+            assertEquals(1, d.get("rows").size(), d.toString());
+            assertEquals(A, d.at("/rows/0/key").asText());
+            assertEquals(CLASH, d.at("/rows/0/row/__ref_key").asText(), "the real column keeps its own value");
         }
     }
 

@@ -192,7 +192,7 @@ its detail dialog.
 Risk and Enrichment look up only the entities they need (the node itself, or every drawn node for Compute risk and
 *Fill nodeScores from indicators*), on the server (`POST /inv/reference-rows`, at most 500 keys a call), so they work
 in a masked Space too: identifying values (the entity id, and any column classified MSISDN / IMSI / ACCOUNT / PII or as
-a masked Entity Type; under masking mode `all`, every text value) are shown as aliases and the section says *Entity
+a masked Entity Type; under masking mode `all`, every value except fractional numbers and yes/no flags) are shown as aliases and the section says *Entity
 masking is on*, while numeric indicator scores stay readable. A lookup that matched more rows than one read returns is
 flagged, and Compute risk is then held - an incomplete score map would understate risk.
 
