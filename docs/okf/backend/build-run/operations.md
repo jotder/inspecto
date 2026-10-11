@@ -68,6 +68,18 @@ is a **withdrawn** duplicate of `GHSA-r7wm-3cxj-wff9` (fixed in 3.2.3) whose fro
 3.2.3 — `vuln-scan.mjs` does not yet honour the OSV `withdrawn` field. Open: teach the matcher to skip
 withdrawn records (operator decision; an agent edit to the guard was refused), or waive it with a date.
 
+**MEDIUM/LOW follow-up (2026-10-11, same 2026-10-10 snapshot, lock mode, operator-approved single online
+fetch):** 7 non-gating findings → **0 unwaived** (1 waived). Bumped to the lowest fixed same-major version
+OSV names: logback `logback-classic`/`logback-core` 1.5.18 → **1.5.34** (root `${logback.version}`; clears
+GHSA-25qh-j22f-pwp8, -qqpg-mvqg-649v, -p47f-322f-whfh, -jhq6-gfmj-v8fx — the last needs 1.5.34) ·
+`commons-net` 3.6 → **3.9.0** (`inspecto-connectors` `${commons-net.version}`; GHSA-cgp8-4m63-fhh5) ·
+`commons-lang3` 3.14.0 → **3.18.0** in the asn `legacy-code` module only (a direct pin overriding
+`commons-text` 1.12.0's transitive; the root already managed 3.18.0; GHSA-j288-q9x7-2f5v). The lock dropped
+90 → 89 coordinates (the second lang3 line). **Waived:** `net.i2p.crypto:eddsa` 0.3.0 GHSA-p53j-g8pw-4w5f —
+OSV names no fixed version (`last_affected` 0.3.0, library unmaintained); runtime transitive of `sshj` 0.39.0
+for SFTP; waiver expires 2027-04-11. ⚠ The asn `asn-golden` tests could not run offline (surefire's
+`surefire-junit-platform` 3.5.3 is absent from the local cache), so the lang3 bump there is compile-verified only.
+
 **Snapshot refresh (scripted, operator-approved per run - decision 2026-10-10):** `tools/vuln-db-refresh.mjs`
 (Node built-ins only) fetches the OSV `Maven` export into `$VULN_DB_DIR` in the layout `tools/vuln-scan.mjs` reads.
 It **never touches the network without `--confirm`**.

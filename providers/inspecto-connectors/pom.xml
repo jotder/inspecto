@@ -29,7 +29,7 @@
 
     <properties>
         <sshj.version>0.39.0</sshj.version>
-        <commons-net.version>3.6</commons-net.version>
+        <commons-net.version>3.9.0</commons-net.version>
         <!-- postgresql.version managed by the parent (M1) — shared with the core test-scope pin. -->
         <!-- test-only embedded servers -->
         <sshd.version>2.12.1</sshd.version>
