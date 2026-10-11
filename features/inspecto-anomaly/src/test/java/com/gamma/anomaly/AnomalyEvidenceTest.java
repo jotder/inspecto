@@ -153,6 +153,33 @@ class AnomalyEvidenceTest {
     }
 
     @Test
+    void onlyElevatedAndHighEntitiesCarryEvidence() throws Exception {
+        AnomalyModel model = model(List.of("txn"));
+        AnomalyScoreEvaluator.Run run = AnomalyScoreEvaluator.evaluate(model, AnomalyCorpus.AS_OF, relation,
+                AnomalyScoreEvaluator.NONE, masker(model));
+        long withEvidence = 0;
+        for (AnomalyScorer.Scored s : run.scored()) {
+            boolean has = s.features().stream().anyMatch(f -> !f.evidence().isEmpty());
+            if ("normal".equals(s.band())) assertFalse(has, s.entityKey() + " is normal and must carry no evidence");
+            if (has) withEvidence++;
+        }
+        assertTrue(withEvidence > 0 && byKey(run).get("spike").features().get(0).evidence().size() == 3);
+        assertNotEquals("normal", byKey(run).get("spike").band());
+    }
+
+    @Test
+    void theCapIsSpentOnlyOnElevatedEntities() throws Exception {
+        AnomalyModel model = model(List.of("txn"));
+        // 300 background entities would exhaust a tiny cap if the read were not narrowed; narrowed it holds the
+        // few elevated/high entities' rows (spike alone has 10 on the scored day), so a cap of 40 is not hit
+        AnomalyScoreEvaluator.Run run = AnomalyScoreEvaluator.evaluate(model, AnomalyCorpus.AS_OF, relation, masker(model), 40);
+        assertFalse(run.evidenceTruncated());
+        assertEquals(3, byKey(run).get("spike").features().get(0).evidence().size());
+        // a cap below the elevated entities' own rows still truncates, and is reported
+        assertTrue(AnomalyScoreEvaluator.evaluate(model, AnomalyCorpus.AS_OF, relation, masker(model), 2).evidenceTruncated());
+    }
+
+    @Test
     void evidenceColumnsAreValidatedAtParse() {
         Map<String, Object> m = AnomalyCorpus.model();
         @SuppressWarnings("unchecked") Map<String, Object> f = new LinkedHashMap<>((Map<String, Object>) ((List<?>) m.get("features")).get(0));

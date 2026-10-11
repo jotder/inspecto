@@ -113,6 +113,13 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
             return new Feature(id, label, dataset, key, time, measure, List.copyOf(narrowed), direction, weight, unit, evidence);
         }
 
+        /** This feature narrowed to a set of entities (an extra bound {@code key IN (...)} filter) - the evidence read's input. */
+        public Feature forEntities(java.util.Collection<String> entityKeys) {
+            List<Map<String, Object>> narrowed = new ArrayList<>(filters);
+            narrowed.add(Map.of("field", key, "op", "in", "value", List.copyOf(new java.util.TreeSet<>(entityKeys))));
+            return new Feature(id, label, dataset, key, time, measure, List.copyOf(narrowed), direction, weight, unit, evidence);
+        }
+
         /**
          * The evidence rows' spec: the key plus the evidence columns of the rows in {@code [from, to)} of {@code time},
          * under the same filters, in a fixed order (so a run is reproducible).

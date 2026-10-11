@@ -83,7 +83,7 @@ raw in every score's explanation (`peerBaseline.cohort`) and quoted in its `reas
 `EvidenceMasker.sensitiveColumns` as-is — the Dataset's own column classification, sibling Datasets over the
 same store, and pipeline schema lineage. ⚠ It **fails closed** when the peers Dataset's lineage cannot be
 traced while classified columns are in play (a view / SQL Dataset over such a store) — stricter than the design
-wording; **the operator is to confirm** (BACKLOG §1). The peers join `key` is not checked: it stays raw by design
+wording; **confirmed by the operator 2026-10-11**, no change. The peers join `key` is not checked: it stays raw by design
 (D-P8). Pinned by `AnomalyKindValidatorTest`.
 
 ## The scoring — `anomaly.score` Job
@@ -144,9 +144,14 @@ DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus
   `evaluate` with evidence columns and NO masker throws — never stored raw. Only the top feature's element carries
   `evidence`, and there is no key at all when none is declared, so stored explanations and the golden corpora are
   unchanged and `AnomalyScorer.recompute` ignores it. The preview returns the same masked rows. Pinned by
-  `AnomalyEvidenceTest` and `ControlApiAnomalyScoreTest#thePreviewCarriesEvidenceRowsMaskedAtWriteTime`. ⚠ To confirm:
-  the read is not narrowed to non-normal entities (as Risk Score), so on a wide population most entities lose
-  evidence past the cap.
+  `AnomalyEvidenceTest` and `ControlApiAnomalyScoreTest#thePreviewCarriesEvidenceRowsMaskedAtWriteTime`. **Narrowed to elevated / high
+  (2026-10-11, operator decision):** only entities whose `band` is `elevated` or `high` (score at or above the model's
+  `elevatedThreshold`; `normal` is everything below) get evidence, and the statement is restricted to exactly those
+  entities (a bound `key IN (...)` filter, `AnomalyModel.Feature#forEntities`), so the 20 000-row cap is spent on them
+  alone; truncation is still logged (`evidenceTruncated`) when their rows exceed the cap. Always on, not a model
+  setting: a model without `evidence` is untouched, so stored scores, explanations and the golden corpora do not
+  change. Masking is unchanged. Pinned by `AnomalyEvidenceTest#onlyElevatedAndHighEntitiesCarryEvidence` and
+  `#theCapIsSpentOnlyOnElevatedEntities`.
 - **Preview day series (2026-10-11, `5f76026ee`, residual (h)):** `POST /anomaly-scores/preview` adds `series`
   (additive; `{}` when the entity is not found): per feature id `{points[{day, value}], median, low, high,
   bandSpreads}` — the entity's zero-filled history then the scored day (last), the self baseline's median and the band
