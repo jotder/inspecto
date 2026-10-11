@@ -106,9 +106,13 @@ class TelcoFraudTemplateGoldenTest {
         MetricRegistry.global().reset();
     }
 
-    /** The golden day: the Jobs ship a rolling {@code $yesterday} window, so the golden runs pin day 1 explicitly. */
-    private static final Map<String, String> DAY1 =
-            Map.of("window_start", "2026-07-01 00:00:00", "window_end", "2026-07-02 00:00:00");
+    /** The golden day: the Jobs ship a rolling {@code $yesterday} window, so the golden runs pin day 1 explicitly
+     *  (and the incremental Jobs' {@code day}, the partition the run replaces). */
+    private static final Map<String, String> DAY1 = window(java.time.LocalDate.of(2026, 7, 1));
+
+    private static Map<String, String> window(java.time.LocalDate day) {
+        return Map.of("window_start", day + " 00:00:00", "window_end", day.plusDays(1) + " 00:00:00", "day", day.toString());
+    }
 
     private static Map<String, String> day1With(String k, String v) {
         Map<String, String> m = new java.util.HashMap<>(DAY1);
@@ -172,8 +176,9 @@ class TelcoFraudTemplateGoldenTest {
     /**
      * The template ships a ZERO-row seed snapshot of every detection Job's sink, so each per-entity Alert Rule's
      * {@code by} columns (and each KPI's fields) can be checked against a real Schema when {@code POST /spaces}
-     * seeds the template — that save gate fails closed on a Dataset with no data yet — and so each Job, which
-     * reads its own sink to keep earlier windows, has a relation to read on its first run. Regenerated from each
+     * seeds the template — that save gate fails closed on a Dataset with no data yet — and so each Job that still
+     * reads its own sink to keep earlier windows has a relation to read on its first run. An incremental Job's seed
+     * sits in a {@code window_date=1970-01-01/} placeholder folder (its sink's day layout). Regenerated from each
      * Job's own SQL over empty, schema-typed feeds.
      */
     @Test
@@ -187,11 +192,28 @@ class TelcoFraudTemplateGoldenTest {
             for (JobConfig j : jobs(tpl.resolve("config"))) {
                 String sink = j.params().get("sink_dataset");
                 String sql = substitute(j.params().get("sql"), j.params());
-                Path seed = tpl.resolve("data").resolve(sink).resolve("seed.parquet");
+                boolean incremental = j.params().containsKey("incremental.column");
+                // An incremental Job's sink is laid out window_date=YYYY-MM-DD/ (the date lives in the folder name
+                // only), so its seed is a zero-row file in one placeholder day folder the Job never replaces.
+                Path seed = incremental
+                        ? tpl.resolve("data").resolve(sink).resolve("window_date=1970-01-01").resolve("seed.parquet")
+                        : tpl.resolve("data").resolve(sink).resolve("seed.parquet");
                 String seedRel = "read_parquet('" + seed.toString().replace('\\', '/') + "')";
-                assertTrue(sql.startsWith("WITH cur AS (") && sql.contains(UNION),
-                        j.name() + " keeps earlier windows by reading its own sink");
-                String cur = sql.substring("WITH cur AS (".length(), sql.lastIndexOf(UNION));
+                String cur;
+                if (incremental) {
+                    assertEquals("window_date", j.params().get("incremental.column"), j.name());
+                    assertEquals("$yesterday", j.params().get("day"), j.name() + " replaces the window's own day");
+                    assertFalse(sql.contains(UNION) || List.of(j.params().get("sources").split(",")).contains(sink),
+                            j.name() + ": an incremental Job does not read its own sink");
+                    assertFalse(Files.exists(tpl.resolve("data").resolve(sink).resolve("seed.parquet")),
+                            j.name() + ": a flat seed is refused by the incremental layout gate");
+                    cur = "SELECT * EXCLUDE (window_date) FROM (" + sql + ")";
+                    sql = "SELECT * EXCLUDE (window_date), window_date FROM (" + sql + ")";   // read back: folder column last
+                } else {
+                    assertTrue(sql.startsWith("WITH cur AS (") && sql.contains(UNION),
+                            j.name() + " keeps earlier windows by reading its own sink");
+                    cur = sql.substring("WITH cur AS (".length(), sql.lastIndexOf(UNION));
+                }
                 if (regenerate()) {
                     Files.createDirectories(seed.getParent());
                     st.execute("COPY (SELECT * FROM (" + cur + ") LIMIT 0) TO '" + seed.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
@@ -246,13 +268,13 @@ class TelcoFraudTemplateGoldenTest {
 
             // The NEXT window's run keeps the earlier window's rows: its offenders do not vanish from the Dataset
             // (which would auto-resolve their Alerts with nobody acting), and nothing new is raised.
-            Map<String, String> day2 = Map.of("window_start", "2026-07-02 00:00:00", "window_end", "2026-07-03 00:00:00");
+            Map<String, String> day2 = window(java.time.LocalDate.of(2026, 7, 2));
             for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), day2).status(), j.name() + " day 2");
             assertRaisesExactlyThePlanted(rules, probe, corpus);
             assertEquals(List.of(), svc.evaluateRules(), "the next window neither raises nor heals day 1's Alerts");
             try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement();
                  ResultSet rs = st.executeQuery("SELECT count(DISTINCT window_date) FROM read_parquet('"
-                         + data.resolve("fraud_reversal").toString().replace('\\', '/') + "/*.parquet')")) {
+                         + data.resolve("fraud_reversal").toString().replace('\\', '/') + "/**/*.parquet', hive_partitioning = true)")) {
                 rs.next();
                 assertEquals(2, rs.getLong(1), "the sink holds both windows (day 2 has one reversal-less payment)");
             }
@@ -401,8 +423,7 @@ class TelcoFraudTemplateGoldenTest {
             for (int d = 1; d <= days; d++) {
                 java.time.LocalDate day = java.time.LocalDate.of(2026, 7, 1).plusDays(d - 1);
                 for (JobConfig j : jobs) {
-                    Map<String, String> a = new java.util.HashMap<>(Map.of("window_start", day + " 00:00:00",
-                            "window_end", day.plusDays(1) + " 00:00:00"));
+                    Map<String, String> a = new java.util.HashMap<>(window(day));
                     if (j.name().equals("fraud_simbox")) a.put("exempt_msisdns", pbx.toString());
                     assertEquals("SUCCESS", runJob(js, j.name(), a).status(), j.name() + " day " + d);
                 }
@@ -467,7 +488,7 @@ class TelcoFraudTemplateGoldenTest {
             for (JobConfig j : jobs) {
                 String sink = j.params().get("sink_dataset");
                 try (ResultSet rs = st.executeQuery("SELECT count(*) FROM read_parquet('"
-                        + data.resolve(sink).toString().replace('\\', '/') + "/*.parquet')")) {
+                        + data.resolve(sink).toString().replace('\\', '/') + "/**/*.parquet')")) {
                     rs.next();
                     out.put(sink, rs.getLong(1));
                 }

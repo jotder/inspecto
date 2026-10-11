@@ -417,14 +417,13 @@ the offender alone (`msisdn`, the ringing number, `id_doc`, `dealer_id` or `vouc
 over every retained window, `stormCap: 500`. No new Step Processor. **Thresholds are configuration in two places**: the Job's parameters say what
 counts (`irsf_prefixes`, `premium_prefixes`, `home_cc`, `max_ring_seconds`, `callback_hours`, `max_cells`,
 `exempt_msisdns`, `exempt_doc_prefixes`, `window_hours`, `traffic_grace_hours`, `window_start` / `window_end`,
-`retention_days`) and the Alert Rule's `threshold` (`gt`) says how much is too much. **Schedule:** every detection Job carries `cron: "0 2 * * *"` and the rolling window `window_start: "$yesterday"` / `window_end: "$today"` (job-parameter Expressions, resolved at fire time in the Job's zone), so a created Space detects the previous day each night; a manual run (and the golden test) overrides both with literal timestamps. Also: four KPIs + tiles, one
+`day`) and the Alert Rule's `threshold` (`gt`) says how much is too much. **Schedule:** every detection Job carries `cron: "0 2 * * *"` and the rolling window `window_start: "$yesterday"` / `window_end: "$today"` (job-parameter Expressions, resolved at fire time in the Job's zone), so a created Space detects the previous day each night; a manual run (and the golden test) overrides both with literal timestamps, plus `day` (the partition the run replaces, below). Also: four KPIs + tiles, one
 dashboard (`telco_fraud_overview`: the four KPI tiles plus one bar Widget per typology over its sink Dataset,
 keyed on the offender — the golden test renders every tile through `/kpis/{id}/value` and `/bi/query`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown, kept for the shared guidance; since 2026-10-10 each typology's steps are ALSO a
-`runbook` component linked from its Alert Rule and shown on the Incident/Case page, operator 2026-10-10, superseding the 2026-10-04 park), which names the known false-positive sources that have no defence. **Edition gating (decided 2026-10-04): none** — the template ships to all editions (editions are build flavours, the template is plain config; anyone holding the needed capabilities can create it). **Two product gaps decided DEFER 2026-10-04, no build until a customer asks:** a Dataset whose Schema comes from its producing Job (the pack ships zero-row `data/fraud_*/seed.parquet` Schema seeds instead) and an incremental Job Type mode (the Jobs emulate it with daily full-window runs); both are model-level changes touching every pack. Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
-stays parked); each run reads and rewrites the whole retained sink, and the identity / dealer / voucher / reversal
-sinks keep every entity, so they grow with the subscriber base — **sizing documented (operator, 2026-10-06)**:
-size by subscriber count x `retention_days`, since each run rewrites the retained sink (pack runbook §
-*Sizing and retention*).
+`runbook` component linked from its Alert Rule and shown on the Incident/Case page, operator 2026-10-10, superseding the 2026-10-04 park), which names the known false-positive sources that have no defence. **Edition gating (decided 2026-10-04): none** — the template ships to all editions (editions are build flavours, the template is plain config; anyone holding the needed capabilities can create it). **Two product gaps decided DEFER 2026-10-04, no build until a customer asks:** a Dataset whose Schema comes from its producing Job (the pack ships zero-row `data/fraud_*/seed.parquet` Schema seeds instead) and an incremental Job Type mode — the latter since BUILT (operator, 2026-10-10) and enabled in this pack 2026-10-11 (below). Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
+stays parked); each run writes one day partition, and the identity / dealer / voucher / reversal
+sinks keep every entity, so they grow with the subscriber base and with every retained day — **sizing documented (operator, 2026-10-06)**:
+size by subscriber count x days kept (pack runbook § *Sizing and retention*).
 
 **Content gaps closed 2026-10-09 (`TELCO-FRAUD-CONTENT-GAPS-1`).** Three typologies added to the same template, no new feed and no platform edit: `fraud_recharge` (card-testing / top-up velocity: PAYMENT top-ups under `small_amount` per line, `by` = `msisdn`, `gt 8`), `fraud_data_bypass` (DATA sessions rated at zero outside `zero_rated_apns`, `by` = `msisdn`, `gt 7200` s) and `fraud_internal` (SIM swaps per staff user outside `exempt_staff`, `by` = `staff_id`, `gt 5`), each with its Job, per-entity Alert Rule, sink Dataset + zero-row seed, bar Widget on `telco_fraud_overview` (now 17 tiles) and runbook section. **Seams:** a DATA record reuses the CDR columns (`service = 'DATA'`, `duration_s` = session seconds, `b_number` = the APN) and a staff SIM swap reuses `subscriber_events.dealer_id` as the staff user, so the existing ten Jobs' filters (`VOICE`, `ACTIVATION`, `PAYMENT`) were verified unaffected and the old seeds untouched. **Deliberate cuts:** no KPI for the new typologies, no data-volume (bytes) column, no staff-to-own-line cross-check (needs a staff register Reference Dataset, the same gap as `exempt_doc_prefixes`), no recharge-channel / payer-instrument key (the payments feed carries none). **Gotcha:** the 16-day simulation suffixes every identifier per day, so a recurring exempt or at-threshold key (`zero.operator.apn`, `HELPDESK`, `S111`, the two at-threshold lines) must be added to the golden test's `RECURRING` list. Golden: 13 rules, 54 Alerts; mutation-checked (small_amount 5 to 7 raises the bill-payer, `zero_rated_apns` to `none` raises the zero-rated portal, dropping `charge = 0` raises the charged-data line, `exempt_staff` to `none` raises `HELPDESK`).
 
@@ -438,26 +437,30 @@ silent. SIM-swap anchors each payment to the latest swap before it, so a payment
 precede it. Dealer activations look for traffic up to `traffic_grace_hours` past the window, so late-day activations
 are not idle.
 
-⚠ **A `sql.template` run replaces its whole sink** (stage-and-swap; the Job Type has no partition-incremental
-output). So each Job reads its own sink (`sources: …,fraud_<typology>`) and re-emits the rows of every OTHER
-`window_date` within `retention_days` beside the current window's — partition-incremental by `window_date`, done in
-the SQL; a same-window re-run replaces that window, never duplicates it. A later window's run neither raises nor
-heals an earlier offender's Alert; a key heals only when all its evidence ages out (its Incident stays open —
-D-P11). ⚠ **The storm cap counts every retained breaching key**: `AlertService.evaluateGrouped` collapses a rule
-into ONE storm Alert once the total exceeds `stormCap`, and no new offender gets its own Alert until it drops back.
-A first cut keyed on offender + `window_date` with `stormCap: 50` hit that around day 11 at the corpus rate; keying
-on the offender bounds the count by distinct offenders, and `stormCap` must stay above `retention_days` x daily
-offenders. ⚠ **Scaling**: each run reads and rewrites the whole retained sink (≈ `retention_days` x daily
-candidates); `fraud_simbox` keeps only lines with ≥ `min_candidate_targets` targets, the identity / dealer / voucher /
-reversal sinks still keep every entity. ⚠ **The exemption lists are a trust assumption**: `exempt_doc_prefixes`
+⚠ **Each Job is partition-incremental by `window_date` (2026-10-11, `ASSURE-PACK-TELCO-FRAUD-1` (b)).** Every
+detection Job declares `incremental: {by: day, column: window_date, lookback: 1}` and `day: "$yesterday"`, so a run
+replaces only its own window's `data/fraud_<typology>/window_date=YYYY-MM-DD/` folder and never opens the others
+(→ `okf/backend/control-plane/jobs.md`); the Jobs no longer read their own sink (until then they re-emitted every
+other `window_date` within `retention_days` in their SQL). A manual run passes `day` beside the literal window, or its
+rows fall outside the lookback and are dropped. A same-window re-run replaces that window, never duplicates it; a later
+window's run neither raises nor heals an earlier offender's Alert. ⚠ **No retention:** an incremental sink never
+prunes, and no maintenance task prunes `window_date=` folders, so `retention_days` is gone and a key no longer heals by
+ageing out — evidence stays until an operator deletes old day folders by hand (gap reported 2026-10-11). ⚠ **The storm
+cap counts every retained breaching key**: `AlertService.evaluateGrouped` collapses a rule into ONE storm Alert once
+the total exceeds `stormCap`, and no new offender gets its own Alert until it drops back. A first cut keyed on
+offender + `window_date` with `stormCap: 50` hit that around day 11 at the corpus rate; keying on the offender bounds
+the count by distinct offenders, and `stormCap` must stay above days kept x daily offenders — with nothing pruned,
+that count only grows. ⚠ **Scaling**: each run writes one day (≈ daily candidates); `fraud_simbox` keeps only lines
+with ≥ `min_candidate_targets` targets, the identity / dealer / voucher / reversal sinks still keep every entity. ⚠ **The exemption lists are a trust assumption**: `exempt_doc_prefixes`
 matches a prefix of `id_doc`, which the dealer enters, so a made-up `CORP-FAKE` document is exempted (pinned in the
 corpus as a known risk). The lists must come from a verified register, never from a field the monitored party
 controls; matching a verified-register Reference Dataset will be built WHEN a customer supplies one (operator,
 2026-10-06); until then the prefix-spoof risk stays pinned and documented. ⚠ **Seeds, and
 why.** The per-entity Alert Rule save gate (`AlertRoutes.requireGroupingColumns`, run by the template seed gate) and
-the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no data, and the Jobs read their own
-sink; so the template ships a **zero-row seed snapshot** per sink (`data/fraud_<typology>/seed.parquet`), replaced by
-the first run. A test regenerates them from each Job's SQL and fails when a seed's Schema drifts. ⚠ The Alert Rules
+the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no data; so the template ships a
+**zero-row seed** per sink in the day layout, `data/fraud_<typology>/window_date=1970-01-01/seed.parquet` (a
+placeholder day no run replaces; a flat `seed.parquet` would be refused by the incremental layout gate). The
+reader auto-detects the `window_date=` folders, so the Schema carries `window_date` (as the last column). A test regenerates them from each Job's SQL and fails when a seed's Schema drifts. ⚠ The Alert Rules
 are Professional+: a Personal build refuses the whole template at `POST /spaces`, though the gallery still lists it.
 
 **Golden corpus**: synthetic, from a fixed-seed generator (`inspecto/src/test/java/com/gamma/control/TelcoFraudCorpus.java`,

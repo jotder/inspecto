@@ -193,10 +193,16 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   3M output rows over 30 days, aggregate SQL that reads the whole source): full snapshot 1.6-1.7 s and
   22.8 MB rewritten per run; incremental `lookback: 1` 0.9-1.0 s and ~0.8 MB (one day) rewritten; the
   30-day backfill took 3.0 s. The read side is unchanged unless the SQL filters its source by the window.
-  ⚠ Not enabled in the shipped packs: the telco-fraud Jobs carry history by reading their own sink and
-  pruning by `retention_days`, their sinks ship a flat zero-row `seed.parquet` (which this gate refuses),
-  and an incremental sink never prunes old days — enabling it would change the golden run, so the
-  templates were left as they are.
+  **Enabled in the telco-fraud pack (2026-10-11):** all 14 detection Jobs run `incremental: {by: day,
+  column: window_date, lookback: 1}` with `day: "$yesterday"` (the same day as `window_start`; a manual or
+  golden run passes `day` beside the literal window), no longer read their own sink, and ship their zero-row
+  schema seed as `data/fraud_<typology>/window_date=1970-01-01/seed.parquet` (a placeholder day the Job
+  never replaces; a flat `seed.parquet` is refused by the layout gate). The Dataset reader leaves
+  `hive_partitioning` unset and DuckDB auto-detects the `window_date=` folders, so `window_date` reaches
+  Alert Rules, KPIs (`timeField: window_date`) and BI as a DATE. ⚠ **An incremental sink never prunes
+  old days** and no maintenance task prunes `<column>=` folders (`partition_prune` knows only
+  `year=/month=/day=`), so `retention_days` is gone from these Jobs and history grows until an operator
+  deletes old day folders by hand.
 * **`caserule.evaluate`** — schedules the auto-grouping tail of the Alert → Incident → Case chain (C5):
   evaluates a saved Case Rule, grouping matching in-window Incidents under a Case via
   `ObjectService.evaluateCaseRule` — the same step `POST /cases/rules/{name}/evaluate` drives — and emits
