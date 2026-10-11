@@ -51,6 +51,7 @@ import {
     linkPrediction,
     louvainCommunities,
     matchPattern,
+    edgeTimeIndex,
     maxFlow,
     maximumSpanningForest,
     neighborhood,
@@ -63,7 +64,16 @@ import {
     weightedShortestPath,
 } from '@inspecto/link-analysis/graph/graph-analysis';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
-import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-packs';
+import {
+    PATTERN_PACK_COLUMNS,
+    PATTERN_PACKS,
+    PatternColumnPlan,
+    PatternPack,
+    patternColumnNeeds,
+    patternColumnRefusal,
+    patternPackFromContent,
+    resolvePatternColumns,
+} from './pattern-packs';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
@@ -103,6 +113,9 @@ export interface FindPathsRequest {
 export interface ServerPatternRequest {
     mapping: number;
     stages: BranchStage[];
+    /** The link kind / time column for this run — the mapping's own, or pre-filled from the domain profile. */
+    linkKindCol?: string;
+    timeCol?: string;
 }
 
 type AnalysisTab =
@@ -415,6 +428,69 @@ export class LinkAnalysisToolboxComponent {
      */
     readonly patternPacks = signal<PatternPack[]>(PATTERN_PACKS);
     readonly loadedPack = signal<PatternPack | null>(null);
+
+    /**
+     * What the loaded motif needs: a time column when its CURRENT steps/stages window or order legs, a kind column
+     * when the PACK pins link kinds (a kind picked in the builder comes from the canvas's own kinds, so it exists).
+     */
+    private readonly patternNeeds = computed(() => {
+        const pack = this.loadedPack();
+        return {
+            time: patternColumnNeeds(this.patternSteps(), this.branchStages()).time,
+            kind: !!pack && patternColumnNeeds(pack.steps, pack.stages).kind,
+        };
+    });
+
+    /**
+     * The kind / time columns the loaded pack needs for a SERVER run: the picked mapping's kind column and the
+     * Query panel's time column, each pre-filled from the domain profile when blank (telecom: `link_kind` /
+     * `first_seen`), or a plain `blocked` reason when still missing. A custom motif's kinds come from the
+     * graph's own dropdowns, so only a loaded pack is judged.
+     */
+    readonly serverPatternColumns = computed<PatternColumnPlan>(() => {
+        if (!this.loadedPack()) return {};
+        const maps = this.indexMappings();
+        const mapping = maps[Number(this.serverMapping())] ?? maps[0];
+        return resolvePatternColumns(
+            this.patternNeeds(),
+            { kindCol: mapping?.kindCol, timeCol: this.timeAttr() },
+            this.profileId(),
+        );
+    });
+
+    /**
+     * The same judgement for the BROWSER run over the canvas. A time column is pre-filled only when the canvas's
+     * links actually carry it; a kind column cannot be pre-filled here (every link's kind was fixed by the
+     * projection — `link` when it had no kind column), so a pack whose kinds the canvas lacks is refused.
+     */
+    readonly browserPatternColumns = computed<{ timeAttr: string; notice?: string; blocked?: string }>(() => {
+        const timeAttr = this.timeAttr();
+        const pack = this.loadedPack();
+        if (!pack) return { timeAttr };
+        const needs = this.patternNeeds();
+        const defaults = PATTERN_PACK_COLUMNS[this.profileId() ?? 'generic'] ?? {};
+        const blocked: string[] = [];
+        let used = timeAttr;
+        if (needs.time && !used) {
+            const g = this.graph();
+            if (defaults.timeCol && g && edgeTimeIndex(g, defaults.timeCol).size) used = defaults.timeCol;
+            else blocked.push(patternColumnRefusal('time', defaults.timeCol));
+        }
+        if (needs.kind) {
+            const wanted = [...(pack.stages ?? []), ...pack.steps]
+                .map((s) => s.edgeKind)
+                .filter((k): k is string => !!k);
+            const maps = this.indexMappings();
+            const mapping = maps[Number(this.serverMapping())] ?? maps[0];
+            const missing = maps.length ? !mapping?.kindCol : !wanted.some((k) => this.edgeKinds().includes(k));
+            if (missing) blocked.push(patternColumnRefusal('kind', defaults.kindCol));
+        }
+        return {
+            timeAttr: used,
+            ...(used !== timeAttr ? { notice: `Using ${used} for this pack.` } : {}),
+            ...(blocked.length ? { blocked: blocked.join(' ') } : {}),
+        };
+    });
     /**
      * LA-14b — the loaded BRANCHING motif (a copy, editable), or null when the builder holds a linear one.
      * Its thresholds are rendered as editable fields so the band a match depends on is never hidden.
@@ -898,9 +974,15 @@ export class LinkAnalysisToolboxComponent {
     /** LA-14b — the loaded branching motif, over the whole Dataset of the picked edge mapping. */
     runBranchingOnServer(): void {
         const stages = this.branchStages();
-        if (!stages || !this.traversalMappings().length) return;
+        const cols = this.serverPatternColumns();
+        if (!stages || !this.traversalMappings().length || cols.blocked) return;
         const idx = Number(this.serverMapping());
-        this.runPatternOnServer.emit({ mapping: idx >= 0 && idx < this.traversalMappings().length ? idx : 0, stages });
+        this.runPatternOnServer.emit({
+            mapping: idx >= 0 && idx < this.traversalMappings().length ? idx : 0,
+            stages,
+            ...(cols.kindCol ? { linkKindCol: cols.kindCol } : {}),
+            ...(cols.timeCol ? { timeCol: cols.timeCol } : {}),
+        });
     }
 
     focusAllPath(p: GraphSelection): void {
@@ -975,13 +1057,20 @@ export class LinkAnalysisToolboxComponent {
         if (!g) return;
         this.analysisError.set('');
         this.clearServerNotices();
+        const cols = this.browserPatternColumns();
+        if (cols.blocked) {
+            this.patternMatches.set([]);
+            this.emphasisChange.emit(null);
+            this.analysisError.set(cols.blocked);
+            return;
+        }
+        const timeAttr = cols.timeAttr;
         const stages = this.branchStages();
         if (stages) {
-            this.runBranching(g, stages);
+            this.runBranching(g, stages, timeAttr);
             return;
         }
         const steps = this.patternSteps();
-        const timeAttr = this.timeAttr();
         // LA-14a: say WHY nothing can be found. `matchPattern` fails closed on a temporal motif with no
         // time column, and "No matches" is the same sentence a genuinely empty result produces - which
         // would tell the analyst the chain is absent when in fact it was never looked for.
@@ -1010,8 +1099,8 @@ export class LinkAnalysisToolboxComponent {
      * LA-14b — run a branching motif. Every refusal (no time column, a threshold nothing passes because the
      * view filtered the legs away, the node cap) is shown as its own sentence, never as "No matches".
      */
-    private runBranching(g: G6GraphData, stages: BranchStage[]): void {
-        const res = matchBranchingPattern(g, stages, { timeAttr: this.timeAttr() });
+    private runBranching(g: G6GraphData, stages: BranchStage[], timeAttr: string): void {
+        const res = matchBranchingPattern(g, stages, { timeAttr });
         this.patternMatches.set(res.matches);
         if (res.refusal || !res.matches.length) {
             this.emphasisChange.emit(null);

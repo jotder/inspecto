@@ -399,12 +399,13 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(serverButton()).toBeUndefined(); // truncated, but nothing to run it against
 
         fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'tx: PAYER → PAYEE' }]);
+        fixture.componentRef.setInput('timeAttr', 'BOOKED'); // structuring windows and orders its legs
         fixture.detectChanges();
         expect(el.textContent).toContain('first links a truncation cuts');
         const asked: unknown[] = [];
         c.runPatternOnServer.subscribe((r) => asked.push(r));
         serverButton()!.click();
-        expect(asked).toEqual([{ mapping: 0, stages: c.branchStages() }]);
+        expect(asked).toEqual([{ mapping: 0, stages: c.branchStages(), timeCol: 'BOOKED' }]);
     });
 
     it('structuring pack: renders the server answer — matches by layer, the fence stated, a11y clean', async () => {
@@ -663,5 +664,90 @@ describe('LinkAnalysisToolboxComponent - DR-D5 results', () => {
         c.runAllPaths();
         expect(c.allPathsResult()).toHaveLength(1);
         expect(c.pathLabel(c.allPathsResult()[0])).toBe('A → B → C · 2 parallel links · wire, cash');
+    });
+});
+
+describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)', () => {
+    const ringPack: ComponentDef = {
+        type: 'pattern-pack',
+        name: 'telecom-subscription-ring',
+        ref: 'pattern-pack/telecom-subscription-ring',
+        content: {
+            name: 'telecom-subscription-ring',
+            label: 'Subscription ring',
+            category: 'telecom',
+            stages: [{ shape: 'fan-in', minBranches: 5, edgeKind: 'shared_identity', windowHours: 168 }],
+        },
+    };
+    const serverButton = (el: HTMLElement) =>
+        [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Run on server'));
+
+    function telecom(kindCol?: string) {
+        const t = make(GRAPH, [ringPack]);
+        t.fixture.componentRef.setInput('graphTruncated', true);
+        t.fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'links: A → B' }]);
+        t.fixture.componentRef.setInput('indexMappings', [
+            { dataset: 'telecom_links', sourceCol: 'a_msisdn', targetCol: 'b_msisdn', kindCol, label: 'links: A → B' },
+        ]);
+        t.c.tab.set('pattern');
+        t.c.loadPatternPack('telecom-subscription-ring');
+        return t;
+    }
+
+    it('pre-fills link_kind / first_seen from the telecom profile, says so, and sends them in the request', () => {
+        const { fixture, c } = telecom();
+        fixture.componentRef.setInput('profileId', 'telecom');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="server-pattern-columns-notice"]')?.textContent).toContain(
+            'Using link_kind / first_seen for this pack',
+        );
+        const asked: unknown[] = [];
+        c.runPatternOnServer.subscribe((r) => asked.push(r));
+        serverButton(el)!.click();
+        expect(asked).toEqual([
+            { mapping: 0, stages: c.branchStages(), linkKindCol: 'link_kind', timeCol: 'first_seen' },
+        ]);
+    });
+
+    it('the projection’s own kind column and time column win over the profile', () => {
+        const { fixture, c } = telecom('kind');
+        fixture.componentRef.setInput('profileId', 'telecom');
+        fixture.componentRef.setInput('timeAttr', 'started');
+        fixture.detectChanges();
+        const asked: unknown[] = [];
+        c.runPatternOnServer.subscribe((r) => asked.push(r));
+        c.runBranchingOnServer();
+        expect(asked).toEqual([{ mapping: 0, stages: c.branchStages(), linkKindCol: 'kind', timeCol: 'started' }]);
+        expect(c.serverPatternColumns().notice).toBeUndefined();
+    });
+
+    it('with no profile fallback, disables Run with a plain reason and sends nothing', async () => {
+        const { fixture, c } = telecom();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(serverButton(el)!.disabled).toBe(true);
+        expect(el.querySelector('[data-testid="server-pattern-columns-blocked"]')?.textContent).toContain(
+            'This pattern needs a time column',
+        );
+        const find = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Find matches'))!;
+        expect(find.disabled).toBe(true);
+        expect(el.querySelector('[data-testid="pattern-columns-blocked"]')?.textContent).toContain(
+            'This pattern needs a link kind column',
+        );
+        const asked: unknown[] = [];
+        c.runPatternOnServer.subscribe((r) => asked.push(r));
+        c.runBranchingOnServer();
+        expect(asked).toEqual([]);
+        await expectNoA11yViolations(el);
+    });
+
+    it('telecom profile without the canvas carrying first_seen: the browser run names the column to set', () => {
+        const { fixture, c } = telecom('link_kind');
+        fixture.componentRef.setInput('profileId', 'telecom');
+        fixture.detectChanges();
+        expect(c.browserPatternColumns().blocked).toBe('This pattern needs a time column — set Time to first_seen.');
+        c.runPattern();
+        expect(c.analysisError()).toBe('This pattern needs a time column — set Time to first_seen.');
     });
 });

@@ -188,9 +188,15 @@ directions, so the payment pack's closing step is always met by the mirror rows.
 evidence (voucher, agent or card) with two or more other lines", and claims no ring. On real data a family or a shop
 topping up several lines with one card or voucher will match too, so read the `via` keys before acting.
 
-To run these packs from the SPA, set the link kind column to `link_kind` and the time column to `first_seen`. The SPA
-sends the projection's kind column and the free-text time field. With a blank time field the windowed and ordered packs
-(subscription ring, forwarding chain) fail. Pre-binding the two columns in the UI is a follow-up.
+Required columns: all three packs pin an `edgeKind`, so they need the link kind column `link_kind`. The subscription
+ring (window) and the forwarding chain (ordering) also need the time column `first_seen`. When the projection's kind
+column or the Query panel's time field is blank and the domain profile is telecom, the toolbox fills in `link_kind` /
+`first_seen` (`PATTERN_PACK_COLUMNS` in `pattern-packs.ts`), sends them in the `POST /inv/pattern/branching` body and
+shows "Using link_kind / first_seen for this pack". Note that the pattern time column is `first_seen`, not the
+Investigation's `last_seen`. With no profile to fall back on, Run is disabled and the toolbox says what to set (for
+example "This pattern needs a time column — set Time to first_seen"). It never sends a request that fails or matches
+nothing. The browser run cannot add a kind column after the projection, so for it set the link kind column in the Query
+panel.
 
 Wangiri, IRSF and SIM box are per-MSISDN ratios, and pattern stages cannot express them. Three Alert Rules in
 `config/registry/alert-rules/` cover them instead. They read the one-row Dataset `telecom_typology_counts_dataset`,

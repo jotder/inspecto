@@ -1,5 +1,6 @@
 import { BranchStage, LegThreshold } from '@inspecto/link-analysis/graph/branching-pattern-engine';
 import { PatternStep } from '@inspecto/link-analysis/graph/graph-analysis';
+import { DomainProfileId, domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 
 /**
  * **Link Analysis — pattern packs** (V2). A pattern pack is a named, parameterized investigation
@@ -263,3 +264,77 @@ export const PATTERN_PACKS: PatternPack[] = [
         ],
     },
 ];
+
+// ── Columns a pack needs (review: telecom packs only worked on a `link_kind` / `first_seen` projection) ──
+
+/**
+ * The columns a domain's pattern packs are authored against, keyed by domain profile. Telecom's packs pin
+ * `edgeKind`s that live in `telecom_links.link_kind` and order their legs by `first_seen` — NOT the profile's
+ * Investigation `timeCol` (`last_seen`), which is the recency a degree expansion windows on, while a pattern
+ * orders legs by when each link STARTED. See docs/superpower/la-telecom-demo-data.md §5a.
+ */
+export const PATTERN_PACK_COLUMNS: Partial<Record<DomainProfileId, { kindCol?: string; timeCol?: string }>> = {
+    telecom: {
+        kindCol: domainProfile('telecom').investigate?.mapping.linkKindCol ?? 'link_kind',
+        timeCol: 'first_seen',
+    },
+};
+
+/** Which columns a motif cannot be evaluated without: a link kind (any pinned `edgeKind`) and a time (any window / ordering). */
+export function patternColumnNeeds(
+    steps: PatternStep[],
+    stages: BranchStage[] | null | undefined,
+): { kind: boolean; time: boolean } {
+    if (stages) {
+        return {
+            kind: stages.some((s) => !!s.edgeKind),
+            time: stages.some((s, i) => !!s.windowHours || (i > 0 && !!s.afterPrevious)),
+        };
+    }
+    return { kind: steps.some((s) => !!s.edgeKind), time: steps.some((s, i) => i > 0 && !!s.afterPrevious) };
+}
+
+/** The columns a pattern run will use, which of them came from the domain profile, and why it cannot run. */
+export interface PatternColumnPlan {
+    kindCol?: string;
+    timeCol?: string;
+    /** Set when a column was pre-filled from the profile: "Using link_kind / first_seen for this pack". */
+    notice?: string;
+    /** Set when a needed column is still missing — Run is disabled and this sentence says what to set. */
+    blocked?: string;
+}
+
+/**
+ * Fill a needed-but-blank kind / time column from the active domain profile's {@link PATTERN_PACK_COLUMNS}, and
+ * refuse (with a plain reason) when it is still missing — a run without them either fails (a window or an ordering
+ * with no time column) or silently matches nothing (every link's kind defaults to `link` with no kind column).
+ */
+export function resolvePatternColumns(
+    needs: { kind: boolean; time: boolean },
+    current: { kindCol?: string; timeCol?: string },
+    profileId: DomainProfileId | null | undefined,
+): PatternColumnPlan {
+    const defaults = (profileId && PATTERN_PACK_COLUMNS[profileId]) || {};
+    const kindCol = current.kindCol || (needs.kind ? defaults.kindCol : undefined);
+    const timeCol = current.timeCol || (needs.time ? defaults.timeCol : undefined);
+    const filled = [
+        ...(needs.kind && !current.kindCol && kindCol ? [kindCol] : []),
+        ...(needs.time && !current.timeCol && timeCol ? [timeCol] : []),
+    ];
+    const missing: string[] = [];
+    if (needs.time && !timeCol) missing.push(patternColumnRefusal('time', defaults.timeCol));
+    if (needs.kind && !kindCol) missing.push(patternColumnRefusal('kind', defaults.kindCol));
+    return {
+        ...(kindCol ? { kindCol } : {}),
+        ...(timeCol ? { timeCol } : {}),
+        ...(filled.length ? { notice: `Using ${filled.join(' / ')} for this pack.` } : {}),
+        ...(missing.length ? { blocked: missing.join(' ') } : {}),
+    };
+}
+
+/** The plain refusal for a column the pattern needs and does not have, naming the profile's column when there is one. */
+export function patternColumnRefusal(what: 'time' | 'kind', suggested: string | undefined): string {
+    return what === 'time'
+        ? `This pattern needs a time column — ${suggested ? `set Time to ${suggested}` : 'set Time in the Query panel'}.`
+        : `This pattern needs a link kind column — ${suggested ? `set Link type to ${suggested}` : 'set Link type in the Query panel'}.`;
+}

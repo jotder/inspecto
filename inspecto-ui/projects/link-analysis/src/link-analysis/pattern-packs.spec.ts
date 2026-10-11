@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PATTERN_PACKS, patternPackFromContent } from './pattern-packs';
+import { PATTERN_PACKS, patternColumnNeeds, patternPackFromContent, resolvePatternColumns } from './pattern-packs';
 
 /**
  * `patternPackFromContent` parses free-form authored TOON — a `pattern-pack` component has no backend
@@ -190,5 +190,42 @@ describe('patternPackFromContent — branching stages', () => {
         expect(patternPackFromContent(pack([row({ minBranches: 0 })]))).toBeNull();
         expect(patternPackFromContent(pack([row({ thresholdMin: '', thresholdMax: '' })]))).toBeNull();
         expect(patternPackFromContent(pack([]))).toBeNull();
+    });
+});
+
+describe('pattern pack columns (telecom packs on a projection without link_kind / first_seen)', () => {
+    const ring = [{ shape: 'fan-in' as const, minBranches: 5, edgeKind: 'shared_identity', windowHours: 168 }];
+
+    it('a pinned edgeKind needs a kind column; a window or an ordering needs a time column', () => {
+        expect(patternColumnNeeds([], ring)).toEqual({ kind: true, time: true });
+        expect(patternColumnNeeds([], [{ shape: 'fan-out', minBranches: 2, edgeKind: 'shared_payment' }])).toEqual({
+            kind: true,
+            time: false,
+        });
+        expect(patternColumnNeeds([{}, { direction: 'out', afterPrevious: true }], null)).toEqual({
+            kind: false,
+            time: true,
+        });
+    });
+
+    it('pre-fills link_kind / first_seen from the telecom profile and says so', () => {
+        expect(resolvePatternColumns({ kind: true, time: true }, {}, 'telecom')).toEqual({
+            kindCol: 'link_kind',
+            timeCol: 'first_seen',
+            notice: 'Using link_kind / first_seen for this pack.',
+        });
+        // the analyst's own columns always win, and nothing is announced
+        expect(resolvePatternColumns({ kind: true, time: true }, { kindCol: 'K', timeCol: 'T' }, 'telecom')).toEqual({
+            kindCol: 'K',
+            timeCol: 'T',
+        });
+    });
+
+    it('with no profile column to fall back on, refuses with a plain reason', () => {
+        const plan = resolvePatternColumns({ kind: true, time: true }, {}, 'finance');
+        expect(plan.kindCol).toBeUndefined();
+        expect(plan.blocked).toContain('This pattern needs a time column — set Time in the Query panel.');
+        expect(plan.blocked).toContain('This pattern needs a link kind column');
+        expect(resolvePatternColumns({ kind: false, time: false }, {}, null)).toEqual({});
     });
 });

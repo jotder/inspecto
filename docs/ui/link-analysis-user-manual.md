@@ -275,6 +275,13 @@ the data cannot answer — no time column, or your filter removed every leg — 
 than returning "none". When the loaded graph was truncated, **Run on server** repeats the search across the whole
 Dataset.
 
+A pack that pins link kinds needs a **link kind column**, and a pack with a window or an ordering needs a **time
+column**. When yours are blank, the toolbox fills them from the domain profile. For telecom it uses `link_kind` and
+`first_seen` and says *Using link_kind / first_seen for this pack*. If there is no column to fall back on, the run
+button is disabled and the reason names what to set, for example *This pattern needs a time column — set Time to
+first_seen*. The browser run can only use a time column the loaded links already carry. It cannot add a kind column
+after the projection, so set **Link type** in the Query panel and re-run the query.
+
 ---
 
 ## 8. Saving, exporting and handing over
