@@ -1032,7 +1032,11 @@
                                     }
                                 </ol>
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <button mat-stroked-button (click)="runPattern()">
+                                    <button
+                                        mat-stroked-button
+                                        (click)="runPattern()"
+                                        [disabled]="!!browserPatternColumns().blocked"
+                                    >
                                         <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                                         Find matches
                                     </button>
@@ -1040,14 +1044,45 @@
                                         <button
                                             mat-stroked-button
                                             (click)="runBranchingOnServer()"
-                                            [disabled]="serverPatternBusy()"
+                                            [disabled]="serverPatternBusy() || !!serverPatternColumns().blocked"
                                         >
                                             <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
                                             Run on server
                                         </button>
                                     }
                                 </div>
+                                <!-- A pack's kind / time column: pre-filled from the domain profile, or why it cannot run. -->
+                                @if (browserPatternColumns().blocked; as why) {
+                                    <p class="m-0 text-sm" role="status" data-testid="pattern-columns-blocked">
+                                        {{ why }}
+                                    </p>
+                                } @else if (browserPatternColumns().notice; as note) {
+                                    <p
+                                        class="text-secondary m-0 text-sm"
+                                        role="status"
+                                        data-testid="pattern-columns-notice"
+                                    >
+                                        {{ note }}
+                                    </p>
+                                }
                                 @if (graphTruncated() && traversalMappings().length) {
+                                    @if (serverPatternColumns().blocked; as why) {
+                                        <p
+                                            class="m-0 text-sm"
+                                            role="status"
+                                            data-testid="server-pattern-columns-blocked"
+                                        >
+                                            Run on server: {{ why }}
+                                        </p>
+                                    } @else if (serverPatternColumns().notice; as note) {
+                                        <p
+                                            class="text-secondary m-0 text-sm"
+                                            role="status"
+                                            data-testid="server-pattern-columns-notice"
+                                        >
+                                            Run on server: {{ note }}
+                                        </p>
+                                    }
                                     <p class="text-secondary m-0 text-sm">
                                         This graph is truncated, and the small legs this pattern looks for are the first
                                         links a truncation cuts. Run on server searches the whole Dataset of
@@ -1169,11 +1204,28 @@
                                         <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                                         Add step
                                     </button>
-                                    <button mat-stroked-button (click)="runPattern()">
+                                    <button
+                                        mat-stroked-button
+                                        (click)="runPattern()"
+                                        [disabled]="!!browserPatternColumns().blocked"
+                                    >
                                         <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                                         Find matches
                                     </button>
                                 </div>
+                                @if (browserPatternColumns().blocked; as why) {
+                                    <p class="m-0 text-sm" role="status" data-testid="pattern-columns-blocked">
+                                        {{ why }}
+                                    </p>
+                                } @else if (browserPatternColumns().notice; as note) {
+                                    <p
+                                        class="text-secondary m-0 text-sm"
+                                        role="status"
+                                        data-testid="pattern-columns-notice"
+                                    >
+                                        {{ note }}
+                                    </p>
+                                }
                             }
                             @if (patternMatches().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Pattern matches">

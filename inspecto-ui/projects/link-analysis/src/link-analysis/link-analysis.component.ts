@@ -1897,8 +1897,9 @@ export class LinkAnalysisComponent implements OnInit {
                     dataset: target.dataset,
                     sourceCol: target.sourceCol,
                     targetCol: target.targetCol,
-                    linkKindCol: target.linkKindCol,
-                    timeCol: this.timeColumn() || undefined,
+                    // The toolbox pre-fills a pack's kind / time column from the domain profile when blank.
+                    linkKindCol: req.linkKindCol ?? target.linkKindCol,
+                    timeCol: req.timeCol ?? (this.timeColumn() || undefined),
                     stages: req.stages,
                     filter: target.filter,
                 }),
