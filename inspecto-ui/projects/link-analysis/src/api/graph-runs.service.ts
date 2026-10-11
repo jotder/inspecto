@@ -150,6 +150,8 @@ export interface GraphRunView {
     /** ONLY on a COMPLETED run - a BUDGET_EXCEEDED / CANCELLED / FAILED run has no such key. */
     result?: GraphRunResult;
     masking?: Record<string, unknown>;
+    /** `propagatedRisk` start only: the per-hop weights the run used and where they came from (the Space default when unstated). */
+    propagatedRiskWeights?: { weights: number[]; source: 'request' | 'space' };
 }
 
 export interface GraphRunRequest {

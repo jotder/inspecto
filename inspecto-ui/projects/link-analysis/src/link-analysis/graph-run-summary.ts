@@ -1,5 +1,10 @@
-import { GraphRunResult, GraphScoreView } from '@inspecto/link-analysis/api/graph-runs.service';
+import {
+    GraphPropagatedRiskView,
+    GraphRunResult,
+    GraphScoreView,
+} from '@inspecto/link-analysis/api/graph-runs.service';
 import { ServerIdMap } from './graph-run-apply';
+import { factorLine, round1 } from './node-risk';
 
 /** A server algorithm answer in words, plus the canvas ids it can emphasise (what the generic *All algorithms* panel shows). */
 export interface GraphRunSummary {
@@ -29,9 +34,17 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
         edgeIds,
     });
     switch (r.kind) {
-        case 'SCORES':
-        case 'SUSPICION':
         case 'PROPAGATED_RISK': {
+            const s = (r.scores ?? []) as GraphPropagatedRiskView[];
+            const reached = s.filter((x) => x.score > 0);
+            return out(
+                `${plural(reached.length, 'node')} carry propagated risk (of ${s.length} scored).`,
+                reached.slice(0, TOP).map((x) => `${x.label}: ${round1(x.score)}`),
+                nodeOf(reached.slice(0, TOP).map((x) => x.id)),
+            );
+        }
+        case 'SCORES':
+        case 'SUSPICION': {
             const s = (r.scores ?? []) as GraphScoreView[];
             return out(
                 `${plural(s.length, 'node')} scored.`,
@@ -133,4 +146,42 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             );
         }
     }
+}
+
+/** One row of the *All algorithms* panel's propagated-risk table. */
+export interface PropagatedRiskRow {
+    id: string;
+    label: string;
+    score: number;
+    raw: number;
+    own: number;
+    contributors: number;
+    /** `+28 from 99979100001, 3 hops, weight 0.35`, the top contributing origins in the server's order. */
+    factors: string[];
+}
+
+/**
+ * A `PROPAGATED_RISK` answer as table rows, highest score first (the server's ranked order), at most `limit`; any other
+ * kind is no rows. Origins are named by their canvas label when the canvas draws them, else by the id the server sent.
+ */
+export function propagatedRiskRows(
+    r: GraphRunResult,
+    map: ServerIdMap | null,
+    labelOfCanvas: (canvasId: string) => string,
+    limit = 50,
+): PropagatedRiskRow[] {
+    if (r.kind !== 'PROPAGATED_RISK') return [];
+    const origin = (id: string) => {
+        const c = map?.node(id);
+        return c ? labelOfCanvas(c) : id;
+    };
+    return ((r.scores ?? []) as GraphPropagatedRiskView[]).slice(0, limit).map((x) => ({
+        id: x.id,
+        label: x.label,
+        score: round1(x.score),
+        raw: round1(x.raw),
+        own: round1(x.own),
+        contributors: x.contributors,
+        factors: (x.factors ?? []).map((f) => factorLine(f, origin(f.origin))),
+    }));
 }
