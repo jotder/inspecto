@@ -655,6 +655,18 @@ Test: `ControlApiJobAuthorityTest` (stamping at four doors, revocation, legacy r
   belong in that switch, and `BUILT_IN_TASKS` stays unchanged. Tests: `SpaceComparisonJobTest`,
   `ControlApiSpaceComparisonTest`. Design + the four decisions (2026-09-24):
   `archived-documents/plans-archive/space-comparison-design.md`.
+  **UI (2026-10-11, `b584c0506`):** Settings › Spaces › **Compare Spaces** dialog
+  (`inspecto-ui/src/app/modules/admin/spaces/space-comparison.dialog.ts`, client
+  `inspecto/api/space-comparison.service.ts`, pure shaping `inspecto/spaces/space-comparison.ts`). The button
+  shows only on a multi-Space server, with `canAdminister`, and with ≥ 2 hosted Spaces (the server still
+  refuses without `canAdminister`). Sequence: `POST /space-comparisons` → poll `GET /jobs/runs/{runId}` until it
+  leaves `RUNNING` → on `SUCCESS` read the result back from the Signal ledger with
+  `GET /signals?type=space.comparison.completed&correlationId=<runId>&limit=1` (an ad-hoc run's correlation
+  id is its run id). ⚠ API gaps the build worked around (BACKLOG §3.7 row notes, not separate items):
+  `JobsService` has no typed run-by-id read, and the route returns `startedAt` / `finishedAt` where the UI's
+  `JobRunRow` has `startTime` / `endTime`; the structured result lives only in the Signal ledger (persisting
+  it is decision (c)); no axis list is served, so the axes filter is free text; the 202 body and `Location`
+  are not described in the OpenAPI.
 ### `incident_purge` — the archived-Incident retention sweep (MNT-14, shipped 2026-07-27)
 
 The retention model is **a retention tier, NOT archive-is-terminal** (BACKLOG D5, decided 2026-07-25):

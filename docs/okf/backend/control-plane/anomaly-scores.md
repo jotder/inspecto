@@ -77,6 +77,15 @@ runs them. ⚠ **The gate needs a Schema at apply**: a template's Feature Datase
 `data/<feed>/database/schema-seed.parquet` (read `union_by_name`; no run replaces it) rather than relaxing the
 gate.
 
+**No classified cohort column (2026-10-11, `fa8a9b3cb`, residual (f)).** `AnomalyKindValidator.requireUnclassifiedCohort`
+refuses (422) a `peers.by` column classified MSISDN / IMSI / ACCOUNT / PII, because the cohort value is stored
+raw in every score's explanation (`peerBaseline.cohort`) and quoted in its `reason`. It reuses
+`EvidenceMasker.sensitiveColumns` as-is — the Dataset's own column classification, sibling Datasets over the
+same store, and pipeline schema lineage. ⚠ It **fails closed** when the peers Dataset's lineage cannot be
+traced while classified columns are in play (a view / SQL Dataset over such a store) — stricter than the design
+wording; **the operator is to confirm** (BACKLOG §1). The peers join `key` is not checked: it stays raw by design
+(D-P8). Pinned by `AnomalyKindValidatorTest`.
+
 ## The scoring — `anomaly.score` Job
 
 Job Type `anomaly.score` (`AnomalyScoreJobType`; params `model`, optional `as_of` YYYY-MM-DD, UTC days)
@@ -94,6 +103,13 @@ DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus
   values → the greatest; none → population only). The peer baseline is median / MAD of the scored-day values
   of the cohort's scored entities; a cohort below `minGroupSize` is `insufficient` (D-AD11). Peer medians are
   computed **in the JVM** from the per-entity series already in memory (not in SQL).
+  ⚠ **NULLs in a multi-column `by` — characterised, policy OPEN (2026-10-11, `bd18b0371`, residual (g)).**
+  `concat_ws` skips NULLs, so ('A', NULL) and (NULL, 'A') both key to cohort `'A'` and are scored as peers — a
+  real collision; an all-NULL row keys to `''`, which the evaluator drops (population only, the same as having
+  no peers row). Untested sibling: a value holding the `|` separator can collide too, e.g. ('A|B', NULL) vs
+  ('A', 'B'). `AnomalyScoreEvaluatorTest` pins today's behaviour, not the intended policy. Recommendation
+  recorded for the operator: exclude rows with a NULL in any `by` column (count them as unscored) and build the
+  key collision-free.
 - **Cohort shift — CONFIRMED (operator, 2026-10-10).** With a plain `max(|zSelf|, |zPeer|)` a whole cohort
   moving together (a promotion day) goes `high`. So each member's self baseline is scaled by
   `k = peer median today / the cohort's usual daily median` (the usual is the model's own `BaselineStatistic`
@@ -158,9 +174,16 @@ factor (`measure: max(score)`) — a documented pattern, no code.
   component routes, gated `canAuthorWorkbench`; the 202 hold reads as held. Schema-form for the scalars + a Feature
   row editor (Dataset picker over readable Schemas, key/time pickers, time DATE/TIMESTAMP only, shared
   `count | agg(column)` grammar). A 422 lands on the field or Feature row it names (`mapAnomalyRefusal`).
-  The preview box (gated `canWorkIncidents`) scores a SAVED model for one key: badge, per-Feature table and an
-  SVG strip of the baseline (median ± 3 MAD, observed point) with a text alternative. Services:
-  `inspecto/api/anomaly-models.service.ts` (config + preview), `inspecto/anomaly/anomaly-model-form.ts`.
+  Since 2026-10-11 (`a8c4c14f7`, residual (h)) the Feature row also edits `filters` (operators = the
+  `MeasureCompiler.filterTerm` set: `=` `!=` `>` `>=` `<` `<=` `in` `like` `isNull` `notNull`;
+  `anomaly-feature-fields.ts`) and `unit` (> 0). ⚠ Both still travel in the draft's `extra`; moving them into
+  `FEATURE_MODELLED` in `inspecto/anomaly/anomaly-model-form.ts` would be cleaner (follow-up note).
+  The preview box (gated `canWorkIncidents`) scores a saved model for one key: badge, per-Feature table and an
+  SVG strip of the baseline (median ± 3 MAD, observed point) with a text alternative. The form dialog's
+  **Preview the draft** box scores the **unsaved** content through `AnomalyModelsService.previewContent`
+  (`POST /anomaly-scores/preview` with `content`; gated `canWorkIncidents`, the dialog itself needs
+  `canAuthorWorkbench`). Services: `inspecto/api/anomaly-models.service.ts` (config + preview),
+  `inspecto/anomaly/anomaly-model-form.ts`.
 - **Entity anomaly panel** `<inspecto-anomaly-panel [entityKey] [model]?>`
   (`inspecto/components/anomaly-panel.component.ts`, reads via `inspecto/api/anomaly-scores.service.ts`,
   helpers `inspecto/anomaly/anomaly-score-view.ts`): band badge, Features by contribution (top 3, "Show all N"),
@@ -193,10 +216,11 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 Tracked in `ANOMALY-DETECTION-RESIDUALS-1`: the dashboard tile (the Widget layer lacks a Widget-level filter and
 a table row limit, and `/bi/query` does not mask entity keys in scores Datasets — a top-10 Widget stays out of
 templates until BI masks); pack golden extension (needs multi-week corpora); evidence rows; hour buckets; JVM
-peer-median performance unmeasured (D-AD9: full recompute until measured slow); refusing a classified cohort
-column at save; NULLs in a multi-column `by` (skipped by `concat_ws`); pane: day-by-day chart series, Feature
-`filters` / `unit` fields, unsaved-content preview; the LA panel's Risk Score model gate. Later: an ML scorer
-behind the same explanation shape (D-AD2).
+peer-median performance unmeasured (D-AD9: full recompute until measured slow); NULLs in a multi-column `by`
+(characterised above, awaiting the operator's policy call); pane: day-by-day chart series (a preview
+response-shape change); the LA panel's Risk Score model gate. Later: an ML scorer behind the same explanation
+shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
+Feature `filters` / `unit` fields; unsaved-content preview.)
 
 ## Decisions (operator, 2026-10-10)
 

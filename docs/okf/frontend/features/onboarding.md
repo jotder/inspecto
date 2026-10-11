@@ -34,6 +34,26 @@ writes a minimal `active: false` pipeline draft + registers it — **the server-
 draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOSSARY](../../../GLOSSARY.md)
 §2 *Onboard*; ⛔ never "wizard" in copy.
 
+**Three starts in the create dialog** (`modules/admin/catalog/onboarding/onboarding-create.dialog.ts`):
+
+1. **Blank** — the minimal draft above ("Create draft").
+2. **Import** — an `inspecto-stream-config` file exported elsewhere ("Create from import"; § *Stream
+   configuration export / import* below).
+3. **Start from a template** (2026-10-11, `968dc1ce4`) — lists the **Pipeline Templates** (configs with
+   `template: true`, written by the pipeline editor's *Save as template…*, listed by `GET /pipelines`).
+   Picking one reuses the Duplicate export seam (`StreamTransferService.exportPipeline`) and the existing
+   Import preview ("Create from template"). The pure helper `planTemplateCopy`
+   (`modules/admin/catalog/onboarding/onboarding-template.ts`) drops `template: true` (the parser refuses
+   `template` + `active`, so a kept flag would make the copy un-runnable) and retargets `stream`,
+   `collector.id` (or legacy `source.id`) and a `data/templates/<tplId>/` ducklake `data_path` to the new
+   name — **only where the value still carries the template's stamp**, so a value the author set on purpose
+   travels as authored. The name is still typed in the dialog and the draft is written once, at Create
+   (⛔ no client-side name deferral). ⚠ Save-as-template does not copy segment schemas, and
+   `exportPipeline` reads them by the `<pipeline>_<segment>` naming rule, so a plugin-parser template (like
+   Duplicate) loses `parsing.plugin.segments`; the dialog states which parts it could not read.
+   ⚠ Import and Duplicate (`planStreamImport`) do **not** retarget `stream` / `collector.id` — two copies
+   can then share one Catalog Stream and one ledger dedup key (BACKLOG `ONB-IMPORT-RETARGET-1`).
+
 ## The stage model (now the editor's checklist chips)
 
 ⚠ **Host: the pipeline editor's guided mode** (`pipeline-stages.ts`, P6-d). The stage *model* below is
@@ -46,12 +66,17 @@ every pipeline as blocked.
 - **Reference** (`produces: reference` written at create): Collection → Parsing → **Keys & Load**
   (the SAME schema pane, plus an honest full-replace load-policy note) → **Publish** (bindable-by-name
   note `ref: <normalized-id>`).
-  ⚠ The versioned-store options `reference.delete` (delete-feed marker, D5-ref) and `reference.order_by`
-  (within-batch tie-break, D6-ref), shipped 2026-09-25, have **no UI surface** — hand-authored TOON only
-  (backend: [onboarding-authoring](../../backend/control-plane/onboarding-authoring.md)). 🔴 The pipeline
-  **Settings** dialog rebuilds the `reference` block from `load`/`key`/`refresh_seconds` and the route
-  replaces it wholesale, so saving Settings on such a pipeline **drops both keys** until the dialog
-  carries the unmodelled keys through.
+  The versioned-store options `reference.delete` (delete-feed marker, D5-ref) and `reference.order_by`
+  (within-batch tie-break, D6-ref), shipped 2026-09-25, are edited in the pipeline **Settings** dialog
+  since 2026-10-11 (`3581de0cf`, `modules/admin/pipelines/pipeline-settings.dialog.ts`): `order_by` is one
+  column (free text), `delete` a marker column plus comma-separated values. Shown only for `upsert` /
+  `scd2`; a `replace` save drops both. Save mirrors the two ERROR rules
+  `reference-delete-needs-column-and-values` and `reference-delete-column-not-a-key` as field errors; the
+  WARNING `reference-delete-without-order-by` shows inline, non-blocking. Clearing a field removes its key,
+  unmodelled `reference` keys pass through (the route replaces the block wholesale), and a non-string stored
+  marker loads and saves as text. (The older note here, that a Settings save dropped both keys, was already
+  stale: the dialog had been passing them through.) Backend:
+  [onboarding-authoring](../../backend/control-plane/onboarding-authoring.md).
 
 Per-stage readiness chips are **computed from the config blocks on every read** (Not configured /
 Configured / Validated — Validated is session-only, from a passed sample test); lifecycle badge =
