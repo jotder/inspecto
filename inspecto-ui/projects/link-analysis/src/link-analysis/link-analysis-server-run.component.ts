@@ -29,6 +29,7 @@ import {
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
+import { fmtScore } from './graph-run-summary';
 
 /**
  * **Run on server** (LA separation D-4 step 7): the control the toolbox shows INSTEAD of a local run when the
@@ -115,6 +116,11 @@ import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
                 </button>
             }
         </div>
+        @if (active() && !view()) {
+            <p class="text-secondary mt-1 text-sm" role="status" data-testid="cancel-wait-reason">
+                Cancel is available once the server has queued the run; a small run is answered before that.
+            </p>
+        }
         @if (blockedReason(); as why) {
             <p class="text-secondary mt-1 text-sm" role="status" data-testid="blocked-reason">{{ why }}</p>
         }
@@ -247,6 +253,8 @@ export class LinkAnalysisServerRunComponent {
 
     /** Emitted once for a COMPLETED Working Set run, never for any other state; an index run is summarised in this control instead. */
     readonly completed = output<GraphRunResult>();
+    /** Emitted when a run is started (any input), so a host drops the previous answer instead of showing it under a refusal. */
+    readonly started = output<void>();
 
     /** The Dataset picked when the Space has several indexes; '' = the first. */
     private readonly pickedDataset = signal('');
@@ -298,7 +306,7 @@ export class LinkAnalysisServerRunComponent {
                 headline: `${r.scores.length} node${r.scores.length === 1 ? '' : 's'} scored by in plus out links.`,
                 lines: (r.scores as { label: string; score: number }[])
                     .slice(0, 10)
-                    .map((x) => `${x.label}: ${x.score}`),
+                    .map((x) => `${x.label}: ${fmtScore(x.score)}`),
             };
         const nodes = r.nodes ?? [];
         const links = r.edges ?? [];
@@ -383,6 +391,7 @@ export class LinkAnalysisServerRunComponent {
         if (!investigationId) return;
         this.lastInput = input;
         this.reset();
+        this.started.emit();
         this.starting.set(true);
         this.startedAt = Date.now();
         const req: GraphRunRequest = {

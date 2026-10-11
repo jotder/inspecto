@@ -282,4 +282,25 @@ describe('LinkAnalysisServerRunComponent', () => {
         push(view('FAILED', { failure: 'IllegalStateException' }));
         await expectNoA11yViolations(el);
     });
+
+    it('while the server has not queued the run yet, Cancel is disabled and says why (LA-ALGO-UI-PARITY-1)', async () => {
+        const { click, q, push, el } = make();
+        click('run-on-server');
+        expect((q('cancel-run') as HTMLButtonElement).disabled).toBe(true);
+        expect(q('cancel-wait-reason')!.textContent).toMatch(/once the server has queued the run/);
+        await expectNoA11yViolations(el);
+        push(view('RUNNING'));
+        expect((q('cancel-run') as HTMLButtonElement).disabled).toBe(false);
+        expect(q('cancel-wait-reason')).toBeNull();
+    });
+
+    it('emits started on every start, so a host can drop the previous answer (LA-DEMO-POLISH-1)', () => {
+        const { click, fixture, push } = make();
+        let n = 0;
+        fixture.componentInstance.started.subscribe(() => n++);
+        click('run-on-server');
+        push(view('COMPLETED', { result: RESULT }));
+        click('run-on-server');
+        expect(n).toBe(2);
+    });
 });

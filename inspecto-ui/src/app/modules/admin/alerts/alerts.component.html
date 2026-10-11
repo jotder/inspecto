@@ -52,11 +52,11 @@
                 sourceName="alerts"
                 exportName="alerts"
                 stateKey="alerts-fired"
-                [rows]="alerts()"
+                [rows]="firedRows()"
                 [columns]="columnDefs"
                 [rowActions]="firedActions()"
                 [pinActions]="true"
-                [loading]="loading()"
+                [loading]="loading() || !rulesSettled()"
                 noRowsTitle="No alerts fired"
                 noRowsHint="Breaches of the armed alert rules will appear here."
             />
