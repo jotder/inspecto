@@ -138,13 +138,14 @@ public final class ExchangeRoutes implements RouteModule {
         if (ctx.root().config() == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
         java.nio.file.Path itemDir = ExchangeSnapshots.itemDir(ex.dir(), owner, item);
         ExchangeSnapshots.SnapshotMeta meta;
+        long startedAt = System.currentTimeMillis();   // the attempt's start orders outcomes across JVMs
         try {
             meta = ExchangeSnapshotSweep.publishFrom(ctx, ex.dir(), owner, item);
         } catch (Exception fail) {
-            ExchangeSnapshotSweep.recordOutcome(itemDir, trigger, null, fail, System.currentTimeMillis());
+            ExchangeSnapshotSweep.recordOutcome(itemDir, trigger, null, fail, startedAt);
             throw fail;
         }
-        ExchangeSnapshotSweep.recordOutcome(itemDir, trigger, meta, null, System.currentTimeMillis());
+        ExchangeSnapshotSweep.recordOutcome(itemDir, trigger, meta, null, startedAt);
         Event.Builder b = Event.builder(EventType.EXCHANGE_REFRESHED).source("exchange")
                 .message("refreshed dataset " + owner + "/" + item + " → " + meta.version())
                 .actor(ApiContext.actor(e)).actorType("user")

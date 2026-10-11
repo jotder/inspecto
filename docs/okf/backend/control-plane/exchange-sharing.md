@@ -80,9 +80,25 @@ below for the generalized rule (`Exchange.DERIVED_KINDS`) — a widget is just t
 `spaces/_shared/exchange/<owner>/<item>/v<epochMillis>/snapshot.parquet`, then atomically flips a
 sibling `current.toon` pointer (`ExchangeSnapshots`) — a reader never observes a half-written version.
 Freshness (`version`, `rows`, `refreshedAt`, Result Set columns) travels in `current.toon`, merged into
-every offer/metadata response as `freshness`. Versions are **monotonic**: the server mints
-`v<System.currentTimeMillis()>`, and any producer must match `/^v(\d+)$/` so versions stay comparable by
-the trailing integer.
+every offer/metadata response as `freshness`. Versions are **time-ordered**: the server mints
+`v<epochMillis>-<8 hex>` (`ExchangeSnapshots.newVersion`); pre-2026-10-11 snapshots carry the legacy
+`v<epochMillis>` and stay valid. Order is `ExchangeSnapshots.compareVersions` (numeric millis, then suffix),
+never a plain string sort; pins compare by equality only.
+
+**Multi-pod safety (`EXCHANGE-SNAPSHOT-MULTIPOD-1`, closed 2026-10-11).** Several JVMs sharing a store
+may publish the same due offer at once. There is no distributed lease. Instead, concurrent publishes are made harmless:
+(1) the random version suffix plus `Files.createDirectory` (never `createDirectories`) gives every publish its
+own version dir, and the temp file is `snapshot-<uuid>.parquet.tmp`. Same-millisecond publishes both
+succeed. (2) `writeCurrent` never moves `current.toon` to an older version than it names. (3) `prune` deletes
+a dir only if it is a version id, is neither the caller's version nor the one `current.toon` names, is
+outside the 2 newest, **and** was minted more than `PRUNE_GRACE_MILLIS` (30 min) ago. That last rule spares a
+peer's in-flight or not-yet-revealed version: 30 min is far above any publish's duration and below
+the shortest cadence. (4) `last-refresh.toon` is keyed by the attempt's **start** time `at`. An older outcome
+is dropped, and at an equal `at` a failure never replaces a success, so a slow older attempt's failure cannot
+overwrite a newer success. ⚠ The read-then-rename checks in (2) and (4) are only atomic within one JVM. Two
+JVMs can still interleave inside that microsecond window, which is acceptable because `current.toon` always
+names a complete version. Duplicate `EXCHANGE_REFRESHED` events from two pods remain possible. Pinned by
+`ExchangeSnapshotMultiPodTest`.
 
 **Published on approve.** `POST /exchange/grants/{id}/approve` publishes the first snapshot of every
 Dataset the approval activated in `snapshot` mode (`publishOnApprove`, reusing the same `publishSnapshot`

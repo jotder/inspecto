@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Publishes a versioned snapshot of an owner Space's Dataset into the Exchange — the S2 "no reprocessing"
+ * Publishes a versioned snapshot of an owner Space's Dataset into the Exchange â€” the S2 "no reprocessing"
  * data path. It resolves the owner's own Dataset ({@link DatasetRelation}, over the owner's local data
- * root — never a shared ref), {@code COPY}s it to a fresh
+ * root â€” never a shared ref), {@code COPY}s it to a fresh
  * {@code <_shared>/exchange/<owner>/<item>/<version>/snapshot.parquet}, captures its Result Set metadata,
  * then flips {@code current.toon} to the new version ({@link ExchangeSnapshots}). Reuses the
  * stage-and-atomic-reveal discipline of {@code MaterializeTask}, but keyed by {@code <version>/} dirs so
@@ -48,6 +48,12 @@ public final class ExchangeSnapshotWriter {
      */
     public static SnapshotMeta publish(Path sharedDir, String owner, Path ownerRegistry,
                                        Path ownerDataRoot, Path ownerViews, String item) throws Exception {
+        return publish(sharedDir, owner, ownerRegistry, ownerDataRoot, ownerViews, item, System.currentTimeMillis());
+    }
+
+    /** {@link #publish} at an explicit wall-clock {@code nowMillis} (the version time — a test seam). */
+    static SnapshotMeta publish(Path sharedDir, String owner, Path ownerRegistry, Path ownerDataRoot,
+                                Path ownerViews, String item, long nowMillis) throws Exception {
         Map<String, Object> dataset = new ComponentStore(ownerRegistry).get("dataset", item)
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("no dataset '" + item + "' to snapshot"));
@@ -55,10 +61,13 @@ public final class ExchangeSnapshotWriter {
         String relationSql = DatasetRelation.relationSql(dataset, ownerDataRoot, new ViewStore(ownerViews));
 
         Path itemDir = ExchangeSnapshots.itemDir(sharedDir, owner, item);
-        String version = "v" + System.currentTimeMillis();
+        // Collision-free across JVMs sharing the store (EXCHANGE-SNAPSHOT-MULTIPOD-1): millis keeps time order,
+        // the random suffix separates same-millisecond publishes; createDirectory fails rather than share a dir.
+        Files.createDirectories(itemDir);
+        String version = ExchangeSnapshots.newVersion(nowMillis);
         Path verDir = itemDir.resolve(version);
-        Files.createDirectories(verDir);
-        Path tmp = verDir.resolve("snapshot.parquet.tmp");
+        Files.createDirectory(verDir);
+        Path tmp = verDir.resolve("snapshot-" + java.util.UUID.randomUUID() + ".parquet.tmp");
         Path finalFile = verDir.resolve("snapshot.parquet");
 
         long rows;
@@ -79,8 +88,8 @@ public final class ExchangeSnapshotWriter {
         Files.move(tmp, finalFile, StandardCopyOption.ATOMIC_MOVE);
 
         SnapshotMeta meta = new SnapshotMeta(version, rows, Instant.now().toString(), columns);
-        ExchangeSnapshots.writeCurrent(itemDir, meta);        // atomic reveal
-        ExchangeSnapshots.prune(itemDir, version, KEEP_VERSIONS);
+        ExchangeSnapshots.writeCurrent(itemDir, meta);        // atomic reveal (never moves backwards)
+        ExchangeSnapshots.prune(itemDir, version, KEEP_VERSIONS, System.currentTimeMillis());
         return meta;
     }
 
