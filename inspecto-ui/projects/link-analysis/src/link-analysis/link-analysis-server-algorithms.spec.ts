@@ -14,6 +14,8 @@ import {
 import { ServerIdMap } from './graph-run-apply';
 import { summarizeGraphRun } from './graph-run-summary';
 import { LinkAnalysisServerAlgorithmsComponent } from './link-analysis-server-algorithms.component';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
+import { NodeRiskService } from './node-risk.service';
 
 /** DR-U11: every catalogue algorithm is reachable from one catalogue-driven panel; the answer is read by its result kind. */
 const MAP: ServerIdMap = {
@@ -57,7 +59,7 @@ const CATALOGUE = {
             needsNode: true,
             params: [{ name: 'direction', type: 'ENUM', default: 'both', allowed: ['out', 'in', 'both'] }],
         }),
-        // a list/map parameter the panel has no control for: API only
+        // list / map parameters with their own controls (weights, seeds, nodeScores)
         alg('propagatedRisk', {
             label: 'Propagated risk',
             cost: 'JOB',
@@ -98,6 +100,15 @@ function make(
         completed({ algorithm: 'kCore', kind: 'SCORES', dropped: 0, elapsedMs: 1, scores: [] }),
 ) {
     const run = vi.fn((r: unknown) => of(answer(r)));
+    const risk = {
+        table: vi.fn(() =>
+            Promise.resolve({
+                byKey: new Map([['a', { msisdn: 'a', indicator_score: 70 }]]),
+                columns: [],
+                truncated: false,
+            }),
+        ),
+    };
     TestBed.configureTestingModule({
         imports: [LinkAnalysisServerAlgorithmsComponent],
         providers: [
@@ -113,15 +124,21 @@ function make(
                     cancel: vi.fn(),
                 },
             },
+            { provide: NodeRiskService, useValue: risk },
+            {
+                provide: LinkAnalysisSettingsService,
+                useValue: { limits: signal({ propagatedRiskWeightsInForce: [1, 0.5] }) },
+            },
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisServerAlgorithmsComponent);
     fixture.componentRef.setInput('investigationId', 'inv');
     fixture.componentRef.setInput('serverIds', MAP);
     fixture.componentRef.setInput('nodeOptions', [{ id: 'c-a', label: 'A' }]);
+    fixture.componentRef.setInput('profileId', 'telecom');
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    return { fixture, c: fixture.componentInstance, run, el };
+    return { fixture, c: fixture.componentInstance, run, el, risk };
 }
 
 describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
@@ -141,25 +158,72 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         expect(el.querySelector('[data-testid=algo-count]')!.textContent).toContain('9 algorithms');
     });
 
-    it('marks an algorithm with a list or map parameter API only: no number field for it, Run held and said why', async () => {
-        const { fixture, c, el, run } = make();
-        expect(c.algorithmOptions().find((o) => o.value === 'propagatedRisk')!.label).toBe(
-            'Propagated risk (API only)',
-        );
-        expect(c.algorithmOptions().find((o) => o.value === 'pageRank')!.label).toBe('pageRank');
+    it('gives propagatedRisk real inputs: weights prefilled from the Space default, seeds from the canvas, nodeScores from indicators', async () => {
+        const { fixture, c, el, run, risk } = make();
+        expect(c.algorithmOptions().find((o) => o.value === 'propagatedRisk')!.label).toBe('Propagated risk');
         c.pick('propagatedRisk');
         fixture.detectChanges();
-        for (const name of ['nodeScores', 'seeds', 'weights'])
-            expect(el.querySelector(`[data-testid=param-${name}]`)).toBeNull();
-        expect(el.querySelector('[data-testid=param-direction]')).not.toBeNull();
-        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain(
-            'API only: this panel cannot edit nodeScores, seeds, weights yet',
-        );
-        const button = el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!;
-        expect(button.disabled).toBe(true);
-        button.click();
-        expect(run).not.toHaveBeenCalled();
+        const weights = el.querySelector<HTMLInputElement>('[data-testid=param-weights]')!;
+        expect(weights.value).toBe('1, 0.5'); // the Space's graph_run.propagated_risk_weights
+        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain('Fill nodeScores first');
+        weights.value = '1, 2';
+        weights.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        expect(el.querySelector('[role=alert]')!.textContent).toContain('from 0 to 1');
+        weights.value = '1, 0.4, 0.2';
+        weights.dispatchEvent(new Event('change'));
+        c.addId('seeds', 'c-a');
+        el.querySelector<HTMLButtonElement>('[data-testid=fill-nodeScores]')!.click();
+        await fixture.whenStable();
+        await Promise.resolve();
+        fixture.detectChanges();
+        expect(risk.table).toHaveBeenCalled();
+        expect(el.querySelector('[data-testid=param-nodeScores]')!.textContent).toContain('1 of 1 nodes');
+        el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
+        expect(run).toHaveBeenCalledWith({
+            investigationId: 'inv',
+            algorithm: 'propagatedRisk',
+            params: { weights: [1, 0.4, 0.2], seeds: ['a'], nodeScores: { a: 70 } },
+        });
         await expectNoA11yViolations(el);
+    });
+
+    it('shows a PROPAGATED_RISK answer as a ranked table whose factors expand, and highlights it', () => {
+        const { fixture, c, el } = make(() =>
+            completed({
+                algorithm: 'propagatedRisk',
+                kind: 'PROPAGATED_RISK',
+                dropped: 0,
+                elapsedMs: 1,
+                scores: [
+                    {
+                        id: 'b',
+                        label: 'B',
+                        score: 68.04,
+                        raw: 68.04,
+                        own: 40,
+                        contributors: 1,
+                        factors: [{ origin: 'a', distance: 3, weight: 0.35, contribution: 28.04 }],
+                    },
+                    { id: 'x', label: 'X', score: 0, raw: 0, own: 0, contributors: 0, factors: [] },
+                ],
+            }),
+        );
+        const emitted: unknown[] = [];
+        c.emphasisChange.subscribe((e) => emitted.push(e));
+        c.pick('propagatedRisk');
+        c.setNodeScores('nodeScores', { a: 80 });
+        fixture.detectChanges();
+        el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
+        fixture.detectChanges();
+        const table = el.querySelector('[data-testid=risk-table]')!;
+        expect(table.textContent).toContain('68');
+        expect(el.querySelector('[data-testid=algo-result]')!.textContent).toContain('1 node carry propagated risk');
+        Array.from(table.querySelectorAll('button'))[0].click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid=factors-b]')!.textContent).toContain('+28 from A, 3 hops, weight 0.35');
+        el.querySelector<HTMLButtonElement>('[data-testid=algo-highlight]')!.click();
+        expect(emitted).toEqual([{ nodeIds: ['c-b'], edgeIds: [] }]);
     });
 
     it('builds the parameter form from the descriptors and sends what was edited', () => {

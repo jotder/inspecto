@@ -203,6 +203,8 @@ import { LinkAnalysisInvestigationComponent } from './link-analysis-investigatio
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
+import { rawIdsOf } from './investigation-state';
+import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoPageHeaderComponent } from '@inspecto/core/components/page-header.component';
 
@@ -782,10 +784,19 @@ export class LinkAnalysisComponent implements OnInit {
     private readonly canvasSource = computed<G6GraphData | null>(() => this.investigation.canvas() ?? this.displayed());
     /** The link kinds the legend offers as chips: those of what the canvas draws, hidden ones included. */
     readonly legendLinkKinds = computed(() => legendEdgeKindsFor(this.canvasSource()));
-    /** What the canvas draws: {@link canvasSource} without the hidden link kinds. */
-    readonly canvasData = computed<G6GraphData | null>(() =>
-        hideLinkKinds(this.canvasSource(), this.hiddenLinkKinds()),
-    );
+    /** Nodes the node detail dialog's "Hide on canvas" took off the exploration canvas (presentation only, never a query). */
+    readonly hiddenNodeIds = signal<string[]>([]);
+    /** What the canvas draws: {@link canvasSource} without the hidden link kinds and the hidden nodes (with their links). */
+    readonly canvasData = computed<G6GraphData | null>(() => {
+        const g = hideLinkKinds(this.canvasSource(), this.hiddenLinkKinds());
+        const hidden = new Set(this.hiddenNodeIds());
+        if (!g || !hidden.size) return g;
+        return {
+            ...g,
+            nodes: g.nodes.filter((n) => !hidden.has(n.id)),
+            edges: g.edges.filter((e) => !hidden.has(e.source) && !hidden.has(e.target)),
+        };
+    });
 
     toggleLinkKind(kind: string): void {
         this.hiddenLinkKinds.update((hidden) => toggleHiddenKind(hidden, kind));
@@ -1695,30 +1706,62 @@ export class LinkAnalysisComponent implements OnInit {
             this.toggleSuperNode(id);
             return;
         }
-        // LA-10: while an Investigation is open a click picks the entity its ops act on (Investigation tab).
+        // LA-10: while an Investigation is open a click picks the entity its ops act on (Investigation tab); a click on
+        // the entity ALREADY picked opens its detail (Risk / Enrichment / Actions), the second-click convention.
         if (this.investigation.active()) {
             const picked = this.canvasData()?.nodes.find((n) => n.id === id);
-            if (picked) {
+            if (picked && this.investigation.selected()?.id !== id) {
                 this.investigation.selected.set(picked);
                 this.openInvestigation();
+                return;
             }
-            return;
+            if (!picked || !this.investigation.canvas()) return;
         }
-        const g = this.baseGraph();
+        this.openNodeDetail(id);
+    }
+
+    /** The node detail dialog: rows, branch/expand actions (exploration), and the Risk / Enrichment / Actions sections. */
+    private openNodeDetail(id: string): void {
+        const onInvestigation = this.investigation.canvas() !== null;
+        const g = onInvestigation ? this.canvasData() : this.baseGraph();
         const node = g?.nodes.find((n) => n.id === id);
         if (!g || !node) return;
         this.brush.fromLink([id], this.brushEntityTypes());
         const outgoing = g.edges.filter((e) => e.source === id);
         const incoming = g.edges.filter((e) => e.target === id);
-        const neighbors = [...new Set([...outgoing.map((e) => e.target), ...incoming.map((e) => e.source)])].map((n) =>
-            this.labelOf(n),
+        const labelIn = (n: string) => g.nodes.find((x) => x.id === n)?.data.label ?? this.labelOf(n);
+        const neighbors = [...new Set([...outgoing.map((e) => e.target), ...incoming.map((e) => e.source)])].map(
+            labelIn,
         );
         const collapsed = this.collapsedRoots().includes(id);
         const objectRef = node.data.objectRef;
         const source = this.graphSources.byId(this.sourceId());
+        const ids = this.serverIds();
+        const invId = this.graphRunInvestigationId();
+        const ws = this.investigation.workingSet();
+        const insight: NodeInsightContext = {
+            nodeId: id,
+            label: node.data.label,
+            key: rawIdsOf(node)[0] ?? node.data.label,
+            profileId: this.profileId() ?? 'generic',
+            entityType: this.profile().investigate?.entityType,
+            investigationId: invId,
+            graphKey: invId && ws ? `${invId}:${ws.hash}` : null,
+            serverId: ids?.serverNode(id) ?? null,
+            serverNodeIds: (this.canvasData()?.nodes ?? [])
+                .map((n) => ids?.serverNode(n.id))
+                .filter((x): x is string => !!x),
+            originLabel: (sid) => {
+                const cid = ids?.node(sid);
+                return cid ? labelIn(cid) : sid;
+            },
+            canRunGraph: this.canRunGraphOnServer(),
+            canManageLists: this.lens.canManageIncidents(),
+            canHide: !this.investigation.active(),
+        };
         this.dialog
             .open(ElementDetailDialog, {
-                width: '28rem',
+                width: '36rem',
                 data: {
                     title: node.data.label,
                     subtitle: node.data.kind,
@@ -1741,10 +1784,17 @@ export class LinkAnalysisComponent implements OnInit {
                         // LA-08: a node mapping's `attributes` values (raw), one row per column.
                         ...Object.entries(node.data.attrs ?? {}).map(([k, v]) => ({ label: k, value: v ?? '—' })),
                     ],
-                    branch: collapsed ? 'expand' : descendants(g, id).size ? 'collapse' : undefined,
+                    branch: onInvestigation
+                        ? undefined
+                        : collapsed
+                          ? 'expand'
+                          : descendants(g, id).size
+                            ? 'collapse'
+                            : undefined,
                     objectRef,
                     pivotViews: objectRef ? ['map'] : undefined,
-                    expandable: !!source?.expand,
+                    expandable: !onInvestigation && !!source?.expand,
+                    extension: { component: NodeInsightComponent, inputs: { ctx: insight } },
                 },
             })
             .afterClosed()
@@ -1753,6 +1803,7 @@ export class LinkAnalysisComponent implements OnInit {
                 else if (action === 'collapse') this.collapseBranch(id);
                 else if (action === 'expand') this.expandBranch(id);
                 else if (action === 'expand-neighbors') this.expandNode(id, node.data.label, node.data.spellings);
+                else if (action === 'hide') this.hiddenNodeIds.update((h) => (h.includes(id) ? h : [...h, id]));
                 else if (action === 'open-record' && objectRef) {
                     this.router.navigate(['/' + (objectRef.type === 'CASE' ? 'cases' : 'incidents'), objectRef.id]);
                 }

@@ -280,13 +280,17 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
 * **29 algorithms** (`Algorithm`), each with a cost class (SYNC / JOB, a hint) and a node ceiling (e.g. 500 for
   betweenness, 100,000 for shortest path) that is the inline-versus-job threshold, not a limit — the budget refuses.
   The toolbox has dedicated controls for 18 (*Run on server*) and 3 (*Run on index*); its catalogue-driven *All
-  algorithms (server)* panel runs every other one, EXCEPT an algorithm with a list/map parameter it has no control for
-  (today only `propagatedRisk`), which it labels *API only* with Run held and the reason stated.
+  algorithms (server)* panel runs every other one, `propagatedRisk` included (number-list, node-list and
+  fill-from-indicators controls for `DOUBLE_LIST` / `ID_LIST` / `SCORE_MAP`); only a parameter type it does not know
+  is labelled *API only* with Run held.
 * **`propagatedRisk`** (server-only, `GraphPropagation`, no TS twin; JOB, ceiling 1,000): `raw(n) = own(n) + Σ own(o) ×
   weights[d(o,n)]` over origins `o ≠ n` within `weights.size()` (≤ 6) shortest hops; `score = min(raw, 100)`. Params:
-  `nodeScores` (id → 0-100, request-only — nodes carry no attributes, so no `scoreAttribute`; no Space default yet),
+  `nodeScores` (id → 0-100, request-only — nodes carry no attributes, so no `scoreAttribute`),
   `seeds` (empty = every node with own > 0), `weights` (each in [0,1], default `[1, .6, .35, .15]`), `direction`. Each
   node returns its top 5 `factors` (origin, distance, weight, contribution) and `contributors` (the full count).
+* **Space setting `graph_run.propagated_risk_weights`** (1..6 numbers in [0,1]; absent = `[1.0, 0.6, 0.35, 0.15]`):
+  the weights a `propagatedRisk` run takes when its params state none; the start response echoes
+  `propagatedRiskWeights {weights, source: request | space}`; `GET /settings/link-analysis` echoes `propagatedRiskWeightsInForce`.
 * **Budgets** (`GraphRunService`): shipped default 50,000 nodes / 500,000 edges / 30 s; ceilings 500,000 / 5,000,000 /
   300 s (both are Space settings under `graphRun`, as are `index.threads` and `index.queue`). Size is checked before work, the deadline at `RunControl` checkpoints; overrun ends `BUDGET_EXCEEDED` with
   no result — never a silent cap.

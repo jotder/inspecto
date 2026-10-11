@@ -76,7 +76,11 @@ export interface LinkAnalysisLimits {
         queue: number | null;
         /** Items per list a run's result may carry (absent/null = 10 000). */
         maxResultItems?: number | null;
+        /** `propagatedRisk`'s default per-hop weights (1..6 numbers in [0,1]); absent/null = [1.0, 0.6, 0.35, 0.15]. */
+        propagatedRiskWeights?: number[] | null;
     } | null;
+    /** The `propagatedRisk` weights a run without `weights` takes - server-computed, read-only. */
+    propagatedRiskWeightsInForce?: number[];
     /**
      * D-3: the edge/node index knobs stated (`enabled` default false, `maxDiskBytes` 0 = no limit, versions kept, build
      * workers, waiting line); `null` = every one inherits. The form edits `enabled`, `threads`, `queue` and

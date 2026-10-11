@@ -1,4 +1,5 @@
 import { DecimalPipe } from '@angular/common';
+import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { RiskScorePanelComponent } from '@inspecto/core/components/risk-score-panel.component';
 import { AnomalyPanelComponent } from '@inspecto/core/components/anomaly-panel.component';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
@@ -298,6 +299,8 @@ export class LinkAnalysisToolboxComponent {
      */
     readonly workingSetNodes = input<number | null>(null);
     readonly serverIds = input<ServerIdMap | null>(null);
+    /** The domain profile, so *All algorithms* can fill `propagatedRisk`'s node scores from its indicators Dataset. */
+    readonly profileId = input<DomainProfileId | null>(null);
     /**
      * The server's per-algorithm `inlineNodeCeiling` (`GET /inv/graph/algorithms`), by algorithm id; null until it is
      * known. The selection algorithms have no browser cap, so the browser threshold is {@link selectionNodeCapValue}
