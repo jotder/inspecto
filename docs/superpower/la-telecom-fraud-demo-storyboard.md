@@ -129,8 +129,8 @@ history / actions over masked `POST /inv/reference-rows`, hub override + real co
 telecom pattern packs with pre-filled columns, `GET /objects/by-entity`). What is left is tracked as backlog row
 `LA-TELECOM-DEMO-1` (`docs/BACKLOG.md` §3.12): the live browser walk-through and the operator questions.
 
-Open operator question: keep `four_eyes_fan_out_above: 5` in the showcase (first suspect expand waits for
-`fm.manager`; the UI shows "waiting for approval") or raise it for the telecom demo.
+Decided 2026-10-11 (operator): KEEP `four_eyes_fan_out_above: 5` in the showcase. The first suspect expand waits for
+`fm.manager` (the UI shows "waiting for approval"); the demo script includes the `fm.manager` approval as the four-eyes beat.
 
 ## 6. Open items before this can be rehearsed
 
