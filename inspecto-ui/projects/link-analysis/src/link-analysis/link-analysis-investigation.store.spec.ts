@@ -420,7 +420,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
         }) as never);
 
         const ok = await store.investigateNumber({
-            projection: { ...P, datasetId: 'telecom_links' },
+            projection: { ...P, datasetId: 'telecom_links_dataset' },
             purpose: 'fraud alert 12',
             title: 'Suspect s',
             timeCol: 'last_seen',

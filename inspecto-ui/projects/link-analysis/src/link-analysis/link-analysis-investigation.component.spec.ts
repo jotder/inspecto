@@ -617,7 +617,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
             seed: '966501',
             profileId: 'telecom',
             projection: {
-                datasetId: 'telecom_links',
+                datasetId: 'telecom_links_dataset',
                 sourceCol: 'a_msisdn',
                 targetCol: 'b_msisdn',
                 entityType: 'msisdn',

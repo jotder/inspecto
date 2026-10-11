@@ -4,7 +4,7 @@ import { factorLine, indexByKey, keyChunks, nodeScoresFor, parseWeights, riskMap
 describe('node-risk', () => {
     it('maps the telecom profile to its indicators Dataset and nothing for the generic one', () => {
         expect(riskMappingFor('telecom')!.indicators).toMatchObject({
-            dataset: 'telecom_msisdn_indicators',
+            dataset: 'telecom_msisdn_indicators_dataset',
             keyCol: 'msisdn',
             scoreCol: 'indicator_score',
         });

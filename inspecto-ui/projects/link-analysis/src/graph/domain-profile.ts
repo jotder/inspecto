@@ -87,7 +87,8 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
         investigate: {
             entityType: 'msisdn',
             mapping: {
-                dataset: 'telecom_links',
+                // the Space's Dataset COMPONENT id (what LA_DATASETS lists), not the store name `telecom_links`
+                dataset: 'telecom_links_dataset',
                 sourceCol: 'a_msisdn',
                 targetCol: 'b_msisdn',
                 linkKindCol: 'link_kind',
