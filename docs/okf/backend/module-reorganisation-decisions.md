@@ -79,19 +79,19 @@ No general rule engine (a second language, a large dependency, a poor fit for se
 | **RBAC capability contribution** (P1-D3) | only 8 of 219 capabilities are module-exclusive (4 `exchange`, 4 `la-api`); moving them edits `Roles.CAN_*`, the `SEED` grants and the literal-only scanner guards, and makes the role vocabulary depend on the classpath. Capabilities therefore stay OUT of `provides` | a module with many exclusive capabilities appears (then a `CapabilityContributor` SPI in `auth-spi`, string literals only, because of the `Roles` / `CapabilityManifest` / contributor init cycle) |
 | **Renaming `ops` to `incidents`** | measured blast radius (~177 files / 484 lines in `inspecto-ops` alone, plus packages, SPA lines, docs) for a retitle | never needed: the `ops` id, packages and directory stay |
 | **In-flight cancellation** of a disabled module's Run (`MODULE-REORG-P4-3`) | needs a per-module start/stop lifecycle contract: a decision | a switchable module owns a long-lived subscription, or cancellation is requested |
-| **Workflow & SLA slice 2 step 2** (second governed source, `GovernedItemProvider` SPI) - **OPEN, decision owed** (research memo 2026-10-11, below; recommendation: answer "no demand" and close as declined) | no consumer has asked: a Break can already get a per-Break SLA by promotion (`POST /recon/promote`, `BREAK-INCIDENT-1`) into an Incident governed by the INCIDENT policy | demand for an SLA on never-promoted Breaks (the memo's Q1); step 1 shipped (`SlaDecisions` over a `GovernedItem` view in `inspecto-workflow`; ops keeps the writes, events and cap) |
+| **Workflow & SLA slice 2 step 2** (second governed source, `GovernedItemProvider` SPI) - **DECLINED 2026-10-11 (operator)** (research memo below is the revisit playbook) | no demand: a promoted Break already gets a per-Break SLA through `POST /recon/promote` (`BREAK-INCIDENT-1`) into an Incident governed by the INCIDENT sla-policy / escalation rules; no consumer has asked for SLAs on never-promoted Breaks | a named consumer wants an SLA on unpromoted Breaks (then the memo's plan applies, starting at Q2); step 1 shipped (`SlaDecisions` over a `GovernedItem` view in `inspecto-workflow`; ops keeps the writes, events and cap) |
 | Serving the OpenAPI document merged at boot; module-only schemas in fragments | the Personal build has no module fragments on its classpath and absent modules' paths must stay documented as 503 stubs | the Personal classpath question is answered |
 | Hand-authored EDITIONS capability rows as generated | a generated table that cannot express a decision makes its guard revert it | never; the module/add-on/posture/jar tables ARE generated |
 
-## Workflow & SLA slice 2 step 2 - research memo (2026-10-11, read-only) - decisions owed
-The archived plan's "P7 Workflow & SLA slice 2 as built" note is never edited; its stale claims are corrected here.
+## Workflow & SLA slice 2 step 2 - research memo (2026-10-11, read-only) - revisit playbook (step 2 DECLINED 2026-10-11)
+Declined by the operator 2026-10-11 (no demand; promote-to-Incident covers Breaks). The memo below is kept as the playbook **if revisited**; precondition to revisit: a named consumer wants an SLA on unpromoted Breaks. The archived plan's "P7 Workflow & SLA slice 2 as built" note is never edited; its stale claims are corrected here.
 - **Corrections to the stated blockers.** *Priority* is not needed (`SlaPolicy`'s `"*"` fallback, `SlaPolicy.java:33,39`;
   `SlaDecisions.java:65-67`). A *per-row version* is not needed (`ReconStateStore` serialises on a static JVM `LOCK`; the
   store is plain JSON via `AtomicFiles`, not signed). **A missed blocker:** `Workflow` is keyed by `ObjectType` too
   (`Workflow.java:35`, `fromComponent` :263-271; `GovernanceRegistry.Snapshot` :43,124; `SlaDecisions` :50,83), so a `kind`
   key change alone is not enough; the cheaper fix is a small `Lifecycle { initialState(); isTerminal(s) }` interface that
   `Workflow` implements.
-- **Why demand is the question.** A Break already gets a per-Break SLA through `POST /recon/promote` (`BREAK-INCIDENT-1`):
+- **Why demand was the question (answered: none).** A Break already gets a per-Break SLA through `POST /recon/promote` (`BREAK-INCIDENT-1`):
   the Incident is governed by the INCIDENT policy. A second source only adds an SLA on never-promoted Breaks.
 - **Candidate sources.** *Break* - viable: status `open/assigned/resolved/auto_closed`, assignee, `firstSeenAt`; add an
   optional `sla` attribute map; zero migration; no new module edge (recon already imports `com.gamma.workflow`; recon, ops
@@ -99,11 +99,11 @@ The archived plan's "P7 Workflow & SLA slice 2 as built" note is never edited; i
   and a compare-and-set in the FS and Pg stores; a provider in the governed `inspecto-la-api` would FAIL `check-module-deps`
   (`ALLOWED['inspecto-la-api']` lacks `inspecto-workflow`, `check-module-deps.mjs:38`): L, high risk. *Entity List entries* -
   not viable (a canonical-string set, no per-entry record).
-- **Recommendation.** Answer "no demand" and close step 2 as declined (a docs-only fix). If demand exists, Breaks in five
+- **Outcome.** Closed as declined 2026-10-11 (a docs-only fix). If revisited (demand exists), Breaks in five
   steps (~1.5 shifts): (1) re-key plus the `Lifecycle` seam (S); (2) a batch-shaped `GovernedItemProvider` SPI, a sweep via
   `ModuleGate`, `provides.governedKinds` and a per-sweep breach cap (S-M); (3) the Break `sla` field (S); (4) a recon
   provider kind `RECON_BREAK` that excludes promoted Breaks (M); (5) SPA and docs (S).
-- **Decisions owed (Q1-Q6).** Q1 is there demand for an SLA on unpromoted Breaks; Q2 which source; Q3 the known-kind set and
+- **Calls if revisited (Q1-Q6).** Q1 (demand for an SLA on unpromoted Breaks) was answered "no" 2026-10-11; Q2 which source; Q3 the known-kind set and
   the absent-module policy (inert, per P4e); Q4 event identity (reuse `OBJECT_SLA_BREACH` / `OBJECT_ESCALATED` with
   `objectType=<kind>`?); Q5 flood control (one recon run can open 50,000 Breaks; escalations are capped at 500 per sweep but
   breaches are uncapped, `ObjectService.java:81`); Q6 a batch SPI (a per-item update would rewrite a file of up to 200,000
@@ -118,4 +118,4 @@ Breaking changes are free on any surface (nothing after 3.x was in production): 
 - **The telecom-asn1 split packages** (`ingester`, `parse`) were first deliberate, then retired (P3g, `com.gamma.telecom.asn1`).
 
 ## Open rows (BACKLOG section Module architecture)
-`MODULE-REORG-1` (umbrella) - `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; Workflow & SLA second source: still open, decision owed - see the research memo above). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).
+`MODULE-REORG-1` (umbrella) - `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; the Workflow & SLA second source was declined 2026-10-11, see the memo above). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).
