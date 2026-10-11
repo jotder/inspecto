@@ -268,6 +268,40 @@ class TelecomLinksGoldenTest {
         assertEquals(Map.of("telecom_irsf_lines", "4.0", "telecom_simbox_lines", "6.0", "telecom_wangiri_lines", "2.0"), fired);
     }
 
+    /**
+     * The crm_kyc and hlr_eir feeds are registered Datasets (the node panel's Enrichment reads {@code crm_kyc} by
+     * msisdn): each loads from the template registry, its physicalRef is where the Pipeline lands the Parquet, the
+     * landed data has rows, and the sensitive columns carry their classifications.
+     */
+    @Test
+    void theCrmKycAndHlrEirFeedsAreRegisteredDatasetsOverTheLandedData() throws Exception {
+        Map<String, Map<String, Object>> byName = new HashMap<>();
+        for (var c : new ComponentStore(space.resolve("config/registry")).list("dataset")) byName.put(c.name(), c.content());
+        Map<String, Map<String, String>> expected = Map.of(
+                "crm_kyc", Map.of("msisdn", "MSISDN", "id_doc_hash", "PII", "address_hash", "PII", "account_holder", "ACCOUNT",
+                        "activation_date", "", "subscriber_type", "", "kyc_complete", ""),
+                "hlr_eir", Map.of("msisdn", "MSISDN", "imsi", "IMSI", "imei", "PII", "forwarding_to", "MSISDN", "sim_swap_at", ""));
+        for (var e : expected.entrySet()) {
+            String id = e.getKey();
+            Map<String, Object> ds = byName.get(id + "_dataset");
+            assertNotNull(ds, id + "_dataset is registered; got " + byName.keySet());
+            String ref = String.valueOf(ds.get("physicalRef"));
+            PipelineConfig pc = PipelineConfig.load(space.resolve("config/telecom/" + id + "_pipeline.toon").toString());
+            assertEquals(Path.of(pc.dirs().database()).toAbsolutePath().normalize(),
+                    space.resolve("data").resolve(ref).toAbsolutePath().normalize(), id + ": physicalRef is the landing store");
+            List<Map<String, Object>> landed = rows("SELECT msisdn FROM read_parquet('"
+                    + data.resolve(ref).toString().replace('\\', '/') + "/**/*.parquet')");
+            assertTrue(landed.size() > 2000, id + " has " + landed.size() + " rows");
+            Map<String, String> classes = new TreeMap<>();
+            for (Object col : (List<?>) ds.get("columns")) {
+                Map<?, ?> m = (Map<?, ?>) col;
+                Object c = m.get("classification");
+                classes.put(String.valueOf(m.get("name")), c == null ? "" : String.valueOf(c));
+            }
+            assertEquals(new TreeMap<>(e.getValue()), classes, id + " classifications");
+        }
+    }
+
     private static ConfigSource noPipelines() {
         return new ConfigSource() {
             @Override public List<PipelineConfig> pipelines() { return List.of(); }

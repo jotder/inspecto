@@ -1,0 +1,18 @@
+physicalRef: crm_kyc/database
+description: "Telecom Link Analysis showcase - the CRM / KYC subscriber register landed by the crm_kyc Pipeline, one row per home-network MSISDN (identity document and address hashes, customer id, activation day, subscriber type, KYC flag). Keyed on msisdn; the Link Analysis node panel's Enrichment section reads it. Synthetic."
+eventDate: activation_date
+columns[7]{name,type,classification}:
+  msisdn,string,MSISDN
+  id_doc_hash,string,PII
+  address_hash,string,PII
+  account_holder,string,ACCOUNT
+  activation_date,date,
+  subscriber_type,string,
+  kyc_complete,boolean,
+owner: fm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,fm.analyst,view
+  user,fm.manager,view
+  user,ra.analyst,view
+  user,demo.manager,view
