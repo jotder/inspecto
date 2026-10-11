@@ -19,6 +19,8 @@ import { entityListErrorMessage } from './investigation-state';
 export function chainMessage(err: unknown, fallback: string): string {
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     if (status === 500) return 'The chain did NOT verify — ' + apiErrorMessage(err, fallback);
+    // A 404 here is the import's mapping Dataset, never an Entity List: do not borrow the Entity List wording.
+    if (status === 404) return 'Not found — ' + apiErrorMessage(err, fallback);
     return entityListErrorMessage(
         err,
         fallback,
@@ -53,14 +55,16 @@ export function chainMessage(err: unknown, fallback: string): string {
             @if (head(); as h) {
                 <inspecto-alert variant="success" title="Chain verified">
                     The server re-checked every link of the chain on this read: {{ h.headSeq }} fact(s), none altered or
-                    missing in between. Cutting the END of a chain leaves a shorter valid chain, so note the head hash and
-                    compare it later.
+                    missing in between. Cutting the END of a chain leaves a shorter valid chain, so note the head hash
+                    and compare it later.
                 </inspecto-alert>
                 <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2" aria-label="Identity Fact log head">
                     <dt class="text-secondary">Head</dt>
                     <dd class="m-0 tabular-nums">fact {{ h.headSeq }}</dd>
                     <dt class="text-secondary">Head hash</dt>
-                    <dd class="m-0 break-all"><code>{{ h.headHash }}</code></dd>
+                    <dd class="m-0 break-all">
+                        <code>{{ h.headHash }}</code>
+                    </dd>
                     <dt class="text-secondary">Resolved groups</dt>
                     <dd class="m-0 tabular-nums">{{ h.groups.length }}</dd>
                 </dl>
@@ -103,8 +107,9 @@ export function chainMessage(err: unknown, fallback: string): string {
             </p>
             @if (imported(); as r) {
                 <inspecto-alert [variant]="r.imported ? 'success' : 'info'" title="Import result">
-                    {{ r.imported }} assertion(s) added from {{ r.rowsRead }} row(s) read{{ r.truncated ? ' (read truncated)' : '' }}.
-                    Skipped: {{ r.skipped.alreadyAsserted }} already asserted, {{ r.skipped.duplicate }} duplicate,
+                    {{ r.imported }} assertion(s) added from {{ r.rowsRead }} row(s) read{{
+                        r.truncated ? ' (read truncated)' : ''
+                    }}. Skipped: {{ r.skipped.alreadyAsserted }} already asserted, {{ r.skipped.duplicate }} duplicate,
                     {{ r.skipped.empty }} empty, {{ r.skipped.self }} self-pair.
                 </inspecto-alert>
             }

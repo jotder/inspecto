@@ -48,7 +48,9 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         const { f, c, el, inv } = create();
         await f.whenStable();
         (inv.listIdentityGroups as ReturnType<typeof vi.fn>).mockReturnValue(
-            throwError(() => new HttpErrorResponse({ status: 500, error: { error: 'identity fact log is broken at seq 3' } })),
+            throwError(
+                () => new HttpErrorResponse({ status: 500, error: { error: 'identity fact log is broken at seq 3' } }),
+            ),
         );
         await c.load();
         f.detectChanges();
@@ -94,6 +96,22 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         const { c, inv } = create();
         await c.import();
         expect(inv.importIdentities).not.toHaveBeenCalled();
+    });
+
+    it('names a missing mapping Dataset (404) without calling it an Entity List', async () => {
+        const { f, c, el } = create({
+            importIdentities: vi.fn(() =>
+                throwError(() => new HttpErrorResponse({ status: 404, error: { error: "no dataset 'nope'" } })),
+            ),
+        });
+        c.dataset.setValue('nope');
+        c.aCol.setValue('x');
+        c.bCol.setValue('y');
+        c.reason.setValue('r');
+        await c.import();
+        f.detectChanges();
+        expect(el.textContent).toContain("no dataset 'nope'");
+        expect(el.textContent).not.toContain('Entity List');
     });
 
     it('shows a refused import (422) in place', async () => {
