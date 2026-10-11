@@ -220,8 +220,7 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 
 Tracked in `ANOMALY-DETECTION-RESIDUALS-1`: the dashboard tile (the Widget layer lacks a Widget-level filter and
 a table row limit, and `/bi/query` does not mask entity keys in scores Datasets — a top-10 Widget stays out of
-templates until BI masks); pack golden extension (needs multi-week corpora); evidence rows; hour buckets; peer
-side grouping (`ANOMALY-PEER-GROUPING-1`, below); pane: day-by-day chart series (a preview
+templates until BI masks); pack golden extension (needs multi-week corpora); evidence rows; hour buckets; pane: day-by-day chart series (a preview
 response-shape change); the LA panel's Risk Score model gate. Later: an ML scorer behind the same explanation
 shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
@@ -238,13 +237,21 @@ score for entities without self history, flagged.
 
 **D-AD9 closure — measured 2026-10-11** (`PeerMedianBench`, `18e3b4d68`; `@Tag("bench")`, runs only with
 `-Dinspecto.bench=true`, skipped by default). `RobustStats` is sort-based (O(n log n); 1M values: 97 ms) and is
-not the cost. `AnomalyScoreEvaluator.PeerSide` rescans every entity once per cohort, O(cohorts × entities):
-fine for few or large cohorts (one 1M cohort: 3 s) but ~7 s at 200k entities in cohorts of 1,000, minutes at
-cohorts of 10 (timed out; ~199 s extrapolated), and 37 s (9.5 GB allocated) at 10k entities in cohorts of 10
-with `fallback: population`. The threshold used was > ~10 s at the 200k default cap (D-AD9 states none). A single
-grouping pass fixes it: group once per Feature into a cohort → values map and compute the population baseline
-once (cached), optionally quickselect; it touches `PeerSide` and `PeerBaseline.compute`, so it is sequenced after
-the NULL-cohort change. **Not built** — filed as P3 `ANOMALY-PEER-GROUPING-1`.
+not the cost. The old `AnomalyScoreEvaluator.PeerSide` rescanned every entity once per cohort, O(cohorts × entities):
+fine for few or large cohorts (one 1M cohort: 3 s) but ~8 s at 200k entities in cohorts of 1,000, minutes at
+cohorts of 10 (timed out; ~230 s extrapolated), and 45 s (9.5 GB allocated) at 10k entities in cohorts of 10
+with `fallback: population`. The threshold used was > ~10 s at the 200k default cap (D-AD9 states none).
+**Fixed 2026-10-11 (`ANOMALY-PEER-GROUPING-1`):** `PeerSide` groups once per Feature in a single pass
+(cohort → usable observations, cohort → per-day values, plus the population), and caches the population
+baseline (`PeerBaseline.Population`) and its usual level, shared by every cohort that falls back.
+`PeerBaseline.compute(members, population, label)` is the grouped entry; the map-based overload delegates to it.
+`RobustStats` stays sort-based (quickselect not needed). After, at 200k entities every shape is 1.0-1.6 s
+(cohorts of 10 min 30: 1.0 s; min 10: 1.3 s; with population fallback: 1.1 s, was ~16,900 s extrapolated;
+cohorts of 1,000: 1.1 s, was 8.2 s; one cohort of N: 1.6 s); 10k entities in cohorts of 10 with fallback:
+0.10 s, was 44.8 s (9.5 GB → 15 MB allocated). Behaviour is unchanged: the golden corpora pass without
+re-baselining and `PeerSideEquivalenceTest` compares the grouped side with the old scan (kept as a test-only
+reference) on randomised shapes (NULL cohorts, no-peers-row entities, fallback, a cohort named "population").
+`PeerMedianBench` now drives the real `PeerSide`.
 ⚠ Separate finding from the same session: at the default 1 GB sandbox memory cap the anomaly bucket query ran
 out of memory at ~20k entities × 29 days (it needed `-Dassist.sql.memory_limit=8GB`) and hit the 30 s sandbox
 timeout at 100k entities even with no peers. Not checked whether production sets the property.
