@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { EntityProjection, EntityTypeRef, G6Node, typedEntityKey } from '@inspecto/core/graph';
 import { InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
+import type { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { resolveEntityId } from '@inspecto/core/graph';
 import { ProjectedGraph, projectTriples } from './entity-projection';
 import { readSourceNote } from './index-source';
@@ -26,6 +27,8 @@ export interface InvestigationRef {
     targetType?: EntityTypeRef;
     /** Set on a fork (D-E4) — the Investigation it was re-ordered from. */
     parentId?: string;
+    /** The domain profile it was started under, so reopening it restores that profile (not Generic). */
+    profileId?: DomainProfileId;
 }
 
 /**

@@ -211,7 +211,7 @@
         @if (store.header(); as h) {
             <div class="flex items-start gap-1">
                 <div class="min-w-0">
-                    <div class="truncate font-semibold">{{ h.title || h.id }}</div>
+                    <div class="truncate font-semibold">{{ store.displayTitle() || h.id }}</div>
                     <div class="text-secondary text-xs">{{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}</div>
                 </div>
                 <button

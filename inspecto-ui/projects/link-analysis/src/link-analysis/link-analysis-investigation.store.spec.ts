@@ -12,6 +12,7 @@ import {
 import { EntityProjection } from '@inspecto/core/graph';
 import { entityId } from '@inspecto/core/graph';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { Router } from '@angular/router';
 import { degreeOutcomeMessage, degreeState } from './investigate-number';
 
 const P: EntityProjection = { datasetId: 'calls', sourceCol: 'A', targetCol: 'B', entityType: 'msisdn' };
@@ -104,6 +105,7 @@ function setup() {
         appendDraftOp: vi.fn(),
         undoDraft: vi.fn(),
         reorderInvestigation: vi.fn(),
+        workingSetRelation: vi.fn((): Observable<{ rows: Record<string, unknown>[] }> => of({ rows: [] })),
     };
     TestBed.configureTestingModule({ providers: [InvestigationSessionStore, { provide: InvService, useValue: inv }] });
     return { store: TestBed.inject(InvestigationSessionStore), inv, logs, sets, bases };
@@ -689,5 +691,56 @@ describe('InvestigationSessionStore - live-run fixes (la-showcase telecom)', () 
         await store.expandNextDegree({}, 4);
         expect(store.degreeOutcomes().at(-1)).toMatchObject({ degree: 2, admitted: 1 });
         expect(store.hubContacts().get('h')).toBe(650);
+    });
+});
+
+describe('InvestigationSessionStore - third live run (la-showcase telecom)', () => {
+    const hubSet = (): WorkingSet => ({
+        ...ws(['s']),
+        entities: [...ws(['s']).entities, { ...ws(['h']).entities[0], hop: 1, admittedBy: 2, highConnectivity: true }],
+    });
+
+    it("reads a flagged hub's contacts from the Working Set rows when this session did not run its step", async () => {
+        const { store, inv, logs, sets } = setup();
+        logs['inv-9'] = { header: header('inv-9'), entries: [], total: 0, truncated: false };
+        sets['inv-9'] = hubSet();
+        inv.workingSetRelation.mockImplementation(() =>
+            of({ rows: [{ entityId: 's', contacts: null }, { entityId: 'h', highConnectivity: true, contacts: 650 }] }),
+        );
+        await store.open('inv-9');
+        expect(inv.workingSetRelation).toHaveBeenCalledWith('inv-9', { of: 'entities', limit: 10_000 });
+        expect(store.hubContacts().get('h')).toBe(650);
+        // the same Working Set head is not read again on a poll
+        await store.reload();
+        expect(inv.workingSetRelation).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps ?investigation=<id> in the URL while one is open and drops it on close', async () => {
+        const { store, logs, sets } = setup();
+        const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        logs['inv-9'] = { header: header('inv-9'), entries: [], total: 0, truncated: false };
+        sets['inv-9'] = ws(['s']);
+        await store.open('inv-9');
+        TestBed.tick();
+        expect(nav).toHaveBeenLastCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { investigation: 'inv-9' }, replaceUrl: true }),
+        );
+        store.close();
+        TestBed.tick();
+        expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { investigation: null } }));
+    });
+
+    it('shows the typed title over a masked one and restores the profile from the bound Dataset', async () => {
+        const { store, inv, logs, sets } = setup();
+        inv.createInvestigation.mockImplementation(() => {
+            const h = { ...header('inv-1'), title: 'masked:0a1b', dataset: 'telecom_links_dataset' };
+            logs['inv-1'] = { header: h, entries: [], total: 0, truncated: false };
+            return of(h);
+        });
+        sets['inv-1'] = ws([]);
+        await store.start(P, 'p', 'Suspect 99979100001');
+        expect(store.displayTitle()).toBe('Suspect 99979100001');
+        expect(store.boundProfileId()).toBe('telecom');
     });
 });
