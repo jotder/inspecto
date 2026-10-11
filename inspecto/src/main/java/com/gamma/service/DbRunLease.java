@@ -351,7 +351,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
         else if (downSince == null) downSince = java.time.Instant.now();
         String msg = up ? null : String.valueOf(failure.getMessage());
         StoreHealth.live(space, liveFamily(), up, null,
-                up ? "lease database answered"
+                up ? "lease database answered" + foreignHolders()
                    : "lease database unreachable since " + downSince + " (no successful tick for "
                      + Duration.between(downSince, java.time.Instant.now()).toSeconds() + "s, kind "
                      + failureKind(failure) + ") - last error: " + msg);
@@ -365,6 +365,47 @@ final class DbRunLease implements RunLease, AutoCloseable {
             else log.warn("Run lease database ({}) unreachable (kind {}) - new runs cannot claim a lease: {}",
                     scope, failureKind(failure), msg);
         }
+    }
+
+    /**
+     * HA-LEASE-HOLDER-HEALTH-1: the unexpired leases some OTHER owner holds in this space/scope, as a detail suffix
+     * ({@code "; held by node-a: 'p' (last renewed 45s ago, expires in 15s)"}), empty when none or unreadable.
+     * Lets an operator watching only {@code /health/details} see a takeover wait: a holder whose renewal age keeps
+     * growing is dead and the lease frees when it reaches 0. The renewal instant is derived as
+     * {@code expires_at - ttl} (every renew writes {@code now + ttl}), so no schema change. Status is unchanged.
+     */
+    private String foreignHolders() {
+        String sql = "SELECT pipeline, owner, expires_at FROM " + TABLE + " WHERE space = ? AND scope = ? "
+                + "AND owner IS NOT NULL AND owner <> ? AND expires_at >= ? ORDER BY pipeline";
+        long now = System.currentTimeMillis();
+        try {
+            return src.with(conn -> {
+                StringBuilder sb = new StringBuilder();
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, space);
+                    ps.setString(2, scope);
+                    ps.setString(3, owner);
+                    ps.setLong(4, now);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        int n = 0;
+                        while (rs.next()) {
+                            if (++n > 5) { sb.append("; ..."); break; }
+                            sb.append(describeHolder(rs.getString(1), rs.getString(2), rs.getLong(3), ttlMs, now));
+                        }
+                    }
+                }
+                return sb.toString();
+            });
+        } catch (SQLException | RuntimeException e) {
+            return "";   // a diagnostic extra must never turn a healthy tick into a failure
+        }
+    }
+
+    static String describeHolder(String pipeline, String holder, long expiresAt, long ttlMs, long now) {
+        long renewedAgo = Math.max(0L, now - (expiresAt - ttlMs)) / 1000;
+        long expiresIn = Math.max(0L, expiresAt - now) / 1000;
+        return "; held by " + holder + ": '" + pipeline + "' (last renewed " + renewedAgo + "s ago, expires in "
+                + expiresIn + "s)";
     }
 
     /**
