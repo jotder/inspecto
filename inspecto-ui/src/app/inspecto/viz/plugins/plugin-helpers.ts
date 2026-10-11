@@ -57,8 +57,18 @@ export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
         filters: ctx.filters ?? null,
         // Categories follow ROW order, and an unordered GROUP BY comes back in hash order — months read
         // "Oct, Jan, Mar, … Nov, Dec". Order by the dimensions; a widget's `sort` option still re-sorts by value.
-        ...(groupBy.length ? { orderBy: groupBy.map((f) => ({ field: f, dir: 'asc' as const })) } : {}),
+        ...(groupBy.length ? { orderBy: categoryOrderBy(groupBy, ctx.options?.categoryOrder) } : {}),
     };
+}
+
+/** The ORDER BY of an XY query: alphabetical by the dimensions, or — when the widget set `options.categoryOrder` —
+ *  that term first (a hidden `agg` only for a column the result does not carry), the dimensions still breaking ties. */
+function categoryOrderBy(groupBy: string[], co: VizRenderOptions['categoryOrder']): NonNullable<QuerySpec['orderBy']> {
+    const alphabetical = groupBy.map((f) => ({ field: f, dir: 'asc' as const }));
+    if (!co?.field) return alphabetical;
+    const hidden = !groupBy.includes(co.field);
+    const term = { field: co.field, dir: co.dir, ...(hidden ? { agg: co.agg ?? ('min' as const) } : {}) };
+    return [term, ...alphabetical.filter((t) => t.field !== co.field)];
 }
 
 /** The `{grains}` fragment for the dimension channels that picked a real bucket (`auto` = none), or

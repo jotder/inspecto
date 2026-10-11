@@ -51,7 +51,8 @@ export class WidgetOptionsDialog {
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;
     /** Every option, minus the per-type ones belonging to another vizType. */
     readonly attributes = WIDGET_OPTION_ATTRIBUTES.filter(
-        (s) => !(s.key in WIDGET_OPTION_VIZ_TYPES) || WIDGET_OPTION_VIZ_TYPES[s.key] === this.input.vizType,
+        (s) =>
+            !(s.key in WIDGET_OPTION_VIZ_TYPES) || [WIDGET_OPTION_VIZ_TYPES[s.key]].flat().includes(this.input.vizType),
     );
 
     /** Current options mapped onto the flat attribute keys (axis/legend are flattened). */
@@ -95,6 +96,9 @@ export class WidgetOptionsDialog {
         gaugeMax: this.data.gauge?.max ?? null,
         tableSortField: this.data.tableSort?.field ?? '',
         tableSortDir: this.data.tableSort?.dir ?? 'desc',
+        categoryOrderField: this.data.categoryOrder?.field ?? '',
+        categoryOrderDir: this.data.categoryOrder?.dir ?? 'asc',
+        categoryOrderAgg: this.data.categoryOrder?.agg ?? 'min',
         rowLinkLabelField: this.data.rowLink?.labelField ?? '', // UIE-6 link text column
     };
 
@@ -218,6 +222,17 @@ export class WidgetOptionsDialog {
             const raw = v['tableSortField'];
             const field = typeof raw === 'string' ? raw.trim() : '';
             o.tableSort = field ? { field, dir: v['tableSortDir'] === 'asc' ? 'asc' : 'desc' } : undefined;
+        }
+        if ('categoryOrderField' in v) {
+            const raw = v['categoryOrderField'];
+            const field = typeof raw === 'string' ? raw.trim() : '';
+            o.categoryOrder = field
+                ? {
+                      field,
+                      dir: v['categoryOrderDir'] === 'desc' ? 'desc' : 'asc',
+                      ...(v['categoryOrderAgg'] === 'max' ? { agg: 'max' as const } : {}),
+                  }
+                : undefined;
         }
     }
 }

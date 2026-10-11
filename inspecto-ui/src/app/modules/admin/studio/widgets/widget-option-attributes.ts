@@ -303,6 +303,40 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
             { value: 'asc', label: 'Ascending (smallest first)' },
         ],
     },
+    // Bar / pie / funnel: the order the query returns the categories in (`options.categoryOrder`). A blank column keeps
+    // the default alphabetical order and writes nothing.
+    {
+        key: 'categoryOrderField',
+        label: 'Sort categories by',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        placeholder: 'A dimension, measure or Dataset column, e.g. stage_order',
+    },
+    {
+        key: 'categoryOrderDir',
+        label: 'Category sort direction',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'asc',
+        options: [
+            { value: 'asc', label: 'Ascending' },
+            { value: 'desc', label: 'Descending' },
+        ],
+    },
+    {
+        key: 'categoryOrderAgg',
+        label: 'Category sort: aggregate of a column not shown',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'min',
+        options: [
+            { value: 'min', label: 'Smallest value per category' },
+            { value: 'max', label: 'Largest value per category' },
+        ],
+    },
     // UIE-6: optional readable column carrying the link instead of the id; the id column is then hidden (still queried).
     {
         key: 'rowLinkLabelField',
@@ -314,11 +348,14 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     },
 ];
 
+/** The Visualization Types whose query is built by `buildXyQuery` and honours `options.categoryOrder`. */
+const CATEGORY_ORDER_VIZ_TYPES = ['bar', 'pie', 'funnel'] as const;
+
 /**
  * Options shown only for one Visualization Type (flat key → vizType). The dialog drops the others from its form,
  * and a dropped field leaves its stored value untouched.
  */
-export const WIDGET_OPTION_VIZ_TYPES: Record<string, string> = {
+export const WIDGET_OPTION_VIZ_TYPES: Record<string, string | readonly string[]> = {
     trendCompareBack: 'kpi-trend',
     progressMax: 'progress-list',
     treemapLimit: 'treemap',
@@ -330,5 +367,8 @@ export const WIDGET_OPTION_VIZ_TYPES: Record<string, string> = {
     gaugeMax: 'gauge',
     tableSortField: 'table',
     tableSortDir: 'table',
+    categoryOrderField: CATEGORY_ORDER_VIZ_TYPES,
+    categoryOrderDir: CATEGORY_ORDER_VIZ_TYPES,
+    categoryOrderAgg: CATEGORY_ORDER_VIZ_TYPES,
 };
 // ── end per-Visualization-Type options ──────────────────────────────────────────────────────────────────────

@@ -57,7 +57,9 @@ export interface QuerySpec {
     grains?: Record<string, TimeGrain>;
     measures: QueryMeasure[];
     filters?: ConditionGroup | null;
-    orderBy?: { field: string; dir: SortDir }[];
+    /** `agg` marks a hidden-aggregate term (CATEGORY-SORT-ORDER-1): `field` is a Dataset column NOT in the result,
+     *  ordered as `agg(field)` server-side while the grouping is unchanged. Absent = a result column. */
+    orderBy?: { field: string; dir: SortDir; agg?: 'min' | 'max' }[];
     limit?: number | null;
     /** A saved Query (R3) the Widget is bound to — the server aggregates over that query's result, read and
      *  rendered at run time, instead of the whole Dataset (QUERY-BOUND-WIDGET-1). Absent = the Dataset. */
@@ -197,6 +199,10 @@ export interface VizRenderOptions {
      *  that is neither is ignored. Distinct from `sort`, which reorders Chart.js categories client-side by value and
      *  which a table ignores. A grid header click still re-sorts the loaded rows client-side. */
     tableSort?: { field: string; dir: SortDir };
+    /** Bar / pie / funnel (the `buildXyQuery` charts): the order the QUERY returns the categories in, instead of the
+     *  default alphabetical. `field` is a grouped Dimension, a Measure id, or any Dataset column (ordered by `agg`, default
+     *  `min`, while the grouping stays unchanged — e.g. an ordinal `stage_order`). Distinct from `sort` (client-side, by value). */
+    categoryOrder?: { field: string; dir: SortDir; agg?: 'min' | 'max' };
     /** UIE-4, table only: a per-column format, keyed by result column id (`sum_exposure_sar`). */
     columnFormats?: Record<string, NumberFormat>;
     /** UIE-6, table only: the operational object each row describes. The `labelField` cell (else the `idField` cell)

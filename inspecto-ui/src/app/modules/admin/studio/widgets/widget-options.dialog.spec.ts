@@ -205,6 +205,44 @@ describe('WidgetOptionsDialog', () => {
     });
     // ── end Table sort ──
 
+    // ── Category order (CATEGORY-SORT-ORDER-1): bar / pie / funnel only ──
+    it('offers "Sort categories by" for a bar, round-trips it, and a blank column removes it', () => {
+        const { fixture, c, ref } = create({ categoryOrder: { field: 'stage_order', dir: 'asc' } }, 'bar');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sort categories by');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).categoryOrder).toEqual({
+            field: 'stage_order',
+            dir: 'asc',
+        });
+        c.schemaForm.form.patchValue({
+            categoryOrderField: ' stage_order ',
+            categoryOrderDir: 'desc',
+            categoryOrderAgg: 'max',
+        });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).categoryOrder).toEqual({
+            field: 'stage_order',
+            dir: 'desc',
+            agg: 'max',
+        });
+        c.schemaForm.form.patchValue({ categoryOrderField: '' });
+        c.save();
+        expect((ref.close.mock.calls[2][0] as WidgetOptions).categoryOrder).toBeUndefined();
+    });
+
+    it('hides "Sort categories by" for a table and keeps a stored one as-is', () => {
+        const { fixture, c, ref } = create({ categoryOrder: { field: 'x', dir: 'asc' } }, 'table');
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Sort categories by');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).categoryOrder).toEqual({ field: 'x', dir: 'asc' });
+    });
+
+    it('renders the category-order control with no a11y violations', async () => {
+        const { fixture } = create({}, 'bar');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+    // ── end Category order ──
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);
