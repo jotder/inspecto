@@ -1082,6 +1082,7 @@ describe('LinkAnalysisComponent', () => {
         await c.runPatternOnServer({ mapping: -1, stages: [], overInvestigation: true, timeCol: 'first_seen' });
         expect(call).toHaveBeenCalledWith(
             expect.objectContaining({
+                investigationId: 'inv-4', // ids answered as this Investigation's pseudonyms, as the canvas draws them
                 dataset: 'telecom_links',
                 sourceCol: 'a',
                 targetCol: 'b',
