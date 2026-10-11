@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { convertToParamMap, provideRouter, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { AlertRule, AlertsService, FiredAlert, LensService } from 'app/inspecto/api';
@@ -173,6 +173,30 @@ describe('AlertsComponent', () => {
         expect(c.rules()).toEqual([RULE]);
         expect(c.loading()).toBe(false);
         expect(fixture.nativeElement.textContent).toContain('Alert Rules');
+    });
+
+    it('holds the fired rows (and keeps the grid loading) until the armed rules answer (LA-DEMO-POLISH-1)', async () => {
+        const rules = new Subject<(typeof RULE)[]>();
+        const { fixture } = await create({ rules: () => rules });
+        const c = fixture.componentInstance;
+        expect(c.firedRows()).toEqual([]);
+        expect(c.rulesSettled()).toBe(false);
+        rules.next([RULE]);
+        rules.complete();
+        expect(c.firedRows()).toEqual([FIRED]);
+    });
+
+    it('still shows the fired rows when the rules route fails', async () => {
+        const { fixture } = await create({ rules: () => throwError(() => new HttpErrorResponse({ status: 500 })) });
+        expect(fixture.componentInstance.firedRows()).toEqual([FIRED]);
+    });
+
+    it('renders Message on one line with a tooltip, not autoHeight (LA-DEMO-POLISH-1)', async () => {
+        const { fixture } = await create();
+        const m = fixture.componentInstance.columnDefs.find((d) => d.field === 'message')!;
+        expect(m.autoHeight).toBeFalsy();
+        expect(m.wrapText).toBeFalsy();
+        expect(m.tooltipField).toBe('message');
     });
 
     it('a manual sweep reports fired count and reloads', async () => {

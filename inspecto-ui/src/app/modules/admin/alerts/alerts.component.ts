@@ -72,6 +72,13 @@ export class AlertsComponent implements OnInit {
     readonly alerts = signal<FiredAlert[]>([]);
     readonly rules = signal<AlertRule[]>([]);
     readonly loading = signal(false);
+    /**
+     * The armed rules have answered (or failed) for the current load. The fired grid gets its rows only then: its
+     * *Open Investigation* action is decided per row from `rules()` when the cell renders, and nothing re-renders the
+     * cells when rules land later - the action was missing (or the click hit a cell being replaced) on first load.
+     */
+    readonly rulesSettled = signal(false);
+    readonly firedRows = computed(() => (this.rulesSettled() ? this.alerts() : []));
     readonly loadError = signal(false);
     readonly evaluating = signal(false);
     readonly pending = signal<PendingAlertRule[]>([]);
@@ -139,13 +146,9 @@ export class AlertsComponent implements OnInit {
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
         { field: 'metric', headerName: 'Metric', minWidth: 140 },
         { field: 'value', headerName: 'Value', minWidth: 110 },
-        {
-            field: 'message',
-            headerName: 'Message',
-            flex: 3,
-            wrapText: true,
-            autoHeight: true,
-        },
+        // One line per row, full text in the tooltip: `autoHeight` measured the message before the flex columns were
+        // sized, so the first render drew very tall rows with empty cells until a search re-rendered them.
+        { field: 'message', headerName: 'Message', flex: 3, tooltipField: 'message' },
     ];
 
     readonly ruleColumnDefs: ColDef<AlertRule>[] = [
@@ -316,9 +319,16 @@ export class AlertsComponent implements OnInit {
                 this.loading.set(false);
             },
         });
+        this.rulesSettled.set(false);
         this.api.rules().subscribe({
-            next: (r) => this.rules.set(r),
-            error: () => this.rules.set([]),
+            next: (r) => {
+                this.rules.set(r);
+                this.rulesSettled.set(true);
+            },
+            error: () => {
+                this.rules.set([]);
+                this.rulesSettled.set(true);
+            },
         });
         this.api.pendingRules().subscribe({
             next: (p) => {
