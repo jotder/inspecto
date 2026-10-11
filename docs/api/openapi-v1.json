@@ -11966,7 +11966,7 @@
         },
         "responses" : {
           "200" : {
-            "description" : "Envelope-wrapped: data = {model, entityType, entityKey, keyMasked, found, periodStart, score, band, raw, elevatedThreshold, highThreshold, insufficientCount, saved, features[{feature, label, bucket, observed, baseline{kind, median, mad, points, season}, unit, zSelf, deviation, direction, weight, contribution, share, insufficient, reason, evidence[]?}]}"
+            "description" : "Envelope-wrapped: data = {model, entityType, entityKey, keyMasked, found, periodStart, score, band, raw, elevatedThreshold, highThreshold, insufficientCount, saved, series{featureId: {points[{day, value}] (the history window then the scored day, value null when absent), median, low, high (median +/- bandSpreads x max(scaled MAD, floor); null when the baseline is insufficient), bandSpreads}} (additive; {} when the entity is not found), features[{feature, label, bucket, observed, baseline{kind, median, mad, points, season}, unit, zSelf, deviation, direction, weight, contribution, share, insufficient, reason, evidence[]?}]}"
           },
           "400" : {
             "description" : "Not exactly one of model/content, a missing or over-long entityKey, or a bad asOf."

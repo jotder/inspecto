@@ -257,6 +257,7 @@ public final class AnomalyScoreRoutes implements RouteModule {
         List<Map<String, Object>> features = new ArrayList<>();
         if (s != null) for (AnomalyScorer.FeatureResult f : s.features()) features.add(f.toMap());
         out.put("features", features);
+        out.put("series", s == null ? Map.of() : run.series());
         return out;
     }
 }

@@ -47,6 +47,19 @@ export interface AnomalyFeatureResult {
     reason: string;
 }
 
+/**
+ * One feature's day-by-day series in a preview: the history window then the scored day (last), `value` null when
+ * absent, and the baseline's median with its usual band `median ± bandSpreads × max(MAD, floor)` — null while the
+ * baseline is insufficient.
+ */
+export interface AnomalyDaySeries {
+    points: { day: string; value: number | null }[];
+    median: number | null;
+    low: number | null;
+    high: number | null;
+    bandSpreads: number;
+}
+
 /** `POST /anomaly-scores/preview` — one entity scored now, nothing written; the key may come back masked. */
 export interface AnomalyScorePreview {
     model: string;
@@ -63,6 +76,8 @@ export interface AnomalyScorePreview {
     insufficientCount: number | null;
     saved: boolean;
     features: AnomalyFeatureResult[];
+    /** Per feature id; absent from an older server, `{}` when the entity was not found. */
+    series?: Record<string, AnomalyDaySeries>;
 }
 
 /**

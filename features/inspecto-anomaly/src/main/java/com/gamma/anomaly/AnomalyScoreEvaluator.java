@@ -87,10 +87,17 @@ public final class AnomalyScoreEvaluator {
     }
 
     /** The outcome of a run: the scored day and one score per entity. */
-    public record Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded, boolean evidenceTruncated) {
+    public record Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded, boolean evidenceTruncated,
+                      Map<String, Map<String, Object>> series) {
+        public Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded, boolean evidenceTruncated) {
+            this(period, scored, excluded, evidenceTruncated, Map.of());
+        }
         public Run(LocalDate period, List<AnomalyScorer.Scored> scored, int excluded) { this(period, scored, excluded, false); }
         public Run(LocalDate period, List<AnomalyScorer.Scored> scored) { this(period, scored, 0, false); }
     }
+
+    /** Half-width of the preview's band, in spreads: {@code median ± BAND_SPREADS × max(scaled MAD, floor)}. */
+    static final double BAND_SPREADS = 3.0;
 
     /** Score every entity any feature names, for the day before {@code asOf} (a day boundary, UTC). */
     public static Run evaluate(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql)
@@ -223,12 +230,15 @@ public final class AnomalyScoreEvaluator {
                         cohorts(model, relationSql, policy), histories, observedByFeature, statistic, scoredDay);
         // Pass 2: baselines and the score.
         List<AnomalyScorer.Scored> scored = new ArrayList<>(series.size());
+        Map<String, Map<String, Object>> daily = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Map<LocalDateTime, Double>>> e : histories.entrySet()) {
             if (scoreOnly != null && !scoreOnly.test(e.getKey())) continue;
             Map<String, AnomalyScorer.Input> inputs = new LinkedHashMap<>();
             for (AnomalyModel.Feature f : model.features()) {
                 Double observed = observedByFeature.get(f.id()).get(e.getKey());
                 Baseline self = statistic.compute(e.getValue().get(f.id()), scoredDay);
+                if (previewEntity != null && previewEntity.equals(e.getKey()))
+                    daily.put(f.id(), dailySeries(e.getValue().get(f.id()), scoredDay, observed, self, f.unit()));
                 if (peers == null) {
                     inputs.put(f.id(), new AnomalyScorer.Input(observed, self));
                 } else {
@@ -240,7 +250,39 @@ public final class AnomalyScoreEvaluator {
         }
         boolean evidenceTruncated = wantsEvidence
                 && attachEvidence(model, period, asOf, relationSql, policy, masker, previewEntity, maxEvidenceRows, scored);
-        return new Run(period, List.copyOf(scored), dropped.size(), evidenceTruncated);
+        return new Run(period, List.copyOf(scored), dropped.size(), evidenceTruncated, daily);
+    }
+
+    /**
+     * The preview's per-day series of ONE entity and feature: the zero-filled history, then the scored day, and the
+     * self baseline's {@code median} with a band {@code median ± }{@link #BAND_SPREADS}{@code × max(scaled MAD, floor)}.
+     * Numbers only - never a key or evidence value. The baseline is one level for the scored day's slot: with weekday
+     * seasonality it is the median of the same weekday, so the band is a reference line, not a per-day forecast.
+     * {@code median} / {@code low} / {@code high} are null when the baseline is insufficient.
+     */
+    private static Map<String, Object> dailySeries(Map<LocalDateTime, Double> history, LocalDateTime scoredDay,
+                                                   Double observed, Baseline self, double unit) {
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (Map.Entry<LocalDateTime, Double> d : new TreeMap<>(history).entrySet())
+            points.add(point(d.getKey(), d.getValue()));
+        points.add(point(scoredDay, observed));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("points", points);
+        boolean usable = !self.insufficient() && Double.isFinite(self.median());
+        double spread = usable ? Math.max(Double.isFinite(self.scaledMad()) ? self.scaledMad() : 0,
+                RobustStats.floor(self.median(), unit)) : 0;
+        out.put("median", usable ? self.median() : null);
+        out.put("low", usable ? self.median() - BAND_SPREADS * spread : null);
+        out.put("high", usable ? self.median() + BAND_SPREADS * spread : null);
+        out.put("bandSpreads", BAND_SPREADS);
+        return out;
+    }
+
+    private static Map<String, Object> point(LocalDateTime day, Double value) {
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("day", day.toLocalDate().toString());
+        p.put("value", value != null && Double.isFinite(value) ? value : null);
+        return p;
     }
 
     /**

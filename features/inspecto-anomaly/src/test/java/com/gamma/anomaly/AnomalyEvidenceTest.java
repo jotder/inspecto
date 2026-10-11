@@ -149,6 +149,7 @@ class AnomalyEvidenceTest {
         List<Map<String, Object>> evidence = p.scored().get(0).features().get(0).evidence();
         assertEquals(3, evidence.size());
         assertTrue(String.valueOf(evidence.get(0).get("msisdn")).startsWith(EvidenceMasker.TOKEN_PREFIX));
+        assertEquals(java.util.Set.of("data_mb", "sessions"), p.series().keySet(), "a per-day series per feature");
     }
 
     @Test
