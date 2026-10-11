@@ -7,21 +7,16 @@ import { MatInputModule } from '@angular/material/input';
 import {
     ANOMALY_DIRECTIONS,
     AnomalyFeatureDraft,
+    FEATURE_FILTER_OPS,
+    FeatureFilterDraft,
     MAX_FEATURES,
+    NO_VALUE_OPS,
     emptyFeature,
+    emptyFilter,
 } from 'app/inspecto/anomaly/anomaly-model-form';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { measureError } from 'app/inspecto/query/measure-grammar';
 import { ColumnMeta } from 'app/inspecto/query/query-types';
-import {
-    FEATURE_FILTER_OPS,
-    FeatureFilterDraft,
-    NO_VALUE_OPS,
-    emptyFilter,
-    filterDrafts,
-    unitText,
-    withFeatureFields,
-} from './anomaly-feature-fields';
 
 const measureValidator = (c: AbstractControl) => {
     const e = measureError(String(c.value ?? ''));
@@ -249,8 +244,9 @@ export class AnomalyModelFeaturesComponent implements OnInit {
             measure: [f.measure, [Validators.required, measureValidator]],
             direction: [f.direction || 'up', Validators.required],
             weight: [f.weight, [Validators.required, Validators.pattern(/^\s*\d*\.?\d+\s*$/)]],
-            unit: [unitText(f.extra ?? {}), unitValidator],
-            filters: this.fb.array<FormGroup>(filterDrafts(f.extra ?? {}).map((d) => this.filterRow(d))),
+            unit: [f.unit, unitValidator],
+            storedUnit: [f.storedUnit],
+            filters: this.fb.array<FormGroup>(f.filters.map((d) => this.filterRow(d))),
             extra: [{ ...(f.extra ?? {}) }],
         });
         g.controls['dataset'].valueChanges.subscribe((d) => this.loadColumns(String(d ?? '')));
@@ -361,16 +357,15 @@ export class AnomalyModelFeaturesComponent implements OnInit {
                 measure: String(v.measure ?? ''),
                 direction: String(v.direction ?? 'up'),
                 weight: String(v.weight ?? ''),
-                extra: withFeatureFields(
-                    (v.extra ?? {}) as Record<string, unknown>,
-                    ((v.filters ?? []) as Record<string, unknown>[]).map((f) => ({
-                        field: String(f['field'] ?? ''),
-                        op: String(f['op'] ?? ''),
-                        value: String(f['value'] ?? ''),
-                        raw: (f['raw'] ?? {}) as Record<string, unknown>,
-                    })),
-                    String(v.unit ?? ''),
-                ),
+                filters: ((v.filters ?? []) as Record<string, unknown>[]).map((f) => ({
+                    field: String(f['field'] ?? ''),
+                    op: String(f['op'] ?? ''),
+                    value: String(f['value'] ?? ''),
+                    raw: (f['raw'] ?? {}) as Record<string, unknown>,
+                })),
+                unit: String(v.unit ?? ''),
+                storedUnit: v.storedUnit,
+                extra: (v.extra ?? {}) as Record<string, unknown>,
             };
         });
     }
