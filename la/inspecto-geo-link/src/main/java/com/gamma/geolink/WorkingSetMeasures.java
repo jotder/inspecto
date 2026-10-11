@@ -52,7 +52,7 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
     private static final Logger log = LoggerFactory.getLogger(WorkingSetMeasures.class);
 
     /** The columns {@code sum}/{@code avg}/{@code min}/{@code max} may aggregate. */
-    static final Set<String> NUMERIC = Set.of("hop", "opSeq", "count");
+    static final Set<String> NUMERIC = Set.of("hop", "opSeq", "count", "contacts");
 
     /** The declared set every Investigation answers: {@code {name, relation, measure}}. */
     static final List<List<String>> DECLARED = List.of(

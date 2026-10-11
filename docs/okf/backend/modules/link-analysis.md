@@ -172,16 +172,28 @@ Design rules visible in the dependency graph:
   refuse an absent `expandHubs` id: an override only lifts a hold, an absent id has nothing to hold, so ignoring it
   cannot widen the read (fork and template ops were validated when first appended; an approval's were validated at
   request). One "nothing to expand" refusal names the held hubs everywhere; an approval whose frontier is all newly
-  flagged says so (409) rather than "left the Working Set". The hub degree is still a flat statement when the index
-  answered the rows — the index's folded buckets would serve it, but that read has not been added.
+  flagged says so (409) rather than "left the Working Set".
+  *Degree surfaced + from the index (2026-10-11, as built):* the sealed degree now reaches the client, always from the
+  SEALED read, never recomputed: the evaluator keeps `State.hubDegree` (id → `read.hubs[].degree` of the step that
+  flagged it; dropped with the entity on exclude) OUTSIDE `toMap()`/`hash()`, so hashes are unchanged; the Working Set
+  entities relation gains column `contacts` (the degree when `highConnectivity`, else null; numeric for measures); the
+  step result's `read` and the log view's `read` summary carry `hubs [{id, degree}]` (ids masked like every other id).
+  The read also seals `hubDegreeSource: index|flat` (beside `hubs`, not in the rung, so a reread's rung is unchanged).
+  `index` when the edge index SERVED the rows and is not stale: `IndexedExpand` counts the degree from the same
+  version (`IndexReader.distinctCounterparties`: both sides per candidate, allowed kinds, excluded counterparties
+  pruned — exactly the flat definition; a served rung has no window). Otherwise (fallback, stale-served, window etc.)
+  the flat statement as before. Parity-tested rung by rung (`ControlApiInvestigationHubDegreeTest`). Old logs: no
+  `hubDegreeSource` (and, before suppression, no `hubs`) — the fields are absent and replay matches.
 * **Events weighting (2026-10-11).** Optional header binding `eventsCol` (create / template instantiate; an
   INTEGER-family column, 422 otherwise; key absent when unbound, so an unweighted header and every older one is
   byte-identical). When set, the expand CTE's pair weight is `CAST(SUM(COALESCE(CAST(eventsCol AS BIGINT), 1)) AS
   BIGINT)` instead of `COUNT(*)` — a NULL count is one row's worth — and that weight drives `minEvents`, the
   `maxFanOut` rank, the budget order and the sealed `count`. `minDistinctDays` and the degree checks
-  (`candidateDegree*`, hub degree: distinct counterparties) are unchanged. The edge index folds rows, so a weighted
-  rung always falls back to the flat read with `read.fallback {reason: rung_not_indexable, details: "...events
-  column..."}` (when an index exists; never a silently wrong count). Templates carry `eventsCol` in `roles` only
+  (`candidateDegree*`, hub degree: distinct counterparties) are unchanged. A weighted rung is served from the edge
+  index when an index's `weightCol` equals `eventsCol` (case-insensitive): the folds sum
+  `CAST(SUM(COALESCE(CAST(w AS BIGINT), 1)) AS BIGINT)` (fingerprint parity with the flat SUM tested); otherwise it
+  falls back with `read.fallback {reason: rung_not_indexable, details: "...which no index carries as its weightCol"}`
+  (never a silently wrong count). Caveat: the index stores `w` as DOUBLE, so an integer count above 2^53 could round. Templates carry `eventsCol` in `roles` only
   when bound; the Dossier names it in the method statement.
 
 ### 3.2 InvestigationStore port and its two backends
@@ -283,7 +295,9 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
   idle pool of 4 per version, siblings evicted unless pinned. Parquet is the only persisted form — no `.duckdb` file.
 * **What reads from it** (`IndexedRead` gate in la-api: `index.enabled` (default ON since 2026-10-10; only an explicit `false` disables) + a matching published index
   + staleness gate, else a closed fallback `Reason`): `recursive-paths` (`IndexedTraversal`, depth ≤ 2, frontier
-  ≤ 20), neighbours, simple Investigation `expand` (byte-identical fingerprint to the flat read), temporal, and Graph
+  ≤ 20), neighbours, simple Investigation `expand` (byte-identical fingerprint to the flat read; weighted when the
+  mapping's `weightCol` is the Investigation's `eventsCol`; the supernode hub degree from the same version when fresh —
+  `read.hubDegreeSource`, §3.1), temporal, and Graph
   Run with `input: "index"`. A response never mixes index and flat answers.
 * **Scheduled builds:** the `la.index.build` Job → `link-index` Platform Service → `ScheduledLinkIndexBuilder`
   (geo-link) → `ScheduledIndexBuild` (la-api), principal `index-build:<job>` holding only `canBuildLinkIndex`,

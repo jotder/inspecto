@@ -44,10 +44,23 @@ final class IndexedExpand {
 
     record Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> frontier,
                    List<String> excluded, List<String> kinds, String direction, long minEvents, Integer fanOut, int budget,
-                   boolean windowed, boolean minDays, boolean degreeBounded, boolean merged, boolean weighted) { }
+                   boolean windowed, boolean minDays, boolean degreeBounded, boolean merged, String eventsCol,
+                   Set<String> admitted, Integer hubThreshold) {
+        /** The rung without supernode suppression (no hub degree asked of the index). */
+        Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> frontier, List<String> excluded,
+                List<String> kinds, String direction, long minEvents, Integer fanOut, int budget, boolean windowed, boolean minDays,
+                boolean degreeBounded, boolean merged, String eventsCol) {
+            this(datasetId, sourceCol, targetCol, kindCol, frontier, excluded, kinds, direction, minEvents, fanOut, budget, windowed,
+                    minDays, degreeBounded, merged, eventsCol, Set.of(), null);
+        }
+    }
 
-    /** {@code rows} are {@code {source, target, kind, count}}; {@code capped} is how many eligible links the fan-out cap cut. */
-    record Result(List<Map<String, Object>> rows, boolean truncated, long capped) { }
+    /**
+     * {@code rows} are {@code {source, target, kind, count}}; {@code capped} is how many eligible links the fan-out cap cut;
+     * {@code hubs} the supernode check's {@code [{id, degree}]} counted from the SAME index version, or null when it was not
+     * asked for or the index was served stale (the caller then counts it over the flat Dataset).
+     */
+    record Result(List<Map<String, Object>> rows, boolean truncated, long capped, List<Map<String, Object>> hubs) { }
 
     private record Pair(String s, String t, String k) { }
 
@@ -59,8 +72,6 @@ final class IndexedExpand {
         if (rq.minDays()) return "the rung has minDistinctDays";
         if (rq.degreeBounded()) return "the rung bounds candidate degree";
         if (rq.merged()) return "the rung is a merged traversal";
-        // the index folds ROWS; an Investigation bound to an eventsCol weighs a pair by SUM(eventsCol), which the index does not carry
-        if (rq.weighted()) return "the Investigation weighs links by an events column, which the index does not carry";
         if (rq.frontier().size() > FRONTIER_CAP) return "the frontier has " + rq.frontier().size() + " entities (the index serves at most " + FRONTIER_CAP + ")";
         if (new HashSet<>(rq.frontier()).size() != rq.frontier().size()) return "the frontier repeats an entity";
         if (rq.kinds() != null && (rq.kinds().isEmpty() || rq.kindCol() == null)) return "linkKinds cannot be applied";
@@ -79,14 +90,20 @@ final class IndexedExpand {
         Selection sel = IndexedRead.select(writeRoot, dataRoot, relationSql, rq.datasetId(), rq.sourceCol(), rq.targetCol(), (m, utc) -> {
             if (why != null) return Fitted.no(Reason.rung_not_indexable);
             if (rq.kindCol() != null && !rq.kindCol().equalsIgnoreCase(m.kindColumn())) return Fitted.no(Reason.column_not_indexed);
+            // an Investigation bound to an eventsCol weighs a pair by SUM(eventsCol): served only when the index carries that column as its weight
+            if (rq.eventsCol() != null && !rq.eventsCol().equalsIgnoreCase(m.weightColumn())) return Fitted.no(Reason.rung_not_indexable);
             return Fitted.ok(null);
         }, pinned);
         if (!sel.usable()) {
             Outcome<Result> o = sel.flat();
-            return o.reason() == Reason.rung_not_indexable ? Outcome.flat(Reason.rung_not_indexable, why) : o;
+            return o.reason() == Reason.rung_not_indexable ? Outcome.flat(Reason.rung_not_indexable, why != null ? why
+                    : "the Investigation weighs links by events column '" + rq.eventsCol() + "', which no index carries as its weightCol") : o;
         }
         try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), policy)) {
-            return sel.served(read(reader, rq));
+            Result r = read(reader, rq);
+            // supernode degree from the same version - only while it is fresh: a stale index misses rows the flat count would see
+            if (rq.hubThreshold() != null && !sel.stale()) r = new Result(r.rows(), r.truncated(), r.capped(), hubs(reader, rq, r.rows()));
+            return sel.served(r);
         } catch (SQLException | IOException | RuntimeException unreadable) {
             return Outcome.flat(Reason.index_read_failed);
         }
@@ -100,8 +117,9 @@ final class IndexedExpand {
         Map<Pair, Long> pairs = new LinkedHashMap<>();                                       // the pair is wholly in each end's own bucket
         for (String f : fr) {
             List<Folded> folded = new ArrayList<>();
-            if (out) folded.addAll(reader.fold(f, Side.OUT, extra, rq.kinds(), null));
-            if (in) folded.addAll(reader.fold(f, Side.IN, extra, rq.kinds(), null));
+            boolean w = rq.eventsCol() != null;
+            if (out) folded.addAll(reader.fold(f, Side.OUT, extra, rq.kinds(), null, List.of(), w));
+            if (in) folded.addAll(reader.fold(f, Side.IN, extra, rq.kinds(), null, List.of(), w));
             for (Folded p : folded) {
                 if (excluded.contains(p.source()) || excluded.contains(p.target())) continue;   // prune, then expand
                 pairs.putIfAbsent(new Pair(p.source(), p.target(), extra.isEmpty() ? null : p.extras().get(0)), p.count());
@@ -146,7 +164,33 @@ final class IndexedExpand {
             m.put("count", e.getValue());
             rows.add(m);
         }
-        return new Result(rows, truncated, rows.isEmpty() ? 0 : capped);                     // the flat statement reports `capped` on a row
+        return new Result(rows, truncated, rows.isEmpty() ? 0 : capped, null);               // the flat statement reports `capped` on a row
+    }
+
+    /**
+     * Supernode suppression from the index - {@code InvestigationRoutes.hubs} over the folded links: the endpoints of {@code rows}
+     * outside the frontier and the admitted set, with their distinct-counterparty degree over both sides (allowed kinds,
+     * excluded counterparties pruned) above the threshold, as {@code [{id, degree}]} sorted by id (DuckDB's VARCHAR order).
+     */
+    private static List<Map<String, Object>> hubs(IndexReader reader, Request rq, List<Map<String, Object>> rows) throws SQLException {
+        java.util.TreeSet<String> candidates = new java.util.TreeSet<>(IndexedExpand::bytes);
+        for (Map<String, Object> r : rows)
+            for (String end : List.of("source", "target"))
+                if (r.get(end) != null) candidates.add(String.valueOf(r.get(end)));
+        candidates.removeAll(rq.frontier());
+        candidates.removeAll(rq.admitted());
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (candidates.isEmpty()) return out;
+        Map<String, Long> degree = reader.distinctCounterparties(candidates, rq.kinds(), rq.excluded());
+        for (String id : candidates) {
+            Long d = degree.get(id);
+            if (d == null || d <= rq.hubThreshold()) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", id);
+            m.put("degree", d);
+            out.add(m);
+        }
+        return out;
     }
 
     /** DuckDB's VARCHAR order: unsigned bytes of the UTF-8; NULL first. */

@@ -820,6 +820,8 @@ public final class InvestigationRoutes implements RouteModule {
                     summary.put(k, r.get(k));
                 if (r.get("index") != null) summary.put("index", r.get("index"));          // which store answered: only when the index did
                 if (r.get("fallback") != null) summary.put("fallback", r.get("fallback"));   // ...or why the flat Dataset did
+                if (r.get("hubs") != null) summary.put("hubs", r.get("hubs"));   // supernode suppression: the SEALED [{id, degree}] (masked below)
+                if (r.get("hubDegreeSource") != null) summary.put("hubDegreeSource", r.get("hubDegreeSource"));
                 out.put("read", summary);
             }
             if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // ...and a diff's item lists
@@ -914,6 +916,8 @@ public final class InvestigationRoutes implements RouteModule {
             if (read.get("hubs") instanceof List<?> hubs) {   // supernode suppression: how many this step left flagged in the Working Set
                 long flagged = hubs.stream().filter(o -> o instanceof Map<?, ?> m && after.highConnectivity.contains(String.valueOf(m.get("id")))).count();
                 r.put("hubsFlagged", flagged);
+                r.put("hubs", hubs);   // the sealed [{id, degree}]: the degree each candidate was flagged at
+                if (read.get("hubDegreeSource") != null) r.put("hubDegreeSource", read.get("hubDegreeSource"));
             }
             if (read.get("index") != null) r.put("index", read.get("index"));   // D-3 step 6: only when the index answered
             if (read.get("fallback") != null) r.put("fallback", read.get("fallback"));   // only when it fell back, and why
@@ -1141,7 +1145,9 @@ public final class InvestigationRoutes implements RouteModule {
                     String.valueOf(hdr.get("sourceCol")), String.valueOf(hdr.get("targetCol")),
                     hdr.get("linkKindCol") == null ? null : String.valueOf(hdr.get("linkKindCol")), frontier, excluded, kinds,
                     direction, ((Number) query.get("minEvents")).longValue(), fanOut, budget, window != null, minDays != null,
-                    degMin != null || degMax != null, query.get("merged") != null, hdr.get("eventsCol") != null), InvRoutes.traversalPolicy(), pins);
+                    degMin != null || degMax != null, query.get("merged") != null,
+                    hdr.get("eventsCol") == null ? null : String.valueOf(hdr.get("eventsCol")), admitted,
+                    query.get("hubThreshold") instanceof Number t ? t.intValue() : null), InvRoutes.traversalPolicy(), pins);
             if (indexed.served()) {
                 rows = new ArrayList<>(indexed.result().rows());
                 truncated = indexed.result().truncated();
@@ -1231,8 +1237,14 @@ public final class InvestigationRoutes implements RouteModule {
         if (indexed != null && indexed.served()) read.put("index", indexed.readIndex());
         else if (indexed != null) read.put("fallback", indexed.readFallback());   // why the flat Dataset answered; never in the fingerprint
         // Supernode suppression: sealed beside the rows (absent on a rung with no hubThreshold - every read before it existed)
-        if (query.get("hubThreshold") instanceof Number t)
-            read.put("hubs", hubs(inv, relationSql, rows, frontier, admitted, kinds, excluded, window, timed, t.intValue()));
+        // The degree comes from the index only when it served these rows FRESH (same version, kinds and exclusions, no window);
+        // otherwise one flat statement. Which one is recorded, never part of the fingerprint.
+        if (query.get("hubThreshold") instanceof Number t) {
+            boolean fromIndex = indexed != null && indexed.served() && indexed.result().hubs() != null;
+            read.put("hubs", fromIndex ? indexed.result().hubs()
+                    : hubs(inv, relationSql, rows, frontier, admitted, kinds, excluded, window, timed, t.intValue()));
+            read.put("hubDegreeSource", fromIndex ? "index" : "flat");
+        }
         return read;
     }
 
@@ -1240,7 +1252,8 @@ public final class InvestigationRoutes implements RouteModule {
      * Supernode suppression — the endpoints of {@code rows} outside the frontier whose distinct-contact degree exceeds
      * {@code threshold}, as {@code [{id, degree}]} sorted by id. The degree is counted exactly as {@code candidateDegreeMax}
      * counts it (distinct counterparties over the rung's events: both directions, allowed link kinds, excluded entities
-     * pruned, inside the window) by one flat statement over the Dataset, whichever source answered the rows; the rows and
+     * pruned, inside the window) by one flat statement over the Dataset - used unless the index served the rows fresh
+     * ({@link IndexedExpand} then counts it from the same version, {@code read.hubDegreeSource}); the rows and
      * their fingerprint are untouched. Only entities THIS step adds are candidates: one {@code admitted} before the step (a
      * seed outside the frontier included) is never newly flagged by another frontier's rows. The evaluator still flags every
      * sealed id in the Working Set, so logs sealed before this rule replay to their recorded hashes.
