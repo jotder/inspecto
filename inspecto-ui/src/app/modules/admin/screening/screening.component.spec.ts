@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -8,6 +9,7 @@ import { LensService, ScreeningHit, ScreeningService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
+import { CheckNameDialog } from './check-name.dialog';
 import { allowedDecisions, hitTone, ScreeningComponent, scorePercent } from './screening.component';
 
 const HIT: ScreeningHit = {
@@ -138,5 +140,15 @@ describe('ScreeningComponent', () => {
         expect(hitTone('open')).toBe('info');
         expect(scorePercent(0.85)).toBe('85 %');
         expect(scorePercent(undefined)).toBe('');
+    });
+
+    it('opens the read-only Check a name dialog from the header, for any lens', async () => {
+        const { fixture } = await create({}, false);
+        const open = vi.spyOn(fixture.componentInstance['dialog'] as MatDialog, 'open').mockReturnValue({} as never);
+        const btn = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+            (b) => (b as HTMLElement).textContent?.trim() === 'Check a name',
+        ) as HTMLButtonElement;
+        btn.click();
+        expect(open).toHaveBeenCalledWith(CheckNameDialog, expect.anything());
     });
 });
