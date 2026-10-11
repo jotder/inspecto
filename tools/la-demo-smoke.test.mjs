@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectStatus, countLaRoutes, tamperManifest, rateLimitVerdict, poolVerdict, buildProbes, run, EXPECTED_LA_ROUTES,
   TELECOM_DATASETS, TELECOM_LINK_COLUMNS, TELECOM_ALERT_RULES, TELECOM_HUB, TELECOM_PACKS, telecomRegistryVerdict, triggerVerdict,
-  expandVerdict, patternVerdict, telecomAlertsVerdict, runTelecom } from './la-demo-smoke.mjs';
+  expandVerdict, patternVerdict, telecomAlertsVerdict, runTelecom, resolvePresenter, denialReason } from './la-demo-smoke.mjs';
 
 test('expectStatus checks the status and, when asked, the error code', () => {
   assert.equal(expectStatus({ status: 404, body: { error: { errorCode: 'MODULE_DISABLED' } } }, { status: 404, code: 'MODULE_DISABLED' }), null);
@@ -158,11 +158,12 @@ const telecomCall = (faults = {}) => {
   };
   return { call, calls };
 };
-const runT = async (faults) => {
+const runT = async (faults, extra = {}) => {
   const results = [];
   const { call, calls } = telecomCall(faults);
   let t = 0;
-  await runTelecom({ call, record: (id, reason) => results.push({ id, ok: !reason, reason }), timeoutMs: 10, pollMs: 1,
+  await runTelecom({ call, record: (id, reason) => results.push({ id, ok: !reason, reason }),
+    skip: (id, reason) => results.push({ id, ok: true, skipped: true, reason }), ...extra, timeoutMs: 10, pollMs: 1,
     sleep: async () => { t += 5; }, now: () => t });
   return { results, calls };
 };
@@ -181,7 +182,7 @@ test('runTelecom passes every probe on a healthy Space and polls rows', async ()
 test('runTelecom FAILs each telecom defect', async () => {
   const failed = async (f) => (await runT(f)).results.filter((r) => !r.ok).map((r) => r.id + ' ' + r.reason).join('\n');
   assert.match(await failed({ cols: [{ name: 'a_msisdn' }] }), /lacks columns/);
-  assert.match(await failed({ forbidden: true }), /403 \(canOperateRuns/);
+  assert.match(await failed({ forbidden: true }), /fm\.manager lacks canOperateRuns/);
   assert.match(await failed({ noRows: true }), /no rows after/);
   assert.match(await failed({ unflagged: true }), /not flagged/);
   assert.match(await failed({ noMatch: true }), /pattern pack telecom-.* 0 matches/);
@@ -191,4 +192,30 @@ test('the dry run lists the telecom group as skipped without --telecom', async (
   const lines = [];
   await run({ dryRun: true, log: (l) => lines.push(l) });
   assert.ok(lines.some((l) => /telecom.*SKIPPED/.test(l)));
+});
+
+test('--telecom defaults the presenter to fm.manager; an explicit --presenter wins', async () => {
+  assert.equal(resolvePresenter(null, true), 'fm.manager');
+  assert.equal(resolvePresenter(null, false), 'fm.analyst');
+  assert.equal(resolvePresenter('fm.analyst', true), 'fm.analyst');
+  const { calls } = await runT({});
+  assert.ok(calls.every((c) => c.user === 'fm.manager'));
+  const explicit = await runT({}, { presenter: 'fm.analyst' });
+  assert.ok(explicit.calls.every((c) => c.user === 'fm.analyst'));
+  const lines = [];
+  await run({ dryRun: true, telecom: true, log: (l) => lines.push(l) });
+  assert.ok(lines.some((l) => /telecom \(fm\.manager\)/.test(l)), lines.join('\n'));
+});
+
+test('a 403 trigger FAILs naming persona + canOperateRuns and SKIPs the dependent rows/Alerts probes', async () => {
+  assert.equal(denialReason({ status: 202 }, 'x'), null);
+  const { results } = await runT({ forbidden: true }, { presenter: 'fm.analyst' });
+  const fails = results.filter((r) => !r.ok);
+  assert.equal(fails.filter((r) => /triggers Job/.test(r.id)).length, 3);
+  assert.ok(fails.every((r) => !/has rows|no rows|did not produce rows/.test(r.id + r.reason)), JSON.stringify(fails));
+  assert.ok(fails.filter((r) => /triggers Job/.test(r.id)).every((r) => /fm\.analyst lacks canOperateRuns/.test(r.reason)));
+  const skipped = results.filter((r) => r.skipped);
+  assert.equal(skipped.length, 4);
+  assert.ok(skipped.every((r) => /trigger denied: fm\.analyst lacks canOperateRuns/.test(r.reason)));
+  assert.ok(skipped.some((r) => /Alerts/.test(r.id)));
 });
