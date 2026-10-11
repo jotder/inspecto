@@ -494,6 +494,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/projection/neighbors", "read-shaped", "computes neighbours from the body"),
             new Exemption("POST", "/inv/projection/multi", "read-shaped", "computes a multi-dataset projection from the body; persists nothing"),
             new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
+            new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing"),
             new Exemption("POST", "/inv/traversal/recursive-paths", "read-shaped", "walks paths over a Dataset (LA-11); persists nothing"),
             new Exemption("POST", "/inv/pattern/branching", "read-shaped", "matches a branching motif over a Dataset (LA-14b); persists nothing"),
             new Exemption("POST", "/inv/pattern/temporal", "read-shaped", "burst / periodicity over a Dataset's link event times; persists nothing"),

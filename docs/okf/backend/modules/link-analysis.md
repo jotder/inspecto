@@ -238,6 +238,20 @@ exploration alias, aliases only) and the SPA matches a selected node to its Work
 bind raw ids. Known gap: an Investigation also masks a seed's explicit `entityType`, which a stateless read does not
 carry, so a column no Entity Type claims is raw on the query graph but seeded ids of a masked `entityType` are aliased in the Working Set.
 
+**Reference rows (`POST /inv/reference-rows`, 2026-10-11).** Body `{dataset, keyCol, keys[1..500], columns?, investigationId?}`
+→ `{dataset, keyCol, columns, rows:[{key, row}], matchedKeys, unresolved, rawKeysRefused, truncated, masking{…, maskedColumns}}`. The node
+dialog's Risk / Enrichment and the panel's *Fill nodeScores from indicators* look entities up through it instead of reading a
+whole Dataset over `/db/query` (which masks nothing). Gates: 503 write root → 422 body (`keyCol`/`columns` safe identifiers)
+→ 413 over 500 keys → with `investigationId` the Investigation read gate (404) → `relationFor` R3 (404) → four-eyes row
+budget on the key count (403) → 422 for a column the relation lacks. Identifiers are quoted; keys are bound `?` parameters
+(`WHERE CAST(key AS VARCHAR) IN (?, …)`), at most 2 000 rows (`truncated`). Keys IN: an Investigation pseudonym
+(`EntityMasking.reveal`) or an exploration alias (the book) resolves; under masking a RAW key names nothing (counted in
+`rawKeysRefused`, never echoed, like `/inv/graph/runs`' hidden raw id), so the route is no raw-id oracle. Rows carry the key AS ASKED. Values
+OUT, `none` shows raw; otherwise the key column is masked when the exploration rule masks `keyCol` or any key was an alias,
+and any column whose registry/lineage class is claimed by a masked Entity Type or is `ColumnClassification.SENSITIVE`
+(MSISDN/IMSI/ACCOUNT/PII) is masked, and under `all` every text value (numbers/booleans pass), to the Space's exploration alias; untraceable lineage masks every column. Audited as
+`LINK_REFERENCE_READ` (counts only, never the keys).
+
 ### 3.5 Entity store (identity data)
 
 * **Identity Fact log** (`EntityFactLog`): `<Space config root>/audit/entity-facts/`, one file per fact
@@ -321,12 +335,12 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
 
 ## 6. HTTP surface (la-api, geo-link)
 
-18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **75**<!--count:la-routes--> routes (**69**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
-the live `GET /audit/route-inventory` lists 75 for `/inv` and `/geo`, all present in `openapi-v1.json`):
+18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **76**<!--count:la-routes--> routes (**70**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
+the live `GET /audit/route-inventory` lists 76 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
 |---|---|---|
-| Exploration | `/geo/projection`, `/geo/routes`, `/inv/projection{,/neighbors,/multi}`, `/inv/schema/*`, `/inv/traversal/recursive-paths`, `/inv/pattern/{branching,temporal}`, `/inv/value-measures`, `/inv/snapshots*` | none (rate-limited as expensive); snapshots POST `canManageIncidents` |
+| Exploration | `/geo/projection`, `/geo/routes`, `/inv/projection{,/neighbors,/multi}`, `/inv/schema/*`, `/inv/traversal/recursive-paths`, `/inv/reference-rows`, `/inv/pattern/{branching,temporal}`, `/inv/value-measures`, `/inv/snapshots*` | none (rate-limited as expensive); snapshots POST `canManageIncidents` |
 | Investigations | `/inv/investigations` create/list, `…/{id}/ops`, `/undo`, `/reorder`, `/replay`, `/log`, `/working-set`, `/coverage`, `/compare`, `/references`, `/case`, `/members`, `/template`, `/inv/investigation-templates*` | `canManageIncidents` (+ lead) |
 | Four-eyes / reveal | `…/pending/{p}/approve|deny`, `…/reveal` | `canApproveLinkExpansions`, `canRevealLinkEntities` |
 | Dossier | `…/dossier`, `/dossier/verify`, `/dossier/bundle`, `/dossier/bundle/verify` | read gate only |
@@ -343,7 +357,7 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
 ### 6.1 Gate order for an `/inv` request
 
 1. `ControlApi.authenticate` → Subject (401 audited).
-2. `rateLimit` → `LinkAnalysisRateClasses`: 11 expensive POSTs share a per-subject `linkAnalysis` bucket (capacity 20,
+2. `rateLimit` → `LinkAnalysisRateClasses`: 12 expensive POSTs share a per-subject `linkAnalysis` bucket (capacity 20,
    refill 1 per 3 s, tunable `control.rateLimit.linkAnalysis.*`; 429); Investigation routes are exempt (pinned by `LinkAnalysisRateClassCoverageTest`).
 3. `authorize` → host ABAC PEP.
 4. `requireModuleEnabled` → feature `geoLink` in the Space's `modules.toon` (404 `MODULE_DISABLED`); then the host's

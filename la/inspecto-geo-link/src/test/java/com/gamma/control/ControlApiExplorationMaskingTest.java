@@ -264,7 +264,9 @@ class ControlApiExplorationMaskingTest {
                     new String[]{"GET", inv + "/sweep/drafts", null}, new String[]{"GET", "/inv/entity-identities", null},
                     new String[]{"GET", "/inv/graph/algorithms", null}, new String[]{"GET", "/inv/graph/runs", null},
                     new String[]{"GET", "/inv/index", null}, new String[]{"GET", "/inv/snapshots", null},
-                    new String[]{"GET", "/inv/investigation-templates", null}, new String[]{"GET", "/inv/schema/relationships", null});
+                    new String[]{"GET", "/inv/investigation-templates", null}, new String[]{"GET", "/inv/schema/relationships", null},
+                    new String[]{"POST", "/inv/reference-rows", "{\"dataset\":\"calls_ds\",\"keyCol\":\"caller\",\"keys\":[\""
+                            + aliasA + "\",\"" + A + "\"]}"});
             for (String[] rd : reads) ok(c, rd[0], rd[1], rd[2], false);
         }
     }
