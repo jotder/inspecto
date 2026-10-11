@@ -20,7 +20,7 @@ import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
-import { LinkAnalysisComponent } from './link-analysis.component';
+import { CANVAS_MIN_PX, FORCE_ATLAS_MAX_NODES, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
@@ -1830,5 +1830,97 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         const { fixture } = create({ views: [OTHER, MONEY] });
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => {
+    const chain = (n: number): G6GraphData =>
+        ({
+            nodes: Array.from({ length: n }, (_, i) => ({ id: `n${i}`, data: { label: `n${i}` } })),
+            edges: Array.from({ length: n - 1 }, (_, i) => ({
+                id: `e${i}`,
+                source: `n${i}`,
+                target: `n${i + 1}`,
+                data: {},
+            })),
+        }) as unknown as G6GraphData;
+
+    it('the snapshot title never starts with a bare dash', () => {
+        expect(snapshotTitle(true, 'Ring 7', '', 1666)).toBe('Investigation Ring 7 — 1666 nodes');
+        expect(snapshotTitle(true, undefined, '', 2)).toBe('Investigation — 2 nodes');
+        expect(snapshotTitle(false, undefined, '', 1666)).toBe('Graph — 1666 nodes');
+        expect(snapshotTitle(false, undefined, 'Entity projection', 1)).toBe('Entity projection — 1 node');
+    });
+
+    it('default layout: Force for an Investigation canvas, a big graph or a hub; Layered for a small chain; never force-atlas2', () => {
+        expect(defaultLayoutFor(null, false)).toBe('dagre');
+        expect(defaultLayoutFor(chain(5), false)).toBe('dagre');
+        expect(defaultLayoutFor(chain(5), true)).toBe('force');
+        expect(defaultLayoutFor(chain(1666), false)).toBe('force');
+        const hub = {
+            nodes: Array.from({ length: 10 }, (_, i) => ({ id: `h${i}`, data: {} })),
+            edges: Array.from({ length: 9 }, (_, i) => ({ id: `x${i}`, source: 'h0', target: `h${i + 1}`, data: {} })),
+        } as unknown as G6GraphData;
+        expect(defaultLayoutFor(hub, false)).toBe('force');
+        for (const g of [chain(900), chain(5000)]) expect(defaultLayoutFor(g, true)).not.toBe('force-cluster');
+    });
+
+    it("the analyst's explicit layout wins over the default", async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-1');
+        c.setLayout('dagre');
+        expect(c.layoutId()).toBe('dagre');
+    });
+
+    it('a restored Clustering force (force-atlas2) opens as Force above the node cap; a pick made here is kept', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        Object.defineProperty(c, 'canvasData', { value: () => chain(FORCE_ATLAS_MAX_NODES + 1) });
+        c.pickedLayout.set('force-cluster'); // as a saved view / undo restores it
+        expect(c.layoutId()).toBe('force');
+        c.setLayout('force-cluster');
+        expect(c.layoutId()).toBe('force-cluster');
+    });
+
+    it('a first click on an Investigation canvas selects without switching the toolbox tab or opening the dock', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.toolboxTab.set('analysis');
+        c.toolboxDockOpen.set(false);
+        c.investigation.activeId.set('inv-1');
+        c.onNodeClick('a');
+        expect(c.investigation.selected()?.id).toBe('a');
+        expect(c.toolboxTab()).toBe('analysis');
+        expect(c.toolboxDockOpen()).toBe(false);
+    });
+
+    it('a reloaded Investigation restores the domain profile it is bound to', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const bound = signal<'telecom' | null>(null);
+        Object.defineProperty(c.investigation, 'boundProfileId', { value: bound });
+        fixture.detectChanges();
+        expect(c.profileControl.value).toBe('generic');
+        bound.set('telecom');
+        fixture.detectChanges();
+        expect(c.profileControl.value).toBe('telecom');
+    });
+
+    it('a canvas zone squeezed below the minimum collapses the Toolbox dock, then the Query dock', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.toolboxDockOpen.set(true);
+        c.queryDockOpen.set(true);
+        c.fitDocksToWidth(CANVAS_MIN_PX + 100);
+        expect([c.toolboxDockOpen(), c.queryDockOpen()]).toEqual([true, true]);
+        c.fitDocksToWidth(15);
+        expect([c.toolboxDockOpen(), c.queryDockOpen()]).toEqual([false, true]);
+        c.fitDocksToWidth(15);
+        expect([c.toolboxDockOpen(), c.queryDockOpen()]).toEqual([false, false]);
     });
 });

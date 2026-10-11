@@ -188,6 +188,7 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                     [investigationOpen]="investigationOpen()"
                     [allowed]="allowed()"
                     (completed)="onCompleted($event)"
+                    (started)="clearResult()"
                 />
                 @if (summary(); as s) {
                     <div class="mt-1 text-sm" data-testid="algo-result">
@@ -454,6 +455,13 @@ export class LinkAnalysisServerAlgorithmsComponent {
         this.riskRows.set(propagatedRiskRows(r, this.serverIds(), (id) => this.labelOfCanvas(id)));
         this.expanded.set(null);
         this.resultChange.emit(r);
+    }
+
+    /** A new run replaces the answer: a refused one (429, 422...) must not leave the previous result under its banner. */
+    clearResult(): void {
+        this.summary.set(null);
+        this.riskRows.set([]);
+        this.expanded.set(null);
     }
 
     highlight(s: GraphRunSummary): void {

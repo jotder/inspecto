@@ -33,7 +33,7 @@ Persona: a fraud analyst. Story: an IRSF/Wangiri alert fires on `MSISDN-A`; the 
 |---|---|---|---|
 | 1. Alert in | Alert names `MSISDN-A`; one click opens Link Analysis with it as the root | W1 | Alert → LA deep link (VERIFY) |
 | 2. First look | Degree 1: voice + SMS neighbours; footer states node/link counts and any cap | W2, W3 | CDR voice + SMS Datasets |
-| 3. Widen, gradually | Expand to degree 2, then 3, then 4 on demand; per-degree cap message shown | W2, W10 | fan-out cap + budget set low enough to trip once |
+| 3. Widen, gradually | Expand to degree 2, then 3, then 4 on demand; per-degree cap message shown. **Order matters:** reach degree 4 (the `shared_payment` rings) BEFORE any "Expand anyway" on the hub — the hub's ~650 background contacts would otherwise crowd the 2000-row budget and degree 4 never reaches the rings. "Expand anyway" (four-eyes) is the LAST beat of this scene, shown as a guardrail, not a route to the ring | W2, W10 | fan-out cap + budget set low enough to trip once |
 | 4. Slice by link kind | Toggle Voice / SMS / Forwarding / Shared device / Shared identity / SIM history / Shared payment | W9 | one mapping per kind (§3) |
 | 5. Ring appears | Shared IMEI joins A, B, C; forwarding chain exposes a rotation | W8 | HLR/EIR IMSI-IMEI + redirect fields |
 | 6. Why this node | Node panel: indicators, contributing factors, case history | W4, W11 | enrichment + risk (GAP) |
@@ -129,8 +129,9 @@ history / actions over masked `POST /inv/reference-rows`, hub override + real co
 telecom pattern packs with pre-filled columns, `GET /objects/by-entity`). What is left is tracked as backlog row
 `LA-TELECOM-DEMO-1` (`docs/BACKLOG.md` §3.12): the live browser walk-through and the operator questions.
 
-Decided 2026-10-11 (operator): KEEP `four_eyes_fan_out_above: 5` in the showcase. The first suspect expand waits for
-`fm.manager` (the UI shows "waiting for approval"); the demo script includes the `fm.manager` approval as the four-eyes beat.
+Decided 2026-10-11 (operator, revised the same day): `four_eyes_fan_out_above: 2000` in the showcase, so bounded expands
+run at once. The four-eyes beat is an UNBOUNDED expand (no `maxFanOut`), which always exceeds the threshold and waits for
+`fm.manager` (the UI shows "waiting for approval"); the demo script includes that approval.
 
 ## 6. Open items before this can be rehearsed
 

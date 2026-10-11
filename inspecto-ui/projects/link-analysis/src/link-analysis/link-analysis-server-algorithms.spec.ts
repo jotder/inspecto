@@ -1,7 +1,8 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import {
@@ -100,6 +101,10 @@ function make(
         completed({ algorithm: 'kCore', kind: 'SCORES', dropped: 0, elapsedMs: 1, scores: [] }),
 ) {
     const run = vi.fn((r: unknown) => of(answer(r)));
+    return makeWith(run);
+}
+
+function makeWith(run: ReturnType<typeof vi.fn>) {
     const risk = {
         lookup: vi.fn((_ref: unknown, _keys: string[], _inv?: string | null) =>
             Promise.resolve({
@@ -277,6 +282,36 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
     });
 });
 
+describe('LinkAnalysisServerAlgorithmsComponent refused re-run (LA-DEMO-POLISH-1)', () => {
+    it('a 429 clears the previous answer instead of leaving it under the error banner', async () => {
+        let n = 0;
+        const run = vi.fn(() =>
+            n++ === 0
+                ? of(
+                      completed({
+                          algorithm: 'kCore',
+                          kind: 'SCORES',
+                          dropped: 0,
+                          elapsedMs: 1,
+                          scores: [{ id: 'a', label: 'A', score: 0.4080267558479552 }],
+                      }),
+                  )
+                : throwError(() => new HttpErrorResponse({ status: 429, error: { error: 'busy' } })),
+        );
+        const { fixture, c, el } = makeWith(run);
+        c.pick('kCore');
+        fixture.detectChanges();
+        el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid=algo-result]')!.textContent).toContain('A: 0.408');
+        el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid=algo-result]')).toBeNull();
+        expect(el.querySelector('inspecto-alert')).not.toBeNull();
+        await expectNoA11yViolations(el);
+    });
+});
+
 describe('summarizeGraphRun', () => {
     const base = { dropped: 0, elapsedMs: 1 };
     it('reads a flag, bridges (link ids) and a score list', () => {
@@ -300,5 +335,29 @@ describe('summarizeGraphRun', () => {
         );
         expect(s.lines).toEqual(['A: 2', 'X: 1']);
         expect(s.nodeIds).toEqual(['c-a']); // x is not drawn
+    });
+
+    it('rounds scores for display to at most 4 decimals (LA-DEMO-POLISH-1)', () => {
+        const s = summarizeGraphRun(
+            {
+                ...base,
+                algorithm: 'pageRank',
+                kind: 'SCORES',
+                scores: [{ id: 'a', label: 'A', score: 0.4080267558479552 }],
+            },
+            MAP,
+        );
+        expect(s.lines).toEqual(['A: 0.408']);
+        const h = summarizeGraphRun(
+            {
+                ...base,
+                algorithm: 'hits',
+                kind: 'HITS',
+                hubs: [{ id: 'a', label: 'A', score: 0.123456 }],
+                authorities: [{ id: 'a', label: 'A', score: 1 / 3 }],
+            },
+            MAP,
+        );
+        expect(h.lines).toEqual(['Hub A: 0.1235', 'Authority A: 0.3333']);
     });
 });

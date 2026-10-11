@@ -16,6 +16,11 @@ export interface GraphRunSummary {
 
 const TOP = 10;
 
+/** A score for display: at most 4 decimals (`0.4080267558479552` -> `0.408`); the raw value stays in the result. */
+export function fmtScore(x: number): number {
+    return Number.isFinite(x) ? Math.round(x * 1e4) / 1e4 : x;
+}
+
 function plural(n: number, one: string, many = one + 's'): string {
     return `${n} ${n === 1 ? one : many}`;
 }
@@ -48,7 +53,7 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             const s = (r.scores ?? []) as GraphScoreView[];
             return out(
                 `${plural(s.length, 'node')} scored.`,
-                s.slice(0, TOP).map((x) => `${x.label}: ${x.score}`),
+                s.slice(0, TOP).map((x) => `${x.label}: ${fmtScore(x.score)}`),
                 nodeOf(s.slice(0, TOP).map((x) => x.id)),
             );
         }
@@ -58,8 +63,8 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             return out(
                 `${plural(h.length, 'hub')} and ${plural(a.length, 'authority', 'authorities')} scored.`,
                 [
-                    ...h.slice(0, 5).map((x) => `Hub ${x.label}: ${x.score}`),
-                    ...a.slice(0, 5).map((x) => `Authority ${x.label}: ${x.score}`),
+                    ...h.slice(0, 5).map((x) => `Hub ${x.label}: ${fmtScore(x.score)}`),
+                    ...a.slice(0, 5).map((x) => `Authority ${x.label}: ${fmtScore(x.score)}`),
                 ],
                 nodeOf([...h.slice(0, 5), ...a.slice(0, 5)].map((x) => x.id)),
             );
@@ -131,7 +136,7 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             const l = r.links ?? [];
             return out(
                 `${plural(l.length, 'predicted link')}.`,
-                l.slice(0, TOP).map((x) => `${x.sourceLabel} - ${x.targetLabel}: ${x.score}`),
+                l.slice(0, TOP).map((x) => `${x.sourceLabel} - ${x.targetLabel}: ${fmtScore(x.score)}`),
                 nodeOf(l.flatMap((x) => [x.source, x.target])),
             );
         }

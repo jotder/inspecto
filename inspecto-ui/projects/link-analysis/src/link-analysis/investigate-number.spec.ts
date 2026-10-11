@@ -13,6 +13,12 @@ import {
     degreeOutcomeMessage,
     degreeState,
     hubBadgeText,
+    hubContactsFromRows,
+    investigationTitle,
+    overrideSteps,
+    profileForDataset,
+    requestedDegree,
+    suspectTitle,
     investigableEntityOf,
     investigateBinding,
     investigateQueryParams,
@@ -334,5 +340,74 @@ describe('investigate-number - live-run fixes', () => {
         expect(approved[0]).toMatchObject({ decision: 'approved', admitted: 1, degree: 1 });
         expect(isAwaiting(approved[0])).toBe(false);
         expect(reconcileApprovals(outcomes, req('denied'), ws())[0].decision).toBe('denied');
+    });
+});
+
+describe('investigate-number - third live run fixes', () => {
+    const at = (id: string, hop: number, admittedBy: number, flagged = false): WorkingSetEntity => ({
+        ...entity(id, hop),
+        admittedBy,
+        ...(flagged ? { highConnectivity: true } : {}),
+    });
+
+    it("reads the flagged entities' contact counts from the Working Set rows", () => {
+        const m = hubContactsFromRows([
+            { entityId: 'h', highConnectivity: true, contacts: 650 },
+            { entityId: 'a', highConnectivity: false, contacts: null },
+            { entityId: 7, contacts: 3 },
+        ]);
+        expect([...m]).toEqual([['h', 650]]);
+        expect(hubBadgeText(500, m.get('h'))).toBe('High connectivity — 650 contacts (threshold 500), not expanded');
+    });
+
+    it('labels a held and an approved "Expand anyway" by the same hop: one past the hub', () => {
+        const set = ws(at('s', 0, 1), at('h', 2, 2, true), at('r', 3, 3));
+        const pending = [{ id: 'p4', status: 'pending', params: { ids: ['h'], expandHubs: ['h'] } }] as never;
+        const held = reconcileApprovals([], pending, set);
+        expect(held[0]).toMatchObject({ degree: 3, awaitingApproval: 'p4' });
+        expect(degreeOutcomeMessage(held[0])).toMatch(/^Degree 3: waiting/);
+        const approved = reconcileApprovals(
+            held,
+            [{ id: 'p4', status: 'approved', step: 5 }] as never,
+            ws(...set.entities, at('n', 3, 5)),
+        );
+        expect(degreeOutcomeMessage(approved[0])).toMatch(/^Degree 3: approved \(request p4\)/);
+        expect(requestedDegree(set, ['h'])).toBe(3);
+        expect(requestedDegree(set, ['nobody'])).toBeNull();
+    });
+
+    it("keeps a hub override's admitted contacts out of the next degree's frontier", () => {
+        const entries = [
+            { step: 3, kind: 'op', op: 'expand', params: { ids: ['a'] }, undoneBy: null },
+            { step: 4, kind: 'op', op: 'expand', params: { ids: ['h'], expandHubs: ['h'] }, undoneBy: null },
+            { step: 5, kind: 'op', op: 'expand', params: { ids: ['x'], expandHubs: ['x'] }, undoneBy: 6 },
+        ] as never;
+        const overrides = overrideSteps(entries);
+        expect([...overrides]).toEqual([4]);
+        const set = ws(at('s', 0, 1), at('h', 1, 2, true), at('r', 2, 3), at('bg1', 2, 4), at('bg2', 2, 4));
+        expect(degreeState(set, 4).frontier).toEqual(['r', 'bg1', 'bg2']);
+        expect(degreeState(set, 4, [], false, overrides)).toMatchObject({ current: 2, frontier: ['r'] });
+        // only override contacts left: they are the frontier rather than nothing
+        expect(degreeState(ws(at('bg', 1, 4)), 4, [], false, overrides).frontier).toEqual(['bg']);
+    });
+
+    it('never puts the raw number in a default title unless masking is known to be off', () => {
+        expect(suspectTitle('99979100001')).toBe('Suspect number');
+        expect(suspectTitle('99979100001', 'typed')).toBe('Suspect number');
+        expect(suspectTitle('99979100001', 'none')).toBe('Suspect 99979100001');
+    });
+
+    it('names the Investigation by the typed title when the server masked it, never by the pseudonym', () => {
+        expect(investigationTitle('Case A', 'Case A', 'inv-1')).toBe('Case A');
+        expect(investigationTitle('masked:0123abcd', 'Suspect 99979100001', 'inv-1')).toBe('Suspect 99979100001');
+        expect(investigationTitle('masked:0123abcd', undefined, 'inv-1')).toBe('(title masked)');
+        expect(investigationTitle('masked:0123abcd', 'masked:0123abcd', 'inv-1')).toBe('(title masked)');
+        expect(investigationTitle(null, null, 'inv-1')).toBe('inv-1');
+    });
+
+    it('finds the profile whose default mapping binds a Dataset', () => {
+        expect(profileForDataset('telecom_links_dataset')).toBe('telecom');
+        expect(profileForDataset('something_else')).toBeNull();
+        expect(profileForDataset(null)).toBeNull();
     });
 });
