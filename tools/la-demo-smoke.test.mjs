@@ -71,7 +71,7 @@ test('run() against a stub server passes every probe, and fails a wrong status',
     if (space === 'la-showcase-off') return res(404, { error: { errorCode: 'MODULE_DISABLED' } });
     if (p === '/inv/investigations' && init.method === 'POST') return res(422, {});
     if (p.endsWith('/log')) return res(200, { data: {} });
-    if (p === '/audit/route-inventory') return res(200, { data: { routes: Array.from({ length: 75 }, (_, i) => ({ pattern: `/inv/x${i}` })) } });
+    if (p === '/audit/route-inventory') return res(200, { data: { routes: Array.from({ length: EXPECTED_LA_ROUTES }, (_, i) => ({ pattern: `/inv/x${i}` })) } });
     if (p.endsWith('/dossier')) return res(200, { data: { manifest: { root: hash } } });
     if (p.endsWith('/dossier/verify')) return res(200, { data: { verified: JSON.parse(init.body).manifest.root === hash } });
     return res(500, {});

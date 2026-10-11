@@ -30,6 +30,7 @@ import { join, relative, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { trackedPaths } from './tracked-paths.mjs';
 import { reactorModuleDirs } from './reactor-modules.mjs';
+import { moduleRoutes } from './lib/module-routes.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACTS = 'inspecto-ui/src/app/inspecto/contracts';
@@ -344,12 +345,6 @@ function read(rel) {
     const p = join(ROOT, rel);
     if (!existsSync(p)) throw new Error(`derive source is missing: ${rel}`);
     return readFileSync(p, 'utf8');
-}
-/** Entries of `provides.routes[N]: "GET /x","POST /y"` in a module's module.toon - counted, not read from N. */
-function moduleRoutes(dir) {
-    const m = read(`${dir}/src/main/resources/META-INF/inspecto/module.toon`).match(/^\s*routes\[\d+\]:\s*(.*)$/m);
-    if (!m) throw new Error(`${dir}: no provides.routes line`);
-    return (m[1].match(/"[^"]*"/g) || []).length;
 }
 function json(rel) { return JSON.parse(read(rel)); }
 

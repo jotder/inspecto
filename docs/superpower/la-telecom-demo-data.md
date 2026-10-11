@@ -213,6 +213,12 @@ The Alerts fire on their own after the counts Job. The `alert.evaluate` Job `tel
 not press *Evaluate*. The boot-time probe of these rules runs before the counts Dataset exists, so it logs "measure
 probe failed … No files found". That is expected: this Job is what fires them.
 
+`telecom_msisdn_indicators` runs every 10 minutes, so the counts and this Job run again every 10 minutes. Each Alert
+fires once per breach. A later sweep that still reads a breach raises nothing new, even after the rule's cooldown.
+Only a heal (the count drops below 1) re-arms the rule. A restart reads the still-active Alert, so it does not
+re-fire either. Before TELECOM-ALERT-REFIRE-1 a scalar Measure rule re-fired on every sweep past its cooldown. A live
+demo then showed about 45 Alerts after a few hours.
+
 | Alert Rule | Line counted when | Count on the seed |
 |---|---|---|
 | `telecom_wangiri_lines` (WARNING) | `out_distinct_b ≥ 50` and `avg_dur_s < 5` | 2 |
@@ -226,6 +232,8 @@ Tests: `ControlApiTelecomPatternPacksTest` (inspecto-geo-link) runs each pack's 
 through the real route. `TelecomLinksGoldenTest.theTypologyAlertRulesFireOnTheSeedWithCountsOnly` sweeps the three
 rules with the production `AlertService`. `theChainEndsWithTheAlertEvaluateJobFiringTheTypologyAlerts` checks that the
 signal-fired `telecom_typology_alerts` Job fires the three Alerts with counts 2, 4 and 6.
+`anUnchangedBreachDoesNotReFireOnLaterSweeps` sweeps three more times past the cooldown and checks that no new Alert
+fires.
 
 ## 6. Tests
 

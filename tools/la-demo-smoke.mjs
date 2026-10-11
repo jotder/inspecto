@@ -12,16 +12,17 @@
 // Datasets get rows (polled); seed 99979100001 + expand (maxFanOut <= four-eyes) admits entities, hub 99970000100 flagged;
 // the three telecom pattern packs match >= 1; the three telecom typology Alerts are present with counts only.
 //
-// Always run: 401, 403, 404 (non-member), 404 MODULE_DISABLED, 422, tamper verify fails, route inventory = 75.
+// Always run: 401, 403, 404 (non-member), 404 MODULE_DISABLED, 422, tamper verify fails, route inventory = EXPECTED_LA_ROUTES (derived from the LA module.toon files).
 // With --staged/--inbox: Replay hash unchanged after a file lands in the bound Dataset (it COPIES the staged file; the
 // step is skipped otherwise). With --burst: >20 expensive POSTs -> 429, 19 concurrent Graph Runs -> a 503 (MUTATES the
 // Space: it starts runs - use a disposable demo). --dry-run prints the probes and sends nothing. Exit 1 on any failed probe.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { laRoutes } from './lib/module-routes.mjs';
 
 export const INV = 'mule-hub-case';
-export const EXPECTED_LA_ROUTES = 75;   // = docs/okf/backend/modules/link-analysis.md (count marker la-routes)
+export const EXPECTED_LA_ROUTES = laRoutes();   // derived exactly like check-doc-counts' la-routes marker
 const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
 
 // ---- pure assertion helpers (unit-tested in la-demo-smoke.test.mjs) ----------------------------------------------

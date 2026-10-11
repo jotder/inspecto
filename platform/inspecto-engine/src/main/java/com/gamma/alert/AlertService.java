@@ -541,8 +541,8 @@ public final class AlertService {
         List<Alert> out = new ArrayList<>();
 
         // Measure rules (BI-5) are dataset-scoped, not pipeline-scoped: any sweep (a terminal batch may
-        // have changed the data, or the manual POST /alerts/evaluate) re-reads the current value; the
-        // cooldown suppresses repeats. Skipped silently when no probe is wired (lean/unit paths).
+        // have changed the data, or the manual POST /alerts/evaluate) re-reads the current value; an
+        // open breach raises nothing new until it heals. Skipped silently when no probe is wired (lean/unit paths).
         for (AlertRule rule : rules) {
             if (!rule.isFreshnessRule()) continue;
             evaluateFreshness(rule, nowMs, out);
@@ -560,10 +560,14 @@ public final class AlertService {
             if (value.isEmpty()) continue;                // unknown: neither fires nor heals
             String measureKey = rule.name() + "|" + rule.dataset();
             if (rule.breached(value.getAsDouble())) {
+                healthyStreak.remove(measureKey);   // a relapse inside the streak restarts it
+                // Edge-triggered like a by-rule key (TELECOM-ALERT-REFIRE-1): an already-open breach raises nothing
+                // new, however many sweeps re-read it — only a heal re-arms it. It used to re-fire every cooldown.
+                // measureOpen seeds a restart from the still-active ALERT, so a restart does not re-fire either.
+                if (measureOpen(rule, measureKey)) continue;
                 // Open only once an Alert was actually raised — a heal must never clear an Alert that never fired.
                 if (fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out))
                     openMeasures.put(measureKey, Boolean.TRUE);
-                healthyStreak.remove(measureKey);   // a relapse inside the streak restarts it
             } else if (measureOpen(rule, measureKey)) {
                 if (!healed(measureKey, rule.healAfterSweeps())) continue;
                 openMeasures.put(measureKey, Boolean.FALSE);
