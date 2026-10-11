@@ -588,9 +588,10 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
   `listOfServiceData` group-by + sum) or runs flatten / reduce / delimit on one (23 directive uses in 9 configs).
   ⚠ "Give it its own segment" is **not available for ASN.1 today**: `Asn1RecordIngester` keys segments by record
   name only (~:124) and NULLs any `List` (~:189), so those columns load NULL. The "cheaper before C1" window has
-  passed (C1–C4 shipped 2026-09-25). The design states no numeric threshold. **The decision stays open — operator
-  decision pending:** design a repeated-child operation (explode to its own segment / reduce-by-key /
-  select-where) in the Decode Profile.
+  passed (C1–C4 shipped 2026-09-25). The design states no numeric threshold. **Operator decided 2026-10-11 to design it —
+  ✅ **designed, awaiting operator approval of the design:**
+  [`docs/superpower/parsing-repeated-child-design.md`](../../../superpower/parsing-repeated-child-design.md)
+  (closed-vocabulary `derive` select / reduce first, then `children` explode; no expression language).
 - **T2 — signer anchoring** (`-Djobs.packs.trustStore`, SEC-7). Not built. D2 made T1 the required gate.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24
