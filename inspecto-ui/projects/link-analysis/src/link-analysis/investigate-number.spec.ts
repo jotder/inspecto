@@ -8,6 +8,7 @@ import {
     degreeOutcome,
     degreeOutcomeMessage,
     degreeState,
+    hubBadgeText,
     investigableEntityOf,
     investigateBinding,
     investigateQueryParams,
@@ -154,6 +155,31 @@ describe('investigate-number - next degree', () => {
         );
         // an earlier empty degree does not block a later one
         expect(degreeState(ws(entity('s', 0), entity('a', 1), entity('b', 2)), 4, [none]).blocked).toBeNull();
+    });
+
+    it('leaves high-connectivity entities out of the frontier unless the analyst opts in (telecom S3)', () => {
+        const hub = { ...entity('h', 1), highConnectivity: true };
+        const state = degreeState(ws(entity('s', 0), entity('a', 1), hub), 4);
+        expect(state).toMatchObject({ current: 1, frontier: ['a'], heldHubs: ['h'], blocked: null });
+        expect(degreeState(ws(entity('s', 0), entity('a', 1), hub), 4, [], true).frontier).toEqual(['a', 'h']);
+        // Every outer entity flagged: nothing to name, and the way out is stated.
+        expect(degreeState(ws(entity('s', 0), hub), 4).blocked).toContain('Include hubs');
+        expect(degreeState(ws(entity('s', 0), hub), 4, [], true).blocked).toBeNull();
+    });
+
+    it('words the hub badge with the threshold when known, never a guessed contact count', () => {
+        expect(hubBadgeText(500)).toBe('High connectivity — more than 500 contacts, not expanded');
+        expect(hubBadgeText(null)).toBe('High connectivity — not expanded');
+        expect(
+            degreeOutcomeMessage({
+                degree: 2,
+                admitted: 1,
+                linksAdded: 1,
+                truncated: false,
+                fanOutCapped: 0,
+                hubsOverridden: 2,
+            }),
+        ).toContain('Analyst override: expanded through 2 high-connectivity numbers — recorded in the log.');
     });
 
     it('is blocked above the server frontier cap', () => {

@@ -57,6 +57,17 @@ describe('LA-10 investigation-state', () => {
         expect(idsInWorkingSet(alice, ws)).toEqual(['Alice ']);
     });
 
+    it('marks a high-connectivity entity on the canvas, and only that one (telecom S3)', () => {
+        const ws: WorkingSet = {
+            entities: [entity('a'), entity('hub', { hop: 1, highConnectivity: true })],
+            links: [{ source: 'a', target: 'hub', kind: 'call', count: 1, admittedBy: 2 }],
+            excluded: [],
+            hash: 'h',
+        };
+        const g = workingSetToGraph(ws, P);
+        expect(g.nodes.filter((n) => n.data.highConnectivity).map((n) => n.id)).toEqual([entityId('msisdn', 'hub')]);
+    });
+
     it('draws EVERY link among a Working Set above the projection node cap (1 200 entities / 1 501 links)', () => {
         const ids = Array.from({ length: 1200 }, (_, i) => `e${i}`);
         const links = [

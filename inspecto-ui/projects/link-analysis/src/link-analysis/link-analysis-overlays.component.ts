@@ -107,6 +107,18 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                         </li>
                     }
                 </ul>
+                @if (highConnectivity()) {
+                    <!-- supernode suppression: the canvas rings each flagged entity with a wide halo -->
+                    <div class="mt-1 flex items-center gap-2 border-t pt-1" data-testid="legend-hubs">
+                        <span
+                            class="inline-block h-3 w-3 shrink-0 rounded-full border-2"
+                            style="border-color: var(--gamma-text-secondary); box-shadow: 0 0 0 3px var(--gamma-border)"
+                            aria-hidden="true"
+                        ></span>
+                        <span>Ringed: high connectivity — shown, not expanded</span>
+                        <span class="text-secondary ml-auto tabular-nums">{{ highConnectivity() }}</span>
+                    </div>
+                }
                 @if (edgeKinds().length) {
                     <!-- one toggle per link kind: pressed = drawn; unpressing hides that kind's links on the canvas -->
                     <ul class="m-0 mt-1 flex list-none flex-wrap gap-1 border-t p-0 pt-1" aria-label="Link kinds">
@@ -171,6 +183,8 @@ export class LinkAnalysisLegendComponent {
     /** A link-kind chip was pressed: the host toggles that kind's links on the canvas. */
     readonly edgeKindToggle = output<string>();
     readonly hint = input('');
+    /** How many drawn entities an Investigation flagged high connectivity; 0 hides the legend row. */
+    readonly highConnectivity = input(0);
     readonly open = input(true);
     readonly openChange = output<boolean>();
 }

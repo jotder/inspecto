@@ -77,7 +77,7 @@ const IDX_DISK_MAX = 1_000_000_000_000_000;
 const draftValidators = (max: number) => [Validators.min(1), Validators.max(max), Validators.pattern('\\d*')];
 
 type RunKey = 'maxNodes' | 'maxEdges' | 'timeoutMs';
-type Key = 'fourEyesBudgetAbove' | 'fourEyesFanOutAbove' | 'mergedDistinctCap' | 'seedByDistinctCap';
+type Key = 'fourEyesBudgetAbove' | 'fourEyesFanOutAbove' | 'mergedDistinctCap' | 'seedByDistinctCap' | 'hubThreshold';
 
 /** Expiry must outlast hibernation (server 422 otherwise); a blank key counts as its value in force, else default. */
 function expiryAfterHibernation(
@@ -95,7 +95,7 @@ function expiryAfterHibernation(
 
 /**
  * Settings ▸ **Link Analysis** — the Investigation controls of `GET|PUT /settings/link-analysis` the SPA had no
- * surface for: the two four-eyes thresholds (D-U7), `mergedDistinctCap` (LA-17 merged traversal, with the value
+ * surface for: the two four-eyes thresholds (D-U7), the hub threshold (supernode suppression, `hub_threshold`), `mergedDistinctCap` (LA-17 merged traversal, with the value
  * in force) and — only when the server reports it — `seedByDistinctCap`. Blank = inherit the shipped default.
  *
  * <p>⚠ The PUT REPLACES the whole document, so a save sends back every other stated key exactly as read (the node
@@ -394,6 +394,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         fourEyesFanOutAbove: new FormControl<number | null>(null, intOrBlank),
         mergedDistinctCap: new FormControl<number | null>(null, intOrBlank),
         seedByDistinctCap: new FormControl<number | null>(null, intOrBlank),
+        hubThreshold: new FormControl<number | null>(null, intOrBlank),
         maxSetBytes: new FormControl<number | null>(null, setBytesValidators),
         maxInvestigationBytes: new FormControl<number | null>(null, invBytesValidators),
         maskingMode: new FormControl<string | null>(null),
@@ -445,6 +446,15 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 placeholder: `default ${s?.mergedDistinctCapInForce ?? ''}`,
             },
         ];
+        if (s && 'hubThreshold' in s)
+            out.push({
+                key: 'hubThreshold',
+                label: 'Hub threshold (distinct contacts)',
+                hint:
+                    `In force: ${s.hubThresholdInForce ?? '—'}. An entity an expand finds with more distinct contacts ` +
+                    'is flagged high connectivity: shown, but not expanded further unless the analyst overrides it.',
+                placeholder: `default ${s.hubThresholdInForce ?? ''}`,
+            });
         if (s && 'seedByDistinctCap' in s)
             out.push({
                 key: 'seedByDistinctCap',
@@ -491,6 +501,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         body['fourEyesBudgetAbove'] = num(v.fourEyesBudgetAbove);
         body['fourEyesFanOutAbove'] = num(v.fourEyesFanOutAbove);
         body['mergedDistinctCap'] = num(v.mergedDistinctCap);
+        if ('hubThreshold' in served) body['hubThreshold'] = num(v.hubThreshold);
         if ('seedByDistinctCap' in served) body['seedByDistinctCap'] = num(v.seedByDistinctCap);
         else delete body['seedByDistinctCap'];
         if ('maxSetBytes' in served) body['maxSetBytes'] = num(v.maxSetBytes);
@@ -545,6 +556,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             fourEyesFanOutAbove: s.fourEyesFanOutAbove ?? null,
             mergedDistinctCap: s.mergedDistinctCap ?? null,
             seedByDistinctCap: s.seedByDistinctCap ?? null,
+            hubThreshold: s.hubThreshold ?? null,
             maxSetBytes: s.maxSetBytes ?? null,
             maxInvestigationBytes: s.maxInvestigationBytes ?? null,
             maskingMode: s.maskingMode ?? null,
