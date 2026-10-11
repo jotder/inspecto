@@ -220,6 +220,7 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    works as written; a node where Spaces are configured but none booted answers `/ready` 503 and `/health`
    `DEGRADED`, and `GET /health/details` lists each skipped Space with a coded reason under `spaces.skipped`.
    Credentials (URL userinfo and a password, token or secret query parameter) are masked in `/health/details` — no need to put them in the URL.
+   Since 2026-10-11 the boot log line for a skipped Space (`Skipping space dir … failed to load`) is ERROR, not WARN.
 2. **A graceful stop did not release a held lease** (above) — restarting the holder cost the full TTL whenever
    a cycle was in flight. **Fixed 2026-10-11 (`HA-GRACEFUL-STOP-LEASE-RELEASE-1`):** a graceful stop now cancels
    in-flight runs cooperatively (they stop at their next checkpoint, writing nothing more), and each run releases
