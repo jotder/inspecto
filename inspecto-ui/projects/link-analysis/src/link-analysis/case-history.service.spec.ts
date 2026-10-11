@@ -49,6 +49,35 @@ describe('CaseHistoryService', () => {
         http.verify();
     });
 
+    it('POSTs a masked key to /inv/case-history (never /objects/by-entity) and maps resolved / unresolved / 503', async () => {
+        const { svc, http } = make();
+
+        const ok = svc.byMaskedKey('masked:00ff', 'inv-1', 'open');
+        await flushNext();
+        const req = http.expectOne((r) => r.url.endsWith('/inv/case-history'));
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual({ key: 'masked:00ff', status: 'open', investigationId: 'inv-1' });
+        req.flush({ entityType: 'msisdn', resolved: true, objects: [{ kind: 'case', id: 'c1' }], total: 3, truncated: true });
+        expect(await ok).toEqual({ items: [{ kind: 'case', id: 'c1' }], truncated: true, total: 3 });
+
+        const gone = svc.byMaskedKey('masked:00ff', null, 'all');
+        await flushNext();
+        const req2 = http.expectOne((r) => r.url.endsWith('/inv/case-history'));
+        expect(req2.request.body).toEqual({ key: 'masked:00ff', status: 'all' });
+        req2.flush({ entityType: 'msisdn', resolved: false, objects: [], total: 0, truncated: false });
+        expect((await gone).error).toContain('no longer knows this masked number');
+
+        const absent = svc.byMaskedKey('masked:00ff', null, 'all');
+        await flushNext();
+        http.expectOne((r) => r.url.endsWith('/inv/case-history')).flush(
+            { error: { message: 'not installed' } },
+            { status: 503, statusText: 'Unavailable' },
+        );
+        expect((await absent).error).toContain('Case management');
+        http.expectNone((r) => r.url.endsWith('/objects/by-entity'));
+        http.verify();
+    });
+
     it('reads truncated / message / total from the v1 envelope metadata when the server sends it', async () => {
         const { svc, http } = make();
         const ok = svc.byEntity('msisdn', '+256700000001', 'all');

@@ -26,4 +26,11 @@ public interface CasePort {
 
     /** Whether the caller may see this object (SEC-7d scope + row policy). */
     boolean visibleTo(HttpExchange ex, Map<String, Object> summary);
+
+    /**
+     * An Entity's case history, as the host's {@code GET /objects/by-entity} answers it (same matching, same SEC-7d /
+     * ABAC post-filter judged for {@code ex}'s caller): {@code {objects, total, truncated}}. {@code key} is RAW: a
+     * caller resolves any alias first and must not echo it. Throws the host's 422 for an unsearchable key.
+     */
+    Map<String, Object> history(ApiContext api, HttpExchange ex, String type, String key, String status, int limit);
 }

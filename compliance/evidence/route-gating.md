@@ -203,6 +203,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/geo/routes` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java:71` |
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:78` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:79` |
+| POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:108` |
 | POST | `/inv/entity-identities` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:94` |
 | POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:98` |
 | POST | `/inv/entity-identities/import` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:96` |
@@ -244,8 +245,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/projection/neighbors` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:102` |
 | POST | `/inv/reference-rows` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:107` |
 | POST | `/inv/schema/overlap-profile` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:105` |
-| POST | `/inv/snapshots` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:117` |
-| POST | `/inv/snapshots/attach` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:120` |
+| POST | `/inv/snapshots` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:118` |
+| POST | `/inv/snapshots/attach` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:121` |
 | POST | `/inv/traversal/recursive-paths` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:106` |
 | POST | `/jobs` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:70` |
 | DELETE | `/jobs/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:73` |

@@ -32,4 +32,12 @@ public final class HostCasePort implements CasePort {
     public boolean visibleTo(HttpExchange ex, Map<String, Object> summary) {
         return AnnotationTargets.objectVisibleTo(ex, summary);
     }
+
+    /** Over {@link ObjectAccess#byEntity}: the ops module's own {@code GET /objects/by-entity} read. */
+    @Override
+    public Map<String, Object> history(ApiContext api, HttpExchange ex, String type, String key, String status, int limit) {
+        ObjectAccess objects = HostContext.of(api).service().objects()
+                .orElseThrow(() -> new IllegalStateException("Case management is not installed"));
+        return objects.byEntity(api.writeRoot(), ex, type, key, status, limit);
+    }
 }

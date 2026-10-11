@@ -59,7 +59,8 @@ const LIST_REASON_MAX = 1000;
  * propagated score and top contributing origins from a `propagatedRisk` run over the Working Set seeded with those
  * scores. Enrichment: the mapped CRM/KYC row and Entity List membership. Actions: add to a watch / block list (reason
  * required, four-eyes aware) and hide on the canvas. Case history: the Incidents and Cases that reference the node's
- * entity (`GET /objects/by-entity`), read only when the section is opened; a masked pseudonym is never sent.
+ * entity, read only when the section is opened: `GET /objects/by-entity` for a raw key, `POST /inv/case-history` for a
+ * masked one (the server resolves the alias; no raw number reaches the browser).
  */
 @Component({
     selector: 'inspecto-la-node-insight',
@@ -404,11 +405,13 @@ export class NodeInsightComponent implements OnInit {
     readonly historyItems = computed(() =>
         [...(this.history()?.items ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     );
-    /** Why no lookup is possible: a masking pseudonym the route cannot resolve, or no Entity Type to look up as. */
+    /** A masked key (alias / pseudonym) is looked up on the server, which resolves it and picks the Entity Type. */
+    readonly historyMasked = computed(() => this.ctx().key.startsWith('masked:'));
+    /** Why no lookup is possible: a raw key with no Entity Type to look up as. */
     readonly historyBlocked = computed(() => {
         const c = this.ctx();
-        if (c.key.startsWith('masked:')) return 'Case history is unavailable for a masked number.';
-        if (!c.entityType) return 'Case history needs an Entity Type, and this domain profile names none.';
+        if (!this.historyMasked() && !c.entityType)
+            return 'Case history needs an Entity Type, and this domain profile names none.';
         return '';
     });
 
@@ -428,10 +431,12 @@ export class NodeInsightComponent implements OnInit {
 
     private async loadHistory(): Promise<void> {
         const c = this.ctx();
-        if (this.historyBlocked() || !c.entityType) return;
+        if (this.historyBlocked()) return;
         this.history.set(null);
         const status = this.historyStatus();
-        const h = await this.historySvc.byEntity(c.entityType, c.key, status);
+        const h = this.historyMasked()
+            ? await this.historySvc.byMaskedKey(c.key, c.investigationId, status)
+            : await this.historySvc.byEntity(c.entityType!, c.key, status);
         if (status === this.historyStatus()) this.history.set(h);
     }
 

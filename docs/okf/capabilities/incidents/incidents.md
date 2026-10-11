@@ -584,6 +584,10 @@ bound). The route is on the standard per-subject rate-limit bucket (`ControlApi.
 separators inside the digits is not found. Not covered: an LA Investigation linked to a Case
 (`PUT /inv/investigations/{id}/case`) — that link lives in the Professional LA module, which `inspecto-ops` cannot see.
 No read audit (no object read is audited today).
+**Masked keys:** the same read is on the engine seam as `ObjectAccess.byEntity(writeRoot, exchange, type, key, status,
+limit)` (`ObjectServiceAccess` → `EntityHistory.query`, the route's own code: same matching, visibility and `truncated`),
+so Link Analysis's `POST /inv/case-history` can resolve an alias server-side and look it up without the raw id ever
+reaching the browser — see the Link Analysis module concept.
 
 ### 3.5 Cases
 

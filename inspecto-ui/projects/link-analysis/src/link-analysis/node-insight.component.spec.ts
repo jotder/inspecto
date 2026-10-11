@@ -116,9 +116,13 @@ function make(
         masked?: boolean;
         truncated?: boolean;
         history?: (type: string, id: string, status: string) => Promise<EntityHistory>;
+        maskedHistory?: (key: string, inv: string | null, status: string) => Promise<EntityHistory>;
     } = {},
 ) {
     const byEntity = vi.fn(opts.history ?? (() => Promise.resolve({ items: [], truncated: false } as EntityHistory)));
+    const byMaskedKey = vi.fn(
+        opts.maskedHistory ?? (() => Promise.resolve({ items: [], truncated: false } as EntityHistory)),
+    );
     const close = vi.fn();
     const computeRisk = vi.fn(() => of({ ...riskView(), status: 'RUNNING' } as GraphRunView, riskView()));
     const addMember = vi.fn(opts.add ?? (() => of({ changed: 1 })));
@@ -156,7 +160,7 @@ function make(
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: CaseHistoryService, useValue: { byEntity } },
+            { provide: CaseHistoryService, useValue: { byEntity, byMaskedKey } },
             { provide: NodeRiskService, useValue: svc },
             { provide: MatDialog, useValue: dialog },
             { provide: MatDialogRef, useValue: { close } },
@@ -174,7 +178,7 @@ function make(
     const fixture = TestBed.createComponent(NodeInsightComponent);
     fixture.componentRef.setInput('ctx', { ...CTX, ...ctx });
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, svc, dialog, close, byEntity };
+    return { fixture, c: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, svc, dialog, close, byEntity, byMaskedKey };
 }
 
 const settle = async (f: { detectChanges(): void; whenStable(): Promise<unknown> }) => {
@@ -346,14 +350,46 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         await expectNoA11yViolations(el);
     });
 
-    it('never sends a masked pseudonym: says case history is unavailable', async () => {
-        const { fixture, el, byEntity } = make({ key: 'masked:0123456789abcdef', label: 'masked:0123…' });
+    it('looks a masked key up on the server (POST /inv/case-history), never through the raw-id route', async () => {
+        const { fixture, el, byEntity, byMaskedKey } = make(
+            { key: 'masked:0123456789abcdef', label: 'masked:0123…', entityType: undefined, investigationId: 'inv-1' },
+            {
+                maskedHistory: () =>
+                    Promise.resolve({
+                        items: [
+                            {
+                                kind: 'incident',
+                                id: 'INC-1',
+                                title: 'calls spike masked:0123456789abcdef',
+                                status: 'OPEN',
+                                createdAt: '2026-10-11T00:00:00Z',
+                                matchedOn: 'key.caller_msisdn',
+                            },
+                        ],
+                        truncated: false,
+                    } as EntityHistory),
+            },
+        );
         el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
         await settle(fixture);
         expect(byEntity).not.toHaveBeenCalled();
-        expect(el.querySelector('[data-testid=history-unavailable]')!.textContent).toContain(
-            'Case history is unavailable for a masked number.',
+        expect(byMaskedKey).toHaveBeenCalledWith('masked:0123456789abcdef', 'inv-1', 'all');
+        expect(el.querySelector('[data-testid=history-unavailable]')).toBeNull();
+        expect(el.querySelector('[data-testid=history-list]')!.textContent).toContain('calls spike masked:0123456789abcdef');
+        await expectNoA11yViolations(el);
+    });
+
+    it('states an unresolved masked key in words', async () => {
+        const { fixture, el } = make(
+            { key: 'masked:0123456789abcdef', label: 'masked:0123…' },
+            {
+                maskedHistory: () =>
+                    Promise.resolve({ items: [], truncated: false, error: 'The server no longer knows this masked number.' }),
+            },
         );
+        el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
+        await settle(fixture);
+        expect(el.querySelector('[data-testid=history-error]')!.textContent).toContain('no longer knows');
         await expectNoA11yViolations(el);
     });
 

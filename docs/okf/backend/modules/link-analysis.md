@@ -275,6 +275,20 @@ and any column whose registry/lineage class is claimed by a masked Entity Type o
 (MSISDN/IMSI/ACCOUNT/PII) is masked, and under `all` every value but fractional numbers and booleans (an integral column may be an unclassified id), to the Space's exploration alias; untraceable lineage masks every column. Audited as
 `LINK_REFERENCE_READ` (counts only, never the keys).
 
+**Case history (`POST /inv/case-history`, 2026-10-11).** Body `{key, investigationId?, status?, limit?}` →
+`{entityType, resolved, reason?, objects, total, truncated, masking{mode, masked}}`. The node dialog's Case history for a
+key it holds only as an alias (`GET /objects/by-entity` needs the raw id). The key resolves with the reference-rows rules:
+an Investigation pseudonym (readable Investigation only), else an exploration alias, and only when the masking covers the
+Entity Type (`all`, or `typed` with a masked type); under that masking a raw key names nothing (`resolved:false`, the
+same answer as an unknown alias — no oracle). Entity Type = the Investigation header's `entityType`/`sourceType`/`targetType`,
+else `msisdn`. The read is the ops module's own (`ObjectAccess.byEntity` → `EntityHistory.query`, reached through
+`CasePort.history` / `HostCasePort`): same matching, SEC-7d / ABAC post-filter and `truncated`. No key is echoed; under
+masking titles are scrubbed fail-closed: the raw id in any spelling (spaces, dashes, dots, parentheses, `+`) becomes the
+key as asked, every other token of 5+ digits `[number]` and an email `[email]` (placeholders, never minted aliases), and
+rows carry only an allowlist of fields.
+Gates: 503 write root → 503 Case management not installed → 422 body → Investigation read gate (404) → 422 unsearchable
+key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTORY_READ` (counts only).
+
 ### 3.5 Entity store (identity data)
 
 * **Identity Fact log** (`EntityFactLog`): `<Space config root>/audit/entity-facts/`, one file per fact
@@ -370,12 +384,12 @@ and any column whose registry/lineage class is claimed by a masked Entity Type o
 
 ## 6. HTTP surface (la-api, geo-link)
 
-18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **77**<!--count:la-routes--> routes (**71**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
-the live `GET /audit/route-inventory` lists 77 for `/inv` and `/geo`, all present in `openapi-v1.json`):
+18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **78**<!--count:la-routes--> routes (**72**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
+the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
 |---|---|---|
-| Exploration | `/geo/projection`, `/geo/routes`, `/inv/projection{,/neighbors,/multi}`, `/inv/schema/*`, `/inv/traversal/recursive-paths`, `/inv/reference-rows`, `/inv/pattern/{branching,temporal}`, `/inv/value-measures`, `/inv/snapshots*` | none (rate-limited as expensive); snapshots POST `canManageIncidents` |
+| Exploration | `/geo/projection`, `/geo/routes`, `/inv/projection{,/neighbors,/multi}`, `/inv/schema/*`, `/inv/traversal/recursive-paths`, `/inv/reference-rows`, `/inv/case-history`, `/inv/pattern/{branching,temporal}`, `/inv/value-measures`, `/inv/snapshots*` | none (rate-limited as expensive); snapshots POST `canManageIncidents` |
 | Investigations | `/inv/investigations` create/list, `…/{id}/ops`, `/undo`, `/reorder`, `/replay`, `/log`, `/working-set`, `/coverage`, `/compare`, `/references`, `/case`, `/members`, `/template`, `/inv/investigation-templates*` | `canManageIncidents` (+ lead) |
 | Four-eyes / reveal | `…/pending/{p}/approve|deny`, `GET /inv/pending` (approver inbox), `…/reveal` | `canApproveLinkExpansions`, `canRevealLinkEntities` |
 | Dossier | `…/dossier`, `/dossier/verify`, `/dossier/bundle`, `/dossier/bundle/verify` | read gate only |

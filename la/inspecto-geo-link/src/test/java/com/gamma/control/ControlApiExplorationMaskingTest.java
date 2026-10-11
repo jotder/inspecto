@@ -245,6 +245,10 @@ class ControlApiExplorationMaskingTest {
      */
     @Test
     void everyInvReadOnAMaskedSpaceIsScannedForRawIds(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // Case management present, with a history whose title names raw ids: /inv/case-history must re-mask it
+        CaseTeamObjectEngine.arm();
+        CaseTeamObjectEngine.HISTORY = List.of(Map.of("kind", "incident", "id", "INC-1", "title", "calls spike " + A + " -> +" + B,
+                "status", "OPEN", "createdAt", 1L, "matchedOn", "key.caller_msisdn"));
         try (Ctx c = open(cfg, root, plain())) {
             settings(c, "masking_mode: all\n");
             String aliasA = aliasOf(ok(c, "POST", PROJECTION, "{" + BASE + "}", false), 0, "source");
@@ -266,8 +270,14 @@ class ControlApiExplorationMaskingTest {
                     new String[]{"GET", "/inv/index", null}, new String[]{"GET", "/inv/snapshots", null},
                     new String[]{"GET", "/inv/investigation-templates", null}, new String[]{"GET", "/inv/schema/relationships", null},
                     new String[]{"POST", "/inv/reference-rows", "{\"dataset\":\"calls_ds\",\"keyCol\":\"caller\",\"keys\":[\""
-                            + aliasA + "\",\"" + A + "\"]}"});
+                            + aliasA + "\",\"" + A + "\"]}"},
+                    new String[]{"POST", "/inv/case-history", "{\"key\":\"" + aliasA + "\"}"},
+                    new String[]{"POST", "/inv/case-history", "{\"key\":\"" + aliasA + "\",\"investigationId\":\"sweep\"}"},
+                    new String[]{"POST", "/inv/case-history", "{\"key\":\"" + A + "\"}"});
             for (String[] rd : reads) ok(c, rd[0], rd[1], rd[2], false);
+        } finally {
+            CaseTeamObjectEngine.CASES = null;
+            CaseTeamObjectEngine.HISTORY = null;
         }
     }
 }
