@@ -60,7 +60,8 @@ draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOS
    every rewrite is listed as a note in the Import preview. So two copies no longer share a Catalog Stream or a
    ledger dedup key. `dirs.*` derive from the slug id (`NAME-DIRS-1`, the client Import path had still used the
    display name; decision in `pipeline-identity.md`). Duplicate never used `planStreamImport` (it goes through
-   the server bundle, since 2026-09-02).
+   the server bundle, since 2026-09-02). Enrichment / Job satellites stay name-keyed (accepted 2026-10-11,
+   `pipeline-identity.md`). ⛔ Do not implement name-deferral by holding the draft client-side.
 
 ## The stage model (now the editor's checklist chips)
 

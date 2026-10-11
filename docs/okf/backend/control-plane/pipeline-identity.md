@@ -306,3 +306,7 @@ pipelines are untouched (dirs are stored, not re-derived). Build: `pipelineScaff
 The client Import plan (`planStreamImport`, `inspecto/transfer/stream-bundle.ts`) follows it too since
 2026-10-11 (`237269fe9`, `ONB-IMPORT-RETARGET-1`): dirs from the slug id, and `stream` / collector `id` /
 ducklake `data_path` re-pointed to the copy like the server's `PipelineBundleRoutes.retargetPipeline`.
+
+**Decided 2026-10-11 (accepted):** Enrichment (`triggers.on_pipeline`) and Job (`on_pipeline`) satellites stay
+**name-keyed** (`<name>_enrich` / `<name>_job`); save-as-template deliberately does not copy them (D3). Revisit
+only on a reported defect. This was the last caveat of the closed `ONB-IMPORT-RETARGET-1` row.
