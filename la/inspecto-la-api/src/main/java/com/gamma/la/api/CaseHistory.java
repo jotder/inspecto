@@ -8,7 +8,10 @@ import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.MaskTokens;
 import com.gamma.la.core.CasePort;
 import com.gamma.la.core.CasePorts;
+import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.InvestigationStores;
 import com.gamma.la.core.LinkEventTypes;
+import com.gamma.la.core.SnapshotStore;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
@@ -155,6 +158,20 @@ final class CaseHistory {
                 }
         int total = h.get("total") instanceof Number n ? n.intValue() : objects.size();
         boolean truncated = Boolean.TRUE.equals(h.get("truncated"));
+        // the Cases the analyst attached graphs to: an Investigation linked to a Case, or a sealed snapshot attached to one,
+        // that CONTAINS this entity. Neither registers an entity reference on the host, so the host's read misses them.
+        List<Map<String, Object>> linked = new ArrayList<>();
+        boolean linkedTruncated = linkedCases(api, ex, port, writeRoot, raw, status, linked);
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Map<String, Object> o : objects) seen.add(o.get("kind") + "|" + o.get("id"));
+        for (Map<String, Object> row : linked) {
+            if (!seen.add(row.get("kind") + "|" + row.get("id"))) continue;
+            total++;
+            if (objects.size() >= limit) { truncated = true; continue; }
+            if (remask && row.get("title") instanceof String t) row.put("title", scrub(t, raw, key));
+            objects.add(row);
+        }
+        truncated |= linkedTruncated;
         res.put("resolved", true);
         res.put("objects", objects);
         res.put("total", total);
@@ -185,6 +202,125 @@ final class CaseHistory {
         }
         m.appendTail(sb);
         return sb.toString().replace(SENTINEL, asked);
+    }
+
+    /** At most this many Case-linked Investigations are opened and evaluated, and this many attachment records read. */
+    static final int MAX_LINKED_INVESTIGATIONS = 100;
+    static final int MAX_ATTACHMENTS = 500;
+
+    /**
+     * Adds to {@code out} one row per Case linked to an Investigation (its Case link) or to a sealed snapshot (the attach
+     * log) that contains {@code raw}: {@code matchedOn: investigation|snapshot}, {@code via} the Investigation / snapshot
+     * id. Fail closed: only Investigations the caller can read ({@link InvestigationRoutes#openForRead}; a snapshot is
+     * judged by the Investigation it is anchored to), only an existing {@code case} the caller may see
+     * ({@link CasePort#visibleTo}); a record that cannot be read is skipped. Returns whether a cap left records unread.
+     */
+    private static boolean linkedCases(ApiContext api, HttpExchange ex, CasePort port, Path writeRoot, String raw,
+                                       String status, List<Map<String, Object>> out) throws IOException {
+        boolean truncated = false;
+        Map<String, Boolean> readable = new java.util.HashMap<>();   // investigation id -> admitted by openForRead
+        InvestigationStore store = InvestigationStores.of(writeRoot);
+        int opened = 0;
+        for (String id : store.ids()) {
+            String caseRef;
+            try {
+                caseRef = InvestigationCaseRoutes.caseRef(store, id);
+            } catch (IOException | RuntimeException bad) {
+                continue;
+            }
+            if (caseRef == null) continue;
+            if (opened++ >= MAX_LINKED_INVESTIGATIONS) { truncated = true; break; }
+            InvestigationRoutes.Inv inv = readable(api, ex, id, readable);
+            if (inv == null) continue;
+            boolean member = false;
+            try {
+                for (Map<String, Object> row : WorkingSetRoutes.relation(inv, new boolean[1]).tables().get("entities"))
+                    if (raw.equals(row.get("entityId"))) { member = true; break; }
+            } catch (IOException | RuntimeException bad) {
+                continue;
+            }
+            if (member) caseRow(api, ex, port, caseRef, status, "investigation", id, out);
+        }
+
+        boolean[] cut = {false};
+        SnapshotStore snapshots = new SnapshotStore(writeRoot);
+        Map<String, Boolean> contains = new java.util.HashMap<>();
+        for (String line : snapshots.recentAttachments(MAX_ATTACHMENTS, cut)) {
+            String sid, caseId;
+            try {
+                @SuppressWarnings("unchecked") Map<String, Object> a = ApiContext.JSON.readValue(line, Map.class);
+                sid = a.get("snapshotId") instanceof String s ? s : null;
+                caseId = a.get("caseId") instanceof String c ? c : null;
+            } catch (IOException | RuntimeException bad) {
+                continue;
+            }
+            if (sid == null || caseId == null || !SnapshotStore.SAFE_ID.matcher(sid).matches()) continue;
+            Boolean in = contains.get(sid);
+            if (in == null) {
+                in = snapshotContains(api, ex, snapshots, sid, raw, writeRoot, readable);
+                contains.put(sid, in);
+            }
+            if (in) caseRow(api, ex, port, caseId, status, "snapshot", sid, out);
+        }
+        return truncated || cut[0];
+    }
+
+    private static InvestigationRoutes.Inv readable(ApiContext api, HttpExchange ex, String id, Map<String, Boolean> seen) {
+        if (Boolean.FALSE.equals(seen.get(id))) return null;
+        try {
+            InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
+            seen.put(id, true);
+            return inv;
+        } catch (IOException | RuntimeException refused) {
+            seen.put(id, false);   // not readable by this caller: it does not exist here
+            return null;
+        }
+    }
+
+    /** A sealed snapshot holds {@code raw} among its nodes, and the caller can read the Investigation it is anchored to. */
+    private static boolean snapshotContains(ApiContext api, HttpExchange ex, SnapshotStore snapshots, String sid, String raw,
+                                            Path writeRoot, Map<String, Boolean> readable) {
+        try {
+            String json = snapshots.read(sid);
+            if (json == null) return false;
+            @SuppressWarnings("unchecked") Map<String, Object> snap = ApiContext.JSON.readValue(json, Map.class);
+            if (!(snap.get("investigationId") instanceof String invId)) return false;   // unanchored: no gate to judge it by
+            InvestigationRoutes.Inv inv = readable(api, ex, invId, readable);
+            if (inv == null || !(snap.get("nodes") instanceof List<?> nodes)) return false;
+            EntityMasking mask = null;
+            for (Object n : nodes) {
+                if (!(n instanceof Map<?, ?> m) || !(m.get("id") instanceof String nid)) continue;
+                if (raw.equals(nid)) return true;
+                if (nid.startsWith(MaskTokens.TOKEN_PREFIX)) {
+                    if (raw.equals(ExplorationMasking.lookup(writeRoot, nid))) return true;
+                    if (mask == null) mask = EntityMasking.of(inv, List.of());
+                    if (raw.equals(mask.reveal(nid))) return true;
+                }
+            }
+            return false;
+        } catch (IOException | RuntimeException bad) {
+            return false;
+        }
+    }
+
+    /** One allowlisted row for Case {@code ref} when it exists, is a Case, the caller may see it and it passes {@code status}. */
+    private static void caseRow(ApiContext api, HttpExchange ex, CasePort port, String ref, String status, String matchedOn,
+                                String via, List<Map<String, Object>> out) {
+        try {
+            Map<String, Object> c = port.summary(api, ref).orElse(null);
+            if (c == null || !"case".equals(c.get("kind")) || !port.visibleTo(ex, c)) return;
+            boolean closed = !Boolean.FALSE.equals(c.get("closed"));
+            if (status.equals("open") && closed || status.equals("closed") && !closed) return;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("kind", "case");
+            row.put("id", c.get("id") == null ? ref : String.valueOf(c.get("id")));
+            for (String f : List.of("title", "status", "severity", "createdAt")) if (c.get(f) != null) row.put(f, c.get(f));
+            row.put("matchedOn", matchedOn);
+            row.put("via", via);
+            out.add(row);
+        } catch (RuntimeException bad) {
+            // a Case that cannot be read is not shown
+        }
     }
 
     private static int limit(Object v) {

@@ -265,6 +265,68 @@ class ControlApiInvCaseHistoryTest {
         }
     }
 
+    /** The live walk-through defect: Attach to Case registers no entity reference, so the host's read alone misses the Case. */
+    @Test
+    void aCaseTheGraphWasAttachedToIsListedViaSnapshotAndInvestigationLinkOnlyForAReader(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+                case "Bearer owner" -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents")));
+                case "Bearer stranger" -> Optional.of(new Subject("analyst-3", Set.of("canManageIncidents")));
+                default -> Optional.empty();
+            });
+            String own = "Bearer owner";
+            CaseTeamObjectEngine.HISTORY = List.of();   // the host knows no Incident for the entity
+            Map<String, Map<String, Object>> cases = CaseTeamObjectEngine.CASES;
+            Map<String, Object> linkedCase = new java.util.HashMap<>(CaseTeamObjectEngine.caseOf("CASE-9", "analyst-1", "analyst-2", false));
+            linkedCase.put("title", "fraud ring +" + A);
+            cases.put("CASE-9", linkedCase);
+            cases.put("CASE-8", CaseTeamObjectEngine.caseOf("CASE-8", "analyst-1", "analyst-2", false));
+            String aliasA = aliasOfA(c, own);
+            assertEquals(200, send(c, "/inv/investigations", "{\"id\":\"inv-a\",\"purpose\":\"case history\","
+                    + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", own).statusCode());
+            assertEquals(200, send(c, "/inv/investigations/inv-a/ops", "{\"op\":\"seed\",\"ids\":[\"" + aliasA + "\"]}", own).statusCode());
+
+            // one-step Attach to Case: seal, attach, link
+            HttpResponse<String> sealed = send(c, "/inv/snapshots", "{\"id\":\"snap-a\",\"investigationId\":\"inv-a\","
+                    + "\"manifestHash\":\"h\",\"nodes\":[{\"id\":\"" + aliasA + "\"}],\"edges\":[]}", own);
+            assertEquals(200, sealed.statusCode(), sealed.body());
+            assertEquals(200, send(c, "/inv/snapshots/attach", "{\"snapshotId\":\"snap-a\",\"caseId\":\"CASE-8\"}", own).statusCode());
+            HttpRequest put = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port() + "/api/v1/inv/investigations/inv-a/case"))
+                    .header("Content-Type", "application/json").header("Authorization", own)
+                    .PUT(BodyPublishers.ofString("{\"caseRef\":\"CASE-9\"}")).build();
+            HttpResponse<String> linked = client.send(put, BodyHandlers.ofString());
+            assertEquals(200, linked.statusCode(), linked.body());
+
+            String body = "{\"key\":\"" + aliasA + "\",\"investigationId\":\"inv-a\",\"status\":\"all\"}";
+            HttpResponse<String> r = send(c, ROUTE, body, own);
+            assertEquals(200, r.statusCode(), r.body());
+            for (String raw : RAW) assertFalse(r.body().contains(raw), "leaked " + raw + ": " + r.body());
+            JsonNode d = JSON.readTree(r.body()).get("data");
+            assertEquals(2, d.get("objects").size(), d.toString());
+            assertEquals(2, d.get("total").asInt());
+            Map<String, JsonNode> byId = new java.util.HashMap<>();
+            d.get("objects").forEach(o -> byId.put(o.get("id").asText(), o));
+            assertEquals("investigation", byId.get("CASE-9").get("matchedOn").asText());
+            assertEquals("inv-a", byId.get("CASE-9").get("via").asText());
+            assertEquals("fraud ring " + aliasA, byId.get("CASE-9").get("title").asText(), "a linked Case's title is scrubbed too");
+            assertEquals("snapshot", byId.get("CASE-8").get("matchedOn").asText());
+            assertEquals("snap-a", byId.get("CASE-8").get("via").asText());
+            assertFalse(byId.get("CASE-8").has("owner"), "only allowlisted fields");
+
+            // an entity outside the graph matches nothing; an open-only read keeps open Cases; closed-only drops them
+            assertEquals(0, JSON.readTree(send(c, ROUTE, "{\"key\":\"" + aliasA + "\",\"status\":\"closed\"}", own).body())
+                    .at("/data/objects").size());
+
+            // a non-member cannot read inv-a (nor the snapshot anchored to it): neither Case is revealed
+            HttpResponse<String> stranger = send(c, ROUTE, "{\"key\":\"" + aliasA + "\"}", "Bearer stranger");
+            assertEquals(200, stranger.statusCode(), stranger.body());
+            assertEquals(0, JSON.readTree(stranger.body()).at("/data/objects").size(), stranger.body());
+            assertFalse(stranger.body().contains("CASE-") || stranger.body().contains("inv-a") || stranger.body().contains("snap-a"),
+                    stranger.body());
+        }
+    }
+
     @Test
     void gates503422And404(@TempDir Path cfg, @TempDir Path root, @TempDir Path cfg2) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
