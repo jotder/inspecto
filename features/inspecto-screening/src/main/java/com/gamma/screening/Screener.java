@@ -25,7 +25,8 @@ import java.util.function.UnaryOperator;
  *   <li><b>identifier</b> — the list's own matching ({@link EntityRegistry.EntityList#match}: exact under the sealed
  *       normaliser, then prefix / range / CIDR), score 1.0;</li>
  *   <li><b>name</b> — {@link NameMatcher} against the list's LIVE members, compared only with members that share
- *       the first folded letter of at least one token (blocking, SCR-D9).</li>
+ *       the first folded letter, or the first letter of the transliteration skeleton, of at least one token (blocking,
+ *       SCR-D9; {@link NameMatcher#blockKeys}).</li>
  * </ul>
  * A retired list matches nothing; an expired entry never matches. An entry is shown as the list renders it: a
  * masked list's entry is its mask token (SCR-D14).
@@ -57,7 +58,7 @@ public final class Screener {
                 List<String> tokens = NameMatcher.tokens(key);
                 if (tokens.isEmpty()) continue;
                 Member m = new Member(key, tokens);
-                for (Character c : initials(tokens)) byInitial.computeIfAbsent(c, x -> new ArrayList<>()).add(m);
+                for (Character c : NameMatcher.blockKeys(tokens)) byInitial.computeIfAbsent(c, x -> new ArrayList<>()).add(m);
             }
         }
 
@@ -107,7 +108,7 @@ public final class Screener {
             }
             if (nameTokens.isEmpty()) continue;
             Set<Member> candidates = new LinkedHashSet<>();
-            for (Character c : initials(nameTokens)) candidates.addAll(p.byInitial.getOrDefault(c, List.of()));
+            for (Character c : NameMatcher.blockKeys(nameTokens)) candidates.addAll(p.byInitial.getOrDefault(c, List.of()));
             for (Member m : candidates) {
                 if (seen.contains(m.key())) continue;
                 double score = NameMatcher.score(nameTokens, m.tokens());
@@ -120,12 +121,6 @@ public final class Screener {
         out.sort(Comparator.comparingDouble(Match::score).reversed()
                 .thenComparing(Match::listId).thenComparing(Match::entry));
         return out.size() > maxMatches ? List.copyOf(out.subList(0, maxMatches)) : out;
-    }
-
-    private static Set<Character> initials(List<String> tokens) {
-        Set<Character> out = new LinkedHashSet<>();
-        for (String t : tokens) out.add(t.charAt(0));
-        return out;
     }
 
     /** The wire shape of one match. */

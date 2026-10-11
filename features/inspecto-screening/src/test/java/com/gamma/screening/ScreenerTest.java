@@ -108,11 +108,13 @@ class ScreenerTest {
 
     @Test
     void blockingComparesOnlyEntriesSharingATokenInitial(@TempDir Path root) throws Exception {
-        // SCR-D9's recorded cost: a different first letter in EVERY token is never compared (Gaddafi / Qadhafi alone).
+        // SCR-D9: a different first letter in EVERY token is never compared. SCREENING-1 (2) lifted that for
+        // transliteration variants (Gaddafi / Qadhafi share a phonetic block); a truly different initial stays blocked.
         ScreeningLists.unmasked(root);
         ScreeningLists.create(root, "sanctions", "block", "subscriber", "default");
         ScreeningLists.add(root, "sanctions", "default", List.of("Qadhafi"));
-        assertEquals(List.of(), screen(root, name("Gaddafi"), "sanctions"));
+        assertEquals(1, screen(root, name("Gaddafi"), "sanctions").size(), "phonetic block: Gaddafi / Qadhafi");
+        assertEquals(List.of(), screen(root, name("Zubair"), "sanctions"), "no shared block, never compared");
         ScreeningLists.add(root, "sanctions", "default", List.of("Moammar Qadhafi"));
         assertEquals(1, screen(root, name("Muammar Gaddafi"), "sanctions").size(), "one shared initial is enough");
     }
