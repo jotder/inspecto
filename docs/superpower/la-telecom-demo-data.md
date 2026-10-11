@@ -53,7 +53,7 @@ Volumes: 20 342 voice rows, 7 131 SMS, 2 544 HLR/EIR, 2 423 CRM, 4 541 recharges
 | **Subscription fraud** | `99979300001`–`99979300005` | One identity document, shared with IRSF-01. Activated 2026-09-12 to 09-16, KYC incomplete, all traffic international. |
 | **SIM box** | `99979400001`–`99979400006` | Six SIMs rotate across one 8-slot gateway, so each SIM shows 4 IMEIs and each IMEI shows up to 4 SIMs, with 3 SIM swaps each. They make 160–200 outbound calls each and take 1 stray inbound call in total. SIMBOX-03 is blocklisted. SIMBOX-01 is topped up with the same card as SUBFRAUD-03. |
 | **Mules** | `99979500001`–`99979500005` | Forwarding chain MULE-01 → MULE-02 → MULE-03 (HLR plus 30 forwarded calls). All five top up only at rogue agent `AGT-666` (SUBFRAUD-05 topped up there once too), with cloned vouchers `VMULE00000A1` (MULE-01..03) and `VMULE00000A2` (MULE-03..05). MULE-01's customer `CUST-M01` took over SIMBOX-06 and SUBFRAUD-04 (ownership transfers, sim_history). |
-| **Supernode** | `99970000100` (taxi dispatch) | 650 distinct callers, more than 500 contacts |
+| **Supernode** | `99970000100` (taxi dispatch) | 650 distinct callers all-time; 628 distinct contacts inside the preset's 30-day window (600 callers are placed in the last 30 days), so it trips `hubThreshold` 500 in the windowed expand too |
 | Stale background block-list entry | `99971002000` | Blocklisted in March for bad debt. The only loud background number. |
 
 ### Degree ladder from the suspect `99979100001`
@@ -76,17 +76,21 @@ step, show "Expand anyway" on the hub. Overriding the hub first admits its ~650 
 frontier.
 
 **The Telecom preset reaches this ladder by degree 4 (re-tuned 2026-10-12): 30 days, `minEvents` 1, `maxFanOut` 500,
-`budget` 10 000.** Measured by replaying the expand (fan-out ranked by `events`, budget over the ranked rows) on the
-folded seed CSVs with the hub held:
+`budget` 10 000, `hubThreshold` 500, hub held.** Measured 2026-10-12 with DuckDB over the `telecom_links` Job SQL's
+fold of the seed CSVs, replaying `IndexedExpand`: links with `last_seen` in the 30 days ending at the newest
+`last_seen` (2026-09-29 23:57:59), pairs per (a, b, kind) with summed `events`, fan-out ranked by `events`, budget over
+the ranked rows, and the hub check as distinct counterparties (both sides, all kinds, in-window) above 500:
 
-| Degree | Frontier | Candidate rows | Admitted |
-|---|---|---|---|
-| 1 | 1 (the suspect) | 403 | 402 |
-| 2 | 402 | 4 386 | 528 (the hub flagged) |
-| 3 | 527 | 4 731 | 134 |
-| 4 | 134 | 816 | 50 |
+| Degree | Frontier | Candidate rows | Admitted | Planted numbers admitted |
+|---|---|---|---|---|
+| 1 | 1 (the suspect) | 403 | 402 | WANGIRI-B, PREMIUM-01 |
+| 2 | 402 | 2 901 | 492 (the hub flagged, 628 contacts) | IRSF-01, IRSF-02, HUB |
+| 3 | 491 | 2 825 | 143 | SUBFRAUD-01..05, IRSF-03/04, PREMIUM-02..06 |
+| 4 | 143 | 667 | 55 | SIMBOX-01, SIMBOX-06, MULE-01..05, PREMIUM-07..12 |
+| 5 | 55 | 419 | 258 | SIMBOX-02..05 |
 
-Nothing is fan-out capped and nothing truncated. The old preset (`maxFanOut` 50, `budget` 2000) failed twice: the
+Nothing is fan-out capped and nothing truncated. Before the 2026-10-12 data fix the hub had only 413 contacts inside the
+window (650 all-time), was never flagged, and its callers flooded degree 3 (391 admitted) and degree 4 (663). The old preset (`maxFanOut` 50, `budget` 2000) failed twice: the
 suspect's 403 rows ranked by `events` put the 1-event `shared_device` link to WANGIRI-B last, so a cap of 50 dropped it
 at degree 1 (it then arrived at degree 2); and the 2000-row budget truncated degree 4 (2 386 rows) before the
 `shared_payment` rings. `maxFanOut` must stay ≥ 403 and at or under `four_eyes_fan_out_above` (2000) so the ladder runs
@@ -306,7 +310,12 @@ Use JDK 27 (`JAVA_HOME=C:\sandbox\.graalvm-cache\jdk-27-win`).
    requests, `fm.manager` approves in Oversight. While a degree waits, the
    Investigation panel re-reads the log every 15 s (and on window focus or reopening the same id) and then shows
    "approved (N new entities admitted / nothing new)" or "denied".
-4. **The Jobs run on a `*/10` cron.** After seeding a Space, press *Run* on `telecom_links` and
+4. **The hub must be a hub INSIDE the window, not just all-time.** The expand's hub check counts distinct
+   counterparties over the windowed links, so a supernode whose calls are spread over the full 60 days shows only half
+   its contacts. Live run 5 found the hub at 413 (< 500) and never flagged. `tools/gen-la-telecom-data.py` now moves
+   the first 600 hub callers' calls into the last 30 days (same rng draws, so nothing else moves); 628 contacts fall
+   in the window. `TelecomLinksGoldenTest` pins ≥ 500 in-window contacts.
+5. **The Jobs run on a `*/10` cron.** After seeding a Space, press *Run* on `telecom_links` and
    `telecom_msisdn_indicators` rather than waiting up to 10 minutes. Sign in as `fm.manager` to do it (only the
    `fraud-manager` role holds `canOperateRuns`). The counts Job and the typology Alerts then follow on their own.
 

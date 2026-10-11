@@ -191,6 +191,16 @@ class TelecomLinksGoldenTest {
         for (Map<String, Object> l : links)
             if (l.get("link_kind").equals("voice") && l.get("b_msisdn").equals(HUB)) callers.add((String) l.get("a_msisdn"));
         assertTrue(callers.size() > 500, "the hub has " + callers.size() + " distinct callers");
+        // the Telecom preset's 30-day window (ending at the newest last_seen) must still see the hub above hubThreshold 500
+        java.time.LocalDateTime end = links.stream().map(l -> at(l.get("last_seen"))).max(java.util.Comparator.naturalOrder()).orElseThrow();
+        java.time.LocalDateTime start = end.minusDays(30);
+        Set<String> inWindow = new HashSet<>();
+        for (Map<String, Object> l : links) {
+            if (at(l.get("last_seen")).isBefore(start)) continue;
+            if (l.get("a_msisdn").equals(HUB)) inWindow.add((String) l.get("b_msisdn"));
+            if (l.get("b_msisdn").equals(HUB)) inWindow.add((String) l.get("a_msisdn"));
+        }
+        assertTrue(inWindow.size() >= 500, "the hub has " + inWindow.size() + " distinct contacts in the 30-day window");
         for (Map<String, Object> l : links) {
             String via = String.valueOf(l.get("via"));
             assertFalse(via.matches(".*agent:AGT-0\\d\\d.*"), "a retail agent serving ~60 lines makes no pair: " + l);
@@ -531,6 +541,12 @@ class TelecomLinksGoldenTest {
                 if (d.putIfAbsent(y, d.get(x) + 1) == null) q.add(y);
         }
         return d;
+    }
+
+    private static java.time.LocalDateTime at(Object v) {
+        if (v instanceof java.sql.Timestamp t) return t.toLocalDateTime();
+        if (v instanceof java.time.LocalDateTime t) return t;
+        return java.time.LocalDateTime.parse(String.valueOf(v).replace(' ', 'T'));
     }
 
     /** Shortest undirected hop counts over every link kind - how Link Analysis expands degree by degree. */
