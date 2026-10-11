@@ -173,7 +173,7 @@ export function triggerVerdict(res) {
 }
 
 /** The telecom presenter: an explicit --presenter wins; else fm.manager (only fm.manager may press Run in la-showcase,
- *  docs/superpower/la-telecom-demo-data.md §7). Non-telecom runs keep fm.analyst. */
+ *  docs/archived-documents/plans-archive/la-telecom-demo-data.md §7). Non-telecom runs keep fm.analyst. */
 export function resolvePresenter(presenter, telecom) {
   return presenter || (telecom ? 'fm.manager' : 'fm.analyst');
 }

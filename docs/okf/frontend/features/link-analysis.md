@@ -2016,3 +2016,48 @@ Already covered there (skip): LD refusal codes, `standing` binding, `canViewAs`,
 - **Compare**: the `compare` op through the Investigation tab hits the same `…/ops` route; checked live against a demo backend (activity mode, two windows) — answered with a sealed `comparison`.
 - **Identity Fact log**: `LinkAnalysisIdentityComponent` on the la-app Entity Lists page reads `GET /inv/entity-identities`; the server re-verifies the WHOLE chain on every read (`EntityFactLog.read`), so a successful read renders *Chain verified* + head seq/hash, a 500 renders *Chain NOT verified* and hides the stale head. Tail truncation is undetectable from the log alone (stated on screen). Import form → `POST /inv/entity-identities/import` (counts only).
 - **Alert → Investigation (DR-U9)**: DECISION — the Alert does NOT carry the breaching entity names. `la-live-detection-design` invariant 2 ("aggregate output only"; D-LD9 relies on it) holds: an Alert is readable by people outside the Investigation's gates, so names on it would bypass R3/PDP/membership even masked per Space. Instead the Alerts page offers *Open Investigation* for an Investigation rule's fired Alert (`?investigation=<id>` deep link, handled in `LinkAnalysisComponent.ngOnInit`), where Value Measures name them under the Investigation's own gates and masking. Reversing this needs the invariant changed first.
+
+## Telecom fraud demo (as-built 2026-10-12)
+
+Shipped through six live browser walk-throughs; the sixth (2026-10-12) was judged *ready to present*, every
+storyboard beat passing. Backend routes and invariants are in
+[`okf/backend/modules/link-analysis.md`](../../backend/modules/link-analysis.md); this section is the demo as the
+presenter runs it. Provenance (archived): [`la-telecom-fraud-demo-storyboard.md`](../../../archived-documents/plans-archive/la-telecom-fraud-demo-storyboard.md)
+and [`la-telecom-demo-data.md`](../../../archived-documents/plans-archive/la-telecom-demo-data.md).
+Remaining small items: BACKLOG `LA-TELECOM-DEMO-RESIDUALS-1`.
+
+**Scenes (one analyst, one ring, ~15 min).** (1) Start from the **MSISDN starter card** ("Investigate a number",
+`?seed=`) with the suspect `99979100001` - telecom typology Alerts are aggregate-only (no entity on the Alert, by
+design), so they are not the entry point. (2) Degree 1: voice / SMS / forwarding / shared-device neighbours, footer
+counts. (3) Expand degree 2, 3, 4 with the hub held; **only then**, as the last beat, show the hub's audited
+"Expand anyway" and four-eyes - overriding the hub first floods the frontier with its background contacts.
+(4) Slice by link kind (voice, SMS, forwarding, shared device / identity / payment, SIM history). (5) The ring:
+shared IMEI, forwarding chain. (6) Node dialog: Risk (`propagatedRisk`), Enrichment (`crm_kyc`, `hlr_eir` over the
+masked `POST /inv/reference-rows`), Case history (`POST /inv/case-history`), watch / block actions. (7) Louvain
+community and the telecom pattern packs (Wangiri, IRSF, SIM box, forwarding chain). (8) Act: watch list, one-step
+Attach to Case, export. (9) Under the hood: the Pipelines and Jobs that built it.
+
+**Data (`la-showcase` Space Template).** Eight synthetic feeds (CDR voice/SMS, HLR/EIR, CRM/KYC, recharge,
+provisioning, block list, alarms; generator `tools/gen-la-telecom-data.py`, byte-identical output) folded by the
+`sql.template` Jobs `telecom_links` (MSISDN-MSISDN pairs, the "shared X" key in `via`) and
+`telecom_msisdn_indicators` (0-100 score) on a `*/10` cron, plus `telecom_typology_counts`. Planted: suspect /
+Wangiri `99979100001` (WANGIRI-B `99979100002`), premium range `99891000001`-`12`, IRSF `99979200001`-`4`,
+subscription fraud `99979300001`-`5`, SIM box `99979400001`-`6`, mules `99979500001`-`5`, the benign taxi-dispatch
+hub `99970000100`. Degree ladder from the suspect under the Telecom preset (pinned by `TelecomLinksGoldenTest`):
+d1 402 admitted · d2 492, hub flagged at 628 in-window contacts · d3 143 (SUBFRAUD-01..05) · d4 55 (SIMBOX-01/06,
+MULE-01..05) · SIMBOX-02..05 at d5 via `shared_device`. Nothing is fan-out capped or truncated.
+
+**Telecom preset.** 30-day window on `last_seen` ending at the Dataset's latest `last_seen`, read zone-free
+(`strftime`) and parsed as UTC (a bare `MAX` came back in the host zone and dropped links); when the latest time
+cannot be read no window is sent ("all available data"). `minEvents` 1, `maxFanOut` 500, `budget` 10000,
+`hubThreshold` 500; expand ranks by `eventsCol`. `config/link-analysis.toon` sets `four_eyes_fan_out_above: 2000`
+(operator 2026-10-11), so the bounded ladder never waits.
+
+**Four-eyes beat.** An unbounded expand (no `maxFanOut`) or any fan-out above 2000 waits for approval:
+`fm.analyst` requests, `fm.manager` approves in **Approvals → Link expansions**; the panel re-reads the log and
+shows approved / denied.
+
+**Gotchas.** Only `fm.manager` (`fraud-manager`, `canOperateRuns`) may press *Run* on the Jobs - the seed `admin`
+gets 403; press it after seeding rather than waiting for the cron. The benign taxi hub scores like the suspect - a
+talking point (high connectivity is not guilt), not a defect. Offline smoke: `node tools/la-demo-smoke.mjs --telecom`.
+Live run recipe: build the bundle in a worktree and serve it on a free port (e.g. :8099), never the shared :8080.
