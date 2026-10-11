@@ -30,8 +30,19 @@ public final class CommitFence {
     public enum State { HELD, LOST, UNREADABLE }
 
     /** Thrown at a commit point when the pipeline's lease is lost (taken over) or could not be verified. */
-    public static final class LeaseLostException extends IllegalStateException {
+    public static class LeaseLostException extends IllegalStateException {
         LeaseLostException(String msg) { super(msg); }
+    }
+
+    /**
+     * Thrown at a checkpoint or commit point when the host is closing and cancelled the run
+     * (HA-GRACEFUL-STOP-LEASE-RELEASE-1). A {@link LeaseLostException} on purpose: every existing handler for
+     * "the run stopped for a reason that is not this Consignment's fault" — no retry attempt spent, no
+     * quarantine, no output cleanup (the deterministic batch id makes the next holder's re-plan overwrite
+     * in place), inputs left in the inbox — is exactly what a cancelled run needs.
+     */
+    public static final class RunCancelledException extends LeaseLostException {
+        RunCancelledException(String msg) { super(msg); }
     }
 
     /** A registration; closing it removes the check. */
@@ -41,6 +52,11 @@ public final class CommitFence {
 
     private static final Map<String, Supplier<State>> CHECKS = new ConcurrentHashMap<>();
 
+    /** Cooperative-cancel signals (HA-GRACEFUL-STOP-LEASE-RELEASE-1), same key as {@link #CHECKS}. Deliberately
+     *  separate from the lease state: the claim is still ours, the host is merely closing and asks the run to
+     *  stop so the claim can be released safely. Cheap — a flag read, never a lease-table read. */
+    private static final Map<String, BooleanSupplier> CANCELS = new ConcurrentHashMap<>();
+
     private CommitFence() {}
 
     private static String key(Scope scope, String pipeline) {
@@ -49,9 +65,15 @@ public final class CommitFence {
 
     /** Register {@code state} for {@code pipeline} in the current thread's Space until the handle closes. */
     public static Held hold(Scope scope, String pipeline, Supplier<State> state) {
+        return hold(scope, pipeline, state, null);
+    }
+
+    /** As above, plus a {@code cancelled} signal the engine polls at its checkpoints ({@code null} = never cancelled). */
+    public static Held hold(Scope scope, String pipeline, Supplier<State> state, BooleanSupplier cancelled) {
         String k = key(scope, pipeline);
         CHECKS.put(k, state);
-        return () -> CHECKS.remove(k, state);
+        if (cancelled != null) CANCELS.put(k, cancelled);
+        return () -> { CHECKS.remove(k, state); if (cancelled != null) CANCELS.remove(k, cancelled); };
     }
 
     /** {@link #hold(Scope, String, Supplier)} for a plain held / not-held answer. */
@@ -61,6 +83,7 @@ public final class CommitFence {
 
     /** Refuse the commit unless {@code pipeline}'s registered lease is held; no registration means nothing to lose. */
     public static void check(Scope scope, String pipeline) {
+        checkpoint(scope, pipeline);   // a cancel is refused at every commit point too
         Supplier<State> c = CHECKS.get(key(scope, pipeline));
         State st = c == null ? State.HELD : c.get();
         if (st == State.HELD) return;
@@ -74,5 +97,22 @@ public final class CommitFence {
         log.warn("Run lease lost for '{}' ({}) — another node took it over; aborting without committing, the "
                 + "files stay in the inbox for the new holder", pipeline, scope);
         throw new LeaseLostException("lease lost: '" + pipeline + "' was taken over by another node — not committed");
+    }
+
+    /**
+     * A cooperative-cancellation checkpoint (HA-GRACEFUL-STOP-LEASE-RELEASE-1): throws {@link RunCancelledException}
+     * only when the host cancelled the run; a lost or unreadable lease is ignored here (those are verdicts for the
+     * commit points, which keep calling {@link #check}, and which also refuse a cancel). Placed before an output write so a cancelled run stops
+     * writing; safety does NOT depend on its density — the claim is released only after the run thread ends.
+     */
+    public static void checkpoint(Scope scope, String pipeline) {
+        BooleanSupplier c = CANCELS.get(key(scope, pipeline));
+        if (c != null && c.getAsBoolean()) throw cancelled(scope, pipeline);
+    }
+
+    private static RunCancelledException cancelled(Scope scope, String pipeline) {
+        log.info("Run '{}' ({}) cancelled — the host is closing; stopping without committing, the files stay in "
+                + "the inbox and the claim is released once this run has stopped", pipeline, scope);
+        return new RunCancelledException("run cancelled: '" + pipeline + "' — the host is closing; not committed");
     }
 }

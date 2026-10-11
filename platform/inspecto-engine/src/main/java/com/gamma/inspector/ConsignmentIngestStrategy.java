@@ -158,6 +158,10 @@ interface ConsignmentIngestStrategy {
                                  PipelineConfig cfg, String dbDir, String baseName,
                                  String batchId, Map<Integer, String> srcIdToFile,
                                  String writeScope, String selectedTable) throws Exception {
+        // HA-GRACEFUL-STOP-LEASE-RELEASE-1: the shared output-write choke point, before the lane fork below — a
+        // cancelled run writes no more. (Safety never depends on this: the claim is released only after the
+        // run thread has stopped; the checkpoint just makes that happen promptly.)
+        CommitFence.checkpoint(CommitFence.Scope.RUN, cfg.identity().pipelineName());
         // ── the lane fork ─────────────────────────────────────────────────────
         // This is the one choke point every ingest lane already funnels through, holding the live
         // connection and the materialised table. Everything downstream of the returned Written
@@ -343,6 +347,8 @@ interface ConsignmentIngestStrategy {
         Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
 
         for (PipelineConfig.Sink dest : sinks) {
+            // HA-GRACEFUL-STOP-LEASE-RELEASE-1: the shared output-write choke point — a cancelled run writes no more.
+            CommitFence.checkpoint(CommitFence.Scope.RUN, cfg.identity().pipelineName());
             String destDir = fanOut ? Paths.get(dest.database()).resolve(rel).toString() : dbDir;
             // B4: dest.filenameColumn() (null = byte-identical) translates __src_id into a source-file
             // column via the same map the lineage ledger uses.

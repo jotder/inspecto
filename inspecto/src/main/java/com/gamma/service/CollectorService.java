@@ -187,6 +187,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     // Phase B: the seam, not the class. Defaults to the in-heap PipelineRunGuard, so single-node
     // behaviour is byte-identical; -Drun.lease.backend=db makes the exclusion cross-process.
     private final RunLease runGuard;
+
+    /** The acquisition lease, held here so {@link #close()} can cancel in-flight fetches too (the scheduler uses it). */
+    private final RunLease acquireGuard;
     /** Serialises registry mutation ({@link #registry} + {@link ConfigRegistry#rebuild}) against a cycle's
      *  selection pass. Deliberately narrow — never held across a run. */
     private final ReentrantLock registryLock = new ReentrantLock();
@@ -366,6 +369,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.root              = root;
         // Phase B: heap by default (single-node behaviour byte-identical), database when selected.
         this.runGuard          = ServiceStores.openRunLease(root, DbRunLease.SCOPE_RUN);
+        this.acquireGuard      = ServiceStores.openRunLease(root, DbRunLease.SCOPE_ACQUIRE);
         this.spaceId           = root.id();
         // The default space reuses the process-wide log (so legacy single-tenant behaviour is unchanged and
         // the capture appender's global fallback still hits it); a hosted space gets its own instance.
@@ -682,7 +686,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         int acquireHighWater = Integer.getInteger("acquire.backpressure.highWater", 0);
         // Two leases, two scopes — runs and remote acquisition stay independent (operator, 2026-09-12).
         this.pipelineScheduler = new PipelineScheduler(this.registry, this.configRegistry, this.paused,
-                this.running, this.runGuard, ServiceStores.openRunLease(root, DbRunLease.SCOPE_ACQUIRE),
+                this.running, this.runGuard, this.acquireGuard,
                 this.registryLock, this.bus, this.triggerWorkers,
                 this.maxConcurrentRuns, maxConcurrentAcquisitions, acquireHighWater,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
@@ -1939,7 +1943,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 try (RunLease.Claim claim = runGuard.acquire(pipelineName);
                      // LEASE-TAKEOVER-INFLIGHT-1: the engine asks this before it commits a Consignment
                      com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::state)) {
+                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::state, claim::cancelled)) {
                     running.add(pipelineName);
                     try {
                         // T13: any run resets the cadence — but a simulated one must not, or a dry run
@@ -2043,7 +2047,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             return Optional.of(triggerWorkers.submit(() -> underSpace(() -> {
                 try (RunLease.Claim claim = runGuard.acquire(pipelineName);
                      com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::state)) {
+                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::state, claim::cancelled)) {
                     running.add(pipelineName);
                     try {
                         return com.gamma.inspector.RecordReplay.replay(
@@ -2182,6 +2186,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     @Override
     public void close() {
+        // HA-GRACEFUL-STOP-LEASE-RELEASE-1: ask in-flight runs to stop at their next checkpoint BEFORE draining, so
+        // the drain below finishes inside SpaceManager's deadline and each run thread releases its own claim.
+        // Idempotent (a second close just re-sets it). Nothing here releases a lease: see RunLease#cancelRuns.
+        runGuard.cancelRuns();
+        acquireGuard.cancelRuns();
         if (watcher != null) { watcher.close(); watcher = null; }   // stop push triggers before draining runs
         assistSlot.close();                            // release agent resources first
         intelligenceSlot.close();

@@ -122,6 +122,8 @@ public final class ConsignmentIngestor {
             if (batch.members().stream().map(m -> m.file().toPath().toAbsolutePath().normalize()).anyMatch(f ->
                     AcquisitionLedgers.hasDbWatermark(f) || SliceFrontiers.read(cfg, f).isPresent()))
                 com.gamma.config.safety.StateGate.requireAdvance("DB-export / Kafka watermark of '" + cfg.identity().pipelineName() + "'");
+            // HA-GRACEFUL-STOP-LEASE-RELEASE-1: a closing host cancels before this batch starts writing outputs.
+            CommitFence.checkpoint(CommitFence.Scope.RUN, cfg.identity().pipelineName());
             try {
                 outcome = strategy.ingest(batch, cfg);
             } finally {

@@ -57,7 +57,19 @@ interface RunLease {
          * commit, but the claim is not written off). What {@code CommitFence} is handed.
          */
         com.gamma.inspector.CommitFence.State state();
+
+        /** The host is closing and asked this run to stop at its next checkpoint (HA-GRACEFUL-STOP-LEASE-RELEASE-1). */
+        default boolean cancelled() { return false; }
     }
+
+    /**
+     * Ask every run holding a claim from this lease to stop at its next checkpoint (HA-GRACEFUL-STOP-LEASE-RELEASE-1):
+     * each claim's {@link Claim#cancelled()} turns true. ⛔ This only SIGNALS — it never releases, renews or takes a
+     * claim. Release stays with the run thread's own try-with-resources, so the lease row is freed strictly after
+     * the thread that could write under it has stopped; releasing here while the thread lives would let a survivor
+     * claim it and write the same files concurrently. Idempotent; the default is a lease whose runs cannot be asked.
+     */
+    default void cancelRuns() {}
 
     /**
      * Claim {@code pipeline} without blocking.
