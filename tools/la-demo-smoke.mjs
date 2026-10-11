@@ -5,7 +5,7 @@
 //
 //   node tools/la-demo-smoke.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--off-space la-showcase-off]
 //                                [--staged <dir with TRANSFERS_20260904.csv> --inbox <Space inbox/mule_transfers dir>]
-//                                [--burst] [--telecom [--presenter fm.analyst] [--four-eyes 5] [--telecom-timeout 180]] [--dry-run]
+//                                [--burst] [--telecom [--presenter fm.manager] [--four-eyes 5] [--telecom-timeout 180]] [--dry-run]
 //
 // With --telecom (MUTATES: triggers the telecom Jobs, creates a smoke-telecom-<ts> Investigation): telecom Datasets + the
 // telecom_links_dataset link columns; the presenter triggers telecom_links / _msisdn_indicators / _typology_counts and their
@@ -120,6 +120,18 @@ export function triggerVerdict(res) {
   return res.status === 403 ? `403 (canOperateRuns?) ${excerpt(res)}` : excerpt(res);
 }
 
+/** The telecom presenter: an explicit --presenter wins; else fm.manager (only fm.manager may press Run in la-showcase,
+ *  docs/superpower/la-telecom-demo-data.md §7). Non-telecom runs keep fm.analyst. */
+export function resolvePresenter(presenter, telecom) {
+  return presenter || (telecom ? 'fm.manager' : 'fm.analyst');
+}
+
+/** A 403 on a Job trigger names the persona and the capability it lacks; null for anything else. */
+export function denialReason(res, persona) {
+  if (res.status !== 403) return null;
+  return `${persona} lacks canOperateRuns (403 on Job trigger; run as fm.manager or pass --presenter <persona with canOperateRuns>): ${excerpt(res)}`;
+}
+
 /** Expand verdict: entities admitted and, when the hub is reached, flagged highConnectivity. `ws` = working-set?of=entities. */
 export function expandVerdict(step, ws, hub = TELECOM_HUB) {
   if (step.status === 202 || (step.data && (step.data.pending || step.data.held))) return `expand held for four-eyes: ${excerpt(step)}`;
@@ -150,7 +162,7 @@ export function telecomAlertsVerdict(alerts) {
 }
 
 /** The telecom group (mutates: triggers Jobs, creates an Investigation). `call(user, method, path, body)` as in run(). */
-export async function runTelecom({ call, record, presenter = 'fm.analyst', fourEyes = 5, timeoutMs = 180000, pollMs = 3000,
+export async function runTelecom({ call, record, skip = () => {}, presenter = 'fm.manager', fourEyes = 5, timeoutMs = 180000, pollMs = 3000,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now() }) {
   const ds = await call(presenter, 'GET', '/components/dataset');
   record('telecom Datasets listed, telecom_links_dataset columns complete', ds.status === 200 ? telecomRegistryVerdict(ds.data) : excerpt(ds));
@@ -166,10 +178,16 @@ export async function runTelecom({ call, record, presenter = 'fm.analyst', fourE
     }
   };
   let countsRan = false;
+  let countsDenied = null;
   for (const [job, dataset] of TELECOM_JOBS) {
     const t = await call(presenter, 'POST', `/jobs/${job}/trigger`, {});
-    const tv = triggerVerdict(t);
+    const denied = denialReason(t, presenter);
+    const tv = denied || triggerVerdict(t);
     record(`${presenter} triggers Job ${job}`, tv);
+    if (denied) {
+      skip(`${dataset} has rows after ${job}`, `trigger denied: ${presenter} lacks canOperateRuns`);
+      if (job === 'telecom_typology_counts') countsDenied = presenter;
+    }
     if (tv) continue;
     const rv = await waitRows(dataset);
     record(`${dataset} has rows after ${job}`, rv);
@@ -197,7 +215,8 @@ export async function runTelecom({ call, record, presenter = 'fm.analyst', fourE
     record(`pattern pack ${pack} matches >= 1`, patternVerdict(r));
   }
 
-  if (!countsRan) record('telecom typology Alerts present (counts only)', 'telecom_typology_counts did not produce rows');
+  if (countsDenied) skip('telecom typology Alerts present (counts only)', `trigger denied: ${countsDenied} lacks canOperateRuns`);
+  else if (!countsRan) record('telecom typology Alerts present (counts only)', 'telecom_typology_counts did not produce rows');
   else {
     const deadline = now() + timeoutMs;
     let verdict;
@@ -228,11 +247,13 @@ export function buildProbes({ space = 'la-showcase', offSpace = 'la-showcase-off
 }
 
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', offSpace = 'la-showcase-off',
-  inbox = null, staged = null, burst = false, telecom = false, presenter = 'fm.analyst', fourEyes = 5, telecomTimeoutMs = 180000,
+  inbox = null, staged = null, burst = false, telecom = false, presenter = null, fourEyes = 5, telecomTimeoutMs = 180000,
   dryRun = false, log = () => {} } = {}) {
   const results = [];
   const api = `${base}/api/v1`;
   const record = (id, reason) => { results.push({ id, ok: !reason, reason }); log(`${reason ? 'FAIL' : 'PASS'}  ${id}${reason ? '  - ' + reason : ''}`); };
+  const skip = (id, reason) => { results.push({ id, ok: true, skipped: true, reason }); log(`SKIPPED  ${id}  - ${reason}`); };
+  presenter = resolvePresenter(presenter, telecom);
   const probes = buildProbes({ space, offSpace });
   if (dryRun) {
     for (const p of probes) log(`  ${(p.as || '(no token)').padEnd(13)} ${p.method} /spaces/${p.space}${p.path}  -> ${JSON.stringify(p.want)}`);
@@ -305,7 +326,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     record('19 concurrent Graph Runs -> a 503', poolVerdict(runs.map((r) => r.status)));
   } else log('skip  burst limits (no --burst)');
 
-  if (telecom) await runTelecom({ call, record, presenter, fourEyes, timeoutMs: telecomTimeoutMs });
+  if (telecom) await runTelecom({ call, record, skip, presenter, fourEyes, timeoutMs: telecomTimeoutMs });
   else log('skip  telecom (no --telecom)');
 
   return results;
@@ -316,7 +337,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const opt = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
   run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), offSpace: opt('--off-space', 'la-showcase-off'),
     inbox: opt('--inbox', null), staged: opt('--staged', null), burst: args.includes('--burst'),
-    telecom: args.includes('--telecom'), presenter: opt('--presenter', 'fm.analyst'), fourEyes: Number(opt('--four-eyes', 5)),
+    telecom: args.includes('--telecom'), presenter: opt('--presenter', null), fourEyes: Number(opt('--four-eyes', 5)),
     telecomTimeoutMs: Number(opt('--telecom-timeout', 180)) * 1000, dryRun: args.includes('--dry-run'), log: console.log })
     .then((rs) => { const bad = rs.filter((r) => !r.ok); console.log(`${rs.length - bad.length}/${rs.length} probes passed`); process.exitCode = bad.length ? 1 : 0; })
     .catch((e) => { console.error(e.message); process.exitCode = 2; });
