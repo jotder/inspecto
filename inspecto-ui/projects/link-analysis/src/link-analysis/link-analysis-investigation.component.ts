@@ -284,7 +284,8 @@ export class LinkAnalysisInvestigationComponent {
         const form = this.rungForm();
         const rung = form ? form.rung() : {};
         if (!rung || !(await this.confirmOverride([id]))) return;
-        if (!(await this.store.expandHub(id, rung))) form?.fail(this.store.error());
+        if (!(await this.store.expandHub(id, this.store.withPresets(this.degreePresets(), rung))))
+            form?.fail(this.store.error());
     }
     /** 1 … maxDegree, for the indicator. */
     readonly degreeSteps = computed(() => Array.from({ length: this.maxDegree() }, (_, i) => i + 1));
@@ -471,8 +472,10 @@ export class LinkAnalysisInvestigationComponent {
 
     async expand(all = false): Promise<void> {
         const form = this.rungForm();
-        const rung = form ? form.rung() : {};
-        if (!rung) return;
+        const own = form ? form.rung() : {};
+        if (!own) return;
+        // Every expand from the panel carries the profile's preset window and budget, like "Expand next degree".
+        const rung = this.store.withPresets(this.degreePresets(), own);
         let scope: string[] = [];
         if (rung.includeHubs) {
             // Only an expand that actually reaches a flagged entity is an override worth confirming.

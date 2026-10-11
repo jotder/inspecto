@@ -141,6 +141,15 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('re-reads the lists (fresh member counts) when the node dialog changed one', async () => {
+        const { inv, store, settle } = create();
+        await settle();
+        expect(inv.listEntityLists).toHaveBeenCalledTimes(1);
+        store.entityListsChanged.update((n) => n + 1);
+        await settle();
+        expect(inv.listEntityLists).toHaveBeenCalledTimes(2);
+    });
+
     it('lists title, purpose, Entity Type label, size and a retired badge — never members', async () => {
         const { el, button, settle } = create();
         await settle();

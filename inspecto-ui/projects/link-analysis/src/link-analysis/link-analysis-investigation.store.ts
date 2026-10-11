@@ -387,6 +387,19 @@ export class InvestigationSessionStore {
         return true;
     }
 
+    /**
+     * The profile's preset rung (window + budget + caps) laid under the analyst's own rung fields, for an expand that
+     * is not "Expand next degree" (one hop from the selection, every entity, "Expand anyway"). Without it those
+     * expands read with NO window and the server's default budget. `includeHubs` / `expandHubs` are kept — the caller
+     * decides them; an Advanced `window` (incl. `'full'`, All time) wins over the preset window.
+     */
+    withPresets(presets: DegreePresets, rung: ExpandRung): ExpandRung {
+        return { ...presetRung(presets, !!this.header()?.timeCol, this.windowEnd()), ...rung };
+    }
+
+    /** Bumped when an Entity List changed outside the Entity Lists panel (the node dialog's add): it re-reads. */
+    readonly entityListsChanged = signal(0);
+
     private expanding = false;
     /** True while "Investigate a number" runs its create → seed → expand chain; the panel disables its buttons. */
     readonly chainRunning = signal(false);

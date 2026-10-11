@@ -1850,6 +1850,19 @@ export class LinkAnalysisComponent implements OnInit {
             ?.focus();
     }
 
+    /**
+     * A node chosen in the list view (click, Enter or Space). The list is an explicit choice, not a pointer on a
+     * moving canvas, so it picks the Investigation entity AND opens the detail at once — the canvas's second-click
+     * convention made Enter on a fresh row only select it (live run 5).
+     */
+    onListNodeSelect(id: string): void {
+        if (this.investigation.active()) {
+            const picked = this.canvasData()?.nodes.find((n) => n.id === id);
+            if (picked && this.investigation.selected()?.id !== id) this.investigation.selected.set(picked);
+        }
+        this.onNodeClick(id);
+    }
+
     onNodeClick(id: string): void {
         // A super-node exists only in `displayed()`, so the lookup below would miss it and the click
         // would do nothing at all. Clicking a stand-in means "show me what you are standing in for".
@@ -1909,6 +1922,7 @@ export class LinkAnalysisComponent implements OnInit {
             },
             canRunGraph: this.canRunGraphOnServer(),
             canManageLists: this.lens.canManageIncidents(),
+            onListChanged: () => this.investigation.entityListsChanged.update((n) => n + 1),
             canHide: !this.investigation.active(),
         };
         this.dialog

@@ -42,6 +42,8 @@ export interface NodeInsightContext {
     originLabel: (serverId: string) => string;
     canRunGraph: boolean;
     canManageLists: boolean;
+    /** Called after this dialog changed an Entity List (a direct add), so open list panels re-read their counts. */
+    onListChanged?: () => void;
     /** Hide is offered in exploration only (an Investigation hides through its own op). */
     canHide: boolean;
 }
@@ -270,8 +272,16 @@ const LIST_REASON_MAX = 1000;
                                                     <span class="text-secondary">{{ o.severity }}</span>
                                                 }
                                                 <span class="text-secondary text-xs">{{ o.createdAt | date: 'medium' }}</span>
-                                                @if (o.via) {
-                                                    <span class="text-secondary text-xs"
+                                                @if (o.matchedOn === 'investigation') {
+                                                    <span class="text-secondary text-xs" data-testid="history-via"
+                                                        >via Investigation {{ o.via }}</span
+                                                    >
+                                                } @else if (o.matchedOn === 'snapshot') {
+                                                    <span class="text-secondary text-xs" data-testid="history-via"
+                                                        >via sealed snapshot</span
+                                                    >
+                                                } @else if (o.via) {
+                                                    <span class="text-secondary text-xs" data-testid="history-via"
                                                         >via <a [routerLink]="['/incidents', o.via]">Incident {{ o.via }}</a></span
                                                     >
                                                 }
@@ -524,6 +534,7 @@ export class NodeInsightComponent implements OnInit {
             } else {
                 this.actionNote.set({ variant: 'success', text: `Added to "${list.title}".` });
                 this.addedHere.add(list.id);
+                this.ctx().onListChanged?.();
                 await this.loadMemberships();
             }
         } catch (e) {

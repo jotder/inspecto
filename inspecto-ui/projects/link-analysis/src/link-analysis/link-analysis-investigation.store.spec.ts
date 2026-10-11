@@ -464,6 +464,19 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(store.degreeOutcomes().at(-1)).toMatchObject({ degree: 4, admitted: 0 });
         expect(await store.expandNextDegree({}, 4)).toBe(false);
         expect(store.error()).toBe('Degree 4 found no new entities — there is nothing further to expand.');
+        // D4 (live run 5): one-hop / Expand anyway carry the preset window + budget too; All time and the
+        // analyst's own fields win, and the hub opt-ins are passed through untouched.
+        const presets = { windowDays: 30, budget: 10_000 };
+        expect(store.withPresets(presets, { expandHubs: ['h'] })).toEqual({
+            budget: 10_000,
+            window: { from: '2026-08-30T18:30:00.000Z', to: '2026-09-29T18:30:01.000Z' },
+            expandHubs: ['h'],
+        });
+        expect(store.withPresets(presets, { window: 'full', budget: 500, includeHubs: true })).toEqual({
+            budget: 500,
+            window: 'full',
+            includeHubs: true,
+        });
         store.close();
         expect(store.degreeOutcomes()).toEqual([]);
     });

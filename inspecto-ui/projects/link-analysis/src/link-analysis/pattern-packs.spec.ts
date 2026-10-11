@@ -250,6 +250,18 @@ describe('defaultPatternPack', () => {
         expect(defaultPatternPack([...PATTERN_PACKS, space], 'finance')?.id).toBe('layering-chain');
     });
 
+    it('telecom opens on the forwarding chain even when another Space pack comes first', () => {
+        const ring = patternPackFromContent({
+            name: 'telecom-subscription-ring',
+            label: 'Subscription ring',
+            category: 'telecom',
+            steps: [{ direction: '' }, { direction: 'out', edgeKind: 'SUBSCRIBES' }],
+        })!;
+        const chain = { ...space, id: 'telecom-forwarding-chain' };
+        expect(defaultPatternPack([...PATTERN_PACKS, ring, chain], 'telecom')?.id).toBe('telecom-forwarding-chain');
+        expect(defaultPatternPack([...PATTERN_PACKS, ring], 'telecom')?.id).toBe('telecom-subscription-ring');
+    });
+
     it('falls back to the first pack for an unmapped or absent profile', () => {
         expect(defaultPatternPack(PATTERN_PACKS, null)?.id).toBe(PATTERN_PACKS[0].id);
         expect(defaultPatternPack(PATTERN_PACKS, 'cyber')?.id).toBe(PATTERN_PACKS[0].id);

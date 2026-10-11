@@ -102,11 +102,11 @@ export class LinkExpansionApprovalsComponent implements OnInit {
     }
 
     async approve(r: LinkExpansionRequest): Promise<void> {
-        const ok = await this.confirm.confirm(
+        const ok = await this.confirm.confirmDestructive(
             `${r.summary}\n\nRequested by ${r.requestedBy ?? 'unknown'} on ${r.title ?? r.investigationId}.` +
                 (r.purpose ? `\nPurpose: ${r.purpose}` : '') +
                 '\n\nApproving runs it now, as the requester’s step, and records you as the approver.',
-            'Approve this link expansion?',
+            { title: 'Approve this link expansion?', confirmText: 'Approve', destructive: false },
         );
         if (!ok) return;
         this.busy.set(this.key(r));
