@@ -93,6 +93,7 @@ final class SaveGate {
         f.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         f.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
         f.addAll(ConfigRoutes.stepConfigFindings(type, draft, configDir));   // G4: the run's step refusals
+        f.addAll(ConfigRoutes.stepColumnMetadataFindings(type, draft));   // AUTHORING-REDESIGN-1 (e)
         f.addAll(ConfigRoutes.collectorFindings(type, draft));   // post_action MOVE target; inert remote keys
         f.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
         f.addAll(editionFindings(type, draft));   // G9: Professional+ features on a Personal build
