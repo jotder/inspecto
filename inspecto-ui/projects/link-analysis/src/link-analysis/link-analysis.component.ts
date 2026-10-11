@@ -1024,6 +1024,11 @@ export class LinkAnalysisComponent implements OnInit {
     readonly profileOptions = DOMAIN_PROFILES.map((p) => ({ value: p.id, label: p.label, hint: p.description }));
     readonly profileId = toSignal(this.profileControl.valueChanges, { initialValue: this.profileControl.value });
     readonly profile = computed(() => domainProfile(this.profileId()));
+    /** A reloaded / adopted Investigation brings back the domain profile it was opened under. */
+    private readonly restoreBoundProfile = effect(() => {
+        const p = this.investigation.boundProfileId();
+        if (p && p !== this.profileControl.value) this.profileControl.setValue(p);
+    });
     readonly workingSet = computed(() => {
         const g = this.graph();
         // ⚠ Measured on the PRE-aggregation graph on purpose. A super-node folds N real entities into one

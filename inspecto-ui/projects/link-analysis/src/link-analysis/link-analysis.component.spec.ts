@@ -1899,6 +1899,18 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect(c.toolboxDockOpen()).toBe(false);
     });
 
+    it('a reloaded Investigation restores the domain profile it is bound to', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const bound = signal<'telecom' | null>(null);
+        Object.defineProperty(c.investigation, 'boundProfileId', { value: bound });
+        fixture.detectChanges();
+        expect(c.profileControl.value).toBe('generic');
+        bound.set('telecom');
+        fixture.detectChanges();
+        expect(c.profileControl.value).toBe('telecom');
+    });
+
     it('a canvas zone squeezed below the minimum collapses the Toolbox dock, then the Query dock', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
