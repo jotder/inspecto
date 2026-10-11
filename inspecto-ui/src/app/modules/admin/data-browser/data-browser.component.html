@@ -72,6 +72,49 @@
                     }
                 </div>
             }
+            @if (sharedDatasets().length > 0) {
+                <section class="mt-4" aria-labelledby="db-shared-heading" data-testid="shared-datasets">
+                    <h2
+                        id="db-shared-heading"
+                        class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide"
+                    >
+                        Shared with this Space
+                    </h2>
+                    <p class="text-secondary mb-2 px-1 text-xs">
+                        Shared Datasets are read through Exchange grants, so they are not browsable as raw rows here.
+                    </p>
+                    <ul class="flex flex-col gap-1">
+                        @for (d of sharedDatasets(); track d.id) {
+                            <li class="bg-card rounded px-2 py-1.5 text-sm">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="truncate font-mono">{{ d.name }}</span>
+                                    <inspecto-status-badge value="shared" label="shared" />
+                                </div>
+                                <p class="text-secondary truncate text-xs">{{ d.owner }} / {{ d.item }}</p>
+                                <div class="mt-1 flex flex-wrap gap-2 text-xs">
+                                    @if (canEditDatasets()) {
+                                        <a
+                                            class="text-primary underline"
+                                            [routerLink]="['/catalog/datasets', d.id]"
+                                            [attr.aria-label]="'Open ' + d.name + ' in the Dataset editor'"
+                                            >Open in Dataset editor</a
+                                        >
+                                    }
+                                    @if (exchangeEnabled()) {
+                                        <a
+                                            class="text-primary underline"
+                                            [routerLink]="['/catalog']"
+                                            [queryParams]="{ tab: 'shared-with-me' }"
+                                            [attr.aria-label]="'See ' + d.name + ' under Shared with me in the Catalog'"
+                                            >Shared with me</a
+                                        >
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
         </nav>
 
         <div

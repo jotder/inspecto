@@ -7,7 +7,19 @@ import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { ColDef } from 'ag-grid-community';
 
-import { apiErrorMessage, DbBrowserService, DbGroup, DbResult, DbTable, LensService } from 'app/inspecto/api';
+import { RouterLink } from '@angular/router';
+import {
+    apiErrorMessage,
+    ComponentsService,
+    DbBrowserService,
+    DbGroup,
+    DbResult,
+    DbTable,
+    LensService,
+    SessionService,
+} from 'app/inspecto/api';
+import { parseSharedRef } from 'app/inspecto/api/shared-ref';
+import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -22,6 +34,14 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
  * over the full dataset). Backed by {@code /db/*} ({@link DbBrowserService}); the active space is applied by
  * the global space interceptor. Design: {@code docs/superpower/db-browser-design.md}.
  */
+/** A Dataset bound to another Space's shared item (`physicalRef` = `shared/<owner>/<item>`). */
+export interface SharedDatasetEntry {
+    id: string;
+    name: string;
+    owner: string;
+    item: string;
+}
+
 @Component({
     selector: 'app-data-browser',
     standalone: true,
@@ -33,6 +53,8 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
         InspectoSplitDirective,
+        StatusBadgeComponent,
+        RouterLink,
         MatButtonModule,
         MatFormFieldModule,
         MatInputModule,
@@ -44,6 +66,11 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 export class DataBrowserComponent {
     private api = inject(DbBrowserService);
     private lens = inject(LensService);
+    private components = inject(ComponentsService);
+    /** Exchange is a multi-space module — its Catalog tabs (the link target) exist only when enabled. */
+    readonly exchangeEnabled = inject(SessionService).exchangeEnabled;
+    /** Opening the Dataset editor is authoring; gated like the Datasets pane's own edit action. */
+    readonly canEditDatasets = this.lens.canAuthorWorkbench;
     private destroyRef = inject(DestroyRef);
 
     private static readonly PAGE = 200;
@@ -69,6 +96,9 @@ export class DataBrowserComponent {
     });
     readonly storeCount = computed(() => this.visibleGroups().reduce((n, g) => n + g.tables.length, 0));
     readonly shownStoreCount = computed(() => this.filteredGroups().reduce((n, g) => n + g.tables.length, 0));
+    /** Bound shared Datasets (listed, never browsed: `/db/*` cannot read a `shared/` ref — it resolves only
+     *  through the grant-checked Exchange resolver). Empty when Exchange/Datasets are unavailable. */
+    readonly sharedDatasets = signal<SharedDatasetEntry[]>([]);
     readonly loadingCatalog = signal(true);
     readonly catalogError = signal<string | null>(null);
 
@@ -81,6 +111,24 @@ export class DataBrowserComponent {
 
     constructor() {
         this.loadCatalog();
+        this.loadSharedDatasets();
+    }
+
+    /** Degrades to "no section" on any failure (e.g. the Exchange module is absent) — never an error. */
+    private loadSharedDatasets(): void {
+        this.components
+            .list('dataset')
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (defs) =>
+                    this.sharedDatasets.set(
+                        defs.flatMap((d) => {
+                            const ref = parseSharedRef(d.content['physicalRef'] as string | null | undefined);
+                            return ref ? [{ id: d.name, name: (d.content['name'] as string) || d.name, ...ref }] : [];
+                        }),
+                    ),
+                error: () => this.sharedDatasets.set([]),
+            });
     }
 
     loadCatalog(): void {
