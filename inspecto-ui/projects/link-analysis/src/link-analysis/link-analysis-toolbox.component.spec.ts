@@ -790,6 +790,30 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         });
     });
 
+    it('on the Investigation canvas: the telecom pack time column (first_seen) wins over the binding last_seen', () => {
+        const t = make(GRAPH, [ringPack]);
+        t.c.tab.set('pattern');
+        t.c.loadPatternPack('telecom-subscription-ring');
+        t.fixture.componentRef.setInput('profileId', 'telecom');
+        t.fixture.componentRef.setInput('investigationPatternTarget', {
+            dataset: 'telecom_links',
+            linkKindCol: 'link_kind',
+            timeCol: 'last_seen',
+        });
+        t.fixture.detectChanges();
+        const cols = t.c.investigationPatternColumns()!;
+        expect(cols.timeCol).toBe('first_seen');
+        expect(cols.notice).toBe('Using link_kind / first_seen for this pack.');
+        const el = t.fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="investigation-pattern-columns-notice"]')?.textContent).not.toContain(
+            'last_seen',
+        );
+        const asked: { timeCol?: string }[] = [];
+        t.c.runPatternOnServer.subscribe((r) => asked.push(r as { timeCol?: string }));
+        t.c.runPattern();
+        expect(asked[0]?.timeCol).toBe('first_seen');
+    });
+
     it('telecom profile without the canvas carrying first_seen: the browser run names the column to set', () => {
         const { fixture, c } = telecom('link_kind');
         fixture.componentRef.setInput('profileId', 'telecom');
@@ -797,5 +821,27 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         expect(c.browserPatternColumns().blocked).toBe('This pattern needs a time column — set Time to first_seen.');
         c.runPattern();
         expect(c.analysisError()).toBe('This pattern needs a time column — set Time to first_seen.');
+    });
+
+    it('LA-DEMO-POLISH-1 (1): an open Investigation bound to a time column the links carry runs; one they lack is named', () => {
+        const timed: G6GraphData = {
+            nodes: GRAPH.nodes,
+            edges: GRAPH.edges.map((e, i) => ({ ...e, data: { ...e.data, attrs: { last_seen: `2026-10-0${i + 1}T00:00:00Z` } } })),
+        };
+        const t = make(timed, [ringPack]);
+        t.c.tab.set('pattern');
+        t.c.loadPatternPack('telecom-subscription-ring');
+        t.fixture.componentRef.setInput('profileId', 'telecom');
+        t.fixture.componentRef.setInput('investigationTimeCol', 'last_seen');
+        t.fixture.detectChanges();
+        const cols = t.c.browserPatternColumns();
+        expect(cols.blocked ?? '').not.toContain('needs a time column');
+        expect(cols.timeAttr).toBe('last_seen');
+        expect(cols.notice).toBe('Using last_seen for this pack.');
+
+        t.fixture.componentRef.setInput('investigationTimeCol', 'first_seen');
+        t.fixture.componentRef.setInput('graph', GRAPH);
+        t.fixture.detectChanges();
+        expect(t.c.browserPatternColumns().blocked).toContain("Investigation's time column first_seen is not on the links");
     });
 });

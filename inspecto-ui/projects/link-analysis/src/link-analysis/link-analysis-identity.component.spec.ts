@@ -5,7 +5,9 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { IdentityGroupIndex, IdentityImportResult, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { LinkAnalysisIdentityComponent } from './link-analysis-identity.component';
+import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
+import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
+import { importFieldNames, LinkAnalysisIdentityComponent } from './link-analysis-identity.component';
 
 const HEAD: IdentityGroupIndex = { groups: [], atSeq: 4, headSeq: 4, headHash: 'sha256:abc123' };
 const IMPORTED: IdentityImportResult = {
@@ -26,7 +28,15 @@ function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
         ...overrides,
     };
     TestBed.configureTestingModule({
-        providers: [provideNoopAnimations(), { provide: InvService, useValue: inv }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InvService, useValue: inv },
+            {
+                provide: LA_DATASETS,
+                useValue: { list: () => of([{ id: 'map', name: 'SIM map', sourceName: 'map' }]), get: () => of({}) },
+            },
+            { provide: DatasetRowsService, useValue: { columns: vi.fn(async () => [{ name: 'msisdn' }, { name: 'imsi' }]) } },
+        ],
     });
     const f = TestBed.createComponent(LinkAnalysisIdentityComponent);
     f.detectChanges();
@@ -126,6 +136,27 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         c.reason.setValue('r');
         await c.import();
         f.detectChanges();
-        expect(el.textContent).toContain("'aCol' must be a column");
+        expect(el.textContent).toContain('"Column A" must be a column');
+        expect(el.textContent).not.toContain('aCol');
+    });
+
+    it('offers the Datasets and the picked one’s columns as pickers, clearing stale column picks', async () => {
+        const { f, c, el } = create();
+        await f.whenStable();
+        f.detectChanges();
+        expect(el.querySelectorAll('mat-select').length).toBe(3);
+        expect(c.datasets().map((d) => d.id)).toEqual(['map']);
+        c.dataset.setValue('map');
+        await f.whenStable();
+        expect(c.columns()).toEqual(['msisdn', 'imsi']);
+        c.aCol.setValue('msisdn');
+        c.dataset.setValue('other');
+        await f.whenStable();
+        expect(c.aCol.value).toBe('');
+        expect(c.columns()).toEqual([]);
+    });
+
+    it('names the form fields, not the wire names, in a refusal', () => {
+        expect(importFieldNames("'bCol' and aType are unknown")).toBe('"Column B" and "Type A" are unknown');
     });
 });

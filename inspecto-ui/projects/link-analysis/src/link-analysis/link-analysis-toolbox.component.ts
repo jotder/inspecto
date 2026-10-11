@@ -310,6 +310,8 @@ export class LinkAnalysisToolboxComponent {
      * links carry no `link_kind` / `first_seen` attrs, so a branching pack runs on the server over that Dataset.
      */
     readonly investigationPatternTarget = input<InvestigationPatternTarget | null>(null);
+    /** The open Investigation's bound time column ('' = none / no Investigation open), whatever the canvas draws. */
+    readonly investigationTimeCol = input<string>('');
 
     /**
      * D-4 step 7: the Investigation whose Working Set the canvas draws (null = the canvas shows a query graph, so a
@@ -488,8 +490,16 @@ export class LinkAnalysisToolboxComponent {
         const blocked: string[] = [];
         let used = timeAttr;
         if (needs.time && !used) {
+            // The profile's pattern column first (packs are authored against it), then the open Investigation's bound
+            // one — each only when the canvas's links actually carry it (LA-DEMO-POLISH-1 (1)).
             const g = this.graph();
-            if (defaults.timeCol && g && edgeTimeIndex(g, defaults.timeCol).size) used = defaults.timeCol;
+            const bound = this.investigationTimeCol();
+            const carried = [defaults.timeCol, bound].find((c) => !!c && !!g && edgeTimeIndex(g, c).size > 0);
+            if (carried) used = carried;
+            else if (bound)
+                blocked.push(
+                    `This pattern orders its hops by time, and the Investigation's time column ${bound} is not on the links drawn here — run it from a query graph with Time set to ${defaults.timeCol || bound}.`,
+                );
             else blocked.push(patternColumnRefusal('time', defaults.timeCol));
         }
         if (needs.kind) {
@@ -517,9 +527,13 @@ export class LinkAnalysisToolboxComponent {
         const pack = this.loadedPack();
         if (!target || !pack || !this.branchStages()) return null;
         const needs = this.patternNeeds();
+        // A pack that orders / windows its legs is authored against the profile's pattern time column (telecom:
+        // `first_seen` = when a link STARTED); the Investigation binding's `timeCol` (`last_seen`) is the recency a
+        // degree expansion windows on and would match nothing, so the profile's column wins when it has one.
+        const packTime = needs.time ? PATTERN_PACK_COLUMNS[this.profileId() ?? 'generic']?.timeCol : undefined;
         const plan = resolvePatternColumns(
             needs,
-            { kindCol: target.linkKindCol, timeCol: target.timeCol || this.timeAttr() },
+            { kindCol: target.linkKindCol, timeCol: packTime || target.timeCol || this.timeAttr() },
             this.profileId(),
         );
         const used = [

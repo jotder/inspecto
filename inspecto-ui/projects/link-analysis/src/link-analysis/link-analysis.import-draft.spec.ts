@@ -191,7 +191,7 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         expect(writes(http)).toEqual([]);
 
         // An edit AFTER adoption is what Save writes — not the content the bundle carried.
-        c.layoutId.set('circular');
+        c.pickedLayout.set('circular');
         const saved = c.saveDraft();
         const checked = await recheck(http, 'error');
         expect(checked.items[0].content).toMatchObject({ layout: 'circular' }); // the EDITED content is judged

@@ -6,6 +6,7 @@ import {
     ElementRef,
     OnInit,
     ViewChild,
+    afterNextRender,
     computed,
     effect,
     inject,
@@ -253,6 +254,8 @@ const SERVER_PATH_LIMIT = 100;
 
 /** Below this viewport width the Toolbox dock starts collapsed to its rail (canvas width); wider windows start open. */
 export const TOOLBOX_NARROW_PX = 1300;
+/** The narrowest canvas zone worth keeping beside the docks; below it a dock collapses to its rail. */
+export const CANVAS_MIN_PX = 320;
 const TOOLBOX_OPEN_KEY = 'inspecto.la.toolboxOpen';
 
 /**
@@ -267,6 +270,36 @@ function initialToolboxOpen(): boolean {
         /* storage blocked — fall through to the viewport rule */
     }
     return !(window.matchMedia?.(`(max-width: ${TOOLBOX_NARROW_PX - 1}px)`).matches ?? false);
+}
+
+/**
+ * The snapshot dialog's suggested title — never a bare "— N nodes": "Investigation <title> — N nodes" on an
+ * Investigation canvas, "<source> — N nodes" for a query graph, else "Graph — N nodes".
+ */
+export function snapshotTitle(onInvestigation: boolean, invTitle: string | undefined, source: string, nodes: number): string {
+    const n = `${nodes} ${nodes === 1 ? 'node' : 'nodes'}`;
+    if (onInvestigation) return invTitle?.trim() ? `Investigation ${invTitle.trim()} — ${n}` : `Investigation — ${n}`;
+    return `${source.trim() || 'Graph'} — ${n}`;
+}
+
+/**
+ * The layout a fresh graph opens with when the analyst has not picked one: Layered (dagre LR) draws a big or
+ * hub-shaped graph as a thin column, so an Investigation canvas, a graph over {@link LAYERED_MAX_NODES} nodes or a
+ * hub-shaped one opens in Force (d3-force; never force-atlas2, which froze the tab on ~1.6k nodes).
+ */
+export const LAYERED_MAX_NODES = 30;
+/** Above this many nodes a force-atlas2 layout the analyst did not pick in this session opens as Force instead. */
+export const FORCE_ATLAS_MAX_NODES = 800;
+export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean): GraphLayoutId {
+    if (!g) return 'dagre';
+    if (onInvestigation || g.nodes.length > LAYERED_MAX_NODES) return 'force';
+    const deg = new Map<string, number>();
+    for (const e of g.edges) {
+        deg.set(e.source, (deg.get(e.source) ?? 0) + 1);
+        deg.set(e.target, (deg.get(e.target) ?? 0) + 1);
+    }
+    const max = Math.max(0, ...deg.values());
+    return g.nodes.length >= 8 && max >= g.nodes.length / 2 ? 'force' : 'dagre';
 }
 
 @Component({
@@ -426,6 +459,26 @@ export class LinkAnalysisComponent implements OnInit {
     /** Canvas overlays — each minimises to a pill so the graph gets the space. */
     readonly legendOpen = signal(true);
     readonly workingSetOpen = signal(true);
+    /**
+     * Keep the canvas usable on a narrow page that has not stacked yet (the stack breakpoint is the VIEWPORT's
+     * 960px, so a ~800px page beside an open nav stayed side-by-side and squeezed the canvas to ~15px): when the
+     * canvas zone drops below {@link CANVAS_MIN_PX}, collapse the Toolbox dock, then the Query dock, to their rails.
+     */
+    private readonly watchCanvasWidth = afterNextRender(() => {
+        const zone = this.canvasZone?.nativeElement;
+        if (!zone || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver((entries) => this.fitDocksToWidth(entries[0]?.contentRect.width ?? 0));
+        ro.observe(zone);
+        this.destroyRef.onDestroy(() => ro.disconnect());
+    });
+
+    /** Collapse one dock when the canvas zone is narrower than {@link CANVAS_MIN_PX} (side-by-side layout only). */
+    fitDocksToWidth(zoneWidth: number): void {
+        if (zoneWidth <= 0 || zoneWidth >= CANVAS_MIN_PX) return;
+        if (window.matchMedia?.('(max-width: 959px)').matches) return; // stacked: the canvas has the full width
+        if (this.toolboxDockOpen()) this.toolboxDockOpen.set(false);
+        else if (this.queryDockOpen()) this.queryDockOpen.set(false);
+    }
     /** The docks give the canvas their width in one step (and take it back). */
     readonly canvasMaximized = computed(() => !this.queryDockOpen() && !this.toolboxDockOpen());
 
@@ -934,7 +987,20 @@ export class LinkAnalysisComponent implements OnInit {
     );
 
     // ── layout (the Layout toolbox; persisted with a saved view) ──
-    readonly layoutId = signal<GraphLayoutId>('dagre');
+    /** The analyst's explicit layout (toolbox pick, undo, saved view); null = none, so {@link defaultLayoutFor} decides. */
+    readonly pickedLayout = signal<GraphLayoutId | null>(null);
+    /** Whether {@link pickedLayout} was chosen in the Layout toolbox this session (not restored from a view / undo). */
+    private readonly layoutPickedHere = signal(false);
+    readonly layoutId = computed<GraphLayoutId>(() => {
+        const picked = this.pickedLayout();
+        const g = this.canvasData();
+        if (!picked) return defaultLayoutFor(g, this.investigation.canvas() !== null);
+        // A RESTORED force-atlas2 ("Clustering force") froze the tab for ~60 s on a big graph; only a pick made here
+        // keeps it there.
+        if (picked === 'force-cluster' && !this.layoutPickedHere() && (g?.nodes.length ?? 0) > FORCE_ATLAS_MAX_NODES)
+            return 'force';
+        return picked;
+    });
     readonly layouts = GRAPH_LAYOUTS;
     /** Whether the current graph is tree/forest-shaped — gates the tree layouts. */
     readonly isTreeShaped = computed<boolean>(() => {
@@ -1403,7 +1469,13 @@ export class LinkAnalysisComponent implements OnInit {
             predicate,
             origin,
             layout: this.layoutId(),
-            suggestedTitle: `${this.sourceLabel()} — ${g.nodes.filter((n) => !n.data.missing).length} nodes`,
+            suggestedTitle: snapshotTitle(
+                ws,
+                this.investigation.header()?.title ??
+                    this.investigation.refs().find((r) => r.id === investigationId)?.title,
+                this.sourceLabel(),
+                g.nodes.filter((n) => !n.data.missing).length,
+            ),
             caseId: this.deepLinkedCaseId(),
             selectedNodeIds: this.emphasis()?.nodeIds ?? [],
             investigationId,
@@ -1618,7 +1690,8 @@ export class LinkAnalysisComponent implements OnInit {
     /** Pick a graph layout (tree layouts are gated on {@link isTreeShaped} in the template). */
     setLayout(id: GraphLayoutId): void {
         this.recordHistory();
-        this.layoutId.set(id);
+        this.pickedLayout.set(id);
+        this.layoutPickedHere.set(true);
     }
 
     // ── undo/redo (Phase G, presentation state only — not the query/graph itself) ──
@@ -1660,7 +1733,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.nodeShapes.set(s.nodeShapes);
         this.edgePatterns.set(s.edgePatterns);
         this.edgeSizes.set(s.edgeSizes);
-        this.layoutId.set(s.layoutId);
+        this.pickedLayout.set(s.layoutId);
     }
 
     /** Call before a presentation-state mutation to make it undoable. */
@@ -1784,8 +1857,9 @@ export class LinkAnalysisComponent implements OnInit {
         if (this.investigation.active()) {
             const picked = this.canvasData()?.nodes.find((n) => n.id === id);
             if (picked && this.investigation.selected()?.id !== id) {
+                // No dock open / tab switch here: reflowing the panels moved the canvas under the pointer, so the
+                // second click missed the node (third live run). Tabs change only on an explicit action.
                 this.investigation.selected.set(picked);
-                this.openInvestigation();
                 return;
             }
             if (!picked || !this.investigation.canvas()) return;
@@ -2352,7 +2426,7 @@ export class LinkAnalysisComponent implements OnInit {
     async loadView(view: LinkAnalysisView): Promise<void> {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
-        this.layoutId.set(view.layout ?? 'dagre');
+        this.pickedLayout.set(view.layout ?? null);
         this.profileControl.setValue(view.profile ?? 'generic');
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());

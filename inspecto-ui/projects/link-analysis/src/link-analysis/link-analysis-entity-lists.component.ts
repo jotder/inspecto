@@ -19,7 +19,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
-import { entityListErrorMessage, listableIds } from './investigation-state';
+import { entityListErrorMessage, listableIds, rawIdsOf } from './investigation-state';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import {
     CreateEntityListDialog,
@@ -94,9 +94,8 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                             <p class="text-secondary m-0" aria-label="Selection for Entity Lists">
                                 @if (store.selected(); as n) {
                                     Selected: <strong>{{ n.data.label }}</strong>
-                                    @if (selection().masked) {
-                                        — {{ selection().masked }} masked value(s) cannot be added (a list needs the
-                                        real value).
+                                    @if (selection().masked && !selection().raw) {
+                                        — masked; the server resolves it to the real value when added.
                                     }
                                 } @else {
                                     Click an entity on the canvas while an Investigation is open to add it to a list.
@@ -215,8 +214,16 @@ export class LinkAnalysisEntityListsComponent {
     readonly canWrite = computed(() => this.lens.canManageIncidents());
     /** Registering the sidecar Dataset authors a Dataset, so the server asks `canAuthorWorkbench` (not the list-write one). */
     readonly canAuthorDataset = computed(() => this.lens.canAuthorWorkbench());
-    /** The selected canvas entity's raw values — masked pseudonyms are split out and never sent. */
-    readonly selection = computed(() => listableIds(this.store.selected()));
+    /**
+     * The values to add for the selected canvas entity: its raw spellings, or — when it only carries masked aliases —
+     * those aliases, which the server resolves to the real value (the same call the node dialog's add-to-list makes).
+     */
+    readonly selection = computed(() => {
+        const { ids, masked } = listableIds(this.store.selected());
+        if (ids.length || !masked) return { ids, masked, raw: ids.length };
+        const aliases = rawIdsOf(this.store.selected()!).filter((v) => v.startsWith('masked:'));
+        return { ids: aliases, masked, raw: 0 };
+    });
 
     constructor() {
         // Off the module, every route 503s — no call for an explained absence the page already renders.

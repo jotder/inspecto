@@ -1,12 +1,16 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { firstValueFrom } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
+import { LA_DATASETS, LaDataset } from '@inspecto/link-analysis/la-host';
 import { IdentityGroupIndex, IdentityImportResult, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { entityListErrorMessage } from './investigation-state';
 
@@ -21,12 +25,25 @@ export function chainMessage(err: unknown, fallback: string): string {
     if (status === 500) return 'The chain did NOT verify — ' + apiErrorMessage(err, fallback);
     // A 404 here is the import's mapping Dataset, never an Entity List: do not borrow the Entity List wording.
     if (status === 404) return 'Not found — ' + apiErrorMessage(err, fallback);
-    return entityListErrorMessage(
+    return importFieldNames(entityListErrorMessage(
         err,
         fallback,
         false,
         'Identity facts need the Incident-management capability (they are readable only to those who may change them).',
-    );
+    ));
+}
+
+/** The import request's wire names, as the form labels them — a refusal never shows `aCol` / `bCol` to the analyst. */
+const IMPORT_FIELD_LABELS: Record<string, string> = {
+    aCol: 'Column A',
+    bCol: 'Column B',
+    aType: 'Type A',
+    bType: 'Type B',
+};
+
+/** Replace the import's internal field names in a server message with the form's labels. */
+export function importFieldNames(message: string): string {
+    return message.replace(/'?\b(aCol|bCol|aType|bType)\b'?/g, (_m, k: string) => `"${IMPORT_FIELD_LABELS[k]}"`);
 }
 
 /**
@@ -39,7 +56,14 @@ export function chainMessage(err: unknown, fallback: string): string {
     selector: 'inspecto-link-analysis-identity',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, InspectoAlertComponent],
+    imports: [
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatSelectModule,
+        InspectoAlertComponent,
+    ],
     host: { class: 'block' },
     template: `
         <section class="flex flex-col gap-2 text-xs" aria-label="Identity Fact log">
@@ -77,15 +101,27 @@ export function chainMessage(err: unknown, fallback: string): string {
             >
                 <mat-form-field class="w-40" subscriptSizing="dynamic">
                     <mat-label>Mapping Dataset</mat-label>
-                    <input matInput [formControl]="dataset" />
+                    <mat-select [formControl]="dataset">
+                        @for (d of datasets(); track d.id) {
+                            <mat-option [value]="d.id">{{ d.name || d.id }}</mat-option>
+                        }
+                    </mat-select>
                 </mat-form-field>
                 <mat-form-field class="w-32" subscriptSizing="dynamic">
                     <mat-label>Column A</mat-label>
-                    <input matInput [formControl]="aCol" />
+                    <mat-select [formControl]="aCol">
+                        @for (col of columns(); track col) {
+                            <mat-option [value]="col">{{ col }}</mat-option>
+                        }
+                    </mat-select>
                 </mat-form-field>
                 <mat-form-field class="w-32" subscriptSizing="dynamic">
                     <mat-label>Column B</mat-label>
-                    <input matInput [formControl]="bCol" />
+                    <mat-select [formControl]="bCol">
+                        @for (col of columns(); track col) {
+                            <mat-option [value]="col">{{ col }}</mat-option>
+                        }
+                    </mat-select>
                 </mat-form-field>
                 <mat-form-field class="w-32" subscriptSizing="dynamic">
                     <mat-label>Type A (optional)</mat-label>
@@ -118,6 +154,12 @@ export function chainMessage(err: unknown, fallback: string): string {
 })
 export class LinkAnalysisIdentityComponent implements OnInit {
     private inv = inject(InvService);
+    private datasetsPort = inject(LA_DATASETS);
+    private rows = inject(DatasetRowsService);
+
+    /** The Datasets the mapping can come from, and the picked one's columns (declared, else probed). */
+    readonly datasets = signal<LaDataset[]>([]);
+    readonly columns = signal<string[]>([]);
 
     readonly head = signal<IdentityGroupIndex | null>(null);
     readonly imported = signal<IdentityImportResult | null>(null);
@@ -132,8 +174,28 @@ export class LinkAnalysisIdentityComponent implements OnInit {
     readonly bType = new FormControl('', { nonNullable: true });
     readonly reason = new FormControl('', { nonNullable: true, validators: [Validators.required] });
 
+    constructor() {
+        this.dataset.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => void this.loadColumns(id));
+    }
+
     ngOnInit(): void {
         void this.load();
+        this.datasetsPort.list().subscribe({ next: (d) => this.datasets.set(d), error: () => this.datasets.set([]) });
+    }
+
+    /** A new Dataset clears the column picks — a column of the previous one would be refused. */
+    private async loadColumns(id: string): Promise<void> {
+        this.aCol.setValue('');
+        this.bCol.setValue('');
+        this.columns.set([]);
+        const ds = this.datasets().find((d) => d.id === id);
+        if (!ds) return;
+        try {
+            const cols = (await this.rows.columns(ds)).map((c) => c.name);
+            if (this.dataset.value === id) this.columns.set(cols);
+        } catch {
+            this.columns.set([]);
+        }
     }
 
     valid(): boolean {
