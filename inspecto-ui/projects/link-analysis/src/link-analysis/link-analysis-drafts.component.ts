@@ -34,11 +34,20 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                     'You already have a live Draft on this Investigation — continue it, promote it or discard it before forking another. Server: ' +
                     server
                 );
-            if (/must rebase/.test(server))
+            if (/must rebase/.test(server) && /undone steps/.test(server))
+                return 'The Draft holds undone steps — rebase it to compact them away, then promote. Server: ' + server;
+            if (/must rebase/.test(server) && /index version/.test(server))
+                return (
+                    'The index version this Draft pinned has expired — rebase it to re-pin, then promote. Server: ' +
+                    server
+                );
+            if (/must rebase/.test(server) && /based on step/.test(server))
                 return (
                     'The main log has moved on — rebase this Draft onto the current head, then promote. Server: ' +
                     server
                 );
+            if (/must rebase/.test(server))
+                return 'This Draft must be rebased before it can be promoted. Server: ' + server;
             return 'Refused as the Draft stands now — ' + server;
         case 422:
             return 'The server refused the request: ' + server;
@@ -95,7 +104,7 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                         <code>{{ d.draftId }}</code>
                         <inspecto-status-badge [value]="tone(d.state)" [label]="d.state"></inspecto-status-badge>
                         <span class="text-secondary">
-                            forked at step {{ d.baseStep }} · {{ d.steps }} own step(s)
+                            forked at step {{ d.baseStep }} · {{ ownSteps(d) }} own step(s)
                         </span>
                         @if (d.behind > 0) {
                             <inspecto-status-badge
@@ -179,6 +188,8 @@ export class LinkAnalysisDraftsComponent {
     readonly notice = signal('');
     readonly sizes = signal<Record<string, { entities: number; links: number; excluded: number }>>({});
     readonly reports = signal<Record<string, DraftConflictReport>>({});
+    /** EFFECTIVE own steps per Draft (undo records and the ops they undid folded away, as the evaluator does). */
+    readonly effective = signal<Record<string, number>>({});
 
     constructor() {
         effect(() => {
@@ -204,11 +215,41 @@ export class LinkAnalysisDraftsComponent {
             if (id !== this.investigationId()) return;
             this.drafts.set(l.items);
             this.hidden.set(false);
+            await this.countEffective(id, l.items);
         } catch (err) {
             this.drafts.set([]);
             if ((err as { status?: number } | null)?.status === 404) this.hidden.set(true);
             else this.error.set(draftErrorMessage(err, 'Could not read the Drafts.'));
         }
+    }
+
+    /** The own-step count shown: the effective count when the Draft's log was read, else the server's raw record count. */
+    ownSteps(d: InvestigationDraft): number {
+        return this.effective()[d.draftId] ?? d.steps;
+    }
+
+    /**
+     * `steps` on the list counts every own log RECORD, an Undo included; fold the Draft's own entries the way the evaluator
+     * does (an op counts unless it was undone; undo records never count). A read that fails or is truncated keeps the raw count.
+     */
+    private async countEffective(id: string, items: InvestigationDraft[]): Promise<void> {
+        const counts: Record<string, number> = {};
+        await Promise.all(
+            items
+                .filter((d) => d.steps > 0 && (d.state === 'open' || d.state === 'hibernated'))
+                .map(async (d) => {
+                    try {
+                        const log = await firstValueFrom(this.inv.draftLog(id, d.draftId));
+                        if (log.truncated) return;
+                        counts[d.draftId] = log.entries.filter(
+                            (e) => e.step > d.baseStep && e.kind === 'op' && e.undoneBy == null,
+                        ).length;
+                    } catch {
+                        /* keep the raw count */
+                    }
+                }),
+        );
+        if (id === this.investigationId()) this.effective.set(counts);
     }
 
     /** Run one Draft call, show a refusal in place, refresh the list; resolves to the answer or null on refusal. */
