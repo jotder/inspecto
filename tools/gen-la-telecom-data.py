@@ -17,7 +17,7 @@ Numbering (every number is invented; country codes 999/998 are not assigned to a
   99971xxxxxx  home-network background subscribers (2 400, in 100 closed calling clusters of 24)
   99970000100  HUB - a taxi-dispatch business line called by 650 distinct subscribers (the supernode;
                600 of them call inside the last 30 days, so the 30-day window still sees >= 560 contacts)
-  99979xxxxxx  the planted rings (see RINGS below and docs/superpower/la-telecom-demo-data.md)
+  99979xxxxxx  the planted rings (see RINGS below and docs/archived-documents/plans-archive/la-telecom-demo-data.md)
   9989100xxxx  premium-rate international range (IRSF / Wangiri callback destinations)
   998200xxxxx  ordinary international numbers
 
