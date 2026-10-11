@@ -232,4 +232,48 @@ class RemoteAcquisitionStagingTest {
         assertNull(connector.lastDest.get(), "refused before any bytes moved");
     }
 
+
+    /**
+     * HA-CANCEL-RESIDUALS-1 (2): a cancel that arrives mid-fetch stops the acquisition between files. The file in
+     * flight completes its whole unit (fetch, land, post-action), so nothing is half-acked; files not yet started
+     * are neither fetched nor acked and stay on the remote for the survivor's next cycle.
+     */
+    @Test
+    void aCancelMidFetchStopsBetweenFilesAndLeavesEveryFileWholeOrUntouched(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = configWithDeletePostAction(dir);
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        java.util.concurrent.atomic.AtomicBoolean cancel = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicInteger fetches = new java.util.concurrent.atomic.AtomicInteger();
+        FakeConnector connector = new FakeConnector(() -> { fetches.incrementAndGet(); cancel.set(true); });
+
+        List<RemoteFile> out;
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.ACQUIRE, cfg.identity().pipelineName(),
+                () -> CommitFence.State.HELD, cancel::get)) {
+            out = RemoteAcquisitionHandler.materializeRemote(cfg, connector, List.of(
+                    listed("c1.csv", PAYLOAD.length), listed("c2.csv", PAYLOAD.length),
+                    listed("c3.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
+        }
+
+        assertEquals(1, fetches.get(), "the cancel is seen before the next file: only the file in flight was fetched");
+        assertEquals(1, out.size(), "the file in flight finished its whole unit and is reported landed");
+        assertEquals(1, fileCount(inbox), "exactly that one file landed");
+        assertEquals(1, connector.postCalls.get(), "and only it was acked — no file is half-acked or acked unlanded");
+    }
+
+    /** The control: a fence that is never cancelled fetches every file. */
+    @Test
+    void anUncancelledFetchFetchesEveryFile(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir);
+        Files.createDirectories(Path.of(cfg.dirs().poll()));
+        FakeConnector connector = new FakeConnector(null);
+        List<RemoteFile> out;
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.ACQUIRE, cfg.identity().pipelineName(),
+                () -> CommitFence.State.HELD, () -> false)) {
+            out = RemoteAcquisitionHandler.materializeRemote(cfg, connector, List.of(
+                    listed("u1.csv", PAYLOAD.length), listed("u2.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
+        }
+        assertEquals(2, out.size());
+    }
+
 }

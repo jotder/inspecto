@@ -106,17 +106,25 @@ final class RemoteAcquisitionHandler {
         RateLimiter limiter = fetch.rateLimited() ? RateLimiter.perSecond(fetch.rateLimitBytesPerSec()) : null;
         int parallelism = Math.max(1, Math.min(fetch.parallelFetch(), toFetch.size()));
         List<RemoteFile> staged = java.util.Collections.synchronizedList(new ArrayList<>(toFetch.size()));
+        // HA-CANCEL-RESIDUALS-1 (2): the host's cooperative cancel is checked before EACH file, not only at cycle
+        // start. A file is one whole unit (fetch → land → post-action), so stopping between files never leaves one
+        // half-acked; unstarted files stay on the remote for the next holder. Resolved here, on the caller's
+        // thread: the parallel workers below do not carry its MDC Space, which keys the fence.
+        java.util.function.BooleanSupplier cancelled =
+                CommitFence.cancelSignal(CommitFence.Scope.ACQUIRE, cfg.identity().pipelineName());
 
         // Sequential (the Phase-E default): the single already-open session does everything.
         if (parallelism == 1) {
             AcquisitionTelemetry.setActiveConnections(cfg, 1);
             try {
-                for (RemoteFile rf : toFetch)
+                for (RemoteFile rf : toFetch) {
+                    if (cancelled.getAsBoolean()) break;
                     fetchOne(cfg, primary, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged, skipPostAction);
+                }
             } finally {
                 AcquisitionTelemetry.setActiveConnections(cfg, 0);
             }
-            return new ArrayList<>(staged);
+            return stoppedIfCancelled(cfg, cancelled, staged, toFetch.size());
         }
 
         // Parallel fetch (Phase F): the SPI's connectors each hold ONE non-thread-safe session, so concurrency is
@@ -139,6 +147,7 @@ final class RemoteAcquisitionHandler {
                     futures.add(ex.submit(() -> {
                         CollectorConnector c = pool.take();   // blocks until a session frees up ⇒ bounds concurrency
                         try {
+                            if (cancelled.getAsBoolean()) return null;   // not started: leave it on the remote
                             fetchOne(cfg, c, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged, skipPostAction);
                         } finally {
                             pool.put(c);
@@ -157,7 +166,18 @@ final class RemoteAcquisitionHandler {
                 try { c.close(); } catch (Exception ignore) { /* best-effort: each extra session is owned here */ }
             }
         }
-        return new ArrayList<>(staged);
+        return stoppedIfCancelled(cfg, cancelled, staged, toFetch.size());
+    }
+
+    /** The landed files, logging once when a cancel cut the fetch short. */
+    private static List<RemoteFile> stoppedIfCancelled(PipelineConfig cfg, java.util.function.BooleanSupplier cancelled,
+                                                       List<RemoteFile> staged, int wanted) {
+        List<RemoteFile> out = new ArrayList<>(staged);
+        if (out.size() < wanted && cancelled.getAsBoolean())
+            log.info("Acquisition for '{}' cancelled — the host is closing; stopped between files after landing {} "
+                    + "of {}, the rest stay on the remote for the next holder", cfg.identity().pipelineName(),
+                    out.size(), wanted);
+        return out;
     }
 
     /**
