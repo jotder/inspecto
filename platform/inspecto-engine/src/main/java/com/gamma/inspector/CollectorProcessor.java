@@ -292,6 +292,12 @@ public class CollectorProcessor {
                 try {
                     f.get();
                 } catch (Exception e) {
+                    // HA-GRACEFUL-STOP-LEASE-RELEASE-1: a run the closing host cancelled is not a failed batch —
+                    // its files stay in the inbox for the next holder; nothing to count or report as an error.
+                    if (e.getCause() instanceof CommitFence.RunCancelledException) {
+                        log.info("Consignment processing cancelled: {}", e.getCause().getMessage());
+                        continue;
+                    }
                     failedBatches++;
                     log.error("Consignment processing failed", e);
                 }

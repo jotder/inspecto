@@ -763,7 +763,9 @@ public final class SpaceManager implements AutoCloseable {
         try {
             t.join(CLOSE_DEADLINE_MS);
             if (t.isAlive())
-                log.warn("Close of space '{}' did not finish within {} ms; abandoning it and continuing teardown",
+                log.warn("Close of space '{}' did not finish within {} ms; abandoning it and continuing teardown — a run "
+                        + "thread that has not stopped still holds its run lease, which is deliberately NOT released "
+                        + "(a survivor would become a second writer); it expires after its TTL",
                         ctx.id(), CLOSE_DEADLINE_MS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

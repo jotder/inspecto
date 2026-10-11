@@ -101,6 +101,8 @@ final class GenerationModeIngester {
 
                 if (survivors.isEmpty()) batchStatus = "EMPTY";
             }
+        } catch (CommitFence.RunCancelledException cancelled) {
+            throw cancelled;   // not a data failure: no FAILED outcome, no retry attempt — see CommitFence.RunCancelledException
         } catch (Exception e) {
             batchStatus = "FAILED";
             batchError  = com.gamma.etl.FailureText.render(e, cfg);   // never store values (2026-10-03)

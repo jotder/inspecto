@@ -57,6 +57,11 @@ final class PipelineRunGuard implements RunLease {
     /** One binary semaphore per pipeline id, created on first use. */
     private final Map<String, Semaphore> permits = new ConcurrentHashMap<>();
 
+    /** Set by {@link #cancelRuns()}; read by every claim's {@code cancelled()} (HA-GRACEFUL-STOP-LEASE-RELEASE-1). */
+    private volatile boolean cancelRuns;
+
+    @Override public void cancelRuns() { cancelRuns = true; }
+
     /**
      * T13 / §3.8 — per-pipeline last-run epoch (ms), the cadence baseline for {@code schedule:{every}}/{@code cron}.
      *
@@ -90,6 +95,7 @@ final class PipelineRunGuard implements RunLease {
             @Override public com.gamma.inspector.CommitFence.State state() {   // a heap permit is never taken over
                 return released ? com.gamma.inspector.CommitFence.State.LOST : com.gamma.inspector.CommitFence.State.HELD;
             }
+            @Override public boolean cancelled() { return cancelRuns; }
             @Override public String toString() { return "Claim[" + pipeline + "]"; }
         };
     }

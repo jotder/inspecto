@@ -207,8 +207,8 @@ final class NativeCsvStreamingEngine {
             String code = RefusalQuarantine.reasonCode(cfg, e);
             if (code == null) throw e;   // the transform failed, not the read → fail the batch (don't quarantine)
             return empty(batch, batchStart, RefusalQuarantine.restrict(m, cfg, code, batch.batchId(), mStart));
-        } catch (SinkFlushException e) {
-            throw e;   // the write failed, not the read → fail the batch (don't quarantine)
+        } catch (SinkFlushException | CommitFence.LeaseLostException e) {
+            throw e;   // the write failed (or the run was cancelled), not the read → don't quarantine
         } catch (Exception e) {
             // read_csv failure (unreadable/undecodable) surfaces when the CTAS drives it.
             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
@@ -288,8 +288,8 @@ final class NativeCsvStreamingEngine {
                 } catch (TransformFailedException e) {
                     refused = RefusalQuarantine.reasonCode(cfg, e);
                     if (refused == null) throw e;   // the transform failed, not the read → fail the batch
-                } catch (SinkFlushException e) {
-                    throw e;   // the write failed, not the read → fail the batch
+                } catch (SinkFlushException | CommitFence.LeaseLostException e) {
+                    throw e;   // the write failed (or the run was cancelled), not the read → fail the batch
                 } catch (Exception e) {
                     unreadable = "chunk " + seq + " unreadable: " + msg(e);
                 } finally {
@@ -398,6 +398,8 @@ final class NativeCsvStreamingEngine {
         try {
             written = writeAndTrace(conn, "transformed", partCols, cfg, dbDir, baseName,
                     batchId, Map.of(srcId, lineageName), baseName, selectedTable);
+        } catch (CommitFence.LeaseLostException cancelled) {
+            throw cancelled;   // a cancelled run is not a sink failure
         } catch (Exception e) {
             throw new SinkFlushException("partition write failed for " + baseName + ": " + msg(e), e);
         }

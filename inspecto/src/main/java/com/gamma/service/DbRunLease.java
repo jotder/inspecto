@@ -105,6 +105,11 @@ final class DbRunLease implements RunLease, AutoCloseable {
     /** Pipelines this process currently holds → the epoch it holds them at (its fencing token). */
     private final Map<String, Long> held = new ConcurrentHashMap<>();
 
+    /** Set by {@link #cancelRuns()}; read by every claim's {@code cancelled()} (HA-GRACEFUL-STOP-LEASE-RELEASE-1). */
+    private volatile boolean cancelRuns;
+
+    @Override public void cancelRuns() { cancelRuns = true; }
+
     /**
      * Pipelines whose claim this process has learned it LOST -> the epoch it lost (LEASE-TAKEOVER-INFLIGHT-1).
      * Written by {@link #renewAll} when a fenced renew matches no row, and by {@link Claim#isValid} when its
@@ -252,6 +257,9 @@ final class DbRunLease implements RunLease, AutoCloseable {
                 }
                 return com.gamma.inspector.CommitFence.State.HELD;
             }
+
+            @Override
+            public boolean cancelled() { return cancelRuns; }
 
             @Override
             public String toString() {
