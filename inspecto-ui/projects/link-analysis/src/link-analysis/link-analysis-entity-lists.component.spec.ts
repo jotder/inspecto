@@ -169,7 +169,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
             data: { label: '+1 555 0001', kind: 'entity', spellings: ['+1 555 0001', 'masked:0123456789abcdef'] },
         });
         await settle();
-        expect(el.textContent).toContain('1 masked value(s) cannot be added');
+        expect(el.textContent).not.toContain('cannot be added');
         next.result = 'seen on the ring';
         button('Add the selected entity to Known mules')!.click();
         await settle();
@@ -181,6 +181,26 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         });
         expect(el.textContent).toContain('1 member added to “Known mules” — it now has 41.');
         expect(inv.listEntityLists).toHaveBeenCalledTimes(2); // re-read after the write
+    });
+
+    it('a masked-only selection is added through its alias (the server resolves it), like the node dialog', async () => {
+        const { store, inv, next, el, button, settle } = create();
+        await settle();
+        store.selected.set({
+            id: 'entity:msisdn:masked',
+            data: { label: 'masked:0123456789abcdef', kind: 'entity', spellings: ['masked:0123456789abcdef'] },
+        });
+        await settle();
+        expect(el.textContent).not.toContain('cannot be added');
+        expect(el.textContent).toContain('the server resolves it');
+        expect(button('Add the selected entity to Known mules')!.disabled).toBe(false);
+        next.result = 'ring member';
+        button('Add the selected entity to Known mules')!.click();
+        await settle();
+        expect(inv.changeEntityListMembers).toHaveBeenCalledWith('mules', {
+            add: ['masked:0123456789abcdef'],
+            reason: 'ring member',
+        });
     });
 
     it('a cancelled reason dialog writes nothing', async () => {
