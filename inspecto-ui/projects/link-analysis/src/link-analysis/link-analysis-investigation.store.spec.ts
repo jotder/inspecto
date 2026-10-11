@@ -558,3 +558,136 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(store.degreeOutcomes()).toEqual([]);
     });
 });
+
+describe('InvestigationSessionStore - live-run fixes (la-showcase telecom)', () => {
+    const pendingReq = (status: 'pending' | 'approved' | 'denied', extra: Record<string, unknown> = {}) => ({
+        id: 'p2',
+        investigationId: 'inv-1',
+        op: 'expand' as const,
+        params: {},
+        sensitivity: { exceeded: [], budget: 1, maxFanOut: null, fourEyesBudgetAbove: null, fourEyesFanOutAbove: null },
+        status,
+        requestedBy: 'fm.analyst',
+        requestedAt: '',
+        ...extra,
+    });
+
+    /** Seed `s`, then hold the first expand as four-eyes request `p2`. */
+    async function heldDegree() {
+        const ctx = setup();
+        const { store, inv, sets, logs } = ctx;
+        let n = 0;
+        inv.appendInvestigationOp.mockImplementation(((_id: string, op: { op: string }) => {
+            n++;
+            if (op.op === 'seed') {
+                sets['inv-1'] = ws(['s']);
+                return of({ ...step(n, 'seed'), delta: { ...step(n, 'seed').delta, admitted: ['s'] } });
+            }
+            logs['inv-1'].pending = [pendingReq('pending')];
+            return of({
+                status: 'pending',
+                pending: { id: 'p2' },
+                workingSet: { entities: 1, links: 0, excluded: 0, hash: '' },
+            });
+        }) as never);
+        await store.investigateNumber({
+            projection: P,
+            purpose: 'p',
+            title: 't',
+            seed: 's',
+            presets: {},
+            maxDegree: 4,
+            degrees: 2,
+        });
+        return ctx;
+    }
+
+    it('a held degree is listed once, and reload picks up the approval made elsewhere (N admitted)', async () => {
+        const { store, sets, logs } = await heldDegree();
+        expect(store.degreeOutcomes()).toHaveLength(1); // the log's pending list did not add a second line
+        expect(store.awaitingApproval()).toBe('p2');
+        // fm.manager approves in Oversight: the expand ran as step 3 and admitted a, b at hop 1
+        logs['inv-1'].pending = [pendingReq('approved', { step: 3 })];
+        sets['inv-1'] = {
+            ...ws(['s']),
+            entities: [
+                ...ws(['s']).entities,
+                ...['a', 'b'].map((id) => ({ ...ws([id]).entities[0], hop: 1, admittedBy: 3 })),
+            ],
+        };
+        expect(await store.reload()).toBe(true);
+        expect(store.awaitingApproval()).toBeNull();
+        expect(store.degreeOutcomes()[0]).toMatchObject({ degree: 1, decision: 'approved', admitted: 2 });
+        expect(degreeOutcomeMessage(store.degreeOutcomes()[0])).toBe(
+            'Degree 1: approved (request p2) — 2 new entities admitted.',
+        );
+        expect(degreeState(store.workingSet(), 4, store.degreeOutcomes()).blocked).toBeNull();
+    });
+
+    it('reopening the same id refreshes in place; a denial unblocks the next degree', async () => {
+        const { store, logs, inv } = await heldDegree();
+        const reads = inv.investigationLog.mock.calls.length;
+        logs['inv-1'].pending = [pendingReq('denied', { reason: 'too wide' })];
+        expect(await store.open('inv-1')).toBe(true);
+        expect(inv.investigationLog.mock.calls.length).toBe(reads + 1);
+        expect(store.degreeOutcomes()[0]).toMatchObject({ decision: 'denied', reason: 'too wide' });
+        expect(degreeOutcomeMessage(store.degreeOutcomes()[0])).toBe(
+            'Degree 1: request p2 was denied (too wide) — nothing was read.',
+        );
+        expect(degreeState(store.workingSet(), 4, store.degreeOutcomes()).blocked).toBeNull();
+    });
+
+    it('opening an Investigation with a still-pending request shows it as waiting', async () => {
+        const { store, logs, sets } = setup();
+        logs['inv-9'] = {
+            header: header('inv-9'),
+            entries: [],
+            total: 0,
+            truncated: false,
+            pending: [pendingReq('pending')],
+        };
+        sets['inv-9'] = ws(['s']);
+        await store.open('inv-9');
+        expect(store.degreeOutcomes()).toEqual([expect.objectContaining({ degree: 1, awaitingApproval: 'p2' })]);
+    });
+
+    it('the Advanced fields win over the presets on "Expand next degree" (minimum events per link)', async () => {
+        const { store, inv, sets } = setup();
+        await store.start(P, 'p');
+        sets['inv-1'] = ws(['s']);
+        await store.reload();
+        inv.appendInvestigationOp.mockImplementation((() => of(step(1, 'expand'))) as never);
+        await store.expandNextDegree({ minEvents: 2, maxFanOut: 50 }, 4, false, { minEvents: 1, includeHubs: true });
+        expect((inv.appendInvestigationOp.mock.calls.at(-1) as unknown[])[1]).toEqual({
+            op: 'expand',
+            ids: ['s'],
+            minEvents: 1,
+            maxFanOut: 50,
+        });
+    });
+
+    it('a degree is the outermost hop the step admitted, and the step’s sealed hub counts are kept', async () => {
+        const { store, inv, sets } = setup();
+        await store.start(P, 'p');
+        sets['inv-1'] = ws(['s']);
+        await store.reload();
+        inv.appendInvestigationOp.mockImplementation((() => {
+            sets['inv-1'] = {
+                ...ws(['s']),
+                entities: [
+                    ...ws(['s']).entities,
+                    { ...ws(['h']).entities[0], hop: 2, admittedBy: 7, highConnectivity: true },
+                ],
+            };
+            const r = step(7, 'expand');
+            return of({
+                ...r,
+                delta: { ...r.delta, admitted: ['h'] },
+                read: { rowCount: 1, fingerprint: '', readAt: '', hubsFlagged: 1, hubs: [{ id: 'h', degree: 650 }] },
+            });
+        }) as never);
+        await store.expandNextDegree({}, 4);
+        expect(store.degreeOutcomes().at(-1)).toMatchObject({ degree: 2, admitted: 1 });
+        expect(store.hubContacts().get('h')).toBe(650);
+    });
+});

@@ -82,6 +82,9 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
  * lives in {@link InvestigationSessionStore}; this component is the view over it. The LA-17 Entity Lists section
  * ({@link LinkAnalysisEntityListsComponent}) renders in both states — `excludeBy`/`seedBy` only while one is open.
  */
+/** How often a held degree re-reads the log for its four-eyes decision. */
+export const APPROVAL_POLL_MS = 15_000;
+
 @Component({
     selector: 'inspecto-link-analysis-investigation',
     standalone: true,
@@ -116,7 +119,8 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         LinkAnalysisValueMeasuresComponent,
         LinkAnalysisWorkingSetRowsComponent,
     ],
-    host: { class: 'block' },
+    // Back on the tab: a decision made elsewhere (an approval in Oversight) shows without reopening.
+    host: { class: 'block', '(window:focus)': 'store.reload()' },
     templateUrl: './link-analysis-investigation.component.html',
 })
 export class LinkAnalysisInvestigationComponent {
@@ -158,6 +162,13 @@ export class LinkAnalysisInvestigationComponent {
             const p = this.pending();
             if (p && this.title.pristine) this.title.setValue(suspectTitle(p.seed), { emitEvent: false });
         });
+        // A held degree: poll the log modestly until the four-eyes request is decided (the effect re-runs, and the
+        // interval is cleared, as soon as the reconciled outcome is no longer waiting).
+        effect((onCleanup) => {
+            if (!this.store.awaitingApproval()) return;
+            const timer = setInterval(() => void this.store.reload(), APPROVAL_POLL_MS);
+            onCleanup(() => clearInterval(timer));
+        });
     }
 
     /** What the pending investigation's Start will do, in words. */
@@ -175,6 +186,9 @@ export class LinkAnalysisInvestigationComponent {
             this.purpose.markAsTouched();
             return;
         }
+        const form = this.rungForm();
+        const advanced = form ? form.rung() : null;
+        if (form && !advanced) return; // an Advanced field is out of bounds — the section opens on it
         const ok = await this.store.investigateNumber({
             projection: p.projection,
             purpose: this.purpose.value.trim(),
@@ -186,6 +200,7 @@ export class LinkAnalysisInvestigationComponent {
             maxDegree: p.maxDegree,
             degrees: 2,
             windowEnd: p.windowEnd,
+            advanced,
         });
         // Once created the Investigation is open — the pending form is done even when a later expand was refused.
         if (ok || this.store.active()) {
@@ -201,10 +216,17 @@ export class LinkAnalysisInvestigationComponent {
     );
     /** The analyst's "Include hubs" opt-in on the expand rung. */
     readonly includeHubs = computed(() => this.rungForm()?.includeHubsOn() ?? false);
+    /** The blocked reason worth its own line — a held degree already says it is waiting in the results list. */
+    readonly blockedNote = computed(() => (this.store.awaitingApproval() ? null : this.degree().blocked));
 
     // ── supernode suppression: flagged entities, shown but not expanded unless the analyst overrides ──
     /** Working Set entities a sealed read flagged high connectivity. */
-    readonly hubs = computed(() => (this.store.workingSet()?.entities ?? []).filter((e) => e.highConnectivity));
+    readonly hubs = computed(() => {
+        const sealed = this.store.hubContacts();
+        return (this.store.workingSet()?.entities ?? [])
+            .filter((e) => e.highConnectivity)
+            .map((e) => (e.contacts == null && sealed.has(e.id) ? { ...e, contacts: sealed.get(e.id)! } : e));
+    });
     /** The hub threshold: the last step's sealed value when it ran, else the Space's value in force. */
     readonly hubThreshold = computed(() => {
         const sealed = this.store.lastStep()?.read?.rung?.['hubThreshold'];
@@ -255,8 +277,11 @@ export class LinkAnalysisInvestigationComponent {
 
     async expandNextDegree(): Promise<void> {
         const held = this.includeHubs() ? this.degree().heldHubs : [];
+        const form = this.rungForm();
+        const advanced = form ? form.rung() : null;
+        if (form && !advanced) return; // an Advanced field is out of bounds — the section opens on it
         if (held.length && !(await this.confirmOverride(held))) return;
-        await this.store.expandNextDegree(this.degreePresets(), this.maxDegree(), held.length > 0);
+        await this.store.expandNextDegree(this.degreePresets(), this.maxDegree(), held.length > 0, advanced);
     }
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 
@@ -406,10 +431,14 @@ export class LinkAnalysisInvestigationComponent {
     }
 
     switchTo(id: string | null): void {
-        if (id && id !== this.store.activeId()) {
-            this.order.set(null);
-            this.store.open(id);
+        if (!id) return;
+        if (id === this.store.activeId()) {
+            // Reopening the open one refreshes it: its log and Working Set may have moved on elsewhere.
+            void this.store.reload();
+            return;
         }
+        this.order.set(null);
+        this.store.open(id);
     }
 
     seed(): void {

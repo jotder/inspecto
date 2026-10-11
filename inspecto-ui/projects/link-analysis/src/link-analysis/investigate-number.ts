@@ -1,5 +1,10 @@
 import type { EntityProjection } from '@inspecto/core/graph';
-import type { ExpandRung, InvestigationStepResult, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
+import type {
+    ExpandRung,
+    InvestigationStepResult,
+    PendingExpansion,
+    WorkingSet,
+} from '@inspecto/link-analysis/api/inv.service';
 import {
     DEFAULT_MAX_DEGREE,
     DOMAIN_PROFILES,
@@ -222,6 +227,72 @@ export interface DegreeOutcome {
     hubsOverridden?: number;
     /** D-U7: the expand was held for four-eyes approval — the pending request's id; nothing was read. */
     awaitingApproval?: string;
+    /** The held request was decided elsewhere (read back from the log's `pending` list); absent = still waiting. */
+    decision?: 'approved' | 'denied';
+    /** On a deny, the reason when one was given. */
+    reason?: string;
+}
+
+/** True while a held degree is still waiting for its four-eyes decision. */
+export function isAwaiting(o: DegreeOutcome | null | undefined): boolean {
+    return !!o?.awaitingApproval && !o.decision;
+}
+
+/** The outermost hop of the entities a step admitted, from the refreshed Working Set rows; null when none. */
+export function admittedHop(ws: WorkingSet | null, step: number): number | null {
+    const hops = (ws?.entities ?? []).filter((e) => e.admittedBy === step).map((e) => e.hop);
+    return hops.length ? Math.max(...hops) : null;
+}
+
+/**
+ * Bring held degrees up to date with the log's four-eyes requests: a decided request becomes `approved` (with what
+ * the step it ran as admitted, counted from the Working Set rows) or `denied`. A still-pending request the session
+ * does not know about (the Investigation was reopened) is appended as a waiting degree. Returns the same array when
+ * nothing changed.
+ */
+export function reconcileApprovals(
+    outcomes: readonly DegreeOutcome[],
+    pending: readonly PendingExpansion[] | undefined,
+    ws: WorkingSet | null,
+): DegreeOutcome[] {
+    const byId = new Map((pending ?? []).map((p) => [p.id, p]));
+    let changed = false;
+    const next = outcomes.map((o) => {
+        const p = o.awaitingApproval && !o.decision ? byId.get(o.awaitingApproval) : undefined;
+        if (!p || p.status === 'pending') return o;
+        changed = true;
+        if (p.status === 'denied') return { ...o, decision: 'denied' as const, ...(p.reason ? { reason: p.reason } : {}) };
+        const admitted = p.step != null ? (ws?.entities ?? []).filter((e) => e.admittedBy === p.step).length : 0;
+        const hop = p.step != null ? admittedHop(ws, p.step) : null;
+        return { ...o, decision: 'approved' as const, admitted, degree: hop ?? o.degree };
+    });
+    const known = new Set(outcomes.map((o) => o.awaitingApproval).filter(Boolean));
+    for (const p of pending ?? []) {
+        if (p.status !== 'pending' || known.has(p.id)) continue;
+        const visible = (ws?.entities ?? []).filter((e) => !e.hidden);
+        const current = visible.length ? Math.max(...visible.map((e) => e.hop)) : 0;
+        next.push({
+            degree: current + 1,
+            admitted: 0,
+            linksAdded: 0,
+            truncated: false,
+            fanOutCapped: 0,
+            awaitingApproval: p.id,
+        });
+        changed = true;
+    }
+    return changed ? next : (outcomes as DegreeOutcome[]);
+}
+
+/**
+ * The rung "Expand next degree" sends: the profile's preset rung with the analyst's Advanced fields laid over it (a
+ * field the analyst set wins; an unset one keeps the preset). The hub opt-in travels separately, so it is dropped.
+ */
+export function mergeRung(preset: ExpandRung, advanced: ExpandRung | null | undefined): ExpandRung {
+    const extra: ExpandRung = { ...(advanced ?? {}) };
+    delete extra.includeHubs;
+    delete extra.expandHubs;
+    return { ...preset, ...extra };
 }
 
 /**
@@ -244,10 +315,10 @@ export function degreeState(
     const frontier = outer.filter((e) => includeHubs || !e.highConnectivity).map((e) => e.id);
     let blocked: string | null = null;
     const last = outcomes.at(-1);
-    if (last?.awaitingApproval)
-        blocked = `Degree ${last.degree} is waiting for approval (request ${last.awaitingApproval}) — a second person must approve this expand before it runs.`;
+    if (isAwaiting(last))
+        blocked = `Degree ${last!.degree} is waiting for approval (request ${last!.awaitingApproval}) — a second person must approve this expand before it runs.`;
     else if (current >= maxDegree) blocked = `Degree ${maxDegree} reached.`;
-    else if (last && last.degree === current + 1 && last.admitted === 0)
+    else if (last && last.decision !== 'denied' && last.degree === current + 1 && last.admitted === 0)
         blocked = `Degree ${current + 1} found no new entities — there is nothing further to expand.`;
     else if (!frontier.length && heldHubs.length)
         blocked =
@@ -281,13 +352,19 @@ export function presetRung(presets: DegreePresets, hasTimeColumn: boolean, windo
     return rung;
 }
 
-/** What a step at `degree` did, from the `/ops` answer and the rung it sent. */
+/**
+ * What a step did, from the `/ops` answer and the rung it sent. `degree` is the expected next degree; when the
+ * refreshed Working Set `ws` is given, the degree is the outermost hop the step actually admitted (the rows' own
+ * `hop`), never a count of steps.
+ */
 export function degreeOutcome(
-    degree: number,
+    expected: number,
     step: InvestigationStepResult,
     rung: ExpandRung,
     range?: string | null,
+    ws?: WorkingSet | null,
 ): DegreeOutcome {
+    const degree = (step.status !== 'pending' && ws ? admittedHop(ws, step.step) : null) ?? expected;
     if (step.status === 'pending')
         return {
             degree,
@@ -324,6 +401,12 @@ const HUB_SOURCE: Record<'index' | 'flat', string> = {
 
 /** One degree's result in plain language, truncation and the fan-out cap included. */
 export function degreeOutcomeMessage(o: DegreeOutcome): string {
+    if (o.decision === 'approved')
+        return `Degree ${o.degree}: approved (request ${o.awaitingApproval}) — ${
+            o.admitted ? `${plural(o.admitted, 'new entity', 'new entities')} admitted.` : 'nothing new was found.'
+        }`;
+    if (o.decision === 'denied')
+        return `Degree ${o.degree}: request ${o.awaitingApproval} was denied${o.reason ? ` (${o.reason})` : ''} — nothing was read.`;
     if (o.awaitingApproval)
         return `Degree ${o.degree}: waiting for approval — this expand exceeds the Space's four-eyes limit, so it runs once a second person approves request ${o.awaitingApproval}.`;
     const parts = [

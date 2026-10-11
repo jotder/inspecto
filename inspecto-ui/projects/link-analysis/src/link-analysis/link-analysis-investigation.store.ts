@@ -22,7 +22,16 @@ import {
 import { ProjectedGraph } from './entity-projection';
 import { QueuedSeed } from './la-starter';
 import { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
-import { DegreeOutcome, degreeOutcome, degreeState, presetRung, windowLabel } from './investigate-number';
+import {
+    DegreeOutcome,
+    degreeOutcome,
+    degreeState,
+    isAwaiting,
+    mergeRung,
+    presetRung,
+    reconcileApprovals,
+    windowLabel,
+} from './investigate-number';
 
 const EMPTY_SET: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
 
@@ -86,6 +95,16 @@ export class InvestigationSessionStore {
 
     /** "Expand next degree": what each degree expanded in THIS session did (the open Investigation only). */
     readonly degreeOutcomes = signal<DegreeOutcome[]>([]);
+    /** The held degree still waiting for its four-eyes decision, or null — the panel polls while it is set. */
+    readonly awaitingApproval = computed(() => {
+        const last = this.degreeOutcomes().at(-1);
+        return isAwaiting(last) ? last!.awaitingApproval! : null;
+    });
+    /**
+     * Hub suppression: each flagged entity's sealed contact count, as this session's steps answered it
+     * (`read.hubs`). The Working Set rows' own `contacts` wins; this fills in where a replay row has none.
+     */
+    readonly hubContacts = signal<ReadonlyMap<string, number>>(new Map());
 
     readonly active = computed(() => this.activeId() !== null);
     readonly activeRef = computed(() => this.refs().find((r) => r.id === this.activeId()) ?? null);
@@ -152,6 +171,7 @@ export class InvestigationSessionStore {
         this.selected.set(null);
         this.error.set('');
         this.degreeOutcomes.set([]);
+        this.hubContacts.set(new Map());
         this.windowEnd.set(null);
         this.lastOverride.set(null);
     }
@@ -215,7 +235,12 @@ export class InvestigationSessionStore {
      * unless the analyst opted in (`includeHubs`), and only then does the op carry `includeHubs: true`, which the
      * server seals in the step's params as the audited override.
      */
-    async expandNextDegree(presets: DegreePresets, maxDegree: number, includeHubs = false): Promise<boolean> {
+    async expandNextDegree(
+        presets: DegreePresets,
+        maxDegree: number,
+        includeHubs = false,
+        advanced: ExpandRung | null = null,
+    ): Promise<boolean> {
         if (this.expanding) return false; // one degree at a time: a second click while one runs is ignored
         const state = degreeState(this.workingSet(), maxDegree, this.degreeOutcomes(), includeHubs);
         if (state.blocked) {
@@ -225,7 +250,11 @@ export class InvestigationSessionStore {
         const id = this.activeId();
         const end = this.windowEnd();
         const overriding = includeHubs && state.heldHubs.length > 0;
-        const rung = { ...presetRung(presets, !!this.header()?.timeCol, end), ...(overriding ? { includeHubs: true } : {}) };
+        // The analyst's Advanced fields (e.g. minimum events per link) win over the profile's presets.
+        const rung = {
+            ...mergeRung(presetRung(presets, !!this.header()?.timeCol, end), advanced),
+            ...(overriding ? { includeHubs: true } : {}),
+        };
         this.expanding = true;
         try {
             if (!(await this.apply({ op: 'expand', ids: state.frontier, ...rung }))) return false;
@@ -234,18 +263,26 @@ export class InvestigationSessionStore {
         }
         if (this.activeId() !== id) return false; // switched away meanwhile - the answer belongs to another one
         const step = this.lastStep();
-        const range = rung.window
-            ? windowLabel(presets, end)
-            : presets.windowDays != null
-              ? 'all available data'
-              : null;
+        const own = advanced?.window;
+        const range =
+            own === 'full'
+                ? 'all available data'
+                : own
+                  ? 'the window set for this degree'
+                  : rung.window
+                    ? windowLabel(presets, end)
+                    : presets.windowDays != null
+                      ? 'all available data'
+                      : null;
         if (step) {
-            const outcome = degreeOutcome(state.current + 1, step, rung, range);
+            const outcome = degreeOutcome(state.current + 1, step, rung, range, this.workingSet());
             if (overriding && step.status !== 'pending') {
                 outcome.hubsOverridden = state.heldHubs.length;
                 this.lastOverride.set({ step: step.step, ids: state.heldHubs });
             }
-            this.degreeOutcomes.update((all) => [...all, outcome]);
+            // The refresh may already have listed a held request from the log — this outcome replaces that line.
+            const held = outcome.awaitingApproval;
+            this.degreeOutcomes.update((all) => [...all.filter((o) => !held || o.awaitingApproval !== held), outcome]);
         }
         return true;
     }
@@ -295,6 +332,8 @@ export class InvestigationSessionStore {
         degrees: number;
         /** The Dataset's latest event time — the window's end. */
         windowEnd?: string | null;
+        /** The analyst's Advanced rung fields, laid over the presets on every degree. */
+        advanced?: ExpandRung | null;
     }): Promise<boolean> {
         if (this.chainRunning()) return false;
         this.chainRunning.set(true);
@@ -319,16 +358,35 @@ export class InvestigationSessionStore {
             if (this.activeId() !== id) return false; // closed or switched mid-chain: stop, never act on another one
             // The chain never opts into hubs: an override is the analyst's own, confirmed decision.
             if (degreeState(this.workingSet(), req.maxDegree, this.degreeOutcomes()).blocked) break;
-            if (!(await this.expandNextDegree(req.presets, req.maxDegree))) return false;
+            if (!(await this.expandNextDegree(req.presets, req.maxDegree, false, req.advanced ?? null))) return false;
         }
         return true;
     }
 
     /** Open a remembered Investigation: its log and (via replay) its Working Set. */
     async open(id: string): Promise<boolean> {
+        // Reopening the open one refreshes it in place: its degree results stay and pick up a decision made elsewhere.
+        if (id === this.activeId() && !this.activeDraftId())
+            return this.run('Could not open the Investigation.', () => this.refresh(id));
         this.close();
         this.activeId.set(id);
         return this.run('Could not open the Investigation.', () => this.refresh(id));
+    }
+
+    /**
+     * Re-read the open Investigation's log and Working Set without closing it — after a decision made elsewhere
+     * (an approval in Oversight), on reopen of the same id, on focus, and while a held degree is polled. Quiet: it
+     * neither sets `busy` nor replaces a shown error; false when nothing is open, a mutation is running, or it failed.
+     */
+    async reload(): Promise<boolean> {
+        const id = this.activeId();
+        if (!id || this.busy() || this.expanding) return false;
+        try {
+            await this.refresh(id);
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /** Append one op, then re-read the log and the Working Set. */
@@ -344,11 +402,11 @@ export class InvestigationSessionStore {
             `The ${op.op} step failed.`,
             async () => {
                 const draft = this.activeDraftId();
-                this.lastStep.set(
-                    await firstValueFrom(
-                        draft ? this.inv.appendDraftOp(id, draft, op) : this.inv.appendInvestigationOp(id, op),
-                    ),
+                const step = await firstValueFrom(
+                    draft ? this.inv.appendDraftOp(id, draft, op) : this.inv.appendInvestigationOp(id, op),
                 );
+                this.lastStep.set(step);
+                this.noteHubs(step);
                 await this.refresh(id);
             },
             message,
@@ -458,6 +516,16 @@ export class InvestigationSessionStore {
         this.log.set(l.log);
         this.workingSet.set(l.workingSet);
         this.draftBaseStep.set(l.baseStep);
+        this.degreeOutcomes.set(reconcileApprovals(this.degreeOutcomes(), l.log.pending, l.workingSet));
+    }
+
+    /** Remember the sealed contact counts a step's read answered for its flagged entities. */
+    private noteHubs(step: InvestigationStepResult | null | undefined): void {
+        const hubs = step?.read?.hubs;
+        if (!hubs?.length) return;
+        const next = new Map(this.hubContacts());
+        for (const h of hubs) if (typeof h.degree === 'number') next.set(h.id, h.degree);
+        this.hubContacts.set(next);
     }
 
     private async run(

@@ -663,7 +663,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
 
         const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
         next().click();
-        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4, false);
+        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4, false, {});
 
         store.degreeOutcomes.set([
             { degree: 1, admitted: 3, linksAdded: 4, truncated: true, fanOutCapped: 0, budget: 2000 },
@@ -782,5 +782,48 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         const second = inv.appendInvestigationOp.mock.calls[1] as unknown as [string, Record<string, unknown>];
         expect(second[1]['ids']).toEqual(['b', 'hub']);
         expect(second[1]['includeHubs']).toBe(true);
+    });
+
+    it('badges a hub with the sealed count its step read answered when the Working Set row has none', async () => {
+        const { fixture, store, el } = create({ ws: HUB_WS });
+        await openInv(store);
+        store.hubContacts.set(new Map([['hub', 650]]));
+        fixture.detectChanges();
+        const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
+        expect(list.textContent).toContain('650 contacts');
+        expect(list.textContent).not.toContain('more than');
+    });
+
+    it('a held degree says it is waiting once; the decision replaces it', async () => {
+        const { fixture, store, el } = create({ ws: HUB_WS });
+        await openInv(store);
+        const held = { degree: 2, admitted: 0, linksAdded: 0, truncated: false, fanOutCapped: 0, awaitingApproval: 'p2' };
+        store.degreeOutcomes.set([held]);
+        fixture.detectChanges();
+        const next = el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
+        expect(next.disabled).toBe(true);
+        expect(el.querySelector('[data-testid="degree-blocked"]')).toBeNull();
+        expect(el.textContent?.match(/waiting for approval/g)?.length).toBe(1);
+        await expectNoA11yViolations(el);
+
+        store.degreeOutcomes.set([{ ...held, decision: 'approved', admitted: 0 }]);
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain(
+            'Degree 2: approved (request p2) — nothing new was found.',
+        );
+        expect(el.textContent).not.toContain('waiting for approval');
+    });
+
+    it('"Expand next degree" sends the Advanced minimum events per link over the presets', async () => {
+        const { fixture, store, el } = create({ ws: HUB_WS });
+        await openInv(store);
+        fixture.detectChanges();
+        const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
+        const input = el.querySelector('input[formcontrolname="minEvents"]') as HTMLInputElement;
+        input.value = '1';
+        input.dispatchEvent(new Event('input'));
+        (el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        expect(spy).toHaveBeenCalledWith(expect.anything(), expect.any(Number), false, { minEvents: 1 });
     });
 });
