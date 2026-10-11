@@ -126,6 +126,80 @@ class GracefulStopHandoverTest {
         }
     }
 
+    /**
+     * A pipeline with two inbox files = two Consignments run one at a time (threads: 1), and a Park on the run
+     * thread's first event - emitted after the FIRST batch commits, so the second batch is still to come and
+     * its checkpoint sees the close.
+     */
+    private static Object[] parkedPipeline(Path dir, CollectorService[] svcOut) throws Exception {
+        System.setProperty("run.lease.backend", leaseUrl(dir));
+        Path pipe = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("cfg")), "");
+        String toon = Files.readString(pipe);
+        assertTrue(toon.contains("threads: 2"));
+        Files.writeString(pipe, toon.replace("threads: 2", "threads: 1"));
+        PipelineConfig cfg = PipelineConfig.load(pipe.toString());
+        String name = cfg.identity().pipelineName();
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        for (int i = 0; i < 2; i++)
+            Files.writeString(inbox.resolve("f" + i + ".csv"), "ID,AMT,EVENT_DATE\nr" + i + ",1.0,2020-04-03\n");
+        CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+        Park park = new Park(e -> Thread.currentThread().isVirtual() && name.equalsIgnoreCase(e.pipeline()),
+                () -> CommitFence.checkpoint(CommitFence.Scope.RUN, name),
+                () -> CommitFence.cancelSignal(CommitFence.Scope.RUN, name));
+        svc.eventLog().addSubscriber(park);
+        svcOut[0] = svc;
+        return new Object[] {name, park, inbox};
+    }
+
+    /** Operator decision 2026-10-11: a cancelled manual pipeline run is recorded CANCELLED, never SUCCESS. */
+    @Test
+    void aManualPipelineRunCancelledByCloseIsRecordedCancelled(@TempDir Path dir) throws Exception {
+        CollectorService[] box = new CollectorService[1];
+        Object[] p = parkedPipeline(dir, box);
+        CollectorService svc = box[0];
+        Park park = (Park) p[1];
+        try {
+            String runId = svc.triggerRunAsync((String) p[0]).orElseThrow();
+            assertTrue(park.parked.await(20, TimeUnit.SECONDS), "the run emitted an event mid-flight");
+            closeWhileParked(svc, park);
+            PipelineRun r = svc.pipelineRunById(runId).orElseThrow();
+            assertEquals("CANCELLED", r.status(), "a cancelled run is not a success: " + r);
+            assertEquals(0, r.failed(), "nor a failure");
+            try (var left = Files.list((Path) p[2])) {
+                assertEquals(1, left.count(), "the uncommitted batch's input stays in the inbox");
+            }
+        } finally {
+            svc.eventLog().removeSubscriber(park);
+            svc.close();
+        }
+    }
+
+    /** ...and a cancelled scheduled run neither counts as failed nor marks the poll failed. */
+    @Test
+    void aScheduledRunCancelledByCloseIsNotAFailure(@TempDir Path dir) throws Exception {
+        CollectorService[] box = new CollectorService[1];
+        Object[] p = parkedPipeline(dir, box);
+        CollectorService svc = box[0];
+        Park park = (Park) p[1];
+        String name = (String) p[0];
+        try {
+            CompletableFuture<com.gamma.inspector.MultiCollectorProcessor.RunResult> cycle =
+                    CompletableFuture.supplyAsync(svc::runAllOnce);
+            assertTrue(park.parked.await(20, TimeUnit.SECONDS), "the run emitted an event mid-flight");
+            closeWhileParked(svc, park);
+            assertEquals(0, cycle.get(10, TimeUnit.SECONDS).failed(), "a cancel is not a failed source run");
+            Map<String, Object> row = svc.collectors().stream()
+                    .filter(m -> name.equalsIgnoreCase(String.valueOf(m.get("pipeline")))).findFirst().orElseThrow();
+            assertNull(row.get("lastError"), "the poll is not marked failed: " + row);
+            try (var left = Files.list((Path) p[2])) {
+                assertEquals(1, left.count(), "the uncommitted batch's input stays in the inbox");
+            }
+        } finally {
+            svc.eventLog().removeSubscriber(park);
+            svc.close();
+        }
+    }
+
     @Test
     void closingMidJobRunCancelsItReleasesTheLeaseAndASurvivorClaims(@TempDir Path dir) throws Exception {
         String url = leaseUrl(dir);

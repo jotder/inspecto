@@ -138,12 +138,37 @@ class RunCancellationTest {
         // Through the service-facing entry point the cancel is counted as not completed, not as a success.
         try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
                 () -> CommitFence.State.HELD, () -> true)) {
-            assertEquals(1, MultiCollectorProcessor.runConfigs(java.util.List.of(cfg), 1, null, true).failed(),
-                    "a cancelled source run is not reported as completed");
+            MultiCollectorProcessor.RunResult cancelledRun =
+                    MultiCollectorProcessor.runConfigs(java.util.List.of(cfg), 1, null, true);
+            assertEquals(1, cancelledRun.cancelled(), "a cancelled source run is counted cancelled");
+            assertEquals(0, cancelledRun.failed(), "...not failed");
+            assertEquals(0, cancelledRun.succeeded(), "...and not succeeded");
         }
         assertEquals(0, MultiCollectorProcessor.runConfigs(java.util.List.of(cfg), 1, null, true).failed(),
                 "no cancel: the survivor-style rerun ingests the leftover normally");
         assertEquals(0, filesUnder(cfg.dirs().poll()));
+    }
+
+    /** A cancel that first lands at the commit point (after every checkpoint passed) still surfaces as cancelled. */
+    @Test
+    void aCancelAtTheCommitPointSurfacesAsCancelled(@TempDir Path dir) throws Exception {
+        // Count the fence's looks over an uncancelled run, then cancel exactly on the last one: the commit check.
+        PipelineConfig probe = pipelineWithFeed(Files.createDirectories(dir.resolve("probe")));
+        AtomicInteger total = new AtomicInteger();
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, probe.identity().pipelineName(),
+                () -> CommitFence.State.HELD, () -> { total.incrementAndGet(); return false; })) {
+            CollectorProcessor.run(probe);
+        }
+        PipelineConfig cfg = pipelineWithFeed(Files.createDirectories(dir.resolve("real")));
+        File feed = Path.of(cfg.dirs().poll()).resolve("feed.csv").toFile();
+        AtomicInteger looks = new AtomicInteger();
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
+                () -> CommitFence.State.HELD, () -> looks.incrementAndGet() >= total.get())) {
+            assertThrows(CommitFence.RunCancelledException.class, () -> CollectorProcessor.run(cfg));
+        }
+        assertTrue(feed.exists(), "not committed: the input stays in the inbox");
+        assertEquals(0, filesUnder(cfg.dirs().quarantine()));
+        assertNull(CommitRetry.recordFor(feed, cfg), "no attempt spent");
     }
 
     /** (c): a fence that is never cancelled changes nothing. */

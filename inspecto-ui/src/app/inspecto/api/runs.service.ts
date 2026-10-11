@@ -149,7 +149,7 @@ export interface ConsignmentOutputsPage {
 export interface PipelineRunStatus {
     runId: string;
     pipeline?: string;
-    status: 'RUNNING' | 'SUCCESS' | 'FAILED' | string;
+    status: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | string;
     startedAt?: string;
     finishedAt?: string | null;
     total?: number;

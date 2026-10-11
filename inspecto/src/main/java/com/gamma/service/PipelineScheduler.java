@@ -411,6 +411,8 @@ final class PipelineScheduler {
                     reg.inc("inspecto_source_run_failures_total", "Source-run failures", Map.of(), r.failed());
                     poll.failed(System.currentTimeMillis(), r.failed() + " source run(s) failed");
                 }
+                // HA-CANCEL-RESIDUALS-1: a run a closing host cancelled is not a failure — no failure metric, no failed poll.
+                if (r.cancelled() > 0) log.info("Source '{}' run cancelled (host closing)", due.id());
                 return r.failed();
             } catch (RuntimeException e) {
                 // ⚠ A throw is a poll that happened and failed — recording it here rather than only on the

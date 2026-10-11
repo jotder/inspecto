@@ -58,8 +58,10 @@ public final class MultiCollectorProcessor {
     private MultiCollectorProcessor() {}
 
     /** Outcome of a multi-source run. */
-    public record RunResult(int total, int failed) {
-        public int succeeded() { return total - failed; }
+    /** {@code cancelled}: source runs a closing host cancelled (HA-CANCEL-RESIDUALS-1) — neither succeeded nor failed. */
+    public record RunResult(int total, int failed, int cancelled) {
+        public RunResult(int total, int failed) { this(total, failed, 0); }
+        public int succeeded() { return total - failed - cancelled; }
     }
 
     public static void main(String[] args) throws Exception {
@@ -152,6 +154,7 @@ public final class MultiCollectorProcessor {
                                    boolean skipPostAction, boolean dryRun) {
         Semaphore permits   = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
+        AtomicInteger cancelled = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
         // The run's pinned Safety Policy is a ScopedValue: not visible on these workers unless handed over.
         var pin = com.gamma.config.safety.SafetyPolicy.pinned();
@@ -171,8 +174,8 @@ public final class MultiCollectorProcessor {
                             });
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
                         } catch (CommitFence.RunCancelledException e) {
-                            // Cancelled by a closing host: not completed, so counted as not-success — but not an error.
-                            failed.incrementAndGet();
+                            // Cancelled by a closing host: neither a success nor a failure.
+                            cancelled.incrementAndGet();
                             log.info("Source {} cancelled: {}", cfgPath, e.getMessage());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
@@ -198,7 +201,7 @@ public final class MultiCollectorProcessor {
                 }
             }
         }
-        return new RunResult(configs.size(), failed.get());
+        return new RunResult(configs.size(), failed.get(), cancelled.get());
     }
 
     /**
@@ -246,6 +249,7 @@ public final class MultiCollectorProcessor {
                                        boolean acquireFirst) {
         Semaphore permits    = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
+        AtomicInteger cancelled = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
         // The run's pinned Safety Policy is a ScopedValue: not visible on these workers unless handed over.
         var pin = com.gamma.config.safety.SafetyPolicy.pinned();
@@ -265,8 +269,8 @@ public final class MultiCollectorProcessor {
                             });
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
                         } catch (CommitFence.RunCancelledException e) {
-                            // Cancelled by a closing host: not completed, so counted as not-success — but not an error.
-                            failed.incrementAndGet();
+                            // Cancelled by a closing host: neither a success nor a failure.
+                            cancelled.incrementAndGet();
                             log.info("Source '{}' cancelled: {}", cfg.identity().pipelineName(), e.getMessage());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
@@ -293,7 +297,7 @@ public final class MultiCollectorProcessor {
                 }
             }
         }
-        return new RunResult(configs.size(), failed.get());
+        return new RunResult(configs.size(), failed.get(), cancelled.get());
     }
 
     /**

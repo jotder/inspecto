@@ -9131,7 +9131,7 @@
           },
           "status" : {
             "type" : "string",
-            "description" : "RUNNING, then terminal SUCCESS / FAILED."
+            "description" : "RUNNING, then terminal SUCCESS / FAILED / CANCELLED (the host closed mid-run and nothing genuinely failed; inputs stay in the inbox)."
           },
           "total" : {
             "type" : "integer",
