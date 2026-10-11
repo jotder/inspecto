@@ -402,6 +402,14 @@ export class LinkAnalysisServerAlgorithmsComponent {
         const m = this.riskMapping();
         const ids = this.serverIds();
         if (!m) return;
+        // /db/query applies no entity masking: under any mode but `none` (or an unknown one) no reference row is read
+        if (this.settings.limits()?.maskingModeInForce !== 'none') {
+            this.scoreNote.update((n) => ({
+                ...n,
+                [p.name]: 'Scores are unavailable while entity masking is on.',
+            }));
+            return;
+        }
         this.filling.set(true);
         try {
             const table = await this.risk.table(m.indicators);
@@ -418,7 +426,8 @@ export class LinkAnalysisServerAlgorithmsComponent {
                 ...n,
                 [p.name]:
                     `${r.matched} of ${serverIds.length} nodes have a score in ${m.indicators.dataset}` +
-                    (r.dropped ? ` (${r.dropped} left out at the ${p.maxSize}-entry cap).` : '.'),
+                    (r.dropped ? ` (${r.dropped} left out at the ${p.maxSize}-entry cap).` : '.') +
+                    (table.truncated ? ' The Dataset was only partly read: some scores may be missing.' : ''),
             }));
         } finally {
             this.filling.set(false);

@@ -127,7 +127,7 @@ function make(
             { provide: NodeRiskService, useValue: risk },
             {
                 provide: LinkAnalysisSettingsService,
-                useValue: { limits: signal({ propagatedRiskWeightsInForce: [1, 0.5] }) },
+                useValue: { limits: signal({ propagatedRiskWeightsInForce: [1, 0.5], maskingModeInForce: 'none' }) },
             },
         ],
     });

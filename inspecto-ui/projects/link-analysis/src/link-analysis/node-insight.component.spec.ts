@@ -10,6 +10,9 @@ import { GraphRunView } from '@inspecto/link-analysis/api/graph-runs.service';
 import { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
+import { InvService } from '@inspecto/link-analysis/api/inv.service';
+import { signal } from '@angular/core';
 
 const list = (id: string, purpose: EntityListSummary['purpose'], over: Partial<EntityListSummary> = {}) =>
     ({
@@ -91,13 +94,24 @@ function riskView(): GraphRunView {
 
 function make(
     ctx: Partial<NodeInsightContext> = {},
-    opts: { add?: () => unknown; reason?: string | undefined; matched?: string[] } = {},
+    opts: {
+        add?: () => unknown;
+        reason?: string | undefined;
+        matched?: string[];
+        masking?: string;
+        truncated?: boolean;
+    } = {},
 ) {
     const close = vi.fn();
     const computeRisk = vi.fn(() => of({ ...riskView(), status: 'RUNNING' } as GraphRunView, riskView()));
     const addMember = vi.fn(opts.add ?? (() => of({ changed: 1 })));
     const svc = {
-        table: vi.fn((ref: { dataset: string }) => Promise.resolve(ref.dataset === 'crm_kyc' ? CRM : INDICATORS)),
+        table: vi.fn((ref: { dataset: string }) =>
+            Promise.resolve({
+                ...(ref.dataset === 'crm_kyc' ? CRM : INDICATORS),
+                truncated: !!opts.truncated,
+            }),
+        ),
         cachedRisk: vi.fn(() => null),
         computeRisk,
         entityLists: vi.fn(() =>
@@ -126,6 +140,16 @@ function make(
             { provide: NodeRiskService, useValue: svc },
             { provide: MatDialog, useValue: dialog },
             { provide: MatDialogRef, useValue: { close } },
+            {
+                provide: LinkAnalysisSettingsService,
+                useValue: {
+                    limits: signal({
+                        maskingModeInForce: opts.masking ?? 'none',
+                        propagatedRiskWeightsInForce: [1, 0.5],
+                    }),
+                },
+            },
+            { provide: InvService, useValue: { masking: signal(null) } },
         ],
     });
     TestBed.overrideComponent(NodeInsightComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
@@ -158,7 +182,9 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         el.querySelector<HTMLButtonElement>('[data-testid=compute-risk]')!.click();
         await settle(fixture);
         // seeded with every drawn node's positive indicator score; 222 has none
-        expect(svc.computeRisk).toHaveBeenCalledWith('inv:h1', 'inv', { '999': 40, '111': 80 });
+        // the cache key carries the weights in force, so a weights change never reads a stale answer
+        expect(svc.computeRisk).toHaveBeenCalledWith('inv:h1|w=1,0.5', 'inv', { '999': 40, '111': 80 });
+        expect(svc.cachedRisk).toHaveBeenCalledWith('inv:h1|w=1,0.5');
         const p = el.querySelector('[data-testid=risk-propagated]')!.textContent!;
         expect(p).toContain('Propagated score 68');
         expect(p).toContain('+28 from L111, 3 hops, weight 0.35');
@@ -207,6 +233,24 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(el.querySelector('[data-testid=lists-forbidden]')!.textContent).toContain('Manage incidents');
         el.querySelector<HTMLButtonElement>('[data-testid=hide-node]')!.click();
         expect(close).toHaveBeenCalledWith('hide');
+    });
+
+    it('reads no reference Dataset while entity masking is on, and holds Compute risk', async () => {
+        const { fixture, el, svc } = make({}, { masking: 'typed' });
+        await settle(fixture);
+        expect(svc.table).not.toHaveBeenCalled();
+        expect(el.querySelector('[data-testid=risk-masked]')!.textContent).toContain('entity masking is on');
+        expect(el.querySelector('[data-testid=enrich-masked]')).not.toBeNull();
+        expect(el.querySelector('[data-testid=compute-risk]')).toBeNull();
+    });
+
+    it('warns in both sections on a truncated read and blocks Compute risk with the reason', async () => {
+        const { fixture, el } = make({}, { truncated: true });
+        await settle(fixture);
+        expect(el.querySelector('[data-testid=risk-truncated]')).not.toBeNull();
+        expect(el.querySelector('[data-testid=enrich-truncated]')).not.toBeNull();
+        expect(el.querySelector<HTMLButtonElement>('[data-testid=compute-risk]')!.disabled).toBe(true);
+        expect(el.querySelector('[data-testid=compute-blocked]')!.textContent).toContain('understate risk');
     });
 
     it('says when the profile maps no indicators Dataset', async () => {

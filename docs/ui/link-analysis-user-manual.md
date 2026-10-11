@@ -186,8 +186,13 @@ condition*).
 #### The node detail dialog
 
 Besides the node's rows (id, links, neighbours, Datasets, attributes) and its canvas actions, the dialog has three
-sections. On an Investigation canvas the first click picks the entity for the next op; **click it again** to open
-the dialog.
+sections. On an Investigation canvas, click a node once to select it, then click the selected node again to open
+its detail dialog.
+
+While the Space's entity masking mode is anything but `none`, Risk and Enrichment are unavailable: the reference
+Datasets are read through a route that applies no masking (a masking-aware server-side key lookup is the planned
+follow-up). A reference read cut at its row limit is flagged, and Compute risk is then held - an incomplete score map
+would understate risk.
 
 * **Risk** — on a profile that maps an indicators Dataset (Telecom: `telecom_msisdn_indicators` by `msisdn`), the
   node's own **indicator score** and its factor columns. **Compute risk** runs `propagatedRisk` on the server over the
