@@ -216,6 +216,8 @@ export interface DegreeOutcome {
     /** Hub suppression: high-connectivity entities admitted but not expanded further, and frontier hubs held back. */
     hubsFlagged?: number;
     hubsHeld?: number;
+    /** How the flagged hubs' contacts were counted (`index` = link index, `flat` = the Dataset). */
+    hubDegreeSource?: 'index' | 'flat';
     /** The analyst opted in: this degree expanded THROUGH this many flagged entities (sealed in the step's params). */
     hubsOverridden?: number;
     /** D-U7: the expand was held for four-eyes approval — the pending request's id; nothing was read. */
@@ -308,11 +310,17 @@ export function degreeOutcome(
         ...(range ? { range } : {}),
         hubsFlagged: step.read?.hubsFlagged ?? 0,
         hubsHeld: step.read?.rung?.hubsHeld?.length ?? 0,
+        ...(step.read?.hubDegreeSource ? { hubDegreeSource: step.read.hubDegreeSource } : {}),
     };
 }
 
 const plural = (n: number, one: string, many = `${one}s`): string =>
     `${n.toLocaleString('en')} ${n === 1 ? one : many}`;
+
+const HUB_SOURCE: Record<'index' | 'flat', string> = {
+    index: 'counted from the link index',
+    flat: 'counted from the Dataset',
+};
 
 /** One degree's result in plain language, truncation and the fan-out cap included. */
 export function degreeOutcomeMessage(o: DegreeOutcome): string {
@@ -330,7 +338,12 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
             `${plural(o.fanOutCapped, 'weaker link was', 'weaker links were')} left out: each entity keeps its ` +
                 `${o.maxFanOut ? `${o.maxFanOut} ` : ''}strongest links.`,
         );
-    if (o.hubsFlagged) parts.push(`${plural(o.hubsFlagged, 'high-connectivity number')} shown but not expanded.`);
+    if (o.hubsFlagged) {
+        const how = o.hubDegreeSource ? HUB_SOURCE[o.hubDegreeSource] : '';
+        parts.push(
+            `${plural(o.hubsFlagged, 'high-connectivity number')} shown but not expanded${how ? ` (contacts ${how})` : ''}.`,
+        );
+    }
     if (o.hubsOverridden)
         parts.push(
             `Analyst override: expanded through ${plural(o.hubsOverridden, 'high-connectivity number')} — recorded in the log.`,
@@ -340,10 +353,16 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
 }
 
 /**
- * The high-connectivity badge. `threshold` is the hub threshold the flag was measured against when known (the step's
- * sealed rung, else the Space's value in force); the entity's own contact count is not served, so it is never guessed.
+ * The high-connectivity badge. `contacts` is the entity's own sealed count when served (null in old logs);
+ * `threshold` is the hub threshold the flag was measured against when known (the step's sealed rung, else the
+ * Space's value in force). Nothing unserved is guessed.
  */
-export function hubBadgeText(threshold?: number | null): string {
+export function hubBadgeText(threshold?: number | null, contacts?: number | null): string {
+    if (contacts != null)
+        return (
+            `High connectivity — ${plural(contacts, 'contact')}` +
+            `${threshold != null ? ` (threshold ${threshold.toLocaleString('en')})` : ''}, not expanded`
+        );
     return threshold != null
         ? `High connectivity — more than ${threshold.toLocaleString('en')} contacts, not expanded`
         : 'High connectivity — not expanded';

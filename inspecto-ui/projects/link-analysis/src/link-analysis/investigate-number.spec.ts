@@ -170,6 +170,16 @@ describe('investigate-number - next degree', () => {
     it('words the hub badge with the threshold when known, never a guessed contact count', () => {
         expect(hubBadgeText(500)).toBe('High connectivity — more than 500 contacts, not expanded');
         expect(hubBadgeText(null)).toBe('High connectivity — not expanded');
+        // The entity's own sealed count, when served; null (old logs) falls back to the threshold wording.
+        expect(hubBadgeText(500, 650)).toBe('High connectivity — 650 contacts (threshold 500), not expanded');
+        expect(hubBadgeText(null, 1200)).toBe('High connectivity — 1,200 contacts, not expanded');
+        expect(hubBadgeText(500, null)).toBe('High connectivity — more than 500 contacts, not expanded');
+        const base = { degree: 2, admitted: 1, linksAdded: 1, truncated: false, fanOutCapped: 0, hubsFlagged: 1 };
+        expect(degreeOutcomeMessage({ ...base, hubDegreeSource: 'index' })).toContain(
+            '1 high-connectivity number shown but not expanded (contacts counted from the link index).',
+        );
+        expect(degreeOutcomeMessage({ ...base, hubDegreeSource: 'flat' })).toContain('(contacts counted from the Dataset)');
+        expect(degreeOutcomeMessage(base)).toContain('1 high-connectivity number shown but not expanded.');
         expect(
             degreeOutcomeMessage({
                 degree: 2,

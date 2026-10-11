@@ -205,10 +205,20 @@ export class LinkAnalysisInvestigationComponent {
     // ── supernode suppression: flagged entities, shown but not expanded unless the analyst overrides ──
     /** Working Set entities a sealed read flagged high connectivity. */
     readonly hubs = computed(() => (this.store.workingSet()?.entities ?? []).filter((e) => e.highConnectivity));
-    /** The badge: the last step's sealed hub threshold when it ran, else the Space's value in force. */
-    readonly hubBadge = computed(() => {
+    /** The hub threshold: the last step's sealed value when it ran, else the Space's value in force. */
+    readonly hubThreshold = computed(() => {
         const sealed = this.store.lastStep()?.read?.rung?.['hubThreshold'];
-        return hubBadgeText(typeof sealed === 'number' ? sealed : this.laSettings.limits().hubThresholdInForce);
+        return typeof sealed === 'number' ? sealed : this.laSettings.limits().hubThresholdInForce;
+    });
+    /** The badge for one flagged entity: its own sealed count when served, else the threshold wording. */
+    hubBadge(contacts?: number | null): string {
+        return hubBadgeText(this.hubThreshold(), contacts);
+    }
+    /** The selected entity's badge: its own count when it is a single flagged id, else the threshold wording. */
+    readonly selectedHubBadge = computed(() => {
+        const ids = this.selectedHubs();
+        const one = ids.length === 1 ? this.hubs().find((e) => e.id === ids[0]) : undefined;
+        return this.hubBadge(one?.contacts);
     });
     /** The selected entity's flagged ids — "Expand one hop" would be refused for them; "Expand anyway" is offered. */
     readonly selectedHubs = computed(() => {
