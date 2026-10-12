@@ -1,5 +1,6 @@
 import { Route } from '@angular/router';
 import { authGuard } from '@inspecto/core/auth/auth.guard';
+import { ALERTS_INVESTIGATION_ROUTE } from 'app/modules/admin/alerts/alerts.component';
 import { LaShellComponent } from './la-shell.component';
 import { LandingComponent } from './landing.component';
 
@@ -28,6 +29,12 @@ export const laAppRoutes: Route[] = [
             {
                 path: 'entity-lists',
                 loadComponent: () => import('./entity-lists.page').then((m) => m.EntityListsPageComponent),
+            },
+            {
+                // The console's Alerts page, reused whole; *Open Investigation* stays inside this app.
+                path: 'alerts',
+                loadComponent: () => import('app/modules/admin/alerts/alerts.component').then((m) => m.AlertsComponent),
+                providers: [{ provide: ALERTS_INVESTIGATION_ROUTE, useValue: '/link-analysis' }],
             },
             {
                 path: 'settings',

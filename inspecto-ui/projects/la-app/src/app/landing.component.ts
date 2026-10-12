@@ -18,7 +18,7 @@ import { LA_APP_NAV } from './la-nav';
                     lists of the ones that matter.
                 </p>
             </header>
-            <ul class="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-3">
+            <ul class="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
                 @for (item of nav; track item.path) {
                     <li>
                         <a

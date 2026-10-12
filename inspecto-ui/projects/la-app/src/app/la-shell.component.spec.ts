@@ -51,6 +51,12 @@ describe('la-app shell and landing page', () => {
         expect(el.querySelector('main')).toBeTruthy();
     });
 
+    it('offers Alerts in the rail and on the landing page (reading Alerts is ungated, as in the console)', async () => {
+        const el = await render();
+        expect(el.querySelector('nav[aria-label="Areas"] a[href="/alerts"]')).toBeTruthy();
+        expect(el.querySelector('ul a[href="/alerts"]')).toBeTruthy();
+    });
+
     it('offers the Settings link only to a user who may change the Link Analysis settings', async () => {
         const plain = await render(false);
         expect(plain.querySelector('nav[aria-label="Areas"] a[href="/settings"]')).toBeNull();

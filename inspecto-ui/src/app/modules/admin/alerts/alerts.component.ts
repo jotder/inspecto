@@ -4,6 +4,7 @@ import {
     computed,
     ElementRef,
     inject,
+    InjectionToken,
     OnInit,
     signal,
     viewChild,
@@ -38,6 +39,15 @@ import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.d
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
+ * Where *Open Investigation* goes: the host's Link Analysis route. The console's default is the Studio route; the
+ * standalone Link Analysis app provides its own `/link-analysis`.
+ */
+export const ALERTS_INVESTIGATION_ROUTE = new InjectionToken<string>('ALERTS_INVESTIGATION_ROUTE', {
+    providedIn: 'root',
+    factory: () => '/studio/link-analysis',
+});
+
+/**
  * Alerts — the core alert engine's surface (v4.1, B5): recent fired alerts (GET /alerts) over the
  * armed Alert Rules (GET /alerts/rules), with a manual evaluation sweep. Rules are authored right
  * here (audit C3 — create/edit/delete, Ops-gated via `canAuthorAlertRules`); the Assistant's
@@ -68,6 +78,7 @@ export class AlertsComponent implements OnInit {
     protected lens = inject(LensService);
     private route = inject(ActivatedRoute);
     private router = inject(Router);
+    private investigationRoute = inject(ALERTS_INVESTIGATION_ROUTE);
 
     readonly alerts = signal<FiredAlert[]>([]);
     readonly rules = signal<AlertRule[]>([]);
@@ -216,7 +227,7 @@ export class AlertsComponent implements OnInit {
                 hint: (a) => `Open Investigation ${this.investigationOf(a)} — it lists the breaching entities`,
                 visible: (a) => !!this.investigationOf(a),
                 onClick: (a) =>
-                    void this.router.navigate(['/studio/link-analysis'], {
+                    void this.router.navigate([this.investigationRoute], {
                         queryParams: { investigation: this.investigationOf(a) },
                     }),
             },

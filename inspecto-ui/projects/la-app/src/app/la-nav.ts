@@ -18,6 +18,12 @@ export const LA_APP_NAV = [
         icon: 'heroicons_outline:queue-list',
         blurb: 'Keep watch lists of entities, with every change on the record.',
     },
+    {
+        path: 'alerts',
+        label: 'Alerts',
+        icon: 'heroicons_outline:bell-alert',
+        blurb: 'See fired Alerts, and open the Investigation behind a standing detection.',
+    },
 ] as const;
 
 /**
