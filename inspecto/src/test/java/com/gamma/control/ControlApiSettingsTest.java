@@ -502,6 +502,8 @@ class ControlApiSettingsTest {
             for (String bad : new String[] {"{\"index\":{\"keepVersions\":0}}", "{\"index\":{\"threads\":65}}", "{\"index\":{\"queue\":1001}}", "{\"index\":{\"maxAgeHours\":0}}", "{\"index\":{\"maxAgeHours\":8761}}",
                     "{\"index\":{\"maxDiskBytes\":-1}}", "{\"index\":{\"enabled\":\"yes\"}}", "{\"index\":{\"bogus\":1}}", "{\"index\":7}"})
                 assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", bad).statusCode(), bad);
+            for (String bad : new String[] {"{\"index\":{\"maxAgeHours\":0}}", "{\"index\":{\"maxAgeHours\":8761}}"})   // both refusals name the SAME range
+                assertTrue(send(c.port, "PUT", "/spaces/acme/settings/link-analysis", bad).body().contains("must be 1..8760"), bad);
         }
     }
 

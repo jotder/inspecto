@@ -395,13 +395,14 @@ final class SettingsRoutes implements RouteModule {
     }
 
     private static Integer rangedInt(Map<String, Object> g, String key, String label, int max) {
-        Integer v = boundedInt(g, key, label);
-        if (v != null && v > max)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, label + " must be 1.." + max + ", got " + v);
-        return v;
+        return boundedInt(g, key, label, max);
     }
 
     private static Integer boundedInt(Map<String, Object> g, String key, String label) {
+        return boundedInt(g, key, label, MAX_GRAPH_RUN);
+    }
+
+    private static Integer boundedInt(Map<String, Object> g, String key, String label, int max) {
         Object raw = g.get(key);
         if (raw == null) return null;
         int v;
@@ -410,8 +411,8 @@ final class SettingsRoutes implements RouteModule {
         } catch (NumberFormatException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, label + " must be an integer, got '" + raw + "'");
         }
-        if (v < 1 || v > MAX_GRAPH_RUN)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, label + " must be 1.." + MAX_GRAPH_RUN + ", got " + v);
+        if (v < 1 || v > max)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, label + " must be 1.." + max + ", got " + v);
         return v;
     }
 
