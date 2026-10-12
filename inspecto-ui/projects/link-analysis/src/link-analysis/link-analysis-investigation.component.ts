@@ -71,6 +71,7 @@ import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.c
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
 import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
 import { LinkAnalysisMembersComponent } from './link-analysis-members.component';
+import { LinkAnalysisEmbedComponent } from './link-analysis-embed.component';
 import { LinkAnalysisInvestigationCaseComponent } from './link-analysis-investigation-case.component';
 import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
@@ -116,6 +117,7 @@ export const APPROVAL_POLL_MS = 15_000;
         LinkAnalysisIdentitiesComponent,
         LinkAnalysisInvestigationCaseComponent,
         LinkAnalysisMembersComponent,
+        LinkAnalysisEmbedComponent,
         LinkAnalysisOversightComponent,
         LinkAnalysisTemplateMeasuresComponent,
         LinkAnalysisValueMeasuresComponent,

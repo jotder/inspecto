@@ -840,6 +840,39 @@ export interface InvestigationCaseLink {
 
 export type InvestigationRole = 'lead' | 'analyst' | 'reviewer';
 
+/** One embed link of an Investigation as the list reads it - never the token (LA-EMBED-SPA-1). */
+export interface EmbedGrantSummary {
+    grantId: string;
+    label: string | null;
+    issuedBy: string;
+    issuedAt: string;
+    expiresAt: string;
+    status: 'active' | 'expired' | 'revoked';
+    viewCount: number;
+    lastViewAt?: string;
+    revokedAt?: string;
+}
+
+/** `GET /inv/investigations/{id}/embeds`. `enabled` false = the host runs without `-Dla.embed.enabled`. */
+export interface EmbedGrantList {
+    investigationId: string;
+    enabled: boolean;
+    grants: EmbedGrantSummary[];
+    max: number;
+}
+
+/** `POST /inv/investigations/{id}/embeds` - `token` and `url` are answered ONCE, never listed again. */
+export interface EmbedMinted {
+    grantId: string;
+    investigationId: string;
+    token: string;
+    url: string;
+    expiresAt: string;
+    label: string | null;
+    maskingMode: string;
+    note: string;
+}
+
 /** `GET|POST /inv/investigations/{id}/members[/revoke]` — the current roles, the history, and the caller's own role. */
 export interface InvestigationMembers {
     investigationId: string;
@@ -1588,6 +1621,21 @@ export class InvService {
     /** Revoke a member — lead only; the last lead cannot be revoked (422). */
     revokeInvestigationMember(id: string, subject: string): Observable<InvestigationMembers> {
         return this.http.post<InvestigationMembers>(invPath(id, 'members/revoke'), { subject });
+    }
+
+    /** The embed links of an Investigation (LA-EMBED-SPA-1); never a token. */
+    investigationEmbeds(id: string): Observable<EmbedGrantList> {
+        return this.http.get<EmbedGrantList>(invPath(id, 'embeds'));
+    }
+
+    /** Mint a read-only embed link - lead + `canShareInvestigation`; the token is in the answer once. */
+    mintInvestigationEmbed(id: string, body: { label?: string; ttl_hours?: number }): Observable<EmbedMinted> {
+        return this.http.post<EmbedMinted>(invPath(id, 'embeds'), body);
+    }
+
+    /** Revoke an embed link at once - lead + `canShareInvestigation`. */
+    revokeInvestigationEmbed(id: string, grantId: string): Observable<EmbedGrantSummary> {
+        return this.http.post<EmbedGrantSummary>(invPath(id, `embeds/${encodeURIComponent(grantId)}/revoke`), {});
     }
 
     /** The caller's Drafts (a lead and a reviewer see all); `closed` adds discarded and promoted ones. */

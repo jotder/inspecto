@@ -177,7 +177,7 @@ function create(opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: Wor
                       },
                   ]
                 : []),
-            { provide: LensService, useValue: { canManageIncidents: signal(opts.canManage ?? true) } },
+            { provide: LensService, useValue: { canManageIncidents: signal(opts.canManage ?? true), canShareInvestigation: signal(false) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },

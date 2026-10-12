@@ -262,6 +262,13 @@ export class LensService {
         this.identityCapability('canRevealLinkEntities', 'linkgraph.reveal-entities'),
     );
 
+    /** May mint and revoke the read-only embed links of an Investigation (LA-EMBED-SPA-1,
+     *  `POST /inv/investigations/{id}/embeds`). {@link identityCapability}; the server also requires being a
+     *  lead of the Investigation and the host flag `-Dla.embed.enabled`. No Access-Catalog node carries it yet. */
+    readonly canShareInvestigation = computed(() =>
+        this.identityCapability('canShareInvestigation', 'linkgraph.share-investigation'),
+    );
+
     /** May decide a Pending Change — approve or decline a held config change (`ASSURE-MAKER-CHECKER-1`,
      *  `POST /pending-changes/{id}/approve | decline`). RBAC: Admin, Super. {@link identityCapability}: the
      *  `admin` seed holds it and qualifies for no non-Business lens. The server adds the kind's own
