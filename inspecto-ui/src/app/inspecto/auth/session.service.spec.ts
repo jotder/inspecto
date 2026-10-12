@@ -341,6 +341,28 @@ describe('SessionService (W6d edition switch)', () => {
         assign.mockRestore();
     });
 
+    it('records the server message of a typed DEMO_ROSTER_CONFLICT 409 as the bootstrap error', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush(
+            { error: { errorCode: 'DEMO_ROSTER_CONFLICT', message: "Demo User 'x' is defined differently in Spaces 'a' and 'b'." } },
+            { status: 409, statusText: 'Conflict' },
+        );
+        await done;
+        expect(svc.bootstrapError()).toContain("Spaces 'a' and 'b'");
+    });
+
+    it('flags a demo with spacesAttached 0 and not one with Spaces', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            features: { authMode: 'demo' },
+            auth: { mock: true, demoUsers: [], spacesAttached: 0 },
+        });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
+        await done;
+        expect(svc.demoNoSpace()).toBe(true);
+    });
+
     // DEMO-AUTH-1: a demo build reports authMode 'demo' and a Demo User list; it signs in through the same backend
     // session routes as OIDC, and a picked Demo User travels as `demo:<id>` instead of an IAM code.
     it("treats authMode 'demo' as a login-required session and signs in as the picked Demo User", async () => {

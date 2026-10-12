@@ -18,6 +18,7 @@ function create(
         oidcConfigured: signal(true),
         version: signal<string | null>(version),
         demoUsers: signal([]),
+        demoNoSpace: signal(false),
         bootstrapError: signal<string | null>(null),
         branding: signal({
             logoDataUrl: branding.logoDataUrl ?? null,

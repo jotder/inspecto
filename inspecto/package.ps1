@@ -2296,7 +2296,7 @@ It is not secure and must never be given to a customer, exposed on a network, or
 2. Run serve-demo.bat (Windows) or ./serve-demo.sh (Linux)
 3. Open http://127.0.0.1:8080 and pick a Demo User
 
-Demo Users are defined per Space in config/demo-users.toon; their roles come from that Space's role table.
+Demo Users are defined per Space in config/demo-users.toon; their roles come from that Space's role table. If two attached Spaces list the same user id, the rows must be identical, otherwise sign-in answers a DEMO_ROSTER_CONFLICT error naming the user and both Spaces.
 The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
 The bundled SBOM describes the Enterprise module set: it lists inspecto-oidc (not shipped here) and
 omits inspecto-demo-auth (shipped here).

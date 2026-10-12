@@ -116,6 +116,17 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                         <inspecto-alert class="mt-4 block text-left" variant="warning" title="Demo sign-in">
                             Not secure, local only. Pick who you are for this demo.
                         </inspecto-alert>
+                        @if (noSpace()) {
+                            <inspecto-alert
+                                class="mt-4 block text-left"
+                                variant="info"
+                                title="No Space attached"
+                                data-testid="no-space"
+                            >
+                                No Space is attached to this demo yet. Copy a Space folder (it needs
+                                config\\demo-users.toon) into the bundle's spaces\\ folder and restart.
+                            </inspecto-alert>
+                        }
                         <ul class="mt-4 flex flex-col gap-2 text-left" aria-label="Demo Users">
                             @for (u of demoUsers(); track u.id) {
                                 <li>
@@ -176,7 +187,9 @@ export class SignInComponent implements OnInit {
     /** DEMO-AUTH-1: a demo build's Demo Users — non-empty replaces the SSO button with a picker. */
     readonly demoUsers = computed(() => this.session.demoUsers());
     /** R2-17: demo sign-in is on — the page must not claim security or SSO, nor pitch builder copy. */
-    readonly demo = computed(() => this.demoUsers().length > 0);
+    readonly demo = computed(() => this.demoUsers().length > 0 || this.session.demoNoSpace());
+    /** A demo build started with zero Spaces: no Demo Users exist, so say how to get some. */
+    readonly noSpace = computed(() => this.session.demoNoSpace() && this.demoUsers().length === 0);
     /** LIVEFIX2 #3: the server's own message when `GET /bootstrap` answered an error. */
     readonly startupError = computed(() => this.session.bootstrapError());
 

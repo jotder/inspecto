@@ -20,7 +20,7 @@ const FAILED_KEY = 'inspecto.signInFailed';
  * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
-function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean } = {}) {
+function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean } = {}) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => opts.loginRequired ?? true,
@@ -29,6 +29,7 @@ function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstr
         version: signal<string | null>(null),
         branding: signal({ logoDataUrl: null, caption: null, footerText: null }),
         demoUsers: signal<DemoUser[]>(opts.demoUsers ?? []),
+        demoNoSpace: signal(opts.noSpace ?? false),
         bootstrapError: signal<string | null>(opts.bootstrapError ?? null),
     };
     const router = { navigate: vi.fn() };
@@ -142,6 +143,23 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
         await fixture.whenStable();
         expect(session.beginLogin).toHaveBeenCalledWith('admin');
         await expectNoA11yViolations(el);
+    });
+
+    it('a demo with no Space attached says how to attach one instead of an empty picker or SSO', () => {
+        const { el } = create({ noSpace: true });
+        const note = el.querySelector('[data-testid="no-space"]');
+        expect(note?.textContent?.replace(/\s+/g, ' ')).toContain(
+            "No Space is attached to this demo yet. Copy a Space folder (it needs config\\demo-users.toon) into the bundle's spaces\\ folder and restart.",
+        );
+        expect(el.textContent).not.toContain('Sign in with SSO');
+        expect(el.querySelector('[data-demo-user]')).toBeNull();
+    });
+
+    it('a roster conflict is shown with the server message, and the generic text stays for unknown errors', () => {
+        const msg = "Demo User 'demo.manager' is defined differently in Spaces 'a' and 'b'. Make it identical.";
+        const conflict = create({ bootstrapError: msg });
+        expect(conflict.el.querySelector('[data-testid="startup-error"]')?.textContent).toContain(msg);
+        expect(conflict.el.querySelector('[data-testid="no-space"]')).toBeNull();
     });
 
     // R2-17: a demo build is shown to a business audience. "This workspace is secured … single sign-on"
