@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { Observable, firstValueFrom } from 'rxjs';
 import { InvService, InvestigationCaseLink } from '@inspecto/link-analysis/api/inv.service';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { apiErrorMessage, LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { LA_CASES } from '@inspecto/link-analysis/la-host';
@@ -31,6 +31,11 @@ import { LA_CASES } from '@inspecto/link-analysis/la-host';
             @if (error()) {
                 <inspecto-alert variant="error" title="Case link">{{ error() }}</inspecto-alert>
             }
+            @if (!canWrite()) {
+                <p id="case-link-read-only" class="text-secondary m-0" data-testid="case-link-read-only">
+                    Read-only: linking or unlinking a Case needs the Incident management capability.
+                </p>
+            }
             @if (link(); as l) {
                 @if (l.readOnly) {
                     <inspecto-alert variant="info" title="Read-only — shared with your Case">
@@ -40,7 +45,15 @@ import { LA_CASES } from '@inspecto/link-analysis/la-host';
                 } @else if (l.caseRef) {
                     <div>
                         <strong>Linked to Case</strong> <code>{{ l.caseRef }}</code>
-                        <button mat-button class="!ml-1" [disabled]="busy()" (click)="unlink()">Unlink</button>
+                        <button
+                            mat-button
+                            class="!ml-1"
+                            [disabled]="busy() || !canWrite()"
+                            [attr.aria-describedby]="canWrite() ? null : 'case-link-read-only'"
+                            (click)="unlink()"
+                        >
+                            Unlink
+                        </button>
                     </div>
                     <p class="text-secondary m-0">{{ l.reason }}</p>
                 } @else if (opsEnabled()) {
@@ -52,7 +65,14 @@ import { LA_CASES } from '@inspecto/link-analysis/la-host';
                         placeholder="Select a Case"
                         help="The Case's owner and assignee will be able to read this Investigation; only you can change it."
                     ></inspecto-option-picker>
-                    <button mat-stroked-button [disabled]="busy() || !picked()" (click)="linkTo()">Link to Case</button>
+                    <button
+                        mat-stroked-button
+                        [disabled]="busy() || !picked() || !canWrite()"
+                        [attr.aria-describedby]="canWrite() ? null : 'case-link-read-only'"
+                        (click)="linkTo()"
+                    >
+                        Link to Case
+                    </button>
                 } @else {
                     <p class="text-secondary m-0">
                         Sharing with a Case team needs Case management, which is not installed in this edition — the
@@ -68,6 +88,9 @@ export class LinkAnalysisInvestigationCaseComponent {
 
     private readonly inv = inject(InvService);
     private readonly caseMgmt = inject(LA_CASES);
+    private readonly lens = inject(LensService);
+    /** Linking (`PUT`/`DELETE .../case`) is gated server-side on `canManageIncidents`. */
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
     readonly opsEnabled = this.caseMgmt.available;
 
     readonly link = signal<InvestigationCaseLink | null>(null);

@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationCaseLink } from '@inspecto/link-analysis/api/inv.service';
-import { ObjectsService, SessionService } from '@inspecto/core/api';
+import { LensService, ObjectsService, SessionService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { LinkAnalysisInvestigationCaseComponent } from './link-analysis-investigation-case.component';
@@ -31,7 +31,7 @@ const UNLINKED: InvestigationCaseLink = {
 };
 const LINKED: InvestigationCaseLink = { ...UNLINKED, caseRef: 'CASE-1', sharing: true, reason: 'members read' };
 
-async function create(link: InvestigationCaseLink, opsEnabled: boolean) {
+async function create(link: InvestigationCaseLink, opsEnabled: boolean, canManage = true) {
     const inv = {
         investigationCase: vi.fn(() => of(link)),
         linkInvestigationCase: vi.fn(() => of(LINKED)),
@@ -46,6 +46,7 @@ async function create(link: InvestigationCaseLink, opsEnabled: boolean) {
             { provide: InvService, useValue: inv },
             { provide: ObjectsService, useValue: objects },
             { provide: SessionService, useValue: { opsEnabled: signal(opsEnabled) } },
+            { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
         ],
     });
     const f = TestBed.createComponent(Host);
@@ -57,6 +58,29 @@ async function create(link: InvestigationCaseLink, opsEnabled: boolean) {
 }
 
 describe('LinkAnalysisInvestigationCaseComponent (LA-24)', () => {
+    const btn = (el: HTMLElement, text: string) =>
+        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === text)!;
+
+    it('without the Incident management capability Link and Unlink are disabled with the reason; with it, enabled', async () => {
+        const ro = await create(UNLINKED, true, false);
+        ro.c.picked.set('CASE-1');
+        ro.f.detectChanges();
+        expect(btn(ro.el, 'Link to Case').disabled).toBe(true);
+        expect(ro.el.querySelector('[data-testid="case-link-read-only"]')?.textContent).toContain(
+            'Incident management capability',
+        );
+        await expectNoA11yViolations(ro.el);
+        TestBed.resetTestingModule();
+        const linked = await create(LINKED, true, false);
+        expect(btn(linked.el, 'Unlink').disabled).toBe(true);
+        TestBed.resetTestingModule();
+        const rw = await create(UNLINKED, true, true);
+        rw.c.picked.set('CASE-1');
+        rw.f.detectChanges();
+        expect(btn(rw.el, 'Link to Case').disabled).toBe(false);
+        expect(rw.el.querySelector('[data-testid="case-link-read-only"]')).toBeNull();
+    });
+
     it('offers real Cases to the owner and links the picked one', async () => {
         const { f, c, el, inv, objects } = await create(UNLINKED, true);
         expect(objects.list).toHaveBeenCalledWith({ type: 'CASE' });

@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
+import { LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InvestigationReferences, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { investigationErrorMessage } from './investigation-state';
@@ -77,14 +78,29 @@ import { investigationErrorMessage } from './investigation-state';
                         <mat-label>Label (optional)</mat-label>
                         <input matInput [formControl]="label" />
                     </mat-form-field>
-                    <button mat-flat-button type="submit" [disabled]="busy() || !valid()">Add reference</button>
+                    <button
+                        mat-flat-button
+                        type="submit"
+                        [disabled]="busy() || !valid() || !canWrite()"
+                        [attr.aria-describedby]="canWrite() ? null : 'refs-read-only'"
+                    >
+                        Add reference
+                    </button>
                 </form>
+                @if (!canWrite()) {
+                    <p id="refs-read-only" class="text-secondary m-0" data-testid="references-read-only">
+                        Read-only: adding a reference needs the Incident management capability.
+                    </p>
+                }
             }
         </section>
     `,
 })
 export class LinkAnalysisReferencesComponent {
     private inv = inject(InvService);
+    private readonly lens = inject(LensService);
+    /** Adding is gated server-side on `canManageIncidents`; the form asks the same question. */
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
 
     readonly investigationId = input.required<string>();
 
@@ -120,7 +136,7 @@ export class LinkAnalysisReferencesComponent {
     }
 
     add(): Promise<void> {
-        if (!this.valid()) return Promise.resolve();
+        if (!this.valid() || !this.canWrite()) return Promise.resolve();
         const url = this.url.value.trim();
         const label = this.label.value.trim();
         return this.run('Could not add the reference.', async () => {

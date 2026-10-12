@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationMembers } from '@inspecto/link-analysis/api/inv.service';
+import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisMembersComponent } from './link-analysis-members.component';
 
@@ -30,7 +31,7 @@ const AS_ANALYST: InvestigationMembers = { ...AS_LEAD, you: 'analyst' };
 
 const http = (status: number, message: string) => new HttpErrorResponse({ status, error: { error: { message } } });
 
-async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
+async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, canManage = true) {
     const inv = {
         investigationMembers: vi.fn(() => of(AS_LEAD)),
         grantInvestigationMember: vi.fn(() => of(AS_LEAD)),
@@ -39,7 +40,11 @@ async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}
     };
     TestBed.configureTestingModule({
         imports: [Host],
-        providers: [provideNoopAnimations(), { provide: InvService, useValue: inv }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InvService, useValue: inv },
+            { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
+        ],
     });
     const f = TestBed.createComponent(Host);
     f.detectChanges();
@@ -70,6 +75,16 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         expect(button(el, 'Grant')).toBeUndefined();
         expect(el.querySelector('[aria-label^="Revoke"]')).toBeNull();
         expect(el.textContent).toContain('only a lead can grant or revoke');
+    });
+
+    it('a lead without the Incident management capability sees no write controls and the reason', async () => {
+        const { el } = await create({}, false);
+        expect(button(el, 'Grant')).toBeUndefined();
+        expect(el.querySelector('[aria-label^="Revoke"]')).toBeNull();
+        expect(el.querySelector('[data-testid="members-read-only"]')?.textContent).toContain(
+            'Incident management capability',
+        );
+        await expectNoA11yViolations(el);
     });
 
     it('grants the typed subject with the picked role', async () => {

@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvestigationReferences, InvService } from '@inspecto/link-analysis/api/inv.service';
+import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisReferencesComponent } from './link-analysis-references.component';
 
@@ -36,7 +37,7 @@ const ONE: InvestigationReferences = {
     ],
 };
 
-function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
+function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, canManage = true) {
     const inv = {
         investigationReferences: vi.fn(() => of(ONE)),
         addInvestigationReference: vi.fn(() => of(ONE)),
@@ -44,7 +45,11 @@ function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
     };
     TestBed.configureTestingModule({
         imports: [Host],
-        providers: [provideNoopAnimations(), { provide: InvService, useValue: inv }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InvService, useValue: inv },
+            { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
+        ],
     });
     const f = TestBed.createComponent(Host);
     f.detectChanges();
@@ -65,6 +70,35 @@ describe('LinkAnalysisReferencesComponent', () => {
         expect(list.querySelector('a')).toBeNull();
         expect(el.textContent).toContain('never trusted');
         await expectNoA11yViolations(el);
+    });
+
+    const addButton = (el: HTMLElement) =>
+        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Add reference')!;
+
+    it('without the Incident management capability Add reference is disabled with the reason; with it, enabled', async () => {
+        const ro = create({}, false);
+        await ro.c.load();
+        ro.c.system.setValue('jira');
+        ro.c.type.setValue('ticket');
+        ro.c.refId.setValue('X-1');
+        ro.f.detectChanges();
+        expect(addButton(ro.el).disabled).toBe(true);
+        expect(ro.el.querySelector('[data-testid="references-read-only"]')?.textContent).toContain(
+            'Incident management capability',
+        );
+        expect(addButton(ro.el).getAttribute('aria-describedby')).toBe('refs-read-only');
+        await ro.c.add();
+        expect(ro.inv.addInvestigationReference).not.toHaveBeenCalled();
+        await expectNoA11yViolations(ro.el);
+        TestBed.resetTestingModule();
+        const rw = create({}, true);
+        await rw.c.load();
+        rw.c.system.setValue('jira');
+        rw.c.type.setValue('ticket');
+        rw.c.refId.setValue('X-1');
+        rw.f.detectChanges();
+        expect(addButton(rw.el).disabled).toBe(false);
+        expect(rw.el.querySelector('[data-testid="references-read-only"]')).toBeNull();
     });
 
     it('adds a reference, sending only the filled optional fields, and shows the answer', async () => {

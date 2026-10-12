@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { MatButtonModule } from '@angular/material/button';
 import { Observable, firstValueFrom } from 'rxjs';
 import { InvService, InvestigationMembers, InvestigationRole } from '@inspecto/link-analysis/api/inv.service';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
@@ -73,7 +73,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                             @if (m.subject === d.you) {
                                 <span class="text-secondary">you</span>
                             }
-                            @if (isLead()) {
+                            @if (canChange()) {
                                 <button
                                     mat-button
                                     [disabled]="busy()"
@@ -86,7 +86,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                         </li>
                     }
                 </ul>
-                @if (isLead()) {
+                @if (canChange()) {
                     <div class="flex items-center gap-2 border-t pt-1" style="border-color: var(--gamma-border)">
                         <input
                             class="rounded border px-1"
@@ -112,6 +112,10 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                             Grant
                         </button>
                     </div>
+                } @else if (!canManage()) {
+                    <p class="text-secondary m-0" data-testid="members-read-only">
+                        Read-only: granting or revoking members needs the Incident management capability.
+                    </p>
                 } @else {
                     <p class="text-secondary m-0">
                         You are {{ d.you ?? 'a reader' }} here — only a lead can grant or revoke members.
@@ -125,7 +129,10 @@ export class LinkAnalysisMembersComponent {
     readonly investigationId = input.required<string>();
 
     private readonly inv = inject(InvService);
+    private readonly lens = inject(LensService);
     readonly roles = ROLES;
+    /** Grant and revoke are gated server-side on `canManageIncidents` as well as on being a lead. */
+    readonly canManage = computed(() => this.lens.canManageIncidents());
 
     readonly data = signal<InvestigationMembers | null>(null);
     readonly hidden = signal(false);
@@ -138,6 +145,8 @@ export class LinkAnalysisMembersComponent {
         const d = this.data();
         return !!d && (d.you === 'lead' || d.you === null);
     });
+
+    readonly canChange = computed(() => this.isLead() && this.canManage());
 
     constructor() {
         effect(() => {
