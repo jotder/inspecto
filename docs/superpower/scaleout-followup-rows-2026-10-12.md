@@ -1,6 +1,6 @@
 # Scale-out follow-up BACKLOG rows (2026-10-12)
 
-> **Status: ready to paste into `docs/BACKLOG.md`** (not yet pasted). Produced from the 2026-10-12 audit of
+> **Status: PASTED into `docs/BACKLOG.md` on 2026-10-13** (kept here as the evidence trail). Produced from the 2026-10-12 audit of
 > [`enterprise-scale-out-plan.md`](enterprise-scale-out-plan.md); each candidate was re-checked against code.
 > Once pasted, move the durable facts into the plan or the matching OKF concept and archive this file.
 
