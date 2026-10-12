@@ -14,6 +14,12 @@ export const laAppRoutes: Route[] = [
         path: 'auth/callback',
         loadComponent: () => import('@inspecto/core/auth/callback.component').then((m) => m.CallbackComponent),
     },
+    // LA-EMBED-VIEW-1: the anonymous read-only Investigation viewer. Outside the guarded shell on purpose - the token in the
+    // path is the credential, there is no sign-in redirect, and the page never touches the session.
+    {
+        path: 'embed/inv/:token',
+        loadComponent: () => import('./embed-view.page').then((m) => m.EmbedViewPageComponent),
+    },
     {
         path: '',
         component: LaShellComponent,

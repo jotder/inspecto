@@ -8,7 +8,7 @@ const child = (path: string): Route => shell.children!.find((r) => r.path === pa
 
 describe('la-app routes', () => {
     it('has the two OIDC guest routes outside the guarded shell, and one guarded shell', () => {
-        expect(laAppRoutes.map((r) => r.path)).toEqual(['sign-in', 'auth/callback', '']);
+        expect(laAppRoutes.map((r) => r.path)).toEqual(['sign-in', 'auth/callback', 'embed/inv/:token', '']);
         expect(shell.canActivate?.length).toBe(1);
     });
 
@@ -26,6 +26,12 @@ describe('la-app routes', () => {
     // runner: each resolves in its own test with a generous budget (the 5 s default failed once on CI for a smaller load).
     it('resolves the shared sign-in and callback pages', async () => {
         for (const r of laAppRoutes.slice(0, 2)) expect(await r.loadComponent!()).toBeTruthy();
+    }, 60_000);
+
+    it('has the anonymous embed viewer outside the guarded shell, with no guard', async () => {
+        const r = laAppRoutes.find((x) => x.path === 'embed/inv/:token') as Route;
+        expect(r.canActivate).toBeUndefined();
+        expect(await r.loadComponent!()).toBeTruthy();
     }, 60_000);
 
     it('resolves the Link Analysis routes from the library', async () => {
