@@ -26,6 +26,7 @@ One directory per case:
 |---|---|
 | `backtoback` | back-to-back records, no framing; `[APPLICATION n]` root, OPTIONAL absent/present, SEQUENCE OF, CHOICE, multi-byte lengths and INTEGER values |
 | `repeated_child` | SEQUENCE OF SEQUENCE lists (identity {type,value} and service-data {group,up,down}); OPTIONAL list absent, empty list — the Parsing D9 `derive` fixtures |
+| `repeated_child_nested` | a list whose elements each carry a NESTED list (usage → charges), one element with the nested list absent — lets a `derive` declared on a child segment yield real values |
 | `huawei_framed` | the vendor file shape without the vendor: a 50-byte file header, a 4-byte header before every record (`skipOnly`), 0x00 trailing padding; BOOLEAN, OCTET STRING, nested SEQUENCE |
 
 ## Running / regenerating

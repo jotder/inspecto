@@ -1,0 +1,2 @@
+{"id":5,"usage":{"usage":[{"group":1,"charges":{"charge":[{"code":1,"amount":10},{"code":2,"amount":20}]}},{"group":2,"charges":{"charge":[{"code":3,"amount":7}]}},{"group":3}]}}
+{"id":6,"usage":{}}

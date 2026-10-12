@@ -1,0 +1,9 @@
+SYNTH-NESTED DEFINITIONS IMPLICIT TAGS ::= BEGIN
+Record ::= [APPLICATION 2] SEQUENCE
+{
+  id    [0] INTEGER,
+  usage [1] SEQUENCE OF Usage
+}
+Usage ::= SEQUENCE { group [0] INTEGER, charges [1] SEQUENCE OF Charge OPTIONAL }
+Charge ::= SEQUENCE { code [0] INTEGER, amount [1] INTEGER }
+END

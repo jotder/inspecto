@@ -1,0 +1,9 @@
+# Two Record values, no framing. All values invented. Each Usage child element carries a NESTED list (charges).
+# record 1: id=5; usage=[(group 1, charges [(1,10),(2,20)]), (group 2, charges [(3,7)]), (group 3, charges absent)]
+62 30  80 01 05
+  A1 2B
+    30 15  80 01 01  A1 10  30 06 80 01 01 81 01 0A   30 06 80 01 02 81 01 14
+    30 0D  80 01 02  A1 08  30 06 80 01 03 81 01 07
+    30 03  80 01 03
+# record 2: id=6; usage=[] (empty list)
+62 05  80 01 06  A1 00

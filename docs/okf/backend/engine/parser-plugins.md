@@ -612,7 +612,7 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
   1 000 000, summed over a record's lists). A child segment is not matched by record name (a record carrying its
   name is junk); a `derive` on a child segment runs over the child element. TOON accepts the dotted list path as
   a map key (`usage.usage: Usage`). Tests: `ChildSpecTest`, `Asn1RecordIngesterChildTest` over the synthetic
-  `repeated_child` case. **Slice 3 SHIPPED 2026-10-12** — the Parse drawer lists the effective `derive` read-only
+  `repeated_child` case, and over `repeated_child_nested` (the child element holds a nested list, so a child `derive` yields real sum / count / first values, `PARSING-CHILD-DERIVE-CORPUS-1`). **Slice 3 SHIPPED 2026-10-12** — the Parse drawer lists the effective `derive` read-only
   ("N derived columns on M segments", segment / column / operation; the Pipeline's own `asn1.derive` wins whole
   over the profile's). **Still open:** the preview does NOT compute derived columns — the ASN.1 preview is a record
   Tree (no rows or columns), so where a derived value would appear is an undecided design question; the counters

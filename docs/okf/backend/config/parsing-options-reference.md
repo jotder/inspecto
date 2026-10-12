@@ -318,6 +318,7 @@ parsing:
 `read_csv`+`substring`; binary via the shipped `com.gamma.ingester.FixedWidthRecordIngester`
 plugin — §6.3), `json` (`read_ndjson`/`read_json`, selectors = top-level JSON keys — §6.4), and
 `text_regex` (`read_csv` 1-col + `regexp_extract` named groups, selectors = group names — §6.5),
+**Selector rule:** for `delimited` and `fixedwidth` a `raw.fields[].selector` is a zero-based column INDEX (`"0"`, `"1"`, ...); a name there is refused at config load (and by `POST /validate`, 422) naming the Pipeline, the column and the value.
 `xlsx`/`excel` (DuckDB `excel` extension, three-layer fail-closed load), `parquet` (native),
 and `asn1` (synthesized `Asn1RecordIngester` binding, grammar inline — P3c).
 `text_regex.record_split` is `[LIVE]` too (`blank_line` or any literal delimiter — shipped, see

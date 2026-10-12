@@ -49,14 +49,14 @@ class Asn1RecordIngesterChildTest {
                 raw:
                   name: use
                   format: CSV
-                  fields[5]{name,selector,type}:
+                  fields[%d]{name,selector,type}:
                     %s
                 mapping:
                   canonicalName: use
                   rawName: use
                   rules[1]{targetColumn,sourceExpression,transformType}:
                     PARENT_ID,PARENT_ID,DIRECT
-                """.formatted(selectors);
+                """.formatted(selectors.split("\n").length, selectors);
     }
 
     private static final String GOOD_SELECTORS =
@@ -103,6 +103,29 @@ class Asn1RecordIngesterChildTest {
         assertArrayEquals(new Object[]{"5", "Record"}, sink.emitted.get(0));
     }
 
+    /**
+     * PARSING-CHILD-DERIVE-CORPUS-1: the {@code repeated_child_nested} corpus case's child element carries a nested
+     * list (charges), so a {@code derive} declared on the child segment yields REAL values per child row: the sum, the
+     * count and the first code of that element's own charges (null where the element has none).
+     */
+    @Test
+    void aDeriveOnAChildSegmentOverANestedListYieldsRealValues(@TempDir Path dir) throws Exception {
+        Path nested = Path.of("..", "asn-parser", "corpus-synthetic", "repeated_child_nested");
+        CapturingSink sink = new CapturingSink();
+        run(nested, dir, "children:\n  Record:\n    usage.usage: Usage\n"
+                        + "derive:\n  Usage:\n    CHARGE_SUM:\n      reduce: charges.charge\n      op: sum\n      of: amount\n"
+                        + "    CHARGE_COUNT:\n      reduce: charges.charge\n      op: count\n"
+                        + "    FIRST_CODE:\n      reduce: charges.charge\n      op: first\n      of: code\n",
+                "PARENT_ID,$parent.id,VARCHAR\n    IDX,$index,VARCHAR\n    GRP,group,VARCHAR", sink);
+
+        assertEquals(List.of("PARENT_ID", "IDX", "GRP", "CHARGE_SUM", "CHARGE_COUNT", "FIRST_CODE", "EVENT_TYPE"),
+                sink.defined.get("Usage"));
+        assertEquals(5, sink.emitted.size());   // record 1, its three child rows, record 2
+        assertArrayEquals(new Object[]{"5", "0", "1", "30", "2", "1", "Usage"}, sink.emitted.get(1));
+        assertArrayEquals(new Object[]{"5", "1", "2", "7", "1", "3", "Usage"}, sink.emitted.get(2));
+        assertArrayEquals(new Object[]{"5", "2", "3", null, null, null, "Usage"}, sink.emitted.get(3));
+    }
+
     @Test
     void aProfileWithoutChildrenGivesTheSameRowsAsBefore(@TempDir Path dir) throws Exception {
         CapturingSink sink = new CapturingSink();
@@ -146,24 +169,28 @@ class Asn1RecordIngesterChildTest {
         }
     }
 
-    private static byte[] corpusBytes() throws Exception {
+    private static byte[] corpusBytes(Path corpus) throws Exception {
         StringBuilder hex = new StringBuilder();
-        for (String line : Files.readAllLines(CASE.resolve("data.hex"), StandardCharsets.UTF_8))
+        for (String line : Files.readAllLines(corpus.resolve("data.hex"), StandardCharsets.UTF_8))
             if (!line.startsWith("#")) hex.append(line);
         return HexFormat.of().parseHex(hex.toString().replaceAll("\\s", ""));
     }
 
     private static void run(Path dir, String extra, String childSelectors, CapturingSink sink) throws Exception {
-        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, extra, childSelectors).toString());
+        run(CASE, dir, extra, childSelectors, sink);
+    }
+
+    private static void run(Path corpus, Path dir, String extra, String childSelectors, CapturingSink sink) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(corpus, dir, extra, childSelectors).toString());
         File dat = dir.resolve("cdr.ber").toFile();
-        Files.write(dat.toPath(), corpusBytes());
+        Files.write(dat.toPath(), corpusBytes(corpus));
         new Asn1RecordIngester().ingest(dat, sink, 0, cfg);
     }
 
-    private static Path writePipeline(Path dir, String extraIngesterConfig, String childSelectors) throws Exception {
+    private static Path writePipeline(Path corpus, Path dir, String extraIngesterConfig, String childSelectors) throws Exception {
         String d = dir.toString().replace('\\', '/');
         Path grammar = dir.resolve("cdr.asn");
-        Files.copy(CASE.resolve("grammar.asn"), grammar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(corpus.resolve("grammar.asn"), grammar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         Path schema = dir.resolve("rec_schema.toon");
         Files.writeString(schema, RECORD_SCHEMA, StandardCharsets.UTF_8);
         Path child = dir.resolve("use_schema.toon");
