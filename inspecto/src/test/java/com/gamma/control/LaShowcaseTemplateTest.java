@@ -91,6 +91,11 @@ class LaShowcaseTemplateTest {
             assertFalse(caps.get(id).contains(Roles.CAN_OPERATE_RUNS), id + " does not operate runs");
 
         assertTrue(caps.get("admin").contains(Roles.CAN_REVEAL_LINK_ENTITIES));
+        // Operator 2026-10-12: the demo's admin edits Settings > Link Analysis (PUT /settings/link-analysis needs
+        // canAuthorWorkbench) through the template role 'la-settings'; no other persona gets it.
+        assertTrue(caps.get("admin").contains(Roles.CAN_AUTHOR_WORKBENCH), "admin edits the Link Analysis settings");
+        for (String id : List.of("fm.analyst", "fm.manager", "ra.analyst", "demo.manager"))
+            assertFalse(caps.get(id).contains(Roles.CAN_AUTHOR_WORKBENCH), id + " does not author");
         // the read-only personas: nothing that writes anything
         for (String id : List.of("ra.analyst", "demo.manager")) assertEquals(Set.of(), caps.get(id), id);
     }

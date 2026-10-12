@@ -1,5 +1,5 @@
 users[5]{id,displayName,title,roles}:
-  admin,Demo Admin,Platform administrator,admin;fraud-analyst
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
   fm.analyst,Demo FM Analyst,Fraud analyst (lead),fraud-analyst
   fm.manager,Demo FM Manager,Fraud manager (second approver),fraud-manager
   ra.analyst,Demo RA Analyst,Revenue Assurance analyst (reviewer),la-viewer

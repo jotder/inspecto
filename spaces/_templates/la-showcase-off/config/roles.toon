@@ -1,7 +1,9 @@
-roles[3]:
+roles[4]:
   - name: fraud-analyst
     capabilities[5]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules
   - name: fraud-manager
     capabilities[4]: canManageIncidents,canWorkIncidents,canApproveLinkExpansions,canOperateRuns
   - name: la-viewer
     capabilities[0]:
+  - name: la-settings
+    capabilities[1]: canAuthorWorkbench
