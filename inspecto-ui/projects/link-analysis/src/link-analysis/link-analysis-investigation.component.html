@@ -691,9 +691,10 @@
                         </table>
                     } @else {
                         <p class="text-secondary m-0 text-xs">
-                            Per-Collector coverage: not assessed{{
-                                c.collectors.note ? ' — ' + c.collectors.note : ''
-                            }}.
+                            Per-Collector coverage is not assessed for this Dataset.
+                            @if (c.collectors.note) {
+                                <span>{{ c.collectors.note }}</span>
+                            }
                         </p>
                     }
                 }

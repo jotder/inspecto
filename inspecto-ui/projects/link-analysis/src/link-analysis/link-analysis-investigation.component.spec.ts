@@ -512,7 +512,10 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         expect(section.textContent).toContain('2 of 3 days in the window have zero rows in calls (UTC)');
         expect(section.textContent).toContain('2026-09-02, 2026-09-03');
         expect(section.textContent).not.toContain('2026-09-01');
-        expect(section.textContent?.match(/per-Collector coverage: not assessed/gi)).toHaveLength(1);
+        expect(section.textContent?.match(/Per-Collector coverage is not assessed for this Dataset\./g)).toHaveLength(1);
+        expect(section.textContent).toContain('a Dataset row carries no Collector attribution');
+        expect(section.textContent).not.toMatch(/no collectors delivered/i);
+        expect(section.querySelector('inspecto-alert[variant="error"]')).toBeNull();
         await expectNoA11yViolations(section);
 
         inv.investigationCoverage.mockReturnValue(
@@ -543,6 +546,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
             ['south', '1 of 3', '2026-09-02, 2026-09-03'],
         ]);
         expect(section.textContent).not.toContain('not assessed');
+        expect(section.querySelector('[aria-label="Per-Collector coverage"]')).not.toBeNull();
         await expectNoA11yViolations(section);
 
         inv.investigationCoverage.mockReturnValue(refused('coverage needs a bounded window'));
