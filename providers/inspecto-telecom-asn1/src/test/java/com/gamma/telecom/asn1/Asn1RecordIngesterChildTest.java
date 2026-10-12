@@ -83,6 +83,26 @@ class Asn1RecordIngesterChildTest {
         assertArrayEquals(new Object[]{"6", "Record"}, sink.emitted.get(4));
     }
 
+    /**
+     * A {@code derive} declared on the CHILD segment is declared after the child's raw columns (before EVENT_TYPE) and
+     * evaluated per child element. The synthetic {@code Usage} element holds only scalars (no nested list), so the
+     * select finds nothing and the derived value is null; the point is that the child row carries the extra column
+     * in the declared position and the parent row is untouched.
+     */
+    @Test
+    void aDeriveDeclaredOnAChildSegmentAddsItsColumnToEveryChildRow(@TempDir Path dir) throws Exception {
+        CapturingSink sink = new CapturingSink();
+        run(dir, CHILDREN + "derive:\n  Usage:\n    TAGGED:\n      select: tags.tag\n      where:\n        kind: 1\n      take: val\n",
+                GOOD_SELECTORS, sink);
+
+        assertEquals(List.of("PARENT_ID", "IDX", "GRP", "UP", "DOWN", "TAGGED", "EVENT_TYPE"), sink.defined.get("Usage"));
+        assertEquals(List.of("ID", "EVENT_TYPE"), sink.defined.get("Record"), "the parent segment has no derive");
+        assertEquals(5, sink.emitted.size());
+        assertArrayEquals(new Object[]{"5", "0", "1", "10", "20", null, "Usage"}, sink.emitted.get(1));
+        assertArrayEquals(new Object[]{"5", "2", "2", "100", "1", null, "Usage"}, sink.emitted.get(3));
+        assertArrayEquals(new Object[]{"5", "Record"}, sink.emitted.get(0));
+    }
+
     @Test
     void aProfileWithoutChildrenGivesTheSameRowsAsBefore(@TempDir Path dir) throws Exception {
         CapturingSink sink = new CapturingSink();
