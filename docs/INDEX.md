@@ -99,6 +99,7 @@ paid for violating them.
 - [`ui/accessibility-audit.md`](ui/accessibility-audit.md) — the **living** inspecto-ui WCAG/a11y findings
   register (referenced by `okf/frontend/conventions/accessibility.md`).
 - [`ui/link-analysis-user-manual.md`](ui/link-analysis-user-manual.md) — the **Link Analysis user manual** (2026-09-30): what the studio is, the screen, building and exploring a graph, the analysis and pattern tools, Investigations (op log, Working Set, identity resolution, value Measures, Dossier, templates, Widgets, Case link), who can do what, worked examples on the demo data
+- [`ui/d6-think-aloud-script.md`](ui/d6-think-aloud-script.md) — the **D6 think-aloud session script** (2026-10-12): pre-session checklist, opening, tasks T2/T6/T7/T5, facilitator rules, and how to record a real Case-desk lead's run (`D6-REAL-USER-SESSION-1`)
 - [`../compliance/`](../compliance/) — the NFR-7 compliance tree (repo root, shipped in the deploy bundle's
   docs). [`controls-matrix.md`](../compliance/controls-matrix.md) is the **C2 single mapping table** (SOC 2 TSC
   ↔ ISO 27001 Annex A ↔ NIST 800-53 → implementing file/route/gate → evidence → responsibility); the ISO SoA

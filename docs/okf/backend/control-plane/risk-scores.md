@@ -304,7 +304,15 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
   capability approvers hold for held component changes. Plan archived at
   [`risk-score-authoring-pane-spec.md`](../../../archived-documents/plans-archive/risk-score-authoring-pane-spec.md).
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
-  Measure component, because none exists.
+  Measure component, because none exists (`sum(amount - fee)` is refused at save). **Supported workaround:** put
+  the arithmetic in a Dataset `calculated` column and aggregate that column. Worked example, verified by
+  `RiskScoreCalculatedColumnWorkaroundTest`: Dataset `wallet_tx` carries
+  `calculated: [{name: net_amount, expr: "amount - fee"}, {name: fee_pct, expr: "round(100.0 * fee / nullif(amount, 0), 1)"}]`;
+  a factor then says `measure: "sum(net_amount)"` or `measure: "max(fee_pct)"`. The save gate counts a calculated
+  column as part of the Dataset Schema, and `nullif` makes a zero divisor NULL (no signal) rather than an error.
+  The expression is guarded by `ExpressionGuard` (closed token set, function whitelist, 500 characters, no
+  subquery) and is re-evaluated on every read, so editing the Dataset changes later runs; a stored factor records
+  only the `measure` text, so keep a calculated column's meaning stable once scores depend on it.
 - ✅ **Opt-in history retention (2026-10-04).** Optional model key `retainDays` or `retainRuns` (whole number
   >= 1; not both; fail closed at save). OFF by default: with neither set, every run is kept. After each write the
   Job deletes whole older run files from `risk_scores_<id>` (by the file's run timestamp, or all but the newest N)
