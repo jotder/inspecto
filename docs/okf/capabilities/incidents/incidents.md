@@ -576,9 +576,14 @@ tokens IS the type id — `caller_msisdn` names msisdn, `excellent` does not nam
 Type id, so `entity:host:8080` matches as untyped), `member` (a Case CONTAINING a matched Incident; `via`
 names it). Ungated like `GET /objects`, under the same SEC-7d / ABAC post-filter: a hidden object — and a Case reached
 only through it — is absent and uncounted. 422 on an unknown type, missing / oversized / empty-folding `id`, bad
-`status` or `limit`. ⚠ Cost: the attribute bag is un-indexed JSON, so each call is one bounded
-`LOWER(attributes) LIKE ?` scan (`ObjectStore.findByAttributeFragment`, newest 2 000 candidate rows, the same
-`createdAt DESC, id DESC` window on every store). When the scan hits that cap, `metadata.pagination` carries
+`status` or `limit`. ⚠ Cost (2026-10-12): `DbObjectStore` keeps a derived side table `inspecto_ops_object_entity_ref`
+(`object_id, attr_key, value_lc` — the lower-cased `key.*` / `entityKey` values, plus one placeholder row per object;
+rewritten on create/update, deleted on delete, backfilled for unindexed rows when the store opens), and
+`ObjectStore.findByAttributeFragment` is one substring `LIKE` over THAT narrow table, then the objects by id in the
+`createdAt DESC, id DESC` window (newest 2 000 candidates). Results are unchanged because `EntityHistory` still re-checks
+every row exactly; candidates are only objects whose reference VALUE contains the fragment (the old scan also hit keys
+and unrelated attributes). Still O(rows in the side table): the store does not know the Entity Type normaliser, so an
+exact-key index would miss `00…` / separator spellings. The in-memory store keeps the JSON scan. When the window hits that cap, `metadata.pagination` carries
 `truncated: true` + a `message` and the response the `X-Inspecto-Truncated: true` header (`total` is then a lower
 bound). The route is on the standard per-subject rate-limit bucket (`ControlApi.isRateLimited`, 429 `RATE_LIMITED`); a stored value with
 separators inside the digits is not found. Not covered: an LA Investigation linked to a Case

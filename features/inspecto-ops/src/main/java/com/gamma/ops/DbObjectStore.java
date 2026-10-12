@@ -42,6 +42,11 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     private static final Logger log = LoggerFactory.getLogger(DbObjectStore.class);
 
     private static final String TABLE = "inspecto_ops_objects";
+    /**
+     * Derived side table: one narrow row per entity-bearing attribute ({@code key.*} and {@code entityKey}) of every object,
+     * the lower-cased value, plus one placeholder row (empty key) per object so "already indexed" is a single anti-join.
+     */
+    private static final String REF_TABLE = "inspecto_ops_object_entity_ref";
     /** {@code owner} is quoted — it is a reserved word in some SQL dialects. */
     private static final String COLS = "id, object_type, title, description, status, severity, priority, "
             + "\"owner\", assignee, correlation_id, attributes, created_at, updated_at, closed_at, version";
@@ -78,6 +83,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     bindAll(ps, obj);
                     ps.executeUpdate();
+                    writeRefs(conn, obj);
                     return obj.withVersion(0);
                 }
             });
@@ -142,6 +148,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                         }
                         throw new ObjectVersionConflictException(obj.id(), obj.version());
                     }
+                    writeRefs(conn, obj);
                     return obj.withVersion(obj.version() + 1);
                 }
             });
@@ -159,6 +166,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                     if (ps.executeUpdate() == 0)
                         throw new NoSuchElementException("no object with id '" + id + "'");
                 }
+                deleteRefs(conn, id);
             });
         } catch (SQLException e) {
             throw new IllegalStateException("could not delete object " + id + ": " + e.getMessage(), e);
@@ -249,13 +257,24 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         return out;
     }
 
-    /** {@inheritDoc} <p>One {@code LOWER(attributes) LIKE ?} scan over the named types, bound parameters only. */
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Index-assisted: the fragment is matched against the narrow {@value #REF_TABLE} side table (only the entity
+     * reference values, lower-cased) instead of the whole attribute JSON of every object, and the object rows are then
+     * fetched by id in the same newest-first order. Candidates are therefore objects whose {@code key.*} /
+     * {@code entityKey} VALUE contains the fragment - a subset of the old JSON-text scan (which also matched keys and
+     * unrelated attributes); the caller's exact re-check only ever accepted those, so results are unchanged, and the
+     * {@code limit} window now counts only real candidates. What remains O(n): a substring {@code LIKE} over the side
+     * table (rows = reference attributes, not objects x full attribute bag).
+     */
     @Override
     public List<OperationalObject> findByAttributeFragment(java.util.Collection<ObjectType> types, String fragment, int limit) {
         if (types.isEmpty()) return List.of();
         String in = String.join(", ", java.util.Collections.nCopies(types.size(), "?"));
         String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE object_type IN (" + in + ")"
-                + " AND LOWER(attributes) LIKE ? ESCAPE '\\' ORDER BY created_at DESC, id DESC LIMIT ?";
+                + " AND id IN (SELECT object_id FROM " + REF_TABLE + " WHERE value_lc LIKE ? ESCAPE '\\')"
+                + " ORDER BY created_at DESC, id DESC LIMIT ?";
         String like = "%" + fragment.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
         List<OperationalObject> out = new ArrayList<>();
         try {
@@ -276,6 +295,45 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         return out;
     }
 
+    /** Replace {@code o}'s side-table rows (idempotent): a placeholder row plus one per entity-bearing attribute. */
+    private static void writeRefs(Connection conn, OperationalObject o) throws SQLException {
+        deleteRefs(conn, o.id());
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO " + REF_TABLE + " (object_id, attr_key, value_lc) VALUES (?,?,?)")) {
+            ps.setString(1, o.id());
+            ps.setString(2, "");
+            ps.setString(3, "");
+            ps.addBatch();
+            for (Map.Entry<String, String> a : o.attributes().entrySet()) {
+                String k = a.getKey(), v = a.getValue();
+                if (v == null || v.isBlank() || !(k.startsWith("key.") || k.equals(ObjectService.ATTR_ENTITY_KEY))) continue;
+                ps.setString(1, o.id());
+                ps.setString(2, k);
+                ps.setString(3, v.toLowerCase(Locale.ROOT));
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        }
+    }
+
+    private static void deleteRefs(Connection conn, String id) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + REF_TABLE + " WHERE object_id = ?")) {
+            ps.setString(1, id);
+            ps.executeUpdate();
+        }
+    }
+
+    /** Index every object that has no side-table rows yet (existing databases, rows written by older builds). */
+    private static void backfillRefs(Connection conn) throws SQLException {
+        List<OperationalObject> missing = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT " + COLS + " FROM " + TABLE
+                     + " WHERE id NOT IN (SELECT object_id FROM " + REF_TABLE + ")")) {
+            while (rs.next()) missing.add(mapRow(rs));
+        }
+        for (OperationalObject o : missing) writeRefs(conn, o);
+    }
+
     // ── schema + helpers ─────────────────────────────────────────────────────────
 
     private void initSchema() {
@@ -290,7 +348,11 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                     // Optimistic lock counter — additive migration for tables created before it existed; their
                     // rows start at 0. (A DEFAULT, not NOT NULL: DuckDB cannot add a constrained column.)
                     st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS version BIGINT DEFAULT 0");
+                    st.execute("CREATE TABLE IF NOT EXISTS " + REF_TABLE
+                            + " (object_id VARCHAR, attr_key VARCHAR, value_lc VARCHAR)");
+                    st.execute("CREATE INDEX IF NOT EXISTS idx_" + REF_TABLE + "_object ON " + REF_TABLE + " (object_id)");
                 }
+                backfillRefs(conn);
             });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise object DB schema", e);

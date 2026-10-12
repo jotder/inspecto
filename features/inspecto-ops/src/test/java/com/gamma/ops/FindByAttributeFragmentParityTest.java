@@ -40,4 +40,52 @@ class FindByAttributeFragmentParityTest {
             assertEquals(List.of("c", "b"), ids(db, 2));
         }
     }
+
+    private static OperationalObject withAttrs(String id, ObjectType t, long created, String k, String v) {
+        return OperationalObject.builder(t).id(id).title(id).description("d").status("OPEN")
+                .attr(k, v).createdAt(created).updatedAt(created).build();
+    }
+
+    private static void seed(ObjectStore s) {
+        s.create(withAttrs("p1", ObjectType.INCIDENT, 100, "key.msisdn", "+256700123456"));
+        s.create(withAttrs("p2", ObjectType.INCIDENT, 200, "key.caller_msisdn", "256700123456"));
+        s.create(withAttrs("p3", ObjectType.INCIDENT, 300, "entityKey", "entity:msisdn:+256700123456"));
+        s.create(withAttrs("p4", ObjectType.CASE, 400, "entityKey", "msisdn:256700123456"));
+        s.create(withAttrs("p5", ObjectType.INCIDENT, 500, "key.msisdn", "256 700 123 456"));   // separators inside digits
+        s.create(withAttrs("p6", ObjectType.INCIDENT, 600, "key.entity_key", "ABC-256700123456-X")); // case + embedded
+        s.create(withAttrs("p7", ObjectType.INCIDENT, 700, "key.imsi", "999999999999"));
+        s.create(withAttrs("p8", ObjectType.TASK, 800, "key.msisdn", "256700123456"));
+        s.create(withAttrs("p9", ObjectType.INCIDENT, 900, "key.msisdn", "50%_off"));            // LIKE metacharacters
+    }
+
+    private static List<String> frag(ObjectStore s, String f, int cap) {
+        return s.findByAttributeFragment(List.of(ObjectType.INCIDENT, ObjectType.CASE), f, cap)
+                .stream().map(OperationalObject::id).toList();
+    }
+
+    @Test
+    void indexedLookupEqualsTheScanOnEntityReferenceValues() throws Exception {
+        try (DbObjectStore db = DbObjectStore.open("jdbc:duckdb:", null, null)) {
+            ObjectStore mem = new InMemoryObjectStore();
+            seed(mem);
+            seed(db);
+            for (String f : List.of("256700123456", "700123", "abc-256", "50%_", "%", "nomatch"))
+                for (int cap : List.of(2, 100))
+                    assertEquals(frag(mem, f, cap), frag(db, f, cap), "fragment '" + f + "' cap " + cap);
+            assertEquals(List.of("p6", "p4", "p3", "p2", "p1"), frag(db, "256700123456", 100));
+        }
+    }
+
+    @Test
+    void sideTableFollowsUpdateDeleteAndBackfillsExistingRows() throws Exception {
+        try (DbObjectStore db = DbObjectStore.open("jdbc:duckdb:", null, null)) {
+            OperationalObject a = db.create(withAttrs("u1", ObjectType.INCIDENT, 1, "key.msisdn", "256711111111"));
+            assertEquals(List.of("u1"), frag(db, "711111", 10));
+            db.update(a.withAttributes(java.util.Map.of("key.msisdn", "256722222222"), 2));
+            assertEquals(List.of(), frag(db, "711111", 10), "an update drops the old reference");
+            assertEquals(List.of("u1"), frag(db, "722222", 10));
+            db.delete("u1");
+            assertEquals(List.of(), frag(db, "722222", 10));
+        }
+    }
 }
