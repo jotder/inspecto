@@ -390,6 +390,15 @@ then D8, D5, D6, D9-D13 (each a yes/no that mostly resolves to "not now").
   close as "verified" rather than carry as a build row.
 * **Not verifiable here**: see the report; no test, build, browser, or data run was possible on this lane.
 
+## 9a. Decisions taken 2026-10-12 (operator interview)
+
+* **D1-D4** multi-file batch re-plan duplicate: stage 1 = the same-stem collision guard (fail the second member closed); stage 2 = an opt-in `processing.output_per_member` (default OFF) with `PartitionCompactor` merging the many small files, a 50-file measurement, then flip the default after one release. Stage 1 builds now; stage 2 is designed, not built.
+* **D5** Parsing: build D9 slices 2 (`children` explode) and 3 (drawer display) and the derived-columns-in-preview slice; the counters channel stays log-only; the grammar-walk error code is deferred. **D6** remove the no-op `group_by` key from the `derive` vocabulary.
+* **D7** mask classified entity keys in `/bi/query` and `/queries/{id}/run` result rows unless the caller holds the reveal capability, as its OWN gated, reviewed row (it changes every BI consumer); the anomaly top-N tile stays out until then.
+* **D8** pack goldens assert properties; exact goldens stay in the module's own corpora. **D9** hour buckets deferred until a pack or customer needs sub-day scoring.
+* **D10** Measures stay `{agg, field}` pairs (no server `measure` kind). **D11** no free-form arithmetic in a Risk Score factor; the supported way is a Dataset calculated column (documented). **D12/D13** Space comparison: only the two API-hygiene slices (serve the axes list, typed 202); no scheduled/authored cross-Space comparison and no persisted comparison rows.
+* **D14** the D6 think-aloud session is prepared (script in `ui/d6-think-aloud-script.md`); running it needs a real Case-desk lead.
+
 ## References
 
 `docs/BACKLOG.md` (the seven rows); `okf/backend/engine/ingestion.md`; `okf/backend/engine/parser-plugins.md`;

@@ -357,6 +357,14 @@ Not a fourth rule engine: it scores, and an ordinary Alert Rule over its scores 
 ⛔ Not the Link Analysis *suspicion score* (a client-side graph centrality composite), and ⛔ never "risk
 rating" / "fraud score" for this concept. As built: [`okf/backend/control-plane/risk-scores.md`](okf/backend/control-plane/risk-scores.md).
 
+**Prediction** *(added 2026-10-12, operator decision OD-1 — PREDICTIVE-ANALYTICS-1; design only, nothing built: [`superpower/predictive-analytics-design.md`](superpower/predictive-analytics-design.md))* — The umbrella word for what the Predictive Analytics add-on produces: a **Customer Segment** assignment, a **Churn Score** or a **Forecast**, each stored with its inputs so it is recomputable. A Prediction is not an **Anomaly Score** and not a **Risk Score**.
+
+**Segmentation Model** *(2026-10-12, OD-1)* — The component kind (a **Type**) that declares how entities are grouped (first slice: declared RFM bins and a label table). Its Instance is a **Customer Segment** assignment. ⛔ Not a **Segment** (§3: one record kind a plugin ingester emits) — the word *Segment* alone is never used for this; always **Customer Segment**.
+
+**Churn Model** *(2026-10-12, OD-1)* — The component kind that declares a churn score: named **Inputs** (trailing-window entity Measures) with authored coefficients (the platform does not train in v1). Its Instance is a **Churn Score**. **Input** here means one declared variable of a Churn Model; ⛔ not a **Feature** (that word is reserved for an Anomaly Model).
+
+**Forecast Model** *(2026-10-12, OD-1)* — The component kind that declares a time-series forecast (seasonal-naive or Holt-Winters, with a stored backtest). Its Instance is a **Forecast**: predicted values with an interval per series and bucket.
+
 **Consequence** — A **typed action a Decision Engine produces** (`route · tag · quarantine · drop · emit-signal ·
 create-alert · start-job · trigger-pipeline · render-widget · generate-report · invoke-api`), executed via the
 Execution / Signal networks. A consequence that targets a component `invokes` it (lineage edge). ⚠️ §6-proposed → **binding** (R5).

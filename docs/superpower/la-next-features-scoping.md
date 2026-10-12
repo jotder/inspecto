@@ -224,6 +224,17 @@ of the verb; (c) owner only. **Recommend (a)**; the list is read-shaped for the 
 **D12. Embed: grant store backing.** (a) file implementation behind `InvestigationStore` now; (b) Postgres first. **Recommend (a)**: the
 seam exists and a Postgres implementation follows its contract test.
 
+## 6a. Decisions taken 2026-10-12 (operator interview)
+
+* **D1** build the embed API first (S1-S3); the SPA shell (S4) and host-wide frame headers (S5) are deferred. This overrides the 2026-10-03 deferral.
+* **D2** link-only: every embed response carries `frame-ancestors 'none'`; no per-grant allowlist.
+* **D3** the embedded view FOLLOWS the Space masking mode (not always-masked; the recommendation was declined). Because a Space on mode `none` would show raw ids to anyone holding the link, the mint route must say so in its response and the audit record carries the mode in force.
+* **D4** token expiry: default 72 h, maximum 30 d, configurable per Space.
+* **D6** a new `canShareInvestigation` verb, no four-eyes on mint, plus an ABAC `embed` action and a max-classification 422. **D11** minting = the Investigation's lead roles intersected with the verb; the grant list is read-shaped for its readers. **D12** the grant store is a file implementation behind `InvestigationStore`.
+* **D7** standing detection: nothing more to build; a cron on `la.detect` counts as live; templates stay owner-only; the stale design header is corrected and the row closes.
+* **D8** Investigation ops: build only the last-weekday-of-month recurring rule; the playback overlay, computed holidays and the three declined items stay out.
+* **D9** coverage: derive an expected-Collector roster from Pipeline schemas AFTER the pinning test (S1); stop and keep it declined if the mapping is not unique. **D10** keep the pinned Pipeline zone at window edges and label it.
+
 ## 7. Recommended build order
 
 1. **Coverage S1** (pin the mapping; a pure test, no risk) - answers D9 with evidence.

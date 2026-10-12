@@ -289,6 +289,14 @@ its own Signal for the `afterScore` Alert path.
 **OD-17 Priority and start.** Confirm P3, and whether S0 may start before the BI pack is scheduled. *Recommend* keep P3;
 run S0 (decisions + glossary) only when the operator schedules the module.
 
+## 9a. Decisions taken 2026-10-12 (operator interview)
+
+* **OD-1, OD-2, OD-3, OD-5** accepted as recommended: terms **Customer Segment** / **Segmentation Model**, **Churn Model**, **Forecast Model** with the umbrella **Prediction** (recorded in `GLOSSARY.md` section 4 on 2026-10-12); one new optional module `inspecto-predictive`; three component kinds; own add-on `predictiveAnalytics`, Professional and up, not Personal.
+* **OD-4, OD-6, OD-9** all three thin 'declared' first slices (RFM segmentation, churn score with AUTHORED coefficients, forecasting with a stored backtest); the platform never trains in v1; no new dependency (hand-written JVM/DuckDB kernels); platform-fitted models are decided after S6; external ML runtimes refused.
+* **OD-7, OD-8, OD-14** maker-checker on every model save and on promotion of a fitted version (a promotion writer needs an operator-approved inventory row when built); reuse the existing gates and mask keys like scores; a compliance sign-off gates any customer-facing template, not the engine module.
+* **OD-17** priority stays P3 and design-only: S0 (decisions + glossary) is DONE with this record; no kernel work until the operator schedules the module.
+* Not yet decided (answer when the module is scheduled): OD-10 churn label, OD-11 forecast grain and limits, OD-12 reproducibility tolerance, OD-13 validation display, OD-15 Sales & Marketing pack relationship, OD-16 interaction with Anomaly/Risk.
+
 ## 10. Proposed BACKLOG rows (text only - this lane may not edit `docs/BACKLOG.md`)
 
 - **P3 `PREDICTIVE-ANALYTICS-1`** (existing row, re-point): design in `superpower/predictive-analytics-design.md`; S0 is the
