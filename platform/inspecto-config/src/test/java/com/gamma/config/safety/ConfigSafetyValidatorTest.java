@@ -560,6 +560,21 @@ class ConfigSafetyValidatorTest {
                 "processing.reject_mode"));
     }
 
+    /** INGEST-MULTIFILE-BATCH-REPLAN-DUP-1 stage 2: {@code processing.output_per_member} is a boolean. */
+    @Test
+    void outputPerMemberMustBeABoolean(@TempDir Path root) {
+        for (Object v : List.of(true, false, "true", "FALSE")) {
+            Map<String, Object> ok = pipeline(safeDirs(root));
+            ok.put("processing", Map.of("output_per_member", v));
+            assertFalse(hasError(ConfigSafetyValidator.check("pipeline", ok, SafetyPolicy.withRoots(root)),
+                    "processing.output_per_member"), String.valueOf(v));
+        }
+        Map<String, Object> bad = pipeline(safeDirs(root));
+        bad.put("processing", Map.of("output_per_member", "sometimes"));
+        assertTrue(hasError(ConfigSafetyValidator.check("pipeline", bad, SafetyPolicy.withRoots(root)),
+                "processing.output_per_member"));
+    }
+
     /** DUCKLE-C10-ADMISSION-POOLS-1: a Pipeline CHOOSES a pool, so only its shape is gated — a
      *  well-formed name the server does not define is accepted (it is admitted in `default`). */
     @Test

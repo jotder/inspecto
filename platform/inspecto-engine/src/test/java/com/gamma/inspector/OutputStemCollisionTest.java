@@ -66,12 +66,15 @@ class OutputStemCollisionTest {
         return sb.toString();
     }
 
-    private static PipelineConfig cfg(Path dir) throws Exception {
+    private static PipelineConfig cfg(Path dir) throws Exception { return cfg(dir, false); }
+
+    private static PipelineConfig cfg(Path dir, boolean perMember) throws Exception {
         Path schema = dir.resolve("call_schema.toon");
         Files.writeString(schema, SCHEMA);
         Path pipeline = dir.resolve("events_pipeline.toon");
         Files.writeString(pipeline, PIPELINE.formatted(dir, dir, dir, dir, dir, dir, dir, dir,
-                StubIngester.class.getName(), schema.toString().replace("\\", "/")));
+                StubIngester.class.getName(), schema.toString().replace("\\", "/"))
+                .replace("processing:\n", perMember ? "processing:\n  output_per_member: true\n" : "processing:\n"));
         return PipelineConfig.load(pipeline.toString());
     }
 
@@ -134,6 +137,38 @@ class OutputStemCollisionTest {
         assertEquals("SUCCESS", out.status(), out.error());
         assertEquals(2, out.survivors().size());
         assertTrue(allData(cfg).contains("AAA1") && allData(cfg).contains("BBB2"), allData(cfg));
+    }
+
+    /** {@code processing.output_per_member}: the origin hash makes the stem unique, so the stage-1 refusal never fires. */
+    @Test
+    void generationModeOutputPerMemberLandsBothSameStemMembers(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = cfg(dir, true);
+        File a = inbox(cfg, "a/x.bin", String.format(CALL, "AAA1"));
+        File b = inbox(cfg, "b/x.bin", String.format(CALL, "BBB2"));
+
+        IngestOutcome out = new StreamingPluginIngestStrategy(1).ingest(batch(cfg, a, b), cfg);
+
+        assertEquals("SUCCESS", out.status(), out.error());
+        assertEquals(2, out.survivors().size(), "no output_stem_collision: " + out.memberAudits());
+        assertTrue(allData(cfg).contains("AAA1") && allData(cfg).contains("BBB2"), allData(cfg));
+        assertEquals(2, data(cfg).stream().filter(p -> p.getFileName().toString().matches("x__[0-9a-f]{8}_g.*")).count(),
+                data(cfg).toString());
+    }
+
+    /** The multi-schema union lane (per-segment write) under output_per_member: one file per member. */
+    @Test
+    void unionModeOutputPerMemberWritesOneFilePerMember(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = cfg(dir, true);
+        File a = inbox(cfg, "a/x.bin", String.format(CALL, "AAA1"));
+        File b = inbox(cfg, "b/x.bin", String.format(CALL, "BBB2"));
+
+        IngestOutcome out = new StreamingPluginIngestStrategy().ingest(batch(cfg, a, b), cfg);
+
+        assertEquals("SUCCESS", out.status(), out.error());
+        assertEquals(2, out.survivors().size());
+        assertTrue(allData(cfg).contains("AAA1") && allData(cfg).contains("BBB2"), allData(cfg));
+        assertEquals(2, data(cfg).stream().filter(p -> p.getFileName().toString().matches("x__[0-9a-f]{8}_out.*")).count(),
+                data(cfg).toString());
     }
 
     private static final String SCHEMA = """

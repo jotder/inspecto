@@ -320,6 +320,7 @@ final class PipelineConfigParser {
 
         // ── processing.reject_mode (X4 deferral, 2026-09-28): eject (default) | all_or_nothing ──
         b.rejectMode = PipelineConfig.RejectMode.parse(proc.get("reject_mode"));
+        b.outputPerMember = Boolean.TRUE.equals(boolOrNull(proc.get("output_per_member"), "processing.output_per_member"));
         // ── processing.refusal (opt-in content refusal → restricted quarantine), default off ──
         b.refusal = PipelineConfig.Refusal.parse(proc.get("refusal"),
                 intOrNull(proc.get("refusal_retention_days"), "processing.refusal_retention_days"),

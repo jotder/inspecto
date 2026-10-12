@@ -88,4 +88,38 @@ class KillBeforeAckDuplicateTest {
         // its batch id, so a different member set is a different file name. Fix it and flip this to 2.
         assertEquals(4, rows(cfg), "the re-planned batch wrote a second, differently named output");
     }
+
+    /**
+     * The hole above, FLIPPED by {@code processing.output_per_member} (stage 2 of INGEST-MULTIFILE-BATCH-REPLAN-DUP-1):
+     * the same two plans, written through the real per-member seam, leave 2 rows, not 4. The OFF test above stays
+     * as the documented default behaviour.
+     */
+    @Test
+    void multiFileBatchReplannedAfterKillDoesNotDuplicateWithOutputPerMember(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(
+                PipelineConfigBatchTestRef.writePipeline(dir, "  output_per_member: true").toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path a = inbox.resolve("a.csv"), b = inbox.resolve("b.csv");
+        Files.writeString(a, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
+        Files.writeString(b, "ID,AMT,EVENT_DATE\ny,9.0,2020-04-03\n");
+        List<Consignment.Member> ms = List.of(member(cfg, a.toFile(), 0), member(cfg, b.toFile(), 1));
+        for (String batchId : List.of("b_ab", "b_abc")) {   // node A's plan, then the survivor's re-plan under another id
+            DuckDbUtil.loadDriver();
+            File db = DuckDbUtil.tempDbFile("kill_ack_pm_");
+            try (Connection conn = DuckDbUtil.openConnection(db)) {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE transformed AS SELECT * FROM (VALUES "
+                            + "('alice', 250.0, '2026', '07', '01', 0), ('bob', 50.0, '2026', '07', '01', 1)) "
+                            + "v(name, cost, year, month, day, __src_id)");
+                }
+                ConsignmentIngestStrategy.writeAndTraceEach(conn, "transformed", List.of("year", "month", "day"), cfg,
+                        cfg.dirs().database(), ms, new Consignment(batchId, "stg", null, ms),
+                        Map.of(0, "a.csv", 1, "b.csv"), "", null);
+            } finally {
+                DuckDbUtil.deleteTempDb(db);
+            }
+        }
+        assertEquals(2, rows(cfg), "per-member names: the re-planned batch rewrote the same files");
+    }
 }

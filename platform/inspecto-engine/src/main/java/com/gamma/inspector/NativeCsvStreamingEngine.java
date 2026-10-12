@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import com.gamma.consignment.EventTimeBounds;
 
-import static com.gamma.inspector.ConsignmentIngestStrategy.consolidatedBaseName;
+import static com.gamma.inspector.ConsignmentIngestStrategy.memberStem;
 import static com.gamma.inspector.ConsignmentIngestStrategy.databaseDir;
 import static com.gamma.inspector.ConsignmentIngestStrategy.dropTable;
 import static com.gamma.inspector.ConsignmentIngestStrategy.msg;
@@ -153,9 +153,9 @@ final class NativeCsvStreamingEngine {
         DataTransformer.materialize(conn, schema, cfg);   // single streaming pass over all members
         long castFailures = DataTransformer.countCastFailures(conn, schema, cfg, "raw_input");
 
-        var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
-                cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch, cfg),
-                batch.batchId(), srcIdToFile, "",   // union streaming: the batch's ONE write
+        var written = ConsignmentIngestStrategy.writeAndTraceEach(conn, "transformed", partitionColumns(schema),
+                cfg, databaseDir(batch, cfg), survivors, batch,
+                srcIdToFile, "",   // union streaming: the batch's ONE write (one per member with output_per_member)
                 batch.members().get(0).selection().table());
 
         return new IngestOutcome(batchStart, "SUCCESS", "", survivors, memberAudits,
@@ -191,7 +191,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = FileNames.outputStem(cfg, m.file().getName());
+        String baseName = memberStem(cfg, m.file());
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 
@@ -237,7 +237,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = FileNames.outputStem(cfg, m.file().getName());
+        String baseName = memberStem(cfg, m.file());
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 

@@ -383,6 +383,11 @@ public final class ConfigSpecs {
                                 + "records land. all_or_nothing: a file with ANY rejected record lands nothing and is "
                                 + "quarantined whole under rejects_all_or_nothing, its reject sidecar beside it.",
                         FieldType.ENUM, false, null, List.of("eject", "all_or_nothing"), null, "select", null),
+                FieldSpec.withDefault("processing.output_per_member", "Name outputs per member", FieldType.BOOL, false,
+                        "false: a multi-file batch writes ONE output named by its batch id. true: every member "
+                                + "writes its OWN output per partition, named <stem>__<origin hash>_out, so a batch "
+                                + "re-planned after a failover rewrites the same files instead of adding a second "
+                                + "copy (a shared output tree only). More, smaller files per partition."),
                 new FieldSpec("processing.refusal", "Content refusal",
                         "off (unset): a failing transform fails the batch. restricted_quarantine: a file an authored "
                                 + "mapping refuses with error('INGEST_REFUSE:<CODE>') moves to the restricted quarantine "

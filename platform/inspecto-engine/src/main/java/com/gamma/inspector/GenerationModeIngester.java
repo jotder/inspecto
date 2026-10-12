@@ -56,7 +56,7 @@ final class GenerationModeIngester {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
-                    String stem = FileNames.outputStem(cfg, m.file().getName());
+                    String stem = ConsignmentIngestStrategy.memberStem(cfg, m.file());
                     MemberAudit collided = ConsignmentIngestStrategy.claimOutputStem(stems, m, stem, cfg, mStart);
                     if (collided != null) { memberAudits.add(collided); continue; }
                     // lineageName: the ENTRY name for an unpack-expanded archive member, the plain

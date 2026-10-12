@@ -280,6 +280,11 @@ public final class ConfigSafetyValidator {
                 && !List.of("off", "card_number").contains(refusalScan.trim().toLowerCase(java.util.Locale.ROOT)))
             out.add(Finding.error("processing.refusal_scan", "refusal_scan must be one of off, card_number (got '"
                     + refusalScan + "')"));
+        String perMember = RawConfig.str(raw, "processing.output_per_member");
+        if (perMember != null && !perMember.isBlank()
+                && !List.of("true", "false").contains(perMember.trim().toLowerCase(java.util.Locale.ROOT)))
+            out.add(Finding.error("processing.output_per_member", "output_per_member must be true or false (got '"
+                    + perMember + "')"));
         String rejectMode = RawConfig.str(raw, "processing.reject_mode");
         if (rejectMode != null && !rejectMode.isBlank()
                 && !List.of("eject", "all_or_nothing").contains(rejectMode.trim().toLowerCase(java.util.Locale.ROOT)))

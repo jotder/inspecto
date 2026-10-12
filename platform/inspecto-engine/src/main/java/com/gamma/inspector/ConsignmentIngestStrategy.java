@@ -558,6 +558,9 @@ interface ConsignmentIngestStrategy {
      */
     static String segmentWrite(PipelineConfig cfg, String writeScope) {
         if (writeScope == null || writeScope.isEmpty()) return null;
+        int perMember = writeScope.indexOf(MEMBER_SCOPE);
+        if (perMember >= 0) writeScope = writeScope.substring(0, perMember);   // per-member write: the segment's own key
+        if (writeScope.isEmpty()) return null;
         Map<String, Map<String, Object>> segments = cfg.schemas().segments();
         // The LIFT's key for the segment (PipelineLift.routeKey), which is what its node ids carry.
         return segments != null && segments.containsKey(writeScope)
@@ -775,9 +778,79 @@ interface ConsignmentIngestStrategy {
      */
     static String consolidatedBaseName(List<Consignment.Member> survivors, Consignment batch, PipelineConfig cfg) {
         return survivors.size() == 1
-                ? FileNames.outputStem(cfg, survivors.get(0).file().getName())
+                ? memberStem(cfg, survivors.get(0).file())
                 : batch.batchId();
     }
+
+    /**
+     * The output stem of ONE member. Off ({@code processing.output_per_member} unset): the plain
+     * {@link FileNames#outputStem}, byte-identical to before. On: {@code <stem>__<8 hex>}, where the hex is the
+     * salted keyed fingerprint ({@link com.gamma.etl.FailureText#fingerprint}) of the member's ORIGIN path (the inbox
+     * path relative to {@code dirs.poll}, the archive's path for an unpack-expanded entry) — so the name depends on
+     * the member ALONE (a re-planned batch rewrites the same file) and on where it came from (a same-stem file in
+     * another directory, in this or a later batch, gets a different name). Never the raw path: never-store-values.
+     */
+    static String memberStem(PipelineConfig cfg, java.io.File file) {
+        String stem = FileNames.outputStem(cfg, file.getName());
+        if (!cfg.outputPerMember()) return stem;
+        java.nio.file.Path origin = com.gamma.etl.unpack.UnpackOrigins.originalOr(file).toPath().toAbsolutePath().normalize();
+        java.nio.file.Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        String rel = (origin.startsWith(poll) ? poll.relativize(origin) : origin).toString().replace('\\', '/');
+        return stem + "__" + com.gamma.etl.FailureText.fingerprint(cfg, rel).substring(3, 11);
+    }
+
+    /**
+     * The write of a batch's survivors: ONE call named by {@link #consolidatedBaseName} when
+     * {@code processing.output_per_member} is off (byte-identical to the old call), else one write per member,
+     * each named by {@link #memberStem}, over that member's own rows (a copy of {@code table} filtered on
+     * {@code __src_id}, so the per-member lineage has exactly one srcId). {@code srcIdToFile} names the members
+     * this {@code table} holds (a multi-schema batch writes one segment per call). A versioned reference store keeps
+     * its batch-unique {@code __v_<batchId>} naming, so it is never split.
+     */
+    static Written writeAndTraceEach(Connection conn, String table, List<String> partCols, PipelineConfig cfg,
+                                     String dbDir, List<Consignment.Member> survivors, Consignment batch,
+                                     Map<Integer, String> srcIdToFile, String writeScope,
+                                     String selectedTable) throws Exception {
+        boolean versioned = cfg.producesReference() && cfg.reference().load().versionedStore();
+        if (!cfg.outputPerMember() || versioned)
+            return writeAndTrace(conn, table, partCols, cfg, dbDir, consolidatedBaseName(survivors, batch, cfg),
+                    batch.batchId(), srcIdToFile, writeScope, selectedTable);
+        List<Consignment.Member> owners = survivors.stream().filter(m -> srcIdToFile.containsKey(m.srcId())).toList();
+        if (owners.size() == 1) {
+            Consignment.Member m = owners.get(0);
+            return writeAndTrace(conn, table, partCols, cfg, dbDir, memberStem(cfg, m.file()),
+                    batch.batchId(), srcIdToFile, writeScope, selectedTable);
+        }
+        List<PartitionOutput> outputs = new java.util.ArrayList<>();
+        List<LineageRow> lineage = new java.util.ArrayList<>();
+        Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
+        for (Consignment.Member m : owners) {
+            String copy = table + "__m" + m.srcId();
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("DROP TABLE IF EXISTS \"" + copy + "\"");
+                st.execute("CREATE TABLE \"" + copy + "\" AS SELECT * FROM \"" + table + "\" WHERE __src_id = " + m.srcId());
+            }
+            try {
+                // the member is its own branch-ledger scope: a second call under the same scope would read as
+                // "already committed" and drop its rows (see writeAndTrace)
+                Written w = writeAndTrace(conn, copy, partCols, cfg, dbDir, memberStem(cfg, m.file()), batch.batchId(),
+                        Map.of(m.srcId(), srcIdToFile.get(m.srcId())),
+                        (writeScope == null ? "" : writeScope) + MEMBER_SCOPE + m.srcId(),
+                        selectedTable);
+                outputs.addAll(w.outputs());
+                lineage.addAll(w.lineage());
+                bounds.putAll(w.bounds());
+            } finally {
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute("DROP TABLE IF EXISTS \"" + copy + "\"");
+                }
+            }
+        }
+        return new Written(outputs, lineage, bounds);
+    }
+
+    /** Separates a segment/batch scope from the member a per-member write belongs to (see {@link #segmentWrite}). */
+    static final String MEMBER_SCOPE = "#m";
 
     /** Output database dir for a batch: {@code dirs.database}, or a {@code table}-named subdir when set. */
     static String databaseDir(Consignment batch, PipelineConfig cfg) {

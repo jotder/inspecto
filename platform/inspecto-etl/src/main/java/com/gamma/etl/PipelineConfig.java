@@ -1408,6 +1408,7 @@ public final class PipelineConfig {
     private final Intake         intake;
     private final CommitRetryPolicy commitRetry;
     private final RejectMode     rejectMode;
+    private final boolean        outputPerMember;
     private final Refusal        refusal;
     private final Integer        rawCopyRetentionDays;
     private final Unpack         unpack;
@@ -1582,6 +1583,8 @@ public final class PipelineConfig {
     public Intake         intake()   { return intake; }
     /** Per-pipeline bounded-COMMIT-retry override, or {@code null} = inherit the {@code -Dingest.retry.*} globals. */
     public CommitRetryPolicy commitRetry() { return commitRetry; }
+    /** {@code processing.output_per_member}: name each multi-file batch member's output by the member, not the batch (default false). */
+    public boolean        outputPerMember() { return outputPerMember; }
     /** {@code processing.reject_mode}; never null — absent reads as {@link RejectMode#EJECT}. */
     public RejectMode     rejectMode() { return rejectMode; }
     /** {@code processing.refusal} / {@code processing.refusal_retention_days}; never null — absent reads as off. */
@@ -1715,6 +1718,7 @@ public final class PipelineConfig {
         this.intake = b.intake;
         this.commitRetry = b.commitRetry;
         this.rejectMode = b.rejectMode == null ? RejectMode.EJECT : b.rejectMode;
+        this.outputPerMember = b.outputPerMember;
         this.refusal = b.refusal == null ? Refusal.OFF : b.refusal;
         requireScanCoverage(this.refusal, this.schemas, b.name);
         this.rawCopyRetentionDays = b.rawCopyRetentionDays;
@@ -1812,6 +1816,7 @@ public final class PipelineConfig {
         this.intake = src.intake;
         this.commitRetry = src.commitRetry;
         this.rejectMode = src.rejectMode;
+        this.outputPerMember = src.outputPerMember;
         this.refusal = src.refusal;
         this.rawCopyRetentionDays = src.rawCopyRetentionDays;
         this.unpack = src.unpack;
@@ -2171,6 +2176,13 @@ public final class PipelineConfig {
      * @throws IllegalStateException naming the first rule the config breaks
      */
     public void requireRunnable() {
+        // output_per_member names each member's output file itself; a route: pipeline parks disabled branches
+        // under the BATCH id and DrainCommand resumes them under the batch name, so the two cannot be mixed yet.
+        if (outputPerMember && route != null) {
+            throw new IllegalStateException(
+                    "processing.output_per_member is not supported with route: branches yet "
+                            + "(a parked branch is resumed under its batch's name) — remove one of them");
+        }
         if (sinks.size() > 1 && produces == Produces.REFERENCE && reference.load().versionedStore()) {
             throw new IllegalStateException(
                     "a versioned reference store (reference.load upsert/scd2) writes a single version history; "
@@ -2392,6 +2404,7 @@ public final class PipelineConfig {
         Intake intake            = null;   // absent block = inherit the -Dingest.* globals whole
         CommitRetryPolicy commitRetry = null;   // absent block = inherit the -Dingest.retry.* globals whole
         RejectMode rejectMode    = RejectMode.EJECT;   // absent key = eject-and-continue
+        boolean    outputPerMember;   // absent key = false: a multi-file batch is named by its batch id
         Refusal    refusal       = Refusal.OFF;
         Integer    rawCopyRetentionDays;
         Unpack unpack            = null;   // absent block = Unpack.defaults() (stage on, shipped caps)

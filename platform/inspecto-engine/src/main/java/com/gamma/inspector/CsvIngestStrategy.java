@@ -20,7 +20,6 @@ import java.util.Map;
 
 import static com.gamma.inspector.ConsignmentIngestStrategy.configure;
 import static com.gamma.inspector.ConsignmentIngestStrategy.memberFiles;
-import static com.gamma.inspector.ConsignmentIngestStrategy.consolidatedBaseName;
 import static com.gamma.inspector.ConsignmentIngestStrategy.databaseDir;
 import static com.gamma.inspector.ConsignmentIngestStrategy.dropTable;
 import static com.gamma.inspector.ConsignmentIngestStrategy.msg;
@@ -231,9 +230,9 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                     castFailures = DataTransformer.countCastFailures(conn, schema, cfg, "raw_input");
 
                     StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "sink", 3, 3);
-                    var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
-                            cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch, cfg),
-                            batch.batchId(), srcIdToFile, "",   // the batch's ONE write — no scope needed
+                    var written = ConsignmentIngestStrategy.writeAndTraceEach(conn, "transformed", partitionColumns(schema),
+                            cfg, databaseDir(batch, cfg), survivors, batch,
+                            srcIdToFile, "",   // the batch's ONE write (one per member with output_per_member) — no scope needed
                             batch.members().get(0).selection().table());
                     outputs = written.outputs();
                     lineage = written.lineage();
