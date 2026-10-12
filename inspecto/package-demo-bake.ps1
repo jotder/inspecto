@@ -85,10 +85,9 @@ function Invoke-DemoSpaceBake {
         }
         if (-not $healthy) { foreach ($f in @($log, "$log.err")) { if (Test-Path $f) { Get-Content $f -Tail 40 | Write-Host } }; throw "demo bake: the staged bundle never answered /health on :$Port" }
 
-        # The seed script's own extra stages (pending four-eyes request, fired Alert, Draft) are enabled by flags another lane adds
-        # to it: pass whichever of these the script on this base knows, so the bake picks them up with no edit here.
-        $seedText = Get-Content $seed -Raw
-        $extra = @('--pending-request', '--fire-alert', '--draft') | Where-Object { $seedText.Contains("'$_'") }
+        # The seed script's extra stages (pending four-eyes request, fired Alert, Draft) run by default; its --no-pending /
+        # --no-alert / --no-draft flags opt out, so the bake passes nothing extra.
+        $extra = @()
         Write-Host "Demo bake: seeding la-showcase (node tools/seed-la-showcase.mjs --apply $($extra -join ' ')) ..." -ForegroundColor Cyan
         & node $seed --base "http://127.0.0.1:$Port" --space la-showcase --apply @extra | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "demo bake: the seed script failed (exit $LASTEXITCODE) - refusing to ship a half-seeded demo. Server log: $log" }

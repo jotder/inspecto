@@ -64,8 +64,8 @@ nothing to show) · **UI** (backend exists, no UI) · **ROUGH** (works but a sta
 | 7 | Identity Fact log, Entity Lists, resolution groups, Entity Types, sidecar (§3.5) | UI: Entity Lists, Identity panels; head hash only via API | READY after seed; UI missing for chain/head and import | DR-S4, DR-U8, DR-T10 |
 | 8 | Store port: FS default, Postgres (Preview/Enterprise), crash-safe promote (§3.2, §8) | Tests; active backend not visible | EVIDENCE; DATA (PG variant) | DR-S9, DR-U3 |
 | 9 | Link index: layout, modes, staleness, limits, scheduled build (§4) | Settings API; Edge index tool (unreachable) | DATA; DOC (trigger); UI missing | DR-T1, DR-U4, DR-U5, DR-U10, DR-S2, DR-S3 |
-| 10 | Graph Run: Materialised vs IndexRef, 28 algorithms, budgets, pool, cache (§5, §9) | UI: 18 *Run on server*, 3 *Run on index*; catalogue by API | ROUGH (7 API-only; server tools gated by the query-graph toggle) | DR-U11, DR-D3, DR-T7 |
-| 11 | HTTP surface 75 routes, capabilities, gate order, audit (§6, §6.1) | curl probes (401/403/404/422), route inventory, `LINK_*` events | READY as `curl`; DOC fixed | DR-T2, DR-T5, DR-S7, DR-S8 |
+| 10 | Graph Run: Materialised vs IndexRef, 29 algorithms, budgets, pool, cache (§5, §9) | UI: 18 *Run on server*, 3 *Run on index*; catalogue by API | ROUGH (7 API-only; server tools gated by the query-graph toggle) | DR-U11, DR-D3, DR-T7 |
+| 11 | HTTP surface 82 routes, capabilities, gate order, audit (§6, §6.1) | curl probes (401/403/404/422), route inventory, `LINK_*` events | READY as `curl`; DOC fixed | DR-T2, DR-T5, DR-S7, DR-S8 |
 | 12 | Editions and packaging: optional jars, `-Ui la-app`, Postgres/PDP only Preview+Enterprise (§8) | Enterprise demo only | DATA (Personal 503, la-app, PG variants) | DR-S9 |
 | 13 | Live detection: bound rule, standing detection, `la.detect`, refusal codes (§7) | UI: Value Measures, *Watch*, standing detection, Monitoring | DATA; ROUGH | DR-S3, DR-S5, DR-D6, DR-U9 |
 | 14 | Resource bounds: rate limit 20 + 1/3 s, pool 2/16, builds 1/4, Drafts 50 (§9) | API numbers; UI has no 429/413 wording | API; UI missing | DR-D6, DR-T7 |
@@ -121,7 +121,7 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 | DR-U7 | `/references` UI; Compare through the UI works (DR-D1) | same | SHOULD |
 | DR-U8 | Entity Lists shows head hash and "chain verified"; identity import UI | same | SHOULD |
 | DR-U9 | A fired standing-detection Alert names the breaching entities and links to the Investigation | same | SHOULD |
-| DR-U11 | All 28 algorithms reachable (7 are API-only: connected components, k-core, triangle count, isForest, descendants, Jaccard, PageRank); server run available below the browser cap | `LA-ALGO-UI-PARITY-1` (P3) | SHOULD |
+| DR-U11 | All 29 algorithms reachable (7 are API-only: connected components, k-core, triangle count, isForest, descendants, Jaccard, PageRank); server run available below the browser cap | `LA-ALGO-UI-PARITY-1` (P3) | SHOULD |
 | DR-U12 | An installed-modules view filtered to Link Analysis | same | COULD |
 
 ### 3.5 Tests and guards that keep the defence true (`LA-DEMO-GUARDS-1`, P3)
@@ -130,8 +130,8 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 | DR-T2 | A test pins the route count and operations to the manifests (75) so the page cannot drift | MUST |
 | DR-T3 | A guard: no `com.gamma.la.*` or `com.gamma.geolink.*` import in `inspecto/src/main` | SHOULD |
 | DR-T4 | A test scans every `/inv` response on a masked Space for known raw ids | MUST |
-| DR-T5 | A demo smoke runner executes the scripted probes against the seeded demo and asserts each status (401, 403, 404, 404 `MODULE_DISABLED`, 422, replay hash unchanged after a Dataset change, tamper verify fails, route inventory 75) | SHOULD |
-| DR-T6 | A pre-demo check reproduces the manual's §10 figures on the mule data (13 accounts near 0.985, `TILL-06` at 82 %) | MUST |
+| DR-T5 | A demo smoke runner executes the scripted probes against the seeded demo and asserts each status (401, 403, 404, 404 `MODULE_DISABLED`, 422, replay hash unchanged after a Dataset change, tamper verify fails, route inventory 82) | SHOULD |
+| DR-T6 | A pre-demo check reproduces the manual's §10 figures on the mule data (13 accounts near 0.985, `TILL-06` at 97 %) | MUST |
 | DR-T7 | Burst scripts for the limits: > 20 POSTs → 429, 19 concurrent runs → 503, a 6th concurrent build → 503 | SHOULD |
 | DR-T8 | A replay-versus-drift script: append a file to the bound Dataset; Replay hash unchanged, *Re-read* reports drift | MUST |
 | DR-T9 | `/inv/index` exposes bytes, per-table file counts and the dropped-NULL count | COULD - BUILT (`tables`, `droppedNull`, `versions`; `ControlApiIndexTest`) |
@@ -141,7 +141,7 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 
 | Step | Persona | Action → expected | Needs |
 |---|---|---|---|
-| 0 | — | Smoke runner passes; modules ACTIVE; route inventory 75 | DR-T5, DR-T2 |
+| 0 | — | Smoke runner passes; modules ACTIVE; route inventory 82 | DR-T5, DR-T2 |
 | 1 | `fm.analyst` | *Follow the money* card → 170 nodes, 1,803 links; shortest path `SMURF-01`→`RELAY-01` via `MULE-HUB-01`; cut points = `MULE-HUB-01`; centrality `ACC-1008` | ready |
 | 2 | `fm.analyst` | Open the seeded Investigation; replay equal; append the next day's file; replay still equal, *Re-read* shows drift | DR-S1, DR-T8 |
 | 3 | `fm.analyst` | Value Measures pass-through: 13 accounts flagged on the shipped la-showcase data at default thresholds (`SHELL-A` 1.08, the two relays 0.985, `MULE-HUB-01` 0.979; the DR-T6 test pins these) | DR-D4, DR-T6 |
@@ -160,7 +160,7 @@ against a mocked `fetch` and not yet run live. Steps that now have their data: 2
 showcase corpus is smaller than the `demo` Space's: step 1's figures (170 nodes, 1,803 links, centrality `ACC-1008`) are for `demo`; on the showcase the hub ranks first.
 
 ## 5. Corrections already applied to the page (2026-10-10, verified in code)
-Trigger signal is `pipeline.commit` for file ingest (also fixed in `ingestion.md` and the frontend concept); 75 routes
+Trigger signal is `pipeline.commit` for file ingest (also fixed in `ingestion.md` and the frontend concept); 82 routes
 (69 + 6); Identity reads are capability-gated and `/import` has no UI; Graph Run and Index capabilities gate only the
 starting POST (cancel is owner-or-admin); gate order gains the idempotency step and the linked-Case READ path; rate
 limit numbers (capacity 20, refill 1 per 3 s); Standard is a Professional alias; the Postgres store needs

@@ -12,7 +12,7 @@
 //   --no-pending   one PENDING four-eyes expand on mule-hub-case (an unbounded expand by fm.analyst; left undecided for fm.manager)
 //   --no-alert     one run of the la_detect Job (as fm.manager, who holds canOperateRuns) until the mule-pass-through Alert exists
 //   --no-draft     one open Draft of mule-hub-case forked by fm.analyst, carrying one annotate step, left unpromoted
-//   (a Draft has no name field: the fork body is {at?} only, so the Draft is found again as fm.analyst's one live Draft)
+// (the Draft carries the label 'Draft: widen the ring'; it is still found again as fm.analyst's one live Draft)
 //
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Never sends a credential: the Demo User exchange
 // takes a `demo:<id>` code and no password.
@@ -188,7 +188,7 @@ async function stageDraft(call, out, log) {
   const live = (must(await call('fm.analyst', 'GET', base), 'Draft list').items || []).find((d) => d.state === 'open' || d.state === 'hibernated');
   if (live && live.steps > 0) { out.skipped.push('draft'); out.summary.draftId = live.draftId; return; }
   const created = !live;
-  const id = live ? live.draftId : must(await call('fm.analyst', 'POST', base, {}), 'Draft fork').draftId;
+  const id = live ? live.draftId : must(await call('fm.analyst', 'POST', base, { label: 'Draft: widen the ring' }), 'Draft fork').draftId;
   try {
     must(await call('fm.analyst', 'POST', `${base}/${id}/ops`, DRAFT_STEP), 'the Draft step');
     const d = must(await call('fm.analyst', 'GET', `${base}/${id}`), 'Draft read');

@@ -36,7 +36,7 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
  * relation run over it unchanged. There is no rebase or promote yet (D7-5): a Draft is explored, undone and discarded.
  *
  * <ul>
- *   <li>{@code POST /inv/investigations/{id}/drafts} - fork ({@code {at?}}); lead or analyst; ONE live Draft per member (409).</li>
+ *   <li>{@code POST /inv/investigations/{id}/drafts} - fork ({@code {at?, label?}}); lead or analyst; ONE live Draft per member (409).</li>
  *   <li>{@code GET  .../drafts} - the caller's own Drafts; a lead and a reviewer see all (D7-Q8).</li>
  *   <li>{@code GET  .../drafts/{draftId}} - header, head step, and whether the main log has moved on (behind).</li>
  *   <li>{@code GET  .../drafts/{draftId}/log} · {@code /working-set} · {@code /replay} - reads.</li>
