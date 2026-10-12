@@ -280,6 +280,7 @@ against, round-tripped untouched.
 | `processing.join` | parser-only |
 | `processing.map` | parser-only |
 | `processing.mapping_file` | parser-only |
+| `processing.output_per_member` | spec |
 | `processing.pool` | spec |
 | `processing.priority` | spec |
 | `processing.profile` | spec |
