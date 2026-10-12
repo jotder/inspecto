@@ -82,7 +82,20 @@ final class ParserRoutes implements RouteModule {
         Path configDir = configDirOf(api, body);
         try {
             ParseResult r = parser.preview(sample, grammar, configDir);
-            return toJson(r);
+            Map<String, Object> json = toJson(r);
+            // PARSING-PREVIEW-DERIVED-1, additive: a hierarchical Parse step that declares derive / children also
+            // serves the rows it would load, next to the tree. A parser that declares neither adds no key, so every
+            // existing preview response is unchanged. A failure here (a bad segment schema) never costs the tree.
+            if (r instanceof ParseResult.Tree) {
+                try {
+                    parser.previewRows(sample, grammar, configDir)
+                            .ifPresent(rows -> json.put("derived", rowsJson(rows)));
+                } catch (Exception derivedFail) {
+                    json.put("derivedError", derivedFail.getMessage() == null
+                            ? "derived rows could not be previewed" : derivedFail.getMessage());
+                }
+            }
+            return json;
         } catch (PathJail.Escape escape) {
             // A grammar FILE reference (asn1.grammar_file) outside the allowed roots — the jail's verdict.
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, escape.getMessage());
@@ -183,6 +196,24 @@ final class ParserRoutes implements RouteModule {
             out.put("recordCount", t.recordCount());
             out.put("nodes", nodesJson(t.nodes()));
         }
+        return out;
+    }
+
+    private static Map<String, Object> rowsJson(ParseResult.Rows rows) {
+        List<Map<String, Object>> sets = new ArrayList<>();
+        for (ParseResult.RowSet s : rows.segments()) {
+            Map<String, Object> set = new LinkedHashMap<>();
+            set.put("segment", s.segment());
+            set.put("child", s.child());
+            set.put("columns", s.columns());
+            set.put("derivedColumns", s.derivedColumns());
+            set.put("rows", s.rows());
+            set.put("rowCount", s.rowCount());
+            sets.add(set);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("kind", "rows");
+        out.put("segments", sets);
         return out;
     }
 

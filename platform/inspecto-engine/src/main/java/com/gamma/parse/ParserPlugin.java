@@ -84,6 +84,17 @@ public interface ParserPlugin {
     }
 
     /**
+     * The rows this grammar's {@code derive} / {@code children} declarations would load from {@code sample}
+     * (PARSING-PREVIEW-DERIVED-1), served next to the record tree a hierarchical {@link #preview} returns.
+     * Empty when the grammar declares neither (the common case — the preview is then the tree alone).
+     * Same error contract as {@link #preview(byte[], Map, Path)}. Default: none.
+     */
+    default Optional<ParseResult.Rows> previewRows(byte[] sample, Map<String, Object> grammar, Path configDir)
+            throws Exception {
+        return Optional.empty();
+    }
+
+    /**
      * Optional clues: grammar values sniffed from {@code sample} (e.g. a proposed record element).
      * Suggestions assist, they never constrain — the UI offers them as one-click chips, never
      * auto-applies. Default: no clues.

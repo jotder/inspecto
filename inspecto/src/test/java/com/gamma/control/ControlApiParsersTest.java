@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -190,6 +191,60 @@ class ControlApiParsersTest {
      * SAME spelling beside it. Without a Pipeline context the ref falls back to the Space root, where the
      * sibling spelling does not resolve; an absolute {@code subdir} is a caller error.
      */
+    /**
+     * PARSING-PREVIEW-DERIVED-1: a Parse step that declares {@code derive}/{@code children} gets the rows it would load
+     * under {@code derived} next to the tree; one that declares neither gets no such key (the tree response is unchanged);
+     * a declaration whose rows cannot be built costs the tree nothing and says why under {@code derivedError}.
+     */
+    @Test
+    void asn1PreviewServesDerivedRowsNextToTheTreeOnlyWhenDeclared(@TempDir Path cfg) throws Exception {
+        Path corpus = Path.of("..", "providers", "asn-parser", "corpus-synthetic", "repeated_child");
+        StringBuilder hex = new StringBuilder();
+        for (String line : java.nio.file.Files.readAllLines(corpus.resolve("data.hex")))
+            if (!line.startsWith("#")) hex.append(line);
+        String sample = Base64.getEncoder().encodeToString(
+                java.util.HexFormat.of().parseHex(hex.toString().replaceAll("\\s", "")));
+        Path rec = cfg.resolve("rec.toon");
+        java.nio.file.Files.writeString(rec, "partitionKey: ID\nraw:\n  name: rec\n  format: CSV\n"
+                + "  fields[1]{name,selector,type}:\n    ID,id,VARCHAR\n");
+        Path use = cfg.resolve("use.toon");
+        java.nio.file.Files.writeString(use, "partitionKey: PARENT_ID\nraw:\n  name: use\n  format: CSV\n"
+                + "  fields[2]{name,selector,type}:\n    PARENT_ID,$parent.id,VARCHAR\n    UP,up,VARCHAR\n");
+        Map<String, Object> asn1 = new java.util.LinkedHashMap<>();
+        asn1.put("grammar", java.nio.file.Files.readString(corpus.resolve("grammar.asn")));
+        asn1.put("root_type", "Record");
+        try (Ctx c = open(cfg)) {
+            ObjectMapper m = new ObjectMapper();
+            JsonNode plain = json(send(c.port, "POST", "/parsers/asn1/preview",
+                    m.writeValueAsString(Map.of("grammar", Map.of("asn1", asn1), "sample_b64", sample))));
+            assertEquals("tree", plain.get("kind").asText());
+            assertFalse(plain.has("derived"), "no derive/children = the tree alone");
+            assertFalse(plain.has("derivedError"));
+
+            Map<String, Object> declared = new java.util.LinkedHashMap<>(asn1);
+            declared.put("segments", Map.of("Record", rec.toString(), "Usage", use.toString()));
+            declared.put("children", Map.of("Record", Map.of("usage.usage", "Usage")));
+            JsonNode r = json(send(c.port, "POST", "/parsers/asn1/preview",
+                    m.writeValueAsString(Map.of("grammar", Map.of("asn1", declared), "sample_b64", sample))));
+            assertEquals(plain.get("nodes"), r.get("nodes"), "the tree is untouched");
+            JsonNode derived = r.get("derived");
+            assertEquals("rows", derived.get("kind").asText());
+            JsonNode usage = derived.get("segments").get(1);
+            assertEquals("Usage", usage.get("segment").asText());
+            assertTrue(usage.get("child").asBoolean());
+            assertEquals(3, usage.get("rowCount").asInt());
+            assertEquals("100", usage.get("rows").get(2).get("UP").asText());
+
+            Map<String, Object> noSegments = new java.util.LinkedHashMap<>(asn1);
+            noSegments.put("children", Map.of("Record", Map.of("usage.usage", "Usage")));
+            JsonNode failed = json(send(c.port, "POST", "/parsers/asn1/preview",
+                    m.writeValueAsString(Map.of("grammar", Map.of("asn1", noSegments), "sample_b64", sample))));
+            assertEquals(plain.get("nodes"), failed.get("nodes"), "a derived failure never costs the tree");
+            assertFalse(failed.has("derived"));
+            assertTrue(failed.get("derivedError").asText().contains("asn1.segments"), failed.toString());
+        }
+    }
+
     @Test
     void asn1PreviewResolvesAGrammarFileBesideThePipelineSubdir(@TempDir Path cfg) throws Exception {
         String grammar = "TEST DEFINITIONS IMPLICIT TAGS ::= BEGIN\n"

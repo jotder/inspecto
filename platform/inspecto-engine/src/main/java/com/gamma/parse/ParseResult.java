@@ -16,7 +16,7 @@ import java.util.Map;
  * 'tree'}), so the control plane serializes a result without translation.
  */
 @PublicApi(since = "4.0.0")
-public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree {
+public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree, ParseResult.Rows {
 
     /**
      * Flat parse output: the produced columns, a bounded row sample, and totals.
@@ -46,6 +46,35 @@ public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree 
         /** The pre-B2 shape — no inferred types (plugins and non-sniffing formats). */
         public Table(List<String> columns, List<Map<String, Object>> rows, long rowCount, long rejectedRows) {
             this(columns, rows, rowCount, rejectedRows, List.of());
+        }
+    }
+
+    /**
+     * The rows a hierarchical grammar's {@code derive} / {@code children} declarations load (the same row-building
+     * path ingest runs), one {@link RowSet} per declared segment. Served next to a {@link Tree}, never instead of it.
+     */
+    record Rows(List<RowSet> segments) implements ParseResult {
+        public Rows {
+            segments = segments == null ? List.of() : List.copyOf(segments);
+        }
+    }
+
+    /**
+     * One segment's sample rows.
+     *
+     * @param segment        the segment key
+     * @param child          {@code true} when the segment's rows are exploded from a parent's list ({@code children})
+     * @param columns        every column, in load order (raw fields, then derived columns, then {@code EVENT_TYPE})
+     * @param derivedColumns the subset of {@code columns} a {@code derive} block adds
+     * @param rows           a bounded sample, column name to value ({@code null} = SQL NULL)
+     * @param rowCount       every row the previewed records produce for this segment (not just the sample)
+     */
+    record RowSet(String segment, boolean child, List<String> columns, List<String> derivedColumns,
+                  List<Map<String, Object>> rows, long rowCount) {
+        public RowSet {
+            columns = columns == null ? List.of() : List.copyOf(columns);
+            derivedColumns = derivedColumns == null ? List.of() : List.copyOf(derivedColumns);
+            rows = rows == null ? List.of() : List.copyOf(rows);
         }
     }
 

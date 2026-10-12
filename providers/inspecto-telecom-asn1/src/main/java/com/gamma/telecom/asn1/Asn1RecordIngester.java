@@ -127,39 +127,14 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
                     "invalid ASN.1 grammar " + module.label() + ": " + badGrammar.getMessage(), badGrammar);
         }
 
-        DeriveSpec derive = DeriveSpec.parse(ic.get("derive"), cfg.schemas().segments() == null ? null : cfg.schemas().segments().keySet(),
-                ic.get("max_list_elements"), ic.get("max_derived_columns"));
-        DeriveSpec.Stats deriveStats = new DeriveSpec.Stats();
-        ChildSpec children = ChildSpec.parse(ic.get("children"),
-                cfg.schemas().segments() == null ? null : cfg.schemas().segments().keySet(),
-                ic.get("max_child_rows_per_record"));
-        Set<String> childSegments = children.childSegments();
-        Map<String, List<String>> selectorsByKey = declareSegments(cfg, sink, derive, childSegments);
-
+        DeriveSpec.Stats deriveStats;
         List<ParseError> errors = new ArrayList<>();
         try (ByteSource src = ByteSource.map(file.toPath())) {
             Iterator<NamedNode> records = decoder.decode(src, framing(ic), strictness(str(ic.get("strictness"))),
                     RecoveryPolicy.STOP_FILE, errors::add,
                     Asn1ParserPlugin.maxValueBytes(ic.get("max_value_bytes"), "ingester_config.max_value_bytes"))
                     .iterator();
-            while (records.hasNext()) {
-                NamedNode record = records.next();
-                List<String> selectors = selectorsByKey.get(record.name());
-                if (selectors == null || childSegments.contains(record.name())) {   // not a record segment → junk candidate
-                    sink.junk();
-                    continue;
-                }
-                Map<String, Object> decoded = RecordMapper.toMap(record);
-                Object[] derived = derive.evaluate(record.name(), decoded, deriveStats);   // ASN1-DERIVE-LIST-TOO-LARGE fails the file
-                Object[] values = new Object[selectors.size() + derived.length + 1];
-                for (int i = 0; i < selectors.size(); i++) {
-                    values[i] = scalar(resolve(decoded, selectors.get(i)));
-                }
-                System.arraycopy(derived, 0, values, selectors.size(), derived.length);   // derived columns after raw.fields
-                values[values.length - 1] = record.name();   // trailing EVENT_TYPE
-                sink.emit(record.name(), values);
-                explode(record.name(), decoded, children, selectorsByKey, derive, deriveStats, sink);
-            }
+            deriveStats = emitRecords(records, ic, cfg.schemas().segments(), sink);
         }
         if (deriveStats.nonNumeric > 0 || deriveStats.noMatch > 0)
             LOG.info("{}: derive_non_numeric={} derive_no_match={}", file.getName(),
@@ -169,6 +144,41 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
             throw new IOException("ASN.1 decode failed in " + file.getName() + " at record "
                     + first.recordIndex() + " (offset " + first.fileOffset() + "): " + first.message());
         }
+    }
+
+    /**
+     * The row-building path ingest and the Parse preview share (PARSING-PREVIEW-DERIVED-1): declare every segment,
+     * then emit each record's row, its derived columns and its exploded child rows into {@code sink}. A preview
+     * passes a collecting sink and a bounded record iterator, so what it shows is what ingest would write.
+     */
+    static DeriveSpec.Stats emitRecords(Iterator<NamedNode> records, Map<String, Object> ic,
+                                        Map<String, Map<String, Object>> segments, RecordSink sink) throws Exception {
+        Set<String> segmentKeys = segments == null ? null : segments.keySet();
+        DeriveSpec derive = DeriveSpec.parse(ic.get("derive"), segmentKeys,
+                ic.get("max_list_elements"), ic.get("max_derived_columns"));
+        DeriveSpec.Stats deriveStats = new DeriveSpec.Stats();
+        ChildSpec children = ChildSpec.parse(ic.get("children"), segmentKeys, ic.get("max_child_rows_per_record"));
+        Set<String> childSegments = children.childSegments();
+        Map<String, List<String>> selectorsByKey = declareSegments(segments, sink, derive, childSegments);
+        while (records.hasNext()) {
+            NamedNode record = records.next();
+            List<String> selectors = selectorsByKey.get(record.name());
+            if (selectors == null || childSegments.contains(record.name())) {   // not a record segment → junk candidate
+                sink.junk();
+                continue;
+            }
+            Map<String, Object> decoded = RecordMapper.toMap(record);
+            Object[] derived = derive.evaluate(record.name(), decoded, deriveStats);   // ASN1-DERIVE-LIST-TOO-LARGE fails the file
+            Object[] values = new Object[selectors.size() + derived.length + 1];
+            for (int i = 0; i < selectors.size(); i++) {
+                values[i] = scalar(resolve(decoded, selectors.get(i)));
+            }
+            System.arraycopy(derived, 0, values, selectors.size(), derived.length);   // derived columns after raw.fields
+            values[values.length - 1] = record.name();   // trailing EVENT_TYPE
+            sink.emit(record.name(), values);
+            explode(record.name(), decoded, children, selectorsByKey, derive, deriveStats, sink);
+        }
+        return deriveStats;
     }
 
     /** Emit one row per element of each list the parent's {@code children} name; over the cap fails the file. */
@@ -205,13 +215,13 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
      * return each key's selector list, so the per-record loop never re-walks the config map.
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, List<String>> declareSegments(PipelineConfig cfg, RecordSink sink, DeriveSpec derive,
-                                                             Set<String> childSegments) throws Exception {
-        if (cfg.schemas().segments() == null || cfg.schemas().segments().isEmpty())
+    private static Map<String, List<String>> declareSegments(Map<String, Map<String, Object>> segments, RecordSink sink,
+                                                             DeriveSpec derive, Set<String> childSegments) throws Exception {
+        if (segments == null || segments.isEmpty())
             throw new IllegalArgumentException("Asn1RecordIngester requires at least one segment");
         Map<String, List<String>> selectorsByKey = new LinkedHashMap<>();
-        for (String key : cfg.schemas().segments().keySet()) {
-            Object raw = cfg.schemas().segments().get(key).get("raw");
+        for (String key : segments.keySet()) {
+            Object raw = segments.get(key).get("raw");
             Object fields = raw instanceof Map<?, ?> m ? m.get("fields") : null;
             if (!(fields instanceof List<?> fl) || fl.isEmpty())
                 throw new IllegalArgumentException("segment '" + key + "' declares no raw.fields");

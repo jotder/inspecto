@@ -181,6 +181,103 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         return new ParseResult.Tree(records.size(), nodes);
     }
 
+    /** Rows kept per segment in {@link #previewRows}; {@code rowCount} still counts every row produced. */
+    static final int MAX_SAMPLE_ROWS = 200;
+
+    /**
+     * The rows the grammar's {@code derive} / {@code children} declarations load (PARSING-PREVIEW-DERIVED-1), built by
+     * the SAME code ingest runs ({@code Asn1RecordIngester.emitRecords}) over the first {@code max_records} records,
+     * into a collecting sink. Empty when the grammar declares neither, or has no grammar to bind records against —
+     * the preview is then the tree alone, byte-for-byte.
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public Optional<ParseResult.Rows> previewRows(byte[] sample, Map<String, Object> grammar, Path configDir)
+            throws Exception {
+        if (sample == null || sample.length == 0)
+            throw new IllegalArgumentException("sample content is required");
+        Path base = configDir != null ? configDir : SpaceConfigRoot.current();
+        Map<String, Object> asn1 = com.gamma.etl.DecodeProfile.overlay(sub(grammar, "asn1"), base).asn1();
+        if (asn1.get("derive") == null && asn1.get("children") == null) return Optional.empty();
+        Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
+                asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file", base);
+        String rootType = trimOrEmpty(asn1.get("root_type"));
+        if (module == null || rootType.isEmpty())
+            throw new IllegalArgumentException("derive / children need asn1.grammar (or grammar_file) and asn1.root_type "
+                    + "to preview their rows");
+        if (!(asn1.get("segments") instanceof Map<?, ?> refs) || refs.isEmpty())
+            throw new IllegalArgumentException("derive / children need asn1.segments to preview their rows");
+
+        Map<String, Map<String, Object>> segments = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : refs.entrySet()) {
+            String ref = String.valueOf(e.getValue()).trim();
+            String field = "asn1.segments." + e.getKey();
+            if (ref.startsWith("schema/")) ref = "registry/schemas/" + ref.substring("schema/".length()) + ".toon";
+            Path file = com.gamma.config.safety.PathJail.requireUnderAny(com.gamma.config.safety.PathJail.allowedRoots(),
+                    com.gamma.config.safety.PathJail.resolveConfigRef(base, ref, field).toString(), field);
+            if (!java.nio.file.Files.isRegularFile(file))
+                throw new IllegalArgumentException("segment schema for '" + e.getKey() + "' not found: " + ref);
+            segments.put(String.valueOf(e.getKey()), com.gamma.util.ToonHelper.load(file.toString()));
+        }
+
+        Asn1Decoder decoder;
+        try {
+            decoder = Asn1Decoder.compile(module.source(), rootType);
+        } catch (Exception badGrammar) {
+            throw new IllegalArgumentException("invalid ASN.1 grammar: " + badGrammar.getMessage(), badGrammar);
+        }
+        List<ParseError> errors = new ArrayList<>();
+        List<NamedNode> records;
+        try (ByteSource src = ByteSource.of(sample)) {
+            records = decoder.decode(src, framing(asn1), strictness(trimOrEmpty(asn1.get("strictness"))),
+                    RecoveryPolicy.SKIP_RECORD, errors::add,
+                    maxValueBytes(asn1.get("max_value_bytes"), "asn1.max_value_bytes")).toList();
+        }
+        Map<String, Object> ic = new java.util.LinkedHashMap<>();
+        for (String k : new String[]{"derive", "max_list_elements", "max_derived_columns", "children",
+                "max_child_rows_per_record"})
+            if (asn1.get(k) != null) ic.put(k, asn1.get(k));
+        CollectingSink sink = new CollectingSink();
+        Asn1RecordIngester.emitRecords(records.stream().limit(clampRecords(asn1.get("max_records"))).iterator(),
+                ic, segments, sink);
+
+        com.gamma.etl.DeriveSpec derive = com.gamma.etl.DeriveSpec.parse(ic.get("derive"), segments.keySet(),
+                ic.get("max_list_elements"), ic.get("max_derived_columns"));
+        Set<String> childSegments = com.gamma.etl.ChildSpec.parse(ic.get("children"), segments.keySet(),
+                ic.get("max_child_rows_per_record")).childSegments();
+        List<ParseResult.RowSet> sets = new ArrayList<>();
+        for (Map.Entry<String, List<String>> d : sink.columns.entrySet()) {
+            List<Map<String, Object>> rows = sink.rows.get(d.getKey());
+            sets.add(new ParseResult.RowSet(d.getKey(), childSegments.contains(d.getKey()), d.getValue(),
+                    derive.columns(d.getKey()), rows, sink.counts.getOrDefault(d.getKey(), 0L)));
+        }
+        return Optional.of(new ParseResult.Rows(sets));
+    }
+
+    /** Collects a bounded row sample per segment and counts every row. */
+    private static final class CollectingSink implements com.gamma.etl.RecordSink {
+        final Map<String, List<String>> columns = new java.util.LinkedHashMap<>();
+        final Map<String, List<Map<String, Object>>> rows = new java.util.LinkedHashMap<>();
+        final Map<String, Long> counts = new java.util.HashMap<>();
+
+        @Override
+        public void define(String segmentKey, List<String> cols) {
+            columns.put(segmentKey, List.copyOf(cols));
+            rows.put(segmentKey, new ArrayList<>());
+        }
+
+        @Override
+        public void emit(String segmentKey, Object... values) {
+            counts.merge(segmentKey, 1L, Long::sum);
+            List<Map<String, Object>> kept = rows.get(segmentKey);
+            if (kept.size() >= MAX_SAMPLE_ROWS) return;
+            Map<String, Object> row = new java.util.LinkedHashMap<>();
+            List<String> cols = columns.get(segmentKey);
+            for (int i = 0; i < cols.size(); i++) row.put(cols.get(i), values[i]);
+            kept.add(row);
+        }
+    }
+
     /** Bytes of a primitive value rendered into the preview before truncation. */
     static final int VALUE_PREVIEW_BYTES = 32;
 
