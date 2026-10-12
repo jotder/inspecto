@@ -543,6 +543,43 @@ describe('LinkAnalysisComponent', () => {
         clickSpy.mockRestore();
     });
 
+    it('Investigation canvas: kind lists and JSON/GraphML export work from the drawn Working Set', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const blobs: Blob[] = [];
+        vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => (blobs.push(b as Blob), 'blob:x'));
+        vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+        let name = '';
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+            name = this.download;
+        });
+        c.exportJson(); // query graph: unchanged name
+        expect(name).toBe('link-analysis.json');
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'd', sourceCol: 's', targetCol: 't', title: 'Fraud ring' },
+            entries: [],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'ws-a' }, { id: 'ws-b' }],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'calls', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        expect(c.workingSetCanvas()).toBe(true);
+        expect(c.nodeKinds().length).toBeGreaterThan(0);
+        expect(c.edgeKinds()).toContain('calls');
+        c.exportJson();
+        expect(name).toBe('link-analysis-Fraud-ring.json');
+        expect(await blobs[blobs.length - 1].text()).toContain('ws-a');
+        c.exportGraphml();
+        expect(name).toBe('link-analysis-Fraud-ring.graphml');
+        expect(await blobs[blobs.length - 1].text()).toContain('ws-b');
+        vi.restoreAllMocks();
+    });
+
     it('smart form: auto-collapses to the selected-values summary after a run, and edit reopens it', async () => {
         const { fixture } = create();
         fixture.detectChanges();
