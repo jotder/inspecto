@@ -527,4 +527,46 @@ describe('LinkAnalysisSettingsComponent', () => {
         expect(el.querySelector('button[type="submit"]')).toBeNull();
         await expectNoA11yViolations(el);
     });
+    /** Every leaf control of the form: a control added without the read-only gate changes this count and fails. */
+    const leaves = (c: LinkAnalysisSettingsComponent) => {
+        const out: { path: string; enabled: boolean }[] = [];
+        const walk = (g: any, path: string) => {
+            for (const [k, ctl] of Object.entries<any>(g.controls)) {
+                if (ctl.controls) walk(ctl, path + k + '.');
+                else out.push({ path: path + k, enabled: ctl.enabled });
+            }
+        };
+        walk(c.form, '');
+        return out;
+    };
+    const CONTROL_COUNT = 22;
+
+    it('read only: EVERY control is disabled, Save is gone, the reason is described, and save() cannot fire (a11y)', async () => {
+        const { el, c, api, fixture } = setup({ canEdit: false });
+        const all = leaves(c);
+        expect(all.length).toBe(CONTROL_COUNT);
+        expect(all.filter((x) => x.enabled).map((x) => x.path)).toEqual([]);
+        const dom = Array.from(el.querySelectorAll<HTMLElement>('input, textarea, select, mat-select'));
+        expect(dom.length).toBeGreaterThan(0);
+        for (const d of dom) {
+            const off = (d as HTMLInputElement).disabled || d.getAttribute('aria-disabled') === 'true';
+            expect(off, d.outerHTML.slice(0, 80)).toBe(true);
+        }
+        expect(el.querySelector('button[type="submit"]')).toBeNull();
+        const form = el.querySelector('form')!;
+        const reason = form.getAttribute('aria-describedby')!;
+        expect(el.querySelector('#' + reason)!.textContent).toContain('Workbench authoring capability');
+        c.save();
+        expect(api.save).not.toHaveBeenCalled();
+        fixture.detectChanges();
+        await expectNoA11yViolations(el);
+    });
+
+    it('writable: every control is enabled and Save is present', () => {
+        const { el, c } = setup({ canEdit: true });
+        const all = leaves(c);
+        expect(all.length).toBe(CONTROL_COUNT);
+        expect(all.filter((x) => !x.enabled)).toEqual([]);
+        expect(el.querySelector('button[type="submit"]')).not.toBeNull();
+    });
 });

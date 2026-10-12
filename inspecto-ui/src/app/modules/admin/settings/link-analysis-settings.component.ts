@@ -153,7 +153,12 @@ function expiryAfterHibernation(
             } @else if (loadError()) {
                 <inspecto-alert variant="error" title="Settings unavailable">{{ loadError() }}</inspecto-alert>
             } @else {
-                <form [formGroup]="form" class="flex max-w-160 flex-col gap-3" (ngSubmit)="save()">
+                <form
+                    [formGroup]="form"
+                    class="flex max-w-160 flex-col gap-3"
+                    [attr.aria-describedby]="canEdit() ? null : 'la-settings-readonly-reason'"
+                    (ngSubmit)="save()"
+                >
                     @for (f of fields(); track f.key) {
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>{{ f.label }}</mat-label>
@@ -403,7 +408,7 @@ function expiryAfterHibernation(
                             </button>
                         </div>
                     } @else {
-                        <inspecto-alert variant="info" title="Read only">
+                        <inspecto-alert id="la-settings-readonly-reason" variant="info" title="Read only">
                             Changing these settings needs the Workbench authoring capability.
                         </inspecto-alert>
                     }
@@ -579,7 +584,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
 
     save(): void {
         const served = this.served();
-        if (!served || this.saving()) return;
+        if (!served || this.saving() || !this.canEdit()) return;
         if (this.form.invalid) {
             this.form.markAllAsTouched();
             return;
@@ -684,10 +689,9 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 expireAfterDays: s.drafts?.expireAfterDays ?? null,
             },
         });
-        // mat-select has no readonly: a viewer without the authoring capability gets disabled selects.
-        for (const c of [this.form.controls.maskingMode, this.form.controls.index.controls.enabled])
-            if (this.canEdit()) c.enable({ emitEvent: false });
-            else c.disable({ emitEvent: false });
+        // A viewer without the authoring capability gets EVERY control disabled (values stay readable and copyable).
+        if (this.canEdit()) this.form.enable({ emitEvent: false });
+        else this.form.disable({ emitEvent: false });
         this.form.controls.drafts.setValidators(expiryAfterHibernation(s.draftsInForce));
         this.form.controls.drafts.updateValueAndValidity();
     }
