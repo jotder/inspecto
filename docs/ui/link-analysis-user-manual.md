@@ -434,6 +434,7 @@ is conservative: if more than one type could claim a value, it stays unmatched a
   the Investigation (its Value Measures), where its access rules and masking apply.
 
 ### 9.8 Value Measures (whole-Dataset behaviour detectors)
+**Where to find it:** open the **Value Measures** group in the Link Analysis toolbox (beside Suspicion score; "Find entities by money flow") - it pre-selects the Dataset and columns of the loaded Query - or use the Value Measures panel in the Investigation side pane, which is also where **Watch** (binding an Alert Rule) lives.
 Choose a Dataset and column roles (value, time, link kind), a window (from/to, or **last N hours/days**, at most 31
 days, evaluated in UTC) and a Measure. The Dataset, the link columns and the bound time column are prefilled from the open
 Investigation; From and To are date pickers; **Run Measure** stays disabled, with the reason beside it, until the form is

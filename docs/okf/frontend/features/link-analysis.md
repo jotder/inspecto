@@ -448,7 +448,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   most 31 days (a `from`/`to` with `Z` or an offset is normalised to UTC). No view filter is accepted, so a `≥ 5 000` view cannot hide structuring. An Alert Rule binds one
   through `POST /inv/investigations/{id}/alert-rules` with `valueMeasure:{…}` and fires when at least one entity
   breaches (one Alert per rule). Definitions, defaults and deviations: plan §2.6.1. **SPA** (2026-09-30): the
-  Investigation side pane's *Value Measures* panel (`link-analysis-value-measures.component`, `value-measures.ts`)
+  Investigation side pane's *Value Measures* panel and, since 2026-10-12, a *Value Measures* toolbox group (one entry, console studio and la-app alike; seeds the Query panel's Dataset and columns via the `mapping` input; Watch stays in the Investigation panel) (`link-analysis-value-measures.component`, `value-measures.ts`)
   — Dataset + role autocomplete, threshold fields left blank for the server default and re-filled with the values
   in force after a run, `truncated` / `unvalued` shown as counts, *Watch* only over the open Investigation's own
   Dataset and roles, sending the answered `measure` block verbatim. ⛔ `valueMeasureQuery` never sends a `filter`.

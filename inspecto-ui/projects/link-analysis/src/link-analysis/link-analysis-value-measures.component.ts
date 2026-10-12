@@ -242,6 +242,8 @@ export class LinkAnalysisValueMeasuresComponent {
     readonly investigation = input<InvestigationHeader | null>(null);
     /** The time column the analyst bound for the graph (the query mapping), prefilled into the Time column. */
     readonly timeCol = input('');
+    /** The loaded Query's edge mapping (toolbox entry): seeds the Dataset and columns when no Investigation is open. */
+    readonly mapping = input<{ dataset: string; sourceCol: string; targetCol: string; kindCol?: string } | null>(null);
 
     readonly specs = valueMeasureAttributes();
     readonly loaders = {
@@ -271,8 +273,18 @@ export class LinkAnalysisValueMeasuresComponent {
 
     readonly seed = computed(() => {
         const h = this.investigation();
+        const m = this.mapping();
         return {
             name: 'passThrough',
+            ...(!h && m
+                ? {
+                      dataset: m.dataset,
+                      sourceCol: m.sourceCol,
+                      targetCol: m.targetCol,
+                      linkKindCol: m.kindCol ?? '',
+                      ...(untracked(this.timeCol) ? { timeCol: untracked(this.timeCol) } : {}),
+                  }
+                : {}),
             ...(h
                 ? {
                       dataset: h.dataset,

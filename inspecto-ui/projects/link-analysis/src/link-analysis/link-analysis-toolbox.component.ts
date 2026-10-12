@@ -92,6 +92,7 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { ServerPathsState, ServerPatternState } from './entity-projection';
 import { indexSourceNote } from './index-source';
 import { IndexMappingTarget, LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
+import { LinkAnalysisValueMeasuresComponent } from './link-analysis-value-measures.component';
 import { LinkAnalysisServerAlgorithmsComponent } from './link-analysis-server-algorithms.component';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
 import { LinkAnalysisResultNextComponent } from './link-analysis-result-next.component';
@@ -155,7 +156,8 @@ type AnalysisTab =
     | 'flow'
     | 'scoring'
     | 'index-build'
-    | 'server-algorithms';
+    | 'server-algorithms'
+    | 'value-measures';
 
 /** The tool groups that can hand an over-cap run to the server (D-4 step 7). */
 type ServerTool =
@@ -221,6 +223,7 @@ type CentralityMetric =
         LinkAnalysisServerAlgorithmsComponent,
         LinkAnalysisServerRunComponent,
         LinkAnalysisIndexBuildComponent,
+        LinkAnalysisValueMeasuresComponent,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
 })
@@ -373,7 +376,7 @@ export class LinkAnalysisToolboxComponent {
     readonly runPatternOnServer = output<ServerPatternRequest>();
 
     /** The analysis tool groups (the accordion = the graph-algorithms toolbox). */
-    readonly tools: { id: AnalysisTab; label: string; icon: string }[] = [
+    readonly tools: { id: AnalysisTab; label: string; icon: string; hint?: string }[] = [
         { id: 'path', label: 'Shortest path', icon: 'heroicons_outline:arrows-right-left' },
         { id: 'all-paths', label: 'All paths', icon: 'heroicons_outline:share' },
         { id: 'server-paths', label: 'Find paths (server)', icon: 'heroicons_outline:server-stack' },
@@ -387,6 +390,12 @@ export class LinkAnalysisToolboxComponent {
         { id: 'similarity', label: 'Similarity & prediction', icon: 'heroicons_outline:sparkles' },
         { id: 'flow', label: 'Flow & backbone', icon: 'heroicons_outline:beaker' },
         { id: 'scoring', label: 'Suspicion score', icon: 'heroicons_outline:shield-exclamation' },
+        {
+            id: 'value-measures',
+            label: 'Value Measures',
+            icon: 'heroicons_outline:banknotes',
+            hint: 'Find entities by money flow: pass-through ratio, cash-out concentration, structuring, benefit transfer',
+        },
         { id: 'pattern', label: 'Pattern match', icon: 'heroicons_outline:magnifying-glass-circle' },
         { id: 'index-build', label: 'Edge index', icon: 'heroicons_outline:server-stack' },
         { id: 'server-algorithms', label: 'All algorithms (server)', icon: 'heroicons_outline:server-stack' },
@@ -842,6 +851,7 @@ export class LinkAnalysisToolboxComponent {
                 return this.explainText() ? this.label(this.explainFor()) : '';
             case 'index-build':
             case 'server-algorithms':
+            case 'value-measures':
                 return '';
             case 'centrality':
                 return this.ranking().length ? `top ${this.ranking().length}` : '';

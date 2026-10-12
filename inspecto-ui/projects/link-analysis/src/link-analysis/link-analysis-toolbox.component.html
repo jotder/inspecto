@@ -23,6 +23,9 @@
             >
                 <mat-icon class="icon-size-5" [svgIcon]="t.icon"></mat-icon>
                 <span class="font-medium">{{ t.label }}</span>
+                @if (t.hint) {
+                    <span class="text-secondary hidden text-xs sm:inline" [id]="'tool-hint-' + t.id">{{ t.hint }}</span>
+                }
                 @if (toolBadge(t.id); as badge) {
                     <inspecto-chip class="whitespace-nowrap">{{ badge }}</inspecto-chip>
                 }
@@ -366,6 +369,12 @@
                                 [profileId]="profileId()"
                                 (emphasisChange)="emphasisChange.emit($event)"
                                 (resultChange)="applyCatalogueResult($event)"
+                            />
+                        }
+                        @case ('value-measures') {
+                            <inspecto-link-analysis-value-measures
+                                [mapping]="indexMappings()[0] ?? null"
+                                [timeCol]="investigationTimeCol() || timeAttr()"
                             />
                         }
                         @case ('index-build') {

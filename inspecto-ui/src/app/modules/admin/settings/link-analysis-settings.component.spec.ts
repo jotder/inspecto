@@ -1,3 +1,4 @@
+import { AbstractControl, FormGroup } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -530,9 +531,9 @@ describe('LinkAnalysisSettingsComponent', () => {
     /** Every leaf control of the form: a control added without the read-only gate changes this count and fails. */
     const leaves = (c: LinkAnalysisSettingsComponent) => {
         const out: { path: string; enabled: boolean }[] = [];
-        const walk = (g: any, path: string) => {
-            for (const [k, ctl] of Object.entries<any>(g.controls)) {
-                if (ctl.controls) walk(ctl, path + k + '.');
+        const walk = (g: FormGroup, path: string) => {
+            for (const [k, ctl] of Object.entries<AbstractControl>(g.controls)) {
+                if (ctl instanceof FormGroup) walk(ctl, path + k + '.');
                 else out.push({ path: path + k, enabled: ctl.enabled });
             }
         };
