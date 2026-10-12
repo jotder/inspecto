@@ -35,7 +35,7 @@ export function buildPlan() {
       id: INV, title: 'Mule hub MULE-HUB-01', purpose: 'Showcase: layering ring around MULE-HUB-01', dataset: DATASET,
       sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT', linkKindCol: 'CHANNEL', timeCol: 'BOOKED_AT' } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'fm.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
-    ...[['ra.analyst', 'reviewer'], ['fm.manager', 'reviewer'], ['admin', 'reviewer']].map(([subject, role]) => (
+    ...[['ra.analyst', 'reviewer'], ['fm.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
       { id: `member-${subject}`, as: 'fm.analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
     { id: 'list-smurfs', as: 'fm.analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'smurf-accounts', title: 'SMURF accounts', purpose: 'watch', entityType: 'account', reason: 'showcase structuring ring' } },

@@ -41,7 +41,7 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:fm.analyst'));
   assert.ok(ops.find((c) => c.body.op === 'exclude').body.reason);
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'ra.analyst', role: 'reviewer' }, { subject: 'fm.manager', role: 'reviewer' }, { subject: 'admin', role: 'reviewer' }]);
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'ra.analyst', role: 'reviewer' }, { subject: 'fm.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);   // admin is a lead: the only persona holding canShareInvestigation, so it can mint an embed link
   assert.ok(!members.some((c) => c.body.subject === 'demo.manager'));
   const assign = m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign');
   assert.deepEqual(assign.body, { assignee: 'fm.manager' });
