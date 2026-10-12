@@ -168,6 +168,11 @@ cards with each one's **Reports** beneath it. A **Report** is a *scheduled deliv
 Dashboard — **Schedule export** delivers a rendered copy (**CSV, PDF, or PNG**) to a recipient
 list on a cron schedule. Each Report runs as a **Job** behind the scenes, so it also appears
 under Runs, and the per-Report actions let you **run now** or **download the latest** output.
+**Masked keys:** a Widget, Query result or shared Dashboard that shows a classified entity key (a phone number,
+subscriber id or account) shows it as `masked:<16 hex>` unless your role holds *reveal link entities*; the same key is
+the same alias everywhere in the Space, including Link Analysis and Entity Lists, and counts of distinct keys are
+unchanged. Filtering or sorting by a masked column, or taking its min, max, sum or average, is refused for roles that
+cannot reveal it. Public share links always show aliases. A Space turns this off with Link Analysis masking mode *none*.
 Keep the two straight: the Dashboard is the *thing*, the Report is the *delivery*. If the page
 is empty, author a Dashboard in Studio first — Studio builds; this page presents and delivers.
 **Authoring a KPI tile**: a KPI is a single-number **Measure** with a target/threshold, rendered as

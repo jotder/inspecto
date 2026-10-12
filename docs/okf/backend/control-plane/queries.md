@@ -102,6 +102,24 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   `/db/table` / `/db/query`. ⚠ A dashboard drill-through (`filtered()` in the dashboard editor) still
   reads the raw store through `/db/query`, so a cross-filter ON a calculated column cannot resolve there.
 
+## Classified entity keys are masked in BI result rows (`BI-QUERY-MASKING-1`, built 2026-10-12, awaiting operator review)
+
+`BiResultMasking` (`inspecto/.../control/`) is the ONE helper behind `/bi/query`, `/queries/{id}/run`,
+`/datasets/{id}/rows` and `POST /public/dashboards/{token}/query`. A column is masked when the Space's Link Analysis
+`maskingMode` says so (`typed`: its classification is claimed by a masked Entity Type; `all`: any MSISDN / IMSI /
+ACCOUNT / PII; `none`: off) and the caller lacks `canRevealLinkEntities`; the cell becomes the Space-key alias
+`masked:<16 hex>` (`MaskTokens.spaceKey`, the same alias Link Analysis exploration and Entity Lists show) AFTER
+execution, so grouping and `countDistinct` are unchanged. The response carries a `masking` block (`mode`, `masked`,
+`columns`, `basis`); a Dataset with no classified column returns today's body, with no block.
+Fail closed: an untraceable lineage masks every column the Dataset does not declare; a calculated column naming a masked
+column is masked; a saved query's string output is masked when its text names a masked column. A viewer's filter, `when`,
+order, or `min / max / sum / avg` over a masked column answers 422 (inference channels); a public share recipient never
+reveals. Design, path inventory and the open decisions D-M1..D-M7:
+[`bi-query-masking-design.md`](../../../superpower/bi-query-masking-design.md). Tests:
+`ControlApiBiQueryMaskingTest`, `ExplorationMaskingSpaceKeyTest`.
+**Not covered:** `/db/table` and `/db/query`, Report Job exports, Exchange snapshots, the assistant's query tool, a numeric
+derivation of a numeric key in a saved query.
+
 ## Row cap on `/bi/query`: ordered and honestly flagged (`BI-QUERY-TRUNCATION-1`, shipped 2026-10-08)
 
 `MeasureCompiler.compile` always ends in a `LIMIT` (the route default is 500). Two defects made that cap lie:
