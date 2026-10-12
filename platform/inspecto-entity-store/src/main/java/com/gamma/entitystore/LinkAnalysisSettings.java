@@ -128,6 +128,25 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     && maxResultItems == null && propagatedRiskWeights == null;
         }
 
+        /** Shipped worker / waiting-line / result-list defaults; mirror {@code GraphRunService.Limits.standard()} and {@code GraphResultJson}. */
+        public static final int DEFAULT_THREADS = 2;
+        public static final int DEFAULT_QUEUE = 16;
+        public static final int DEFAULT_MAX_RESULT_ITEMS = 10_000;
+        public static final int CEILING_MAX_RESULT_ITEMS = 1_000_000;
+
+        public int threadsInForce() {
+            return threads != null ? threads : DEFAULT_THREADS;
+        }
+
+        public int queueInForce() {
+            return queue != null ? queue : DEFAULT_QUEUE;
+        }
+
+        /** The stated list length cap applied: a stated value above the hard ceiling is clamped, as the run service does. */
+        public int maxResultItemsInForce() {
+            return Math.min(maxResultItems != null ? maxResultItems : DEFAULT_MAX_RESULT_ITEMS, CEILING_MAX_RESULT_ITEMS);
+        }
+
         /** The per-hop weights in force: the stated list, else {@link #DEFAULT_PROPAGATED_RISK_WEIGHTS}. */
         public List<Double> propagatedRiskWeightsInForce() {
             return propagatedRiskWeights != null ? propagatedRiskWeights : DEFAULT_PROPAGATED_RISK_WEIGHTS;

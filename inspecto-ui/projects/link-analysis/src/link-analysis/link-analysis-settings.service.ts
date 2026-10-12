@@ -86,6 +86,8 @@ export interface LinkAnalysisLimits {
     } | null;
     /** The `propagatedRisk` weights a run without `weights` takes - server-computed, read-only. */
     propagatedRiskWeightsInForce?: number[];
+    /** The graph-run worker / waiting-line / result-list values in force - server-computed, read-only. */
+    graphRunInForce?: { threads: number; queue: number; maxResultItems: number };
     /**
      * D-3: the edge/node index knobs stated (`enabled` default false, `maxDiskBytes` 0 = no limit, versions kept, build
      * workers, waiting line, maxAgeHours); `null` = every one inherits. The form edits `enabled`, `threads`, `queue` and

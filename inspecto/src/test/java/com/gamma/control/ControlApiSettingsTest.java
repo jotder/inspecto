@@ -447,6 +447,10 @@ class ControlApiSettingsTest {
             assertEquals(900, got.get("maxNodes").asInt());
             assertEquals(3, got.get("threads").asInt());
             assertEquals(250, got.get("maxResultItems").asInt());
+            JsonNode inForce = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRunInForce");
+            assertEquals(3, inForce.get("threads").asInt(), "stated");
+            assertEquals(16, inForce.get("queue").asInt(), "unstated = shipped default");
+            assertEquals(250, inForce.get("maxResultItems").asInt());
             assertTrue(toon.contains("max_result_items: 250"), toon);
             assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"maxResultItems\":0}}").statusCode());
             assertTrue(got.get("maxEdges").isNull() && got.get("queue").isNull(), "unstated knobs stay unstated");

@@ -24,7 +24,8 @@ import com.gamma.access.WriteGates;
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
  *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, maxInvestigationBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems,propagatedRiskWeights},
  *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue,maxAgeHours},
- *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}} (nulls = shipped defaults)
+ *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}, plus read-only *InForce echoes incl.
+ *                                 graphRunInForce{threads,queue,maxResultItems}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
@@ -212,6 +213,11 @@ final class SettingsRoutes implements RouteModule {
         }
         m.put("graphRun", run);
         m.put("propagatedRiskWeightsInForce", s.effectiveGraphRun().propagatedRiskWeightsInForce());
+        Map<String, Object> runInForce = new LinkedHashMap<>();
+        runInForce.put("threads", s.effectiveGraphRun().threadsInForce());
+        runInForce.put("queue", s.effectiveGraphRun().queueInForce());
+        runInForce.put("maxResultItems", s.effectiveGraphRun().maxResultItemsInForce());
+        m.put("graphRunInForce", runInForce);
         LinkAnalysisSettings.Index x = s.index();
         Map<String, Object> idx = null;   // D-3: null = every knob inherits the shipped default (enabled = false)
         if (x != null) {

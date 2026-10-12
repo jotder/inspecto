@@ -130,7 +130,7 @@ describe('LinkAnalysisSettingsComponent', () => {
         const graphRun = { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: null };
         const { api, submit } = setup({ served: { graphRun } });
         submit();
-        expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ graphRun: { ...graphRun, maxResultItems: null } }));
+        expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ graphRun: { ...graphRun, maxResultItems: null, propagatedRiskWeights: null } }));
     });
 
     it('sends the index knobs back untouched, an explicit enabled=false included: the PUT replaces', () => {
@@ -361,7 +361,9 @@ describe('LinkAnalysisSettingsComponent', () => {
             entityTypesInForce: ET,
             index: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8 },
             indexInForce: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8, maxAgeHours: 24 },
-            graphRun: { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: 7, maxResultItems: 55 },
+            graphRun: { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: 7, maxResultItems: 55, propagatedRiskWeights: [1, 0.5] },
+            propagatedRiskWeightsInForce: [1, 0.5],
+            graphRunInForce: { threads: 3, queue: 7, maxResultItems: 55 },
             investigationStoreInForce: 'db',
         };
 
@@ -396,7 +398,7 @@ describe('LinkAnalysisSettingsComponent', () => {
             const body = api.save.mock.calls[0][0] as unknown as Record<string, unknown>;
             expect(body['maskingMode']).toBe('none');
             expect(body['index']).toEqual({ enabled: false, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: null, maxAgeHours: 48 });
-            expect(body['graphRun']).toEqual({ maxNodes: 900, maxEdges: 1234, timeoutMs: 4000, threads: 8, queue: 7, maxResultItems: null });
+            expect(body['graphRun']).toEqual({ maxNodes: 900, maxEdges: 1234, timeoutMs: 4000, threads: 8, queue: 7, maxResultItems: null, propagatedRiskWeights: [1, 0.5] });
             expect(body['entityTypesInForce']).toBeUndefined();
             expect(body['indexInForce']).toBeUndefined();
             expect(body['investigationStoreInForce']).toBeUndefined();
@@ -412,6 +414,42 @@ describe('LinkAnalysisSettingsComponent', () => {
             expect(body).not.toHaveProperty('graphRun');
         });
 
+        it('edits keepVersions and the risk weights, sends the full documents, and shows the in-force run values', () => {
+            const { el, c, api, submit } = setup({ served: FULL });
+            expect(c.form.controls.index.controls.keepVersions.value).toBe(5);
+            expect(c.form.controls.graphRun.controls.propagatedRiskWeights.value).toBe('1, 0.5');
+            expect(el.textContent).toContain('In force: 3. Runs executing at once');
+            expect(el.textContent).toContain('In force: 55. Each list');
+            c.form.controls.index.controls.keepVersions.setValue(7);
+            c.form.controls.graphRun.controls.propagatedRiskWeights.setValue('1, 0.8, 0.2');
+            submit();
+            const body = api.save.mock.calls[0][0] as unknown as Record<string, Record<string, unknown>>;
+            expect(body['index']['keepVersions']).toBe(7);
+            expect(body['graphRun']['propagatedRiskWeights']).toEqual([1, 0.8, 0.2]);
+        });
+
+        it('a blank risk-weights field inherits (null)', () => {
+            const { c, api, submit } = setup({ served: FULL });
+            c.form.controls.graphRun.controls.propagatedRiskWeights.setValue('');
+            submit();
+            const body = api.save.mock.calls[0][0] as unknown as Record<string, Record<string, unknown>>;
+            expect(body['graphRun']['propagatedRiskWeights']).toBeNull();
+        });
+
+        it.each(['1.5', '-0.1', 'a', '1,2', '0.1,0.2,0.3,0.4,0.5,0.6,0.7'])('refuses risk weights "%s" client-side', (bad) => {
+            const { c, api, submit } = setup();
+            c.form.controls.graphRun.controls.propagatedRiskWeights.setValue(bad);
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+        });
+
+        it.each([0, 101])('refuses index.keepVersions = %s client-side', (bad) => {
+            const { c, api, submit } = setup();
+            c.form.controls.index.controls.keepVersions.setValue(bad);
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+        });
+
         it.each([
             ['index', 'threads', 65],
             ['index', 'queue', 1001],
@@ -425,7 +463,7 @@ describe('LinkAnalysisSettingsComponent', () => {
             ['graphRun', 'maxResultItems', 0],
         ])('refuses %s.%s = %s client-side and does not save', (group, key, bad) => {
             const { c, api, submit } = setup();
-            const g = c.form.controls[group as 'index' | 'graphRun'].controls as Record<string, { setValue(v: number): void }>;
+            const g = c.form.controls[group as 'index' | 'graphRun'].controls as unknown as Record<string, { setValue(v: number): void }>;
             g[key].setValue(bad);
             submit();
             expect(api.save).not.toHaveBeenCalled();
@@ -545,7 +583,7 @@ describe('LinkAnalysisSettingsComponent', () => {
         walk(c.form, '');
         return out;
     };
-    const CONTROL_COUNT = 25;
+    const CONTROL_COUNT = 27;
 
     it('read only: EVERY control is disabled, Save is gone, the reason is described, and save() cannot fire (a11y)', async () => {
         const { el, c, api, fixture } = setup({ canEdit: false });

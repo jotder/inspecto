@@ -74,6 +74,22 @@ const runValidators = [Validators.min(1), Validators.max(RUN_MAX), Validators.pa
 const IDX_THREADS_MAX = 64;
 const IDX_QUEUE_MAX = 1000;
 const IDX_DISK_MAX = 1_000_000_000_000_000;
+/** SettingsRoutes index.keepVersions: 1..100 published versions. */
+const IDX_KEEP_MAX = 100;
+/** SettingsRoutes graphRun.propagatedRiskWeights: 1..6 numbers in [0,1], comma separated; blank = inherit. */
+const RISK_WEIGHTS_MAX = 6;
+
+/** The risk weights as typed: comma separated numbers; null when blank (NaN entries kept so the validator refuses them). */
+function parseWeights(text: string | null): number[] | null {
+    const parts = (text ?? '').split(',').map((x) => x.trim()).filter((x) => x.length > 0);
+    return parts.length ? parts.map(Number) : null;
+}
+
+function riskWeightsValid(c: AbstractControl): ValidationErrors | null {
+    const w = parseWeights(c.value as string | null);
+    if (w === null) return null;
+    return w.length <= RISK_WEIGHTS_MAX && w.every((n) => Number.isFinite(n) && n >= 0 && n <= 1) ? null : { riskWeights: true };
+}
 /** SettingsRoutes index.maxAgeHours: 1..8760 hours (one year). */
 const IDX_MAX_AGE_MAX = 8760;
 /** `SettingsRoutes` `embed.*`: lifetimes 1..8760 hours (the cap defaults to 720 and a Space may raise it that far); the default may not exceed the cap. */
@@ -293,6 +309,15 @@ function expiryAfterHibernation(
                             }
                         </mat-form-field>
                         <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Index versions kept</mat-label>
+                            <input matInput type="number" min="1" [max]="idxKeepMax" formControlName="keepVersions"
+                                [readonly]="!canEdit()" [placeholder]="'default ' + (indexInForce()?.keepVersions ?? '')" />
+                            <mat-hint>In force: {{ indexInForce()?.keepVersions ?? '-' }}. Published versions kept per index.</mat-hint>
+                            @if (form.controls.index.controls.keepVersions.invalid) {
+                                <mat-error>A whole number from 1 to {{ idxKeepMax }}, or blank for the default.</mat-error>
+                            }
+                        </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Index disk budget (bytes)</mat-label>
                             <input matInput type="number" min="0" [max]="idxDiskMax" formControlName="maxDiskBytes"
                                 [readonly]="!canEdit()" placeholder="no limit" />
@@ -328,13 +353,22 @@ function expiryAfterHibernation(
                             <mat-form-field subscriptSizing="dynamic">
                                 <mat-label>{{ r.label }}</mat-label>
                                 <input matInput type="number" min="1" [formControlName]="r.key" [readonly]="!canEdit()"
-                                    [placeholder]="'default ' + r.def" />
-                                <mat-hint>{{ r.hint }}</mat-hint>
+                                    [placeholder]="'default ' + extraInForce(r.key)" />
+                                <mat-hint>In force: {{ extraInForce(r.key) }}. {{ r.hint }}</mat-hint>
                                 @if (form.controls.graphRun.controls[r.key].invalid) {
                                     <mat-error>A whole number from 1 to {{ runMax }}, or blank for the default.</mat-error>
                                 }
                             </mat-form-field>
                         }
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Propagated risk: per-hop weights</mat-label>
+                            <input matInput type="text" formControlName="propagatedRiskWeights" [readonly]="!canEdit()"
+                                [placeholder]="'default ' + riskWeightsInForce()" />
+                            <mat-hint>In force: {{ riskWeightsInForce() }}. Comma separated, 1 to 6 numbers from 0 to 1; blank = the default.</mat-hint>
+                            @if (form.controls.graphRun.controls.propagatedRiskWeights.invalid) {
+                                <mat-error>1 to 6 numbers from 0 to 1, comma separated.</mat-error>
+                            }
+                        </mat-form-field>
                     </fieldset>
                     <p class="text-sm">
                         <strong>Investigation store:</strong> {{ storeLabel() }}
@@ -439,6 +473,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly runMax = RUN_MAX;
     readonly idxThreadsMax = IDX_THREADS_MAX;
     readonly idxQueueMax = IDX_QUEUE_MAX;
+    readonly idxKeepMax = IDX_KEEP_MAX;
     readonly idxDiskMax = IDX_DISK_MAX;
     readonly idxMaxAgeMax = IDX_MAX_AGE_MAX;
     readonly embedTtlMax = EMBED_TTL_MAX;
@@ -450,11 +485,16 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         { key: 'timeoutMs', label: 'Graph run: default time budget (ms)' },
     ];
     /** The other `graphRun` keys the server accepts (1..10 000 000 each); their shipped default is not served, so it is stated here. */
-    readonly runExtraFields: { key: 'threads' | 'queue' | 'maxResultItems'; label: string; def: number | string; hint: string }[] = [
-        { key: 'threads', label: 'Graph run: worker threads', def: 'server', hint: 'Runs executing at once; blank = the service default.' },
-        { key: 'queue', label: 'Graph run: waiting line', def: 'server', hint: 'Runs allowed to wait for a worker; blank = the service default.' },
-        { key: 'maxResultItems', label: 'Graph run: items per result list', def: 10000, hint: 'Each list of a run result is cut to this many items (hard ceiling 1 000 000); blank = 10 000.' },
+    readonly runExtraFields: { key: 'threads' | 'queue' | 'maxResultItems'; label: string; hint: string }[] = [
+        { key: 'threads', label: 'Graph run: worker threads', hint: 'Runs executing at once; blank = the service default.' },
+        { key: 'queue', label: 'Graph run: waiting line', hint: 'Runs allowed to wait for a worker; blank = the service default.' },
+        { key: 'maxResultItems', label: 'Graph run: items per result list', hint: 'Each list of a run result is cut to this many items (hard ceiling 1 000 000).' },
     ];
+    /** The served in-force worker / waiting-line / list-length values (`graphRunInForce`). */
+    extraInForce(k: 'threads' | 'queue' | 'maxResultItems'): string | number {
+        return this.served()?.graphRunInForce?.[k] ?? '-';
+    }
+    readonly riskWeightsInForce = computed(() => (this.served()?.propagatedRiskWeightsInForce ?? []).join(', '));
     /** `GET /inv/graph/algorithms`: the budget in force and the server's hard ceilings; null if that route did not answer. */
     private readonly catalogue = signal<{ defaults: Record<RunKey, number>; ceilings: Record<RunKey, number> } | null>(null);
     readonly draftFields = DRAFT_FIELDS;
@@ -506,6 +546,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             enabled: new FormControl<boolean | null>(null),
             threads: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_THREADS_MAX), Validators.pattern('\\d*')]),
             queue: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_QUEUE_MAX), Validators.pattern('\\d*')]),
+            keepVersions: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_KEEP_MAX), Validators.pattern('\\d*')]),
             maxDiskBytes: new FormControl<number | null>(null, [Validators.min(0), Validators.max(IDX_DISK_MAX), Validators.pattern('\\d*')]),
             maxAgeHours: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_MAX_AGE_MAX), Validators.pattern('\\d*')]),
         }),
@@ -524,6 +565,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             threads: new FormControl<number | null>(null, runValidators),
             queue: new FormControl<number | null>(null, runValidators),
             maxResultItems: new FormControl<number | null>(null, runValidators),
+            propagatedRiskWeights: new FormControl<string>('', riskWeightsValid),
         }),
         drafts: new FormGroup(
             {
@@ -623,11 +665,12 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         if ('maxSetBytes' in served) body['maxSetBytes'] = num(v.maxSetBytes);
         if ('maxInvestigationBytes' in served) body['maxInvestigationBytes'] = num(v.maxInvestigationBytes);
         body['maskingMode'] = v.maskingMode || null;
-        // Edited keys replace; keys the form does not show (keepVersions, threads, queue, maxResultItems) stay as read.
+        // Edited keys replace; a key the form does not show stays as read.
         const idx: Record<string, unknown> = { ...(served.index ?? {}) };
         idx['enabled'] = v.index.enabled;
         idx['threads'] = num(v.index.threads);
         idx['queue'] = num(v.index.queue);
+        idx['keepVersions'] = num(v.index.keepVersions);
         idx['maxDiskBytes'] = num(v.index.maxDiskBytes);
         idx['maxAgeHours'] = num(v.index.maxAgeHours);
         if (Object.values(idx).some((x) => x !== null && x !== undefined)) body['index'] = idx;
@@ -644,6 +687,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         const run: Record<string, unknown> = { ...(served.graphRun ?? {}) };
         for (const r of this.runFields) run[r.key] = num(v.graphRun[r.key]);
         for (const r of this.runExtraFields) run[r.key] = num(v.graphRun[r.key]);
+        run['propagatedRiskWeights'] = parseWeights(v.graphRun.propagatedRiskWeights);
         if (Object.values(run).some((x) => x !== null && x !== undefined)) body['graphRun'] = run;
         else delete body['graphRun'];
         // Blank keys are omitted (inherit); no stated key at all = no block.
@@ -691,6 +735,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 enabled: s.index?.enabled ?? null,
                 threads: s.index?.threads ?? null,
                 queue: s.index?.queue ?? null,
+                keepVersions: s.index?.keepVersions ?? null,
                 maxDiskBytes: s.index?.maxDiskBytes ?? null,
                 maxAgeHours: s.index?.maxAgeHours ?? null,
             },
@@ -706,6 +751,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 threads: s.graphRun?.threads ?? null,
                 queue: s.graphRun?.queue ?? null,
                 maxResultItems: s.graphRun?.maxResultItems ?? null,
+                propagatedRiskWeights: (s.graphRun?.propagatedRiskWeights ?? []).join(', '),
             },
             drafts: {
                 maxOpen: s.drafts?.maxOpen ?? null,
