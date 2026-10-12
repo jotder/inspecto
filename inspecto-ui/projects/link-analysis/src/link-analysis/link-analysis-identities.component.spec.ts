@@ -145,6 +145,7 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         await cmp.assertSame();
         await settle();
         expect(el.querySelector('form [role="alert"]')?.textContent).toContain('Choose an identifier type');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
         expect(inv.assertIdentity).not.toHaveBeenCalled();
     });
 
@@ -176,6 +177,7 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         const alert = el.querySelector('inspecto-alert')?.textContent ?? '';
         expect(alert).toContain('Incident-management capability');
         expect(alert).toContain('no capability');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
     it('explains a 503 in an info alert and hides the forms, and passes axe', async () => {
@@ -191,6 +193,7 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         await settle();
         expect(inv.listIdentityGroups).not.toHaveBeenCalled();
         expect(el.textContent).toContain('needs the Incident-management capability');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
         expect(el.querySelector('form')).toBeNull();
     });
 });

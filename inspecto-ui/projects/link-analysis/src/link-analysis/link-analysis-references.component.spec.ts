@@ -139,5 +139,6 @@ describe('LinkAnalysisReferencesComponent', () => {
         f.detectChanges();
         expect(el.textContent).toContain('Refused');
         expect(el.textContent).toContain('already recorded');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 });

@@ -273,6 +273,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         await c.loadSnapshots();
         f.detectChanges();
         expect(el.textContent).toContain('Investigations are not available here');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
     it('explains a 404 as not-yours-or-absent', async () => {
@@ -283,5 +284,6 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         f.detectChanges();
         expect(el.textContent).toContain('not available');
         expect(el.textContent).toContain('not yours');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 });

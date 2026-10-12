@@ -75,6 +75,7 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         expect(button(el, 'Grant')).toBeUndefined();
         expect(el.querySelector('[aria-label^="Revoke"]')).toBeNull();
         expect(el.textContent).toContain('only a lead can grant or revoke');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1: the read-only note state
     });
 
     it('a lead without the Incident management capability sees no write controls and the reason', async () => {
@@ -114,6 +115,7 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         f.detectChanges();
         expect(el.textContent).toContain('always keeps at least one lead');
         expect(el.textContent).toContain('cannot revoke the last lead');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1: the refusal state
     });
 
     it('shows an honest message, no controls, when the server answers 404 (not a member)', async () => {
@@ -122,5 +124,6 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         });
         expect(el.textContent).toContain('not available to you');
         expect(button(el, 'Grant')).toBeUndefined();
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1: the not-a-member state
     });
 });

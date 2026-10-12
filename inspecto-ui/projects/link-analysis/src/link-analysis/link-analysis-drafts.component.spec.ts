@@ -192,6 +192,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         );
         await click(f, button(el, 'Fork a Draft'));
         expect(el.textContent).toContain('Drafts limit (50 open Drafts)');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
     it('words the one-live-Draft refusal readably', async () => {
@@ -203,6 +204,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         );
         await click(f, button(el, 'Fork a Draft'));
         expect(el.textContent).toContain('already have a live Draft');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
     it("shows the Draft's Working Set sizes", async () => {
@@ -219,6 +221,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         expect(el.textContent).toContain('already excluded on main');
         expect(el.textContent).toContain('superseded');
         expect(el.textContent).toContain('asks you to confirm');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
     it('rebases onto the head and confirms exactly the superseded steps it showed', async () => {
@@ -242,6 +245,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         });
         await click(f, button(el, 'Promote'));
         expect(el.textContent).toContain('held for four-eyes approval');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
         expect(f.componentInstance.promoted).toBe(0);
     });
 
