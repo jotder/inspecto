@@ -487,6 +487,23 @@ else sees "Not available to you". A Live Widget cannot be exported to another Sp
 * To annotate a link, pick it in **Annotate a link**, type the note and press **Annotate link**; the sealed notes
   appear under **Link annotations**, and the Dossier carries the same link id.
 
+### 9.13 Share an Investigation (embed link)
+
+**Share (embed link)** in the Investigation tab (next to Members and Drafts) gives someone without an account a
+**read-only, sealed view** of the Investigation through a link.
+
+* **Off unless the host runs with `-Dla.embed.enabled=true`.** Otherwise the panel says so and its controls are disabled.
+* **Who can.** Minting and revoking need the `canShareInvestigation` capability **and** being a *lead* of this Investigation;
+  everyone else sees the list and a read-only note.
+* **Create link.** Give an optional label and a lifetime in hours (the Space's default is pre-filled; the limit is the Space's
+  maximum, set in Settings > Link Analysis). The link is shown **once** with a Copy button - it is not stored and is not shown again,
+  so copy it before pressing Done. A refused classification, a lifetime above the maximum or a missing role is shown with the server's reason.
+* **What the link shows.** The same view the Dossier is built from, read-only and sealed. Ids are masked per the Space's masking
+  mode (stated in the dialog). Anyone holding the link can read it until it **expires** or you **revoke** it, and can copy what they
+  see. It cannot be framed on other sites.
+* **The list.** Each link shows its label, a status (active, expired, revoked), when it expires and how many times it was
+  viewed. **Revoke** (with a confirmation) cuts access at once; this cannot be undone - create a new link instead.
+
 ---
 
 ## 10. Worked examples (demo Space)
