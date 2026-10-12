@@ -1,7 +1,6 @@
 # Enterprise Scale-Out on Kubernetes — Design Plan
 
-> **Status: SIGNED 2026-09-10 (operator) — D1′–D13, all recommendations accepted, D9 refined by D8, D13 added by the
-> operator. ⚠ STATUS STALE (2026-10-12): "nothing built" is no longer true — the shared run lease is built (see `HA-RUNLEASE-*` rows); the extent of Phase A/B was not audited.** The §2 amendments are applied.
+> **Status (audited 2026-10-12): SIGNED 2026-09-10 (operator) — D1′–D13 (D9 refined by D8); D14–D16 still UNSIGNED. PHASE A (shared state) and PHASE B (the run lease) are BUILT; PHASE C is PARTLY BUILT** — §5.3 (Space→pod map, inbox ownership) is built, §5.4 is built on local/mounted storage plus the object-store write lane, and what remains is `dirs.database` as an `s3://` URI with object-store containment (§5.4 bullet 6), the Helm chart for N pods (`deploy/helm/inspecto` is a replicas-1 chart that says so), ingress routing and `/spaces` from the map (§5.5, D14–D16), U1/U2 distribution, D13 and the live halves of S1/S5. The per-item verdicts with evidence are in **Audit 2026-10-12** below. The §2 amendments are applied.
 >
 > ✅ **SPIKES RUN 2026-09-10 — S2, S3 and S4 are CLOSED; S1 and S5 are answered in part and their live
 > halves are still owed** (they need a reachable Postgres and an S3-compatible endpoint, which the sandbox
@@ -47,6 +46,49 @@
 **Coverage map:** what changes and why §1 · what it amends §2 · the seams, grounded §3 · the scaling
 model §4 · the four workstreams §5 · sequencing §6 · the first test §7 · risks §8 · decisions asked §9 ·
 spikes §10 · positioning §11 · defects found while grounding §12.
+
+---
+
+## Audit 2026-10-12 — what is built, item by item
+
+Method: each item was grepped in code and the OKF/ops docs on 2026-10-12 (docs-only lane, nothing run). Verdicts:
+BUILT · PARTLY · NOT BUILT · UNKNOWN (not verifiable by grep). ⚠ Class names in this plan are the PLAN's names where they
+differ: the Postgres lease is `DbRunLease` (there is no `PostgresRunLease` class; `PostgresRunLeaseSchemaPerSpaceTest` is its test)
+and the heap lease is `PipelineRunGuard implements RunLease` (there is no `HeapRunLease`).
+
+| Item | Verdict | Evidence |
+|---|---|---|
+| A: Postgres profile, 12+ store families, fatal-when-partitioned boot | BUILT | `ServiceStores.java:311,391` (`-Dinspecto.topology=partitioned` refuses a private store); `OperationalDb.java` families incl. `RUN_LEASE` |
+| A: `events.backend=db` (D6, query half) | BUILT (live tail cross-pod: NOT BUILT, per §5.5) | `DbEventStore` wired in `ServiceStores.openEventStore` |
+| A: connection pool (D7) | BUILT | `platform/inspecto-util/.../SharedPoolConnectionSource.java` (HikariCP) |
+| A: `DuckLakeRegistrar` failure fatal (D10) | BUILT | `DuckLakeRegistrar.java`, `PipelineJobRunner.registerInLakehouse`; §5.1 |
+| B: `RunLease` seam, heap + DB implementations | BUILT | `service/RunLease.java:39`, `PipelineRunGuard.java:55`, `DbRunLease.java:68`; `-Drun.lease.backend` at `OperationalDb.java:103` |
+| B: fencing token (epoch) on every lease write | BUILT, beyond what §5.2 asked | `DbRunLease.java:34-42`; D15's surviving half |
+| B: scopes (run, acquire, job arming, authored pipeline), `lastRunAtMs` on the lease | BUILT | `CollectorService.java:375-376,1636-1637` |
+| B: lease credentials, heartbeat in `/health` | BUILT | `HealthDetails.java:92` (live probe); board `HA-RUNLEASE-DB-CREDENTIALS-1` closed 2026-10-10 |
+| B: section 7 `RunLeaseContractTest` (two instances, one lease) | BUILT | `inspecto/src/test/.../RunLeaseContractTest.java` (4 tests); `DbRunLeaseTest` |
+| HA lanes 2026-10-10/11: kill -9 failover contract, graceful-stop lease release, cooperative cancel, exchange multi-pod snapshots | BUILT (not in the plan's text) | `okf/backend/engine/ingestion.md` Failover (line 72); `ops/ha-dr-drill-runbook.md:225-230`; `CommitFence.java`; board `HA-KILL9-DOUBLE-INGEST-1`, `HA-GRACEFUL-STOP-LEASE-RELEASE-1`, `EXCHANGE-SNAPSHOT-MULTIPOD-1`. Open: `HA-CANCEL-RESIDUALS-1` (P3) |
+| section 12 data-plane idempotency prerequisite (stable Consignment id, unique constraints, CAS) | PARTLY | `ConsignmentId.java:72` (content digest id); `DbFileStageStore` `UNIQUE (batch_id, source_id, relative_path, stage)` + `ON CONFLICT DO NOTHING`; `DbConsignmentOutputStore.java:127` `UNIQUE (consignment_id, path, run_id)`. UNKNOWN: that every write path keys on the new id; the `DbAcquisitionLedger` check-then-record window |
+| C 5.3 C1: static Space to pod map | BUILT | `partition.toon`, `SpacePartition.java`, `SpaceManager.java:156-184` |
+| C 5.3 C2: shared-inbox detection + cross-pod registry | BUILT | `DbInboxRegistry.java` (`INBOX-REGISTRY-CROSS-POD-1`) |
+| C 5.3: per-tenant ABAC | BUILT | SEC-06, 2026-07-24 |
+| C 5.4 bullet 1: object-store write lane (no reveal needed) | BUILT | `PartitionWriter.java:177,231` (`s3://` lane); `AIRGAP-S3-EXTENSIONS-1` staged `httpfs` + `aws` in `inspecto/package.ps1:2339` |
+| C 5.4 bullets 2-5: registration guard, inlining off, mandatory registration, shared read attach | BUILT | `DuckLakeRegistrationSiteContractTest`; `LakehouseCatalog.java` (`-Dinspecto.ducklake.catalog` / `.data`); `QueryExecutor.attachSql` |
+| C 5.4 bullet 6: `dirs.database` as `s3://` + containment in `PathJail` | NOT BUILT (DEFERRED by D4a) | `PathJail.isUri` only REFUSES a URI (`PathJail.java:80,496`; `ConfigSafetyValidator.java:654`); about 10 `Path.of(dirs.database())` consumers remain scheme-unaware |
+| C: `CatalogCommit` / `RenameReveal` as named strategies | SUPERSEDED | The plan's own names; no such classes — the object-store lane writes straight to final paths (5.4); the local lane keeps the inline reveal |
+| C: Helm chart for N pods | NOT BUILT | `deploy/helm/inspecto/values.yaml:3-7` — replicas 1, "NOT MULTI-REPLICA SAFE"; no ingress template |
+| 5.5 / D16: `/spaces` from the map, ingress rules generated from the map, SPA off the pods | NOT BUILT (D16 unsigned) | board `SPACES-FROM-PARTITION-MAP-1` (blocked); `grep ingress` in `inspecto/src/main` is empty |
+| 5.5: `/auth/refresh` statelessness; live SSE tail across pods | UNKNOWN / NOT BUILT | statelessness not verified by grep; `EventLog` stays an in-heap registry |
+| D14 (inbox-group as unit), D15 posture, D16 | UNSIGNED | section 9; the fencing half of D15 is built in `DbRunLease` regardless |
+| U1 distributed remote acquisition | NOT BUILT (precondition exists: ledgers on Postgres) | `AcquisitionLedgers.java`; `StabilityGate.SHARED` scope unverified (section 12) |
+| U2 distributed Consignment execution | NOT BUILT | admission pools built JVM-local (`ConcurrencyBroker`, 4.1); ordering undecided |
+| U3 inbox-group partition | NOT BUILT (D14 unsigned) | — |
+| D13 external SQL surface (pg_duckdb views) | NOT BUILT | no `pg_duckdb` reference in code; S5 live half owed |
+| D11 dynamic rebalancing | DEFERRED by decision (phase C+1) | section 9 |
+| Spikes S2, S3, S4 | CLOSED | section 10 |
+| Spikes S1, S5 live halves | S1 runnable since 2026-09-14 and the catalog spelling is proven; S5 live half owed; an end-to-end S1 re-run across N processes: UNKNOWN | sections 10, 6 |
+
+**What the board needs** (this lane did not edit `BACKLOG.md`): object-store `dirs.database` + containment (carried today only by this plan), the N-pod Helm chart + generated ingress (`SPACES-FROM-PARTITION-MAP-1` carries only `/spaces`), D14-D16 sign-off, the `/auth/refresh` statelessness check, U1/U2, and the D13/S5 live half. This plan therefore STAYS in `docs/superpower/` while phase C is in flight.
 
 ---
 
@@ -472,6 +514,8 @@ a test must be able to falsify.
 
 ### 5.1 Shared state — every store on Postgres, none may degrade
 
+> **Status (audited 2026-10-12):** BUILT (phase A complete 2026-09-14; see the Audit table).
+
 **Invariant:** *In Enterprise mode, no operational store falls back to memory or a local file; a store
 that cannot reach its backend fails boot.* Today stores "degrade to memory, never block boot"
 (`editions.md` §3.11) — the acceptance row `VER-3` exists because of it. On one node that is graceful
@@ -510,6 +554,8 @@ to, and every T2/T3 Postgres-backed deployment gets a pool. It is also the *enti
 T4 active/passive standby.
 
 ### 5.2 The lease — one run per pipeline per trigger across N pods
+
+> **Status (audited 2026-10-12):** BUILT (phase B complete 2026-09-12, plus the fencing epoch and the 2026-10-10/11 HA lanes).
 
 **Invariant:** *Across N processes sharing one Postgres, a given pipeline runs at most once per
 trigger, and a lease abandoned by a dead pod is reclaimable within a bounded time.*
@@ -693,6 +739,8 @@ the promote runbook's "stop A → start B" becomes automatic.
 
 ### 5.3 Work distribution — Spaces to pods
 
+> **Status (audited 2026-10-12):** BUILT (C1 static map, C2 inbox registry, ABAC). Dynamic rebalancing deferred (D11).
+
 **Invariant:** *Every Space has exactly one owning pod at any moment; no pod polls an inbox it does
 not own.*
 
@@ -840,6 +888,8 @@ Work:
   specifically. Personal ships auth-free by design, so ABAC is inert there — an edition boundary, not a gap.
 
 ### 5.4 The shared lakehouse — visibility is the catalog commit
+
+> **Status (audited 2026-10-12):** PARTLY BUILT - all bullets except 6 (`s3://` `dirs.database` + containment: NOT BUILT, deferred by D4a).
 
 
 > ✅ **D4a — SCOPE NARROWED 2026-09-14 (operator): the OBJECT STORE is POSTPONED; build on local,
@@ -1064,6 +1114,8 @@ Work under (ii):
   containment.
 
 ### 5.5 Request distribution — the UI and the API *(added 2026-09-11)*
+
+> **Status (audited 2026-10-12):** NOT BUILT - D16 unsigned; `/spaces` still pod-local; `/auth/refresh` statelessness UNKNOWN.
 
 **Invariant:** *What an operator sees must not depend on which pod answered.*
 
