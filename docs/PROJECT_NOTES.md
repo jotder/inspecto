@@ -143,6 +143,19 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **The MAIN checkout cannot build, serve or pass the pre-push link guard on the `User` Windows profile; do all
+  three from a clean worktree** (2026-10-11). `inspecto-demo/runtime-natives` is ACL-locked to the other Windows user
+  (the profile that created it), so the `known-modules` exec step of `package.ps1` / any `-Pedition-enterprise` reactor
+  build, `check-doc-links.mjs` (pre-push) and `serve-demo` (DuckDB native unpack) all die with `AccessDenied`. A fresh
+  `git worktree add` has no such folder: build, serve and `git push origin HEAD:master` from it (every guard still runs
+  there). A `-NoRuntime` bundle needs a junction to the main `inspecto-demo/runtime`. `tools/run-backend.ps1` resolves
+  sibling modules from `.m2`, so run `mvn -o -Pedition-enterprise -pl inspecto -am -DskipTests install` from the
+  worktree first, and add `-Dcontrol.bind=127.0.0.1` (via `JAVA_TOOL_OPTIONS`; the script has no bind switch, so it
+  listens on every interface with no sign-in). Agent `isolation: "worktree"` is refused here: create worktrees by hand.
+- **A peer session may be mid-merge in the main checkout** (`.git/MERGE_HEAD`): never run `git merge`/`pull` there.
+  Merge lanes in a scratch worktree and push `HEAD:master` from it; `SESSION_STATUS.local.md` is stacked, newest
+  section first, so a second handoff prepends instead of replacing.
+
 - 🔴 **A new control-API ROUTE needs an entry in `docs/api/openapi-v1.json`, and your own green tests will
   not tell you** (2026-09-22). `OpenApiPathsContractTest` requires every live route to have an operation.
   Measured: a new per-space settings route passed **its own four real-HTTP tests**,
