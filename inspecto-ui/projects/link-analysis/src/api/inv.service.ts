@@ -866,6 +866,8 @@ export interface InvestigationDraft {
     actor: string;
     createdAt: string;
     baseStep: number;
+    /** The analyst's own optional note (1..80 chars). Free text, NOT masked; absent on a Draft forked without one. */
+    label?: string;
     state: DraftStateName;
     expired?: boolean;
     lastAccessAt?: string;
@@ -1596,8 +1598,11 @@ export class InvService {
     }
 
     /** Fork a Draft at the head (or at `at`). One live Draft per member (409); a Space-wide cap (409). */
-    forkDraft(id: string, at?: number): Observable<InvestigationDraft> {
-        return this.http.post<InvestigationDraft>(invPath(id, 'drafts'), at === undefined ? {} : { at });
+    forkDraft(id: string, at?: number, label?: string): Observable<InvestigationDraft> {
+        const body: { at?: number; label?: string } = {};
+        if (at !== undefined) body.at = at;
+        if (label) body.label = label;
+        return this.http.post<InvestigationDraft>(invPath(id, 'drafts'), body);
     }
 
     /** One relation page of a Draft's Working Set (the `total` is the true row count). */

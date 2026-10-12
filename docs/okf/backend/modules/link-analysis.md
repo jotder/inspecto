@@ -228,6 +228,9 @@ references, Case link and Alert Rule binding are last-writer-wins by design on F
 * A Draft lives **inside** its Investigation (`drafts/<draft-uuid>/{header.json, log.jsonl, sets/, discarded.json,
   promoted.json}`); its state = the main log's first `baseStep` entries folded + its own entries, numbered
   continuously. Created by staging in a scratch dot-directory and an atomic move.
+* An optional human `label` (fork body; trimmed, 1..80 chars, no control characters, else 422) is a plain `header.json`
+  field, returned by fork / list / read. It is the analyst's free text: **not masked**, never in a seal or Dossier input
+  (promote copies ops only; `ControlApiDraftLabelTest` pins that), and `link.draft.forked` audits its length only.
 * States `OPEN → HIBERNATED → DISCARDED | PROMOTED` (`DraftLifecycle`); expiry is a discard with `expired:true`.
   Defaults from `LinkAnalysisSettings.Drafts`: 50 open per Space, hibernate after 60 min, expire after 30 d.
 * Admission (`DraftAdmission`, la-api): one live Draft per member, Space cap, heavy-op permit `max(1, min(4, cores/3))`.

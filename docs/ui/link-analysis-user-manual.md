@@ -395,7 +395,9 @@ then use **Working Set** to see its size, **Conflicts** to see what a rebase wou
 Investigation's current head (steps that were superseded or blocked are dropped, and the panel names them), **Promote** to
 apply its steps to the Investigation, or **Discard**. A Draft shows a state badge (open, hibernated) and how many steps the
 Investigation has moved since you forked. A promote that contains a sensitive expand is **held for four-eyes approval**: a
-different person approves it under Oversight, and nothing is applied until then.
+different person approves it under Oversight, and nothing is applied until then. Before you fork you may type a short name
+(up to 80 characters, "Name this Draft (optional)"); the list shows it beside the Draft. The name is your own note: it is shown
+as typed, is not masked, and appears in audit as a length only, so do not put anything in it you would not write on a whiteboard.
 
 ### 9.4 Working Set and rows
 The **Working Set rows** table lists entities, links or exclusions with paging; it states if it is truncated and at

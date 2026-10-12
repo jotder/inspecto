@@ -149,7 +149,36 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const { f, el, inv } = await create({}, []);
         expect(el.textContent).toContain('No Drafts');
         await click(f, button(el, 'Fork a Draft'));
-        expect(inv.forkDraft).toHaveBeenCalledWith('inv-1');
+        expect(inv.forkDraft).toHaveBeenCalledWith('inv-1', undefined, undefined);
+    });
+
+    it('forks with the typed label (trimmed, capped at 80) and clears the field', async () => {
+        const { f, el, inv } = await create({}, []);
+        const input = el.querySelector('input[aria-label="Draft label (optional)"]') as HTMLInputElement;
+        expect(input.getAttribute('maxlength')).toBe('80');
+        expect(input.placeholder).toBe('Name this Draft (optional)');
+        input.value = '  hub of erin-005?  ';
+        input.dispatchEvent(new Event('input'));
+        f.detectChanges();   // as a real keystroke would, before the click
+        await click(f, button(el, 'Fork a Draft'));
+        expect(inv.forkDraft).toHaveBeenCalledWith('inv-1', undefined, 'hub of erin-005?');
+        expect(input.value).toBe('');
+    });
+
+    it('shows a Draft label, and falls back to the id when there is none', async () => {
+        const { el } = await create({}, [
+            { ...DRAFT, label: 'Hub check' },
+            { ...DRAFT, draftId: 'd-2' },
+        ]);
+        expect(el.querySelectorAll('.draft-label').length).toBe(1);
+        expect(el.querySelector('.draft-label')?.textContent).toBe('Hub check');
+        expect(el.textContent).toContain('d-2');
+    });
+
+    it('escapes a label: markup is text, never an element', async () => {
+        const { el } = await create({}, [{ ...DRAFT, label: '<img src=x onerror=alert(1)>' }]);
+        expect(el.querySelector('img')).toBeNull();
+        expect(el.querySelector('.draft-label')?.textContent).toBe('<img src=x onerror=alert(1)>');
     });
 
     it('words the Space limit of 50 Drafts readably', async () => {

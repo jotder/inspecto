@@ -79,6 +79,16 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
         >
             <div class="flex items-center gap-2">
                 <h3 class="m-0 text-sm font-semibold">Drafts</h3>
+                <input
+                    class="min-w-0 flex-1 rounded border px-2 py-1"
+                    style="border-color: var(--gamma-border)"
+                    type="text"
+                    maxlength="80"
+                    placeholder="Name this Draft (optional)"
+                    aria-label="Draft label (optional)"
+                    [value]="label()"
+                    (input)="label.set($any($event.target).value)"
+                />
                 <button mat-stroked-button [disabled]="busy() || !canWrite()" (click)="fork()">Fork a Draft</button>
             </div>
             @if (error()) {
@@ -102,6 +112,9 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                 >
                     <div class="flex flex-wrap items-center gap-2">
                         <strong>{{ d.actor }}</strong>
+                        @if (d.label) {
+                            <strong class="draft-label">{{ d.label }}</strong>
+                        }
                         <code>{{ d.draftId }}</code>
                         <inspecto-status-badge [value]="tone(d.state)" [label]="d.state"></inspecto-status-badge>
                         <span class="text-secondary">
@@ -187,6 +200,8 @@ export class LinkAnalysisDraftsComponent {
     readonly drafts = signal<InvestigationDraft[]>([]);
     readonly hidden = signal(false);
     readonly busy = signal(false);
+    /** The optional label typed for the NEXT fork. */
+    readonly label = signal('');
     readonly error = signal('');
     readonly notice = signal('');
     readonly sizes = signal<Record<string, { entities: number; links: number; excluded: number }>>({});
@@ -273,7 +288,12 @@ export class LinkAnalysisDraftsComponent {
     }
 
     async fork(): Promise<void> {
-        await this.run(() => firstValueFrom(this.inv.forkDraft(this.investigationId())), 'Could not fork a Draft.');
+        const label = this.label().trim();
+        const made = await this.run(
+            () => firstValueFrom(this.inv.forkDraft(this.investigationId(), undefined, label || undefined)),
+            'Could not fork a Draft.',
+        );
+        if (made) this.label.set('');
     }
 
     async showWorkingSet(d: InvestigationDraft): Promise<void> {
