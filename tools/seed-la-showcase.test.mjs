@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, buildPlan, scaffold, INV } from './seed-la-showcase.mjs';
 
+const OFF = { pending: false, alert: false, draft: false };
 function mock(listItems = []) {
   const calls = [];
   const fetchFn = async (url, init = {}) => {
@@ -32,7 +33,7 @@ test('dry run sends nothing and lists every step', async () => {
 
 test('apply signs in once per persona and acts as the right persona', async () => {
   const m = mock();
-  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true });
+  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF });
   assert.deepEqual(r.failed, []);
   assert.equal(m.calls.filter((c) => c.u === '/auth/exchange').length, 1);
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
@@ -59,7 +60,7 @@ test('apply signs in once per persona and acts as the right persona', async () =
 
 test('re-run skips an Investigation that already has its steps and its Case', async () => {
   const m = mock([{ id: INV, headStep: 8, caseRef: 'CASE-7' }]);
-  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true });
+  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF });
   assert.equal(m.calls.filter((c) => c.u.endsWith('/ops')).length, 0);
   assert.equal(m.calls.filter((c) => c.u.includes('/cases/') || c.u.includes('/objects/')).length, 0);
   assert.ok(r.skipped.includes('investigation') && r.skipped.includes('case'));
@@ -68,7 +69,7 @@ test('re-run skips an Investigation that already has its steps and its Case', as
 test('a 409 on create counts as already there, not a failure', async () => {
   const m = mock();
   const f = async (url, init) => (url.endsWith('/entity-lists') ? { ok: false, status: 409, json: async () => ({ data: {} }) } : m.fetchFn(url, init));
-  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true });
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF });
   assert.ok(r.skipped.includes('list-smurfs'));
   assert.deepEqual(r.failed, []);
 });
@@ -105,7 +106,7 @@ test('the Investigation create waits out a 422 while the first ingest has not la
   const m = mock(); let refusals = 2; const slept = [];
   const f = async (url, init) => (url.endsWith('/inv/investigations') && init.method === 'POST' && refusals-- > 0
     ? { ok: false, status: 422, json: async () => ({ data: { message: 'cannot read the columns' } }) } : m.fetchFn(url, init));
-  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, sleep: async (ms) => { slept.push(ms); } });
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async (ms) => { slept.push(ms); } });
   assert.equal(slept.length, 2);
   assert.ok(r.done.includes('investigation'));
   assert.deepEqual(r.failed, []);
@@ -115,7 +116,139 @@ test('a 422 that never clears fails after the bounded wait', async () => {
   const m = mock(); let posts = 0;
   const f = async (url, init) => (url.endsWith('/inv/investigations') && init.method === 'POST' && ++posts
     ? { ok: false, status: 422, json: async () => ({ data: {} }) } : m.fetchFn(url, init));
-  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, sleep: async () => {}, ingestWaitTries: 3 });
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {}, ingestWaitTries: 3 });
   assert.equal(posts, 3);
   assert.ok(r.failed[0].startsWith('investigation: HTTP 422'));
+});
+
+// ── the three pre-staging stages (pending four-eyes expand, fired Alert, Draft ready to promote) ─────────────────────────────
+
+/** A stateful stub of just the routes the stages use. `opts.held` false = the expand RUNS (no threshold); `opts.alertAfter` = polls before the Alert appears. */
+function staged(opts = {}) {
+  const st = { pending: opts.pending || [], alerts: opts.alerts || [], drafts: opts.drafts || [], polls: 0, triggers: 0 };
+  const m = mock([{ id: INV, headStep: 8, caseRef: 'CASE-7' }]);
+  const reply = (status, data) => ({ ok: status < 300, status, json: async () => ({ data }) });
+  const fetchFn = async (url, init = {}) => {
+    const method = init.method || 'GET', u = url.replace('http://h/api/v1/spaces/s', ''), body = init.body ? JSON.parse(init.body) : undefined;
+    const as = ((init.headers && init.headers.authorization) || '').replace('Bearer tok-demo:', '');
+    if (opts.fail && opts.fail(method, u, as)) return reply(opts.failStatus || 500, {});
+    if (u.startsWith('/inv/pending')) return reply(200, { items: as === 'fm.manager' ? st.pending.map((r) => ({ investigationId: INV, requestId: r })) : [] });
+    if (u === `/inv/investigations/${INV}/ops` && body.op === 'expand') {
+      m.calls.push({ method, u, as, body });
+      if (opts.held === false) return reply(200, { status: 'ok' });
+      if (st.pending.length) return reply(409, {});
+      st.pending.push('p1'); return reply(200, { status: 'pending', pending: { id: 'p1' } });
+    }
+    if (u.startsWith('/alerts')) { st.polls++; if (st.polls > (opts.alertAfter ?? 1) && st.triggers) st.alerts.push({ rule: 'mule-pass-through', epochMillis: 7 }); return reply(200, st.alerts); }
+    if (u === '/jobs/la_detect/trigger') { st.triggers++; return reply(202, { runId: 'r1' }); }
+    const dr = `/inv/investigations/${INV}/drafts`;
+    if (u === dr && method === 'GET') return reply(200, { items: st.drafts });
+    if (u === dr && method === 'POST') { st.drafts.push({ draftId: 'd1', state: 'open', steps: 0, behind: 0 }); return reply(201, { draftId: 'd1' }); }
+    if (u === `${dr}/d1/ops`) { st.drafts[0].steps = opts.badStep ? 2 : 1; return reply(200, {}); }
+    if (u === `${dr}/d1/discard`) { st.drafts.length = 0; st.discarded = true; return reply(200, {}); }
+    if (u === `${dr}/d1`) return reply(200, st.drafts[0]);
+    return m.fetchFn(url, init);
+  };
+  return { fetchFn, st, calls: m.calls };
+}
+const go = (s, extra = {}) => run({ fetchFn: s.fetchFn, base: 'http://h', space: 's', apply: true, sleep: async () => {}, ...extra });
+
+test('stage 1 creates ONE pending unbounded expand as fm.analyst and confirms it in fm.manager\'s inbox', async () => {
+  const s = staged();
+  const r = await go(s, { stages: { alert: false, draft: false } });
+  assert.deepEqual(r.warnings, []);
+  assert.ok(r.done.includes('pending-expand'));
+  assert.equal(r.summary.pendingRequestId, 'p1');
+  const expand = s.calls.find((c) => c.body && c.body.op === 'expand' && c.as);
+  assert.deepEqual(expand.body, { op: 'expand', direction: 'either' });
+  assert.equal('maxFanOut' in expand.body, false);
+  assert.equal(expand.as, 'fm.analyst');
+});
+
+test('stage 1 is idempotent: a request already pending means no expand is sent', async () => {
+  const s = staged({ pending: ['p9'] });
+  const r = await go(s, { stages: { alert: false, draft: false } });
+  assert.equal(s.calls.filter((c) => c.body && c.body.op === 'expand').length, 0);
+  assert.equal(r.summary.pendingRequestId, 'p9');
+  assert.ok(r.skipped.includes('pending-expand'));
+});
+
+test('stage 1 soft-fails when the expand RUNS instead of being held, and never fails the seed', async () => {
+  const r = await go(staged({ held: false }), { stages: { alert: false, draft: false } });
+  assert.match(r.warnings[0], /RAN instead of being held/);
+  assert.deepEqual(r.failed, []);
+  assert.equal(r.summary.pendingRequestId, undefined);
+});
+
+test('stage 2 triggers la_detect once as fm.manager and waits for the Alert', async () => {
+  const s = staged({ alertAfter: 2 }); const slept = [];
+  const r = await go(s, { stages: { pending: false, draft: false }, sleep: async (ms) => { slept.push(ms); } });
+  assert.equal(s.st.triggers, 1);
+  assert.ok(r.done.includes('alert'));
+  assert.equal(r.summary.alertId, 'mule-pass-through@7');
+  assert.ok(slept.length >= 2);
+});
+
+test('stage 2 is idempotent: an Alert for the rule already fired means no run', async () => {
+  const s = staged({ alerts: [{ rule: 'mule-pass-through', epochMillis: 5 }] });
+  const r = await go(s, { stages: { pending: false, draft: false } });
+  assert.equal(s.st.triggers, 0);
+  assert.equal(r.summary.alertId, 'mule-pass-through@5');
+});
+
+test('stage 2 ignores an Alert of another rule, and soft-fails after the bounded wait', async () => {
+  const s = staged({ alerts: [{ rule: 'other', epochMillis: 1 }], alertAfter: 99 });
+  const r = await go(s, { stages: { pending: false, draft: false }, alertWaitTries: 3 });
+  assert.equal(s.st.triggers, 1);
+  assert.equal(s.st.polls, 4);   // 1 before the trigger + exactly 3 bounded polls
+  assert.match(r.warnings[0], /no Alert for mule-pass-through appeared after 3 polls/);
+  assert.deepEqual(r.failed, []);
+});
+
+test('stage 2 soft-fails when the trigger is refused', async () => {
+  const s = staged({ fail: (mth, u) => u === '/jobs/la_detect/trigger', failStatus: 403 });
+  const r = await go(s, { stages: { pending: false, draft: false } });
+  assert.match(r.warnings[0], /la_detect trigger answered HTTP 403/);
+});
+
+test('stage 3 forks one Draft as fm.analyst, adds one step, and checks it is open with one step and mainMoved 0', async () => {
+  const s = staged();
+  const r = await go(s, { stages: { pending: false, alert: false } });
+  assert.deepEqual(r.warnings, []);
+  assert.equal(r.summary.draftId, 'd1');
+  assert.equal(s.st.drafts[0].steps, 1);
+  assert.ok(r.done.includes('draft'));
+});
+
+test('stage 3 is idempotent: a live Draft with its step is left alone; an empty one is topped up, not re-forked', async () => {
+  const full = staged({ drafts: [{ draftId: 'd1', state: 'open', steps: 1, behind: 0 }] });
+  const r1 = await go(full, { stages: { pending: false, alert: false } });
+  assert.ok(r1.skipped.includes('draft'));
+  const empty = staged({ drafts: [{ draftId: 'd1', state: 'open', steps: 0, behind: 0 }] });
+  const r2 = await go(empty, { stages: { pending: false, alert: false } });
+  assert.equal(empty.st.drafts.length, 1);
+  assert.equal(empty.st.drafts[0].steps, 1);
+  assert.equal(r2.summary.draftId, 'd1');
+});
+
+test('stage 3 soft-fails and discards the Draft it made when the step is refused or the Draft reads wrong', async () => {
+  const refused = staged({ fail: (mth, u) => u.endsWith('/d1/ops') });
+  const r1 = await go(refused, { stages: { pending: false, alert: false } });
+  assert.match(r1.warnings[0], /the Draft step answered HTTP 500/);
+  assert.equal(refused.st.discarded, true);
+  const odd = staged({ badStep: true });
+  const r2 = await go(odd, { stages: { pending: false, alert: false } });
+  assert.match(r2.warnings[0], /expected 1 and 0/);
+  assert.equal(odd.st.discarded, true);
+});
+
+test('each stage is skipped by its flag, and none runs when the plan itself failed', async () => {
+  const s = staged();
+  await go(s, { stages: { pending: false, alert: false, draft: false } });
+  assert.equal(s.st.triggers + s.st.drafts.length + s.st.pending.length, 0);
+  const bad = staged({ fail: (mth, u) => mth === 'POST' && u === '/entity-lists' });
+  const r = await run({ fetchFn: bad.fetchFn, base: 'http://h', space: 's', apply: true, sleep: async () => {} });
+  assert.equal(bad.st.triggers + bad.st.drafts.length + bad.st.pending.length, 0);
+  assert.ok(r.failed.length);
+  assert.deepEqual(r.summary, {});
 });

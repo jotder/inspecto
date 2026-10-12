@@ -7,6 +7,13 @@
 //   node tools/seed-la-showcase.mjs [--base URL] [--space id]    DRY RUN: print every call it would make, change nothing
 //   node tools/seed-la-showcase.mjs [...] --apply                perform the calls (safe to re-run: existing things are skipped)
 //
+// Three optional stages pre-stage the demo scenes after the plan (each on by default, each skipped with its flag, each
+// idempotent, each SOFT: a refusal prints a warning and leaves the Space as it was, the exit code stays 0):
+//   --no-pending   one PENDING four-eyes expand on mule-hub-case (an unbounded expand by fm.analyst; left undecided for fm.manager)
+//   --no-alert     one run of the la_detect Job (as fm.manager, who holds canOperateRuns) until the mule-pass-through Alert exists
+//   --no-draft     one open Draft of mule-hub-case forked by fm.analyst, carrying one annotate step, left unpromoted
+//   (a Draft has no name field: the fork body is {at?} only, so the Draft is found again as fm.analyst's one live Draft)
+//
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Never sends a credential: the Demo User exchange
 // takes a `demo:<id>` code and no password.
 import fs from 'node:fs';
@@ -65,16 +72,23 @@ export function buildPlan() {
   return plan;
 }
 
+export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
+export const DRAFT_STEP = { op: 'annotate', ids: ['RELAY-01'], note: 'widen the ring: check what RELAY-01 pays on to' };
+const RULE = 'mule-pass-through';
 const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, lines }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', apply = false, log = () => {},
-  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 30 } = {}) {
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 30, alertWaitTries = 20, stages = {} } = {}) {
+  const want = { pending: true, alert: true, draft: true, ...stages };
   const plan = buildPlan();
-  const out = { done: [], skipped: [], failed: [] };
+  const out = { done: [], skipped: [], failed: [], warnings: [], summary: {} };
   if (!apply) {
     log(`DRY RUN (no request is sent; add --apply). Space '${space}' at ${base}`);
     for (const s of plan) log(`  ${s.as.padEnd(11)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
+    if (want.pending) log(`  fm.analyst  POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request; skipped if fm.manager already sees one)`);
+    if (want.alert) log(`  fm.manager  POST /jobs/la_detect/trigger  (skipped if an Alert for ${RULE} already exists)`);
+    if (want.draft) log(`  fm.analyst  POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}  (skipped if fm.analyst has a live Draft)`);
     return out;
   }
   const tokens = {};
@@ -128,7 +142,62 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     log(`  ${s.id}: ${r.status}`);
     if (s.id === 'investigation' && r.status >= 300 && r.status !== 409) break;   // nothing else can work
   }
+  if (out.failed.length) { out.warnings.push('optional stages skipped: the plan above failed'); return out; }
+  const warn = (stage, e) => { const m = `${stage}: ${e.message || e}; the stage was skipped and left no half-made state`; out.warnings.push(m); log(`  WARNING ${m}`); };
+  const items = (d) => (Array.isArray(d) ? d : (d && d.items) || []);
+  if (want.pending) try { await stagePending(call, out, log); } catch (e) { warn('pending', e); }
+  if (want.alert) try { await stageAlert(call, out, log, sleep, alertWaitTries, items); } catch (e) { warn('alert', e); }
+  if (want.draft) try { await stageDraft(call, out, log); } catch (e) { warn('draft', e); }
   return out;
+}
+
+const must = (r, what, ok = [200, 201, 202]) => { if (!ok.includes(r.status)) throw new Error(`${what} answered HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`); return r.data; };
+
+/** ONE pending four-eyes expand. Idempotent: the approver inbox (as fm.manager) is read first. */
+async function stagePending(call, out, log) {
+  const inbox = async () => (must(await call('fm.manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox').items || []).filter((i) => i.investigationId === INV);
+  let mine = await inbox();
+  if (mine.length) { out.skipped.push('pending-expand'); out.summary.pendingRequestId = mine[0].requestId; return; }
+  const r = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND);
+  if (r.status === 409) { mine = await inbox(); if (mine.length) { out.skipped.push('pending-expand'); out.summary.pendingRequestId = mine[0].requestId; return; } }
+  const d = must(r, 'the unbounded expand');
+  if (d.status !== 'pending') throw new Error('the unbounded expand RAN instead of being held (is four_eyes_fan_out_above set in link-analysis.toon?) and added a step to the log');
+  mine = await inbox();
+  if (mine.length !== 1 || mine[0].requestId !== d.pending.id) throw new Error(`fm.manager's inbox shows ${mine.length} pending request(s) on ${INV}, expected exactly the one just made (${d.pending.id})`);
+  out.done.push('pending-expand'); out.summary.pendingRequestId = d.pending.id; log(`  pending-expand: ${d.pending.id}`);
+}
+
+const firedAlert = (alerts) => alerts.find((a) => a.rule === RULE || String(a.rule).endsWith(`/${RULE}`));
+
+/** ONE la_detect run; waits (bounded) for the Alert. Idempotent: an existing Alert for the rule means no run. */
+async function stageAlert(call, out, log, sleep, tries, items) {
+  const read = async () => firedAlert(items(must(await call('fm.analyst', 'GET', '/alerts?limit=200'), 'Alerts list')));
+  const id = (x) => `${x.rule}@${x.epochMillis}`;
+  let a = await read();
+  if (a) { out.skipped.push('alert'); out.summary.alertId = id(a); return; }
+  const t = await call('fm.manager', 'POST', '/jobs/la_detect/trigger');
+  if (t.status !== 409) must(t, 'la_detect trigger');   // 409 = already running: just wait for it
+  for (let i = 0; i < tries && !a; i++) { await sleep(3000); a = await read(); }
+  if (!a) throw new Error(`no Alert for ${RULE} appeared after ${tries} polls of the la_detect run (is standing detection enabled on the rule?)`);
+  out.done.push('alert'); out.summary.alertId = id(a); log(`  alert: ${id(a)}`);
+}
+
+/** ONE open Draft with one step. Idempotent: fm.analyst's live Draft (open or hibernated) is reused, and only topped up when it is empty. */
+async function stageDraft(call, out, log) {
+  const base = `/inv/investigations/${INV}/drafts`;
+  const live = (must(await call('fm.analyst', 'GET', base), 'Draft list').items || []).find((d) => d.state === 'open' || d.state === 'hibernated');
+  if (live && live.steps > 0) { out.skipped.push('draft'); out.summary.draftId = live.draftId; return; }
+  const created = !live;
+  const id = live ? live.draftId : must(await call('fm.analyst', 'POST', base, {}), 'Draft fork').draftId;
+  try {
+    must(await call('fm.analyst', 'POST', `${base}/${id}/ops`, DRAFT_STEP), 'the Draft step');
+    const d = must(await call('fm.analyst', 'GET', `${base}/${id}`), 'Draft read');
+    if (d.steps !== 1 || d.behind !== 0) throw new Error(`the Draft reads steps=${d.steps} behind=${d.behind}, expected 1 and 0`);
+  } catch (e) {
+    if (created) await call('fm.analyst', 'POST', `${base}/${id}/discard`, {});   // no half-made Draft left behind
+    throw e;
+  }
+  out.done.push('draft'); out.summary.draftId = id; log(`  draft: ${id}`);
 }
 
 /** SpaceManager's TemplateSeedGate re-stamps a la.index.build Job to its applier; a file copy does not, and the run authority then
@@ -172,8 +241,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const made = scaffold(opt('--scaffold'));
     console.log(made.length ? `scaffolded: ${made.join(', ')}` : 'nothing to do: the Spaces already exist');
   } else {
-    run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), apply: args.includes('--apply'), log: console.log })
-      .then((r) => { if (args.includes('--apply')) console.log(`created: ${r.done.join(', ') || '-'}\nalready there: ${r.skipped.join(', ') || '-'}\nfailed: ${r.failed.join('; ') || '-'}`); process.exit(r.failed.length ? 1 : 0); })
+    const stages = { pending: !args.includes('--no-pending'), alert: !args.includes('--no-alert'), draft: !args.includes('--no-draft') };
+    run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), apply: args.includes('--apply'), log: console.log, stages })
+      .then((r) => {
+        if (args.includes('--apply')) {
+          console.log(`created: ${r.done.join(', ') || '-'}\nalready there: ${r.skipped.join(', ') || '-'}\nfailed: ${r.failed.join('; ') || '-'}`);
+          console.log(`warnings: ${r.warnings.join('; ') || '-'}\nstaged: pending request ${r.summary.pendingRequestId || '-'} | Alert ${r.summary.alertId || '-'} | Draft ${r.summary.draftId || '-'}`);
+        }
+        process.exit(r.failed.length ? 1 : 0);
+      })
       .catch((e) => { console.error(e.message); process.exit(1); });
   }
 }

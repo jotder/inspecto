@@ -32,6 +32,10 @@ Steps:
 1. Build and launch the Enterprise bundle as for the default variant, with the properties above in `INSPECTO_JAVA_OPTS`.
 2. Create the Space (scaffold or `POST /spaces {"id":"la-showcase","template":"la-showcase"}`), then
    `node tools/seed-la-showcase.mjs --base <url> --apply`.
+   The seed also pre-stages three demo scenes, each idempotent, soft-failing (a warning, exit code unchanged) and skipped
+   by its flag: `--no-pending` (one pending four-eyes expand on `mule-hub-case`, left undecided for `fm.manager`),
+   `--no-alert` (one `la_detect` run until the `mule-pass-through` Alert exists) and `--no-draft` (one open Draft with
+   one step, left unpromoted). It ends with a line naming the pending request, the Alert and the Draft.
 3. Confirm: `GET /settings/link-analysis` echoes `investigationStoreInForce: "db"`
    (`inspecto/src/main/java/com/gamma/control/SettingsRoutes.java`), and `/health/details` shows
    `live.investigations` UP for the Space.
