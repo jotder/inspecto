@@ -33,7 +33,7 @@ import java.util.Map;
  *   <li>{@code member} — a Case that CONTAINS a matched Incident ({@code via} names the Incident).</li>
  * </ul>
  * Under {@code e164} a leading {@code +} is not significant ({@code +256…} and {@code 256…} are one number), since
- * Alert Rule key columns carry raw Dataset values. ⚠ The store prefilter is a substring of the folded key (its
+ * Alert Rule key columns carry raw Dataset values. ⚠ The store prefilter (DbObjectStore: a side table of reference values) is a substring of the folded key (its
  * digits, for a number), so a stored value with separators INSIDE the digits ({@code 256 700 …}) is not found.
  * SEC-7d / ABAC visibility is the same post-filter {@code GET
  * /objects} applies, so a hidden object (and a Case reached only through one) is simply absent, never counted.
@@ -44,7 +44,7 @@ public final class EntityHistory {
 
     static final int DEFAULT_LIMIT = 50;
     static final int MAX_LIMIT = 200;
-    /** Rows the attribute prefilter may read per call — the bounded cost of an un-indexable attribute bag. */
+    /** Candidates the store prefilter may return per call (newest first) - bounds the exact re-check work. */
     static int SCAN_CAP = 2_000;   // not final: a test lowers it to exercise truncation
     private static final int MAX_ID_LENGTH = 256;
     /** A folded key shorter than this would match a large share of the store — refused (422), not scanned. */

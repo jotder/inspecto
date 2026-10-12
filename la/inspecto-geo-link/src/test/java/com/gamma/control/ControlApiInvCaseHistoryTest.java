@@ -333,6 +333,7 @@ class ControlApiInvCaseHistoryTest {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case "Bearer owner" -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents")));
             case "Bearer stranger" -> Optional.of(new Subject("analyst-3", Set.of("canManageIncidents")));
+            case "Bearer other" -> Optional.of(new Subject("analyst-4", Set.of("canManageIncidents")));
             default -> Optional.empty();
         });
         CaseTeamObjectEngine.HISTORY = List.of();
@@ -342,14 +343,22 @@ class ControlApiInvCaseHistoryTest {
 
     /** An Investigation {@code id} of {@code auth} seeded with A's alias, linked to {@code caseRef}; returns A's alias for that caller. */
     private String linked(Ctx c, String auth, String alias, String id, String caseRef) throws Exception {
+        create(c, auth, id);
+        assertEquals(200, send(c, "/inv/investigations/" + id + "/ops", "{\"op\":\"seed\",\"ids\":[\"" + alias + "\"]}", auth).statusCode());
+        linkCase(c, auth, id, caseRef);
+        return alias;
+    }
+
+    private void create(Ctx c, String auth, String id) throws Exception {
         assertEquals(200, send(c, "/inv/investigations", "{\"id\":\"" + id + "\",\"purpose\":\"caps\",\"dataset\":\"calls_ds\","
                 + "\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", auth).statusCode());
-        assertEquals(200, send(c, "/inv/investigations/" + id + "/ops", "{\"op\":\"seed\",\"ids\":[\"" + alias + "\"]}", auth).statusCode());
+    }
+
+    private void linkCase(Ctx c, String auth, String id, String caseRef) throws Exception {
         HttpRequest put = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port() + "/api/v1/inv/investigations/" + id + "/case"))
                 .header("Content-Type", "application/json").header("Authorization", auth)
                 .PUT(BodyPublishers.ofString("{\"caseRef\":\"" + caseRef + "\"}")).build();
         assertEquals(200, client.send(put, BodyHandlers.ofString()).statusCode());
-        return alias;
     }
 
     private JsonNode history(Ctx c, String alias, String auth) throws Exception {
@@ -375,7 +384,7 @@ class ControlApiInvCaseHistoryTest {
     }
 
     @Test
-    void truncatedIsTrueOnlyWhenTheCallersOwnAdmittedCandidatesExceedTheCap(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void boundaryPinInvestigationsTruncateAtOneAdmittedBeyondTheCap(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger");
@@ -392,7 +401,7 @@ class ControlApiInvCaseHistoryTest {
         try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger");
-            linked(c, "Bearer stranger", alias, "inv-s", "CASE-S");
+            create(c, "Bearer stranger", "inv-s");   // NOT linked to a Case: CASE-S is reachable only via the snapshot attachment
             linked(c, "Bearer owner", aliasOfA(c, "Bearer owner"), "inv-o", "CASE-O");
             var store = new com.gamma.la.core.SnapshotStore(root);
             store.create("snap-s", "{\"investigationId\":\"inv-s\",\"nodes\":[{\"id\":\"" + alias + "\"}]}");
@@ -400,14 +409,15 @@ class ControlApiInvCaseHistoryTest {
             store.attach("snap-s", "CASE-S", "2026-10-12T00:00:00Z");                       // the OLDEST line
             for (int i = 0; i < CAP_ATTACHMENTS + 1; i++) store.attach("snap-h", "CASE-O-" + i, "2026-10-12T00:00:01Z");
             JsonNode d = history(c, alias, "Bearer stranger");
-            // inv-s itself is linked to CASE-S, so the Case matches via the Investigation; the snapshot route must not have flagged
+            assertEquals(1, d.get("objects").size(), d.toString());
             assertEquals("CASE-S", d.at("/objects/0/id").asText(), d.toString());
+            assertEquals("snapshot", d.at("/objects/0/matchedOn").asText(), "reached via the snapshot path only: " + d);
             assertFalse(d.get("truncated").asBoolean(), "hidden attachments must not set the flag: " + d);
         }
     }
 
     @Test
-    void attachmentsTruncateOnlyOnTheCallersOwnAdmittedRecords(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void boundaryPinAttachmentsTruncateAtOneAdmittedBeyondTheCap(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger");
@@ -420,6 +430,51 @@ class ControlApiInvCaseHistoryTest {
             assertFalse(history(c, alias, "Bearer stranger").get("truncated").asBoolean(), "exactly the cap is not a cut");
             store.attach("snap-s", "CASE-S-extra", "2026-10-12T00:00:02Z");
             assertTrue(history(c, alias, "Bearer stranger").get("truncated").asBoolean(), "an admitted record beyond the cap is a cut");
+        }
+    }
+
+    /** The 5x DoS bound: readable records beyond the scan window are not seen; the flag follows the documented rule. */
+    @Test
+    void investigationScanBoundSetsTruncatedOnlyForACallerWithAnAdmittedRecord(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            armCaps(c);
+            String alias = aliasOfA(c, "Bearer stranger"), ownerAlias = aliasOfA(c, "Bearer owner"), otherAlias = aliasOfA(c, "Bearer other");
+            linked(c, "Bearer stranger", alias, "inv-0-own", "CASE-S");                          // inside the window
+            for (int i = 0; i < CAP_INVESTIGATIONS * 5 + 1; i++) {                               // hidden: fills the whole window
+                create(c, "Bearer owner", "inv-m-" + i);
+                linkCase(c, "Bearer owner", "inv-m-" + i, "CASE-O");
+            }
+            create(c, "Bearer stranger", "inv-z-own");
+            linkCase(c, "Bearer stranger", "inv-z-own", "CASE-S");                              // beyond the window
+            JsonNode d = history(c, alias, "Bearer stranger");
+            assertEquals(1, d.get("objects").size(), d.toString());
+            assertTrue(d.get("truncated").asBoolean(), "a caller with an admitted record is told the scan was cut: " + d);
+            JsonNode none = history(c, otherAlias, "Bearer other");
+            assertEquals(0, none.get("objects").size(), none.toString());
+            assertFalse(none.get("truncated").asBoolean(), "a caller with nothing admitted learns nothing: " + none);
+        }
+    }
+
+    @Test
+    void attachmentScanBoundSetsTruncatedOnlyForACallerWithAnAdmittedRecord(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            armCaps(c);
+            String alias = aliasOfA(c, "Bearer stranger"), otherAlias = aliasOfA(c, "Bearer other");
+            create(c, "Bearer stranger", "inv-s");
+            linked(c, "Bearer owner", aliasOfA(c, "Bearer owner"), "inv-o", "CASE-O");
+            var store = new com.gamma.la.core.SnapshotStore(root);
+            store.create("snap-s", "{\"investigationId\":\"inv-s\",\"nodes\":[{\"id\":\"" + alias + "\"}]}");
+            store.create("snap-h", "{\"investigationId\":\"inv-o\",\"nodes\":[{\"id\":\"x\"}]}");
+            store.attach("snap-s", "CASE-S", "2026-10-12T00:00:00Z");                                   // oldest: beyond the window
+            for (int i = 0; i < CAP_ATTACHMENTS * 5; i++) store.attach("snap-h", "CASE-O-" + i, "2026-10-12T00:00:01Z");
+            store.attach("snap-s", "CASE-S", "2026-10-12T00:00:02Z");                                   // newest: admitted, in the window
+            JsonNode d = history(c, alias, "Bearer stranger");
+            assertEquals(1, d.get("objects").size(), d.toString());
+            assertEquals("snapshot", d.at("/objects/0/matchedOn").asText());
+            assertTrue(d.get("truncated").asBoolean(), "a caller with an admitted record is told the scan was cut: " + d);
+            JsonNode none = history(c, otherAlias, "Bearer other");
+            assertEquals(0, none.get("objects").size(), none.toString());
+            assertFalse(none.get("truncated").asBoolean(), "a caller with nothing admitted learns nothing: " + none);
         }
     }
 

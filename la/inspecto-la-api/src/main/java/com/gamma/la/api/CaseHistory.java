@@ -218,12 +218,14 @@ final class CaseHistory {
      * ({@link CasePort#visibleTo}); a record that cannot be read is skipped.
      *
      * <p><b>Caps count ADMITTED records only</b> (a readable Investigation; an attachment whose snapshot is anchored to a
-     * readable one), so records the caller cannot see neither consume the cap nor set the flag: a low-privilege caller
-     * learns nothing about hidden records and its own matches are never crowded out. Returns {@code true} only when an
-     * admitted record existed beyond the cap. The one residual is the DoS bound ({@value #SCAN_FACTOR} x the cap in total
-     * records scanned, hidden included): hitting it ends the scan and sets the flag only when the caller was admitted at
-     * least one record, so a caller with nothing readable always gets {@code false}; a caller with readable records is told
-     * the scan was cut (it cannot tell how many of the cut records were hidden).
+     * readable one), so records the caller cannot see neither consume the cap nor set the flag, and the caller's own
+     * matches are never crowded out. Returns {@code true} only when an admitted record existed beyond the cap.
+     *
+     * <p><b>DoS bound, and what it leaks.</b> The scan reads at most {@value #SCAN_FACTOR} x the cap records in total,
+     * hidden included. When it is hit, {@code truncated} is set if the caller has at least one admitted record. That reveals
+     * one coarse Space-wide bit (at least 501 Case-linked Investigations, or 2501 attachment lines) to ANY such caller, and
+     * any caller can obtain an admitted record by creating its own Investigation. Accepted trade-off against silently hiding
+     * that the answer is incomplete. Only the per-snapshot verdict is cached, never the parsed document.
      */
     private static boolean linkedCases(ApiContext api, HttpExchange ex, CasePort port, Path writeRoot, String raw,
                                        String status, List<Map<String, Object>> out) throws IOException {
@@ -255,8 +257,7 @@ final class CaseHistory {
 
         boolean[] cut = {false};
         SnapshotStore snapshots = new SnapshotStore(writeRoot);
-        Map<String, Boolean> contains = new java.util.HashMap<>();
-        Map<String, Map<String, Object>> anchored = new java.util.HashMap<>();   // sid -> snapshot, or null when not admitted
+        Map<String, Boolean> contains = new java.util.HashMap<>();   // sid -> holds raw; null value = not admitted (no document kept)
         int admittedLines = 0;
         for (String line : snapshots.recentAttachments(MAX_ATTACHMENTS * SCAN_FACTOR, cut)) {
             String sid, caseId;
@@ -268,15 +269,10 @@ final class CaseHistory {
                 continue;
             }
             if (sid == null || caseId == null || !SnapshotStore.SAFE_ID.matcher(sid).matches()) continue;
-            if (!anchored.containsKey(sid)) anchored.put(sid, admittedSnapshot(api, ex, snapshots, sid, readable));
-            Map<String, Object> snap = anchored.get(sid);
-            if (snap == null) continue;   // not anchored to a readable Investigation: hidden, counted nowhere
-            if (admittedLines++ >= MAX_ATTACHMENTS) { truncated = true; cut[0] = false; break; }
+            if (!contains.containsKey(sid)) contains.put(sid, admittedContains(api, ex, snapshots, sid, raw, writeRoot, readable));
             Boolean in = contains.get(sid);
-            if (in == null) {
-                in = snapshotContains(api, ex, snap, raw, writeRoot, readable);
-                contains.put(sid, in);
-            }
+            if (in == null) continue;   // not anchored to a readable Investigation: hidden, counted nowhere
+            if (admittedLines++ >= MAX_ATTACHMENTS) { truncated = true; cut[0] = false; break; }
             if (in) caseRow(api, ex, port, caseId, status, "snapshot", sid, out);
         }
         return truncated || cut[0] && admittedLines > 0;
@@ -294,26 +290,20 @@ final class CaseHistory {
         }
     }
 
-    /** The sealed snapshot {@code sid} when it is anchored to an Investigation the caller can read, else null. */
-    private static Map<String, Object> admittedSnapshot(ApiContext api, HttpExchange ex, SnapshotStore snapshots, String sid,
-                                                        Map<String, Boolean> readable) {
+    /**
+     * {@code null} when snapshot {@code sid} is not anchored to an Investigation the caller can read (hidden); else whether
+     * it holds {@code raw} among its nodes. The parsed document is not retained: callers cache only this verdict.
+     */
+    private static Boolean admittedContains(ApiContext api, HttpExchange ex, SnapshotStore snapshots, String sid, String raw,
+                                            Path writeRoot, Map<String, Boolean> readable) {
         try {
             String json = snapshots.read(sid);
             if (json == null) return null;
             @SuppressWarnings("unchecked") Map<String, Object> snap = ApiContext.JSON.readValue(json, Map.class);
             if (!(snap.get("investigationId") instanceof String invId)) return null;   // unanchored: no gate to judge it by
-            return readable(api, ex, invId, readable) == null ? null : snap;
-        } catch (IOException | RuntimeException bad) {
-            return null;
-        }
-    }
-
-    /** An admitted snapshot holds {@code raw} among its nodes. */
-    private static boolean snapshotContains(ApiContext api, HttpExchange ex, Map<String, Object> snap, String raw,
-                                            Path writeRoot, Map<String, Boolean> readable) {
-        try {
-            InvestigationRoutes.Inv inv = readable(api, ex, (String) snap.get("investigationId"), readable);
-            if (inv == null || !(snap.get("nodes") instanceof List<?> nodes)) return false;
+            InvestigationRoutes.Inv inv = readable(api, ex, invId, readable);
+            if (inv == null) return null;
+            if (!(snap.get("nodes") instanceof List<?> nodes)) return false;
             EntityMasking mask = null;
             for (Object n : nodes) {
                 if (!(n instanceof Map<?, ?> m) || !(m.get("id") instanceof String nid)) continue;
@@ -326,7 +316,7 @@ final class CaseHistory {
             }
             return false;
         } catch (IOException | RuntimeException bad) {
-            return false;
+            return null;
         }
     }
 

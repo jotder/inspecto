@@ -44,7 +44,6 @@ import {
     PendingInvestigation,
     degreeOutcomeMessage,
     degreeState,
-    hubBadgeText,
     presetsSummary,
     suspectTitle,
     windowLabel,
@@ -255,16 +254,10 @@ export class LinkAnalysisInvestigationComponent {
     isOverridden(id: string): boolean {
         return this.store.overriddenHubs().has(id);
     }
-    /** The hub threshold: the last step's sealed value when it ran, else the log's sealed value (a reload), else the
-     *  Space's value in force. */
-    readonly hubThreshold = computed(() => {
-        const sealed = this.store.lastStep()?.read?.rung?.['hubThreshold'];
-        if (typeof sealed === 'number') return sealed;
-        return this.store.sealedHubThreshold() ?? this.laSettings.limits().hubThresholdInForce;
-    });
-    /** The badge for one flagged entity: its own sealed count when served, else the threshold wording. */
+    /** The badge for one flagged entity — the store's single source, shared with the node dialog and Working Set rows;
+     *  without an id it is the threshold wording. */
     hubBadge(contacts?: number | null, id?: string): string {
-        return hubBadgeText(this.hubThreshold(), contacts, !!id && this.isOverridden(id));
+        return this.store.hubBadge(id ?? '', contacts, this.laSettings.limits().hubThresholdInForce);
     }
     /** The selected entity's badge: its own count when it is a single flagged id, else the threshold wording. */
     readonly selectedHubBadge = computed(() => {

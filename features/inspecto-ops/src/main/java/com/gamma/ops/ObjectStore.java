@@ -57,9 +57,10 @@ public interface ObjectStore extends AutoCloseable {
      * Entity "case history" lookup ({@code GET /objects/by-entity}): it only narrows, the caller re-checks every row
      * exactly, so a false positive costs a decode and never a wrong answer.
      *
-     * <p>⚠ No store indexes the attribute bag (it is portable JSON text), so this is ONE bounded scan of the object
-     * table per call; {@code limit} caps the rows read. Like {@link #findByAttributes} it fails closed (throws).
-     * The default serves stores without a cheaper path (in-memory, test doubles) by filtering {@link #query}.
+     * <p>{@link DbObjectStore} answers from a derived side table of the entity-reference attribute values
+     * ({@code key.*}, {@code entityKey}): candidates are objects whose reference VALUE contains the fragment. The default
+     * (in-memory, test doubles) scans the whole encoded bag via {@link #query}. Either way {@code limit} caps the
+     * CANDIDATES returned. Like {@link #findByAttributes} it fails closed (throws).
      */
     default List<OperationalObject> findByAttributeFragment(java.util.Collection<com.gamma.workflow.ObjectType> types,
                                                            String fragment, int limit) {

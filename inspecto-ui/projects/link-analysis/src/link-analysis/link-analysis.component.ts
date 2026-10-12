@@ -728,10 +728,10 @@ export class LinkAnalysisComponent implements OnInit {
     readonly search = signal('');
     readonly kindFilter = signal<string[]>([]); // empty = all
     readonly nodeKinds = computed<string[]>(() => {
-        const g = this.graph();
+        const g = this.investigation.canvas() ?? this.graph();
         return g ? [...new Set(g.nodes.map((n) => n.data.kind))].sort() : [];
     });
-    readonly edgeKinds = computed<string[]>(() => legendEdgeKindsFor(this.graph()));
+    readonly edgeKinds = computed<string[]>(() => legendEdgeKindsFor(this.investigation.canvas() ?? this.graph()));
     /** Collapsed branch roots — their downstream nodes are hidden until expanded. */
     readonly collapsedRoots = signal<string[]>([]);
 
@@ -2278,36 +2278,45 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** Download the displayed graph as `link-analysis.json` (the shared G6GraphData shape). */
     exportJson(): void {
-        const g = this.displayed();
+        const g = this.canvasData();
         if (!g) return;
         this.download(
             URL.createObjectURL(new Blob([JSON.stringify(g, null, 2)], { type: 'application/json' })),
-            'link-analysis.json',
+            `${this.exportBaseName()}.json`,
         );
     }
 
     /** Download the rendered canvas as `link-analysis.png`. */
     async exportPng(): Promise<void> {
         const dataUri = await this.graphView?.exportPng();
-        if (dataUri) this.download(dataUri, 'link-analysis.png');
+        if (dataUri) this.download(dataUri, `${this.exportBaseName()}.png`);
         else this.toastr.warning('Nothing rendered to export yet.');
     }
 
     /** Download the rendered graph as a standalone `link-analysis.svg` (Phase F). */
     exportSvg(): void {
         const svg = this.graphView?.exportSvg();
-        if (svg) this.download(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), 'link-analysis.svg');
+        if (svg) this.download(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), `${this.exportBaseName()}.svg`);
         else this.toastr.warning('Nothing rendered to export yet.');
     }
 
     /** Download the displayed graph as generic `link-analysis.graphml` (Phase F, no vendor dialect). */
     exportGraphml(): void {
-        const g = this.displayed();
+        const g = this.canvasData();
         if (!g) return;
         this.download(
             URL.createObjectURL(new Blob([toGraphml(g)], { type: 'application/xml' })),
-            'link-analysis.graphml',
+            `${this.exportBaseName()}.graphml`,
         );
+    }
+
+    /** `link-analysis`, or the open Investigation's title / id — the file name stem of every export. */
+    private exportBaseName(): string {
+        const id = this.investigation.activeId();
+        if (!this.workingSetCanvas() || !id) return 'link-analysis';
+        const title = this.investigation.header()?.title ?? this.investigation.refs().find((r) => r.id === id)?.title;
+        const stem = (title ?? id).replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '');
+        return `link-analysis-${stem || id}`;
     }
 
     private download(href: string, filename: string): void {
