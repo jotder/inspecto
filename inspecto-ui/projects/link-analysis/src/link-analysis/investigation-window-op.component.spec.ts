@@ -101,7 +101,7 @@ describe('InvestigationWindowOpComponent (LA-SPA-OWED-SURFACES-1)', () => {
     it('sends yearly and nth-weekday exclusion rules, named or not', async () => {
         const { fixture, cmp, store, el } = setup();
         cmp.form.patchValue({
-            exclude: 'Christmas=*-12-25, *-11-THU#4\n2026-01-01, *-02-29',
+            exclude: 'Christmas=*-12-25, *-11-THU#4\n2026-01-01, *-02-29, Memorial=*-05-MON#L, *-12-FRI#L',
             timezone: 'America/New_York',
         });
         fixture.detectChanges();
@@ -115,6 +115,8 @@ describe('InvestigationWindowOpComponent (LA-SPA-OWED-SURFACES-1)', () => {
                     { rule: 'nthWeekday', month: 11, weekday: 'THU', nth: 4 },
                     { date: '2026-01-01' },
                     { rule: 'yearly', month: 2, day: 29 },
+                    { rule: 'lastWeekday', month: 5, weekday: 'MON', name: 'Memorial' },
+                    { rule: 'lastWeekday', month: 12, weekday: 'FRI' },
                 ],
                 timezone: 'America/New_York',
             },
@@ -132,6 +134,11 @@ describe('InvestigationWindowOpComponent (LA-SPA-OWED-SURFACES-1)', () => {
             '*-11-THU#6',
             '*-11-THU#0',
             '*-11-THU',
+            '*-13-MON#L',
+            '*-05-MONDAY#L',
+            '*-05-XXX#L',
+            '*-05-MON#l',
+            '*-05-MON#L#L',
             'x=*-1-1',
             '=*-12-25',
         ]) {

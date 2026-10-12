@@ -109,7 +109,7 @@ const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /**
  * A recurring rule body: `*-MM-DD` (every year on that day) or `*-MM-DOW#N` (the Nth DOW of month MM, N 1-5, e.g.
- * `*-11-THU#4`). `undefined` = not a recurring entry (starts without `*-`); `null` = recurring but malformed (the
+ * `*-11-THU#4`) or `*-MM-DOW#L` (the LAST DOW of month MM, e.g. `*-05-MON#L`). `undefined` = not a recurring entry (starts without `*-`); `null` = recurring but malformed (the
  * server's own 422 shapes: month 1-12, a day the month has, a known weekday, nth 1-5).
  */
 function parseRecurring(body: string): InvestigationWindowExclude | null | undefined {
@@ -120,6 +120,13 @@ function parseRecurring(body: string): InvestigationWindowExclude | null | undef
         const day = Number(yearly[2]);
         return month >= 1 && month <= 12 && day >= 1 && day <= MONTH_DAYS[month - 1]
             ? { rule: 'yearly', month, day }
+            : null;
+    }
+    const last = /^\*-(\d{2})-([A-Z]{3})#L$/.exec(body);
+    if (last) {
+        const month = Number(last[1]);
+        return month >= 1 && month <= 12 && (WINDOW_DAYS as readonly string[]).includes(last[2])
+            ? { rule: 'lastWeekday', month, weekday: last[2] as WindowDay }
             : null;
     }
     const nth = /^\*-(\d{2})-([A-Z]{3})#(\d)$/.exec(body);
@@ -135,7 +142,7 @@ function parseRecurring(body: string): InvestigationWindowExclude | null | undef
 
 /**
  * The calendar-exclusion text -> the wire entries. One entry per comma / newline: `[Name=]DATE` or `[Name=]DATE..DATE`
- * (both ends inclusive), DATE = `YYYY-MM-DD`; or a recurring rule `[Name=]*-MM-DD` / `[Name=]*-MM-DOW#N` (see
+ * (both ends inclusive), DATE = `YYYY-MM-DD`; or a recurring rule `[Name=]*-MM-DD` / `[Name=]*-MM-DOW#N` / `[Name=]*-MM-DOW#L` (see
  * {@link parseRecurring}). `null` when any entry is malformed (the server's own 422 shapes) or there are more than
  * {@link MAX_RECURRING_RULES} rules.
  */

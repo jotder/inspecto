@@ -785,8 +785,8 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   date) then rules (by month, day or nth/weekday, name); caps `MAX_EXCLUDES` 366 dates + `MAX_RULES` 32 rules; an
   unknown `rule`, bad month/day (`04-31`, `02-30`), weekday or `nth`, or extra keys is 422 and never logged. A window
   with no rules seals byte-identically to before (pinned by `InvestigationTimeRecurringTest`). SPA text syntax
-  `[Name=]*-MM-DD` and `[Name=]*-MM-DOW#N` (`Xmas=*-12-25`, `*-11-THU#4`), client-validated against the same bounds
-  (a11y spec in `investigation-window-op.component.spec.ts`). ⏳ Not built: "last weekday of month", Easter-style
+  `[Name=]*-MM-DD` `[Name=]*-MM-DOW#N` and `[Name=]*-MM-DOW#L` - the LAST weekday (`Xmas=*-12-25`, `*-11-THU#4`, `*-05-MON#L`), client-validated against the same bounds
+  (a11y spec in `investigation-window-op.component.spec.ts`). ⏳ Not built: Easter-style
   computed holidays, lunar calendars. ✅ The rest
   (`threshold`, `snapshot`, comparison mode — read route, then the sealed `compare` op on 2026-10-05 —, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
@@ -1861,7 +1861,7 @@ render, and the Dossier stamps `linkId` on its link annotations.
   Dossier does not seal live coverage (its root is deterministic); its negative-space note points at the route. Residual:
   never-delivering Collectors are invisible; partition days use the Pipeline's pinned zone.
   SPA (2026-10-05): the Investigation pane's Coverage section renders `collectors.collectors` as a table (Collector · days
-  covered of expected · missing days); `assessed:false` prints "Per-Collector coverage: not assessed" — never a blank or
+  covered of expected · missing days); `assessed:false` prints "Per-Collector coverage is not assessed for this Dataset." plus the server's note — never a blank or
   "no gaps". `HostCollectorCoveragePort.day()` is pinned for the `year=/month=/day=` and `dt=` partition forms.
 * **D-U11 (2026-09-30) answers** that no paragraph above carries: A1 a snapshot captures what is on screen · A2 the
   cash-out share denominator is ALL cash-out · A3 the agent Entity List is read LIVE and its fact-log head seq/hash

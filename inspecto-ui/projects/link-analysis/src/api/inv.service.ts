@@ -274,9 +274,10 @@ export type WindowDay = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 export interface InvestigationWindowExclude {
     /**
      * A RECURRING rule instead of a date: `yearly` (`month` + `day`, e.g. every 25 Dec) or `nthWeekday` (`month` +
-     * `weekday` + `nth` 1-5, e.g. the 4th Thursday of November). Sealed as the rule; applied to the local day.
+     * `weekday` + `nth` 1-5, e.g. the 4th Thursday of November) or `lastWeekday` (`month` + `weekday`, the last such weekday of the month, e.g. the
+     * last Monday of May; no `nth`). Sealed as the rule; applied to the local day.
      */
-    rule?: 'yearly' | 'nthWeekday';
+    rule?: 'yearly' | 'nthWeekday' | 'lastWeekday';
     month?: number;
     day?: number;
     weekday?: WindowDay;
