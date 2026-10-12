@@ -52,6 +52,12 @@ public final class MaskTokens {
         return HexFormat.of().parseHex(Files.readString(f, StandardCharsets.UTF_8).trim());
     }
 
+    /** The Space's ONE identity key: the fact log's {@code mask.key} under {@code <write root>/audit/entity-facts}. The key
+     *  Link Analysis exploration reads and BI result masking use, so one id has one alias across them (BI-QUERY-MASKING-1). */
+    public static byte[] spaceKey(Path writeRoot) throws IOException {
+        return key(writeRoot.resolve("audit").resolve(EntityFactLog.DIR));
+    }
+
     public static String token(byte[] key, String id) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");

@@ -97,6 +97,10 @@ final class BiRoutes implements RouteModule {
         }
 
         vetHiddenOrderColumns(spec, dataset, store, new ViewStore(writeRoot.resolve("views")));
+        // BI-QUERY-MASKING-1: classified entity keys are masked in the rows unless the caller may reveal them.
+        BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")),
+                spec.dataset(), dataset, BiResultMasking.mayReveal(ex));
+        String boundText = null;
 
         // 4. QUERY-BOUND-WIDGET-1: a Widget bound to a saved Query aggregates over THAT query's result, so the
         //    query's own filtering reaches the Widget. Its text is read and rendered NOW (parameter defaults
@@ -104,6 +108,7 @@ final class BiRoutes implements RouteModule {
         String queryId = ApiContext.str(body, "query");
         if (queryId != null) {
             String with = boundQueryWith(ex, store, queryId, spec);
+            boundText = with;
             MeasureCompiler.Compiled over = MeasureCompiler.compile(overBound(probe));
             // The WITH carries no placeholders (the query text is rendered), so the Measure's parameters stay in order.
             sql = new MeasureCompiler.Compiled(with + over.sql(), over.params());
@@ -114,10 +119,13 @@ final class BiRoutes implements RouteModule {
                         "error", "bound query '" + queryId + "' failed the SQL safety check", "findings", boundFindings));
         }
 
+        masking.vet(spec, true, boundText);
         QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql.sql(),
                 spec.limit(), 0, List.of(), List.of(), sql.params());
         try {
-            return response(QueryExecutor.run(req), echoSql);
+            QueryExecutor.Result raw = QueryExecutor.run(req);
+            QueryExecutor.Result shown = masking.apply(raw, boundText == null ? spec.groupBy() : null, boundText);
+            return response(shown, echoSql, masking.describe());
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: "
                     + ServerFaults.sqlMessage(e.getMessage(), api));
@@ -195,7 +203,7 @@ final class BiRoutes implements RouteModule {
     }
 
     /** The Result Set contract (same shape as {@code /queries/{id}/run}) + the compiled SQL for transparency. */
-    private static Object response(QueryExecutor.Result r, String sql) {
+    private static Object response(QueryExecutor.Result r, String sql, Map<String, Object> masking) {
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ResultSetDescriptor.Column c : r.columns()) {
             Map<String, Object> col = new LinkedHashMap<>();
@@ -219,6 +227,7 @@ final class BiRoutes implements RouteModule {
         data.put("rows", r.rows());
         data.put("statistics", statistics);
         data.put("sql", sql);
+        if (masking != null) data.put("masking", masking);
         return data;
     }
 }

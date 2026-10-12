@@ -1,6 +1,5 @@
 package com.gamma.la.api;
 
-import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.MaskTokens;
@@ -128,8 +127,7 @@ final class ExplorationMasking {
 
     private static byte[] spaceKey(Path writeRoot) {
         try {
-            Path dir = writeRoot.resolve("audit").resolve(EntityFactLog.DIR);
-            return MaskTokens.key(dir);
+            return MaskTokens.spaceKey(writeRoot);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

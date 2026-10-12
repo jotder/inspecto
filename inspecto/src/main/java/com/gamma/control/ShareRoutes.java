@@ -134,6 +134,12 @@ final class ShareRoutes implements RouteModule {
 
         List<Finding> findings = SqlGuard.check(sql.sql());
         if (!findings.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "compiled query failed the SQL safety check");
+        // BI-QUERY-MASKING-1: a public recipient is anonymous, so it NEVER reveals (reveal=false whatever the request carries).
+        // The flat filters are the shared Dashboard's own stored ones (trusted); the recipient's own `when`, order and
+        // measures are vetted.
+        BiResultMasking masking = BiResultMasking.of(api.writeRoot(), store, new ViewStore(api.writeRoot().resolve("views")),
+                datasetId, dataset, false);
+        masking.vet(spec, false, null);
         String relationSql;
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(),
@@ -144,10 +150,13 @@ final class ShareRoutes implements RouteModule {
         try {
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
                     spec.dataset(), relationSql, sql.sql(), spec.limit(), 0, List.of(), List.of(), sql.params()));
+            QueryExecutor.Result shown = masking.apply(r, spec.groupBy(), null);
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("rows", r.rows());
-            out.put("rowCount", r.rowCount());
-            out.put("truncated", r.truncated());
+            out.put("rows", shown.rows());
+            out.put("rowCount", shown.rowCount());
+            out.put("truncated", shown.truncated());
+            Map<String, Object> maskingBlock = masking.describe();
+            if (maskingBlock != null) out.put("masking", maskingBlock);
             return out;
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(e.getMessage(), api));

@@ -147,6 +147,11 @@ final class DatasetRoutes implements RouteModule {
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
+        // BI-QUERY-MASKING-1: classified entity keys are masked in the rows unless the caller may reveal them.
+        BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), id, dataset,
+                BiResultMasking.mayReveal(ex));
+        QueryExecutor.Result raw = r;
+        r = masking.apply(raw, raw.columns().stream().map(ResultSetDescriptor.Column::name).toList(), null);
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ResultSetDescriptor.Column c : r.columns()) {
             Map<String, Object> col = new LinkedHashMap<>();
@@ -164,6 +169,8 @@ final class DatasetRoutes implements RouteModule {
         data.put("columns", columns);
         data.put("rows", r.rows());
         data.put("statistics", statistics);
+        Map<String, Object> maskingBlock = masking.describe();
+        if (maskingBlock != null) data.put("masking", maskingBlock);
         return data;
     }
 

@@ -83,6 +83,7 @@ final class QueryRoutes implements RouteModule {
         // 3. Resolve the dataset (if any) to a trusted relation SQL registered as a view.
         String datasetId = ApiContext.str(query, "datasetId");
         String relationSql = null;
+        BiResultMasking masking = null;
         if (datasetId != null) {
             Map<String, Object> dataset = component(store, "dataset", datasetId)
                     .filter(d -> ComponentAccess.canView(ex, d))   // same refusal as BiRoutes: shared-away ⇒ absent
@@ -92,6 +93,10 @@ final class QueryRoutes implements RouteModule {
             } catch (IllegalArgumentException bad) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
             }
+            // BI-QUERY-MASKING-1: classified entity keys are masked in the rows unless the caller may reveal them.
+            masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), datasetId, dataset,
+                    BiResultMasking.mayReveal(ex));
+            masking.vetSort(sort(body));
         }
 
         // 4. Execute with pagination / sort / projection.
@@ -108,12 +113,14 @@ final class QueryRoutes implements RouteModule {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", io);
         }
 
-        return response(result);
+        if (masking == null) return response(result, null);
+        QueryExecutor.Result shown = masking.apply(result, null, resolved);
+        return response(shown, masking.describe());
     }
 
     // ── response shaping (design §6.2) ────────────────────────────────────────────
 
-    private static Object response(QueryExecutor.Result r) {
+    private static Object response(QueryExecutor.Result r, Map<String, Object> masking) {
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ResultSetDescriptor.Column c : r.columns()) {
             Map<String, Object> col = new LinkedHashMap<>();
@@ -138,6 +145,7 @@ final class QueryRoutes implements RouteModule {
         data.put("statistics", statistics);
         data.put("renderings", ResultSetDescriptor.renderings(r.columns()));
         data.put("exportOptions", List.of("csv", "parquet"));
+        if (masking != null) data.put("masking", masking);
         return data;
     }
 
