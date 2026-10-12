@@ -79,14 +79,14 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     public OperationalObject create(OperationalObject obj) {
         String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)";
         try {
-            return withConn(conn -> {
+            return withConn(conn0 -> tx(conn0, conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     bindAll(ps, obj);
                     ps.executeUpdate();
                     writeRefs(conn, obj);
                     return obj.withVersion(0);
                 }
-            });
+            }));
         } catch (SQLException e) {
             // A duplicate id trips the primary-key constraint — surface it as the SPI's contract type.
             if (get(obj.id()).isPresent())
@@ -120,7 +120,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                 + "severity=?, priority=?, \"owner\"=?, assignee=?, correlation_id=?, attributes=?, "
                 + "created_at=?, updated_at=?, closed_at=?, version=version+1 WHERE id=? AND version=?";
         try {
-            return withConn(conn -> {
+            return withConn(conn0 -> tx(conn0, conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     // Same column order as bindAll minus the leading id, then id as the WHERE param last.
                     ps.setString(1, obj.objectType().name());
@@ -151,7 +151,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                     writeRefs(conn, obj);
                     return obj.withVersion(obj.version() + 1);
                 }
-            });
+            }));
         } catch (SQLException e) {
             throw new IllegalStateException("could not update object " + obj.id() + ": " + e.getMessage(), e);
         }
@@ -160,14 +160,15 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     @Override
     public void delete(String id) {
         try {
-            runConn(conn -> {
+            runConn(conn0 -> tx(conn0, conn -> {
                 try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + TABLE + " WHERE id = ?")) {
                     ps.setString(1, id);
                     if (ps.executeUpdate() == 0)
                         throw new NoSuchElementException("no object with id '" + id + "'");
                 }
                 deleteRefs(conn, id);
-            });
+                return null;
+            }));
         } catch (SQLException e) {
             throw new IllegalStateException("could not delete object " + id + ": " + e.getMessage(), e);
         }
@@ -300,10 +301,6 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         deleteRefs(conn, o.id());
         try (PreparedStatement ps = conn.prepareStatement(
                 "INSERT INTO " + REF_TABLE + " (object_id, attr_key, value_lc) VALUES (?,?,?)")) {
-            ps.setString(1, o.id());
-            ps.setString(2, "");
-            ps.setString(3, "");
-            ps.addBatch();
             for (Map.Entry<String, String> a : o.attributes().entrySet()) {
                 String k = a.getKey(), v = a.getValue();
                 if (v == null || v.isBlank() || !(k.startsWith("key.") || k.equals(ObjectService.ATTR_ENTITY_KEY))) continue;
@@ -312,7 +309,28 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                 ps.setString(3, v.toLowerCase(Locale.ROOT));
                 ps.addBatch();
             }
+            // The placeholder goes LAST: an object is "indexed" only once all its reference rows are in.
+            ps.setString(1, o.id());
+            ps.setString(2, "");
+            ps.setString(3, "");
+            ps.addBatch();
             ps.executeBatch();
+        }
+    }
+
+    /** Run {@code body} in ONE transaction (commit, or roll back on any failure), restoring auto-commit. */
+    private static <T> T tx(Connection conn, ConnectionSource.SqlFunction<T> body) throws SQLException {
+        boolean auto = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try {
+            T r = body.apply(conn);
+            conn.commit();
+            return r;
+        } catch (SQLException | RuntimeException e) {
+            try { conn.rollback(); } catch (SQLException ignored) { /* the original failure matters */ }
+            throw e;
+        } finally {
+            conn.setAutoCommit(auto);
         }
     }
 
@@ -323,15 +341,28 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         }
     }
 
-    /** Index every object that has no side-table rows yet (existing databases, rows written by older builds). */
-    private static void backfillRefs(Connection conn) throws SQLException {
-        List<OperationalObject> missing = new ArrayList<>();
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT " + COLS + " FROM " + TABLE
-                     + " WHERE id NOT IN (SELECT object_id FROM " + REF_TABLE + ")")) {
-            while (rs.next()) missing.add(mapRow(rs));
+    private static final int BACKFILL_PAGE = 1_000;
+
+    /**
+     * Index every object that has no placeholder row yet (existing databases, rows written by older builds, a partial
+     * write). Paged - {@value #BACKFILL_PAGE} objects per transaction - so memory stays bounded; each indexed object gains
+     * its placeholder, so the loop ends.
+     */
+    static void backfillRefs(Connection conn) throws SQLException {
+        while (true) {
+            int n = tx(conn, c -> {
+                List<OperationalObject> page = new ArrayList<>();
+                try (Statement st = c.createStatement();
+                     ResultSet rs = st.executeQuery("SELECT " + COLS + " FROM " + TABLE
+                             + " WHERE id NOT IN (SELECT object_id FROM " + REF_TABLE + " WHERE attr_key = '')"
+                             + " ORDER BY id LIMIT " + BACKFILL_PAGE)) {
+                    while (rs.next()) page.add(mapRow(rs));
+                }
+                for (OperationalObject o : page) writeRefs(c, o);
+                return page.size();
+            });
+            if (n < BACKFILL_PAGE) return;
         }
-        for (OperationalObject o : missing) writeRefs(conn, o);
     }
 
     // ── schema + helpers ─────────────────────────────────────────────────────────

@@ -88,4 +88,30 @@ class FindByAttributeFragmentParityTest {
             assertEquals(List.of(), frag(db, "722222", 10));
         }
     }
+
+    @Test
+    void aFailingSideTableWriteRollsBackTheObjectWrite() throws Exception {
+        try (DbObjectStore db = DbObjectStore.open("jdbc:duckdb:", null, null)) {
+            db.browseSource().run(c -> { try (var st = c.createStatement()) { st.execute("DROP TABLE inspecto_ops_object_entity_ref"); } });
+            assertThrows(IllegalStateException.class,
+                    () -> db.create(withAttrs("r1", ObjectType.INCIDENT, 1, "key.msisdn", "256733333333")));
+            assertTrue(db.get("r1").isEmpty(), "the object INSERT rolled back with the failed refs write");
+        }
+    }
+
+    @Test
+    void backfillRepairsAnObjectWhoseReferenceRowsAreMissingOrPartial() throws Exception {
+        try (DbObjectStore db = DbObjectStore.open("jdbc:duckdb:", null, null)) {
+            db.create(withAttrs("b1", ObjectType.INCIDENT, 1, "key.msisdn", "256744444444"));
+            // A crash left an attribute row but no placeholder (and a stale value) for b1.
+            db.browseSource().run(c -> { try (var st = c.createStatement()) {
+                st.execute("DELETE FROM inspecto_ops_object_entity_ref");
+                st.execute("INSERT INTO inspecto_ops_object_entity_ref VALUES ('b1','key.old','stale')");
+            } });
+            assertEquals(List.of(), frag(db, "744444", 10));
+            db.browseSource().run(DbObjectStore::backfillRefs);
+            assertEquals(List.of("b1"), frag(db, "744444", 10));
+            assertEquals(List.of(), frag(db, "stale", 10), "the partial rows were rewritten, not kept");
+        }
+    }
 }
