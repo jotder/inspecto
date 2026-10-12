@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>The file is written here, not in {@link ModuleSettingsRoutes}, so the route class holds no TOON write of its own
  * (a settings document that writes itself, like the other Space settings records).
  */
-final class ModuleSettings {
+public final class ModuleSettings {
 
     static final String FILE = "modules.toon";
     static final String KEY = "disabled";
@@ -49,7 +49,7 @@ final class ModuleSettings {
     private static final Map<Path, Cached> CACHE = new ConcurrentHashMap<>();
 
     /** The disabled feature ids of the Space whose config root is {@code root} (all stored ids, inert ones included). */
-    static Set<String> disabled(Path root) {
+    public static Set<String> disabled(Path root) {
         if (root == null) return Set.of();
         Path f = root.resolve(FILE).toAbsolutePath().normalize();
         try {
