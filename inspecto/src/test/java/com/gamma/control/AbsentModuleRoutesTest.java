@@ -52,7 +52,7 @@ class AbsentModuleRoutesTest {
 
     @Test
     void theSurfaceIsReadFromTheManifestsOfTheOptionalModules() {
-        assertEquals(72 + 6, AbsentModuleRoutes.surface("la-api", "geo-link").size());
+        assertEquals(76 + 6, AbsentModuleRoutes.surface("la-api", "geo-link").size());
         assertEquals(List.of("GET /risk-scores/([^/]+)/([^/]+)", "POST /risk-scores/preview"),
                 AbsentModuleRoutes.surface("scoring").stream().map(r -> r[0] + " " + r[1]).toList());
     }

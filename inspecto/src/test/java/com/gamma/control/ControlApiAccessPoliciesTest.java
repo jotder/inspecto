@@ -133,6 +133,18 @@ class ControlApiAccessPoliciesTest {
         }
     }
 
+    /** LA-EMBED-VIEW-1: the ABAC action {@code embed} is authorable (a policy can forbid sharing an Investigation); an unknown verb is still 422. */
+    @Test
+    void embedIsAnAuthorableActionAndAnUnknownVerbIsStillRefused(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("cfg"))) {
+            JsonNode saved = json(send(c.port, "PUT", "/access/policies",
+                    "{\"policies\":[{\"name\":\"no-embed\",\"effect\":\"deny\",\"target\":{\"actions\":[\"embed\"],\"resourceKinds\":[\"investigation\"]},\"when\":\"subject.id == 'nobody'\"}]}"));
+            assertEquals("embed", saved.get("policies").get(0).get("target").get("actions").get(0).asText());
+            assertEquals(422, send(c.port, "PUT", "/access/policies",
+                    "{\"policies\":[{\"name\":\"x\",\"effect\":\"deny\",\"target\":{\"actions\":[\"share\"]},\"when\":\"subject.id == 'nobody'\"}]}").statusCode());
+        }
+    }
+
     @Test
     void authoredPoliciesCarryAnAuthoredSourceBadge(@TempDir Path dir) throws Exception {
         // Seed rows only appear when the Enterprise engine supplies them (ControlApiPolicyEnforcementTest);
