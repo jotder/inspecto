@@ -259,7 +259,7 @@ exploration alias, aliases only) and the SPA matches a selected node to its Work
 bind raw ids. Known gap: an Investigation also masks a seed's explicit `entityType`, which a stateless read does not
 carry, so a column no Entity Type claims is raw on the query graph but seeded ids of a masked `entityType` are aliased in the Working Set.
 
-**Stateless four-eyes semantics (fix 2026-10-11).** A stateless read's `limit` is a RENDER CAP, never a fan-out: `/inv/projection`,
+**Stateless four-eyes semantics (fix 2026-10-11).** A *default* is not a declaration (2026-10-12): a `recursive-paths` call that sends no `maxEdgeYield` has its default clamped to `four_eyes_fan_out_above` (the response `fences.maxEdgeYield` says what ran) instead of being refused; one that declares a larger bound is still refused. A stateless read's `limit` is a RENDER CAP, never a fan-out: `/inv/projection`,
 `/multi` and the identity import are judged only as rows against `four_eyes_budget_above`. `four_eyes_fan_out_above` gates where one
 entity's expansion is the thing read - an Investigation `expand` (held for approval) and `/inv/projection/neighbors` of ONE node, judged
 on that node's real counted degree (distinct links; over the threshold = 403). Traversals still judge their declared `maxEdgeYield`.

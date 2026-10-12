@@ -345,7 +345,7 @@ Investigation's purpose; the override is sealed in that step and the panel shows
 The hub threshold is set per Space in **Settings → Link Analysis → Hub threshold** (a whole number ≥ 1; blank = the
 default, 500; the value in force is shown; editing needs the Workbench authoring capability, read-only otherwise).
 
-Reading a Dataset's links (Explore a Dataset, Follow the money, saved views) is never held by the fan-out threshold - the row limit only caps what is drawn; only expanding ONE entity whose real link count is above the threshold waits.
+Reading a Dataset's links (Explore a Dataset, Follow the money, saved views) is never held by the fan-out threshold - the row limit only caps what is drawn; only expanding ONE entity whose real link count is above the threshold waits. Without the Incident management capability the Investigation tab is read-only: Seed, Expand, Undo, marks, Fork a Draft and the Draft actions are disabled, with a note saying why. In the standalone Link Analysis app, a user with the Workbench authoring capability also sees a **Settings** link in the left rail (Settings > Link Analysis).
 
 **Four-eyes (large expands).** An expand whose budget or fan-out cap is above the Space's four-eyes thresholds
 (**Settings → Link Analysis**) does not run: it answers *Waiting for approval* and is held as a request, one at a time
