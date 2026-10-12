@@ -1,6 +1,8 @@
 # BI result masking - design (`BI-QUERY-MASKING-1`)
 
-> **Status: DESIGN + first slice built 2026-10-12 (lane), awaiting operator security review before any push.**
+> **Status: DESIGN + first slice + gap-closure slice built 2026-10-12 (lane), awaiting operator security review before any push.**
+> Gap closure (section 11): `/db` routes, Report exports, KPI values, Rule Template simulate, numeric key derivations and the
+> `$parameter` oracle are covered; Exchange snapshots stay open on decision D-M6 (section 11.6).
 > Decision D7 of [`parked-rows-scoping-2026-10-12.md`](parked-rows-scoping-2026-10-12.md): classified entity keys in BI
 > result rows are MASKED unless the caller holds the reveal capability. This is a security change that alters what
 > every dashboard, report and share viewer sees; it is written to be reviewed line by line.
@@ -35,10 +37,10 @@ Found by grepping every `QueryExecutor.run` / `DatasetRelation.relationSql` call
 | 3 | `GET /datasets/{id}/rows` | Widget Builder, viewer | no | **yes** | the same helper (a one-line reuse) |
 | 4 | `POST /public/dashboards/{token}/query` | anonymous share recipient | no | **yes, never revealed** | same helper with reveal = false whatever the request carries; the stored dashboard filter is trusted, the recipient's own `when` is vetted |
 | 5 | Widget / Dashboard data | (client-side over 1) | n/a | **yes via 1** | a Widget has no data route of its own; the Dashboard fetches `/bi/query` per tile |
-| 6 | `GET /db/table`, `POST /db/query` (business-store group) | viewer | no | **NOT covered** | reads a STORE by name (not a Dataset): needs a store-to-Dataset classification resolver; filed as follow-up |
-| 7 | Report render/export (`ReportJob`: CSV / XLSX / PDF written by a scheduled Job) | the Job (no request caller) | no | **NOT covered** | masks at WRITE time under the Job (no Subject): decision D-M5 |
-| 8 | Share snapshot / Exchange snapshot (`ExchangeSnapshotWriter`) | another Space | no | **NOT covered** | publishes a Dataset as Parquet to a consumer Space; a data product, its own contract (D-M6) |
-| 9 | `GET /kpis/{id}/value`, `POST /rule-templates/{id}/simulate` | viewer / author | no (scalar / gated) | not covered | KPI returns one aggregate, no key; simulate needs `canAuthorWorkbench` |
+| 6 | `GET /db/table`, `POST /db/query` (business-store group) | viewer | no | **yes (gap closure, 11.1)** | a STORE carries the classification of the Datasets over its `physicalRef` plus the pipeline schema; sort / WHERE / JOIN on a masked key refused |
+| 7 | Report render/export (`ReportJob`: CSV / XLSX / PDF written by a scheduled Job) | the Job (no request caller) | no | **yes, always masked (gap closure, 11.2)** | masks at WRITE time as a non-revealing caller; a reveal option is the open half of D-M5 |
+| 8 | Share snapshot / Exchange snapshot (`ExchangeSnapshotWriter`) | another Space | no | **NOT covered - open on D-M6 (11.6)** | publishes a Dataset as Parquet to a consumer Space; a data product, its own contract |
+| 9 | `GET /kpis/{id}/value`, `POST /rule-templates/{id}/simulate` | viewer / author | no | **yes (gap closure, 11.3, 11.4)** | a KPI whose Measure is min / max / sum / avg of a masked column is refused (a one-row period IS the key); simulate masks its rows and refuses a hole bound to a masked column |
 | 10 | Intelligence tools (`InspectoTools` query_author) | assistant | no | not covered | reads rows under the author capability |
 | 11 | Risk / Anomaly Score reads | viewer | yes (`keyMasked`) | yes | existing; uses the Risk Score key (see 6) |
 | 12 | Link Analysis reads | viewer | yes | yes | existing (`ExplorationMasking`) |
@@ -92,8 +94,8 @@ The default ordering of an ungrouped-order grouped query is by raw key; it does 
 Output columns are named by the author's SQL, so the match is by name PLUS a conservative rule: the output column is masked
 when its name equals a masked Dataset column, OR when the query text mentions a masked column and the output column is a
 string that is not itself a known unclassified column of the Dataset (`SELECT upper(msisdn) AS u` and `msisdn AS m` are
-masked; `region` and `count(*) AS n` are not). A NUMERIC derivation of a numeric key (`CAST(msisdn AS BIGINT) AS m`) is NOT
-detected: that is a documented residual (see 7).
+masked; `region` and `count(*) AS n` are not). A NUMERIC derivation of a numeric key (`CAST(msisdn AS BIGINT) AS m`) is now detected by the DuckDB parse tree
+(11.5); only when the tree cannot be trusted does the coarse rule apply.
 A bound-query Widget on `/bi/query` (`query` in the body) uses the same rule over the saved query's text.
 
 ### 4.5 Response
@@ -133,9 +135,10 @@ most the row cap (10 000 rows x masked columns), with a per-request cache so a r
 
 ## 7. What this slice does NOT cover (honest list)
 
-`/db/table` and `/db/query` on business stores; Report Job exports; Exchange snapshots; the assistant's query tool;
-numeric derivations of a numeric key through `/queries/{id}/run`; the raw-order rank of a default-ordered grouped result;
-the Risk Score key mismatch (4.1); `typed` mode leaving an unclaimed PII column raw.
+Exchange snapshots (11.6); the assistant's query tool; the other Job types that write rows to files; the raw-order rank of a
+default-ordered grouped result; the Risk Score key mismatch (4.1); `typed` mode leaving an unclaimed PII column raw. Closed
+since the first slice (section 11): `/db` routes, Report Job exports, KPI values, Rule Template simulate, numeric
+derivations, the `$parameter` oracle.
 
 ## 8. Migration note (what existing dashboards visibly change)
 
@@ -161,6 +164,80 @@ share route. Each negative test is MUTATED once (skip the mask -> red; swap the 
 * **D-M2** a Space on `maskingMode none` opts BI out as well (built), or BI always masks?
 * **D-M3** refuse filter / order on a masked column (built), or accept an alias value through a server-side book?
 * **D-M4** audit a reveal (one event per BI request that returned raw classified data)? Today: no (D-P8).
-* **D-M5** Report Job exports: mask at write time? (follow-up row)
-* **D-M6** Exchange snapshots of a classified Dataset: mask, or refuse the offer? (follow-up row)
+* **D-M5** Report Job exports: built as ALWAYS masked (the fail-closed default). Still open: an explicit, capability-checked
+  `revealKeys` on the Job for a recipient who legitimately needs raw keys (needs a Job write gate; see 11.2).
+* **D-M6** Exchange snapshots of a classified Dataset: mask, refuse the offer, or carry the classification (OPEN, 11.6).
 * **D-M7** unify the Risk Score mask key with the Space identity key so one id has one alias everywhere?
+
+## 11. Gap closure (2026-10-12, second slice)
+
+Every item below follows the first slice's rule (fail closed, a Subject-less request unrestricted, the public share never
+reveals) and is pinned by a real-HTTP or real-Job test in which the SAME request succeeds for a caller holding
+`canRevealLinkEntities` (or with `maskingMode none`), so the refusal or the alias is the only variable.
+
+### 11.1 `/db/table` and `/db/query` (stores of business data)
+A store is not a Dataset, so `DbBrowserRoutes.storeMasking` builds a pseudo-Dataset over the store: `physicalRef = <store>`
+and the merged `columns[]` of every Dataset whose `physicalRef` is that store. The one resolver then adds the pipeline-schema
+and sibling-Dataset lineage as usual. `GET /db/table`: the rows are masked, a `sort` on a masked column is refused 422.
+`POST /db/query` is the caller's OWN SQL, so a masked key may only be SELECTED: any other mention (WHERE, HAVING, GROUP BY,
+ORDER BY, JOIN, subquery, CTE) is refused 422 using the DuckDB parse tree (`SqlGuard.parseSelectNode`, a thin public reader
+of the parser the safety gate already runs); text that does not parse as one plain SELECT is refused when it names a masked
+column. A `count(CASE WHEN key = ..)` or `count(*) FILTER (WHERE key = ..)` is treated as a derivation (its output is aliased),
+not as a count. A store no Dataset or pipeline classifies is byte-identical. The operational (`ops:*`) groups are unchanged
+(already behind `canAuthorWorkbench`; they hold control-plane tables, not entity keys).
+
+### 11.2 Report Job exports
+`ReportJob` (scope `dataset`) writes a file for recipients nobody can capability-check, so the rows are ALWAYS written as a
+non-revealing caller would see them. The classification lives in the entity-store module, which the engine cannot see, so the
+engine declares the seam `com.gamma.job.ReportRowMasking` (a `ServiceLoader` SPI) and the control-plane module provides it
+(`BiReportRowMasking`, registered under `META-INF/services`). With no provider on the classpath (an engine-only deployment)
+there is no classification surface and rows pass through. A `min / max / sum / avg` Measure over a masked column FAILS the Run
+(`IllegalArgumentException`, nothing written): it would write one raw key per group. `maskingMode none` opts the export out.
+Open (D-M5): a `revealKeys` option on the Job. It needs a capability gate at Job write (`JobWriteGuard`) and an approval
+fingerprint entry like `attach`, and it is a product decision: who may author a Report that ships raw keys outside the platform.
+
+### 11.3 KPI values
+`GET /kpis/{id}/value` returns one number per period. A KPI over `max / min / sum / avg` of a masked column returns the key
+itself (or its multiple) when the period holds one row, so it is refused 422 for a non-revealing caller; `count` and
+`countDistinct` are unaffected. The refusal is at READ time (the save gate is unchanged: an author who cannot reveal may still
+save such a KPI, which then serves a revealer only).
+
+### 11.4 Rule Template simulate
+`POST /rule-templates/{id}/simulate` (gated `canAuthorWorkbench`, which is NOT the reveal capability) masks its rows through
+the same helper and adds the `masking` block. A hole whose `field` is a masked column, with a caller-supplied value, is refused
+422: `WHERE msisdn = :who` is an equality oracle.
+
+### 11.5 Numeric derivations and the `$parameter` oracle
+* **Numeric derivation.** For free SQL the helper now reads the DuckDB parse tree: an output POSITION is masked when its
+  select-list expression references a masked column (or, with an untraceable lineage, any column not declared clean) through
+  anything but a plain `count`. This closes `CAST(msisdn AS BIGINT) AS m`, `msisdn::BIGINT + 1`, and an alias that reuses a
+  declared-clean name (`CAST(msisdn AS BIGINT) AS amount`). When the positions cannot be trusted (parse failure, a subquery or CTE,
+  `SELECT *`) every numeric output column not declared clean is masked instead (fail closed; a `count(*) AS n` then reads as
+  masked in such a query).
+* **`$parameter` oracle.** `POST /queries/{id}/run` substitutes caller-supplied `parameters` into the saved text, so
+  `WHERE msisdn LIKE $prefix` bisects a masked key. A caller who cannot reveal and supplies ANY parameter value is refused 422
+  when the text names a masked column (or the lineage is untraceable). The author's declared defaults stay trusted and a
+  parameter over an unclassified column is unaffected.
+
+### 11.6 Exchange snapshots - NOT built (needs decision D-M6)
+`ExchangeSnapshotWriter.publish` copies the owner's WHOLE Dataset to `snapshot.parquet` and records column name / type / role
+only. Two facts make this a product decision rather than a patch:
+1. Classification does not travel. The consumer Space reads the snapshot through a shared ref whose own Dataset declares no
+   `classification`, so the consumer's BI routes (all now masking) see an unclassified column and return the raw key. Masking
+   in the consumer therefore needs the classification carried in the snapshot metadata (`current.toon` `columns[]`).
+2. The offer is a data PRODUCT: the contract with the consumer may include raw keys (a join against the consumer's own
+   subscriber list). Aliasing at publish time (HMAC under the OWNER's identity key) breaks that join; refusing the offer
+   breaks the sharing feature for classified Datasets.
+
+Options for the operator: (a) carry the classification in the snapshot meta and mask in the consumer's BI routes under the
+CONSUMER's reveal capability (raw stays on disk, no join break; the file itself is readable by the consumer Space's operator);
+(b) alias at publish under a key shared by both Spaces (breaks nothing that joins on alias, breaks raw joins); (c) refuse to
+offer a Dataset with a masked column unless the grant carries an explicit `revealKeys` (strictest). The module boundary also
+applies: `inspecto-exchange` cannot see the entity store, so (b) and (c) need a seam like 11.2 and (a) needs only metadata.
+No code was changed for this item.
+
+### 11.7 Still open (not built, no decision needed beyond filing)
+* The Intelligence tools' `query_author` rows, and any Job type other than the Report Job that writes rows to a file, are not
+  masked; each needs the 11.2 seam wired in.
+* A Report file whose rows were aliased carries no marker, and the REPORT_READY event does not say a column was aliased. Cheap
+  to add once D-M5 settles whether a reveal option exists.
