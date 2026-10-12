@@ -91,6 +91,10 @@ param(
     # `if ($DemoAuth)` block, or if the demo branch stops removing inspecto-oidc.jar. The demo bundle's modules.list comes from
     # tools/offering-classpath.mjs --demo (the OIDC trio replaced by the demo jar), which serve-demo.* read like any launcher.
     [switch]$DemoAuth,
+    # With -DemoAuth -Ui la-app the bundle ships the `la-showcase` Space PRE-SEEDED (operator 2026-10-12; step 6f, package-demo-bake.ps1):
+    # the staged bundle is booted against a scaffolded Space and seeded over HTTP before the zip. -NoBakeDemo skips that for a fast
+    # local package (the bundle then ships no Space, as every other bundle does). Ignored without -DemoAuth -Ui la-app.
+    [switch]$NoBakeDemo,
     # UI flavor (D-5 step 7, la-separation-d5-design Decisions 6/7): WHICH single-page application the bundle's ui/ holds.
     # NOT an edition (EDITIONS.md): every edition can ship either. 'gamma' is the Inspecto console (the default, the
     # bundle as it always was); 'la-app' is the Link Analysis application (inspecto-ui/projects/la-app). The two
@@ -1295,7 +1299,8 @@ if (Test-Path $uiDist) {
 }
 
 # ── step 4: stage spaces/ — the Space-template gallery ONLY ───────────────────
-# BUNDLES SHIP NO SPACES (operator decision 2026-09-25), in every edition: the bundle's spaces/ holds
+# BUNDLES SHIP NO SPACES (operator decision 2026-09-25), in every edition EXCEPT the demo-auth la-app flavor (operator 2026-10-12: it
+# ships the pre-seeded la-showcase Space, baked in step 6f below): the bundle's spaces/ holds
 # only _templates (the Space-template gallery - an underscore sentinel, never booted as a Space).
 # Spaces are ATTACHED at deploy time by dropping the Space folder(s) into spaces\ (or pointing
 # SPACES_ROOT / -Dspaces.root at a folder holding them); the server boots with zero Spaces and one can
@@ -2301,6 +2306,34 @@ The server listens on 127.0.0.1 only and refuses to start the demo sign-in on an
 The bundled SBOM describes the Enterprise module set: it lists inspecto-oidc (not shipped here) and
 omits inspecto-demo-auth (shipped here).
 "@
+    if ($Ui -eq 'la-app' -and -not $NoBakeDemo) {
+        # The la-app flavor ships the PRE-SEEDED la-showcase Space (step 6f, operator 2026-10-12): replace the "attach a Space" text.
+        $demoReadme = @"
+INSPECTO DEMO BUILD (LINK ANALYSIS) - INTERNAL EVALUATION ONLY
+===============================================================
+This build signs people in as Demo Users with NO password and NO identity provider (DEMO-AUTH-1).
+It is not secure and must never be given to a customer, exposed on a network, or used with real data.
+
+UNZIP, RUN, SIGN IN. The Space la-showcase is PRE-INSTALLED under .\spaces\la-showcase with its synthetic data and its seeded state:
+the Investigation mule-hub-case (8 steps, 3 members), Drafts, Entity Lists (smurf-accounts, telecom-watch-msisdn), an identity assertion,
+a Case, an Alert Rule with standing detection, and the Jobs (la_index_build, la_detect). Nothing needs a seed step; no node is required.
+
+1. Run serve-demo.bat (Windows) or ./serve-demo.sh (Linux). Set PORT to change the port (default 8080).
+2. Open http://127.0.0.1:8080 and pick a Demo User:
+     fm.analyst    Demo FM Analyst   Fraud analyst (lead): owns mule-hub-case; works Investigations, Alert Rules and Incidents
+     fm.manager    Demo FM Manager   Fraud manager: the second approver of four-eyes requests; the Case is assigned to this user
+     admin         Demo Admin        Platform administrator: lead on the Investigation; can Reveal masked values and change LA settings
+     ra.analyst    Demo RA Analyst   Revenue Assurance reviewer: a member of the Investigation with no capability (view only)
+     demo.manager  Demo Manager      NOT a member of the Investigation: shows what a non-member sees (refused)
+
+RESET THE DEMO: stop the server, delete .\spaces\la-showcase, and restore that folder from the zip (re-extract spaces\la-showcase).
+Anything done during a session (new steps, Drafts, Alert Rules) lives in that folder, so a reset discards it.
+
+The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
+The bundled SBOM describes the Enterprise module set: it lists inspecto-oidc (not shipped here) and
+omits inspecto-demo-auth (shipped here).
+"@
+    }
     Write-CrlfScript -Path "$bundleDir\DEMO-BUILD.txt" -Content $demoReadme
     Write-Host "DEMO BUILD: serve-demo.bat / serve-demo.sh / DEMO-BUILD.txt written; serve.* and service installers removed" -ForegroundColor Yellow
 }
@@ -2523,6 +2556,17 @@ if (-not $SkipBootCheck) {
     }
     Remove-Item $out, "$out.err" -ErrorAction SilentlyContinue
     Write-Host "  verified: the staged $Edition bundle boots and answers /health" -ForegroundColor DarkGray
+}
+
+# ── step 6f: bake the pre-seeded la-showcase Space (ONLY the demo-auth la-app bundle; operator 2026-10-12) ──
+# A deliberate, narrow reversal of "bundles ship no Spaces": a presenter unzips, runs serve-demo, signs in - no node, no seed step.
+# The helper boots THIS staged bundle on a loopback port against a scaffolded Space, seeds it over HTTP, stops it gracefully and
+# copies the Space in; any failure throws (never a half-seeded demo). tools/check-bundle-spaces.mjs guards the gate below.
+if ($DemoAuth -and $Ui -eq 'la-app' -and -not $NoBakeDemo) {
+    . (Join-Path $adjParserDir 'package-demo-bake.ps1')
+    Invoke-DemoSpaceBake -RepoRoot $sandboxRoot -BundleDir $bundleDir -Java $(if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" } elseif (Test-Path "$bundleDir/runtime/bin/java") { "$bundleDir/runtime/bin/java" } else { 'java' }) -ModuleJars @(Get-Content (Join-Path $bundleDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -DemoFlags ($demoFlags -split ' ') -Port ([int]$env:INSPECTO_BAKE_PORT)
+    & node (Join-Path $sandboxRoot 'tools/check-bundle-spaces.mjs') --bundle $bundleDir --demo-auth --ui la-app
+    if ($LASTEXITCODE -ne 0) { throw "the baked demo bundle fails the bundle-spaces guard" }
 }
 
 # ── step 7: copy README + docs tree ─────────────────────────────────────────────
