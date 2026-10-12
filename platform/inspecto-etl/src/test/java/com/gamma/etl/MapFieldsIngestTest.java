@@ -27,8 +27,8 @@ class MapFieldsIngestTest {
               name: ev
               format: CSV
               fields[2]{name,selector,type}:
-                ACCOUNT,"account",VARCHAR
-                AMT,"amt",VARCHAR
+                ACCOUNT,0,VARCHAR
+                AMT,1,VARCHAR
             mapping:
               canonicalName: ev
               rawName: ev

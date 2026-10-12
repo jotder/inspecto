@@ -24,16 +24,16 @@ class StructureCsvDualReadTest {
     void siblingStructureCsvOverridesInlineFields(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("mini_structure.csv"), """
                 field,type,selector,unit,description,classification
-                ACCOUNT_NUMBER,VARCHAR,account,,"Account, as billed",PII
-                EVENT_DATE,DATE,event_date,,,
-                ZZ_FROM_CSV,DOUBLE,amt,USD,,
+                ACCOUNT_NUMBER,VARCHAR,0,,"Account, as billed",PII
+                EVENT_DATE,DATE,1,,,
+                ZZ_FROM_CSV,DOUBLE,2,USD,,
                 """, StandardCharsets.UTF_8);
 
         List<Map<String, Object>> fields = fields(load(dir));
         assertEquals(3, fields.size(), "the CSV's 3 fields must replace the schema's inline list");
         assertEquals("Account, as billed", fields.get(0).get("description"), "a quoted cell keeps its comma");
         assertEquals("PII", fields.get(0).get("classification"));
-        assertEquals(Map.of("name", "EVENT_DATE", "selector", "event_date", "type", "DATE"), fields.get(1));
+        assertEquals(Map.of("name", "EVENT_DATE", "selector", "1", "type", "DATE"), fields.get(1));
         assertEquals("USD", fields.get(2).get("unit"));
     }
 

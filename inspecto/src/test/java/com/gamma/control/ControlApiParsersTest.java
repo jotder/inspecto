@@ -222,7 +222,10 @@ class ControlApiParsersTest {
             assertFalse(plain.has("derivedError"));
 
             Map<String, Object> declared = new java.util.LinkedHashMap<>(asn1);
-            declared.put("segments", Map.of("Record", rec.toString(), "Usage", use.toString()));
+            Map<String, Object> segs = new java.util.LinkedHashMap<>(); // Map.of iterates in a randomised order; the preview lists segments in declared order
+            segs.put("Record", rec.toString());
+            segs.put("Usage", use.toString());
+            declared.put("segments", segs);
             declared.put("children", Map.of("Record", Map.of("usage.usage", "Usage")));
             JsonNode r = json(send(c.port, "POST", "/parsers/asn1/preview",
                     m.writeValueAsString(Map.of("grammar", Map.of("asn1", declared), "sample_b64", sample))));

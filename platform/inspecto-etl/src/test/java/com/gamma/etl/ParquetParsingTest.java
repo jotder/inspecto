@@ -132,7 +132,11 @@ class ParquetParsingTest {
 
     @Test
     void otherFrontendsLeaveParquetNull(@TempDir Path dir) throws Exception {
-        PipelineConfig cfg = load(dir, "off", "parsing:\n  frontend: delimited\n");
+        // delimited selectors are column INDEXES (name selectors are parquet-only), so use an index schema
+        String idxSchema = SCHEMA.replace("\"account\"", "0").replace("\"event_date\"", "1").replace("\"amount\"", "2");
+        Path schema = dir.resolve("schema_off.toon");
+        Files.writeString(schema, idxSchema, StandardCharsets.UTF_8);
+        PipelineConfig cfg = loadWithSchema(dir, "off", "parsing:\n  frontend: delimited\n", schema);
         assertNull(cfg.parquet(), "parquet stays null for every other frontend");
     }
 

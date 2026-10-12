@@ -34,8 +34,8 @@ class SchemaRefResolutionTest {
               name: ev
               format: CSV
               fields[2]{name,selector,type}:
-                ACCOUNT_NUMBER,"account",VARCHAR
-                EVENT_DATE,"event_date",DATE
+                ACCOUNT_NUMBER,0,VARCHAR
+                EVENT_DATE,1,DATE
             mapping:
               canonicalName: ev
               rawName: ev
