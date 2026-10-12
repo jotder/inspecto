@@ -279,6 +279,24 @@ public final class LinkEventTypes {
     /** An index build failed; nothing was published. Adds {@code failure} (the exception CLASS name, never its message). */
     public static final String LINK_INDEX_BUILD_FAILED = "LINK_INDEX_BUILD_FAILED";
 
+    /** A read-only EMBED link to an Investigation was minted ({@code POST /inv/investigations/{id}/embeds}, LA-EMBED-VIEW-1) by a lead.
+     *  {@code investigationId}, {@code grantId}, {@code issuedBy}, {@code expiresAt}, {@code ttlHours}, {@code maskingMode}. Never the token, the
+     *  label (free text) or an entity id. */
+    public static final String LINK_EMBED_MINTED = "LINK_EMBED_MINTED";
+
+    /** An embed link was revoked - by a lead ({@code POST .../embeds/{grantId}/revoke}) or automatically (the minter lost their lead role,
+     *  the Investigation's Case closed, masking was loosened). {@code investigationId}, {@code grantId}, {@code reason}, {@code revokedBy}. */
+    public static final String LINK_EMBED_REVOKED = "LINK_EMBED_REVOKED";
+
+    /** An embed link was used ({@code GET /public/investigations/{token}}). The actor is {@code embed:<grantId>}; {@code investigationId},
+     *  {@code grantId}, {@code issuedBy}, {@code step} (the head shown), {@code uaHash} (a short hash of the user agent). Never the token or an entity id. */
+    public static final String LINK_EMBED_VIEWED = "LINK_EMBED_VIEWED";
+
+    /** A presented embed token was refused. {@code reason} (an internal code: MALFORMED, UNKNOWN, MISMATCH, REVOKED, EXPIRED, PURGED, DISABLED,
+     *  INVESTIGATION_GONE, MINTER_NOT_LEAD, CASE_CLOSED, MASKING_LOOSENED) and {@code tokenHash} (8 hex digits of its SHA-256) - the HTTP client
+     *  only ever sees the same 404. Never the token itself. */
+    public static final String LINK_EMBED_DENIED = "LINK_EMBED_DENIED";
+
     /** A SCHEDULED index build (the {@code la.index.build} Job, run as the delegated principal {@code index-build:<job>})
      *  was attempted or refused. Adds {@code dataset}, {@code result} (BUILT | UP_TO_DATE | REFUSED | FAILED | RUNNING),
      *  {@code mode} and, on a refusal, the stable {@code code}. Never a column name or a row value. */

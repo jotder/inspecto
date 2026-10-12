@@ -58,6 +58,85 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     private static final String MEMBERS = "members.jsonl";
 
+    // -- embed grants (LA-EMBED-VIEW-1) ------------------------------------------------------------------
+    //   investigations/<id>/embeds/<grantId>.json   the grant record (opaque JSON; holds the token's SHA-256, never the token)
+    //   embed-grants/<grantId>                      one line: the Investigation id - the pointer a public lookup starts from
+    // Both are sidecars: nothing here is a log entry, a header byte or a Dossier input.
+
+    private Path embedIndex(String grantId) {
+        return snapshots.directory().resolve("embed-grants").resolve(grantId);
+    }
+
+    private Path embedFile(String investigationId, String grantId) {
+        return snapshots.investigationDir(investigationId).resolve("embeds").resolve(grantId + ".json");
+    }
+
+    @Override
+    public boolean createEmbedGrant(String investigationId, String grantId, String json) throws IOException {
+        if (!EMBED_GRANT_ID.matcher(grantId).matches()) throw new IOException("not a grant id");
+        Path inv = snapshots.investigationDir(investigationId);
+        if (!Files.isRegularFile(inv.resolve("header.json"))) throw new IOException("no such investigation");
+        synchronized (monitor(inv)) {
+            Path file = embedFile(investigationId, grantId);
+            if (Files.exists(embedIndex(grantId))) return false;
+            Files.createDirectories(file.getParent());
+            Files.createDirectories(embedIndex(grantId).getParent());
+            Files.writeString(file, json, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            try {
+                Files.writeString(embedIndex(grantId), investigationId, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            } catch (java.nio.file.FileAlreadyExistsException taken) {
+                Files.deleteIfExists(file);
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /** The Investigation id a grant points at, or null for an id that is not a grant id or has no pointer. */
+    private String embedInvestigation(String grantId) throws IOException {
+        if (grantId == null || !EMBED_GRANT_ID.matcher(grantId).matches()) return null;
+        Path index = embedIndex(grantId);
+        if (!Files.isRegularFile(index)) return null;
+        String id = Files.readString(index, StandardCharsets.UTF_8).trim();
+        return SnapshotStore.SAFE_ID.matcher(id).matches() ? id : null;
+    }
+
+    @Override
+    public Optional<String> embedGrant(String grantId) throws IOException {
+        String inv = embedInvestigation(grantId);
+        if (inv == null) return Optional.empty();
+        Path f = embedFile(inv, grantId);
+        return Files.isRegularFile(f) ? Optional.of(Files.readString(f, StandardCharsets.UTF_8)) : Optional.empty();
+    }
+
+    @Override
+    public boolean replaceEmbedGrant(String grantId, String json) throws IOException {
+        String inv = embedInvestigation(grantId);
+        if (inv == null) return false;
+        Path f = embedFile(inv, grantId);
+        synchronized (monitor(snapshots.investigationDir(inv))) {
+            if (!Files.isRegularFile(f)) return false;
+            Path tmp = Files.createTempFile(f.getParent(), ".embed-", ".tmp");
+            Files.writeString(tmp, json, StandardCharsets.UTF_8);
+            Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            return true;
+        }
+    }
+
+    @Override
+    public List<String> embedGrants(String investigationId) throws IOException {
+        Path d = snapshots.investigationDir(investigationId).resolve("embeds");
+        if (!Files.isDirectory(d)) return List.of();
+        List<Path> files = new ArrayList<>();
+        try (var ds = Files.newDirectoryStream(d, "*.json")) {
+            for (Path f : ds) files.add(f);
+        }
+        files.sort(java.util.Comparator.comparing(f -> f.getFileName().toString()));
+        List<String> out = new ArrayList<>();
+        for (Path f : files) out.add(Files.readString(f, StandardCharsets.UTF_8));
+        return out;
+    }
+
     private final FsInvestigationLayout snapshots;
 
     private final java.util.function.LongSupplier maxSetBytes;

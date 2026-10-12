@@ -54,6 +54,8 @@ class ControlApiGeoLinkModuleGateTest {
             new String[]{"GET", "/inv/investigations/x/coverage"},            // InvestigationCoverageRoutes
             new String[]{"GET", "/inv/investigations/x/members"},             // InvestigationMemberRoutes
             new String[]{"GET", "/inv/investigations/x/references"},          // InvestigationReferenceRoutes
+            new String[]{"GET", "/inv/investigations/x/embeds"},              // InvestigationEmbedRoutes
+            new String[]{"GET", "/public/investigations/x"},                  // PublicInvestigationRoutes
             new String[]{"GET", "/inv/investigation-templates"},              // InvestigationTemplateRoutes
             new String[]{"POST", "/inv/pattern/branching"},                   // PatternRoutes
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes

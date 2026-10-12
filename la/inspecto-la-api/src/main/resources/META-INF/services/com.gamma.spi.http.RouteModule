@@ -15,4 +15,6 @@ com.gamma.la.api.EntityIdentityRoutes
 com.gamma.la.api.GraphRunRoutes
 com.gamma.la.api.IndexRoutes
 com.gamma.la.api.InvestigationMemberRoutes
+com.gamma.la.api.InvestigationEmbedRoutes
+com.gamma.la.api.PublicInvestigationRoutes
 com.gamma.la.api.DraftRoutes

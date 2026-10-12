@@ -162,6 +162,40 @@ public interface InvestigationStore {
     /** An opaque token that changes whenever the scope's log does (an append, a rebase swap, a close): a cache valid at one token is stale at another. */
     String logToken(Scope scope) throws IOException;
 
+    // ── Embed grants (LA-EMBED-VIEW-1) ───────────────────────────────────────────────────────────────────
+
+    /** The only shape a grant id may take: it is the public half of a token and so ARRIVES from a stranger - a store must never build a path or a key from anything else. */
+    java.util.regex.Pattern EMBED_GRANT_ID = java.util.regex.Pattern.compile("[A-Za-z0-9_-]{8,64}");
+
+    /**
+     * Create the record of an embed grant beside the Investigation it shows (a SIDECAR, never a log entry: the sealed hashes, the
+     * Dossier root and the op-log hash never see it). {@code json} is opaque to the store; it holds the token's SHA-256 and never the
+     * token. False when {@code grantId} is taken. A backend that does not hold grants yet answers 503 (the default).
+     */
+    default boolean createEmbedGrant(String investigationId, String grantId, String json) throws IOException {
+        throw embedUnsupported();
+    }
+
+    /** The grant record by its id (as presented by a token - hostile input: an id that is not an {@link #EMBED_GRANT_ID} is simply absent), or empty. */
+    default Optional<String> embedGrant(String grantId) throws IOException {
+        throw embedUnsupported();
+    }
+
+    /** Replace an EXISTING grant record atomically (revoke, view counters, hash purge); false when there is no such grant. */
+    default boolean replaceEmbedGrant(String grantId, String json) throws IOException {
+        throw embedUnsupported();
+    }
+
+    /** Every grant record of one Investigation, in any state. */
+    default List<String> embedGrants(String investigationId) throws IOException {
+        throw embedUnsupported();
+    }
+
+    private static com.gamma.spi.auth.ApiException embedUnsupported() {
+        return new com.gamma.spi.auth.ApiException(503, com.gamma.spi.auth.ErrorCodes.CAPABILITY_UNAVAILABLE,
+                "this Investigation store backend does not hold embed grants yet");
+    }
+
     // ── Drafts ─────────────────────────────────────────────────────────────────────────────────────────
 
     /** The lifecycle state of a Draft; precedence promoted, discarded (an expiry is a discard), hibernated, open. */

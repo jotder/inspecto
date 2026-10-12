@@ -259,7 +259,7 @@ public final class WorkingSetRoutes implements RouteModule {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, List<Map<String, Object>>> tables(InvestigationEvaluator.State s) {
+    static Map<String, List<Map<String, Object>>> tables(InvestigationEvaluator.State s) {
         // LA-17 slice 2: an entity's identity is the group it resolves to under a resolve in force, else itself.
         Map<String, String> resolvedTo = new LinkedHashMap<>();
         Map<String, Object> view = s.resolutionView(resolvedTo);

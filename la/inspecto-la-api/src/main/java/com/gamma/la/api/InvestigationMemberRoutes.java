@@ -108,6 +108,7 @@ public final class InvestigationMemberRoutes implements RouteModule {
                 Entry e = InvestigationMemberStore.append(inv.store(), inv.id(), seen.size(), Instant.now().toString(), ApiContext.actor(ex), subject, held, Op.REVOKE);
                 emit(ex, LinkEventTypes.LINK_INV_MEMBER_REVOKED, "link.investigation.member.revoked",
                         "link.investigation.member.revoked — " + id + " " + subject + " " + held.wire(), id, e);
+                revokeEmbedLinksOf(ex, inv, subject);
                 break;
             } catch (InvestigationVersionConflictException lost) {
                 if (attempt >= InvestigationMemberStore.MAX_ATTEMPTS)
@@ -115,6 +116,26 @@ public final class InvestigationMemberRoutes implements RouteModule {
             }
         }
         return describe(inv, ex);
+    }
+
+    /**
+     * LA-EMBED-VIEW-1: a member who loses their role loses the embed links they minted, at once. (A link also stops working at its
+     * next read if its minter is no longer a lead, so a failure here only delays the flag on the grant, never the refusal.)
+     */
+    private static void revokeEmbedLinksOf(HttpExchange ex, InvestigationRoutes.Inv inv, String subject) {
+        try {
+            int n = EmbedGrants.revokeIssuedBy(inv.store(), inv.id(), subject, ApiContext.actor(ex), "MINTER_MEMBERSHIP_REVOKED",
+                    Instant.now());
+            if (n > 0)
+                EventSink.current().emit(Event.builder(LinkEventTypes.LINK_EMBED_REVOKED).source("inv")
+                        .message("link.embed.revoked — " + inv.id() + " (minter " + subject + " lost their role)")
+                        .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                        .action("link.embed.revoked").actionCategory("analysis")
+                        .attr("investigationId", inv.id()).attr("reason", "MINTER_MEMBERSHIP_REVOKED")
+                        .attr("revokedBy", ApiContext.actor(ex)).attr("count", n));
+        } catch (IOException | RuntimeException ignored) {
+            // best effort - the membership change is already recorded and a read re-checks the minter's role anyway
+        }
     }
 
     private static void refuseLastLead(Map<String, Role> current, Op op, String subject, Role role) {
