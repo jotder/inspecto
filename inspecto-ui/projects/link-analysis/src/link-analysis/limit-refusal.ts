@@ -12,13 +12,17 @@ export function limitRefusalMessage(err: unknown): string | null {
     const status = (err as { status?: number } | null)?.status;
     if (status !== 413 && status !== 429) return null;
     const server = apiErrorMessage(err, '');
-    if (status === 413)
+    if (status === 413) {
+        // The server's tail ("Narrow the step, or raise the limit: set max_set_bytes in ...link-analysis.toon ...") is for an
+        // administrator; the analyst's next step is the sentence below, so the file and the setting name stay out of it.
+        const said = server.replace(/\s*(Narrow the step, or raise|Fork a smaller Investigation, or raise)[^]*$/, '').replace(/;\s*nothing was stored\.?$/, '.');
         return (
             'That is over a size limit, so nothing was stored. ' +
-            (server ? server + ' ' : '') +
+            (said ? said + ' ' : '') +
             'Next step: narrow the step (fewer seeds, a shorter window) or fork a smaller Investigation; a Space ' +
             'administrator can raise max_set_bytes or max_investigation_bytes.'
         );
+    }
     return (
         'Too many requests. Link Analysis allows each user a burst of 20 requests, then one every 3 seconds. ' +
         'Wait a few seconds and try again.' +

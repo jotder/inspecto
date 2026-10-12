@@ -46,9 +46,21 @@ public final class WorkingSetSizeLimit {
             // best effort - the refusal itself is what protects the store
         }
         throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "The Working Set of step " + step + " of Investigation '"
-                + investigationId + "' is larger than this Space's limit of " + max + " bytes (" + (max >> 20) + " MiB) and was not stored. "
+                + investigationId + "' is larger than this Space's limit of " + max + " bytes (" + humanSize(max) + ") and was not stored. "
                 + "Narrow the step, or raise the limit: set max_set_bytes in the Space's link-analysis.toon "
                 + "(Settings > Link Analysis, maxSetBytes; at most 1073741824).");
+    }
+
+    /** A byte count in words an analyst reads: whole MiB/KiB when it is one, one decimal otherwise - never "0 MiB" for a sub-MiB limit. */
+    public static String humanSize(long bytes) {
+        if (bytes >= 1L << 30) return unit(bytes, 1L << 30, "GiB");
+        if (bytes >= 1L << 20) return unit(bytes, 1L << 20, "MiB");
+        if (bytes >= 1L << 10) return unit(bytes, 1L << 10, "KiB");
+        return bytes + " bytes";
+    }
+
+    private static String unit(long bytes, long size, String name) {
+        return bytes % size == 0 ? (bytes / size) + " " + name : String.format(java.util.Locale.ROOT, "%.1f %s", (double) bytes / size, name);
     }
 
     /** {@link #enforce} over every set of a multi-step write; step {@code i} is {@code firstStep + i}. A {@code null} entry is skipped. */

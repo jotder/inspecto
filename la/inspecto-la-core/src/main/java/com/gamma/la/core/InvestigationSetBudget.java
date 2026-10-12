@@ -61,7 +61,7 @@ public final class InvestigationSetBudget {
         }
         throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "Investigation '" + investigationId + "' already holds " + currentTotal
                 + " bytes of sealed Working Sets and this write would take it to " + totalAfter + ", over this Space's budget of " + max
-                + " bytes (" + (max >> 20) + " MiB) per Investigation; nothing was stored. Fork a smaller Investigation, or raise the budget: "
+                + " bytes (" + WorkingSetSizeLimit.humanSize(max) + ") per Investigation; nothing was stored. Fork a smaller Investigation, or raise the budget: "
                 + "set max_investigation_bytes in the Space's link-analysis.toon (Settings > Link Analysis, maxInvestigationBytes; at most 1099511627776).");
     }
 }

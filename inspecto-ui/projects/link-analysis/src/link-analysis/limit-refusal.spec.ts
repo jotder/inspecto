@@ -20,6 +20,20 @@ describe('limitRefusalMessage (DR-D6)', () => {
         expect(m).toContain('nothing was stored');
     });
 
+    it('413 keeps the limit in readable units but not the administrator file edit', () => {
+        const m = limitRefusalMessage(
+            err(
+                413,
+                "The Working Set of step 2 of Investigation 'i1' is larger than this Space's limit of 524288 bytes (512 KiB) and was not stored. " +
+                    "Narrow the step, or raise the limit: set max_set_bytes in the Space's link-analysis.toon (Settings > Link Analysis, maxSetBytes; at most 1073741824).",
+            ),
+        )!;
+        expect(m).toContain('512 KiB');
+        expect(m).not.toContain('link-analysis.toon');
+        expect(m).not.toContain('1073741824');
+        expect(m).toContain('Next step');
+    });
+
     it('429 names the per-user rate limit (burst of 20, one per 3 seconds) and says to wait', () => {
         const m = limitRefusalMessage(err(429))!;
         expect(m).toContain('burst of 20');
