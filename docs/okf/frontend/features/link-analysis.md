@@ -777,7 +777,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   takes them as one text field (`2026-12-25, Winter break=2026-12-24..2026-12-26`). ✅ **Recurring exclusion rules
   (2026-10-05):** an `exclude` entry may be `{rule:"yearly", month, day[, name]}` (every 25 Dec) or
   `{rule:"nthWeekday", month, weekday, nth[, name]}` (4th Thursday of November; `nth` 1–5, a 5th a month lacks never
-  matches; yearly `02-29` matches leap years only). Calls: **the RULE is sealed, not its expansion** — the sealed
+  matches; yearly `02-29` matches leap years only). ✅ **`lastWeekday` (2026-10-12):** `{rule:"lastWeekday", month, weekday[, name]}` (the LAST Monday of May; every month has one; `nth` is refused; SQL `day(lt)+7 > day(last_day(lt))`, Java `matches` identical, parity-tested over a leap and a common year; old logs without it seal unchanged; SPA text syntax not added). ❌ **Derived Collector roster NOT built (2026-10-12, pinned by `PipelineStoreMappingPinTest`):** a batch's `output_table` is the selector table, and only 1 of the 89 shipped Pipeline configs (`ucc` voucher) declares one; single-schema Pipelines write `""`, so a roster by Stream name would list ~every Pipeline yet the join could never see them deliver (false alarms). Calls: **the RULE is sealed, not its expansion** — the sealed
   bytes stay canonical, an unbounded window (no `from`/`to`) needs no horizon, and a replay re-derives the same days;
   so "expanded over `[from,to)`" is realised as a per-day test on the local calendar day in the window's
   `timezone` (SQL `month(lt)`/`day(lt)`/`isodow(lt)`/`(day(lt)-1)//7+1` in `InvestigationTime.predicates`, the same

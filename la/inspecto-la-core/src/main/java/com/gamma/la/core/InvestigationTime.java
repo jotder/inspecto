@@ -59,7 +59,8 @@ import java.util.TreeMap;
  * <h2>Recurring exclusion rules</h2>
  * An {@code exclude} entry may instead be a RULE: {@code {rule:"yearly", month, day[, name]}} (every 25 Dec) or
  * {@code {rule:"nthWeekday", month, weekday, nth[, name]}} (the 4th Thursday of November; {@code nth} 1-5, and a
- * 5th that a month lacks simply never matches). The RULE is what is sealed, not its expansion over the window, so
+ * 5th that a month lacks simply never matches) or {@code {rule:"lastWeekday", month, weekday[, name]}} (the LAST
+ * Monday of May, which every month has). The RULE is what is sealed, not its expansion over the window, so
  * the sealed bytes stay canonical and an unbounded window needs no horizon. The rule is applied to the local
  * calendar day in the window's {@code timezone}, exactly like a named date ({@link #matches} for Java readers,
  * the same arithmetic in {@link #predicates} SQL), which is deterministic: no clock, no host zone. A yearly
@@ -143,7 +144,7 @@ public final class InvestigationTime {
         if (!(raw instanceof List<?> l) || l.isEmpty() || l.size() > MAX_EXCLUDES + MAX_RULES)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be a non-empty list of at most " + MAX_EXCLUDES
                     + " dates plus " + MAX_RULES + " rules: a 'YYYY-MM-DD' string, {date}, {from, to} (inclusive), "
-                    + "{rule:'yearly', month, day} or {rule:'nthWeekday', month, weekday, nth}, each with an optional 'name'");
+                    + "{rule:'yearly', month, day}, {rule:'nthWeekday', month, weekday, nth} or {rule:'lastWeekday', month, weekday}, each with an optional 'name'");
         TreeMap<String, Map<String, Object>> sorted = new TreeMap<>();
         int i = 0, rules = 0;
         for (Object e : l) {
@@ -156,7 +157,7 @@ public final class InvestigationTime {
                 Map<String, Object> rule = rule(rm, at);
                 int month = (Integer) rule.get("month");
                 String order = rule.containsKey("day") ? String.format("%02d", (Integer) rule.get("day"))
-                        : rule.get("nth") + "/" + DAYS.indexOf(String.valueOf(rule.get("weekday")));
+                        : (rule.containsKey("nth") ? rule.get("nth") : "L") + "/" + DAYS.indexOf(String.valueOf(rule.get("weekday")));
                 // "~" sorts after every digit: concrete dates first, then the rules.
                 sorted.put("~" + String.format("%02d", month) + "/" + rule.get("rule") + "/" + order + "/"
                         + (rule.get("name") == null ? "" : rule.get("name")), rule);
@@ -199,9 +200,10 @@ public final class InvestigationTime {
     private static Map<String, Object> rule(Map<?, ?> m, String at) {
         String kind = String.valueOf(m.get("rule"));
         Set<String> allowed = "yearly".equals(kind) ? Set.of("rule", "month", "day", "name")
-                : "nthWeekday".equals(kind) ? Set.of("rule", "month", "weekday", "nth", "name") : null;
+                : "nthWeekday".equals(kind) ? Set.of("rule", "month", "weekday", "nth", "name")
+                : "lastWeekday".equals(kind) ? Set.of("rule", "month", "weekday", "name") : null;
         if (allowed == null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ".rule must be 'yearly' or 'nthWeekday', got '" + kind + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ".rule must be 'yearly', 'nthWeekday' or 'lastWeekday', got '" + kind + "'");
         for (Object k : m.keySet())
             if (!allowed.contains(String.valueOf(k)))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ": unknown key '" + k + "' for a '" + kind + "' rule (allowed: " + allowed + ")");
@@ -218,7 +220,7 @@ public final class InvestigationTime {
             String wd = String.valueOf(m.get("weekday"));
             if (!DAYS.contains(wd)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ".weekday must be one of " + DAYS);
             c.put("weekday", wd);
-            c.put("nth", whole(m.get("nth"), 1, 5, at + ".nth"));
+            if ("nthWeekday".equals(kind)) c.put("nth", whole(m.get("nth"), 1, 5, at + ".nth"));
         }
         if (m.get("name") != null) {
             String name = String.valueOf(m.get("name")).trim();
@@ -239,8 +241,9 @@ public final class InvestigationTime {
             return !day.isBefore(LocalDate.parse(String.valueOf(entry.get("from")))) && !day.isAfter(LocalDate.parse(String.valueOf(entry.get("to"))));
         if (day.getMonthValue() != ((Number) entry.get("month")).intValue()) return false;
         if ("yearly".equals(entry.get("rule"))) return day.getDayOfMonth() == ((Number) entry.get("day")).intValue();
-        return day.getDayOfWeek() == DayOfWeek.of(DAYS.indexOf(String.valueOf(entry.get("weekday"))) + 1)
-                && (day.getDayOfMonth() - 1) / 7 + 1 == ((Number) entry.get("nth")).intValue();
+        boolean weekday = day.getDayOfWeek() == DayOfWeek.of(DAYS.indexOf(String.valueOf(entry.get("weekday"))) + 1);
+        if ("lastWeekday".equals(entry.get("rule"))) return weekday && day.getDayOfMonth() + 7 > day.lengthOfMonth();
+        return weekday && (day.getDayOfMonth() - 1) / 7 + 1 == ((Number) entry.get("nth")).intValue();
     }
 
     private static LocalDate date(Object raw, String origin) {
@@ -337,6 +340,10 @@ public final class InvestigationTime {
                     where.append("(month(lt) = CAST(? AS INTEGER) AND day(lt) = CAST(? AS INTEGER))");
                     binds.add(String.valueOf(r.get("month")));
                     binds.add(String.valueOf(r.get("day")));
+                } else if ("lastWeekday".equals(r.get("rule"))) {
+                    where.append("(month(lt) = CAST(? AS INTEGER) AND isodow(lt) = CAST(? AS INTEGER) AND day(lt) + 7 > day(last_day(lt)))");
+                    binds.add(String.valueOf(r.get("month")));
+                    binds.add(Integer.toString(DAYS.indexOf(String.valueOf(r.get("weekday"))) + 1));
                 } else {
                     where.append("(month(lt) = CAST(? AS INTEGER) AND isodow(lt) = CAST(? AS INTEGER) AND (day(lt) - 1) // 7 + 1 = CAST(? AS INTEGER))");
                     binds.add(String.valueOf(r.get("month")));
@@ -388,6 +395,7 @@ public final class InvestigationTime {
                 Map<?, ?> r = (Map<?, ?>) o;
                 String span = r.get("rule") == null ? (r.get("from").equals(r.get("to")) ? String.valueOf(r.get("from")) : r.get("from") + " to " + r.get("to"))
                         : "yearly".equals(r.get("rule")) ? "every " + String.format("%02d-%02d", ((Number) r.get("month")).intValue(), ((Number) r.get("day")).intValue())
+                        : "lastWeekday".equals(r.get("rule")) ? "the last " + r.get("weekday") + " of month " + r.get("month")
                         : "the " + r.get("nth") + " " + r.get("weekday") + " of month " + r.get("month");
                 xs.add(r.get("name") == null ? span : r.get("name") + " (" + span + ")");
             }
