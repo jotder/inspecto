@@ -12128,6 +12128,107 @@
         "x-optional-module" : true
       }
     },
+    "/inv/investigations/{investigationId}/embeds" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "List the read-only embed links of an Investigation",
+        "operationId" : "getInvInvestigationsByInvestigationIdEmbeds",
+        "description" : "LA-EMBED-VIEW-1. Read-shaped: any reader of the Investigation. {investigationId, enabled, grants[], max}; each grant {grantId, label, issuedBy, issuedAt, expiresAt, status (active|expired|revoked), revokedAt?, revokedBy?, revokedReason?, lastViewAt?, viewCount}. Never a token or a token hash. Expired grants lose their hash here (the row stays).",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The grants."
+          },
+          "404" : {
+            "description" : "No such Investigation, or not readable by the caller (the same answer)."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Mint a read-only embed link to an Investigation",
+        "operationId" : "postInvInvestigationsByInvestigationIdEmbeds",
+        "description" : "LA-EMBED-VIEW-1 (operator decisions 2026-10-12). Body {ttl_hours?, label?}. Gated on canShareInvestigation (no four-eyes) and on the caller being a LEAD of the Investigation; the Enterprise ABAC action `embed` can forbid it. 503 unless -Dla.embed.enabled=true. ttl_hours defaults to the Space embed.default_ttl_hours (72) and is refused with 422 above embed.max_ttl_hours (default and ceiling 720 = 30 days), never clamped. A frame allowlist is refused (422): links are link-only. 422 also when the Investigation reads data of a classification in the Space embed.refuse_classifications. Answers {grantId, investigationId, token, url, expiresAt, label, maskingMode, note}: the token is shown ONCE and only its SHA-256 is stored. Minting writes a sidecar, never an op-log entry: the Dossier root and the op-log hash do not move. At most 20 live links per Investigation (409).",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The grant and its token (once)."
+          },
+          "403" : {
+            "description" : "The caller lacks canShareInvestigation, is not a lead of the Investigation, or an access policy denies the action embed."
+          },
+          "404" : {
+            "description" : "No such Investigation, or not visible to the caller (the same answer)."
+          },
+          "409" : {
+            "description" : "The Investigation already holds 20 live links."
+          },
+          "422" : {
+            "description" : "ttl_hours outside 1..the Space maximum, an unknown field (frame_ancestors included), a bad label, or a refused classification."
+          },
+          "503" : {
+            "description" : "Embed links are disabled (-Dla.embed.enabled) or there is no write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/investigations/{investigationId}/embeds/{grantId}/revoke" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Revoke one embed link of an Investigation",
+        "operationId" : "postInvInvestigationsByInvestigationIdEmbedsByGrantIdRevoke",
+        "description" : "LA-EMBED-VIEW-1. Gated on canShareInvestigation and on the caller being a LEAD of the Investigation. Immediate: the link answers the uniform 404 from the next request on; its token hash is dropped and the row stays. Idempotent. Links also revoke automatically when their minter loses their lead role, the Investigation's linked Case closes, or the Space's masking is loosened.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "grantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The grant, revoked."
+          },
+          "403" : {
+            "description" : "The caller lacks canShareInvestigation or is not a lead."
+          },
+          "404" : {
+            "description" : "No such Investigation or link."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/reference-rows" : {
       "post" : {
         "tags" : [ "inv" ],
@@ -12137,6 +12238,34 @@
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/public/investigations/{token}" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "Read-only embedded view of one Investigation (public; the token is the credential)",
+        "operationId" : "getPublicInvestigationsByToken",
+        "description" : "LA-EMBED-VIEW-1. Anonymous: exempt from platform authentication, authenticated by the embed token in the path; the holder is an EmbedGrant, never a Subject, so it reaches no other route. Answers the masked view {investigation{id,title,purpose,createdAt}, head{step,workingSetHash}, workingSet{entities,links,excludedCount}, annotations, references, link{expiresAt}, masking} - masked exactly as the Space masks an Investigation read (maskingMode), read from the sealed log only. EVERY failure (disabled, malformed, unknown, tampered, expired, revoked, deleted Investigation, minter no longer a lead, Case closed, masking loosened) is the same 404. GET only. Headers: Content-Security-Policy frame-ancestors 'none', X-Frame-Options DENY, Cache-Control no-store, Referrer-Policy no-referrer, X-Content-Type-Options nosniff; no CORS, no cookie. Throttled per token and per IP (429). The token is redacted from every log line and audit row.",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The masked view."
+          },
+          "404" : {
+            "description" : "Not found (one answer for every refusal)."
+          },
+          "429" : {
+            "description" : "Rate limit exceeded for this link or this address."
           }
         },
         "x-optional-module" : true

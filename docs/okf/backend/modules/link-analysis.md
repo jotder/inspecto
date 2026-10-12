@@ -399,7 +399,7 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
 
 ## 6. HTTP surface (la-api, geo-link)
 
-18 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **78**<!--count:la-routes--> routes (**72**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
+20 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **82**<!--count:la-routes--> routes (**76**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -412,6 +412,7 @@ the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all presen
 | Identity | `/inv/entity-identities`, `/group`, `/import`, `/{id}/retract` | `canManageIncidents` (the reads too; `/import` has no UI) |
 | Graph Run | `/inv/graph/runs`, `/algorithms`, `/runs/{id}`, `/cancel` | `canRunLinkGraphAnalysis` on the POST that starts a run; list/get are read-gated; cancel is owner-or-admin, else 404 |
 | Index | `/inv/index`, `/inv/index/builds`, `/builds/{id}`, `/cancel` | `canBuildLinkIndex` on the POST that starts a build; the reads and cancel are not capability-gated |
+| Embed link | `…/{id}/embeds` (POST mint, GET list), `…/embeds/{grantId}/revoke`, and the public `GET /public/investigations/{token}` | `canShareInvestigation` on mint and revoke (+ lead role); the list is read-gated; the public GET is authenticated by its token alone (§6.2) |
 | Measures & detection (geo-link) | `…/{id}/measures`, `…/alert-rules`, `…/standing-detection` | `canAuthorAlertRules` |
 
 Capability constants are in `platform/inspecto-access` `Roles`. OpenAPI fragments
@@ -426,7 +427,7 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
 3. `authorize` → host ABAC PEP.
 4. `requireModuleEnabled` → feature `geoLink` in the Space's `modules.toon` (404 `MODULE_DISABLED`); then the host's
    idempotency check, before the handler. ⚠ The gate only covers a route whose `RouteModule` overrides
-   `featureIds()` → `geoLink`; as of 2026-10-11 all 19 LA route modules (18 in `la-api` + geo-link's
+   `featureIds()` → `geoLink`; as of 2026-10-12 all 21 LA route modules (20 in `la-api` + geo-link's
    `InvestigationMeasureRoutes`, whose manifest now declares `features[1]: geoLink`) do — a new LA route module
    must too (pinned by `ControlApiGeoLinkModuleGateTest`).
 5. `ApiContext.withCapability` → 403. ⚠ A no-op when there is no Subject (Personal / tests without an armed
@@ -438,9 +439,49 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
 7. Handler → `EntityMasking` on output → audit (`LinkEventTypes` via `EventSink` + `AuditTrail`; ≥500 and 401/403
    recorded by `ControlApi`).
 
+### 6.2 Embed links (LA-EMBED-VIEW-1, S1-S3 built 2026-10-12; the SPA shell S4 and host-wide frame headers S5 are deferred)
+
+A **lead** mints a read-only URL to ONE Investigation for someone with no login (operator decisions D1-D12, 2026-10-12).
+Code: `EmbedGrants` (token, hashing, resolve, revoke, counters), `InvestigationEmbedRoutes` (mint / list / revoke),
+`PublicInvestigationRoutes` (the public GET), grant records behind `InvestigationStore` (`createEmbedGrant`, `embedGrant`,
+`replaceEmbedGrant`, `embedGrants`; the file implementation only - another backend answers 503 until it implements the
+`EmbedGrantStoreContract`).
+
+* **Token** `<grantId>.<secret>`: grantId 16 URL-safe chars (the public half, names the record), secret 256 random bits; only the
+  SHA-256 of the whole token is stored and compared in constant time; shown once at mint; never in a list, a log line or an audit row.
+* **Storage is a sidecar, never the op log**: `investigations/<id>/embeds/<grantId>.json` plus a one-line pointer
+  `embed-grants/<grantId>` (the lookup starts from a stranger's grant id, which `EMBED_GRANT_ID` keeps from ever becoming a path).
+  Minting, using and revoking never move the Dossier root or any sealed byte (pinned by test).
+* **The holder is not a Subject.** `EmbedGrant` (auth-spi) is stamped as `ATTR_EMBED_GRANT` by the one public route; no capability gate
+  accepts it, and a session sent on the public path is dropped. `PublicPaths` (auth-spi) is the registry that replaces the hard-coded
+  `startsWith` in `ControlApi.isSelfVerifyingPublic`: the module registers `/public/investigations/` when its routes register.
+* **Redaction.** `PublicPaths.redact` keeps the token out of audit rows (`AuditTrail`), ERROR/debug log lines, the static-fallback log and
+  `links.self` in the envelope. `ControlApi`'s per-token rate bucket is keyed by a hash of the path, never the token.
+* **One answer.** Disabled, malformed, unknown, tampered, expired, revoked, deleted, minter-not-lead, Case closed and masking loosened are
+  the same `404 NOT_FOUND "not found"`; the reason goes to the `LINK_EMBED_DENIED` audit row with an 8-hex hash prefix. (A Space with `geoLink`
+  disabled answers `MODULE_DISABLED` like every LA route: that reveals a module setting, not a token.)
+* **Masking follows the Space** (`maskingMode`, D3): the view is `InvestigationRoutes.masked` over the evaluated sealed log - one masking
+  path. A link auto-revokes if the Space LOOSENS masking after the mint (a stricter mode never revokes). Reveal, pending expands, drafts,
+  the Case, Dataset names and SQL are not in the view.
+* **Expiry** (D4): default 72 h, ceiling 30 d (720 h), `embed.default_ttl_hours` / `embed.max_ttl_hours` in `link-analysis.toon`; a request
+  above the Space's cap is 422, never clamped; a Space may only tighten the ceiling. `embed.refuse_classifications` refuses a mint (422) when the
+  strictest classification of the Investigation's bound columns is listed.
+* **Who** (D6/D11): `canShareInvestigation` AND a lead of the Investigation; the Enterprise PDP is asked the new ABAC action `embed`
+  (`RowScope.allowed`, resource carries `classification`); `ControlApi.actionFor` maps both routes to `embed`. `-Dla.embed.enabled` (default
+  off) is the kill switch: mint 503, every public request the uniform 404. At most 20 live links per Investigation.
+* **Auto-revoke** (S3): the minter's membership revoke flags their links at once; every public read re-checks that the minter is still a
+  lead, the linked Case is open and masking is not looser, and flags the grant when not. Expired grants lose their hash on the next mint or
+  list (the row stays for the audit). There is no Investigation delete or close route today, so "closed" means its linked Case closed.
+* **Headers** on every answer of the public route: `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`,
+  `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, no CORS, no cookie (D2: link-only, no per-grant
+  allowlist). Throttled per token and per IP (`control.rateLimit.embed.*`, burst 60 then 2/s per link; the IP bucket is the callback one).
+* **Gotchas.** The host refuses to start with a mutating handler on the public path (CapabilityManifest "undeclared mutating route"), so
+  GET-only is structural. A grant id differing only by case aliases a file on a case-insensitive filesystem; the full token hash still decides.
+  Audit events: `LINK_EMBED_MINTED | REVOKED | VIEWED | DENIED` (never the token, the label or an entity id).
+
 ## 7. Host registration, Jobs and live detection
 
-* **ServiceLoader files:** la-api → `RouteModule` (18); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
+* **ServiceLoader files:** la-api → `RouteModule` (20); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
   `CasePort`, `CollectorCoveragePort`, `DatasetProvider`, `LinkIndexBuilder`; la-store-pg →
   `InvestigationStoreProvider`.
 * **Host wiring:** `CollectorService` registers Platform Service `link-index` and wires the alerting Investigation

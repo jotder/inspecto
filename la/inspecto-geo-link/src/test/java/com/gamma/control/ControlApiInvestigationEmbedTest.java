@@ -431,7 +431,7 @@ class ControlApiInvestigationEmbedTest {
             assertEquals(403, status(c, "POST", path, "{}", NOCAP), "needs the verb");
             assertEquals(403, status(c, "POST", path, "{}", A), "needs the lead role");
             assertEquals(404, status(c, "POST", path, "{}", S));
-            assertEquals(404, status(c, "POST", INV + "/embeds/AAAAAAAAAAAAAAAA/revoke", "{}", L), "no such link");
+            assertEquals(404, status(c, "POST", "/inv/investigations/inv-a/embeds/AAAAAAAAAAAAAAAA/revoke", "{}", L), "no such link");
             assertEquals(200, pub(c, token).statusCode(), "a refused revoke revoked nothing");
 
             JsonNode first = ok(c, "POST", path, "{}", L);
