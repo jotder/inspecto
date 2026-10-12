@@ -10,16 +10,21 @@ import { SignInComponent } from './sign-in.component';
 function create(
     branding: { logoDataUrl?: string; caption?: string; footerText?: string } = {},
     version: string | null = null,
+    state: {
+        configured?: boolean;
+        demoUsers?: { id: string; displayName: string; title: string }[];
+        bootstrapError?: string | null;
+    } = {},
 ) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => true,
         beginLogin: vi.fn(),
-        oidcConfigured: signal(true),
+        oidcConfigured: signal(state.configured ?? true),
         version: signal<string | null>(version),
-        demoUsers: signal([]),
+        demoUsers: signal(state.demoUsers ?? []),
         demoNoSpace: signal(false),
-        bootstrapError: signal<string | null>(null),
+        bootstrapError: signal<string | null>(state.bootstrapError ?? null),
         branding: signal({
             logoDataUrl: branding.logoDataUrl ?? null,
             caption: branding.caption ?? null,
@@ -47,6 +52,58 @@ describe('SignInComponent (W6d)', () => {
         expect(el.querySelectorAll('h1')).toHaveLength(1);
         expect(el.querySelector('h2')?.textContent).toContain('Sign in');
         await expectNoA11yViolations(el);
+    });
+
+    describe('every state is axe-clean (LA-A11Y-AUDIT-1)', () => {
+        const USERS = [
+            { id: 'analyst', displayName: 'Ana Analyst', title: 'Fraud analyst' },
+            { id: 'admin', displayName: 'Ada Admin', title: 'Space administrator' },
+        ];
+
+        it('SSO not configured: the error is an alert and the button is disabled', async () => {
+            const { el } = create({}, null, { configured: false });
+            expect(el.querySelector('[role="alert"]')?.textContent).toContain("Single sign-on isn't set up");
+            expect(el.querySelector('button')?.hasAttribute('disabled')).toBe(true);
+            await expectNoA11yViolations(el);
+        });
+
+        it('Demo User picker: a named list of buttons and a warning, no SSO button', async () => {
+            const { el } = create({}, null, { demoUsers: USERS });
+            expect(el.querySelector('ul[aria-label="Demo Users"]')?.querySelectorAll('button')).toHaveLength(2);
+            expect(el.textContent).not.toContain('Sign in with SSO');
+            await expectNoA11yViolations(el);
+        });
+
+        it('Demo User picker with no user listed is not a role-less empty list', async () => {
+            const { el } = create({}, null, { demoUsers: [] });
+            expect(el.querySelector('ul[aria-label="Demo Users"]')).toBeNull();
+            await expectNoA11yViolations(el);
+        });
+
+        it('server could not start a session: an alert with a retry button, no picker and no SSO button', async () => {
+            const { el } = create({}, null, { bootstrapError: 'The store is unavailable', demoUsers: USERS });
+            expect(el.querySelector('[data-testid="startup-error"] [role="alert"]')).toBeTruthy();
+            expect(el.querySelector('ul[aria-label="Demo Users"]')).toBeNull();
+            await expectNoA11yViolations(el);
+        });
+
+        it('a failed sign-in is announced as an alert', async () => {
+            sessionStorage.setItem('inspecto.signInFailed', '1');
+            const { el } = create();
+            expect(el.textContent).toContain('Sign-in failed');
+            expect(el.querySelector('[role="alert"]')).toBeTruthy();
+            await expectNoA11yViolations(el);
+        });
+
+        it('busy: the button is named "Signing in" and holds no nested progressbar (nested-interactive)', async () => {
+            const { fixture, el } = create();
+            const button = el.querySelector('button') as HTMLButtonElement;
+            button.click();
+            fixture.detectChanges();
+            expect(button.textContent).toContain('Signing in');
+            expect(button.querySelector('[role="progressbar"]:not([aria-hidden="true"])')).toBeNull();
+            await expectNoA11yViolations(el);
+        });
     });
 
     it('starts the login redirect on click', () => {

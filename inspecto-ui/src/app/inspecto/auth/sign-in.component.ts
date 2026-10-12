@@ -154,7 +154,9 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                             (click)="signIn()"
                         >
                             @if (busy()) {
-                                <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
+                                <!-- Decorative: a progressbar nested in the button is the axe rule nested-interactive; the button is named instead. -->
+                                <mat-progress-spinner diameter="20" mode="indeterminate" aria-hidden="true" [attr.tabindex]="null" />
+                                <span class="sr-only">Signing in</span>
                             } @else {
                                 <ng-container>
                                     <mat-icon svgIcon="heroicons_outline:lock-closed" />

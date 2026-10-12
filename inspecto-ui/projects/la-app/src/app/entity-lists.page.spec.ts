@@ -3,6 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { EntityListsPageComponent } from './entity-lists.page';
 import { provideLaAppHostServices } from './la-host.providers';
 
@@ -18,5 +19,17 @@ describe('EntityListsPageComponent', () => {
         expect(el.querySelector('h1')?.textContent).toContain('Entity Lists');
         expect(el.querySelector('inspecto-link-analysis-entity-lists')).toBeTruthy();
         expect(el.querySelector('inspecto-link-analysis-identity')).toBeTruthy();
+    }, 30_000);
+
+    it('has no axe violations and exactly one h1 that names the section (axe, LA-A11Y-AUDIT-1)', async () => {
+        TestBed.configureTestingModule({
+            providers: [provideHttpClient(), provideHttpClientTesting(), provideNoopAnimations(), ...provideLaAppHostServices()],
+        });
+        const fixture = TestBed.createComponent(EntityListsPageComponent);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelectorAll('h1')).toHaveLength(1);
+        expect(el.querySelector('section')?.getAttribute('aria-labelledby')).toBe('la-entity-lists-title');
+        await expectNoA11yViolations(el);
     }, 30_000);
 });

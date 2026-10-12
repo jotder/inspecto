@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { GraphRunsService, ModuleView } from '@inspecto/link-analysis/api/graph-runs.service';
 import { LinkAnalysisModulesComponent, isLinkAnalysisModule } from './link-analysis-modules.component';
 
@@ -71,5 +72,42 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
         open();
         expect(el.querySelector('[data-testid=modules-error]')).not.toBeNull();
         expect(el.querySelector('[data-testid=modules-list]')).toBeNull();
+    });
+
+    describe('accessibility (axe, LA-A11Y-AUDIT-1)', () => {
+        it('closed: a named toggle that says it is collapsed', async () => {
+            const { el } = make(() => of({ hostBuildId: 'h', modules: [] }));
+            expect(el.querySelector('[data-testid=modules-toggle]')!.getAttribute('aria-expanded')).toBe('false');
+            await expectNoA11yViolations(el);
+        });
+
+        it('open with an active, an inert, a switched-off and a not-installed module', async () => {
+            const { el, open } = make(() =>
+                of({
+                    hostBuildId: 'h',
+                    modules: [
+                        m('geo-link'),
+                        m('la-graph', { state: 'INERT', reasons: ['requires la-core'] }),
+                        m('la-api', { enabledInSpace: false }),
+                        m('la-store-pg', { state: 'not-installed', enabledInSpace: false }),
+                    ],
+                }),
+            );
+            open();
+            await expectNoA11yViolations(el);
+        });
+
+        it('open with no Link Analysis module listed', async () => {
+            const { el, open } = make(() => of({ hostBuildId: 'h', modules: [] }));
+            open();
+            await expectNoA11yViolations(el);
+        });
+
+        it('open after a failed read: the notice is a status', async () => {
+            const { el, open } = make(() => throwError(() => new Error('x')));
+            open();
+            expect(el.querySelector('[data-testid=modules-error]')!.getAttribute('role')).toBe('status');
+            await expectNoA11yViolations(el);
+        });
     });
 });
