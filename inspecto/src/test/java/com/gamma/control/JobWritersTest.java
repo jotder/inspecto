@@ -51,6 +51,9 @@ class JobWritersTest {
             Map.entry("PUT /settings/egress", FIXED + " (egress.toon)"),
             Map.entry("PUT /settings/mail-attachments", FIXED + " (mail-attachments.toon)"),
             Map.entry("PUT /settings/publication-destinations", FIXED + " (publication-destinations.toon)"),
+            Map.entry("PUT /regulatory-reports/templates/([^/]+)", "writes a Regulatory Report TEMPLATE "
+                    + "(<config root>/regulatory-report-templates/<id>.toon, jailed, canApproveChanges); ReportTemplate.parse rejects "
+                    + "every unknown key, so the body cannot carry a job or on_pipeline reference; operator-approved 2026-10-12"),
             Map.entry("POST /pipelines/rename/resume", "finishes an already-admitted rename; rewrites only on_pipeline "
                     + "references in existing jobs, never their params")
     ));

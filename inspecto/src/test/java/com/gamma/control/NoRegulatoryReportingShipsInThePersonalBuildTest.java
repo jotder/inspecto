@@ -42,7 +42,7 @@ class NoRegulatoryReportingShipsInThePersonalBuildTest {
         try {
             api.start();
             List<String[]> surface = AbsentModuleRoutes.surface("regulatory-reporting");
-            assertEquals(8, surface.size(), "the manifest names the eight Regulatory Report routes");
+            assertEquals(10, surface.size(), "the manifest names the ten Regulatory Report routes (8 + template PUT/DELETE)");
             for (String[] r : surface) {
                 HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + api.port() + "/api/v1"
                         + r[1].replace("([^/]+)", "probe"))).header("Content-Type", "application/json");
