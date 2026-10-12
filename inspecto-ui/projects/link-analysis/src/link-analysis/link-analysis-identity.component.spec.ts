@@ -80,6 +80,24 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         expect(el.textContent).not.toContain('Chain NOT verified');
     });
 
+    it('the head the panel shows moves to the new head after a successful import, without Refresh', async () => {
+        const moved: IdentityGroupIndex = { groups: [], atSeq: 7, headSeq: 7, headHash: 'sha256:def456' };
+        const list = vi.fn().mockReturnValueOnce(of(HEAD)).mockReturnValue(of(moved));
+        const { f, c, el } = create({ listIdentityGroups: list });
+        await f.whenStable();
+        f.detectChanges();
+        expect(el.querySelector('[aria-label="Identity Fact log head"]')!.textContent).toContain('sha256:abc123');
+        c.dataset.setValue('map');
+        c.aCol.setValue('msisdn');
+        c.bCol.setValue('imsi');
+        c.reason.setValue('SIM swap file');
+        await c.import();
+        f.detectChanges();
+        const head = el.querySelector('[aria-label="Identity Fact log head"]')!.textContent;
+        expect(head).toContain('sha256:def456');
+        expect(head).not.toContain('sha256:abc123');
+    });
+
     it('imports with only the filled optional fields, reports counts, then re-reads the head', async () => {
         const { f, c, el, inv } = create();
         await f.whenStable();
