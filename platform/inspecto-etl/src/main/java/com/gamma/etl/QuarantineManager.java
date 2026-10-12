@@ -39,6 +39,10 @@ public final class QuarantineManager {
      *  Its reject sidecar is moved beside it; record replay refuses it (re-ingest the whole file instead). */
     public static final String REASON_REJECTS_ALL_OR_NOTHING = "rejects_all_or_nothing";
 
+    /** Two members of one batch share an output stem, so the second would overwrite the first's output file
+     *  ({@code INGEST-MULTIFILE-BATCH-REPLAN-DUP-1} stage 1): the second is failed closed. */
+    public static final String REASON_OUTPUT_STEM_COLLISION = "output_stem_collision";
+
     // ── acquisition-stage reasons (Data Acquisition roadmap Phase F dead-letter) ──
     /** A fetched file failed its post-download integrity check (size/checksum mismatch). */
     public static final String REASON_CORRUPT_DOWNLOAD = "corrupt_download";

@@ -96,6 +96,34 @@ interface ConsignmentIngestStrategy {
                         + " record(s) rejected, nothing landed (reject_mode all_or_nothing)", rejects, mStart);
     }
 
+    /**
+     * <b>Output-stem collision guard</b> ({@code INGEST-MULTIFILE-BATCH-REPLAN-DUP-1} stage 1, decision D3): the ONE
+     * place a lane that names each member's output by its stem ({@link FileNames#outputStem}) claims that stem.
+     * Two members of one batch with the same stem (e.g. {@code a/x.bin} and {@code b/x.bin}) would write the same
+     * {@code <stem>_gNNNNN_out.*} file in the same partition, and the later reveal silently REPLACES the earlier
+     * (the first member's rows were lost while lineage still counted them). Returns {@code null} when {@code m}
+     * owns its stem; otherwise the member is quarantined and its audit row returned — the caller skips it, so the
+     * second member fails closed and the first member's output is untouched.
+     *
+     * <p>Only generation mode needs it: the consolidated lanes (CSV, native CSV, union, the drain resume) name a
+     * multi-member batch by its batch id, and a one-survivor batch by that survivor's own stem, so they cannot
+     * collide inside a batch. The key is case-folded because the output tree may sit on a case-insensitive
+     * filesystem. ⚠ This guards WITHIN a batch only: a later batch holding {@code b/x.bin} still replaces an
+     * earlier batch's {@code x_out} for the same partition (see {@code okf/backend/engine/ingestion.md}).
+     */
+    static MemberAudit claimOutputStem(Map<String, Consignment.Member> claimed, Consignment.Member m, String stem,
+                                       PipelineConfig cfg, java.time.LocalDateTime mStart) throws java.io.IOException {
+        Consignment.Member owner = claimed.putIfAbsent(stem.toLowerCase(java.util.Locale.ROOT), m);
+        if (owner == null) return null;
+        QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_OUTPUT_STEM_COLLISION, false, cfg);
+        log.warn("[INGEST] [{}] output stem '{}' is already used by member [{}] of this batch — failing it closed"
+                        + " (it would overwrite that member's output)",
+                FileNames.safe(cfg, m.file().getName()), stem, FileNames.safe(cfg, owner.file().getName()));
+        return MemberAudit.rejected(m, MemberStatus.QUARANTINED_MISMATCH,
+                QuarantineManager.REASON_OUTPUT_STEM_COLLISION + ": output stem '" + stem
+                        + "' is already used by another member of this batch (srcId " + owner.srcId() + ")", mStart);
+    }
+
     // ── shared ingest-tail helpers (used by both strategies) ─────────────────────
 
     /**

@@ -50,12 +50,15 @@ final class GenerationModeIngester {
             try (var conn = DuckDbUtil.openConnection(tempDb)) {
                 configure(conn, cfg, tempDb, memberFiles(batch));
 
+                java.util.Map<String, Consignment.Member> stems = new java.util.HashMap<>();   // output stem -> owner
                 int memberIdx = 0;
                 for (Consignment.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
                     String stem = FileNames.outputStem(cfg, m.file().getName());
+                    MemberAudit collided = ConsignmentIngestStrategy.claimOutputStem(stems, m, stem, cfg, mStart);
+                    if (collided != null) { memberAudits.add(collided); continue; }
                     // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
                     // filename otherwise — the temp name is workspace bookkeeping, never DATA.
                     try (DuckDbRecordSink sink = new DuckDbRecordSink(
