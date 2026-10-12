@@ -586,6 +586,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         fixture.detectChanges();
         expect(section.textContent).toContain('coverage needs a bounded window');
         expect(section.textContent).not.toContain('zero rows');
+        await expectNoA11yViolations(section); // axe, LA-A11Y-AUDIT-1: the refused-coverage state
     });
 });
 

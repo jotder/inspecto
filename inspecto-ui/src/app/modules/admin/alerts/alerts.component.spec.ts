@@ -215,6 +215,17 @@ describe('AlertsComponent', () => {
         expect(c.loadError()).toBe(true);
         expect(toastr.error).not.toHaveBeenCalled();
         expect(fixture.nativeElement.textContent).toContain("Couldn't load alerts");
+        await expectNoA11yViolations(fixture.nativeElement); // axe, LA-A11Y-AUDIT-1: the failed-load state
+    });
+
+    it('axe: the grid held loading until the armed rules answer, and the empty list (LA-A11Y-AUDIT-1)', async () => {
+        const rules = new Subject<(typeof RULE)[]>();
+        const held = await create({ rules: () => rules });
+        await expectNoA11yViolations(held.fixture.nativeElement);
+        TestBed.resetTestingModule();
+        const empty = await create({ recent: () => of([]) });
+        expect(empty.fixture.componentInstance.alerts()).toEqual([]);
+        await expectNoA11yViolations(empty.fixture.nativeElement);
     });
 
     it('authoring is capability-gated: rule actions and New rule vanish for the read-only lens', async () => {

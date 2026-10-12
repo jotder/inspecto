@@ -116,6 +116,7 @@ describe('LinkAnalysisWorkingSetRowsComponent (LA-20)', () => {
         expect(c.rows().length).toBe(250);
         expect(c.rows()[200]).toEqual({ entityId: 'e200' });
         expect(c.page()!.truncated).toBe(false);
+        await expectNoA11yViolations(f.nativeElement); // axe, LA-A11Y-AUDIT-1: the fully paged state
     });
 
     it('a relation switch refetches that relation from offset 0', async () => {
