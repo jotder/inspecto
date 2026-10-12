@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D-4 step 6 - {@link GraphResultJson}, the one serializer: ALL 28 algorithms run through the real engine on a graph of
+ * D-4 step 6 - {@link GraphResultJson}, the one serializer: ALL 29 algorithms run through the real engine on a graph of
  * raw ids, serialized under {@code maskingMode all}, and the masked tree is checked three ways - no raw id and no raw
  * edge endpoint anywhere in it (edge ids are decoded, they are base64 and a plain text search would miss them); mapping
  * the pseudonyms back gives EXACTLY the unmasked tree (masking changed ids and nothing else - not the order, not a

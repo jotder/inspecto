@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D-4 step 4, engine == la-graph == the browser. Every one of the 28 algorithms is run THROUGH {@link InMemoryGraphEngine}
+ * D-4 step 4, engine == la-graph == the browser. Every one of the 29 algorithms is run THROUGH {@link InMemoryGraphEngine}
  * (never the static port) on the graphs of the six parity fixtures {@code graph-*-parity.fixture.json} — the SAME files the
  * TypeScript specs and la-graph's own parity tests read — and asserted against the fixture's hand-derived {@code expected}
  * (exact for discrete answers, the fixture's own tolerance for floats). {@link #everyAlgorithmWasExercised} fails if one of

@@ -146,7 +146,7 @@ condition*).
   analysis in the browser is capped at **2 000 nodes**. The footer prints the caps.
 * When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query, or use a server-side
   tool (*Find paths (server)*, *Run on server* for patterns, the Measures panel). The Analysis tab's
-  **All algorithms (server)** group lists every algorithm the server offers (28), builds its form from the
+  **All algorithms (server)** group lists every algorithm the server offers (29), builds its form from the
   server's parameter list, and runs it on the open Investigation's Working Set whatever its size; the answer is
   summarised in words with *Highlight on canvas*. **Propagated risk** has its own inputs there: *weights* (per hop,
   prefilled with the Space default), *seeds* (add canvas nodes; empty = every scored node) and *nodeScores* (**Fill
