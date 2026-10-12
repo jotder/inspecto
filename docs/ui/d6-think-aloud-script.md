@@ -21,10 +21,11 @@ Do these before the participant arrives (about 30 minutes):
    from the same four fields.
 4. A second person as note-taker; screen and audio recording with the participant's consent; no real customer data
    on screen (DATA-GOV-1).
-5. **Known defect `FINDINGS-PER-CASE-TYPE-1`: the Findings form applies to EVERY Case, not per Case type.** A real
-   lead will hit it first (they will ask whether a change alters the form for all their case types). It is open and
-   is not a BACKLOG row yet. File or decide it before the session and have the answer ready; do not hide it from the
-   participant, and log their reaction as a finding.
+5. **Check before the session: a Case type's own Findings form (`FINDINGS-PER-CASE-TYPE-1`, decided 2026-10-06).** The Case concept page
+   (`okf/capabilities/incidents/incidents.md`) describes an optional per-Case-type form (`case.<caseType>`, falling back to the generic
+   spec). The proxy session of 2026-09-29 predates it. Confirm on the build you will use that a Case type with its own spec shows that
+   form and a type without one shows the generic form, because a real lead will ask whether a change alters the form for all their
+   case types. Log their reaction as a finding.
 
 ## Opening (read aloud, do not demonstrate)
 
