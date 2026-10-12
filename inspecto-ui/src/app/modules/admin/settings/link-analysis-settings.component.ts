@@ -324,6 +324,17 @@ function expiryAfterHibernation(
                                 }
                             </mat-form-field>
                         }
+                        @for (r of runExtraFields; track r.key) {
+                            <mat-form-field subscriptSizing="dynamic">
+                                <mat-label>{{ r.label }}</mat-label>
+                                <input matInput type="number" min="1" [formControlName]="r.key" [readonly]="!canEdit()"
+                                    [placeholder]="'default ' + r.def" />
+                                <mat-hint>{{ r.hint }}</mat-hint>
+                                @if (form.controls.graphRun.controls[r.key].invalid) {
+                                    <mat-error>A whole number from 1 to {{ runMax }}, or blank for the default.</mat-error>
+                                }
+                            </mat-form-field>
+                        }
                     </fieldset>
                     <p class="text-sm">
                         <strong>Investigation store:</strong> {{ storeLabel() }}
@@ -438,6 +449,12 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         { key: 'maxEdges', label: 'Graph run: default edge budget' },
         { key: 'timeoutMs', label: 'Graph run: default time budget (ms)' },
     ];
+    /** The other `graphRun` keys the server accepts (1..10 000 000 each); their shipped default is not served, so it is stated here. */
+    readonly runExtraFields: { key: 'threads' | 'queue' | 'maxResultItems'; label: string; def: number | string; hint: string }[] = [
+        { key: 'threads', label: 'Graph run: worker threads', def: 'server', hint: 'Runs executing at once; blank = the service default.' },
+        { key: 'queue', label: 'Graph run: waiting line', def: 'server', hint: 'Runs allowed to wait for a worker; blank = the service default.' },
+        { key: 'maxResultItems', label: 'Graph run: items per result list', def: 10000, hint: 'Each list of a run result is cut to this many items (hard ceiling 1 000 000); blank = 10 000.' },
+    ];
     /** `GET /inv/graph/algorithms`: the budget in force and the server's hard ceilings; null if that route did not answer. */
     private readonly catalogue = signal<{ defaults: Record<RunKey, number>; ceilings: Record<RunKey, number> } | null>(null);
     readonly draftFields = DRAFT_FIELDS;
@@ -504,6 +521,9 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             maxNodes: new FormControl<number | null>(null, runValidators),
             maxEdges: new FormControl<number | null>(null, runValidators),
             timeoutMs: new FormControl<number | null>(null, runValidators),
+            threads: new FormControl<number | null>(null, runValidators),
+            queue: new FormControl<number | null>(null, runValidators),
+            maxResultItems: new FormControl<number | null>(null, runValidators),
         }),
         drafts: new FormGroup(
             {
@@ -623,6 +643,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         else delete body['embed'];
         const run: Record<string, unknown> = { ...(served.graphRun ?? {}) };
         for (const r of this.runFields) run[r.key] = num(v.graphRun[r.key]);
+        for (const r of this.runExtraFields) run[r.key] = num(v.graphRun[r.key]);
         if (Object.values(run).some((x) => x !== null && x !== undefined)) body['graphRun'] = run;
         else delete body['graphRun'];
         // Blank keys are omitted (inherit); no stated key at all = no block.
@@ -682,6 +703,9 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 maxNodes: s.graphRun?.maxNodes ?? null,
                 maxEdges: s.graphRun?.maxEdges ?? null,
                 timeoutMs: s.graphRun?.timeoutMs ?? null,
+                threads: s.graphRun?.threads ?? null,
+                queue: s.graphRun?.queue ?? null,
+                maxResultItems: s.graphRun?.maxResultItems ?? null,
             },
             drafts: {
                 maxOpen: s.drafts?.maxOpen ?? null,
