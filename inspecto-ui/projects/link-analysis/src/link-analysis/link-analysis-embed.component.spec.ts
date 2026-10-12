@@ -198,7 +198,8 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
         await settle(c.f);
         expect(c.inv.mintInvestigationEmbed).toHaveBeenCalledWith('inv-1', { ttl_hours: 24, label: 'Auditor' });
         const field = d.querySelector('#embed-link-field') as HTMLInputElement;
-        expect(field.value).toContain('/v1/public/investigations/' + TOKEN);
+        expect(field.value).toBe(location.origin + '/embed/inv/' + encodeURIComponent(TOKEN));
+        expect(field.value).not.toContain('/public/investigations');
         expect(d.textContent).toContain('Copy now - it is not shown again');
         await expectNoA11yViolations(d);
 

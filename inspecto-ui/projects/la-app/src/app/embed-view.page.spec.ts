@@ -10,12 +10,12 @@ const VIEW = {
     investigation: { id: 'inv-1', title: 'Ring case', purpose: 'p', createdAt: 'x' },
     head: { step: 4 },
     workingSet: {
-        entities: [{ entityId: 'msisdn:****12' }],
+        entities: [{ entityId: 'msisdn:****12' }, { entityId: 'b' }, { entityId: 'a' }],
         links: [{ source: 'a', target: 'b', kind: 'calls', count: 2 }],
         excludedCount: 0,
     },
     annotations: [{ step: 2, note: 'seen twice' }],
-    references: [],
+    references: [{ title: 'cdr ****99' }],
     link: { expiresAt: '2026-10-13T10:00:00Z' },
 };
 
@@ -35,6 +35,9 @@ describe('embed view page', () => {
         expect(el.textContent).toContain('Ring case');
         expect(el.textContent).toContain('msisdn:****12');
         expect(el.textContent).toContain('seen twice');
+        expect(el.textContent).toContain('cdr ****99');
+        expect(el.querySelectorAll('svg circle').length).toBe(3);
+        expect(el.querySelectorAll('svg line').length).toBe(1);
         expect(el.querySelector('button, input, a')).toBeNull();
     });
 

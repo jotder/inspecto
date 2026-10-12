@@ -3,7 +3,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
-import { apiUrl } from '@inspecto/core/api/api-base';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InvService } from '@inspecto/link-analysis/api/inv.service';
 
@@ -35,10 +34,9 @@ export function embedErrorMessage(err: unknown, fallback: string): string {
     }
 }
 
-/** The absolute link: the host origin + the API prefix + the answer's public path (the SPA's own `apiUrl`). */
-export function embedAbsoluteLink(publicPath: string): string {
-    const abs = apiUrl(publicPath);
-    return /^https?:\/\//.test(abs) ? abs : location.origin + abs;
+/** The shareable SPA link: the host origin + the la-app's `/embed/inv/<token>` viewer route (never the API URL). */
+export function embedAbsoluteLink(token: string): string {
+    return location.origin + '/embed/inv/' + encodeURIComponent(token);
 }
 
 /**
@@ -163,7 +161,7 @@ export class LinkAnalysisEmbedMintDialog implements OnDestroy {
             if (label) body.label = label;
             const m = await firstValueFrom(this.inv.mintInvestigationEmbed(this.data.investigationId, body));
             this.minted = true;
-            this.link.set(embedAbsoluteLink(m.url));
+            this.link.set(embedAbsoluteLink(m.token));
         } catch (err) {
             this.error.set(embedErrorMessage(err, 'Could not create the link.'));
         } finally {

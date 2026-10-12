@@ -34,3 +34,26 @@ export class EmbedViewService {
             .pipe(map((body) => (isV1Envelope(body) ? (body.data as EmbedView) : (body as EmbedView))));
     }
 }
+
+export interface EmbedGraph {
+    size: number;
+    nodes: { id: string; x: number; y: number }[];
+    edges: { x1: number; y1: number; x2: number; y2: number }[];
+}
+
+/** A static circular layout of the shared working set (no physics, no services): hidden entities are skipped. */
+export function layoutEmbedGraph(ws: Pick<EmbedView['workingSet'], 'entities' | 'links'>): EmbedGraph {
+    const size = 400;
+    const ids = ws.entities.filter((e) => !e.hidden).map((e) => e.entityId);
+    const pos = new Map<string, { x: number; y: number }>();
+    ids.forEach((id, i) => {
+        const a = (2 * Math.PI * i) / ids.length;
+        pos.set(id, { x: size / 2 + 160 * Math.cos(a), y: size / 2 + 160 * Math.sin(a) });
+    });
+    const edges = ws.links.flatMap((l) => {
+        const s = pos.get(l.source);
+        const t = pos.get(l.target);
+        return s && t ? [{ x1: s.x, y1: s.y, x2: t.x, y2: t.y }] : [];
+    });
+    return { size, nodes: ids.map((id) => ({ id, ...pos.get(id)! })), edges };
+}

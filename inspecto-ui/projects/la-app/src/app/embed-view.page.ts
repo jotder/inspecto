@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EmbedView, EmbedViewService } from './embed-view.service';
+import { EmbedView, EmbedViewService, layoutEmbedGraph, EmbedGraph } from './embed-view.service';
 
 /**
  * `/embed/inv/:token` - the read-only viewer of ONE shared Investigation, for someone with no login (LA-EMBED-VIEW-1).
@@ -35,6 +35,25 @@ import { EmbedView, EmbedViewService } from './embed-view.service';
                                 Read-only view at step {{ v.head.step }}. This link expires {{ v.link.expiresAt }}.
                             </p>
                         </header>
+                        @if (graph(); as g) {
+                            <section aria-labelledby="embed-graph">
+                                <h2 id="embed-graph" class="m-0 text-lg font-semibold">Graph</h2>
+                                <svg
+                                    role="img"
+                                    [attr.viewBox]="'0 0 ' + g.size + ' ' + g.size"
+                                    class="w-full max-w-xl"
+                                    aria-label="Entity and link graph, read-only"
+                                >
+                                    @for (e of g.edges; track $index) {
+                                        <line [attr.x1]="e.x1" [attr.y1]="e.y1" [attr.x2]="e.x2" [attr.y2]="e.y2" stroke="currentColor" opacity="0.4" />
+                                    }
+                                    @for (n of g.nodes; track n.id) {
+                                        <circle [attr.cx]="n.x" [attr.cy]="n.y" r="6" fill="currentColor" />
+                                        <text [attr.x]="n.x" [attr.y]="n.y - 10" text-anchor="middle" font-size="10" fill="currentColor">{{ n.id }}</text>
+                                    }
+                                </svg>
+                            </section>
+                        }
                         <section aria-labelledby="embed-ents">
                             <h2 id="embed-ents" class="m-0 text-lg font-semibold">
                                 Entities ({{ v.workingSet.entities.length }})
@@ -54,6 +73,14 @@ import { EmbedView, EmbedViewService } from './embed-view.service';
                             <ul class="m-0 list-none p-0">
                                 @for (l of v.workingSet.links; track $index) {
                                     <li>{{ l.source }} - {{ l.kind }} - {{ l.target }} ({{ l.count ?? 1 }})</li>
+                                }
+                            </ul>
+                        </section>
+                        <section aria-labelledby="embed-refs">
+                            <h2 id="embed-refs" class="m-0 text-lg font-semibold">References ({{ v.references.length }})</h2>
+                            <ul class="m-0 list-none p-0">
+                                @for (r of v.references; track $index) {
+                                    <li>{{ refText(r) }}</li>
                                 }
                             </ul>
                         </section>
@@ -78,6 +105,19 @@ export class EmbedViewPageComponent {
     readonly token = input.required<string>();
     protected readonly state = signal<'loading' | 'ready' | 'unavailable'>('loading');
     protected readonly view = signal<EmbedView | null>(null);
+
+    protected readonly graph = computed<EmbedGraph | null>(() => {
+        const v = this.view();
+        return v && v.workingSet.entities.length ? layoutEmbedGraph(v.workingSet) : null;
+    });
+
+    /** A reference is shown as returned (already masked): its title/label/note/id, else compact JSON. */
+    protected refText(r: unknown): string {
+        if (typeof r === 'string') return r;
+        const o = (r ?? {}) as Record<string, unknown>;
+        const t = o['title'] ?? o['label'] ?? o['note'] ?? o['id'];
+        return typeof t === 'string' ? t : JSON.stringify(r);
+    }
 
     private readonly svc = inject(EmbedViewService);
     private readonly destroyRef = inject(DestroyRef);
