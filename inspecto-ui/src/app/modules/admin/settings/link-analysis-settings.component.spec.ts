@@ -427,6 +427,74 @@ describe('LinkAnalysisSettingsComponent', () => {
         });
     });
 
+    describe('embed links (LA-EMBED-VIEW-1)', () => {
+        const EMBED: Partial<LinkAnalysisLimits> = {
+            embed: { defaultTtlHours: 48, maxTtlHours: 100, refuseClassifications: ['PII', 'SECRET'] },
+            embedInForce: { defaultTtlHours: 48, maxTtlHours: 100, refuseClassifications: ['PII', 'SECRET'] },
+        };
+
+        it('shows the values in force, says the feature is off unless the host enables it, and fills the form (a11y)', async () => {
+            const { el, c } = setup({ served: EMBED });
+            expect(el.textContent).toContain('OFF unless the host runs with');
+            expect(el.textContent).toContain('-Dla.embed.enabled=true');
+            expect(el.textContent).toContain('In force: 48 hours');
+            expect(el.textContent).toContain('In force: 100 hours');
+            expect(el.textContent).toContain('In force: PII, SECRET.');
+            expect(c.form.controls.embed.controls.refuseClassifications.value).toBe('PII, SECRET');
+            await expectNoA11yViolations(el);
+        });
+
+        it('saves the three knobs, the classes as a list, and omits the block when all are blank', () => {
+            const { c, api, submit } = setup({ served: EMBED });
+            c.form.controls.embed.patchValue({ defaultTtlHours: 24, maxTtlHours: 8760, refuseClassifications: ' pii ,, Secret ' });
+            submit();
+            expect((api.save.mock.calls[0][0] as unknown as Record<string, unknown>)['embed']).toEqual({
+                defaultTtlHours: 24, maxTtlHours: 8760, refuseClassifications: ['pii', 'Secret'],
+            });
+            c.form.controls.embed.patchValue({ defaultTtlHours: null, maxTtlHours: null, refuseClassifications: '' });
+            submit();
+            const body = api.save.mock.calls[1][0] as unknown as Record<string, unknown>;
+            expect(body).not.toHaveProperty('embed');
+            expect(body).not.toHaveProperty('embedInForce');
+        });
+
+        it.each([
+            ['defaultTtlHours', 0],
+            ['defaultTtlHours', 8761],
+            ['maxTtlHours', 0],
+            ['maxTtlHours', 8761],
+        ])('refuses embed.%s = %s client-side and does not save', (key, bad) => {
+            const { c, api, submit } = setup();
+            c.form.controls.embed.patchValue({ [key]: bad });
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+        });
+
+        it('refuses a default above the longest lifetime (a blank longest is the shipped 720), and accepts equal', () => {
+            const { c, api, fixture, el, submit } = setup();
+            c.form.controls.embed.patchValue({ defaultTtlHours: 721 });
+            fixture.detectChanges();
+            expect(el.textContent).toContain('must not exceed the longest lifetime');
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+            c.form.controls.embed.patchValue({ defaultTtlHours: 100, maxTtlHours: 99 });
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+            c.form.controls.embed.patchValue({ defaultTtlHours: 99 });
+            submit();
+            expect(api.save).toHaveBeenCalledTimes(1);
+        });
+
+        it('refuses more than 20 classifications or a name over 64 characters', () => {
+            const { c, api, submit } = setup();
+            c.form.controls.embed.patchValue({ refuseClassifications: Array.from({ length: 21 }, (_, i) => 'C' + i).join(',') });
+            submit();
+            c.form.controls.embed.patchValue({ refuseClassifications: 'X'.repeat(65) });
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+        });
+    });
+
     it('is read only without the authoring capability', () => {
         const { el } = setup({ canEdit: false });
         expect(el.querySelector('button[type="submit"]')).toBeNull();

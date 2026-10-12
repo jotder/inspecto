@@ -355,6 +355,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   field means **inherit the shipped default**, never *unbounded*. The shipped values (500 projection,
   2 000 analysis) are **measurements, not truths**: they came from one host, one browser and one
   synthetic graph shape, and a denser graph or a slower laptop moves them.
+* **Embed links** (Settings > Link Analysis, 2026-10-12): `embed.defaultTtlHours` / `maxTtlHours` (1..8760; the default may not exceed the cap, a blank cap is 720) and `refuseClassifications` (comma list, at most 20 names of at most 64 characters) with `embedInForce` shown; the client range check mirrors `SettingsRoutes.embed`, an all-blank block is omitted from the PUT. The pane only states that the feature is OFF unless the host runs with `-Dla.embed.enabled` - there is no status API for it.
 * ⛔ **A persisted cap is refused, not clamped.** A non-integer or anything outside `1..100000` is a
   **422 naming the field and the range** — because an operator typed it and deserves to be told. A silent
   clamp is the pattern for a per-request parameter, not for a stored setting.

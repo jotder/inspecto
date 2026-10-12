@@ -76,6 +76,31 @@ const IDX_QUEUE_MAX = 1000;
 const IDX_DISK_MAX = 1_000_000_000_000_000;
 /** SettingsRoutes index.maxAgeHours: 1..8760 hours (one year). */
 const IDX_MAX_AGE_MAX = 8760;
+/** `SettingsRoutes` `embed.*`: lifetimes 1..8760 hours (the cap defaults to 720 and a Space may raise it that far); the default may not exceed the cap. */
+const EMBED_TTL_MAX = 8760;
+const EMBED_MAX_TTL_DEFAULT = 720;
+const EMBED_REFUSE_MAX = 20;
+const EMBED_NAME_MAX = 64;
+const embedTtlValidators = [Validators.min(1), Validators.max(EMBED_TTL_MAX), Validators.pattern('\\d*')];
+
+/** The refused classifications as typed: comma separated, blanks dropped. */
+function parseClasses(text: string | null): string[] {
+    return (text ?? '').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+/** At most 20 names of at most 64 characters (server 422 otherwise). */
+function embedClassesValid(c: AbstractControl): ValidationErrors | null {
+    const names = parseClasses(c.value as string | null);
+    return names.length <= EMBED_REFUSE_MAX && names.every((n) => n.length <= EMBED_NAME_MAX) ? null : { embedClasses: true };
+}
+
+/** The default lifetime may not exceed the cap in force (a blank cap is the shipped 720 h) - the server's 422, caught before the save. */
+function embedDefaultWithinMax(g: AbstractControl): ValidationErrors | null {
+    const v = g.getRawValue() as { defaultTtlHours: number | null | ''; maxTtlHours: number | null | '' };
+    if (v.defaultTtlHours === null || v.defaultTtlHours === '') return null;
+    const max = v.maxTtlHours === null || v.maxTtlHours === '' ? EMBED_MAX_TTL_DEFAULT : Number(v.maxTtlHours);
+    return Number(v.defaultTtlHours) <= max ? null : { embedDefaultAboveMax: true };
+}
 const draftValidators = (max: number) => [Validators.min(1), Validators.max(max), Validators.pattern('\\d*')];
 
 type RunKey = 'maxNodes' | 'maxEdges' | 'timeoutMs';
@@ -326,6 +351,43 @@ function expiryAfterHibernation(
                             </p>
                         }
                     </fieldset>
+                    <fieldset formGroupName="embed" class="flex flex-col gap-3">
+                        <legend class="text-sm font-semibold">Embed links</legend>
+                        <p class="text-secondary text-sm">
+                            A read-only link to one Investigation for a holder who has no account. The feature is OFF unless the host
+                            runs with <code>-Dla.embed.enabled=true</code>; these settings only apply once it is on.
+                        </p>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Default link lifetime (hours)</mat-label>
+                            <input matInput type="number" min="1" [max]="embedTtlMax" formControlName="defaultTtlHours"
+                                [readonly]="!canEdit()" [placeholder]="'default ' + (embedInForce()?.defaultTtlHours ?? '')" />
+                            <mat-hint>In force: {{ embedInForce()?.defaultTtlHours ?? '-' }} hours, for a link minted without a lifetime.</mat-hint>
+                            @if (form.controls.embed.controls.defaultTtlHours.invalid) {
+                                <mat-error>A whole number of hours from 1 to {{ embedTtlMax }}, or blank for the default.</mat-error>
+                            }
+                        </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Longest link lifetime (hours)</mat-label>
+                            <input matInput type="number" min="1" [max]="embedTtlMax" formControlName="maxTtlHours"
+                                [readonly]="!canEdit()" [placeholder]="'default ' + (embedInForce()?.maxTtlHours ?? '')" />
+                            <mat-hint>In force: {{ embedInForce()?.maxTtlHours ?? '-' }} hours. A longer request is refused, never shortened.</mat-hint>
+                            @if (form.controls.embed.controls.maxTtlHours.invalid) {
+                                <mat-error>A whole number of hours from 1 to {{ embedTtlMax }}, or blank for the default.</mat-error>
+                            }
+                        </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Classifications that may not be shared by link</mat-label>
+                            <input matInput type="text" formControlName="refuseClassifications" [readonly]="!canEdit()"
+                                placeholder="e.g. PII, SECRET" />
+                            <mat-hint>In force: {{ embedRefusedInForce() }}. Comma separated; the strictest classification of the Investigation's columns decides.</mat-hint>
+                            @if (form.controls.embed.controls.refuseClassifications.invalid) {
+                                <mat-error>At most {{ embedRefuseMax }} names of at most {{ embedNameMax }} characters each.</mat-error>
+                            }
+                        </mat-form-field>
+                        @if (form.controls.embed.hasError('embedDefaultAboveMax')) {
+                            <p class="text-warn text-sm" role="alert">The default lifetime must not exceed the longest lifetime.</p>
+                        }
+                    </fieldset>
                     @if (saveError()) {
                         <inspecto-alert variant="error" title="Not saved">{{ saveError() }}</inspecto-alert>
                     }
@@ -363,6 +425,9 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly idxQueueMax = IDX_QUEUE_MAX;
     readonly idxDiskMax = IDX_DISK_MAX;
     readonly idxMaxAgeMax = IDX_MAX_AGE_MAX;
+    readonly embedTtlMax = EMBED_TTL_MAX;
+    readonly embedRefuseMax = EMBED_REFUSE_MAX;
+    readonly embedNameMax = EMBED_NAME_MAX;
     readonly runFields: { key: RunKey; label: string }[] = [
         { key: 'maxNodes', label: 'Graph run: default node budget' },
         { key: 'maxEdges', label: 'Graph run: default edge budget' },
@@ -389,6 +454,11 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly maskingInForce = computed(() => this.served()?.maskingModeInForce ?? 'typed');
     readonly entityTypes = computed(() => this.served()?.entityTypesInForce ?? []);
     readonly indexInForce = computed(() => this.served()?.indexInForce ?? null);
+    readonly embedInForce = computed(() => this.served()?.embedInForce ?? null);
+    readonly embedRefusedInForce = computed(() => {
+        const c = this.embedInForce()?.refuseClassifications ?? [];
+        return c.length ? c.join(', ') : 'none';
+    });
     readonly storeLabel = computed(() => {
         const b = this.served()?.investigationStoreInForce;
         return b === 'db' ? 'PostgreSQL' : b === 'fs' ? 'filesystem' : 'not reported';
@@ -417,6 +487,14 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             maxDiskBytes: new FormControl<number | null>(null, [Validators.min(0), Validators.max(IDX_DISK_MAX), Validators.pattern('\\d*')]),
             maxAgeHours: new FormControl<number | null>(null, [Validators.min(1), Validators.max(IDX_MAX_AGE_MAX), Validators.pattern('\\d*')]),
         }),
+        embed: new FormGroup(
+            {
+                defaultTtlHours: new FormControl<number | null>(null, embedTtlValidators),
+                maxTtlHours: new FormControl<number | null>(null, embedTtlValidators),
+                refuseClassifications: new FormControl<string>('', embedClassesValid),
+            },
+            embedDefaultWithinMax,
+        ),
         graphRun: new FormGroup({
             maxNodes: new FormControl<number | null>(null, runValidators),
             maxEdges: new FormControl<number | null>(null, runValidators),
@@ -529,6 +607,15 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         idx['maxAgeHours'] = num(v.index.maxAgeHours);
         if (Object.values(idx).some((x) => x !== null && x !== undefined)) body['index'] = idx;
         else delete body['index'];
+        // Blank = inherit; no stated key at all = no block (the PUT replaces, so a cleared block must not be sent back).
+        const classes = parseClasses(v.embed.refuseClassifications);
+        const embed = {
+            defaultTtlHours: num(v.embed.defaultTtlHours),
+            maxTtlHours: num(v.embed.maxTtlHours),
+            refuseClassifications: classes.length ? classes : null,
+        };
+        if (Object.values(embed).some((x) => x !== null)) body['embed'] = embed;
+        else delete body['embed'];
         const run: Record<string, unknown> = { ...(served.graphRun ?? {}) };
         for (const r of this.runFields) run[r.key] = num(v.graphRun[r.key]);
         if (Object.values(run).some((x) => x !== null && x !== undefined)) body['graphRun'] = run;
@@ -580,6 +667,11 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 queue: s.index?.queue ?? null,
                 maxDiskBytes: s.index?.maxDiskBytes ?? null,
                 maxAgeHours: s.index?.maxAgeHours ?? null,
+            },
+            embed: {
+                defaultTtlHours: s.embed?.defaultTtlHours ?? null,
+                maxTtlHours: s.embed?.maxTtlHours ?? null,
+                refuseClassifications: (s.embed?.refuseClassifications ?? []).join(', '),
             },
             graphRun: {
                 maxNodes: s.graphRun?.maxNodes ?? null,

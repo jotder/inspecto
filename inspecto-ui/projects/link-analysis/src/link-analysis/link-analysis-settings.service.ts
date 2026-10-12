@@ -102,6 +102,10 @@ export interface LinkAnalysisLimits {
     } | null;
     /** The index knobs actually in force (shipped default or stated) - server-computed, read-only. `maxDiskBytes` 0 = no limit. */
     indexInForce?: { enabled: boolean; maxDiskBytes: number; keepVersions: number; threads: number; queue: number; maxAgeHours: number };
+    /** LA-EMBED-VIEW-1: the embed-link knobs stated (lifetimes in hours, classifications minting is refused for); `null` = every one inherits. */
+    embed?: { defaultTtlHours?: number | null; maxTtlHours?: number | null; refuseClassifications?: string[] | null } | null;
+    /** The embed knobs a mint applies now - server-computed, read-only. */
+    embedInForce?: { defaultTtlHours: number; maxTtlHours: number; refuseClassifications: string[] };
     /** The active InvestigationStore backend (`-Dinvestigations.backend`): `fs` = filesystem, `db` = PostgreSQL. Read-only, not a setting. */
     investigationStoreInForce?: 'fs' | 'db';
 }
