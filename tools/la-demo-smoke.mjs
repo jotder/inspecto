@@ -5,7 +5,12 @@
 //
 //   node tools/la-demo-smoke.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--off-space la-showcase-off]
 //                                [--staged <dir with TRANSFERS_20260904.csv> --inbox <Space inbox/mule_transfers dir>]
-//                                [--burst] [--telecom [--presenter fm.manager] [--four-eyes 2000] [--telecom-timeout 180]] [--dry-run]
+//                                [--burst] [--embed] [--telecom [--presenter fm.manager] [--four-eyes 2000] [--telecom-timeout 180]] [--dry-run]
+//
+// Newer behaviour, always run (each prints PASS/FAIL/SKIPPED): empty-dataset (409 'has no data yet', no engine/path leak; SKIPPED when
+// the telecom Dataset already has rows), read-only-persona (ra.analyst 403 missing capability, read 200), settings-roundtrip (PUT the same
+// document back; maxAgeHours 0/8761 = 422 1..8760), signin-picker (/bootstrap auth.mock). --embed (host runs -Dla.embed.enabled=true; admin
+// must lead the Investigation): mint + public GET headers + mangled/revoked uniform 404 + revoke; without it only the dark answers (503/404).
 //
 // With --telecom (MUTATES: triggers the telecom Jobs, creates a smoke-telecom-<ts> Investigation): telecom Datasets + the
 // telecom_links_dataset link columns; the presenter triggers telecom_links / _msisdn_indicators / _typology_counts and their
@@ -282,6 +287,139 @@ export async function runTelecom({ call, record, skip = () => {}, presenter = 'f
   }
 }
 
+// ---- newer-behaviour probes (empty Dataset, read-only persona, settings, embed link, sign-in picker) ----------------------
+
+/** A la-showcase Dataset that stays empty until the telecom seed runs (the telecom Job fills it). */
+export const EMPTY_DATASET = 'telecom_links_dataset';
+const LEAK = /IO Error|read_parquet|[A-Za-z]:[\\/]|\/tmp\b|\/home\/|\/var\//;
+
+/** A never-ingested Dataset answers a calm 409 naming "has no data yet", never an engine/path leak. */
+export function emptyDatasetVerdict(res) {
+  if (res.status !== 409) return `expected HTTP 409, got ${excerpt(res)}`;
+  const text = JSON.stringify(res.body ?? null);
+  if (!/has no data yet/.test(text)) return `message lacks "has no data yet": ${excerpt(res)}`;
+  const leak = text.match(LEAK);
+  return leak ? `message leaks "${leak[0]}": ${excerpt(res)}` : null;
+}
+
+/** A reviewer-role persona's mutating call is a 403 that names the missing capability; its read is 200. */
+export function readOnlyVerdict(write, read) {
+  if (write.status !== 403) return `mutating call: expected HTTP 403, got ${excerpt(write)}`;
+  if (!/capabilit/i.test(JSON.stringify(write.body ?? null))) return `403 does not name a missing capability: ${excerpt(write)}`;
+  return read.status === 200 ? null : `read: expected HTTP 200, got ${excerpt(read)}`;
+}
+
+/** The document a PUT may send back: the GET shape without its read-only "...InForce" echoes. */
+export function settingsPutBody(doc) {
+  return Object.fromEntries(Object.entries(doc || {}).filter(([k]) => !k.endsWith('InForce')));
+}
+
+/** index.maxAgeHours outside 1..8760 is refused 422 naming the range (nothing is written). */
+export function maxAgeVerdict(res) {
+  if (res.status !== 422) return `expected HTTP 422, got ${excerpt(res)}`;
+  return /1\.\.8760/.test(JSON.stringify(res.body ?? null)) ? null : `422 message lacks the range 1..8760: ${excerpt(res)}`;
+}
+
+/** Same document before and after the replace-with-itself PUT (key order ignored). */
+export function settingsRoundtripVerdict(before, put, after) {
+  if (before.status !== 200) return `GET settings ${excerpt(before)}`;
+  if (put.status !== 200) return `PUT same document ${excerpt(put)}`;
+  if (after.status !== 200) return `second GET settings ${excerpt(after)}`;
+  const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+  return canon(before.data) === canon(after.data) ? null : 'settings changed across a replace-with-itself PUT';
+}
+
+/** `h` = a fetch Headers (or a plain object); null when absent. */
+export const headerOf = (h, name) => (h && typeof h.get === 'function' ? h.get(name) : h && h[name]) ?? null;
+
+/** The public embed view: 200 with the link-only hardening headers. */
+export function publicViewVerdict(res) {
+  if (res.status !== 200) return `public GET: expected HTTP 200, got ${excerpt(res)}`;
+  const csp = headerOf(res.headers, 'content-security-policy') || '';
+  if (!/frame-ancestors 'none'/.test(csp)) return `content-security-policy lacks frame-ancestors 'none' (got ${csp || 'none'})`;
+  if (String(headerOf(res.headers, 'x-frame-options')).toUpperCase() !== 'DENY') return 'x-frame-options is not DENY';
+  if (!/no-store/.test(headerOf(res.headers, 'cache-control') || '')) return 'cache-control lacks no-store';
+  return null;
+}
+
+/** A mangled and a revoked token answer 404 with the same body (no oracle). */
+export function uniform404Verdict(a, b) {
+  if (a.status !== 404 || b.status !== 404) return `expected two 404s, got ${a.status} and ${b.status}`;
+  return JSON.stringify(a.body) === JSON.stringify(b.body) ? null : `404 bodies differ: ${excerpt(a)} vs ${excerpt(b)}`;
+}
+
+/** The sign-in picker: a Demo Auth build publishes `auth.mock`, and `auth.spacesAttached` >= 1 when it publishes that. */
+export function bootstrapVerdict(res) {
+  if (res.status !== 200) return `GET /bootstrap ${excerpt(res)}`;
+  const auth = res.data && res.data.auth;
+  if (!auth || !auth.mock) return 'auth.mock is not truthy (not a Demo Auth build?)';
+  if ('spacesAttached' in auth && !(auth.spacesAttached >= 1)) return `auth.spacesAttached is ${auth.spacesAttached}, expected >= 1`;
+  return null;
+}
+
+/** Mangle a token (change its last character) so it can no longer verify. */
+export const mangleToken = (t) => t.slice(0, -1) + (t.endsWith('A') ? 'B' : 'A');
+
+/** The newer-behaviour probes. `call(user, method, path, body)` as in run(); `pub(path)` = unauthenticated Space GET returning headers;
+ *  `boot()` = unauthenticated GET /bootstrap. Writes nothing to seeded data (the embed mint/revoke pair is the one write). */
+export async function runNewer({ call, pub, boot, record, skip, embed = false, inv = INV }) {
+  const base = `/inv/investigations/${inv}`;
+
+  // (1) empty-dataset
+  const rows = await call('fm.analyst', 'GET', `/datasets/${EMPTY_DATASET}/rows?limit=1`);
+  const emptyId = `empty-dataset: ${EMPTY_DATASET} projection is a calm 409`;
+  if (rows.status !== 200) skip(emptyId, `${EMPTY_DATASET} not readable (${excerpt(rows)}); no reliably empty Dataset here`);
+  else if (rows.data && Array.isArray(rows.data.rows) && rows.data.rows.length) skip(emptyId, `${EMPTY_DATASET} already has rows (the telecom seed has run)`);
+  else record(emptyId, emptyDatasetVerdict(await call('fm.analyst', 'POST', '/inv/projection', { dataset: EMPTY_DATASET, sourceCol: 'a_msisdn', targetCol: 'b_msisdn' })));
+
+  // (2) read-only-persona
+  const write = await call('ra.analyst', 'POST', `${base}/ops`, { op: 'expand', direction: 'either', maxFanOut: 10 });
+  const read = await call('ra.analyst', 'GET', `${base}/log`);
+  record('read-only-persona: ra.analyst mutation is 403 (missing capability), read is 200', readOnlyVerdict(write, read));
+
+  // (3) settings-roundtrip
+  const before = await call('admin', 'GET', '/settings/link-analysis');
+  const rtId = 'settings-roundtrip: replace-with-itself changes nothing';
+  if (before.status !== 200) record(rtId, `GET settings ${excerpt(before)}`);
+  else {
+    const doc = settingsPutBody(before.data);
+    const put = await call('admin', 'PUT', '/settings/link-analysis', doc);
+    const after = await call('admin', 'GET', '/settings/link-analysis');
+    record(rtId, settingsRoundtripVerdict(before, put, after));
+    for (const hours of [0, 8761])
+      record(`settings-roundtrip: index.maxAgeHours ${hours} is 422 (1..8760)`,
+        maxAgeVerdict(await call('admin', 'PUT', '/settings/link-analysis', { ...doc, index: { ...(doc.index || {}), maxAgeHours: hours } })));
+  }
+
+  // (4) embed
+  const minted = await call('admin', 'POST', `${base}/embeds`, { ttl_hours: 1, label: 'la-demo-smoke' });
+  if (!embed) {
+    const darkId = 'embed (dark): mint is 503 CAPABILITY_UNAVAILABLE';
+    if (minted.status === 503) {
+      record(darkId, expectStatus(minted, { status: 503, code: 'CAPABILITY_UNAVAILABLE' }));
+      record('embed (dark): public GET is the uniform 404', expectStatus(await pub(`/public/investigations/${'A'.repeat(40)}`), 404));
+    } else {
+      skip(darkId, `the server answered ${minted.status}, not 503: the feature looks enabled; pass --embed`);
+      if (minted.status === 200 && minted.data && minted.data.grantId) await call('admin', 'POST', `${base}/embeds/${minted.data.grantId}/revoke`, {});
+    }
+  } else if (minted.status !== 200 || !minted.data || !minted.data.token) {
+    record('embed: admin mints a link', `${excerpt(minted)} (does the host run -Dla.embed.enabled=true, and is admin a lead of ${inv}?)`);
+  } else {
+    const { token, grantId } = minted.data;
+    record('embed: public GET (no Authorization) is 200 with frame-ancestors none, DENY, no-store', publicViewVerdict(await pub(`/public/investigations/${token}`)));
+    const mangled = await pub(`/public/investigations/${mangleToken(token)}`);
+    const revoke = await call('admin', 'POST', `${base}/embeds/${grantId}/revoke`, {});
+    record('embed: lead revokes the link', revoke.status === 200 ? null : excerpt(revoke));
+    record('embed: a mangled token and a revoked one are the same 404', uniform404Verdict(mangled, await pub(`/public/investigations/${token}`)));
+  }
+
+  // (5) signin-picker
+  const b = await boot();
+  const bv = bootstrapVerdict(b);
+  record('signin-picker: /bootstrap (no auth) publishes auth.mock', bv);
+  if (!bv && !('spacesAttached' in b.data.auth)) skip('signin-picker: auth.spacesAttached >= 1', 'this build does not publish auth.spacesAttached');
+}
+
 // ---- the probes ---------------------------------------------------------------------------------------------------
 
 /** The scripted probes as data: { id, as, method, path, body?, space?, want } (the ones that need state are in run()). */
@@ -299,7 +437,7 @@ export function buildProbes({ space = 'la-showcase', offSpace = 'la-showcase-off
 }
 
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', offSpace = 'la-showcase-off',
-  inbox = null, staged = null, burst = false, telecom = false, presenter = null, fourEyes = 2000, telecomTimeoutMs = 180000,
+  inbox = null, staged = null, burst = false, telecom = false, embed = false, presenter = null, fourEyes = 2000, telecomTimeoutMs = 180000,
   dryRun = false, log = () => {}, landTimeoutMs = 150000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now() } = {}) {
   const results = [];
   const api = `${base}/api/v1`;
@@ -312,6 +450,11 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     log(`  admin         GET /spaces/${space}/audit/route-inventory  -> ${EXPECTED_LA_ROUTES} /inv + /geo routes`);
     log(`  fm.analyst    GET dossier, tamper the manifest, POST dossier/verify  -> verified:false`);
     log(`  fm.analyst    replay hash before/after copying a staged file  ${inbox && staged ? '' : '(SKIPPED: no --staged/--inbox)'}`);
+    log(`  fm.analyst    GET ${EMPTY_DATASET} rows (empty) then POST /inv/projection  -> 409 'has no data yet', no IO Error/read_parquet/path  (SKIPPED if it has rows)`);
+    log(`  ra.analyst    POST ops expand -> 403 missing capability; GET log -> 200`);
+    log(`  admin         GET /settings/link-analysis, PUT it back unchanged, GET equal; PUT index.maxAgeHours 0 and 8761 -> 422 (1..8760)`);
+    log(`  admin         embed link ${embed ? 'mint, public GET (CSP frame-ancestors none, DENY, no-store), mangled vs revoked = same 404, revoke' : '(feature dark) mint -> 503 CAPABILITY_UNAVAILABLE, public GET -> 404  (pass --embed when the host runs -Dla.embed.enabled=true)'}`);
+    log(`  (no token)    GET /bootstrap -> auth.mock truthy, auth.spacesAttached >= 1 when published`);
     log(`  burst: 25 POST /inv/projection -> 429; 19 concurrent graph runs -> 503; 16 concurrent index builds -> 503; duplicate build -> 409  ${burst ? '' : '(SKIPPED: no --burst)'}`);
     log(`  telecom (${presenter}): Datasets + link columns; trigger ${TELECOM_JOBS.map(([j]) => j).join(', ')} and wait for rows; `
       + `Investigation seed ${TELECOM_SEED} + expand maxFanOut ${fourEyes}; ${Object.keys(TELECOM_PACKS).join(', ')} >= 1 match; `
@@ -331,6 +474,19 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     const headers = { 'content-type': 'application/json' };
     if (user) headers.authorization = `Bearer ${await token(user)}`;
     const r = await fetchFn(`${api}/spaces/${sp}${p}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    let parsed = null;
+    try { parsed = await r.json(); } catch { /* empty body */ }
+    return { status: r.status, body: parsed, data: unwrap(parsed) };
+  };
+
+  const pub = async (p) => {
+    const r = await fetchFn(`${api}/spaces/${space}${p}`, { method: 'GET' });
+    let parsed = null;
+    try { parsed = await r.json(); } catch { /* empty body */ }
+    return { status: r.status, body: parsed, data: unwrap(parsed), headers: r.headers };
+  };
+  const boot = async () => {
+    const r = await fetchFn(`${api}/bootstrap`, { method: 'GET' });
     let parsed = null;
     try { parsed = await r.json(); } catch { /* empty body */ }
     return { status: r.status, body: parsed, data: unwrap(parsed) };
@@ -377,6 +533,8 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     }
   } else log('skip  replay-vs-drift (no --staged/--inbox)');
 
+  await runNewer({ call, pub, boot, record, skip, embed });
+
   if (burst) {
     // The expensive-route bucket is per subject and SHARED by projection, Graph Runs and Index builds (20 tokens, +1 per 3 s), so
     // each capacity probe waits for its tokens first; the 429 probe goes last (it only needs a bucket that runs dry).
@@ -413,7 +571,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const opt = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
   run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), offSpace: opt('--off-space', 'la-showcase-off'),
     inbox: opt('--inbox', null), staged: opt('--staged', null), burst: args.includes('--burst'),
-    telecom: args.includes('--telecom'), presenter: opt('--presenter', null), fourEyes: Number(opt('--four-eyes', 2000)),
+    telecom: args.includes('--telecom'), embed: args.includes('--embed'), presenter: opt('--presenter', null), fourEyes: Number(opt('--four-eyes', 2000)),
     telecomTimeoutMs: Number(opt('--telecom-timeout', 180)) * 1000, dryRun: args.includes('--dry-run'), log: console.log })
     .then((rs) => { const bad = rs.filter((r) => !r.ok); console.log(`${rs.length - bad.length}/${rs.length} probes passed`); process.exitCode = bad.length ? 1 : 0; })
     .catch((e) => { console.error(e.message); process.exitCode = 2; });

@@ -76,10 +76,10 @@ test('run() against a stub server passes every probe, and fails a wrong status',
     if (p.endsWith('/dossier/verify')) return res(200, { data: { verified: JSON.parse(init.body).manifest.root === hash } });
     return res(500, {});
   };
-  const ok = await run({ fetchFn: stub(false) });
+  const ok = await run({ fetchFn: withNewer(stub(false)) });
   assert.ok(ok.every((r) => r.ok), JSON.stringify(ok.filter((r) => !r.ok)));
   assert.ok(ok.some((r) => r.id.includes(String(EXPECTED_LA_ROUTES))));
-  const bad = await run({ fetchFn: stub(true) });
+  const bad = await run({ fetchFn: withNewer(stub(true)) });
   assert.ok(bad.some((r) => !r.ok && r.id === '401 no token'));
 });
 
@@ -315,7 +315,7 @@ const ingest = (inbox) => async () => { for (const f of fs.readdirSync(inbox)) f
 test('run() --staged: writes a drift file, waits for the Space to ingest it, then hash unchanged and the re-read drifts', async () => {
   const { staged, inbox } = dirs();
   let landed = null;
-  const rs = await run({ fetchFn: burstStub(), staged, inbox, sleep: async () => { landed ??= fs.readdirSync(inbox); await ingest(inbox)(); } });
+  const rs = await run({ fetchFn: withNewer(burstStub()), staged, inbox, sleep: async () => { landed ??= fs.readdirSync(inbox); await ingest(inbox)(); } });
   assert.ok(rs.every((r) => r.ok), JSON.stringify(rs.filter((r) => !r.ok)));
   assert.ok(rs.some((r) => r.id === 'Re-read reports drift after a file lands' && r.ok));
   assert.equal(landed.length, 1);
@@ -324,16 +324,16 @@ test('run() --staged: writes a drift file, waits for the Space to ingest it, the
 
 test('run() --staged FAILs a file that is never ingested, and a landed file that does not drift the re-read', async () => {
   const a = dirs(); let t = 0;
-  const stuck = await run({ fetchFn: burstStub(), staged: a.staged, inbox: a.inbox, landTimeoutMs: 6000, now: () => (t += 3000), sleep: fastSleep });
+  const stuck = await run({ fetchFn: withNewer(burstStub()), staged: a.staged, inbox: a.inbox, landTimeoutMs: 6000, now: () => (t += 3000), sleep: fastSleep });
   assert.ok(stuck.some((r) => !r.ok && /not ingested within 6000 ms/.test(r.reason)), JSON.stringify(stuck));
   const b = dirs();
-  const noDrift = await run({ fetchFn: burstStub({ drift: false }), staged: b.staged, inbox: b.inbox, sleep: ingest(b.inbox) });
+  const noDrift = await run({ fetchFn: withNewer(burstStub({ drift: false })), staged: b.staged, inbox: b.inbox, sleep: ingest(b.inbox) });
   assert.ok(noDrift.some((r) => !r.ok && r.id === 'Re-read reports drift after a file lands'));
 });
 
 test('run() --burst: inline Graph Runs are SKIPPED; the 6th index build is a 503, a repeat a 409, the bucket a 429', async () => {
   const waits = [];
-  const rs = await run({ fetchFn: burstStub(), burst: true, sleep: async (ms) => { waits.push(ms); } });
+  const rs = await run({ fetchFn: withNewer(burstStub()), burst: true, sleep: async (ms) => { waits.push(ms); } });
   assert.ok(rs.every((r) => r.ok), JSON.stringify(rs.filter((r) => !r.ok)));
   assert.ok(rs.some((r) => r.skipped && /19 concurrent Graph Runs/.test(r.id)));
   for (const id of ['16 concurrent index builds -> a 503 (queue full)', 'a second live build of the same mapping -> 409', '>20 expensive POSTs -> 429'])
@@ -342,6 +342,111 @@ test('run() --burst: inline Graph Runs are SKIPPED; the 6th index build is a 503
 });
 
 test('run() --burst FAILs a queue that never fills', async () => {
-  const wide = await run({ fetchFn: burstStub({ queue: 99 }), burst: true, sleep: fastSleep });
+  const wide = await run({ fetchFn: withNewer(burstStub({ queue: 99 })), burst: true, sleep: fastSleep });
   assert.ok(wide.some((r) => !r.ok && /index builds/.test(r.id) && /no 503/.test(r.reason)), JSON.stringify(wide.filter((r) => !r.ok)));
+});
+
+// ---- newer-behaviour probes ---------------------------------------------------------------------------------------------
+import { emptyDatasetVerdict, readOnlyVerdict, settingsPutBody, maxAgeVerdict, settingsRoundtripVerdict, publicViewVerdict, uniform404Verdict,
+  bootstrapVerdict, mangleToken, runNewer } from './la-demo-smoke.mjs';
+
+/** Wraps a stub fetch with a healthy Space for the newer probes; `f` switches defects on. */
+function withNewer(inner, f = {}) {
+  let settings = { projectionNodeCap: 5000, maskingMode: 'mask', index: { maxAgeHours: 24 } };
+  const live = new Set();
+  const res = (status, body, headers = {}) => ({ ok: status < 400, status, json: async () => body, headers: { get: (k) => headers[k.toLowerCase()] ?? null } });
+  return async (url, init = {}) => {
+    const u = new URL(url); const p = u.pathname.replace(/^\/api\/v1(\/spaces\/[^/]+)?/, ''); const who = (init.headers || {}).authorization;
+    const body = init.body && !p.startsWith('/auth') ? JSON.parse(init.body) : null;
+    if (p === '/bootstrap') return res(200, { data: { auth: f.noMock ? {} : { mock: true, ...(f.attached0 && { spacesAttached: 0 }) } } });
+    if (p.startsWith('/datasets/telecom_links_dataset/rows')) return res(f.rowsMissing ? 404 : 200, { data: { rows: f.rowsExist ? [{ a: 1 }] : [] } });
+    if (p === '/inv/projection' && init.method === 'POST' && body.dataset === 'telecom_links_dataset')
+      return res(f.wrong409 ? 500 : 409, { error: { message: f.leak ? 'has no data yet: IO Error: read_parquet C:/data/x' : 'telecom_links_dataset has no data yet' } });
+    if (p.endsWith('/ops') && who === 'Bearer demo:ra.analyst') return res(f.writeAllowed ? 200 : 403, { error: { message: 'missing capability canInvestigate' } });
+    if (p.endsWith('/log') && who === 'Bearer demo:ra.analyst') return res(200, { data: {} });
+    if (p === '/settings/link-analysis') {
+      if (!init.method || init.method === 'GET') return res(200, { data: { ...settings, maskingModeInForce: 'mask', hubThresholdInForce: 1 } });
+      if (body.index && (body.index.maxAgeHours === 0 || body.index.maxAgeHours === 8761)) return res(f.range422 ? 200 : 422, { error: { message: 'index.maxAgeHours must be 1..8760' } });
+      if (f.settingsDrift) settings = { ...settings, projectionNodeCap: 1 }; else settings = body;
+      return res(200, { data: settings });
+    }
+    if (p.endsWith('/embeds') && init.method === 'POST') {
+      if (f.embedOn) { live.add('t'); return res(200, { data: { token: 'tok-abcdefABCDEF', grantId: 'g1' } }); }
+      return res(503, { error: { errorCode: 'CAPABILITY_UNAVAILABLE' } });
+    }
+    if (p.endsWith('/revoke')) { live.delete('t'); return res(200, { data: {} }); }
+    if (p.startsWith('/public/investigations/')) {
+      const tok = p.split('/').pop();
+      if (tok === 'tok-abcdefABCDEF' && live.has('t')) return res(200, { data: {} }, f.badHeaders ? {} : { 'content-security-policy': "frame-ancestors 'none'", 'x-frame-options': 'DENY', 'cache-control': 'no-store' });
+      return res(404, { error: { errorCode: 'NOT_FOUND', message: tok === 'tok-abcdefABCDEF' && f.oracle ? 'revoked' : 'not found' } });
+    }
+    return inner(url, init);
+  };
+}
+const runN = async (f, extra = {}) => {
+  const out = [];
+  const fx = withNewer(async () => ({ ok: false, status: 500, json: async () => ({}), headers: { get: () => null } }), f);
+  const pack = async (r) => { const b = await r.json().catch(() => null); return { status: r.status, body: b, data: b && 'data' in b ? b.data : b, headers: r.headers }; };
+  const call = (user, method, p, body) => fx(`http://x/api/v1/spaces/s${p}`, { method, headers: user ? { authorization: `Bearer demo:${user}` } : {}, body: body === undefined ? undefined : JSON.stringify(body) }).then(pack);
+  await runNewer({ ...extra, call, pub: (p) => call(null, 'GET', p), boot: () => fx('http://x/api/v1/bootstrap', { method: 'GET' }).then(pack),
+    record: (id, reason) => out.push({ id, ok: !reason, reason }), skip: (id, reason) => out.push({ id, ok: true, skipped: true, reason }) });
+  return out;
+};
+const failsOf = (rs) => rs.filter((r) => !r.ok).map((r) => `${r.id}: ${r.reason}`).join('\n');
+
+test('newer probes: every one passes on a healthy dark Space; the embed group is the dark answers', async () => {
+  const rs = await runN({});
+  assert.equal(failsOf(rs), '');
+  for (const id of [/empty-dataset/, /read-only-persona/, /replace-with-itself/, /maxAgeHours 0/, /maxAgeHours 8761/, /embed \(dark\): mint/, /uniform 404/, /signin-picker: \/bootstrap/])
+    assert.ok(rs.some((r) => id.test(r.id) && r.ok && !r.skipped), String(id));
+  assert.ok(rs.some((r) => r.skipped && /spacesAttached/.test(r.id)));
+});
+
+test('empty-dataset: FAILs a leak or a wrong status; SKIPs when the Dataset has rows or is unreadable', async () => {
+  assert.match(failsOf(await runN({ leak: true })), /empty-dataset.*leaks/);
+  assert.match(failsOf(await runN({ wrong409: true })), /empty-dataset.*expected HTTP 409/);
+  for (const f of [{ rowsExist: true }, { rowsMissing: true }]) {
+    const rs = await runN(f);
+    assert.equal(failsOf(rs), '');
+    assert.ok(rs.some((r) => r.skipped && /empty-dataset/.test(r.id)));
+  }
+  assert.match(emptyDatasetVerdict({ status: 409, body: { error: { message: 'has no data yet at /tmp/x' } } }), /\/tmp/);
+});
+
+test('read-only-persona FAILs a persona that can write', async () => {
+  assert.match(failsOf(await runN({ writeAllowed: true })), /read-only-persona.*expected HTTP 403/);
+  assert.match(readOnlyVerdict({ status: 403, body: { error: { message: 'nope' } } }, { status: 200 }), /missing capability/);
+});
+
+test('settings-roundtrip FAILs a drifting document and an accepted out-of-range maxAgeHours', async () => {
+  assert.match(failsOf(await runN({ settingsDrift: true })), /replace-with-itself.*changed/);
+  assert.match(failsOf(await runN({ range422: true })), /maxAgeHours 0.*expected HTTP 422/);
+  assert.deepEqual(settingsPutBody({ a: 1, aInForce: 2 }), { a: 1 });
+  assert.match(maxAgeVerdict({ status: 422, body: { error: { message: 'bad' } } }), /1\.\.8760/);
+  assert.match(settingsRoundtripVerdict({ status: 200, data: 1 }, { status: 422, body: null }, { status: 200, data: 1 }), /PUT same document/);
+});
+
+test('--embed: mint, headers, mangled == revoked 404, revoke pass; each defect FAILs; an enabled server without --embed SKIPs the dark pair', async () => {
+  const ok = await runN({ embedOn: true }, { embed: true });
+  assert.equal(failsOf(ok), '');
+  assert.equal(ok.filter((r) => /^embed:/.test(r.id)).length, 3);
+  assert.match(failsOf(await runN({ embedOn: true, badHeaders: true }, { embed: true })), /frame-ancestors/);
+  assert.match(failsOf(await runN({ embedOn: true, oracle: true }, { embed: true })), /404 bodies differ/);
+  assert.match(failsOf(await runN({}, { embed: true })), /embed: admin mints a link/);
+  const enabledNoFlag = await runN({ embedOn: true });
+  assert.ok(enabledNoFlag.some((r) => r.skipped && /embed \(dark\)/.test(r.id) && /pass --embed/.test(r.reason)));
+  assert.match(publicViewVerdict({ status: 200, headers: { 'content-security-policy': "frame-ancestors 'none'", 'x-frame-options': 'SAMEORIGIN', 'cache-control': 'no-store' } }), /DENY/);
+  assert.notEqual(mangleToken('abcA'), 'abcA');
+  assert.match(uniform404Verdict({ status: 404, body: 1 }, { status: 200, body: 1 }), /two 404s/);
+});
+
+test('signin-picker FAILs a non-demo build or spacesAttached 0', async () => {
+  assert.match(failsOf(await runN({ noMock: true })), /auth\.mock/);
+  assert.match(failsOf(await runN({ attached0: true })), /spacesAttached is 0/);
+  assert.equal(bootstrapVerdict({ status: 200, data: { auth: { mock: true, spacesAttached: 2 } } }), null);
+});
+
+test('the dry run lists the newer probes', async () => {
+  const lines = []; await run({ dryRun: true, embed: true, log: (l) => lines.push(l) });
+  for (const w of [/has no data yet/, /ra\.analyst/, /maxAgeHours/, /public GET/, /\/bootstrap/]) assert.ok(lines.some((l) => w.test(l)), String(w));
 });
