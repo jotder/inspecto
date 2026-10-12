@@ -91,7 +91,9 @@ class CommitFenceTest {
 
         try (CommitFence.Held fence = CommitFence.hold(
                 CommitFence.Scope.RUN, cfg.identity().pipelineName(), () -> false)) {
-            for (int i = 0; i < 3; i++) CollectorProcessor.run(cfg);          // 3 > retry.max: would exhaust
+            for (int i = 0; i < 3; i++)                                           // 3 > retry.max: would exhaust
+                assertThrows(CollectorProcessor.ConsignmentProcessingException.class, () -> CollectorProcessor.run(cfg),
+                        "a lost lease is a failed run, never a success (INGEST-COMMIT-LEASE-LOST-OUTCOME-1)");
         }
 
         assertTrue(feed.exists(), "the file stays in the inbox for the new holder");
@@ -177,7 +179,7 @@ class CommitFenceTest {
         AtomicInteger asked = new AtomicInteger();
         try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
                 () -> asked.incrementAndGet() <= 1)) {                       // held at the first look, lost by the second
-            CollectorProcessor.run(cfg);
+            assertThrows(CollectorProcessor.ConsignmentProcessingException.class, () -> CollectorProcessor.run(cfg));
         }
         assertTrue(asked.get() >= 2, "the commit looked again before the backup move");
         assertTrue(feed.exists(), "the original was not moved out from under the new holder");
@@ -227,7 +229,8 @@ class CommitFenceTest {
             }
             return CommitFence.State.LOST;                                       // ... and only now A is refused
         })) {
-            ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg));
+            assertThrows(CommitFence.LeaseLostException.class,
+                    () -> ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg)));
         }
         assertNotNull(held.get());
         assertFalse(held.get().isEmpty(), "harness: the new holder wrote its outputs");
@@ -289,7 +292,8 @@ class CommitFenceTest {
 
         try (CommitFence.Held fence = CommitFence.hold(
                 CommitFence.Scope.RUN, cfg.identity().pipelineName(), () -> false)) {
-            ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg));
+            assertThrows(CommitFence.LeaseLostException.class,
+                    () -> ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg)));
         }
         Set<String> refused = relFiles(cfg.dirs().database());
         assertFalse(refused.isEmpty(), "the refused run's outputs are on disk (the documented posture)");
@@ -309,7 +313,8 @@ class CommitFenceTest {
         File feed = Path.of(cfg.dirs().poll()).resolve("feed.csv").toFile();
         try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
                 () -> CommitFence.State.UNREADABLE)) {
-            for (int i = 0; i < 4; i++) CollectorProcessor.run(cfg);
+            for (int i = 0; i < 4; i++)
+                assertThrows(CollectorProcessor.ConsignmentProcessingException.class, () -> CollectorProcessor.run(cfg));
         }
         assertTrue(feed.exists(), "never quarantined for a database blip");
         assertNull(CommitRetry.recordFor(feed, cfg));
@@ -346,8 +351,9 @@ class CommitFenceTest {
         ParkedBranches.record(lostId, "sink_parked", dir.resolve("parked.parquet"));
         try (CommitFence.Held fence = CommitFence.hold(
                 CommitFence.Scope.RUN, cfg.identity().pipelineName(), () -> false)) {
-            ConsignmentIngestor.process(new Consignment(lostId, "mini", null,
-                    List.of(new Consignment.Member(feed.toFile(), 0, Files.size(feed), sel))), cfg, audit);
+            assertThrows(CommitFence.LeaseLostException.class, () -> ConsignmentIngestor.process(
+                    new Consignment(lostId, "mini", null,
+                            List.of(new Consignment.Member(feed.toFile(), 0, Files.size(feed), sel))), cfg, audit));
         }
         assertTrue(Files.exists(feed), "not parked: the file stays in the inbox");
         assertEquals(0, filesUnder(Path.of(cfg.dirs().backup(), "parked").toString()), "nothing in the park home");
