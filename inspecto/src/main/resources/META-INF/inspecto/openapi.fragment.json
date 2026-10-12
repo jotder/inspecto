@@ -3930,8 +3930,38 @@
           }
         },
         "responses" : {
+          "202" : {
+            "description" : "Accepted; the comparison is running. Poll the Location.",
+            "headers" : {
+              "Location" : {
+                "schema" : { "type" : "string" },
+                "description" : "Poll URL for the run: /api/v1/jobs/runs/{runId}."
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "runId", "spaces", "status" ],
+                        "properties" : {
+                          "runId" : { "type" : "string" },
+                          "spaces" : { "type" : "array", "items" : { "type" : "string" } },
+                          "status" : { "type" : "string", "enum" : [ "running" ] }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
           "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); 202 carries runId, spaces, status."
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); errors only (422 / 404 / 409)."
           }
         }
       }
