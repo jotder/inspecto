@@ -527,6 +527,19 @@ actions are disabled. In the `la-showcase` demo, *Demo RA Analyst* and *Demo Man
 view-only role); *Demo FM Analyst* holds manage-incidents, graph-run, index-build and Alert-Rule authoring;
 *Demo FM Manager* is the second approver; *Demo Admin* also holds `canAuthorWorkbench`.
 
+**Read-only access.** Without a capability the screen shows the control disabled (or the form replaced) with a
+sentence naming what it needs, instead of a button that answers 403. What each kind of user sees:
+
+| Without… | What is read-only, and the note you see |
+|---|---|
+| `canManageIncidents` (for example the `la-viewer` role) | You can open, read and replay Investigations. Start Investigation, Seed, Expand, Exclude, Annotate, Undo, Mark, Re-order, Drafts, Case link (Link to Case / Unlink), Members (Grant / Revoke), Add reference, Save and Instantiate template, Attach to Case, and Entity List and Identity edits are disabled with *"…needs the Incident management capability"*. The Identity Fact log is not read at all (its groups reveal which identifiers belong together). |
+| `canAuthorAlertRules` | *Watch* (arming an Alert Rule), standing detection and *Edit rule* on a bound rule are disabled, with *"…needs the Alert Rule authoring capability"*. |
+| `canAuthorWorkbench` | Settings → Link Analysis shows its values but offers no Save (*"Read only"*), and the Link Analysis settings link is absent from the Link Analysis app's left rail. |
+| `canRunLinkGraphAnalysis`, `canBuildLinkIndex` | *Run on server* and *Build index* are disabled and say why. |
+
+Still available to everyone who can read: the Dossier (build, download, verify), verifying a sealed bundle, graph runs'
+read side, and every view and analysis tool.
+
 A refusal shows the server's reason. "Not found" on an Investigation can mean it does not exist, it is not yours, or
 its Dataset is no longer shared with you — the system answers the same for all three on purpose.
 

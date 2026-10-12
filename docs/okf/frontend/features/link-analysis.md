@@ -2081,3 +2081,5 @@ shows approved / denied.
 gets 403; press it after seeding rather than waiting for the cron. The benign taxi hub scores like the suspect - a
 talking point (high connectivity is not guilt), not a defect. Offline smoke: `node tools/la-demo-smoke.mjs --telecom`.
 Live run recipe: build the bundle in a worktree and serve it on a free port (e.g. :8099), never the shared :8080.
+
+**Read-only access (client gates, 2026-10-12).** Every Link Analysis SPA write control asks the same `LensService` signal the server route gates on (`canManageIncidents`, `canAuthorAlertRules`, `canAuthorWorkbench`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`) and, without it, is disabled with a visible reason (`aria-describedby`) or replaced by a note: Investigation start and step handlers (also inert on Enter), Case link, Members grant/revoke, References add, Templates save/instantiate, bound-rule edit, the Identity Fact log (read AND import). The Dossier, bundle download and both verify POSTs are read-shaped and stay enabled. The user-facing table is `ui/link-analysis-user-manual.md` section 11.
