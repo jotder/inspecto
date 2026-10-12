@@ -139,7 +139,7 @@ describe('LinkAnalysisSettingsComponent', () => {
         expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ index }));
     });
 
-    it("shows a 422 inline in the server's words and a 503 as a writes-disabled notice", () => {
+    it("shows a 422 inline in the server's words and a 503 as a writes-disabled notice", async () => {
         const { el, api, submit } = setup({
             save: () =>
                 throwError(
@@ -157,6 +157,19 @@ describe('LinkAnalysisSettingsComponent', () => {
         );
         submit();
         expect(el.textContent).toContain('Changes cannot be saved here');
+        await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1: the writes-disabled notice
+    });
+
+    it('the 422 shown inline is announced and axe-clean (LA-A11Y-AUDIT-1)', async () => {
+        const { el, submit } = setup({
+            save: () =>
+                throwError(
+                    () => new HttpErrorResponse({ status: 422, error: { error: { message: 'mergedDistinctCap must be 1..100000, got 0' } } }),
+                ),
+        });
+        submit();
+        expect(el.querySelector('[role="alert"]')?.textContent).toContain('mergedDistinctCap must be 1..100000');
+        await expectNoA11yViolations(el);
     });
 
     it('refuses an out-of-range value inline without saving', () => {
@@ -499,5 +512,19 @@ describe('LinkAnalysisSettingsComponent', () => {
         const { el } = setup({ canEdit: false });
         expect(el.querySelector('button[type="submit"]')).toBeNull();
         expect(el.textContent).toContain('Read only');
+    });
+
+    it('read only: no save button, and axe is clean with the embed block showing (LA-A11Y-AUDIT-1)', async () => {
+        const { el } = setup({
+            canEdit: false,
+            served: {
+                embed: { defaultTtlHours: 48, maxTtlHours: 100, refuseClassifications: ['PII'] },
+                embedInForce: { defaultTtlHours: 48, maxTtlHours: 100, refuseClassifications: ['PII'] },
+            },
+        });
+        // Finding (LA-A11Y-AUDIT-1): the knobs of the older blocks (e.g. hub threshold, threads, queue) stay ENABLED
+        // read-only; only the newer selects and the save button are withheld. Not an axe rule; recorded in the audit.
+        expect(el.querySelector('button[type="submit"]')).toBeNull();
+        await expectNoA11yViolations(el);
     });
 });
