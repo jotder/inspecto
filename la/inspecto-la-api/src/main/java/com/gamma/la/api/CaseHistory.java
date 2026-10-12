@@ -204,23 +204,35 @@ final class CaseHistory {
         return sb.toString().replace(SENTINEL, asked);
     }
 
-    /** At most this many Case-linked Investigations are opened and evaluated, and this many attachment records read. */
+    /** At most this many ADMITTED (readable) Case-linked Investigations are evaluated, and this many admitted attachment records. */
     static final int MAX_LINKED_INVESTIGATIONS = 100;
     static final int MAX_ATTACHMENTS = 500;
+    /** DoS guard: total records scanned, admitted or not, is bounded to this multiple of the caps above. */
+    static final int SCAN_FACTOR = 5;
 
     /**
      * Adds to {@code out} one row per Case linked to an Investigation (its Case link) or to a sealed snapshot (the attach
      * log) that contains {@code raw}: {@code matchedOn: investigation|snapshot}, {@code via} the Investigation / snapshot
      * id. Fail closed: only Investigations the caller can read ({@link InvestigationRoutes#openForRead}; a snapshot is
      * judged by the Investigation it is anchored to), only an existing {@code case} the caller may see
-     * ({@link CasePort#visibleTo}); a record that cannot be read is skipped. Returns whether a cap left records unread.
+     * ({@link CasePort#visibleTo}); a record that cannot be read is skipped.
+     *
+     * <p><b>Caps count ADMITTED records only</b> (a readable Investigation; an attachment whose snapshot is anchored to a
+     * readable one), so records the caller cannot see neither consume the cap nor set the flag, and the caller's own
+     * matches are never crowded out. Returns {@code true} only when an admitted record existed beyond the cap.
+     *
+     * <p><b>DoS bound, and what it leaks.</b> The scan reads at most {@value #SCAN_FACTOR} x the cap records in total,
+     * hidden included. When it is hit, {@code truncated} is set if the caller has at least one admitted record. That reveals
+     * one coarse Space-wide bit (at least 501 Case-linked Investigations, or 2501 attachment lines) to ANY such caller, and
+     * any caller can obtain an admitted record by creating its own Investigation. Accepted trade-off against silently hiding
+     * that the answer is incomplete. Only the per-snapshot verdict is cached, never the parsed document.
      */
     private static boolean linkedCases(ApiContext api, HttpExchange ex, CasePort port, Path writeRoot, String raw,
                                        String status, List<Map<String, Object>> out) throws IOException {
         boolean truncated = false;
         Map<String, Boolean> readable = new java.util.HashMap<>();   // investigation id -> admitted by openForRead
         InvestigationStore store = InvestigationStores.of(writeRoot);
-        int opened = 0;
+        int admitted = 0, scanned = 0;
         for (String id : store.ids()) {
             String caseRef;
             try {
@@ -229,9 +241,10 @@ final class CaseHistory {
                 continue;
             }
             if (caseRef == null) continue;
-            if (opened++ >= MAX_LINKED_INVESTIGATIONS) { truncated = true; break; }
+            if (scanned++ >= MAX_LINKED_INVESTIGATIONS * SCAN_FACTOR) { truncated |= admitted > 0; break; }
             InvestigationRoutes.Inv inv = readable(api, ex, id, readable);
-            if (inv == null) continue;
+            if (inv == null) continue;   // hidden: counts toward neither cap nor flag
+            if (admitted++ >= MAX_LINKED_INVESTIGATIONS) { truncated = true; break; }
             boolean member = false;
             try {
                 for (Map<String, Object> row : WorkingSetRoutes.relation(inv, new boolean[1]).tables().get("entities"))
@@ -244,8 +257,9 @@ final class CaseHistory {
 
         boolean[] cut = {false};
         SnapshotStore snapshots = new SnapshotStore(writeRoot);
-        Map<String, Boolean> contains = new java.util.HashMap<>();
-        for (String line : snapshots.recentAttachments(MAX_ATTACHMENTS, cut)) {
+        Map<String, Boolean> contains = new java.util.HashMap<>();   // sid -> holds raw; null value = not admitted (no document kept)
+        int admittedLines = 0;
+        for (String line : snapshots.recentAttachments(MAX_ATTACHMENTS * SCAN_FACTOR, cut)) {
             String sid, caseId;
             try {
                 @SuppressWarnings("unchecked") Map<String, Object> a = ApiContext.JSON.readValue(line, Map.class);
@@ -255,14 +269,13 @@ final class CaseHistory {
                 continue;
             }
             if (sid == null || caseId == null || !SnapshotStore.SAFE_ID.matcher(sid).matches()) continue;
+            if (!contains.containsKey(sid)) contains.put(sid, admittedContains(api, ex, snapshots, sid, raw, writeRoot, readable));
             Boolean in = contains.get(sid);
-            if (in == null) {
-                in = snapshotContains(api, ex, snapshots, sid, raw, writeRoot, readable);
-                contains.put(sid, in);
-            }
+            if (in == null) continue;   // not anchored to a readable Investigation: hidden, counted nowhere
+            if (admittedLines++ >= MAX_ATTACHMENTS) { truncated = true; cut[0] = false; break; }
             if (in) caseRow(api, ex, port, caseId, status, "snapshot", sid, out);
         }
-        return truncated || cut[0];
+        return truncated || cut[0] && admittedLines > 0;
     }
 
     private static InvestigationRoutes.Inv readable(ApiContext api, HttpExchange ex, String id, Map<String, Boolean> seen) {
@@ -277,16 +290,20 @@ final class CaseHistory {
         }
     }
 
-    /** A sealed snapshot holds {@code raw} among its nodes, and the caller can read the Investigation it is anchored to. */
-    private static boolean snapshotContains(ApiContext api, HttpExchange ex, SnapshotStore snapshots, String sid, String raw,
+    /**
+     * {@code null} when snapshot {@code sid} is not anchored to an Investigation the caller can read (hidden); else whether
+     * it holds {@code raw} among its nodes. The parsed document is not retained: callers cache only this verdict.
+     */
+    private static Boolean admittedContains(ApiContext api, HttpExchange ex, SnapshotStore snapshots, String sid, String raw,
                                             Path writeRoot, Map<String, Boolean> readable) {
         try {
             String json = snapshots.read(sid);
-            if (json == null) return false;
+            if (json == null) return null;
             @SuppressWarnings("unchecked") Map<String, Object> snap = ApiContext.JSON.readValue(json, Map.class);
-            if (!(snap.get("investigationId") instanceof String invId)) return false;   // unanchored: no gate to judge it by
+            if (!(snap.get("investigationId") instanceof String invId)) return null;   // unanchored: no gate to judge it by
             InvestigationRoutes.Inv inv = readable(api, ex, invId, readable);
-            if (inv == null || !(snap.get("nodes") instanceof List<?> nodes)) return false;
+            if (inv == null) return null;
+            if (!(snap.get("nodes") instanceof List<?> nodes)) return false;
             EntityMasking mask = null;
             for (Object n : nodes) {
                 if (!(n instanceof Map<?, ?> m) || !(m.get("id") instanceof String nid)) continue;
@@ -299,7 +316,7 @@ final class CaseHistory {
             }
             return false;
         } catch (IOException | RuntimeException bad) {
-            return false;
+            return null;
         }
     }
 

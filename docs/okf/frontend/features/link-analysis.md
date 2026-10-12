@@ -2037,6 +2037,12 @@ masked `POST /inv/reference-rows`), Case history (`POST /inv/case-history`), wat
 community and the telecom pattern packs (Wangiri, IRSF, SIM box, forwarding chain). (8) Act: watch list, one-step
 Attach to Case, export. (9) Under the hood: the Pipelines and Jobs that built it.
 
+**Case history caps (2026-10-12).** `POST /inv/case-history` counts only records the caller may read against its caps 
+(100 Case-linked Investigations, 500 attachment records): hidden ones neither consume a cap nor set `truncated`, so a 
+low-privilege caller learns nothing about the Space and its own matches are never crowded out. A DoS bound of 5x the caps 
+(hidden included) ends the scan; it sets `truncated` only for a caller that was admitted at least one record (see the 
+`CaseHistory` javadoc).
+
 **Data (`la-showcase` Space Template).** Eight synthetic feeds (CDR voice/SMS, HLR/EIR, CRM/KYC, recharge,
 provisioning, block list, alarms; generator `tools/gen-la-telecom-data.py`, byte-identical output) folded by the
 `sql.template` Jobs `telecom_links` (MSISDN-MSISDN pairs, the "shared X" key in `via`) and
