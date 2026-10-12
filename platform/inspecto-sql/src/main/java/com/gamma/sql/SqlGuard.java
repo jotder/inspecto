@@ -300,6 +300,37 @@ public final class SqlGuard {
         return out;
     }
 
+    /**
+     * The DuckDB parse tree of the one statement in {@code sql} ({@code statements[0].node}), or {@code null} when it does
+     * not serialize as a single SELECT (fail closed for the caller). Used by BI result masking to see which output
+     * column of free SQL derives from a column; it grants nothing, {@link #check} remains the safety gate.
+     */
+    public static com.fasterxml.jackson.databind.JsonNode parseSelectNode(String sql) {
+        try {
+            String json;
+            synchronized (PARSER_LOCK) {
+                try {
+                    if (parser == null) parser = openParser();
+                    try (var ps = parser.prepareStatement("SELECT json_serialize_sql(?::VARCHAR)")) {
+                        ps.setString(1, sql);
+                        try (var rs = ps.executeQuery()) {
+                            rs.next();
+                            json = rs.getString(1);
+                        }
+                    }
+                } catch (Exception | LinkageError e) {
+                    closeParser();
+                    return null;
+                }
+            }
+            var root = JSON.readTree(json);
+            if (root.path("error").asBoolean(true) || root.path("statements").size() != 1) return null;
+            return root.path("statements").get(0).path("node");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static void walk(com.fasterxml.jackson.databind.JsonNode n, String trustedRelation, List<String> out) {
         if (!out.isEmpty()) return;
         if (n.isArray()) {

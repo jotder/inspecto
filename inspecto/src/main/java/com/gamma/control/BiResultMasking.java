@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.MaskTokens;
@@ -12,6 +13,7 @@ import com.gamma.query.ResultSetDescriptor;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
+import com.gamma.sql.SqlGuard;
 import com.gamma.util.ColumnClassification;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -221,11 +223,19 @@ final class BiResultMasking {
         if (dimensions != null) for (String d : dimensions) dims.add(d.trim().toLowerCase(Locale.ROOT));
         List<ResultSetDescriptor.Column> columns = new ArrayList<>();
         Set<String> hit = new LinkedHashSet<>();
+        // Free SQL: which output POSITIONS derive from a masked column (a numeric CAST of a numeric key included), by the
+        // DuckDB parse tree; null when the positions cannot be trusted (parse failure, subquery / CTE, SELECT *).
+        Set<Integer> derived = viaText ? derivedPositions(sqlText) : null;
+        int pos = -1;
         for (ResultSetDescriptor.Column c : r.columns()) {
+            pos++;
             String n = c.name().trim().toLowerCase(Locale.ROOT);
             boolean mask = masked.contains(n)
                     || (dimensions != null && unknown && dims.contains(n) && !knownClean.contains(n))
-                    || (viaText && "string".equals(c.type()) && !knownClean.contains(n));
+                    || (viaText && "string".equals(c.type()) && !knownClean.contains(n))
+                    || (viaText && derived != null && derived.contains(pos))
+                    // positions untrusted: a numeric column is masked unless declared clean (count(*) AS n then reads as masked)
+                    || (viaText && derived == null && !"string".equals(c.type()) && !knownClean.contains(n));
             if (mask) hit.add(c.name());
             columns.add(mask ? new ResultSetDescriptor.Column(c.name(), "string", c.role(), c.cardinality()) : c);
         }
@@ -252,6 +262,98 @@ final class BiResultMasking {
         m.put("columns", engaged() ? lastMasked : List.of());
         m.put("basis", basis);
         return m;
+    }
+
+    /**
+     * The 0-based output positions of {@code sql}'s select list that derive from a masked column (or, with an untraceable
+     * lineage, from any column not declared clean) through anything but a {@code count}; {@code null} when the positions
+     * cannot be trusted: the text does not parse as one SELECT, holds a subquery or CTE (more than one SELECT node), or
+     * selects {@code *}. Closes the numeric derivation {@code CAST(msisdn AS BIGINT) AS m}, which no string rule sees.
+     */
+    private Set<Integer> derivedPositions(String sql) {
+        JsonNode node = sql == null ? null : SqlGuard.parseSelectNode(sql);
+        if (node == null || !"SELECT_NODE".equals(node.path("type").asText()) || countSelectNodes(node) != 1) return null;
+        JsonNode list = node.path("select_list");
+        Set<Integer> out = new LinkedHashSet<>();
+        for (int i = 0; i < list.size(); i++) {
+            JsonNode expr = list.get(i);
+            if ("STAR".equals(expr.path("class").asText()) || "STAR".equals(expr.path("type").asText())) return null;
+            String fn = expr.path("function_name").asText("").toLowerCase(Locale.ROOT);
+            boolean count = "FUNCTION".equals(expr.path("class").asText()) && (fn.equals("count") || fn.equals("count_star"))
+                    && (expr.path("filter").isNull() || expr.path("filter").isMissingNode())
+                    && barePlainArguments(expr);   // count(msisdn) is a number; count(CASE WHEN msisdn = ..) is a test of a value
+            if (!count && refsMaskedColumn(expr)) out.add(i);
+        }
+        return out;
+    }
+
+    /** Every argument of the aggregate is a bare column reference (or a star): nothing is computed from a key's value. */
+    private static boolean barePlainArguments(JsonNode fn) {
+        for (JsonNode a : fn.path("children"))
+            if (!"COLUMN_REF".equals(a.path("type").asText()) && !"STAR".equals(a.path("type").asText())) return false;
+        JsonNode order = fn.path("order_bys").path("orders");
+        return order.isMissingNode() || order.size() == 0;
+    }
+
+    /**
+     * Ad-hoc SQL typed by the caller ({@code POST /db/query}): a masked column may appear only in the select list (its
+     * output is aliased); in a WHERE, HAVING, GROUP BY, ORDER BY, JOIN, subquery or CTE it would test or bisect raw values,
+     * so it is refused 422. Text that does not parse as one plain SELECT is refused when it names a masked column.
+     */
+    void vetAdHocSql(String sql) {
+        if (!engaged()) return;
+        JsonNode node = SqlGuard.parseSelectNode(sql);
+        boolean plain = node != null && "SELECT_NODE".equals(node.path("type").asText()) && countSelectNodes(node) == 1;
+        boolean leak = false;
+        if (plain) {
+            for (Map.Entry<String, JsonNode> e : node.properties())
+                if (!"select_list".equals(e.getKey()) && refsMaskedColumn(e.getValue())) leak = true;
+        } else leak = unknown || mentions(sql, masked);
+        if (leak)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the SQL compares, joins, groups or orders by a masked "
+                    + "key (or its lineage is untraceable); that would leak its raw values, so a caller needs " + REVEAL
+                    + " - a masked column may only be selected");
+    }
+
+    private boolean refsMaskedColumn(JsonNode n) {
+        if (n.isObject() && "COLUMN_REF".equals(n.path("type").asText()) && n.path("column_names").isArray()) {
+            JsonNode names = n.path("column_names");
+            String col = names.get(names.size() - 1).asText().trim().toLowerCase(Locale.ROOT);
+            if (masked.contains(col) || (unknown && !knownClean.contains(col))) return true;
+        }
+        for (JsonNode c : n) if (refsMaskedColumn(c)) return true;
+        return false;
+    }
+
+    private static int countSelectNodes(JsonNode n) {
+        int k = n.isObject() && "SELECT_NODE".equals(n.path("type").asText()) ? 1 : 0;
+        for (JsonNode c : n) k += countSelectNodes(c);
+        return k;
+    }
+
+    /** {@code GET /kpis/{id}/value}: a Measure that returns a raw key (min / max / sum / avg of a masked column) is refused. */
+    void vetMeasure(MeasureCompiler.Measure m) {
+        if (!engaged() || m.field() == null) return;
+        if (List.of("min", "max", "sum", "avg").contains(m.agg())) refuseIfMasked(m.field(), m.agg() + " over", false);
+    }
+
+    /** Columns a caller-supplied value is compared with (a rule template hole's {@code field}): a masked one is an oracle. */
+    void vetFields(List<String> fields, String what) {
+        if (!engaged()) return;
+        for (String f : fields) if (f != null) refuseIfMasked(f, what, false);
+    }
+
+    /**
+     * The {@code $parameter} oracle: a caller-supplied parameter value is substituted into a saved query's text, so
+     * {@code WHERE msisdn LIKE $prefix} bisects a masked key exactly as a filter would. Refused when the caller supplies any
+     * value and the query text names a masked column (or the lineage is untraceable). Declared defaults stay the author's.
+     */
+    void vetParameterValues(String queryText, java.util.Collection<String> suppliedNames) {
+        if (!engaged() || suppliedNames.isEmpty()) return;
+        if (unknown || mentions(queryText, masked))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "parameter value(s) " + suppliedNames
+                    + " are refused: the query reads a masked key (or its lineage is untraceable), and a caller-supplied value "
+                    + "could be compared with its raw values; the caller needs " + REVEAL);
     }
 
     private String alias(String raw) {

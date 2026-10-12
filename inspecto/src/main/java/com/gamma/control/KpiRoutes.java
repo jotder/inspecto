@@ -74,6 +74,10 @@ final class KpiRoutes implements RouteModule {
         Map<String, Object> dataset = readableDataset(ex, store, kpi.dataset());
         if (dataset == null)
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "kpi '" + id + "': no dataset '" + kpi.dataset() + "'");
+        // BI-QUERY-MASKING-1: a Measure that returns a raw key (min / max / sum / avg of a masked column) is refused unless
+        // the caller may reveal it.
+        BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), kpi.dataset(), dataset,
+                BiResultMasking.mayReveal(ex)).vetMeasure(kpi.measure());
         KpiEvaluator.Result r;
         try {
             String relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));

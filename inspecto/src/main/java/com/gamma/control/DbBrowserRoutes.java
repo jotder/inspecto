@@ -145,7 +145,7 @@ final class DbBrowserRoutes implements RouteModule {
         }
         if (!STORES_GROUP.equals(group))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown group '" + group + "'");
-        return browseStore(api, name, null, limit, offset, sort);
+        return browseStore(api, ex, name, null, limit, offset, sort);
     }
 
     // ── POST /db/query {group,table,sql,limit,offset} ──────────────────────────────
@@ -177,7 +177,7 @@ final class DbBrowserRoutes implements RouteModule {
         if (!STORES_GROUP.equals(group))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown group '" + group + "'");
         if (tableName == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'table' (the store the SQL reads from)");
-        return browseStore(api, tableName, sql, limit, offset, List.of());
+        return browseStore(api, ex, tableName, sql, limit, offset, List.of());
     }
 
     /**
@@ -224,7 +224,7 @@ final class DbBrowserRoutes implements RouteModule {
         return Files.isDirectory(browseDir);
     }
 
-    private Object browseStore(ApiContext api, String storeName, String userSql,
+    private Object browseStore(ApiContext api, HttpExchange ex, String storeName, String userSql,
                                int limit, int offset, List<QueryExecutor.Sort> sort) {
         Path dataRoot = api.dataRoot();
         if (dataRoot == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no data directory for this space");
@@ -249,10 +249,22 @@ final class DbBrowserRoutes implements RouteModule {
         String relationSql = "SELECT * FROM " + SqlViews.readerOverLiteral(format, source, true);
         String sql = userSql != null ? userSql : "SELECT * FROM " + q(storeName);
 
+        // BI-QUERY-MASKING-1: a store's classified entity keys are masked unless the caller may reveal them; a caller who may
+        // not cannot sort on one, nor compare one in ad-hoc SQL.
+        BiResultMasking masking = storeMasking(api, ex, storeName);
+        masking.vetSort(sort);
+        if (userSql != null) masking.vetAdHocSql(userSql);
+
         QueryExecutor.Request req = new QueryExecutor.Request(storeName, relationSql, sql,
                 limit, offset, List.of(), sort);
         try {
-            return response(QueryExecutor.run(req));
+            QueryExecutor.Result raw = QueryExecutor.run(req);
+            QueryExecutor.Result shown = masking.apply(raw,
+                    userSql == null ? raw.columns().stream().map(ResultSetDescriptor.Column::name).toList() : null, userSql);
+            Map<String, Object> data = response(shown);
+            Map<String, Object> block = masking.describe();
+            if (block != null) data.put("masking", block);
+            return data;
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
@@ -344,7 +356,26 @@ final class DbBrowserRoutes implements RouteModule {
         }
     }
 
-    private static Object response(QueryExecutor.Result r) {
+    /**
+     * The masking for the rows of a business-data STORE (not a Dataset): the classification of every Dataset that
+     * reads the store through its {@code physicalRef}, merged, plus the pipeline schema and sibling lineage the helper
+     * already resolves from {@code physicalRef} (the same resolver every other BI route uses).
+     */
+    private static BiResultMasking storeMasking(ApiContext api, HttpExchange ex, String storeName) {
+        Path writeRoot = api.writeRoot();
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        List<Object> columns = new ArrayList<>();
+        for (ComponentRegistry.Component c : store.list("dataset"))
+            if (storeName.equals(String.valueOf(c.content().get("physicalRef"))) && c.content().get("columns") instanceof List<?> cols)
+                columns.addAll(cols);
+        Map<String, Object> pseudo = new LinkedHashMap<>();
+        pseudo.put("physicalRef", storeName);
+        pseudo.put("columns", columns);
+        return BiResultMasking.of(writeRoot, store, new com.gamma.pipeline.ViewStore(writeRoot.resolve("views")),
+                "store:" + storeName, pseudo, BiResultMasking.mayReveal(ex));
+    }
+
+    private static Map<String, Object> response(QueryExecutor.Result r) {
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ResultSetDescriptor.Column c : r.columns()) {
             Map<String, Object> col = new LinkedHashMap<>();

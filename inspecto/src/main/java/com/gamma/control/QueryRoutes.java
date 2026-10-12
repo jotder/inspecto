@@ -97,6 +97,7 @@ final class QueryRoutes implements RouteModule {
             masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), datasetId, dataset,
                     BiResultMasking.mayReveal(ex));
             masking.vetSort(sort(body));
+            masking.vetParameterValues(text, callerValues(body).keySet());
         }
 
         // 4. Execute with pagination / sort / projection.

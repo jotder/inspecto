@@ -341,4 +341,109 @@ class ControlApiBiQueryMaskingTest {
                     + "\"field\":\"msisdn\",\"operator\":\"=\",\"value\":\"" + A + "\"}]}}").statusCode());
         }
     }
+
+    // ── gaps closed after the first slice (BI-QUERY-MASKING-1 follow-up) ─────────────
+
+    @Test
+    void aCallerSuppliedParameterCannotProbeAMaskedKey(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("query", "probe_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT region, count(*) AS n FROM calls_ds WHERE msisdn LIKE $prefix GROUP BY region",
+                    "parameters", List.of(Map.of("name", "prefix", "type", "string", "default", "%"))));
+            reg.write("query", "region_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT region, count(*) AS n FROM calls_ds WHERE region = $r GROUP BY region",
+                    "parameters", List.of(Map.of("name", "r", "type", "string", "default", "EU"))));
+            String probe = "{\"parameters\":{\"prefix\":\"4417009001%\"}}";
+            assertEquals(422, post(c, "viewer", "/queries/probe_q/run", probe).statusCode(), "the oracle is refused");
+            assertEquals(200, post(c, "revealer", "/queries/probe_q/run", probe).statusCode(), "a revealer is unrestricted");
+            assertEquals(200, post(c, "viewer", "/queries/probe_q/run", null).statusCode(), "the author's default is trusted");
+            assertEquals(200, post(c, "viewer", "/queries/region_q/run", "{\"parameters\":{\"r\":\"US\"}}").statusCode(),
+                    "a parameter over an unclassified column is not an oracle");
+        }
+    }
+
+    @Test
+    void aNumericDerivationOfANumericKeyIsMaskedAndACountIsNot(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("query", "cast_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT CAST(msisdn AS BIGINT) AS m, msisdn::BIGINT + 1 AS m1, amount AS safe_amount, "
+                            + "count(*) AS n FROM calls_ds GROUP BY ALL"));
+            reg.write("query", "hide_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT CAST(msisdn AS BIGINT) AS amount, region FROM calls_ds"));
+            reg.write("query", "case_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT region, count(CASE WHEN msisdn = '" + A + "' THEN 1 END) AS hits FROM calls_ds GROUP BY region"));
+            HttpResponse<String> r = post(c, "viewer", "/queries/cast_q/run", null);
+            assertEquals(200, r.statusCode(), r.body());
+            assertNoRaw(r.body());
+            assertFalse(r.body().contains("441700900102"), "the +1 derivation must not appear either: " + r.body());
+            JsonNode v = V1Body.of(r.body());
+            assertTrue(column(v.get("rows"), "m").stream().allMatch(s -> s.startsWith("masked:")), v.get("rows").toString());
+            assertTrue(column(v.get("rows"), "m1").stream().allMatch(s -> s.startsWith("masked:")));
+            assertTrue(v.get("rows").get(0).get("safe_amount").isNumber(), "an unrelated numeric stays a number");
+            assertTrue(v.get("rows").get(0).get("n").isNumber(), "a count stays a number");
+
+            // Aliasing the derivation to a name the Dataset declares clean does not hide it.
+            JsonNode h = V1Body.of(post(c, "viewer", "/queries/hide_q/run", null).body());
+            assertTrue(column(h.get("rows"), "amount").stream().allMatch(s -> s.startsWith("masked:")), h.get("rows").toString());
+            // A count over a CASE on the key is a test of its value, not a count: masked.
+            JsonNode k = V1Body.of(post(c, "viewer", "/queries/case_q/run", null).body());
+            assertTrue(column(k.get("rows"), "hits").stream().allMatch(s -> s.startsWith("masked:")), k.get("rows").toString());
+
+            JsonNode rev = V1Body.of(post(c, "revealer", "/queries/cast_q/run", null).body());
+            assertTrue(rev.get("rows").get(0).get("m").isNumber(), "a revealer sees the number");
+        }
+    }
+
+    @Test
+    void aKpiMeasureThatReturnsARawKeyIsRefusedForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("kpi_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES (441700900101::BIGINT, 10.0, current_date), (441700900202::BIGINT, 5.0, current_date))"
+                            + " AS t(msisdn, amount, seen_on)", "2026-07-08T00:00:00Z"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("dataset", "kpi_ds", Map.of("view", "kpi_view", "columns", List.of(
+                    Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "amount"), Map.of("name", "seen_on"))));
+            for (String agg : List.of("max", "min", "sum", "avg"))
+                reg.write("kpi", "k_" + agg, Map.of("dataset", "kpi_ds", "measure", agg + "(msisdn)",
+                        "timeField", "seen_on", "grain", "month", "comparison", "previous", "direction", "up"));
+            reg.write("kpi", "k_cnt", Map.of("dataset", "kpi_ds", "measure", "countDistinct(msisdn)",
+                    "timeField", "seen_on", "grain", "month", "comparison", "previous", "direction", "up"));
+            for (String id : List.of("k_max", "k_min", "k_sum", "k_avg")) {
+                HttpResponse<String> viewer = get(c, "viewer", "/kpis/" + id + "/value");
+                assertEquals(422, viewer.statusCode(), id + " -> " + viewer.body());
+                assertEquals(200, get(c, "revealer", "/kpis/" + id + "/value").statusCode(), id + " for a revealer");
+            }
+            HttpResponse<String> cnt = get(c, "viewer", "/kpis/k_cnt/value");
+            assertEquals(200, cnt.statusCode(), "a distinct count is a number, never the key: " + cnt.body());
+            assertEquals(2, V1Body.of(cnt.body()).get("value").asInt());
+        }
+    }
+
+    @Test
+    void aRuleSimulationMasksTheKeyAndRefusesAHoleOnIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("rule-template", "big", Map.of("id", "big", "name", "big", "source", "calls_ds",
+                    "paramSql", "SELECT msisdn, amount FROM calls_ds WHERE amount > :floor",
+                    "params", List.of(Map.of("name", "floor", "field", "amount", "operator", "gt", "value", "0"))));
+            reg.write("rule-template", "byKey", Map.of("id", "byKey", "name", "byKey", "source", "calls_ds",
+                    "paramSql", "SELECT region, amount FROM calls_ds WHERE msisdn = :who",
+                    "params", List.of(Map.of("name", "who", "field", "msisdn", "operator", "eq", "value", A))));
+            // canAuthorWorkbench alone does not reveal: user "author" holds only that capability.
+            HttpResponse<String> sim = post(c, "author", "/rule-templates/big/simulate", "{}");
+            assertEquals(200, sim.statusCode(), sim.body());
+            assertNoRaw(sim.body());
+            JsonNode v = V1Body.of(sim.body());
+            assertTrue(column(v.get("rows"), "msisdn").stream().allMatch(s -> s.startsWith("masked:")), v.get("rows").toString());
+            assertTrue(v.get("masking").get("masked").asBoolean());
+            // The hole bound to a masked column is an oracle: refused when the caller supplies the value.
+            assertEquals(422, post(c, "author", "/rule-templates/byKey/simulate", "{\"params\":{\"who\":\"" + A + "\"}}").statusCode());
+        }
+    }
 }

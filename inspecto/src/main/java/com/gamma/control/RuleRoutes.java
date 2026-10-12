@@ -95,6 +95,7 @@ final class RuleRoutes implements RouteModule {
         // 4. Resolve the template's source dataset to a trusted relation registered as a view.
         String source = template.source();
         String relationSql = null;
+        BiResultMasking masking = null;
         if (source != null) {
             Map<String, Object> dataset = component(store, "dataset", source)
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
@@ -105,6 +106,12 @@ final class RuleRoutes implements RouteModule {
             } catch (IllegalArgumentException bad) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
             }
+            // BI-QUERY-MASKING-1: an author without canRevealLinkEntities sees aliases, and cannot compare a hole with a masked key.
+            masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), source, dataset,
+                    BiResultMasking.mayReveal(ex));
+            Map<String, String> supplied = callerValues(body);
+            masking.vetFields(template.params().stream().filter(p -> supplied.containsKey(p.name())).map(RuleTemplate.Param::field).toList(),
+                    "comparing a caller-supplied value with");
         }
 
         QueryExecutor.Result result;
@@ -119,6 +126,7 @@ final class RuleRoutes implements RouteModule {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", io);
         }
 
+        if (masking != null) result = masking.apply(result, null, resolved);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("matched", result.rowCount());
@@ -129,6 +137,7 @@ final class RuleRoutes implements RouteModule {
         // Echo what each hole was bound to. With values supplied per call, this is what makes a simulation
         // reviewable rather than opaque — the same reason the AI surface echoes its derived args.
         out.put("boundTo", boundTo(template, compiled));
+        if (masking != null && masking.describe() != null) out.put("masking", masking.describe());
         return out;
     }
 
