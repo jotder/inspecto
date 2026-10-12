@@ -2223,6 +2223,12 @@ if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
 set "OPTS=$demoFlags -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
 if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
+rem Extra JVM flags from the operator, same contract as serve.bat (LAUNCHER-SERVE-DEMO-JAVA-OPTS-1): INSPECTO_JAVA_OPTS (fallback
+rem EXTRA_JAVA_OPTS), appended AFTER the mandatory flags and BEFORE -cp (a JVM flag after it would be parsed as a program argument).
+set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
+if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
+if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
+if not "%EXTRA_OPTS%"=="" echo [serve-demo] extra JVM opts: %EXTRA_OPTS%
 set "JAVA=java"
 if exist runtime\bin\java.exe set "JAVA=runtime\bin\java.exe"
 rem ASSURE-INTELLIGENCE-BUNDLE-1: the same owner-only, offline native dirs as serve.bat.
@@ -2252,6 +2258,14 @@ SPACES_ROOT="`${SPACES_ROOT:-spaces}"
 JAVA_OPTS=($demoFlags "-Dcontrol.port=`${PORT}" "-Dspaces.root=`${SPACES_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
 [ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
+# Extra JVM flags from the operator, same contract as serve.sh (LAUNCHER-SERVE-DEMO-JAVA-OPTS-1): INSPECTO_JAVA_OPTS (fallback
+# EXTRA_JAVA_OPTS), whitespace-separated, appended AFTER the mandatory flags and BEFORE -cp.
+EXTRA_OPTS="`${INSPECTO_JAVA_OPTS:-`${EXTRA_JAVA_OPTS:-}}"
+if [ -n "`${EXTRA_OPTS}" ]; then
+    read -r -a _extra_opts <<< "`${EXTRA_OPTS}"
+    JAVA_OPTS+=("`${_extra_opts[@]}")
+    echo "[serve-demo] extra JVM opts: `${EXTRA_OPTS}"
+fi
 JAVA=java
 [ -x runtime/bin/java ] && JAVA=runtime/bin/java
 # ASSURE-INTELLIGENCE-BUNDLE-1: the same owner-only (0700), offline native dirs as serve.sh.

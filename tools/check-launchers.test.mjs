@@ -46,6 +46,17 @@ test('RED (static): the demo launchers keep a jar list of their own', () => {
     assert.match(statics(REAL.replaceAll('modules.list', 'xxx.list')), /serveDemoBat never reads modules\.list[\s\S]*serveDemoSh never reads modules\.list/);
 });
 
+test('RED (static): the demo launchers ignore INSPECTO_JAVA_OPTS / never append it / read it after -cp (LAUNCHER-SERVE-DEMO-JAVA-OPTS-1)', () => {
+    assert.match(statics(REAL.replaceAll('INSPECTO_JAVA_OPTS', 'XXX_OPTS')), /serveDemoBat does not read INSPECTO_JAVA_OPTS[\s\S]*serveDemoSh does not read INSPECTO_JAVA_OPTS/);
+    const noAppend = REAL.replace(/^if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"\n/gm, '').replace(/^    JAVA_OPTS\+=\("`\$\{_extra_opts\[@\]\}"\)\n/m, '');
+    assert.notEqual(noAppend, REAL);
+    assert.match(statics(noAppend), /serveDemoBat reads INSPECTO_JAVA_OPTS but never appends[\s\S]*serveDemoSh reads INSPECTO_JAVA_OPTS but never appends/);
+    // the real read is stripped from its place and re-added behind -cp
+    const late = REAL.replace(/^rem Extra JVM flags from the operator, same contract as serve\.bat \(LAUNCHER[\s\S]*?extra JVM opts: %EXTRA_OPTS%\n/m, '').replace('com.gamma.control.ControlApi\n"@\n    Write-CrlfScript -Path "$bundleDir\\serve-demo.bat"', 'com.gamma.control.ControlApi %INSPECTO_JAVA_OPTS% %EXTRA_JAVA_OPTS% %OPTS% %EXTRA_OPTS%\n"@\n    Write-CrlfScript -Path "$bundleDir\\serve-demo.bat"');
+    assert.notEqual(late, REAL);
+    assert.match(statics(late), /serveDemoBat reads INSPECTO_JAVA_OPTS only after -cp/);
+});
+
 test('RED (executed): a serve.sh that ignores modules.list (falls to the *.jar glob) puts the jars in the WRONG ORDER', () => {
     const t = mutate('if [ -f modules.list ]; then\n    CP="$(tr -d \'\\r\' < modules.list | tr \'\\n\' \':\')"; CP="${CP%:}"\nelse\n    echo "[serve.sh] modules.list', 'if false; then\n    CP=x\nelse\n    echo "[serve.sh] modules.list');
     assert.match(scenarios(t), /expected exactly the Offering's modules\.list/);

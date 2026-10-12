@@ -335,6 +335,13 @@ export function staticFindings(ps1src) {
     if (open < 0) { out.push(`$${n} (the demo launcher here-string) was not found in package.ps1 — renamed? fix this guard.`); continue; }
     const body = ps1.slice(open, ps1.indexOf('\n"@\n', open));
     if (!body.includes('modules.list')) out.push(`${n} never reads modules.list — the demo launcher keeps its own jar list.`);
+    // LAUNCHER-SERVE-DEMO-JAVA-OPTS-1: the demo launcher honours INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS) like serve/run/ura,
+    // appended before -cp (a JVM flag after it is a program argument).
+    const optsAt = body.indexOf('INSPECTO_JAVA_OPTS');
+    const cpAt = body.indexOf('-cp "');
+    if (optsAt < 0 || !body.includes('EXTRA_JAVA_OPTS')) out.push(`${n} does not read INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS) — operator JVM flags are silently ignored.`);
+    else if (cpAt < 0 || optsAt > cpAt) out.push(`${n} reads INSPECTO_JAVA_OPTS only after -cp (or has no -cp) — the flags would be parsed as program arguments.`);
+    else if (!body.includes('%OPTS% %EXTRA_OPTS%') && !body.includes('JAVA_OPTS+=("${_extra_opts[@]}")') && !body.includes('JAVA_OPTS+=("`${_extra_opts[@]}")')) out.push(`${n} reads INSPECTO_JAVA_OPTS but never appends it to the JVM options.`);
   }
   return out;
 }
