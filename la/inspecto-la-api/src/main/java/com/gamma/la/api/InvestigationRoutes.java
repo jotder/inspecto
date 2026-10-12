@@ -830,6 +830,8 @@ public final class InvestigationRoutes implements RouteModule {
                 if (r.get("fallback") != null) summary.put("fallback", r.get("fallback"));   // ...or why the flat Dataset did
                 if (r.get("hubs") != null) summary.put("hubs", r.get("hubs"));   // supernode suppression: the SEALED [{id, degree}] (masked below)
                 if (r.get("hubDegreeSource") != null) summary.put("hubDegreeSource", r.get("hubDegreeSource"));
+                if (r.get("query") instanceof Map<?, ?> rq && rq.get("hubsHeld") instanceof List<?> held && !held.isEmpty())
+                    summary.put("hubsHeld", held.size());   // a COUNT of the sealed frontier hubs held back, never the ids or the rung
                 out.put("read", summary);
             }
             if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // ...and a diff's item lists

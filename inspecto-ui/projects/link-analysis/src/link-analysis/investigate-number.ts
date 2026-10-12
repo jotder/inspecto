@@ -395,7 +395,7 @@ export function degreeOutcomesFromLog(entries: readonly InvestigationLogEntry[],
         const range = sealedRangeLabel(p.window);
         const override = p.expandHubs?.[0];
         // The log view seals the flagged candidates (`read.hubs`); the ones this step left flagged are those the Working
-        // Set still marks. `hubsHeld` lives in the rung, which the log view does not carry, so it is not rebuilt.
+        // Set still marks. `hubsHeld` arrives as a count the log view takes from the sealed rung.
         const flagged = new Set((ws?.entities ?? []).filter((x) => x.highConnectivity).map((x) => x.id));
         const hubsFlagged = (e.read?.hubs ?? []).filter((h) => flagged.has(h.id)).length;
         out.push({
@@ -405,6 +405,7 @@ export function degreeOutcomesFromLog(entries: readonly InvestigationLogEntry[],
             truncated: e.read?.truncated ?? false,
             fanOutCapped: e.read?.fanOutCapped ?? 0,
             ...(hubsFlagged ? { hubsFlagged } : {}),
+            ...(e.read?.hubsHeld ? { hubsHeld: e.read.hubsHeld } : {}),
             ...(hubsFlagged && e.read?.hubDegreeSource ? { hubDegreeSource: e.read.hubDegreeSource } : {}),
             ...(p.budget != null ? { budget: p.budget } : {}),
             ...(p.maxFanOut != null ? { maxFanOut: p.maxFanOut } : {}),

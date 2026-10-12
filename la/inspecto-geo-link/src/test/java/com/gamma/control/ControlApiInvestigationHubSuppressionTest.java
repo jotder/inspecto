@@ -147,6 +147,25 @@ class ControlApiInvestigationHubSuppressionTest {
     }
 
     @Test
+    void theLogViewCarriesTheHeldBackCountNotTheRungOrTheIds(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seeded(c, "k");
+            op(c, "k", "{\"op\":\"expand\",\"hubThreshold\":3}");
+            op(c, "k", "{\"op\":\"expand\"}");
+            java.nio.file.Path logFile = root.resolve("audit/snapshots/investigations/k/log.jsonl");
+            String sealedBefore = Files.readString(logFile);
+            assertTrue(sealedBefore.contains("\"hubsHeld\":[\"h\"]"), "the held ids are sealed in read.query: " + sealedBefore);
+            JsonNode view = data(send(c, "GET", "/inv/investigations/k/log", null));
+            assertEquals(1, view.at("/entries/2/read/hubsHeld").asInt(), view.toString());
+            assertTrue(view.at("/entries/1/read/hubsHeld").isMissingNode(), "a step that held none carries no count");
+            assertTrue(view.at("/entries/2/read/query").isMissingNode() && view.at("/entries/2/read/rung").isMissingNode(),
+                    "the rung stays out of the log view: " + view.at("/entries/2/read"));
+            assertFalse(view.at("/entries/2/read").toString().contains("\"h\""), "no raw id beside the count");
+            assertEquals(sealedBefore, Files.readString(logFile), "reading the view never rewrites the sealed log");
+        }
+    }
+
+    @Test
     void theAnalystOverrideExpandsThroughTheHubAndIsSealed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seeded(c, "o");

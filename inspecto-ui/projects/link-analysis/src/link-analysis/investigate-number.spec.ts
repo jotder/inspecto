@@ -557,6 +557,20 @@ describe('investigate-number - walk-through 6 fixes', () => {
         expect(degreeOutcomeMessage(o)).toContain('high-connectivity number');
     });
 
+    it('rebuilds the held-back frontier hub count from the log view, worded like the live line', () => {
+        const set: WorkingSet = { entities: [at('s', 0, 1), at('x', 1, 2)], links: [], excluded: [], hash: '' };
+        const entries = [
+            { step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['s'] } },
+            { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['s'] }, read: { truncated: false, hubsHeld: 2 } },
+        ] as never;
+        const [o] = degreeOutcomesFromLog(entries, set);
+        expect(o.hubsHeld).toBe(2);
+        expect(degreeOutcomeMessage(o)).toBe(degreeOutcomeMessage({ ...o, hubsHeld: 2 }));
+        expect(degreeOutcomeMessage(o)).toContain('2 high-connectivity numbers of the frontier not expanded from.');
+        const [none] = degreeOutcomesFromLog([{ step: 1, kind: 'seed' }, { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['s'] }, read: { truncated: false } }] as never, set);
+        expect(none.hubsHeld).toBeUndefined();
+    });
+
     it('labels a held one-hop expand by what it expands from, never as the ladder degree', () => {
         const set = ws(entity('s', 0), entity('a', 1), entity('b', 2));
         expect(isOneHop(set, ['s'])).toBe(true);

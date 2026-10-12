@@ -681,6 +681,8 @@ export interface InvestigationLogEntry {
         /** The sealed `[{id, degree}]` of flagged high-connectivity candidates, and how they were counted. */
         hubs?: { id: string; degree: number }[];
         hubDegreeSource?: 'index' | 'flat';
+        /** How many frontier hubs the sealed rung held back (a count; the ids stay in the sealed log). */
+        hubsHeld?: number;
         fingerprint: string;
         /** As on the step result: the sealed read's source, when the server's log view carries it. */
         index?: { version: number; stale: boolean; fingerprint?: string };
