@@ -178,6 +178,7 @@ public final class DraftRoutes implements RouteModule {
         Object atRaw = body.get("at");
         if (atRaw != null && !(atRaw instanceof Number))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'at' must be a step number");
+        String label = labelOf(body.get("label"));
         String draftId = DraftStore.newId();
         List<Map<String, Object>> pinned = new ArrayList<>();
         Map<String, Object> header = new LinkedHashMap<>();
@@ -195,6 +196,7 @@ public final class DraftRoutes implements RouteModule {
         header.put("createdAt", Instant.now().toString());
         header.put("baseStep", at);
         header.put("baseLogHash", DraftStore.prefixHash(main, at));
+        if (label != null) header.put("label", label);   // the analyst's own free-text note: never masked, never in a hash or seal input
         try {
             pinIndexes(inv, draftId, pinned);   // D7-Q2: no index => nothing pinned, and the Draft works (seal-at-use, D-E3)
             Map<String, Object> pins = new LinkedHashMap<>();
@@ -225,10 +227,26 @@ public final class DraftRoutes implements RouteModule {
         InvestigationRoutes.emit(ex, LinkEventTypes.LINK_DRAFT_FORKED, "link.draft.forked",
                 "link.draft.forked — " + draftId + " of " + invId + " at step " + header.get("baseStep"),
                 b -> b.attr("investigationId", invId).attr("draftId", draftId).attr("actor", me)
-                        .attr("baseStep", header.get("baseStep")).attr("pins", pinned.size()));
+                        .attr("baseStep", header.get("baseStep")).attr("pins", pinned.size())
+                        .attr("labelLength", label == null ? 0 : label.length()));   // the length only - a label may carry a name or an entity id
         Opened o = openDraft(api, ex, invId, draftId, Act.READ);
         ex.getResponseHeaders().set("Location", "/api/v1/inv/investigations/" + invId + "/drafts/" + draftId);
         return ApiContext.respondJson(ex, 201, describe(o, true));
+    }
+
+    static final int LABEL_MAX = 80;
+
+    /** The optional human label of a Draft: absent -> null; else trimmed, 1..80 chars, no control characters (422 otherwise). */
+    private static String labelOf(Object raw) {
+        if (raw == null) return null;
+        if (!(raw instanceof String s))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must be a string");
+        String t = s.strip();
+        if (t.isEmpty() || t.length() > LABEL_MAX)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must be 1.." + LABEL_MAX + " characters after trimming");
+        if (t.codePoints().anyMatch(Character::isISOControl))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must not contain control characters");
+        return t;
     }
 
     /**
@@ -585,6 +603,7 @@ public final class DraftRoutes implements RouteModule {
         InvestigationRoutes.Inv v = o.view();
         Map<String, Object> out = new LinkedHashMap<>();
         for (String k : List.of("draftId", "investigationId", "actor", "createdAt", "baseStep")) out.put(k, o.header().get(k));
+        if (o.header().get("label") != null) out.put("label", o.header().get("label"));
         int base = v.draft().baseStep();
         int own = o.discarded() ? 0 : v.store().log(v.scope()).size();
         out.put("state", v.store().draftState(v.id(), o.draftId()).wire());   // promoted > discarded > hibernated > open (D7-6 precedence)
