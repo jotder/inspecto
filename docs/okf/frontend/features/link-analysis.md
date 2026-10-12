@@ -106,6 +106,19 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a node resolving an `objectRef` offers
   "View on map" (pivots to Geo Map Analysis with the same record); see
   [Investigation Pivot](investigation-pivot.md) for the shared contract.
+* **Geo scene of the `la-showcase` demo** (operator decision 2026-10-12; **SYNTHETIC**, cities only, no real place of a person). The
+  template carries `mule_account_locations` (113 accounts, city centroid plus a small deterministic jitter, `SITE_TYPE`) and
+  `mule_geo_legs` (the planted stories' legs with BOTH ends geocoded), the Datasets `mule_account_locations_dataset`,
+  `mule_ring_legs_dataset` and `mule_cashout_legs_dataset`, and three saved Geo Views: `mule_account_locations_map` (points),
+  `mule_ring_route_map` and `mule_cashout_till_map` (od-routes). Story: cash goes in at small-town branches (Soria, Matera, Suwalki,
+  Aurillac ...), converges on MULE-HUB-01 in Rotterdam, fans out to RELAY-01 (Madrid) and RELAY-02 (Warsaw) and leaves for OFFSHORE-77
+  (George Town); SHELL-A to SHELL-D circle Valencia, Milan, Lyon, Turin; the cash-out is MULE-HUB-02 (Marseille) to eight CASHER
+  accounts to TILL-06 in Paris, against ordinary tills in five other cities. ⚠ Why a pre-joined legs file: `POST /geo/routes` reads
+  origin and destination coordinates from ONE relation and a virtual Dataset reads ONE store (`DatasetRelation.virtualRelationSql`), so
+  the two virtual Datasets filter `mule_geo_legs` by `SCENE` rather than joining transfers to locations. The generator
+  (`tools/gen-la-showcase-data.py`) draws the geo scene from its OWN random generator, so the transfer files are byte-identical
+  (`tools/gen-la-showcase-data.test.mjs`); pinned by `ControlApiLaShowcaseGeoSceneTest` and `LaShowcaseTemplateTest`. Not verified
+  in a browser: the map render.
 * **Geo ↔ Link brushing** (LA-22, shipped 2026-09-23) — `link-analysis/geo-link-brush.ts`'s root
   `GeoLinkBrushService` holds the last selection. On the Geo Map, closing a polygon (or clicking a point)
   publishes the displayed points' `GeoPoint.key`s; Link Analysis highlights the nodes those keys project to

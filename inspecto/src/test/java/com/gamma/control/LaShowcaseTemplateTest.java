@@ -100,6 +100,42 @@ class LaShowcaseTemplateTest {
         for (String id : List.of("ra.analyst", "demo.manager")) assertEquals(Set.of(), caps.get(id), id);
     }
 
+    /** GEO scene (operator 2026-10-12): synthetic locations + geocoded legs, their Datasets, three saved Geo Views. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void theGeoSceneIsCarriedAndItsViewsPointAtCarriedDatasets() throws Exception {
+        Path ds = CFG.resolve("registry").resolve("datasets");
+        for (String store : List.of("mule_account_locations", "mule_geo_legs")) {
+            Map<String, Object> p = ToonHelper.load(CFG.resolve("mule").resolve(store + "_pipeline.toon").toString());
+            assertEquals(store, p.get("name"));
+            assertTrue(Files.exists(CFG.resolve("mule").resolve(store + "_schema.toon")), store + " schema");
+        }
+        Map<String, Object> loc = ToonHelper.load(ds.resolve("mule_account_locations_dataset.toon").toString());
+        assertEquals("mule_account_locations/database", loc.get("physicalRef"));
+        List<Map<String, Object>> cols = (List<Map<String, Object>>) loc.get("columns");
+        assertEquals("ACCOUNT", cols.get(0).get("name"));
+        assertEquals("ACCOUNT", cols.get(0).get("classification"), "the key carries the ACCOUNT classification");
+        for (String scene : List.of("ring", "cashout")) {
+            Map<String, Object> d = ToonHelper.load(ds.resolve("mule_" + scene + "_legs_dataset.toon").toString());
+            assertEquals("mule_geo_legs", d.get("sourceName"));
+            assertTrue(String.valueOf(d.get("sql")).contains("SCENE = '" + scene + "'"), String.valueOf(d.get("sql")));
+        }
+        Path views = CFG.resolve("registry").resolve("geo-map-views");
+        Map<String, String> dataset = Map.of("mule_ring_route_map", "mule_ring_legs_dataset",
+                "mule_cashout_till_map", "mule_cashout_legs_dataset");
+        for (var e : dataset.entrySet()) {
+            Map<String, Object> v = ToonHelper.load(views.resolve(e.getKey() + ".toon").toString());
+            Map<String, Object> routes = (Map<String, Object>) ((Map<String, Object>) v.get("query")).get("routes");
+            assertEquals(e.getValue(), routes.get("datasetId"));
+            assertTrue(Files.exists(ds.resolve(e.getValue() + ".toon")), e.getValue());
+        }
+        Map<String, Object> pts = ToonHelper.load(views.resolve("mule_account_locations_map.toon").toString());
+        assertEquals("mule_account_locations_dataset",
+                ((Map<String, Object>) ((Map<String, Object>) pts.get("query")).get("projection")).get("datasetId"));
+        assertFalse(Files.exists(TPL.resolve("la-showcase-off").resolve("config").resolve("registry")),
+                "the feature-off companion carries no geo views or datasets");
+    }
+
     @Test
     void theCompanionSwitchesTheFeatureOffAndSharesThePersonas() throws Exception {
         Path off = TPL.resolve("la-showcase-off").resolve("config");
