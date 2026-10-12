@@ -1271,8 +1271,7 @@ public final class InvRoutes implements RouteModule {
                     datasetId, relationSql, "SELECT * FROM " + q(datasetId), 0, 0, List.of(), List.of()));
             return r.columns().stream().map(DatasetProvider.Column::name).toList();
         } catch (Exception unusable) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "cannot read the columns of dataset '" + datasetId
-                    + "' to validate 'filter': " + unusable.getMessage());
+            throw DatasetReadFault.of("cannot read the columns of dataset '" + datasetId + "'", datasetId, null, unusable);
         }
     }
 

@@ -25,6 +25,11 @@ public final class DatasetReadFault {
     private static final Pattern LEFTOVER_PATH = Pattern.compile(
             "(?<![\\w.])(?:[A-Za-z]:[\\\\/]|/(?=[^\\s'\"/]+/))[^\\s'\"]*");
 
+    /** A path DuckDB quoted: a glob or a relative store path ("database/store/**" + "/*.parquet"). */
+    private static final Pattern QUOTED_PATH = Pattern.compile("(['\"])[^'\"\\s]*[/\\\\][^'\"\\s]*\\1");
+    /** DuckDB's trailing statement echo ("LINE 1: CREATE VIEW ...") carries the view's path and SQL. */
+    private static final Pattern STATEMENT_ECHO = Pattern.compile("\\R+LINE \\d+:.*", Pattern.DOTALL);
+
     private DatasetReadFault() {}
 
     /**
@@ -49,7 +54,10 @@ public final class DatasetReadFault {
 
     /** {@code message} with every absolute path replaced; {@code null} stays {@code null}. */
     public static String scrub(String message) {
-        return message == null ? null : LEFTOVER_PATH.matcher(message).replaceAll("<path>");
+        if (message == null) return null;
+        String m = STATEMENT_ECHO.matcher(message).replaceFirst("");
+        m = LEFTOVER_PATH.matcher(m).replaceAll("<path>");
+        return QUOTED_PATH.matcher(m).replaceAll("'<path>'");
     }
 
     private static String storeOf(String datasetId, Path writeRoot) {
