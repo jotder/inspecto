@@ -168,7 +168,7 @@ import { fmtScore } from './graph-run-summary';
                                 @if (sum.lines.length) {
                                     <ol class="mt-1 list-inside list-decimal text-sm" data-testid="index-lines">
                                         @for (l of sum.lines; track $index) {
-                                            <li>{{ l }}</li>
+                                            <li [attr.title]="sum.fullLines[$index] || null" [attr.aria-label]="sum.fullLines[$index] || null">{{ l }}</li>
                                         }
                                     </ol>
                                 }
@@ -297,7 +297,7 @@ export class LinkAnalysisServerRunComponent {
         return this.hold();
     });
     /** What an index run answered, in words (the canvas has no apply path for these results). */
-    readonly indexSummary = computed<{ headline: string; lines: string[] } | null>(() => {
+    readonly indexSummary = computed<{ headline: string; lines: string[]; fullLines: string[] } | null>(() => {
         const v = this.view();
         const r = v?.result;
         if (!r || !v.source) return null;
@@ -307,12 +307,16 @@ export class LinkAnalysisServerRunComponent {
                 lines: (r.scores as { label: string; score: number }[])
                     .slice(0, 10)
                     .map((x) => `${x.label}: ${fmtScore(x.score)}`),
+                fullLines: (r.scores as { label: string; score: number }[])
+                    .slice(0, 10)
+                    .map((x) => (fmtScore(x.score) === x.score ? '' : `${x.label}: ${x.score}`)),
             };
         const nodes = r.nodes ?? [];
         const links = r.edges ?? [];
         return {
             headline: `${nodes.length} node${nodes.length === 1 ? '' : 's'} and ${links.length} link${links.length === 1 ? '' : 's'} reached${r.truncated ? ' (the server cut the list)' : ''}.`,
             lines: nodes.slice(0, 10).map((n) => n.label),
+            fullLines: [],
         };
     });
 

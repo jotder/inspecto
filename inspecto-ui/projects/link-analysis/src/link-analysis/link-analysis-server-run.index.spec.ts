@@ -250,4 +250,29 @@ describe('LinkAnalysisServerRunComponent - input index', () => {
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    it('carries the full-precision score as a tooltip + aria-label only where the line rounded it (LA-DEMO-POLISH-1)', () => {
+        const { fixture, q, stream } = make({ algorithm: 'degreeCentrality', seeds: ['A'] });
+        q('run-on-index')!.click();
+        stream.next(
+            indexRun({
+                result: {
+                    algorithm: 'degreeCentrality',
+                    kind: 'SCORES',
+                    dropped: 0,
+                    elapsedMs: 1,
+                    scores: [
+                        { id: 'A', label: 'A', score: 0.4080267558479552 },
+                        { id: 'B', label: 'B', score: 2 },
+                    ],
+                } as never,
+            }),
+        );
+        fixture.detectChanges();
+        const items = Array.from(q('index-lines')!.querySelectorAll('li'));
+        expect(items[0].textContent).toContain('A: 0.408');
+        expect(items[0].getAttribute('title')).toBe('A: 0.4080267558479552');
+        expect(items[0].getAttribute('aria-label')).toBe('A: 0.4080267558479552');
+        expect(items[1].hasAttribute('title')).toBe(false);
+    });
 });

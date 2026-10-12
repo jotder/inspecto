@@ -214,9 +214,9 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                                         <tr>
                                             <td>{{ i + 1 }}</td>
                                             <td>{{ r.label }}</td>
-                                            <td class="text-right font-semibold">{{ r.score }}</td>
-                                            <td class="text-right">{{ r.raw }}</td>
-                                            <td class="text-right">{{ r.own }}</td>
+                                            <td class="text-right font-semibold" [attr.title]="r.full.score" [attr.aria-label]="r.full.score">{{ r.score }}</td>
+                                            <td class="text-right" [attr.title]="r.full.raw" [attr.aria-label]="r.full.raw">{{ r.raw }}</td>
+                                            <td class="text-right" [attr.title]="r.full.own" [attr.aria-label]="r.full.own">{{ r.own }}</td>
                                             <td class="text-right">{{ r.contributors }}</td>
                                             <td>
                                                 @if (r.factors.length) {

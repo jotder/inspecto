@@ -13,7 +13,7 @@ import {
     GraphRunsService,
 } from '@inspecto/link-analysis/api/graph-runs.service';
 import { ServerIdMap } from './graph-run-apply';
-import { summarizeGraphRun } from './graph-run-summary';
+import { propagatedRiskRows, summarizeGraphRun } from './graph-run-summary';
 import { LinkAnalysisServerAlgorithmsComponent } from './link-analysis-server-algorithms.component';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { NodeRiskService } from './node-risk.service';
@@ -226,6 +226,10 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         fixture.detectChanges();
         const table = el.querySelector('[data-testid=risk-table]')!;
         expect(table.textContent).toContain('68');
+        const cells = Array.from(table.querySelectorAll('tbody tr:first-child td'));
+        expect(cells[2].getAttribute('title')).toBe('68.04');
+        expect(cells[2].getAttribute('aria-label')).toBe('68.04');
+        expect(cells[4].getAttribute('title')).toBe('40');
         expect(el.querySelector('[data-testid=algo-result]')!.textContent).toContain('1 node carry propagated risk');
         Array.from(table.querySelectorAll('button'))[0].click();
         fixture.detectChanges();
@@ -386,5 +390,18 @@ describe('summarizeGraphRun', () => {
             MAP,
         );
         expect(h.fullLines).toEqual(['Hub A: 0.123456']);
+    });
+
+    it('carries the full-precision propagated score on the summary line and the table row (LA-DEMO-POLISH-1)', () => {
+        const r = {
+            ...base,
+            algorithm: 'propagatedRisk',
+            kind: 'PROPAGATED_RISK',
+            scores: [{ id: 'a', label: 'A', score: 68.04, raw: 70.123, own: 40, contributors: 1, factors: [] }],
+        } as GraphRunResult;
+        const s = summarizeGraphRun(r, MAP);
+        expect(s.lines).toEqual(['A: 68']);
+        expect(s.fullLines).toEqual(['A: 68.04']);
+        expect(propagatedRiskRows(r, MAP, (i) => i)[0].full).toEqual({ score: 68.04, raw: 70.123, own: 40 });
     });
 });

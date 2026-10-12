@@ -24,8 +24,8 @@ export function fmtScore(x: number): number {
 }
 
 /** A scored line (rounded for display) and its full-precision twin, in one place so the two never disagree. */
-function scored(prefix: string, x: number): { line: string; full: string } {
-    return { line: `${prefix}: ${fmtScore(x)}`, full: `${prefix}: ${x}` };
+function scored(prefix: string, x: number, round: (n: number) => number = fmtScore): { line: string; full: string } {
+    return { line: `${prefix}: ${round(x)}`, full: `${prefix}: ${x}` };
 }
 
 function plural(n: number, one: string, many = one + 's'): string {
@@ -57,7 +57,7 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             const reached = s.filter((x) => x.score > 0);
             return out(
                 `${plural(reached.length, 'node')} carry propagated risk (of ${s.length} scored).`,
-                reached.slice(0, TOP).map((x) => `${x.label}: ${round1(x.score)}`),
+                reached.slice(0, TOP).map((x) => scored(x.label, x.score, round1)),
                 nodeOf(reached.slice(0, TOP).map((x) => x.id)),
             );
         }
@@ -173,6 +173,8 @@ export interface PropagatedRiskRow {
     score: number;
     raw: number;
     own: number;
+    /** The full-precision `score` / `raw` / `own` the cells rounded, for the tooltip + aria-label. */
+    full: { score: number; raw: number; own: number };
     contributors: number;
     /** `+28 from 99979100001, 3 hops, weight 0.35`, the top contributing origins in the server's order. */
     factors: string[];
@@ -199,6 +201,7 @@ export function propagatedRiskRows(
         score: round1(x.score),
         raw: round1(x.raw),
         own: round1(x.own),
+        full: { score: x.score, raw: x.raw, own: x.own },
         contributors: x.contributors,
         factors: (x.factors ?? []).map((f) => factorLine(f, origin(f.origin))),
     }));
