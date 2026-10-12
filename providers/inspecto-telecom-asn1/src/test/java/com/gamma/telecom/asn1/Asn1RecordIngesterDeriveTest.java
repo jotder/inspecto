@@ -65,11 +65,6 @@ class Asn1RecordIngesterDeriveTest {
                   reduce: usage.usage
                   op: sum
                   of: up
-                UP_GROUPED:
-                  reduce: usage.usage
-                  op: sum
-                  of: up
-                  group_by[1]: group
                 UP_MIN:
                   reduce: usage.usage
                   op: min
@@ -107,14 +102,14 @@ class Asn1RecordIngesterDeriveTest {
         CapturingSink sink = new CapturingSink();
         List<Object[]> rows = run(dir, DERIVE, sink);
 
-        assertEquals(List.of("ID", "MSISDN", "IMSI", "OTHER", "UP_SUM", "UP_GROUPED", "UP_MIN", "DOWN_MAX",
+        assertEquals(List.of("ID", "MSISDN", "IMSI", "OTHER", "UP_SUM", "UP_MIN", "DOWN_MAX",
                 "N_USAGE", "GROUPS", "EVENT_TYPE"), sink.defined.get("Record"));
         assertEquals(2, rows.size(), "row cardinality unchanged: one row per record");
         // record 1: 3 usage elements (up 10,5,100 · down 20,7,1 · group 1,1,2)
-        assertArrayEquals(new Object[]{"5", "1234", "ab", null, "115", "115", "5", "20", "3", "1,1,2", "Record"},
+        assertArrayEquals(new Object[]{"5", "1234", "ab", null, "115", "5", "20", "3", "1,1,2", "Record"},
                 rows.get(0));
         // record 2: ids absent, usage empty: NULL everywhere, never 0
-        assertArrayEquals(new Object[]{"6", null, null, null, null, null, null, null, null, null, "Record"},
+        assertArrayEquals(new Object[]{"6", null, null, null, null, null, null, null, null, "Record"},
                 rows.get(1));
     }
 

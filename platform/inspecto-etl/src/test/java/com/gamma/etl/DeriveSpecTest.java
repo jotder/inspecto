@@ -87,11 +87,12 @@ class DeriveSpecTest {
     }
 
     @Test
-    void groupByCombinesTheGroupsIntoOneScalar() throws IOException {
-        List<String> g = List.of("g");
-        assertEquals("115", one("C", reduce("sum", "up", "group_by", g)));
-        assertEquals("5", one("C", reduce("min", "up", "group_by", g)));
-        assertEquals("100", one("C", reduce("max", "up", "group_by", g)));
+    void groupByWasRemovedFromTheVocabularyAndFailsClosedWithAClearMessage() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> spec("C", reduce("sum", "up", "group_by", List.of("g"))));
+        assertTrue(e.getMessage().startsWith("ASN1-DERIVE-UNKNOWN-OP"), e.getMessage());
+        assertTrue(e.getMessage().contains("group_by was removed"), e.getMessage());
+        refused("UNKNOWN-OP", () -> spec("C", reduce("count", null, "group_by", List.of("g"))));
     }
 
     @Test
@@ -147,7 +148,6 @@ class DeriveSpecTest {
         refused("UNKNOWN-OP", () -> spec("C", m("select", "ids.e", "take", "v")));
         refused("UNKNOWN-OP", () -> spec("C", select("ids.e", m("a", 1, "b", 2), "v", null)));
         refused("UNKNOWN-OP", () -> spec("C", reduce("join", "g", "sep", ",,")));
-        refused("UNKNOWN-OP", () -> spec("C", reduce("first", "g", "group_by", List.of("g"))));
         refused("UNKNOWN-OP", () -> spec("C", "sum(up)"));
     }
 
@@ -165,7 +165,6 @@ class DeriveSpecTest {
         refused("BAD-PATH", () -> spec("C", m("reduce", "a..b", "op", "count")));
         refused("BAD-PATH", () -> spec("C", m("reduce", "a.b.c.d.e.f.g.h.i", "op", "count")));
         refused("BAD-PATH", () -> spec("C", m("reduce", "$parent.x", "op", "count")));
-        refused("BAD-PATH", () -> spec("C", reduce("sum", "up", "group_by", List.of())));
     }
 
     @Test

@@ -37,7 +37,7 @@ public final class DeriveSpec {
     static final int MAX_PATH_DEPTH = 8;
 
     private static final Set<String> SELECT_KEYS = Set.of("select", "where", "take", "nth");
-    private static final Set<String> REDUCE_KEYS = Set.of("reduce", "op", "of", "group_by", "sep");
+    private static final Set<String> REDUCE_KEYS = Set.of("reduce", "op", "of", "sep");
     private static final Set<String> OPS = Set.of("sum", "min", "max", "first", "count", "join");
 
     /** Per-file counters the caller surfaces (never failures). */
@@ -47,7 +47,7 @@ public final class DeriveSpec {
     }
 
     private record Op(String column, boolean select, String[] list, String[] where, String whereValue,
-                      String[] leaf, int nth, String op, String[][] groupBy, String sep) {
+                      String[] leaf, int nth, String op, String sep) {
     }
 
     private final Map<String, List<Op>> bySegment;
@@ -139,9 +139,13 @@ public final class DeriveSpec {
         boolean sel = m.containsKey("select"), red = m.containsKey("reduce");
         if (sel == red) throw err("UNKNOWN-OP", at + " must hold exactly one of select / reduce");
         Set<String> allowed = sel ? SELECT_KEYS : REDUCE_KEYS;
-        for (Object k : m.keySet())
+        for (Object k : m.keySet()) {
+            if ("group_by".equals(String.valueOf(k)))
+                throw err("UNKNOWN-OP", at + ".group_by was removed from the derive vocabulary (it never changed the "
+                        + "scalar); to get one row per group use a children explode");
             if (!allowed.contains(String.valueOf(k)))
                 throw err("UNKNOWN-OP", at + " has key '" + k + "' outside the closed vocabulary");
+        }
         String[] list = path(at, m.get(sel ? "select" : "reduce"));
         if (sel) {
             if (!(m.get("where") instanceof Map<?, ?> w) || w.size() != 1)
@@ -159,7 +163,7 @@ public final class DeriveSpec {
                 if (nth < 0) throw err("UNKNOWN-OP", at + ".nth must be a non-negative integer");
             }
             return new Op(col, true, list, path(at + ".where", we.getKey()), String.valueOf(we.getValue()),
-                    path(at + ".take", m.get("take")), nth, null, null, null);
+                    path(at + ".take", m.get("take")), nth, null, null);
         }
         String op = String.valueOf(m.get("op")).trim();
         if (m.get("op") == null || !OPS.contains(op))
@@ -168,21 +172,12 @@ public final class DeriveSpec {
         if (m.get("of") != null) leaf = path(at + ".of", m.get("of"));
         else if (!op.equals("count") && !op.equals("join") && !op.equals("first"))
             throw err("BAD-PATH", at + ".of is required for op " + op);
-        String[][] groupBy = null;
-        if (m.get("group_by") != null) {
-            if (op.equals("first") || op.equals("join"))
-                throw err("UNKNOWN-OP", at + ".group_by is not supported with op " + op);
-            if (!(m.get("group_by") instanceof List<?> gl) || gl.isEmpty())
-                throw err("BAD-PATH", at + ".group_by must be a non-empty list of leaf fields");
-            groupBy = new String[gl.size()][];
-            for (int i = 0; i < groupBy.length; i++) groupBy[i] = path(at + ".group_by", gl.get(i));
-        }
         String sep = "";
         if (op.equals("join")) {
             sep = m.get("sep") == null ? "," : String.valueOf(m.get("sep"));
             if (sep.length() != 1) throw err("UNKNOWN-OP", at + ".sep must be one character");
         } else if (m.get("sep") != null) throw err("UNKNOWN-OP", at + ".sep applies to op join only");
-        return new Op(col, false, list, null, null, leaf, 0, op, groupBy, sep);
+        return new Op(col, false, list, null, null, leaf, 0, op, sep);
     }
 
     private static String[] path(String at, Object v) {
@@ -277,9 +272,9 @@ public final class DeriveSpec {
         }
     }
 
-    /** sum / min / max over BigDecimal leaves; with group_by, per group then combined (same op) into one scalar. */
+    /** sum / min / max over BigDecimal leaves. */
     private static Object numeric(Op o, List<?> l, Stats stats) {
-        Map<List<String>, BigDecimal> groups = new LinkedHashMap<>();
+        BigDecimal total = null;
         for (Object e : l) {
             BigDecimal d;
             try {
@@ -290,12 +285,8 @@ public final class DeriveSpec {
                 stats.nonNumeric++;
                 continue;
             }
-            List<String> key = new ArrayList<>();
-            if (o.groupBy != null) for (String[] g : o.groupBy) key.add(leaf(e, g));
-            groups.merge(key, d, (a, b) -> combine(o.op, a, b));
+            total = total == null ? d : combine(o.op, total, d);
         }
-        BigDecimal total = null;
-        for (BigDecimal g : groups.values()) total = total == null ? g : combine(o.op, total, g);
         return total == null ? null : total.toPlainString();
     }
 
