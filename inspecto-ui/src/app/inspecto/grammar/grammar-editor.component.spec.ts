@@ -297,6 +297,41 @@ describe('GrammarEditorComponent', () => {
         expect(fixture.componentInstance.isDirty()).toBe(false);
     });
 
+    it('shows the derived-rows section under an ASN.1 tree (PARSING-PREVIEW-DERIVED-1)', () => {
+        const fixture = create({ frontend: 'plugin' }, [XML, ASN1]);
+        fixture.componentRef.setInput('sampleMode', 'host'); // host mode renders the result inline, not under the Parsed tab
+        fixture.componentRef.setInput('configuredIngester', 'com.gamma.asn.Asn1Ingester');
+        fixture.detectChanges();
+        fixture.componentInstance.preview.set({ kind: 'tree', recordCount: 1, nodes: [] });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-test="derived-empty"]')).toBeTruthy();
+
+        fixture.componentInstance.preview.set({
+            kind: 'tree',
+            recordCount: 1,
+            nodes: [],
+            derived: {
+                kind: 'rows',
+                segments: [
+                    { segment: 'Record', child: false, columns: ['ID'], derivedColumns: [], rows: [{ ID: '5' }], rowCount: 1 },
+                ],
+            },
+        });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-test="derived-segment-Record"]')).toBeTruthy();
+        expect(el.querySelector('[data-test="derived-empty"]')).toBeNull();
+    });
+
+    it('does not show the derived-rows section under another parser tree', () => {
+        const xml = create({ frontend: 'plugin' }, [XML, ASN1]);
+        xml.componentRef.setInput('sampleMode', 'host');
+        xml.componentRef.setInput('configuredIngester', 'com.gamma.xml.XmlIngester');
+        xml.componentInstance.preview.set({ kind: 'tree', recordCount: 1, nodes: [] });
+        xml.detectChanges();
+        expect((xml.nativeElement as HTMLElement).querySelector('[data-test="derived-rows"]')).toBeNull();
+    });
+
     it('has no a11y violations', async () => {
         const fixture = create({}, [XML]);
 

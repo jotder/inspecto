@@ -341,6 +341,9 @@
 
             @if (treeNodes(); as nodes) {
                 <app-parser-tree [nodes]="nodes" />
+                @if (activeType() === 'asn1') {
+                    <app-parser-derived-rows [derived]="derivedRows()" [error]="derivedError()" />
+                }
             } @else if (sampleTree() && resultView() === 'tree') {
                 <app-parser-tree [nodes]="sampleTree()!" />
             } @else {

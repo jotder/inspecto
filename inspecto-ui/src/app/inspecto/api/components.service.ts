@@ -166,6 +166,31 @@ export interface ParserTreePreview {
     kind: 'tree';
     recordCount: number;
     nodes: ParserTreeNode[];
+    /** Additive (PARSING-PREVIEW-DERIVED-1): the rows the Parse step's `derive` / `children` would load. Absent when it declares neither. */
+    derived?: ParserRowsPreview;
+    /** Additive: why `derived` could not be built (a bad segment schema); the tree is still valid. */
+    derivedError?: string;
+}
+
+/** One segment's sample rows in a {@link ParserRowsPreview}. */
+export interface ParserRowSet {
+    segment: string;
+    /** Rows exploded from a parent's list (`children`). */
+    child: boolean;
+    /** Every column in load order: raw fields, derived columns, `EVENT_TYPE`. */
+    columns: string[];
+    /** The subset of `columns` a `derive` block adds. */
+    derivedColumns: string[];
+    /** A bounded sample; `null` = SQL NULL. */
+    rows: Record<string, string | null>[];
+    /** Every row the previewed records produce for the segment, not just the sample. */
+    rowCount: number;
+}
+
+/** Derived columns and exploded child rows, built by the same code ingest runs. */
+export interface ParserRowsPreview {
+    kind: 'rows';
+    segments: ParserRowSet[];
 }
 
 /** A parse-preview result — flat for tabular formats, tree for hierarchical ones (discriminated on `kind`). */

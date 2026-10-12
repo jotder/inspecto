@@ -17,6 +17,7 @@ import {
     PipelineParseDefinitionComponent,
     decodeProfileOverrides,
     decodeProfileProvenance,
+    deriveKeysToCarry,
     derivedColumnsOf,
 } from './pipeline-parse-definition.component';
 
@@ -2144,5 +2145,30 @@ describe('derivedColumnsOf', () => {
         expect(derivedColumnsOf(undefined)).toEqual([]);
         expect(derivedColumnsOf([])).toEqual([]);
         expect(derivedColumnsOf({ R: 'x', S: { C: 5 } })).toEqual([]);
+    });
+});
+
+describe('deriveKeysToCarry (PARSING-PREVIEW-DERIVED-1)', () => {
+    const prior = {
+        derive: { Record: { N: { reduce: 'usage.usage', op: 'count' } } },
+        children: { Record: { 'usage.usage': 'Usage' } },
+        segments: { Record: 'rec.toon', Usage: 'use.toon' },
+        strictness: 'DER',
+    };
+
+    it('carries the saved derive/children/segments the preview body lacks, and nothing else', () => {
+        const out = deriveKeysToCarry({ root_type: 'Record' }, prior);
+        expect(Object.keys(out).sort()).toEqual(['children', 'derive', 'segments']);
+    });
+
+    it('never overrides a key the body already holds', () => {
+        const out = deriveKeysToCarry({ segments: { Record: 'other.toon' } }, prior);
+        expect(Object.keys(out).sort()).toEqual(['children', 'derive']);
+    });
+
+    it('carries nothing for a Pipeline that declares none (the preview is then unchanged)', () => {
+        expect(deriveKeysToCarry({}, { strictness: 'DER' })).toEqual({});
+        expect(deriveKeysToCarry({}, undefined)).toEqual({});
+        expect(deriveKeysToCarry({}, { derive: '', children: null })).toEqual({});
     });
 });

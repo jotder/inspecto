@@ -108,6 +108,29 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
 export const isParseNodeType = (type: string): boolean => type === 'parser' || type in PARSE_NODE_FRONTENDS;
 
 /**
+ * The saved `asn1:` keys that make a preview serve derived rows (PARSING-PREVIEW-DERIVED-1): the `derive` /
+ * `children` blocks, their limits, and the `segments` whose schemas name the columns. None is a grammar-form field.
+ */
+export const DERIVE_PREVIEW_KEYS = [
+    'derive',
+    'children',
+    'max_list_elements',
+    'max_derived_columns',
+    'max_child_rows_per_record',
+    'segments',
+] as const;
+
+/** The saved block's {@link DERIVE_PREVIEW_KEYS} the preview body does not already carry; `{}` when there are none. */
+export function deriveKeysToCarry(
+    own: Record<string, unknown>,
+    prior: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const k of DERIVE_PREVIEW_KEYS) if (own[k] === undefined && isSetValue(prior?.[k])) out[k] = prior![k];
+    return out;
+}
+
+/**
  * The `asn1:` keys a Pipeline backed by a **Decode Profile** (`asn1.profile_file`) actually overrides.
  * The served form holds every field at its default, and on the server every key the Pipeline sets wins
  * over the profile — so persisting (or previewing) the whole form would silently fork the Pipeline off
@@ -1118,6 +1141,15 @@ export class PipelineParseDefinitionComponent {
                     this.editor.dirtyKeys(),
                 ),
             };
+        }
+        // PARSING-PREVIEW-DERIVED-1: `derive` / `children` (and the segment refs they name) are not grammar-form
+        // fields, so the form never carries them; the saved block's own are sent so the preview can serve the rows
+        // they load. A Pipeline that sets none sends none and previews exactly as before.
+        if (type === 'asn1' && this.editor) {
+            const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+            const own = (grammar['asn1'] ?? {}) as Record<string, unknown>;
+            const carried = deriveKeysToCarry(own, prior);
+            if (Object.keys(carried).length) grammar = { ...grammar, asn1: { ...own, ...carried } };
         }
         return this.parsersApi.preview(type, grammar, text, b64, this.configSubdir().trim()).pipe(
             tap((p) => {

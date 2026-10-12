@@ -37,6 +37,7 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { ParserDerivedRowsComponent } from 'app/inspecto/components/parser-derived-rows.component';
 import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { PARSING_FRONTENDS, ParsingFrontend, grammarTabsFor, parsingAttributesFor } from './parsing-attributes';
@@ -106,6 +107,7 @@ export type SampleMode = 'own' | 'host';
         ChipComponent,
         InspectoSchemaFormComponent,
         ParserTreeComponent,
+        ParserDerivedRowsComponent,
         DataTableComponent,
     ],
     templateUrl: './grammar-editor.component.html',
@@ -384,6 +386,16 @@ export class GrammarEditorComponent implements AfterViewInit {
     readonly treeNodes = computed<ParserTreeNode[] | null>(() => {
         const p = this.preview();
         return p?.kind === 'tree' ? p.nodes : null;
+    });
+
+    /** PARSING-PREVIEW-DERIVED-1: the rows a tree preview's `derive` / `children` would load, when it served any. */
+    readonly derivedRows = computed(() => {
+        const p = this.preview();
+        return p?.kind === 'tree' ? (p.derived ?? null) : null;
+    });
+    readonly derivedError = computed(() => {
+        const p = this.preview();
+        return p?.kind === 'tree' ? (p.derivedError ?? null) : null;
     });
 
     /** Client-side JSON tree of the raw sample — offered for the json frontend, no server hop. */
