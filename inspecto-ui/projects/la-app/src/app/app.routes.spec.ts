@@ -39,4 +39,8 @@ describe('la-app routes', () => {
     it('resolves the Entity Lists page from the library', async () => {
         expect(await child('entity-lists').loadComponent!()).toBeTruthy();
     }, 60_000);
+
+    it('resolves the Settings page', async () => {
+        expect(await child('settings').loadComponent!()).toBeTruthy();
+    }, 60_000);
 });

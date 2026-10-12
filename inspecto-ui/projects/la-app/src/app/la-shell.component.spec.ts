@@ -9,7 +9,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { LA_APP_NAV } from './la-nav';
+import { LensService } from 'app/inspecto/api';
+import { LA_APP_NAV, LA_APP_SETTINGS_NAV } from './la-nav';
 import { LA_RAIL_EXPANDED_KEY, LaShellComponent } from './la-shell.component';
 import { LandingComponent } from './landing.component';
 
@@ -18,12 +19,13 @@ describe('la-app shell and landing page', () => {
 
     let harness: RouterTestingHarness;
 
-    async function render() {
+    async function render(canAuthor = false) {
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(),
                 provideHttpClientTesting(),
                 provideNoopAnimations(),
+                { provide: LensService, useValue: { canAuthorWorkbench: signal(canAuthor), canManageIncidents: signal(false) } },
                 {
                     provide: SessionService,
                     useValue: { authMode: signal('none'), actorName: signal(''), loginRequired: signal(false) },
@@ -47,6 +49,16 @@ describe('la-app shell and landing page', () => {
         expect(hrefs('ul a')).toEqual(expected);
         expect(el.querySelector('h1')?.textContent).toContain('Link Analysis');
         expect(el.querySelector('main')).toBeTruthy();
+    });
+
+    it('offers the Settings link only to a user who may change the Link Analysis settings', async () => {
+        const plain = await render(false);
+        expect(plain.querySelector('nav[aria-label="Areas"] a[href="/settings"]')).toBeNull();
+        TestBed.resetTestingModule();
+        const author = await render(true);
+        const links = [...author.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Areas"] a')];
+        expect(links.map((a) => a.getAttribute('href'))).toEqual([...LA_APP_NAV.map((n) => '/' + n.path), '/settings']);
+        expect(links.at(-1)?.textContent?.trim()).toBe(LA_APP_SETTINGS_NAV.label);
     });
 
     it('is a left rail: three areas, Space switcher and user menu inside it, no header or footer', async () => {

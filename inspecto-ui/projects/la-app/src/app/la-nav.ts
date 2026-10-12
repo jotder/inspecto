@@ -19,3 +19,13 @@ export const LA_APP_NAV = [
         blurb: 'Keep watch lists of entities, with every change on the record.',
     },
 ] as const;
+
+/**
+ * The rail link to the Link Analysis settings: shown only to a user who may change them (`canAuthorWorkbench`, the
+ * capability `PUT /settings/link-analysis` is gated on). Not on the landing page, which offers the three areas.
+ */
+export const LA_APP_SETTINGS_NAV = {
+    path: 'settings',
+    label: 'Settings',
+    icon: 'heroicons_outline:cog-6-tooth',
+} as const;

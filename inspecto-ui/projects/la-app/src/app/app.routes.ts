@@ -29,6 +29,10 @@ export const laAppRoutes: Route[] = [
                 path: 'entity-lists',
                 loadComponent: () => import('./entity-lists.page').then((m) => m.EntityListsPageComponent),
             },
+            {
+                path: 'settings',
+                loadComponent: () => import('./settings.page').then((m) => m.SettingsPageComponent),
+            },
             { path: '**', redirectTo: '' },
         ],
     },

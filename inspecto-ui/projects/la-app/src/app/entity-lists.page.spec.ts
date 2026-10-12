@@ -4,12 +4,13 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { EntityListsPageComponent } from './entity-lists.page';
+import { provideLaAppHostServices } from './la-host.providers';
 
 /** Rendering the page is the proof it provides everything the library section injects (a missing store is NG0201). */
 describe('EntityListsPageComponent', () => {
     it('renders the Entity Lists section on its own, without an Investigation', () => {
         TestBed.configureTestingModule({
-            providers: [provideHttpClient(), provideHttpClientTesting(), provideNoopAnimations()],
+            providers: [provideHttpClient(), provideHttpClientTesting(), provideNoopAnimations(), ...provideLaAppHostServices()],
         });
         const fixture = TestBed.createComponent(EntityListsPageComponent);
         fixture.detectChanges();
