@@ -529,6 +529,34 @@ describe('investigate-number - walk-through 6 fixes', () => {
         expect(out[0].budget).toBe(5000);
     });
 
+    it('rebuilds the fan-out and hub counts from the sealed read, worded like the live line', () => {
+        const hub = { ...at('h', 1, 2), highConnectivity: true };
+        const set: WorkingSet = { entities: [at('s', 0, 1), hub, at('x', 1, 2)], links: [], excluded: [], hash: '' };
+        const entries = [
+            { step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['s'] } },
+            {
+                step: 2,
+                kind: 'op',
+                op: 'expand',
+                undoneBy: null,
+                params: { ids: ['s'], maxFanOut: 10 },
+                read: {
+                    truncated: false,
+                    fanOutCapped: 4,
+                    hubs: [{ id: 'h', degree: 900 }, { id: 'gone', degree: 800 }],
+                    hubDegreeSource: 'index',
+                },
+            },
+        ] as never;
+        const [o] = degreeOutcomesFromLog(entries, set);
+        expect(o.fanOutCapped).toBe(4);
+        expect(o.hubsFlagged).toBe(1);
+        const live = degreeOutcomeMessage({ ...o, hubsFlagged: 1, hubDegreeSource: 'index', fanOutCapped: 4 });
+        expect(degreeOutcomeMessage(o)).toBe(live);
+        expect(degreeOutcomeMessage(o)).toContain('weaker links were');
+        expect(degreeOutcomeMessage(o)).toContain('high-connectivity number');
+    });
+
     it('labels a held one-hop expand by what it expands from, never as the ladder degree', () => {
         const set = ws(entity('s', 0), entity('a', 1), entity('b', 2));
         expect(isOneHop(set, ['s'])).toBe(true);

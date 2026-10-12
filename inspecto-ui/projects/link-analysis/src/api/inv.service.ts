@@ -675,6 +675,11 @@ export interface InvestigationLogEntry {
         readAt: string;
         rowCount: number;
         truncated: boolean;
+        /** Candidate links the rung's `maxFanOut` left out (not a truncation). */
+        fanOutCapped?: number;
+        /** The sealed `[{id, degree}]` of flagged high-connectivity candidates, and how they were counted. */
+        hubs?: { id: string; degree: number }[];
+        hubDegreeSource?: 'index' | 'flat';
         fingerprint: string;
         /** As on the step result: the sealed read's source, when the server's log view carries it. */
         index?: { version: number; stale: boolean; fingerprint?: string };
