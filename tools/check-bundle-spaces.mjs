@@ -5,6 +5,10 @@
 // OPERATOR DECISION (2026-09-25): every edition's bundle carries spaces/_templates and nothing else under
 // spaces/. Spaces are attached at deploy time (drop the folder into spaces/ or set SPACES_ROOT). The
 // committed sample Spaces (default, demo, ucc) no longer ship; neither does anything untracked.
+// EXCEPTION (operator 2026-10-12): the demo-auth la-app bundle ships exactly one pre-seeded Space, `la-showcase`,
+// baked by package.ps1 (`Invoke-DemoSpaceBake`, inspecto/package-demo-bake.ps1). This guard proves Copy-SpaceTemplates
+// itself still ships templates only, that the bake is called once and only behind the demo-auth la-app gate, and
+// (`--bundle <dir>`) that a built bundle carries only the Spaces its flavor allows (tools/bundle-spaces-rule.mjs).
 //
 // WHY THIS EXISTS (`BUNDLE-UNTRACKED-SPACES-1`, found 2026-09-25). Unzipping a demo bundle built by
 // `inspecto/package.ps1` in the shared sandbox checkout showed `spaces/telco-assurance` (a git-EXCLUDED
@@ -32,6 +36,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { bundleSpacesVerdict } from './bundle-spaces-rule.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const HELPER = join(ROOT, 'inspecto', 'package-spaces.ps1');
@@ -39,6 +44,24 @@ const PACKAGE_PS1 = join(ROOT, 'inspecto', 'package.ps1');
 
 const fail = (msg) => { console.error(`✗ Bundle-spaces guard: ${msg}`); process.exit(1); };
 const abort = (msg) => { console.error(`✗ Bundle-spaces guard could not run: ${msg}`); process.exit(2); };
+
+// ── mode 2: check a BUILT bundle (package.ps1 runs this on the bundle it is about to zip) ───────
+//   node tools/check-bundle-spaces.mjs --bundle <dir> [--demo-auth --ui la-app]
+// Exception (operator 2026-10-12): only the demo-auth la-app bundle may carry exactly one Space, `la-showcase`
+// (the rule lives in tools/bundle-spaces-rule.mjs; see docs/ops/la-showcase-variants-runbook.md).
+const argv = process.argv.slice(2);
+if (argv.includes('--bundle')) {
+  const dir = argv[argv.indexOf('--bundle') + 1];
+  const ui = argv.includes('--ui') ? argv[argv.indexOf('--ui') + 1] : 'gamma';
+  if (!dir) abort('--bundle needs a directory.');
+  const spacesDir = join(dir, 'spaces');
+  let entries = [];
+  try { entries = readdirSync(spacesDir); } catch { /* no spaces/ at all is fine */ }
+  const v = bundleSpacesVerdict(entries, { demoAuth: argv.includes('--demo-auth'), ui });
+  if (!v.ok) fail(v.reason);
+  console.log(`✓ Bundle-spaces guard: ${dir} carries ${entries.filter((n) => n !== '_templates').join(', ') || 'no Spaces'} (allowed for this flavor).`);
+  process.exit(0);
+}
 
 // ── static: package.ps1 routes step 4 through the helper ──────────────────────────────────────
 const pkg = readFileSync(PACKAGE_PS1, 'utf8');
@@ -50,6 +73,12 @@ if (/Get-ChildItem\s+-Path\s+\$spacesSrc/.test(pkg))
   fail('inspecto/package.ps1 enumerates the working-tree spaces/ again — that is the leak this guard exists for.');
 if (/\$staged\.Spaces/.test(pkg))
   fail('inspecto/package.ps1 prunes or re-lists staged Spaces again — the helper alone decides what ships (templates only, every edition).');
+
+// The ONLY step that may add a Space to a bundle is the demo bake, and only behind this exact gate.
+const bakeCalls = pkg.match(/Invoke-DemoSpaceBake\s+-/g) || [];
+if (bakeCalls.length > 1) fail('inspecto/package.ps1 calls Invoke-DemoSpaceBake more than once.');
+if (bakeCalls.length === 1 && !/if \(\$DemoAuth -and \$Ui -eq 'la-app'[^\r\n]*\)\s*\{\s*[^}]*Invoke-DemoSpaceBake\s+-/.test(pkg))
+  fail("inspecto/package.ps1 calls Invoke-DemoSpaceBake outside `if ($DemoAuth -and $Ui -eq 'la-app' ...)` — only the demo-auth la-app bundle may ship a Space.");
 
 // ── fixture repository ────────────────────────────────────────────────────────────────────────
 const work = mkdtempSync(join(tmpdir(), 'inspecto-bundle-spaces-'));

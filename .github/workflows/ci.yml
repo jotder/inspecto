@@ -320,7 +320,7 @@ jobs:
       # step 4 copied the working-tree spaces/ listing. Staging now reads `git ls-tree HEAD` only
       # (inspecto/package-spaces.ps1); this runs it under pwsh against a throwaway repo full of traps.
       - name: Guard — a bundle ships only committed Space content
-        run: node tools/check-bundle-spaces.mjs
+        run: node tools/check-bundle-spaces.mjs && node --test tools/check-bundle-spaces.test.mjs
 
       # Offerings guard (MODULE-REORG-1 P6a): every module has a manifest, every Offering names real modules. Reads git
       # ls-files + tracked manifests/offerings/*.toon only; no build.
