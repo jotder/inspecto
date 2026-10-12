@@ -1,0 +1,25 @@
+kind: virtual
+sourceName: mule_geo_legs
+sql: "SELECT * FROM mule_geo_legs WHERE SCENE = 'cashout'"
+description: "Link Analysis showcase GEO scene - the cash-out legs with both ends geocoded: MULE-HUB-02 (Marseille) funds eight CASHER accounts in metro branches, who all cash out through TILL-06 in Paris; ordinary customers cash out across TILL-01 to TILL-05 in five other cities, so the map shows one converging star against scattered spokes. SYNTHETIC."
+columns[13]{name,type,classification}:
+  SCENE,string,
+  ROLE,string,
+  FROM_ACCOUNT,string,ACCOUNT
+  TO_ACCOUNT,string,ACCOUNT
+  CHANNEL,string,
+  FROM_CITY,string,
+  TO_CITY,string,
+  FROM_LAT,number,
+  FROM_LON,number,
+  TO_LAT,number,
+  TO_LON,number,
+  TRANSFERS,number,
+  TOTAL_AMOUNT,number,
+owner: fm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,fm.analyst,view
+  user,fm.manager,view
+  user,ra.analyst,view
+  user,demo.manager,view

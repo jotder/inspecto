@@ -1,0 +1,17 @@
+name: mule_cashout_till_map
+description: "GEO scene 2 - the cash-out: MULE-HUB-02 (Marseille) funds eight CASHER accounts in metro branches and all of them cash out through TILL-06 in Paris, a converging star beside the scattered ordinary tills in Amsterdam, Rome, Utrecht, Barcelona and Krakow. Route colour = role. Synthetic placements."
+sourceId: od-routes
+display: markers
+query:
+  routes:
+    datasetId: mule_cashout_legs_dataset
+    fromLatCol: FROM_LAT
+    fromLonCol: FROM_LON
+    toLatCol: TO_LAT
+    toLonCol: TO_LON
+    fromCol: FROM_ACCOUNT
+    toCol: TO_ACCOUNT
+    kindCol: ROLE
+camera:
+  center[2]: 6,47
+  zoom: 4.5

@@ -1,0 +1,16 @@
+physicalRef: mule_account_locations/database
+description: "Link Analysis showcase GEO scene - where each account of the mule corpus sits: a city, its coordinates (the city centroid plus a tiny deterministic jitter) and the kind of site. SYNTHETIC: invented placements, cities only, no real person or address. Landed by the mule_account_locations Pipeline."
+columns[6]{name,type,classification}:
+  ACCOUNT,string,ACCOUNT
+  CITY,string,
+  COUNTRY,string,
+  LAT,number,
+  LON,number,
+  SITE_TYPE,string,
+owner: fm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,fm.analyst,view
+  user,fm.manager,view
+  user,ra.analyst,view
+  user,demo.manager,view

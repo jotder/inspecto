@@ -1,0 +1,60 @@
+raw:
+  name: MULE_GEO_LEGS
+  format: CSV
+  fields[13]{name,selector,type,description,unit,classification}:
+    SCENE,"0",VARCHAR,"ring or cashout","","INTERNAL"
+    ROLE,"1",VARCHAR,"structuring, pass_through, offshore, circular, funding, till_06 or ordinary_till","","INTERNAL"
+    FROM_ACCOUNT,"2",VARCHAR,"Payer account","","CONFIDENTIAL"
+    TO_ACCOUNT,"3",VARCHAR,"Payee account","","CONFIDENTIAL"
+    CHANNEL,"4",VARCHAR,"Transfer channel","","INTERNAL"
+    FROM_CITY,"5",VARCHAR,"Payer city","","INTERNAL"
+    TO_CITY,"6",VARCHAR,"Payee city","","INTERNAL"
+    FROM_LAT,"7",DOUBLE,"Payer latitude","deg","INTERNAL"
+    FROM_LON,"8",DOUBLE,"Payer longitude","deg","INTERNAL"
+    TO_LAT,"9",DOUBLE,"Payee latitude","deg","INTERNAL"
+    TO_LON,"10",DOUBLE,"Payee longitude","deg","INTERNAL"
+    TRANSFERS,"11",INTEGER,"Transfers folded into the leg over the three landed days","","INTERNAL"
+    TOTAL_AMOUNT,"12",DOUBLE,"Summed amount (EUR)","EUR","INTERNAL"
+mapping:
+  canonicalName: mule_geo_legs
+  rawName: MULE_GEO_LEGS
+  fields[13]:
+    - name: SCENE
+      from: SCENE
+      fn: keep
+    - name: ROLE
+      from: ROLE
+      fn: keep
+    - name: FROM_ACCOUNT
+      from: FROM_ACCOUNT
+      fn: keep
+    - name: TO_ACCOUNT
+      from: TO_ACCOUNT
+      fn: keep
+    - name: CHANNEL
+      from: CHANNEL
+      fn: keep
+    - name: FROM_CITY
+      from: FROM_CITY
+      fn: keep
+    - name: TO_CITY
+      from: TO_CITY
+      fn: keep
+    - name: FROM_LAT
+      from: FROM_LAT
+      fn: keep
+    - name: FROM_LON
+      from: FROM_LON
+      fn: keep
+    - name: TO_LAT
+      from: TO_LAT
+      fn: keep
+    - name: TO_LON
+      from: TO_LON
+      fn: keep
+    - name: TRANSFERS
+      from: TRANSFERS
+      fn: keep
+    - name: TOTAL_AMOUNT
+      from: TOTAL_AMOUNT
+      fn: keep

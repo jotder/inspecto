@@ -1,0 +1,17 @@
+name: mule_ring_route_map
+description: "GEO scene 1 - the layering ring over Europe: cash placed at small-town branches converges on MULE-HUB-01 in Rotterdam, fans out to Madrid and Warsaw and leaves for George Town; the SHELL loop circles Valencia, Milan, Lyon, Turin. Route colour = role. Synthetic placements."
+sourceId: od-routes
+display: markers
+query:
+  routes:
+    datasetId: mule_ring_legs_dataset
+    fromLatCol: FROM_LAT
+    fromLonCol: FROM_LON
+    toLatCol: TO_LAT
+    toLonCol: TO_LON
+    fromCol: FROM_ACCOUNT
+    toCol: TO_ACCOUNT
+    kindCol: ROLE
+camera:
+  center[2]: 10,47
+  zoom: 4

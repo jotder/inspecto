@@ -1,0 +1,32 @@
+raw:
+  name: MULE_ACCOUNT_LOCATIONS
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    ACCOUNT,"0",VARCHAR,"Account id","","CONFIDENTIAL"
+    CITY,"1",VARCHAR,"City the account is placed in (synthetic)","","INTERNAL"
+    COUNTRY,"2",VARCHAR,"ISO country of the city","","INTERNAL"
+    LAT,"3",DOUBLE,"Latitude - city centroid plus a small deterministic jitter","deg","INTERNAL"
+    LON,"4",DOUBLE,"Longitude - city centroid plus a small deterministic jitter","deg","INTERNAL"
+    SITE_TYPE,"5",VARCHAR,"rural_branch, metro_branch, atm, online, till or offshore","","INTERNAL"
+mapping:
+  canonicalName: mule_account_locations
+  rawName: MULE_ACCOUNT_LOCATIONS
+  fields[6]:
+    - name: ACCOUNT
+      from: ACCOUNT
+      fn: keep
+    - name: CITY
+      from: CITY
+      fn: keep
+    - name: COUNTRY
+      from: COUNTRY
+      fn: keep
+    - name: LAT
+      from: LAT
+      fn: keep
+    - name: LON
+      from: LON
+      fn: keep
+    - name: SITE_TYPE
+      from: SITE_TYPE
+      fn: keep

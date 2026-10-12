@@ -6,6 +6,9 @@ Writes under spaces/_templates/la-showcase/data/:
   staged/mule_transfers/TRANSFERS_20260904.csv      the NEXT day  (copy into data/inbox/mule_transfers)
   staged/mule_transfers/TRANSFERS_20260906.csv      a GAP day     (20260905 is missing -> a delivery-gap signal)
 
+Also writes the GEO scene (inbox/mule_account_locations, inbox/mule_geo_legs): synthetic city-level coordinates for every
+account and the planted stories' legs, geocoded. Drawn from a SEPARATE generator, so the transfer files never change.
+
 Derived from spaces/demo/data/samples/gen-link-analysis-demos.py (same planted stories: MULE-HUB-01 structuring and
 pass-through, the SHELL-A->B->C->D->A circular loop, the TILL-06 cash-out and the SKIMMER-01 benefit skim) with ONE
 deliberate difference - the ordinary traffic is ACYCLIC and TRIANGLE-FREE (accounts 1000-1034 pay accounts 1035-1069, never the
@@ -102,7 +105,103 @@ def write(sub, day, rows):
     print(f"{f.relative_to(ROOT)}: {len(rows)} rows")
 
 
+landed_rows = []
 for n, day in enumerate(LANDED):
-    write("inbox", day, day_rows(day, structuring=n < 2))
+    rows = day_rows(day, structuring=n < 2)
+    landed_rows.extend(rows)
+    write("inbox", day, rows)
 write("staged", NEXT_DAY, day_rows(NEXT_DAY, structuring=False))
 write("staged", GAP_DAY, day_rows(GAP_DAY, structuring=False))
+
+# --- GEO scene (operator 2026-10-12): SYNTHETIC account locations + the planted stories' legs, geocoded -------------
+# Uses its OWN generator (never `rng`), so the transfer corpus above is byte-identical with or without this block.
+# Every place is a CITY centroid plus a tiny deterministic jitter; no real person or address is implied. Each account
+# sits in the country the feed already gives it (COUNTRY), so PAYER_COUNTRY and the map never contradict.
+geo = random.Random(20261012)
+CITY = {                                   # name: (lat, lon)
+    "Madrid": (40.4168, -3.7038), "Barcelona": (41.3874, 2.1686), "Valencia": (39.4699, -0.3763),
+    "Soria": (41.7664, -2.4790), "Teruel": (40.3456, -1.1065), "Zamora": (41.5033, -5.7446), "Cuenca": (40.0704, -2.1374),
+    "Rome": (41.9028, 12.4964), "Milan": (45.4642, 9.1900), "Turin": (45.0703, 7.6869), "Naples": (40.8518, 14.2681),
+    "Matera": (40.6664, 16.6043), "Potenza": (40.6404, 15.8056), "Campobasso": (41.5603, 14.6627),
+    "Warsaw": (52.2297, 21.0122), "Krakow": (50.0647, 19.9450), "Gdansk": (54.3520, 18.6466), "Wroclaw": (51.1079, 17.0385),
+    "Suwalki": (54.1118, 22.9308), "Zamosc": (50.7231, 23.2519), "Przemysl": (49.7838, 22.7678),
+    "Paris": (48.8566, 2.3522), "Lyon": (45.7640, 4.8357), "Marseille": (43.2965, 5.3698), "Toulouse": (43.6047, 1.4442),
+    "Aurillac": (44.9300, 2.4400), "Gueret": (46.1700, 1.8700), "Mende": (44.5180, 3.5010),
+    "Rotterdam": (51.9244, 4.4777), "Amsterdam": (52.3676, 4.9041), "Utrecht": (52.0907, 5.1214), "Eindhoven": (51.4416, 5.4697),
+    "Leeuwarden": (53.2012, 5.7999), "Emmen": (52.7792, 6.9069), "Middelburg": (51.4988, 3.6110),
+    "Berlin": (52.5200, 13.4050), "Hamburg": (53.5511, 9.9937), "Munich": (48.1351, 11.5820), "Cologne": (50.9375, 6.9603),
+    "Cottbus": (51.7563, 14.3329), "Hof": (50.3127, 11.9124), "Flensburg": (54.7937, 9.4469),
+    "George Town": (19.2866, -81.3744),
+}
+METRO = {"ES": ["Madrid", "Barcelona", "Valencia"], "IT": ["Rome", "Milan", "Turin", "Naples"],
+         "PL": ["Warsaw", "Krakow", "Gdansk", "Wroclaw"], "FR": ["Paris", "Lyon", "Marseille", "Toulouse"],
+         "NL": ["Rotterdam", "Amsterdam", "Utrecht", "Eindhoven"], "DE": ["Berlin", "Hamburg", "Munich", "Cologne"]}
+RURAL = {"ES": ["Soria", "Teruel", "Zamora", "Cuenca"], "IT": ["Matera", "Potenza", "Campobasso"],
+         "PL": ["Suwalki", "Zamosc", "Przemysl"], "FR": ["Aurillac", "Gueret", "Mende"],
+         "NL": ["Leeuwarden", "Emmen", "Middelburg"], "DE": ["Cottbus", "Hof", "Flensburg"]}
+PLACE = {HUB: ("Rotterdam", "metro_branch"), RELAYS[0]: ("Madrid", "metro_branch"), RELAYS[1]: ("Warsaw", "metro_branch"),
+         OFFSHORE: ("George Town", "offshore"), HUB2: ("Marseille", "metro_branch"), GOV: ("Warsaw", "metro_branch"),
+         SKIMMER: ("Berlin", "online"), SHELLS[0]: ("Valencia", "online"), SHELLS[1]: ("Milan", "online"),
+         SHELLS[2]: ("Lyon", "online"), SHELLS[3]: ("Turin", "online"), TILLS[0]: ("Amsterdam", "till"),
+         TILLS[1]: ("Rome", "till"), TILLS[2]: ("Utrecht", "till"), TILLS[3]: ("Barcelona", "till"),
+         TILLS[4]: ("Krakow", "till"), TILLS[5]: ("Paris", "till")}
+for i, a in enumerate(SMURFS):             # cash-in at small-town branches, spread over their own country's rural list
+    PLACE[a] = (RURAL[COUNTRY[a]][i % len(RURAL[COUNTRY[a]])], "rural_branch")
+for i, a in enumerate(CASHERS):
+    PLACE[a] = (METRO[COUNTRY[a]][i % len(METRO[COUNTRY[a]])], "metro_branch")
+for i, a in enumerate(BENEFICIARIES):
+    PLACE[a] = (RURAL[COUNTRY[a]][i % len(RURAL[COUNTRY[a]])], "rural_branch")
+for a in NORMAL:
+    PLACE[a] = (geo.choice(METRO[COUNTRY[a]]), geo.choice(["online", "online", "metro_branch", "atm"]))
+LOC = {}
+for a in ALL:
+    city, site = PLACE[a]
+    lat, lon = CITY[city]
+    LOC[a] = (city, round(lat + geo.uniform(-0.03, 0.03), 4), round(lon + geo.uniform(-0.03, 0.03), 4), site)
+
+
+def write_csv(sub, name, header, rows):
+    out = ROOT / sub
+    out.mkdir(parents=True, exist_ok=True)
+    f = out / name
+    with f.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(header)
+        w.writerows(rows)
+    print(f"{f.relative_to(ROOT)}: {len(rows)} rows")
+
+
+write_csv("inbox/mule_account_locations", "MULE_ACCOUNT_LOCATIONS_20260901.csv",
+          ["ACCOUNT", "CITY", "COUNTRY", "LAT", "LON", "SITE_TYPE"],
+          [[a, LOC[a][0], COUNTRY[a], f"{LOC[a][1]:.4f}", f"{LOC[a][2]:.4f}", LOC[a][3]] for a in ALL])
+
+# The geo routes read origin AND destination coordinates from ONE relation, and a virtual Dataset reads one store, so the
+# stories' legs are pre-joined here: one row per distinct (scene, payer, payee, channel) over the three landed days.
+ORDINARY_CASHOUT = set(TILLS[:5])
+legs = {}
+for r in landed_rows:
+    payer, payee, channel, amount = r[1], r[2], r[3], float(r[4])
+    if payee == HUB and payer in SMURFS:
+        scene, role = "ring", "structuring"
+    elif payer == HUB and payee in RELAYS:
+        scene, role = "ring", "pass_through"
+    elif payer in RELAYS and payee == OFFSHORE:
+        scene, role = "ring", "offshore"
+    elif payer in SHELLS and payee in SHELLS:
+        scene, role = "ring", "circular"
+    elif payer == HUB2 and payee in CASHERS:
+        scene, role = "cashout", "funding"
+    elif payee == TILLS[5]:
+        scene, role = "cashout", "till_06"
+    elif payee in ORDINARY_CASHOUT:
+        scene, role = "cashout", "ordinary_till"
+    else:
+        continue
+    k = (scene, role, payer, payee, channel)
+    n, total = legs.get(k, (0, 0.0))
+    legs[k] = (n + 1, total + amount)
+write_csv("inbox/mule_geo_legs", "MULE_GEO_LEGS_20260901.csv",
+          ["SCENE", "ROLE", "FROM_ACCOUNT", "TO_ACCOUNT", "CHANNEL", "FROM_CITY", "TO_CITY", "FROM_LAT", "FROM_LON",
+           "TO_LAT", "TO_LON", "TRANSFERS", "TOTAL_AMOUNT"],
+          [[sc, ro, p, q, ch, LOC[p][0], LOC[q][0], f"{LOC[p][1]:.4f}", f"{LOC[p][2]:.4f}", f"{LOC[q][1]:.4f}",
+            f"{LOC[q][2]:.4f}", n, f"{t:.2f}"] for (sc, ro, p, q, ch), (n, t) in sorted(legs.items())])

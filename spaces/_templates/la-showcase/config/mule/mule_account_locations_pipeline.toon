@@ -1,0 +1,34 @@
+name: mule_account_locations
+active: true
+description: "Link Analysis showcase GEO scene - synthetic city-level coordinates for every account of the mule corpus (one CSV, MULE_ACCOUNT_LOCATIONS_20260901.csv). Cities only, no real person or address. Synthetic; regenerate with tools/gen-la-showcase-data.py."
+
+dirs:
+  poll:       data/inbox/mule_account_locations
+  database:   data/mule_account_locations/database
+  backup:     data/mule_account_locations/backup
+  temp:       data/mule_account_locations/temp
+  errors:     data/mule_account_locations/errors
+  quarantine: data/mule_account_locations/quarantine
+  markers:    data/mule_account_locations/markers
+  status_dir: data/mule_account_locations/status
+  log_dir:    data/mule_account_locations/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: mule_account_locations_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+
+collector:
+  discovery: poll
+  connector: local

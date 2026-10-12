@@ -1,0 +1,25 @@
+kind: virtual
+sourceName: mule_geo_legs
+sql: "SELECT * FROM mule_geo_legs WHERE SCENE = 'ring'"
+description: "Link Analysis showcase GEO scene - the layering ring's legs with both ends geocoded: SMURF accounts structure cash from small-town branches into MULE-HUB-01 (Rotterdam), the hub passes it to RELAY-01 (Madrid) and RELAY-02 (Warsaw), they move it to OFFSHORE-77 (George Town), and SHELL-A to SHELL-D circle money Valencia, Milan, Lyon, Turin. The geo routes read both ends from one relation, which is why the legs are pre-joined in mule_geo_legs. SYNTHETIC."
+columns[13]{name,type,classification}:
+  SCENE,string,
+  ROLE,string,
+  FROM_ACCOUNT,string,ACCOUNT
+  TO_ACCOUNT,string,ACCOUNT
+  CHANNEL,string,
+  FROM_CITY,string,
+  TO_CITY,string,
+  FROM_LAT,number,
+  FROM_LON,number,
+  TO_LAT,number,
+  TO_LON,number,
+  TRANSFERS,number,
+  TOTAL_AMOUNT,number,
+owner: fm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,fm.analyst,view
+  user,fm.manager,view
+  user,ra.analyst,view
+  user,demo.manager,view

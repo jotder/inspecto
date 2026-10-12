@@ -1,0 +1,15 @@
+name: mule_account_locations_map
+description: "GEO scene 0 - every account of the mule corpus as a point (113 accounts, city-level), coloured by site type: rural branches are where the SMURF cash goes in, tills are where it comes out. Synthetic placements."
+sourceId: dataset
+display: markers
+query:
+  projection:
+    datasetId: mule_account_locations_dataset
+    latCol: LAT
+    lonCol: LON
+    entityCol: ACCOUNT
+    entityIdCol: ACCOUNT
+    kindCol: SITE_TYPE
+camera:
+  center[2]: 10,47
+  zoom: 4

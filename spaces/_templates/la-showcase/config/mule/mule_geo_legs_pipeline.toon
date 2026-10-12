@@ -1,0 +1,34 @@
+name: mule_geo_legs
+active: true
+description: "Link Analysis showcase GEO scene - the planted mule stories' transfer legs pre-joined to the account locations (one CSV, MULE_GEO_LEGS_20260901.csv): scene ring (structuring, pass-through, offshore, circular) and scene cashout (funding, TILL-06, ordinary tills). Synthetic; regenerate with tools/gen-la-showcase-data.py."
+
+dirs:
+  poll:       data/inbox/mule_geo_legs
+  database:   data/mule_geo_legs/database
+  backup:     data/mule_geo_legs/backup
+  temp:       data/mule_geo_legs/temp
+  errors:     data/mule_geo_legs/errors
+  quarantine: data/mule_geo_legs/quarantine
+  markers:    data/mule_geo_legs/markers
+  status_dir: data/mule_geo_legs/status
+  log_dir:    data/mule_geo_legs/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: mule_geo_legs_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+
+collector:
+  discovery: poll
+  connector: local
