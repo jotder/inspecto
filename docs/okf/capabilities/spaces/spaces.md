@@ -892,6 +892,8 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   `inspecto-demo/spaces-la-showcase` with both Spaces, then serves on 8097); (3) `node tools/seed-la-showcase.mjs --base http://127.0.0.1:8097` (dry run), then
   `--apply`. On a fresh spaces root the sign-in picker is empty until a Space with `demo-users.toon` exists - that is why step 2 scaffolds first.
   A Space created later from the gallery (`POST /spaces {"id":"la-showcase","template":"la-showcase"}`) is equivalent.
+  **Since 2026-10-12 the `-DemoAuth -Ui la-app` bundle ships `la-showcase` already seeded** (bundles ship no Spaces *except* this flavor): unzip,
+  `serve-demo`, sign in - see [`build-test.md`](../../backend/build-run/build-test.md) (step 6f) and the variants runbook.
 - **Variants.** `inspecto-personal` (launch config; a Personal bundle from `package.ps1` with no flags, port 8098): `GET /inv/investigations` answers 503
   `CAPABILITY_UNAVAILABLE`. **Postgres store (no Docker automation):** start the Enterprise/Preview server with
   `-Dinvestigations.backend=db -Dinvestigations.db.url=jdbc:postgresql://<host>:5432/<db>` (password through the `SecretResolver`; the `la-store-pg` jar is

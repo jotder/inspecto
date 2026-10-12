@@ -229,7 +229,8 @@ Builds `inspecto-deploy-<platform>.zip` per embedded runtime (Since 2026-09-17 t
 inspecto-deploy/
   inspecto.jar          the product jar (processor + third-party shaded); the 14 core libraries are thin jars beside it, listed in modules.list
   spaces/                     ONLY the _templates gallery (every edition, since 2026-09-25) — bundles
-                              ship NO Spaces. Staged from `git ls-tree HEAD` (committed content only).
+                              ship NO Spaces (except the demo-auth la-app bundle, which ships the
+                              pre-seeded la-showcase Space, 2026-10-12). Staged from `git ls-tree HEAD` (committed content only).
                               ATTACH Spaces at deploy time: drop each Space folder (a dir with a
                               config/ subtree) into spaces/ — or point SPACES_ROOT / -Dspaces.root at
                               a folder holding them — and restart; or create one in Settings → Spaces.

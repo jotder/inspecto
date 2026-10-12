@@ -8,6 +8,15 @@ bundle, filesystem Investigation store) is described in
 Status: the steps below are derived from code and config, cited per line. Neither variant has been driven
 end to end in a browser by this page's author (see "Not verified").
 
+## 0. The default demo: unzip, run, sign in (since 2026-10-12)
+
+The `-Edition Enterprise -DemoAuth -Ui la-app` bundle (`inspecto-demo-<platform>.zip`) ships `la-showcase` **pre-seeded** under
+`spaces\la-showcase` (operator decision 2026-10-12; the only bundle that ships a Space; `docs/okf/backend/build-run/build-test.md`).
+Pre-flight is: unzip, run `serve-demo.bat` / `./serve-demo.sh` (`PORT` overrides 8080), open the URL, pick a Demo User. No node, no scaffold, no seed.
+It carries the Investigation, members, Drafts, Entity Lists, identity assertion, Case, Alert Rule and Jobs; `DEMO-BUILD.txt` in the zip lists the five Demo Users.
+**Reset:** stop the server, delete `spaces\la-showcase`, restore it from the zip. `package.ps1 -NoBakeDemo` builds the bundle without the Space
+(then scaffold and seed as in the sections below).
+
 ## A. Postgres Investigation store
 
 What it is: the optional module `la/inspecto-la-store-pg` keeps the sealed Investigation log, Working Set sets,

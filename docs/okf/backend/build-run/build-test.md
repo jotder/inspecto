@@ -167,7 +167,7 @@ Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.
 > staging block and its boot-smoke classpath. Owner: [`okf/capabilities/editions/editions.md`](../../capabilities/editions/editions.md) §3.3.
 
 **Bundles ship NO Spaces — the `spaces/` tree holds only `spaces/_templates`** (operator decision
-2026-09-25, every edition). `_templates` is the Space-template gallery, an underscore sentinel never booted
+2026-09-25, every edition — **except the demo-auth la-app flavor**, see the 2026-10-12 decision below). `_templates` is the Space-template gallery, an underscore sentinel never booted
 as a Space. Spaces are **attached** at deploy time: drop each Space folder (a dir with a `config/` subtree)
 into the bundle's `spaces/` — or point `SPACES_ROOT` (launchers) / `-Dspaces.root` at a folder holding them —
 and restart, or create one in Settings → Spaces (`POST /spaces`, no restart). Step 4 is
@@ -176,6 +176,14 @@ and restart, or create one in Settings → Spaces (`POST /spaces`, no restart). 
 `git checkout-index` from a throwaway index, so .gitattributes eol rules apply as in a fresh checkout.
 Every other top-level entry (the committed `default`/`demo`/`ucc`, untracked or git-excluded dirs, `uat`,
 `_shared`) is named in the build log as not bundled.
+- ⚖ **Decision 2026-10-12 (operator): the Link Analysis demo bundle ships `la-showcase` PRE-SEEDED.** `package.ps1 -Edition Enterprise
+  -DemoAuth -Ui la-app` (and only that flavor) runs step 6f, `Invoke-DemoSpaceBake` (`inspecto/package-demo-bake.ps1`): it scaffolds
+  `la-showcase` into a temp spaces root (`node tools/seed-la-showcase.mjs --scaffold`), boots the staged bundle on a loopback port
+  with the `serve-demo` flags, runs the seed script `--apply`, stops the server gracefully (Ctrl+C, so DuckDB checkpoints; a leftover
+  `.wal` fails the build), scans the baked folder for the build-time path (any hit fails the build), and copies it to
+  `spaces\la-showcase`, so a presenter unzips, runs `serve-demo` and signs in with no node and no seed step. Any failure throws; `-NoBakeDemo`
+  skips it for a fast local package. `tools/check-bundle-spaces.mjs` allows exactly that one Space, only for demo-auth + la-app
+  (`tools/bundle-spaces-rule.mjs`, `--bundle <dir>`), and still fails every other bundle shape. Every other bundle still ships none.
 - 🔴 **Why no Spaces.** A hand-over built as "the bundle plus ONE Space folder" opened the sample `default`
   Space instead of the one dropped in beside it (2026-09-25 rehearsal); `0228534d0` pruned the samples for
   `-DemoAuth` only, and this decision made it the rule for every edition.
