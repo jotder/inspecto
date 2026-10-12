@@ -411,6 +411,29 @@ describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-
         expect(c.prefilled()).toBeNull();
     });
 
+    it('a second pick re-derives Source/Target - columns of the previous Dataset do not linger', async () => {
+        const { c, fixture } = withDatasets();
+        fixture.componentRef.setInput('datasets', [
+            ...DATASETS,
+            {
+                id: 'telecom_links_dataset',
+                name: 'telecom_links_dataset',
+                sourceName: 'tl',
+                columns: [
+                    { name: 'a_msisdn', type: 'string' },
+                    { name: 'b_msisdn', type: 'string' },
+                ],
+            },
+        ]);
+        fixture.detectChanges();
+        c.queryForm.patchValue({ datasetId: 'telecom_links_dataset' });
+        await settle(fixture);
+        expect(c.queryForm.getRawValue()).toMatchObject({ sourceCol: 'a_msisdn', targetCol: 'b_msisdn' });
+        c.queryForm.patchValue({ datasetId: 'mule_transfers_dataset' });
+        await settle(fixture);
+        expect(c.queryForm.getRawValue()).toMatchObject({ sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT' });
+    });
+
     it('a Dataset with no obvious pair is left blank for the analyst to choose', async () => {
         const { c, fixture } = withDatasets();
         c.queryForm.patchValue({ datasetId: 'maintenance_backups' });

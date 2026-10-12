@@ -317,7 +317,10 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         this.datasetTimeColumn.set(meta.find((c) => c.type === 'date')?.name ?? '');
         const f = this.queryForm.controls;
         // Pre-fill only a blank mapping: a loaded saved view, or the analyst's own pick, is never overwritten.
-        const guess = !f.sourceCol.value && !f.targetCol.value ? suggestLinkColumns(meta) : null;
+        // A pick whose columns are not columns of THIS Dataset (left over from the previous pick) counts as blank.
+        const names = new Set(meta.map((c) => c.name));
+        const kept = (v: string): boolean => !!v && names.has(v);
+        const guess = !kept(f.sourceCol.value) && !kept(f.targetCol.value) ? suggestLinkColumns(meta) : null;
         if (guess) {
             this.queryForm.patchValue({ sourceCol: guess.source, targetCol: guess.target });
             this.prefilled.set(guess);
