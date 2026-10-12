@@ -1166,11 +1166,19 @@ export class LinkAnalysisComponent implements OnInit {
         this.graphRuns.loadCatalogue(); // the footer's server ceiling; absent when the server cannot answer
         this.pendingPivot = this.pivotService.readIncoming(this.route);
         // DR-U9: `?investigation=<id>` (the Alerts page's link from a fired Investigation rule) opens that Investigation.
-        const investigationId = this.route.snapshot.queryParamMap.get('investigation');
-        if (investigationId) {
-            this.openInvestigation();
-            void this.investigation.adopt(investigationId);
-        }
+        // A stream, not the snapshot: a second Alert's link navigates to this same route with a NEW id, which Angular
+        // reuses. The id the store already has open (it writes the param itself) is not adopted again.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => p.get('investigation')),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe((investigationId) => {
+                if (!investigationId || investigationId === this.investigation.activeId()) return;
+                this.openInvestigation();
+                void this.investigation.adopt(investigationId);
+            });
         // Sprint 1: `?seed=<id>&entityType=msisdn[&dataset=<id>]` investigates that entity. A stream, not the snapshot:
         // the starter card navigates to the same route, which Angular reuses. Each new request is consumed once.
         this.route.queryParamMap

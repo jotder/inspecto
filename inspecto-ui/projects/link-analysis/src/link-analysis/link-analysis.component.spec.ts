@@ -6,7 +6,8 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
@@ -304,6 +305,40 @@ describe('LinkAnalysisComponent', () => {
         const adopt = vi.spyOn(fixture.componentInstance.investigation, 'adopt').mockResolvedValue(true);
         fixture.detectChanges();
         expect(adopt).toHaveBeenCalledWith('case-v');
+        expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
+    });
+
+    it('adopts a SECOND ?investigation= id on the reused route, and ignores the id it already has open (DR-U9)', async () => {
+        const params = new BehaviorSubject(convertToParamMap({ investigation: 'inv-1' }));
+        const { fixture } = create({ queryParams: { investigation: 'inv-1' } });
+        (TestBed.inject(ActivatedRoute) as { queryParamMap: unknown }).queryParamMap = params;
+        const c = fixture.componentInstance;
+        const adopt = vi.spyOn(c.investigation, 'adopt').mockImplementation(async (id) => {
+            c.investigation.activeId.set(id);
+            return true;
+        });
+        fixture.detectChanges();
+        expect(adopt).toHaveBeenCalledTimes(1);
+        params.next(convertToParamMap({ investigation: 'inv-2' }));
+        expect(adopt).toHaveBeenLastCalledWith('inv-2');
+        params.next(convertToParamMap({ investigation: 'inv-2', other: 'x' })); // the store's own sync: no re-adopt
+        params.next(convertToParamMap({})); // closed: nothing to adopt
+        expect(adopt).toHaveBeenCalledTimes(2);
+    });
+
+    it('says the Investigation is not available when the deep-linked id is unknown (404 is absence, DR-U9)', async () => {
+        const { fixture } = create({
+            queryParams: { investigation: 'inv-gone' },
+            inv: {
+                investigationLog: () =>
+                    throwError(() => new HttpErrorResponse({ status: 404, error: { error: 'no such' } })),
+                replayInvestigation: () =>
+                    throwError(() => new HttpErrorResponse({ status: 404, error: { error: 'no such' } })),
+            },
+        });
+        fixture.detectChanges();
+        for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r));
+        expect(fixture.componentInstance.investigation.error()).toContain('not available');
         expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
     });
 
