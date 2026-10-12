@@ -17,7 +17,9 @@ class DemoUsersConflictTest {
         Path b = Files.createDirectories(root.resolve("telco-ra").resolve("config"));
         Files.writeString(a.resolve(DemoUsers.FILE), "users[1]{id,roles}:\n  admin,admin\n");
         Files.writeString(b.resolve(DemoUsers.FILE), "users[1]{id,roles}:\n  admin,operations\n");
-        IllegalStateException e = assertThrows(IllegalStateException.class, () -> DemoUsers.all(root));
+        com.gamma.spi.auth.ApiException e = assertThrows(com.gamma.spi.auth.ApiException.class, () -> DemoUsers.all(root));
+        assertEquals(409, e.status);
+        assertEquals("DEMO_ROSTER_CONFLICT", e.errorCode);
         assertTrue(e.getMessage().contains("'admin'"), e.getMessage());
         assertTrue(e.getMessage().contains("'acme'") && e.getMessage().contains("'telco-ra'"), e.getMessage());
     }

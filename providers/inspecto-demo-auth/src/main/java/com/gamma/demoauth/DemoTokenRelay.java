@@ -21,6 +21,25 @@ public final class DemoTokenRelay implements TokenRelay {
 
     public DemoTokenRelay() {
         LoopbackOnly.require();
+        warnIfRosterConflicts();
+    }
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(DemoTokenRelay.class);
+
+    /**
+     * Startup: a roster conflict is logged as one unmissable block, and the server KEEPS SERVING (a demo is
+     * a dev/eval build; every sign-in surface answers the same typed 409 until the operator fixes it).
+     */
+    static void warnIfRosterConflicts() {
+        try {
+            known();
+        } catch (com.gamma.spi.auth.ApiException e) {
+            if (DemoUsers.ROSTER_CONFLICT.equals(e.errorCode))
+                LOG.error("\n==================== DEMO SIGN-IN IS DISABLED ====================\n{}\n"
+                        + "No Demo User can sign in until this is fixed. The server is still running.\n"
+                        + "=================================================================", e.getMessage());
+            else throw e;
+        }
     }
 
     @Override
@@ -50,6 +69,8 @@ public final class DemoTokenRelay implements TokenRelay {
         Map<String, Object> auth = new LinkedHashMap<>();
         auth.put("mock", true);
         auth.put("demoUsers", users);
+        // An empty picker with zero Spaces attached is a dead end the sign-in page must explain.
+        auth.put("spacesAttached", DemoUsers.spacesAttached());
         return auth;
     }
 

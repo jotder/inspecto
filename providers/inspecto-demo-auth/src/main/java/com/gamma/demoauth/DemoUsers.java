@@ -1,5 +1,6 @@
 package com.gamma.demoauth;
 
+import com.gamma.spi.auth.ApiException;
 import com.gamma.util.ToonHelper;
 
 import java.nio.file.Files;
@@ -29,6 +30,9 @@ import java.util.Set;
 final class DemoUsers {
 
     static final String FILE = "demo-users.toon";
+
+    /** Machine-readable code of the 409 a conflicting roster answers (bootstrap, sign-in, every API call). */
+    static final String ROSTER_CONFLICT = "DEMO_ROSTER_CONFLICT";
 
     /** One Demo User. {@code roles} are lower-cased, like the role table's keys. */
     record User(String id, String displayName, String title, Set<String> roles, String landing) {}
@@ -69,7 +73,8 @@ final class DemoUsers {
 
     /**
      * Every Space's Demo Users under {@code -Dspaces.root}, keyed by id — what the sign-in picker lists.
-     * A duplicate id across Spaces is refused: one id must mean one person on the picker.
+     * A duplicate id across Spaces that differs is refused with a typed 409 {@link #ROSTER_CONFLICT}: one id must
+     * mean one person on the picker. The message names the user and both Space ids, never a path.
      */
     static Map<String, User> all(Path spacesRoot) {
         Map<String, User> byId = new LinkedHashMap<>();
@@ -82,8 +87,10 @@ final class DemoUsers {
                     User prior = byId.putIfAbsent(u.id(), u);
                     spaceOf.putIfAbsent(u.id(), name);
                     if (prior != null && !prior.equals(u))
-                        throw new IllegalStateException("Demo User '" + u.id() + "' is defined differently in Spaces '"
-                                + spaceOf.get(u.id()) + "' and '" + name + "'");
+                        throw new ApiException(409, ROSTER_CONFLICT, "Demo User '" + u.id()
+                                + "' is defined differently in Spaces '" + spaceOf.get(u.id()) + "' and '" + name
+                                + "'. Make that user's row in config/demo-users.toon identical in both Spaces, "
+                                + "or attach only one of them to this demo, then restart.");
                 }
             }
         } catch (java.io.IOException e) {
@@ -98,5 +105,21 @@ final class DemoUsers {
 
     private static String orElse(String v, String d) {
         return v == null ? d : v;
+    }
+
+    /** How many Spaces are attached (directories under {@code -Dspaces.root}; 1 for a legacy write root, else 0). */
+    static int spacesAttached() {
+        String spaces = System.getProperty("spaces.root");
+        if (spaces != null && !spaces.isBlank()) {
+            Path root = Path.of(spaces.trim());
+            if (!Files.isDirectory(root)) return 0;
+            try (var dirs = Files.list(root)) {
+                return (int) dirs.filter(Files::isDirectory).count();
+            } catch (java.io.IOException e) {
+                return 0;
+            }
+        }
+        String wr = System.getProperty("assist.write.root");
+        return wr != null && !wr.isBlank() ? 1 : 0;
     }
 }
