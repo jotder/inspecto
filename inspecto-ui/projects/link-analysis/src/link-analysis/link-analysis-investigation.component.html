@@ -782,7 +782,7 @@
                 <button
                     mat-stroked-button
                     class="ml-auto"
-                    [disabled]="!canWrite() || store.busy()"
+                    [disabled]="store.busy()"
                     (click)="store.replay(reread() && !store.activeDraftId())"
                 >
                     Replay

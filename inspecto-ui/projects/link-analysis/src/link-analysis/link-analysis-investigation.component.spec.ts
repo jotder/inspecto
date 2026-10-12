@@ -344,6 +344,31 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         expect(el.textContent).toContain('a Draft has no re-read of current data');
     });
 
+    it('read-only: Replay and the Re-read (drift check) stay usable and call the service; mutating buttons stay disabled', async () => {
+        const { fixture, store, el, inv, button } = create({ canManage: false });
+        await openInv(store);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const reread = el.querySelector('[aria-label="Replay"] input[type="checkbox"]') as HTMLInputElement;
+        expect(reread.disabled).toBe(false);
+        expect(button('Replay').disabled).toBe(false);
+        expect((el.querySelector('[aria-label="Undo the latest step"]') as HTMLButtonElement).disabled).toBe(true);
+        expect(button('Re-order steps').disabled).toBe(true);
+        inv.replayInvestigation.mockClear();
+        inv.replayInvestigation.mockReturnValue(
+            of({ workingSet: WS, equivalent: true, mismatches: [], reread: false, drift: [], diverged: false }),
+        );
+        button('Replay').click();
+        await fixture.whenStable();
+        expect(inv.replayInvestigation).toHaveBeenCalledTimes(1);
+        reread.click();
+        fixture.detectChanges();
+        button('Replay').click();
+        await fixture.whenStable();
+        expect(inv.replayInvestigation).toHaveBeenLastCalledWith('inv-1', expect.objectContaining({ reread: true }));
+    });
+
     it('does not offer Pin to a Widget when the shell has no Widget library (LA_WIDGETS.available false)', async () => {
         const { fixture, store, el } = create({ noWidgetLibrary: true });
         await openInv(store);

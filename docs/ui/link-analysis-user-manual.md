@@ -382,7 +382,8 @@ decided by any approver. *All decisions* lists the ones already approved or deni
 ### 9.3 Replay, drift and fork
 
 * **Replay** re-checks that the log still produces the recorded Working Set. **Re-read** re-runs each recorded query
-  and shows **drift** — what changed in the data since you did it.
+  and shows **drift** — what changed in the data since you did it. Both stay available when you can only read (a
+  reviewer): they change nothing, so a read-only role can check an Investigation.
 * **Re-order** steps creates a **fork**: a new Investigation showing its parent; the original stays untouched.
 
 **Members.** Under the Investigation's header, **Members** lists who works on it, each with a role chip (lead, analyst,

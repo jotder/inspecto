@@ -751,7 +751,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   (D-E4): `/{id}/reorder` creates a new Investigation whose header names its parent and order; the
   original log, its per-step Working Sets and any snapshot anchored to them stay byte-identical. The log and
   Working Sets live in the snapshot store (D-E2, `audit/snapshots/investigations/<id>/`). Access is
-  **owner-only** (a non-owner reads 404), writes need `canManageIncidents`, and a bound Dataset shared away
+  **owner-only** (a non-owner reads 404), writes need `canManageIncidents` (Replay and Re-read are read-shaped and stay enabled read-only), and a bound Dataset shared away
   from the caller makes the Investigation read as absent.
 * **Case-team sharing** (LA-24, decision D-U10, shipped 2026-09-30; `InvestigationCaseRoutes`). An
   Investigation may carry an OPTIONAL `caseRef` — `caseRef` on create, `PUT`/`DELETE /inv/investigations/{id}/case`
