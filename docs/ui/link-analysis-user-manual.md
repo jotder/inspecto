@@ -22,7 +22,8 @@ It answers questions such as:
 * Which agent till takes most of the cash-out, and from how many different payers?
 * Which subscribers share a device or partner and might be one person (**split identity**)?
 
-**Where:** *Studio → Link Analysis* (`/studio/link-analysis`).
+**Where:** *Studio → Link Analysis* (`/studio/link-analysis`), or the standalone **Link Analysis** application
+(§2, *The standalone application*).
 **Editions:** Professional and Enterprise. In Personal the page says it is not installed.
 **You need:** to be signed in. Reading and exploring need nothing special; changing things needs the
 capabilities listed in §11.
@@ -49,7 +50,7 @@ your saved views. The steps below are the same thing done by hand.
 **Investigate a number:** the fourth card takes an MSISDN (6 to 15 digits, an optional `+`). It opens the same
 flow as the deep link `/studio/link-analysis?seed=<id>&entityType=msisdn[&dataset=<datasetId>]`, which an
 Incident or Case page offers as **Investigate … in Link Analysis** when a keyed Alert Rule recorded the number
-(`key.msisdn`-style attribute). The Telecom profile binds the Dataset `telecom_links` (`a_msisdn` → `b_msisdn`, link
+(`key.msisdn`-style attribute). The Telecom profile binds the Dataset `telecom_links_dataset` (`a_msisdn` → `b_msisdn`, link
 kind `link_kind`, time `last_seen`); `dataset=` names another one. The Investigation tab asks only the purpose (the
 title is pre-filled *Suspect &lt;id&gt;*); **Investigate** then creates the Investigation, seeds the number and expands
 two degrees. **Expand next degree** goes one hop further from the outermost entities, up to degree 4, with the
@@ -69,8 +70,23 @@ chips hide or show each kind of link on the canvas.
 5. Save what you found: **Save the current view** (keep the setup) or **Save this analysis** (seal a snapshot
    you can attach to a Case).
 
-**Shortcut:** open **Open saved views** and load a ready-made one — the demo Space ships `mule_layering_ring`,
-`mule_structuring`, `roaming_imsi_footprint` and others.
+**Shortcut:** open **Open saved views** and load a ready-made one — the `la-showcase` Space Template ships
+`mule_layering_ring`, `mule_structuring`, `mule_large_transfers` and `telecom_fraud_network`; the `demo` Space ships
+`roaming_imsi_footprint` and others.
+
+### The standalone application
+
+Link Analysis also runs as its own application, without the rest of the studio. After sign-in its front page offers
+three areas — **Link Analysis**, **Geo** and **Entity Lists** — and the same three sit in the slim menu down the
+left edge (with the Space switcher and your user menu). A user who may change Link Analysis settings also sees
+**Settings** there.
+
+* **Sign-in.** A secured installation shows *Sign in with SSO*. A demonstration installation instead shows
+  *Inspecto demonstration*, a warning *Demo sign-in — Not secure, local only*, and one button per **Demo User**
+  (name and title). Pick one; there is no password. The `la-showcase` Space Template defines five: *Demo Admin*
+  (also holds the settings role), *Demo FM Analyst* (fraud analyst, lead), *Demo FM Manager* (fraud manager, the
+  second approver for four-eyes), *Demo RA Analyst* and *Demo Manager* (both view-only, §11).
+* **When sign-in cannot start**, the page says so instead of showing a picker — see §13.
 
 ---
 
@@ -153,6 +169,12 @@ condition*).
   from indicators** reads the profile's indicators Dataset); its answer is a ranked table (score, raw, own,
   contributors) whose *Factors* expand to the contributing origins. The footer's **Installed modules** lists the Link Analysis modules
   and whether each is active, inert (with the reason), switched off in this Space, or not installed.
+* Each server read says where it was answered: *Answered from the link index v3* (with a stale note when rows were
+  added after the build) or *Answered from the Dataset because …*, with the reason in words — the index is switched
+  off for this Space, the Dataset has no index yet, the index was built over different columns, the index cannot apply
+  this filter or time zone, the walk is deeper than the index serves, or **the index is older than the Space allows and
+  the Dataset's input files cannot be checked for changes** (reason `stale_unknown`; see *index max age* in §11). The same
+  sentence appears on a sealed expand step. An unrecognised reason is shown as sent, never hidden.
 * Very busy hub nodes are folded into a **super-node** so they do not hide everything else.
 * Above 20 links on the canvas, link labels are hidden (shown on hover or click) to keep the picture readable; *All link labels* in the Display menu overrides it.
 
@@ -212,7 +234,7 @@ flagged, and Compute risk is then held - an incomplete score map would understat
   looked up on the server (`POST /inv/case-history`), which resolves the alias itself and never shows the number:
   titles show the alias instead; an alias the server no longer knows (it restarted) says so; an id too short or of another Entity Type, a busy server (*Too many lookups*) or any other
   failure is stated in the section, and reopening it tries again.
-* **Actions** — **Add to watch / block list** (one button per watch or block list of the node's Entity Type that does
+* **Actions** — **Add to watch list: …** / **Add to block list: …** (one button per watch or block list of the node's Entity Type that does
   not already hold it) asks for a reason first; a list under four-eyes answers *Waiting for approval* and nothing is
   written until a second person approves. The buttons need *Manage incidents*; without it they are disabled and the
   dialog says so. **Hide on canvas** (exploration only) takes the node and its links off the canvas; it changes no
@@ -323,7 +345,7 @@ it is given to.
 |---|---|
 | **seed** | Put starting entities into the Working Set (by id, or from an Entity List). |
 | **expand** | Follow links one hop. Options (the *hop ladder*): direction, link kinds, time **window**, minimum events / distinct days, candidate degree bounds, fan-out cap, **budget**, and a **hub threshold** (default 500, set per Space): an entity this step adds with more distinct contacts is added but flagged *high connectivity* and not expanded further unless you name it in `expandHubs` (or send `includeHubs`); an entity already in the Working Set is never newly flagged. Minimum events, the fan-out ranking and the budget order use the `eventsCol` sum when one is bound (§9.1). |
-| **window** | Set the time range later expands inherit. |
+| **window** | Set the time range later expands inherit: from / to, slot, days of the week and **Excluded dates (holidays)** — a date, `FROM..TO`, or a yearly rule `*-MM-DD`, `*-MM-DOW#N` (the Nth weekday of a month, e.g. `*-11-THU#4`) or `*-MM-DOW#L` (the last one, e.g. `*-05-MON#L`), optional `Name=` first, at most 32 rules. |
 | **exclude** | Remove entities — a **reason is required**. Stays excluded. |
 | **hide / keep** | Hide from view only; **keep** protects an entity from exclusion. |
 | **annotate** | Attach a note, with an optional **confidence grade** (NATO/Admiralty, e.g. `B2`), to an entity or a link. |
@@ -349,7 +371,7 @@ Reading a Dataset's links (Explore a Dataset, Follow the money, saved views) is 
 
 **Four-eyes (large expands).** An expand whose budget or fan-out cap is above the Space's four-eyes thresholds
 (**Settings → Link Analysis**) does not run: it answers *Waiting for approval* and is held as a request, one at a time
-per Investigation. Someone **other than you** who holds *Approve link expansions* decides it under **Approvals →
+per Investigation. Someone **other than you** who holds *Approve link expansions* decides it under **Approvals Inbox →
 Link expansions**: each request shows the Investigation, who asked and when, its purpose, why it was held and, in
 plain words, what it will read (frontier, Dataset, direction, link kinds, budget). **Approve** runs it at once as
 your step, sealed with who approved it; **Deny…** takes an optional reason (at most 200 characters) and reads
@@ -377,7 +399,10 @@ different person approves it under Oversight, and nothing is applied until then.
 
 ### 9.4 Working Set and rows
 The **Working Set rows** table lists entities, links or exclusions with paging; it states if it is truncated and at
-which step. **Coverage** shows how much of the world your steps actually looked at.
+which step. **Coverage** (button **Check coverage**) shows which days of the Investigation's window have no rows at all in its
+Dataset (*Days with no data* / *Every day has data*), because an empty result on a missing day says nothing about
+activity. Where the Dataset can tell, a per-Collector table lists days covered and missing days; otherwise the panel
+says *Per-Collector coverage is not assessed for this Dataset.*
 
 ### 9.5 Entity Lists
 Named lists of entities (watch lists, agent tills, accounts of interest) with ranges, network ranges (CIDR) and
@@ -398,7 +423,7 @@ is conservative: if more than one type could claim a value, it stays unmatched a
 
 ### 9.7 Measures and Alert Rules
 * **Measures** strip: entity count, link count, events, excluded count, deepest hop, links by kind.
-* **Watch this measure** creates an **Alert Rule** on an Investigation's Measure. It fires through the normal alert
+* **Watch** on a Measure (Measures strip or Value Measures) creates an **Alert Rule** on an Investigation's Measure. It fires through the normal alert
   path and can open an Incident. It watches the sealed Working Set.
 * **A fired Alert names the Investigation, not the entities.** On the Alerts page, an Alert from an Investigation rule has
   an *Open Investigation* action (it opens Link Analysis on that Investigation). The Alert carries the **count** only, by
@@ -416,10 +441,10 @@ valid. **Watch** is shown only to users who can author Alert Rules. Refusals for
 |---|---|
 | **Pass-through** | Accounts forwarding nearly everything they receive (ratio, with retention = 1 − ratio). |
 | **Velocity** | Accounts that forward money within hours of receiving it. |
-| **Time-to-cash-out** | How fast received money reaches a cash-out. |
+| **Time to cash-out** | How fast received money reaches a cash-out. |
 | **Cash-out concentration** | An agent/till taking a large share of all cash-out, and from how many payers. Can be limited to an **agent Entity List**. |
 | **Structuring** | Payees collecting many in-band legs from several payers. |
-| **Benefit-transfer** | A benefit payment passed on to one counterparty (default: at least 5 recipients). |
+| **Benefit transfer** | A benefit payment passed on to one counterparty (default: at least 5 recipients). |
 | **Value-weighted links** | Total value and count per pair (a weighting, not a test). |
 
 A rule based on one of these is an Alert Rule that fires **once, on the count of breaching entities**, and lists them.
@@ -472,8 +497,12 @@ hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub). *Save this analy
 **Find the cash-out point.** Value Measures → *Cash-out concentration* with cash-out kind `cash_out`: `TILL-06` holds
 97 % of cash-out value from 8 payers (reproduced by `ControlApiLaShowcaseFiguresTest`). *Benefit-transfer* isolates `SKIMMER-01` (6 recipients).
 
-**Check for one person behind two identities.** Load `roaming_imsi_footprint` (212 subscribers). The panel notes
-*1 possible split identity*. In an Investigation open **Identity resolution**, assert the two identifiers, then **resolve**.
+**Check for one person behind two identities.** In the `demo` Space load `roaming_imsi_footprint` (each roaming IMSI
+linked to the visited networks that billed it): IMSI `001010000000042` touches four partners in three days, which
+*Explain node* and *Centrality* surface. Spellings of one operator (the corpus has *Cinder Wireless* written four ways)
+are merged into one node automatically; for two different identifiers of one person (a phone number and a SIM), open an
+Investigation, use **Identity resolution** to assert them, then **resolve**. *(Unverified: whether the screen
+announces a count of possible split identities.)*
 
 ---
 
@@ -482,10 +511,19 @@ hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub). *Save this analy
 | You want to… | Needs |
 |---|---|
 | Explore, analyse, save a view, export | Sign-in (Builder lens for the studio) |
-| Start an Investigation, run ops, link a Case, create a Case from nodes, save a snapshot to a Case | `canManageIncidents` |
+| Start an Investigation, run ops, Drafts, link a Case, create a Case from nodes, save a snapshot to a Case, add an entity to a watch or block list | `canManageIncidents` |
+| Run a server graph run (*All algorithms (server)*, *Compute risk*) | `canRunLinkGraphAnalysis` |
+| Build a link index | `canBuildLinkIndex` |
+| Approve or deny a held large expand (never your own) | `canApproveLinkExpansions` |
 | Bind an Alert Rule to a Measure | `canAuthorAlertRules` |
 | See entity keys unmasked | `canRevealLinkEntities` (otherwise masked per the Space's setting) |
-| Change Link Analysis settings | `canAuthorWorkbench` |
+| Change Link Analysis settings (and see **Settings** in the standalone app) | `canAuthorWorkbench` |
+
+**Read-only access.** Without `canManageIncidents` you can still read: the Investigation tab says *Changing an
+Investigation needs the Incident management capability - you can read it*, and Seed, Expand, Undo, marks and the Draft
+actions are disabled. In the `la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are in this position (a
+view-only role); *Demo FM Analyst* holds manage-incidents, graph-run, index-build and Alert-Rule authoring;
+*Demo FM Manager* is the second approver; *Demo Admin* also holds `canAuthorWorkbench`.
 
 A refusal shows the server's reason. "Not found" on an Investigation can mean it does not exist, it is not yours, or
 its Dataset is no longer shared with you — the system answers the same for all three on purpose.
@@ -500,8 +538,8 @@ the Selected line keeps them one entity and marks it *(masked)*. After a server 
 **Settings → Link Analysis** sets per-Space limits: the four-eyes thresholds (large expands wait for a second
 person), the merged-traversal cap and the `seedBy` cap. It also shows and, with the authoring capability, changes the
 **masking mode** (`typed`, `all` or `none`, each explained beside the field, with the mode in force), the **link index**
-(whether reads are served from a fresh index, plus its build workers, waiting line and disk budget, and the longest age in hours of an index that may still serve a Dataset whose files cannot be checked for changes - older, the read comes from the Dataset and says so), the default
-**server graph-run budget** (nodes, edges, time, shown with the server's ceilings) the Draft limits and the **embed links** (the default and the longest lifetime in hours, 1 to 8760, the default not above the longest, and the classifications that may not be shared by link; the feature itself is OFF unless the host runs with `-Dla.embed.enabled=true`). It lists the
+(whether reads are served from a fresh index, plus its build workers, waiting line and disk budget, and the longest age in hours of an index that may still serve a Dataset whose files cannot be checked for changes - older, the read comes from the Dataset and says so; default 24 hours), the default
+**server graph-run budget** (nodes, edges, time, shown with the server's ceilings) the Draft limits (default: 50 open per Space, hibernate after 60 minutes, expire after 30 days; the `la-showcase` template sets 10, 60 and 14) and the **embed links** (the default and the longest lifetime in hours, 1 to 8760, the default not above the longest, and the classifications that may not be shared by link; the feature itself is OFF unless the host runs with `-Dla.embed.enabled=true`; defaults 72 h and 720 h). Embed links are an API feature only: there is no screen to mint or open one yet. It lists the
 Entity Types in force and names the active Investigation store (filesystem or PostgreSQL) read only. Without the
 capability every field is read only.
 
@@ -528,6 +566,15 @@ capability every field is read only.
 | Merged step refused | No **resolve** is in force at that point — add one first. |
 | Two accounts that are one person appear separately | Assert an identity (§9.6); near-duplicate spellings are merged automatically. |
 | Link Analysis menu missing | Personal edition, or the module is not installed. |
+| Sign-in page: **The server could not start a session** | The server answered an error when the page asked how to sign in (for example two Spaces define the same Demo User differently: *Demo User '…' is defined differently in Spaces '…' and '…'*). The page shows the server's message and **Try again**; fix the configuration, then reload. No picker or SSO button is shown meanwhile. |
+| Sign-in page: **Single sign-on isn't set up** | SSO has not been configured on this installation; ask the administrator. |
+| Sign-in page: **Sign-in failed — We couldn't complete sign-in. Please try again.** | The sign-in did not complete; try again. |
+| *The server requires sign-in, but this page started without a session. Reload to sign in.* | Your session ended or the server's edition changed under an open page; reload. |
+| *No Space is attached - drop a Space folder into the spaces root … or create one in Settings -> Spaces* (503) | The installation hosts no Space; an administrator must add or create one. |
+| *Changing an Investigation needs the Incident management capability - you can read it.* | Your role is read-only (§11). Ask for `canManageIncidents`. |
+| *That is over a size limit, so nothing was stored.* (413) | The step or Investigation passed its size limit. Narrow the step (fewer seeds, a shorter window) or fork a smaller Investigation; an administrator can raise the limit. |
+| *Too many requests…* (429) | Link Analysis allows a burst of 20 requests per user, then one every 3 seconds. Wait and retry. |
+| Waiting for approval | A large expand is held for four-eyes (§9.2); a second person decides it. |
 
 ## 14. Vocabulary
 
