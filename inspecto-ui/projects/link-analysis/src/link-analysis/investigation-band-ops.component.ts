@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { LensService } from '@inspecto/core/api';
 import {
     AbstractControl,
     FormControl,
@@ -110,7 +111,7 @@ export function thresholdForm() {
                 @if (form.hasError('order') && form.touched) {
                     <p class="text-warn m-0 text-xs" role="alert">The minimum must be less than the maximum.</p>
                 }
-                <button mat-stroked-button type="submit" class="self-start" [disabled]="store.busy()">
+                <button mat-stroked-button type="submit" class="self-start" [disabled]="!canWrite() || store.busy()">
                     Apply threshold
                 </button>
             </form>
@@ -122,6 +123,8 @@ export function thresholdForm() {
 })
 export class InvestigationThresholdOpComponent {
     readonly store = inject(InvestigationSessionStore);
+    private readonly lens = inject(LensService);
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
     readonly form = thresholdForm();
     readonly measures = THRESHOLD_MEASURES;
     readonly error = signal('');
@@ -172,7 +175,7 @@ export class InvestigationThresholdOpComponent {
                         <mat-error>At most {{ max }} characters.</mat-error>
                     }
                 </mat-form-field>
-                <button mat-stroked-button type="submit" class="self-start" [disabled]="store.busy()">
+                <button mat-stroked-button type="submit" class="self-start" [disabled]="!canWrite() || store.busy()">
                     Mark this position
                 </button>
             </form>
@@ -184,6 +187,8 @@ export class InvestigationThresholdOpComponent {
 })
 export class InvestigationSnapshotOpComponent {
     readonly store = inject(InvestigationSessionStore);
+    private readonly lens = inject(LensService);
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
     readonly max = MAX_SNAPSHOT_LABEL;
     readonly form = new FormGroup({
         label: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(MAX_SNAPSHOT_LABEL)] }),

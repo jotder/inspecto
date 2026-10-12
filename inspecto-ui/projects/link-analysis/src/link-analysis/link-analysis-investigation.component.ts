@@ -10,6 +10,7 @@ import {
     signal,
     viewChild,
 } from '@angular/core';
+import { LensService } from '@inspecto/core/api';
 import {
     FormControl,
     FormGroup,
@@ -129,6 +130,9 @@ export class LinkAnalysisInvestigationComponent {
     private inv = inject(InvService);
     private widgets = inject(LA_WIDGETS);
     private confirm = inject(InspectoConfirmService);
+    private lens = inject(LensService);
+    /** Steps, Undo, marks and Drafts are gated server-side on `canManageIncidents`; the tab asks the same question. */
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
     private laSettings = inject(LinkAnalysisSettingsService);
     /** The shell has a Widget library to pin into (la-app has none: the section is not offered). */
     protected readonly canPin = this.widgets.available !== false;

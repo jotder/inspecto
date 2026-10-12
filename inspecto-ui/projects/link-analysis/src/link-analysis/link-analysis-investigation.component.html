@@ -266,6 +266,11 @@
             <button mat-stroked-button (click)="store.forget(store.activeId()!)">Forget this Investigation</button>
         }
 
+        @if (!canWrite()) {
+            <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
+                Changing an Investigation needs the Incident management capability - you can read it.
+            </inspecto-alert>
+        }
         @if (store.activeDraftId(); as draft) {
             <inspecto-alert variant="info" title="Working on a Draft">
                 Steps and Undo go to Draft <code>{{ draft }}</code
@@ -436,12 +441,12 @@
                     }
                 </div>
                 <div class="flex flex-wrap gap-1">
-                    <button mat-stroked-button [disabled]="store.busy()" (click)="seed()">Seed</button>
+                    <button mat-stroked-button [disabled]="!canWrite() || store.busy()" (click)="seed()">Seed</button>
                     @if (selectedHubs().length && !includeHubs() && !isOverridden(selectedHubs()[0])) {
                         <button
                             mat-stroked-button
                             data-testid="selected-expand-anyway"
-                            [disabled]="store.busy()"
+                            [disabled]="!canWrite() || store.busy()"
                             (click)="expandAnyway(selectedHubs()[0])"
                         >
                             Expand anyway
@@ -449,7 +454,7 @@
                     } @else {
                         <button
                             mat-stroked-button
-                            [disabled]="store.busy() || !selectedInSet().length"
+                            [disabled]="!canWrite() || store.busy() || !selectedInSet().length"
                             (click)="expand()"
                         >
                             Expand one hop
@@ -457,14 +462,14 @@
                     }
                     <button
                         mat-stroked-button
-                        [disabled]="store.busy() || !selectedInSet().length"
+                        [disabled]="!canWrite() || store.busy() || !selectedInSet().length"
                         (click)="mark('keep')"
                     >
                         Keep
                     </button>
                     <button
                         mat-stroked-button
-                        [disabled]="store.busy() || !selectedInSet().length"
+                        [disabled]="!canWrite() || store.busy() || !selectedInSet().length"
                         (click)="mark('hide')"
                     >
                         Hide
@@ -479,7 +484,7 @@
                         <mat-error>At most 200 characters.</mat-error>
                     }
                 </mat-form-field>
-                <button mat-stroked-button [disabled]="store.busy() || !selectedInSet().length" (click)="exclude()">
+                <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !selectedInSet().length" (click)="exclude()">
                     Exclude
                 </button>
                 <!-- LA-19: a note changes nothing about traversal, display or counts -->
@@ -501,7 +506,7 @@
                         <mat-error>At most 2000 characters.</mat-error>
                     }
                 </mat-form-field>
-                <button mat-stroked-button [disabled]="store.busy() || !selectedInSet().length" (click)="annotate()">
+                <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !selectedInSet().length" (click)="annotate()">
                     Annotate
                 </button>
             } @else {
@@ -512,7 +517,7 @@
             }
             <button
                 mat-button
-                [disabled]="store.busy() || !counts().entities"
+                [disabled]="!canWrite() || store.busy() || !counts().entities"
                 (click)="expand(true)"
                 matTooltip="Expand one hop from every entity in the Working Set (at most 1 000)"
             >
@@ -533,7 +538,7 @@
                 <button
                     mat-button
                     class="ml-auto"
-                    [disabled]="store.busy() || !store.canUndo()"
+                    [disabled]="!canWrite() || store.busy() || !store.canUndo()"
                     (click)="store.undo()"
                     aria-label="Undo the latest step"
                 >
@@ -629,7 +634,7 @@
                         <mat-error>At most 2000 characters.</mat-error>
                     }
                 </mat-form-field>
-                <button mat-stroked-button [disabled]="store.busy() || !linkPick()" (click)="annotateLink()">
+                <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !linkPick()" (click)="annotateLink()">
                     Annotate link
                 </button>
             </section>
@@ -732,7 +737,7 @@
                     <button
                         mat-flat-button
                         color="primary"
-                        [disabled]="store.busy() || !orderChanged()"
+                        [disabled]="!canWrite() || store.busy() || !orderChanged()"
                         (click)="createFork()"
                     >
                         Create fork
@@ -742,7 +747,7 @@
             } @else {
                 <button
                     mat-button
-                    [disabled]="store.busy() || store.effectiveSteps().length < 2 || !!store.activeDraftId()"
+                    [disabled]="!canWrite() || store.busy() || store.effectiveSteps().length < 2 || !!store.activeDraftId()"
                     (click)="beginReorder()"
                 >
                     Re-order steps (creates a fork)…
@@ -769,7 +774,7 @@
                 <button
                     mat-stroked-button
                     class="ml-auto"
-                    [disabled]="store.busy()"
+                    [disabled]="!canWrite() || store.busy()"
                     (click)="store.replay(reread() && !store.activeDraftId())"
                 >
                     Replay

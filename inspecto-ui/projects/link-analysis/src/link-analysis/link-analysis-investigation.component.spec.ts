@@ -116,7 +116,7 @@ const COVERAGE: InvestigationCoverage = {
 const refused = (message: string) =>
     throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } }));
 
-function create(opts: { noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: () => Promise<boolean> } = {}) {
+function create(opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: () => Promise<boolean> } = {}) {
     const inv = {
         createInvestigation: vi.fn(() => of(LOG.header)),
         investigationLog: vi.fn(() => of(LOG)),
@@ -177,7 +177,7 @@ function create(opts: { noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: ()
                       },
                   ]
                 : []),
-            { provide: LensService, useValue: { canManageIncidents: signal(true) } },
+            { provide: LensService, useValue: { canManageIncidents: signal(opts.canManage ?? true) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
@@ -218,6 +218,28 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledWith(expect.objectContaining({ timeCol: 'booked_at' }));
+    });
+
+    it('without the Incident management capability the write controls are disabled and say why', async () => {
+        const { fixture, store, el, button } = create({ canManage: false });
+        await openInv(store);
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
+            'needs the Incident management capability',
+        );
+        for (const label of ['Seed', 'Expand the whole Working Set', 'Undo', 'Mark this position', 'Fork a Draft']) {
+            expect(button(label)?.disabled, label).toBe(true);
+        }
+    });
+
+    it('with the capability the read-only note is absent and Seed is enabled', async () => {
+        const { fixture, store, el, button } = create();
+        await openInv(store);
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="investigation-read-only"]')).toBeNull();
+        expect(button('Seed').disabled).toBe(false);
     });
 
     it('start state: explains the binding, starts from the projection, and passes axe', async () => {

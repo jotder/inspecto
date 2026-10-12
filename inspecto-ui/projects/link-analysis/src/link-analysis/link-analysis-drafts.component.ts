@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { LensService } from '@inspecto/core/api';
 import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -78,7 +79,7 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
         >
             <div class="flex items-center gap-2">
                 <h3 class="m-0 text-sm font-semibold">Drafts</h3>
-                <button mat-stroked-button [disabled]="busy()" (click)="fork()">Fork a Draft</button>
+                <button mat-stroked-button [disabled]="busy() || !canWrite()" (click)="fork()">Fork a Draft</button>
             </div>
             @if (error()) {
                 <inspecto-alert variant="error" title="Drafts">{{ error() }}</inspecto-alert>
@@ -133,9 +134,9 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                             }
                             <button mat-button [disabled]="busy()" (click)="showWorkingSet(d)">Working Set</button>
                             <button mat-button [disabled]="busy()" (click)="showConflicts(d)">Conflicts</button>
-                            <button mat-button [disabled]="busy()" (click)="rebase(d)">Rebase</button>
-                            <button mat-stroked-button [disabled]="busy()" (click)="promote(d)">Promote</button>
-                            <button mat-button [disabled]="busy()" (click)="discard(d)">Discard</button>
+                            <button mat-button [disabled]="busy() || !canWrite()" (click)="rebase(d)">Rebase</button>
+                            <button mat-stroked-button [disabled]="busy() || !canWrite()" (click)="promote(d)">Promote</button>
+                            <button mat-button [disabled]="busy() || !canWrite()" (click)="discard(d)">Discard</button>
                         </div>
                     }
                     @if (sizes()[d.draftId]; as s) {
@@ -180,6 +181,8 @@ export class LinkAnalysisDraftsComponent {
     readonly refreshOn = input<unknown>(null);
 
     private readonly inv = inject(InvService);
+    private readonly lens = inject(LensService);
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
 
     readonly drafts = signal<InvestigationDraft[]>([]);
     readonly hidden = signal(false);
