@@ -233,6 +233,9 @@ class ControlApiInvestigationEmbedTest {
             assertTrue(d.toHours() >= 23 && d.toHours() <= 24, "the Space's default applies: " + d);
             assertEquals(200, status(c, "POST", INV + "/embeds", "{\"ttl_hours\":48}", L));
             assertEquals(422, status(c, "POST", INV + "/embeds", "{\"ttl_hours\":49}", L), "above the Space's cap");
+            settings(root, null, new LinkAnalysisSettings.Embed(null, 2000, null));   // the Space RAISES the cap above the 30 d default
+            assertEquals(200, status(c, "POST", INV + "/embeds", "{\"ttl_hours\":2000}", L));
+            assertEquals(422, status(c, "POST", INV + "/embeds", "{\"ttl_hours\":2001}", L), "still refused above the Space's cap, never clamped");
         }
     }
 

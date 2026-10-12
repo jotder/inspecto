@@ -1325,8 +1325,8 @@ public final class ConfigSpecs {
                                 + "always longer than the hibernation; every key absent = the shipped default."),
                 FieldSpec.of("embed", "Embedded Investigation links", FieldType.MAP,
                         "Read-only embed links to one Investigation (LA-EMBED-VIEW-1): default_ttl_hours = the lifetime of a link whose mint "
-                                + "states none (1..720; absent = 72); max_ttl_hours = the longest a link may live, a longer request is refused "
-                                + "with 422 (1..720 - a Space may tighten the 30-day ceiling, never raise it; absent = 720); "
+                                + "states none (1..8760; absent = 72, never above the cap); max_ttl_hours = the longest a link may live, a longer request is refused "
+                                + "with 422 (1..8760 = 365 days; absent = 720 = 30 days); "
                                 + "refuse_classifications = column classifications (strictest of the bound source/target columns) for which "
                                 + "minting is refused with 422 (absent = none); every key absent = the shipped default.")
         );

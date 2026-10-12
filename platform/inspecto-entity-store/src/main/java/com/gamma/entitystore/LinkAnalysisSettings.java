@@ -65,14 +65,16 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * The embedded-Investigation link knobs (LA-EMBED-VIEW-1, operator 2026-10-12 D4; {@code embed} in {@code link-analysis.toon}):
      * {@code defaultTtlHours} - the lifetime of a link whose mint states none (default {@link #DEFAULT_TTL_HOURS}, 72 h);
      * {@code maxTtlHours} - the longest a link may live, a larger request is refused with 422 (default and CEILING
-     * {@link #CEILING_TTL_HOURS}, 30 d: a Space may tighten it, never raise it); {@code refuseClassifications} - column
+     * {@link #DEFAULT_MAX_TTL_HOURS}, 30 d; a Space admin may set it from 1 up to the validation ceiling {@link #CEILING_TTL_HOURS}, 365 d); {@code refuseClassifications} - column
      * classifications (the strictest of the Investigation's bound source/target columns, strictest-wins) for which minting is
      * refused with 422 (default none). Every field is optional ({@code null} = the shipped default).
      */
     public record Embed(Integer defaultTtlHours, Integer maxTtlHours, List<String> refuseClassifications) {
         public static final Embed NONE = new Embed(null, null, null);
         public static final int DEFAULT_TTL_HOURS = 72;
-        public static final int CEILING_TTL_HOURS = 30 * 24;
+        public static final int DEFAULT_MAX_TTL_HOURS = 30 * 24;
+        /** The hard validation ceiling of {@code max_ttl_hours} (365 d): a Space may raise its cap above the 30 d default, never past this. */
+        public static final int CEILING_TTL_HOURS = 365 * 24;
 
         public Embed {
             refuseClassifications = refuseClassifications == null ? null : List.copyOf(refuseClassifications);
@@ -82,9 +84,9 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             return defaultTtlHours == null && maxTtlHours == null && refuseClassifications == null;
         }
 
-        /** The longest a link may live, in hours: the stated cap, else {@link #CEILING_TTL_HOURS}. */
+        /** The longest a link may live, in hours: the stated cap, else {@link #DEFAULT_MAX_TTL_HOURS}. */
         public int maxTtlHoursInForce() {
-            return maxTtlHours != null ? maxTtlHours : CEILING_TTL_HOURS;
+            return maxTtlHours != null ? maxTtlHours : DEFAULT_MAX_TTL_HOURS;
         }
 
         /** The lifetime of a link whose mint states none: the stated default, else 72 h, never above the cap in force. */
@@ -374,7 +376,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
     /**
      * A stored {@code embed} block, else {@code null} = every knob inherits; a bad value inside costs only that knob.
-     * ⚠ A stored cap above {@link Embed#CEILING_TTL_HOURS} reads as {@code null} (the ceiling): a hand edit cannot raise it. A stored
+     * ⚠ A stored cap above {@link Embed#CEILING_TTL_HOURS} reads as {@code null} (the 30 d default): a hand edit cannot go past the validation ceiling. A stored
      * default above the cap in force is clamped by {@link Embed#defaultTtlHoursInForce}.
      */
     @SuppressWarnings("unchecked")

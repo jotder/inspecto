@@ -364,7 +364,7 @@ final class SettingsRoutes implements RouteModule {
     }
 
     /** The embed-link knobs (LA-EMBED-VIEW-1, D4): absent/null = inherit; {@code defaultTtlHours} and {@code maxTtlHours} are
-     *  1..{@code CEILING_TTL_HOURS} (30 d - a Space may tighten the cap, never raise it), the default may not exceed the cap
+     *  1..{@code CEILING_TTL_HOURS} (365 d; the cap defaults to 30 d and a Space admin may raise it that far), the default may not exceed the cap
      *  in force, {@code refuseClassifications} is a list of at most 20 classification names; each refused (422), never clamped. */
     @SuppressWarnings("unchecked")
     private static LinkAnalysisSettings.Embed embed(Map<String, Object> body) {

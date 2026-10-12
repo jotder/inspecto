@@ -463,8 +463,8 @@ Code: `EmbedGrants` (token, hashing, resolve, revoke, counters), `InvestigationE
 * **Masking follows the Space** (`maskingMode`, D3): the view is `InvestigationRoutes.masked` over the evaluated sealed log - one masking
   path. A link auto-revokes if the Space LOOSENS masking after the mint (a stricter mode never revokes). Reveal, pending expands, drafts,
   the Case, Dataset names and SQL are not in the view.
-* **Expiry** (D4): default 72 h, ceiling 30 d (720 h), `embed.default_ttl_hours` / `embed.max_ttl_hours` in `link-analysis.toon`; a request
-  above the Space's cap is 422, never clamped; a Space may only tighten the ceiling. `embed.refuse_classifications` refuses a mint (422) when the
+* **Expiry** (D4): default 72 h, default cap 30 d (720 h), `embed.default_ttl_hours` / `embed.max_ttl_hours` in `link-analysis.toon`; a request
+  above the Space's cap is 422, never clamped; a Space admin may set `max_ttl_hours` anywhere from 1 h up to the validation ceiling of 8760 h (365 d; 422 above in the Settings API), and `default_ttl_hours` may not exceed it. `embed.refuse_classifications` refuses a mint (422) when the
   strictest classification of the Investigation's bound columns is listed.
 * **Who** (D6/D11): `canShareInvestigation` AND a lead of the Investigation; the Enterprise PDP is asked the new ABAC action `embed`
   (`RowScope.allowed`, resource carries `classification`); `ControlApi.actionFor` maps both routes to `embed`. `-Dla.embed.enabled` (default

@@ -27,7 +27,8 @@ class LinkAnalysisEmbedSettingsTest {
         assertEquals(720, e.maxTtlHoursInForce());
         assertEquals(List.of(), e.refuseClassificationsInForce());
         assertTrue(e.allows(1) && e.allows(720));
-        assertFalse(e.allows(0) || e.allows(721));
+        assertFalse(e.allows(0) || e.allows(721), "the shipped cap is 30 d");
+        assertTrue(read(dir, "embed:\n  max_ttl_hours: 2000\n").effectiveEmbed().allows(2000), "a Space may raise it");
     }
 
     @Test
@@ -42,7 +43,8 @@ class LinkAnalysisEmbedSettingsTest {
 
     @Test
     void aHandEditCannotRaiseTheCeilingAndADefaultAboveTheCapIsClamped(@TempDir Path dir) throws Exception {
-        assertEquals(720, read(dir, "embed:\n  max_ttl_hours: 9000\n").effectiveEmbed().maxTtlHoursInForce(), "above 30 days reads as the ceiling");
+        assertEquals(720, read(dir, "embed:\n  max_ttl_hours: 9000\n").effectiveEmbed().maxTtlHoursInForce(), "above the 365 d ceiling reads as the default");
+        assertEquals(8760, read(dir, "embed:\n  max_ttl_hours: 8760\n").effectiveEmbed().maxTtlHoursInForce());
         assertEquals(24, read(dir, "embed:\n  default_ttl_hours: 100\n  max_ttl_hours: 24\n").effectiveEmbed().defaultTtlHoursInForce(),
                 "a default longer than the cap is the cap");
         assertNull(read(dir, "embed:\n").embed(), "an empty key arrives as {}: no knob");

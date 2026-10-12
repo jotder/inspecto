@@ -505,6 +505,36 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** LA-EMBED-VIEW-1 (D4): the embed-link knobs are a nested block; absent = inherit 72 h / 30 d, a Space may only TIGHTEN the cap, refusals are 422. */
+    @Test
+    void linkAnalysisEmbedRoundTripsAndRefusesBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String path = "/spaces/acme/settings/link-analysis";
+            JsonNode def = json(send(c.port, "GET", path, null));
+            assertTrue(def.get("embed").isNull(), "absent => inherit");
+            assertEquals(72, def.get("embedInForce").get("defaultTtlHours").asInt());
+            assertEquals(720, def.get("embedInForce").get("maxTtlHours").asInt());
+            assertEquals(0, def.get("embedInForce").get("refuseClassifications").size());
+            HttpResponse<String> put = send(c.port, "PUT", path, "{\"embed\":{\"defaultTtlHours\":24,\"maxTtlHours\":168,\"refuseClassifications\":[\"msisdn\",\"IMSI\"]}}");
+            assertEquals(200, put.statusCode(), put.body());
+            String file = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(file.contains("default_ttl_hours: 24") && file.contains("max_ttl_hours: 168") && file.contains("MSISDN"), file);
+            JsonNode got = json(send(c.port, "GET", path, null));
+            assertEquals(24, got.get("embed").get("defaultTtlHours").asInt());
+            assertEquals(168, got.get("embedInForce").get("maxTtlHours").asInt());
+            assertEquals("MSISDN", got.get("embedInForce").get("refuseClassifications").get(0).asText(), "stored upper-case");
+            for (String bad : new String[] {"{\"embed\":{\"maxTtlHours\":8761}}", "{\"embed\":{\"maxTtlHours\":0}}", "{\"embed\":{\"defaultTtlHours\":8761}}",
+                    "{\"embed\":{\"defaultTtlHours\":100,\"maxTtlHours\":50}}", "{\"embed\":{\"defaultTtlHours\":\"x\"}}",
+                    "{\"embed\":{\"refuseClassifications\":\"MSISDN\"}}", "{\"embed\":{\"refuseClassifications\":[\"\"]}}",
+                    "{\"embed\":{\"bogus\":1}}", "{\"embed\":7}"})
+                assertEquals(422, send(c.port, "PUT", path, bad).statusCode(), bad);
+            assertEquals(24, json(send(c.port, "GET", path, null)).get("embed").get("defaultTtlHours").asInt(), "a refused write left the file as it was");
+            assertEquals(200, send(c.port, "PUT", path, "{\"embed\":{\"defaultTtlHours\":72,\"maxTtlHours\":8760}}").statusCode(), "a Space admin may raise the cap to 365 d");
+            assertEquals(8760, json(send(c.port, "GET", path, null)).get("embedInForce").get("maxTtlHours").asInt());
+        }
+    }
+
     /** LA-DRAFT-PROMOTE-COST-1: the Draft lifecycle knobs are a nested block; absent = inherit, refusals are 422 and leave the file as it was. */
     @Test
     void linkAnalysisDraftsRoundTripAndRefuseBadValues(@TempDir Path root) throws Exception {
