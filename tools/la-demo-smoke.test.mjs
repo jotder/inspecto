@@ -371,11 +371,11 @@ function withNewer(inner, f = {}) {
       return res(200, { data: settings });
     }
     if (p.endsWith('/embeds') && init.method === 'POST') {
-      if (f.embedOn) { live.add('t'); return res(200, { data: { token: 'tok-abcdefABCDEF', grantId: 'g1' } }); }
+      if (f.embedOn) { live.add('t'); return res(200, { data: { token: 'tok-abcdefABCDEF', url: '/public/investigations/tok-abcdefABCDEF', grantId: 'g1' } }); }
       return res(503, { error: { errorCode: 'CAPABILITY_UNAVAILABLE' } });
     }
     if (p.endsWith('/revoke')) { live.delete('t'); return res(200, { data: {} }); }
-    if (p.startsWith('/public/investigations/')) {
+    if (p.startsWith('/public/investigations/') && !u.pathname.includes('/spaces/')) {
       const tok = p.split('/').pop();
       if (tok === 'tok-abcdefABCDEF' && live.has('t')) return res(200, { data: {} }, f.badHeaders ? {} : { 'content-security-policy': "frame-ancestors 'none'", 'x-frame-options': 'DENY', 'cache-control': 'no-store' });
       return res(404, { error: { errorCode: 'NOT_FOUND', message: tok === 'tok-abcdefABCDEF' && f.oracle ? 'revoked' : 'not found' } });
@@ -388,7 +388,7 @@ const runN = async (f, extra = {}) => {
   const fx = withNewer(async () => ({ ok: false, status: 500, json: async () => ({}), headers: { get: () => null } }), f);
   const pack = async (r) => { const b = await r.json().catch(() => null); return { status: r.status, body: b, data: b && 'data' in b ? b.data : b, headers: r.headers }; };
   const call = (user, method, p, body) => fx(`http://x/api/v1/spaces/s${p}`, { method, headers: user ? { authorization: `Bearer demo:${user}` } : {}, body: body === undefined ? undefined : JSON.stringify(body) }).then(pack);
-  await runNewer({ ...extra, call, pub: (p) => call(null, 'GET', p), boot: () => fx('http://x/api/v1/bootstrap', { method: 'GET' }).then(pack),
+  await runNewer({ ...extra, call, pub: (p) => fx(`http://x/api/v1${p}`, { method: 'GET' }).then(pack), boot: () => fx('http://x/api/v1/bootstrap', { method: 'GET' }).then(pack),
     record: (id, reason) => out.push({ id, ok: !reason, reason }), skip: (id, reason) => out.push({ id, ok: true, skipped: true, reason }) });
   return out;
 };

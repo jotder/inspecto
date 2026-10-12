@@ -360,7 +360,7 @@ export function bootstrapVerdict(res) {
 /** Mangle a token (change its last character) so it can no longer verify. */
 export const mangleToken = (t) => t.slice(0, -1) + (t.endsWith('A') ? 'B' : 'A');
 
-/** The newer-behaviour probes. `call(user, method, path, body)` as in run(); `pub(path)` = unauthenticated Space GET returning headers;
+/** The newer-behaviour probes. `call(user, method, path, body)` as in run(); `pub(path)` = unauthenticated GET under /api/v1 (NOT space-scoped) returning headers;
  *  `boot()` = unauthenticated GET /bootstrap. Writes nothing to seeded data (the embed mint/revoke pair is the one write). */
 export async function runNewer({ call, pub, boot, record, skip, embed = false, inv = INV }) {
   const base = `/inv/investigations/${inv}`;
@@ -402,15 +402,15 @@ export async function runNewer({ call, pub, boot, record, skip, embed = false, i
       skip(darkId, `the server answered ${minted.status}, not 503: the feature looks enabled; pass --embed`);
       if (minted.status === 200 && minted.data && minted.data.grantId) await call('admin', 'POST', `${base}/embeds/${minted.data.grantId}/revoke`, {});
     }
-  } else if (minted.status !== 200 || !minted.data || !minted.data.token) {
+  } else if (minted.status !== 200 || !minted.data || !minted.data.url) {
     record('embed: admin mints a link', `${excerpt(minted)} (does the host run -Dla.embed.enabled=true, and is admin a lead of ${inv}?)`);
   } else {
-    const { token, grantId } = minted.data;
-    record('embed: public GET (no Authorization) is 200 with frame-ancestors none, DENY, no-store', publicViewVerdict(await pub(`/public/investigations/${token}`)));
-    const mangled = await pub(`/public/investigations/${mangleToken(token)}`);
+    const { grantId } = minted.data;
+    record('embed: public GET (no Authorization) is 200 with frame-ancestors none, DENY, no-store', publicViewVerdict(await pub(minted.data.url)));
+    const mangled = await pub(mangleToken(minted.data.url));
     const revoke = await call('admin', 'POST', `${base}/embeds/${grantId}/revoke`, {});
     record('embed: lead revokes the link', revoke.status === 200 ? null : excerpt(revoke));
-    record('embed: a mangled token and a revoked one are the same 404', uniform404Verdict(mangled, await pub(`/public/investigations/${token}`)));
+    record('embed: a mangled token and a revoked one are the same 404', uniform404Verdict(mangled, await pub(minted.data.url)));
   }
 
   // (5) signin-picker
@@ -480,7 +480,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   };
 
   const pub = async (p) => {
-    const r = await fetchFn(`${api}/spaces/${space}${p}`, { method: 'GET' });
+    const r = await fetchFn(`${api}${p}`, { method: 'GET' });
     let parsed = null;
     try { parsed = await r.json(); } catch { /* empty body */ }
     return { status: r.status, body: parsed, data: unwrap(parsed), headers: r.headers };
