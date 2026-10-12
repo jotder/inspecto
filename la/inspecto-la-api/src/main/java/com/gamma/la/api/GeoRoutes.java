@@ -12,7 +12,6 @@ import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
 
-import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -231,14 +230,14 @@ public final class GeoRoutes implements RouteModule {
     // ── shared helpers ────────────────────────────────────────────────────────────
 
     /** Resolved dataset + its trusted relation SQL, or a fail-closed {@link ApiException}. */
-    private record Ctx(String datasetId, String relationSql) {}
+    private record Ctx(String datasetId, String relationSql, Path writeRoot) {}
 
     private Ctx context(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "geo projection");
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         // The gate order every projection shares — unknown → 404, shared-away → the SAME 404 (R3), unusable → 422.
-        return new Ctx(datasetId, InvRoutes.relationFor(api, ex, writeRoot, datasetId));
+        return new Ctx(datasetId, InvRoutes.relationFor(api, ex, writeRoot, datasetId), writeRoot);
     }
 
     private static DatasetProvider.Result run(Ctx c, String sql, int limit) {
@@ -246,9 +245,9 @@ public final class GeoRoutes implements RouteModule {
             return DatasetProviders.require().run(new DatasetProvider.Request(
                     c.datasetId, c.relationSql, sql, limit, 0, List.of(), List.of()));
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw DatasetReadFault.of("projection failed", c.datasetId, c.writeRoot, e);
         } catch (IOException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + e.getMessage());
+            throw DatasetReadFault.of("projection failed", c.datasetId, c.writeRoot, e);
         }
     }
 

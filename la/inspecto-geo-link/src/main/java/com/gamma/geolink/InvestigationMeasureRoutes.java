@@ -463,8 +463,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "value measure failed: "
-                    + com.gamma.util.DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw com.gamma.la.api.DatasetReadFault.of("value measure failed", dataset, null, e);
         }
     }
 

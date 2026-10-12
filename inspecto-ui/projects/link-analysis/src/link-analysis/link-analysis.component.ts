@@ -1394,7 +1394,7 @@ export class LinkAnalysisComponent implements OnInit {
                     ? 'Link analysis is not available in this edition — its backend module is not installed in this bundle.'
                     : err instanceof Error
                       ? err.message
-                      : apiErrorMessage(err, 'The graph query failed.'),
+                      : invErrorMessage(err, 'The graph query failed.'),
             );
         } finally {
             this.loading.set(false);
@@ -2173,7 +2173,7 @@ export class LinkAnalysisComponent implements OnInit {
             // Monotonic on purpose: only a fresh `run()` replaces the graph and so resets it.
             if ((extra as ProjectedGraph).truncated) this.truncated.set(true);
         } catch (err) {
-            this.toastr.error(apiErrorMessage(err, 'Could not fetch neighbors for this node.'));
+            this.toastr.error(invErrorMessage(err, 'Could not fetch neighbors for this node.'));
         }
     }
 

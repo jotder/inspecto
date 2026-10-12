@@ -17,7 +17,6 @@ import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
-import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -221,8 +220,7 @@ public final class EntityIdentityRoutes implements RouteModule {
             read = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql, limit, 0, List.of(), List.of()),
                     SqlSandboxPolicy.withCaps(null, 0, IMPORT_TIMEOUT_SECONDS));
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import read failed: "
-                    + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw DatasetReadFault.of("the import read failed", datasetId, null, e);
         }
         List<List<String>> rows = new ArrayList<>(read.rows().size());
         for (Map<String, Object> row : read.rows())

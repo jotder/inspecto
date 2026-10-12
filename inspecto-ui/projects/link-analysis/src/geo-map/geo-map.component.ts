@@ -63,6 +63,7 @@ import {
 import { PivotService } from '@inspecto/link-analysis/investigation/pivot.service';
 import { uniqueNameValidator } from '@inspecto/core/investigation';
 import { ComponentsService, apiErrorMessage } from '@inspecto/core/api';
+import { invErrorMessage } from '@inspecto/link-analysis/link-analysis/entity-projection';
 import { GeoSettingsService } from '@inspecto/link-analysis/api/geo-settings.service';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { LA_DATASETS, LA_FEATURES, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from '@inspecto/link-analysis/la-host';
@@ -533,7 +534,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
                     ? 'Geo map is not available in this edition — its backend module is not installed in this bundle.'
                     : err instanceof Error
                       ? err.message
-                      : apiErrorMessage(err, 'The query failed.'),
+                      : invErrorMessage(err, 'The query failed.'),
             );
         } finally {
             this.loading.set(false);

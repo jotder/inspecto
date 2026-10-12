@@ -13,7 +13,6 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.util.ColumnClassification;
-import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -153,8 +152,7 @@ final class ReferenceRows {
                 r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql.toString(),
                         MAX_ROWS, 0, List.of(), List.of(), binds));
             } catch (SQLException e) {
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reference read of dataset '" + datasetId
-                        + "' failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+                throw DatasetReadFault.of("reference read of dataset '" + datasetId + "' failed", datasetId, null, e);
             }
             truncated = r.truncated();
             for (Map<String, Object> row : r.rows()) {

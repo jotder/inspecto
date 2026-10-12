@@ -18,7 +18,6 @@ import com.gamma.la.core.BranchingPatternEngine.Edge;
 import com.gamma.la.core.PatternQueryCompiler.Compiled;
 import com.gamma.la.core.PatternQueryCompiler.Stage;
 import com.gamma.sql.SqlSandboxPolicy;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -241,7 +240,7 @@ public final class PatternRoutes implements RouteModule {
             audit(ex, datasetId, results.size(), limited || rowCapped, null);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "temporal query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw DatasetReadFault.of("temporal query failed", datasetId, writeRoot, e);
         }
     }
 
@@ -429,7 +428,7 @@ public final class PatternRoutes implements RouteModule {
             audit(ex, datasetId, matches.size(), truncated, null);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pattern query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw DatasetReadFault.of("pattern query failed", datasetId, writeRoot, e);
         }
     }
 

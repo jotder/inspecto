@@ -8,7 +8,6 @@ import com.gamma.spi.http.RouteModule;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.nio.file.Path;
@@ -90,8 +89,7 @@ public final class ValueMeasureRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException | java.io.IOException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "value measure failed: "
-                    + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw DatasetReadFault.of("value measure failed", datasetId.trim(), writeRoot, e);
         }
         Map<String, Object> out = answer(spec, r);
         // DR-D2: the entities leave as aliases when the Space masks them (a list-masked agent already carries the list's own token)

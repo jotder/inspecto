@@ -17,7 +17,6 @@ import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
-import com.gamma.util.DuckDbUtil;
 import com.gamma.util.JsonAttributes;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
@@ -670,7 +669,7 @@ public final class InvRoutes implements RouteModule {
                 r = DatasetProviders.require().run(new DatasetProvider.Request(mp.dataset(), mp.relationSql(), mp.sql(),
                         limit, 0, List.of(), List.of(), mp.binds()));
             } catch (SQLException e) {
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection of dataset '" + mp.dataset() + "' failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+                throw DatasetReadFault.of("projection of dataset '" + mp.dataset() + "' failed", mp.dataset(), writeRoot, e);
             }
             for (Map<String, Object> row : r.rows()) {
                 Map<String, Object> out;
@@ -800,7 +799,7 @@ public final class InvRoutes implements RouteModule {
                 refuseIfSensitive(writeRoot, "a neighbours read of one entity (degree " + degree + ")", 0,
                         (int) Math.min(Integer.MAX_VALUE, degree));
             } catch (SQLException e) {
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+                throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);
             }
         }
 
@@ -858,7 +857,7 @@ public final class InvRoutes implements RouteModule {
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);
         }
     }
 
@@ -1143,7 +1142,7 @@ public final class InvRoutes implements RouteModule {
             auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "traversal failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw DatasetReadFault.of("traversal failed", datasetId, writeRoot, e);
         }
     }
 

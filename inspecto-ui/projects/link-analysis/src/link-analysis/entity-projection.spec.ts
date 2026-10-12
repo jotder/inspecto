@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { SAMPLE_SOURCES } from '@inspecto/core/fixtures/sample-sources';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import {
     EntityProjectionGraphSource,
     ProjectedGraph,
+    invErrorMessage,
     isProjectionError,
     mergeProjectedGraphs,
     projectEntities,
@@ -440,5 +442,25 @@ describe('projection limit is configurable (D-S3)', () => {
         configureProjectionLimits({ projectionNodeCap: 9 });
         resetProjectionLimits();
         expect(projectionNodeCapValue()).toBe(PROJECTION_NODE_CAP_DEFAULT);
+    });
+});
+
+describe('invErrorMessage - an empty Dataset store', () => {
+    const noData =
+        "Dataset 'mule_transfers_dataset' has no data yet: nothing has been ingested into its store (mule_transfers). " +
+        "Run the Pipeline that fills it, or check the Dataset's physicalRef.";
+    const http = (status: number, message: string) =>
+        new HttpErrorResponse({ status, error: { error: { message } } });
+
+    it('shows the server words plus a hint, with no DuckDB text', () => {
+        const out = invErrorMessage(http(409, noData), 'The graph query failed.');
+        expect(out).toContain(noData);
+        expect(out).toContain('Nothing is wrong with your query');
+        expect(out).not.toContain('projection failed');
+        expect(out).not.toContain('IO Error');
+    });
+
+    it('leaves any other 409 as the server says it', () => {
+        expect(invErrorMessage(http(409, 'something else conflicted'), 'x')).toBe('something else conflicted');
     });
 });
