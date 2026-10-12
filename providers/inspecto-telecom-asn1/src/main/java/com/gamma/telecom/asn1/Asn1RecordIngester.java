@@ -8,6 +8,7 @@ import com.gamma.asn.core.Strictness;
 import com.gamma.asn.facade.Asn1Decoder;
 import com.gamma.asn.facade.RecordMapper;
 import com.gamma.asn.schema.NamedNode;
+import com.gamma.etl.ChildSpec;
 import com.gamma.etl.DeriveSpec;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RecordSink;
@@ -74,6 +75,12 @@ import java.util.Set;
  * cardinality is unchanged and a segment without {@code derive} is byte-identical to before. A list over
  * {@code max_list_elements} fails the file (QUARANTINED_UNREADABLE) rather than truncating an aggregate.
  *
+ * <h3>Child rows (Parsing D9 slice 2)</h3>
+ * An optional {@code ingester_config.children} block ({@link ChildSpec}) explodes a list of a decoded record into
+ * rows of a declared child segment, in addition to the record's own row. A child segment's selectors resolve
+ * relative to the child element, plus {@code $index} and {@code $parent.<path>}. More than
+ * {@code max_child_rows_per_record} child rows from one record fails the file (QUARANTINED_UNREADABLE).
+ *
  * <h3>Failure handling</h3>
  * A malformed record makes the reader stop (these framings carry no length prefix, so there is no
  * reliable resync). Rather than silently ingesting the prefix, any parse error fails the file so
@@ -123,7 +130,11 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
         DeriveSpec derive = DeriveSpec.parse(ic.get("derive"), cfg.schemas().segments() == null ? null : cfg.schemas().segments().keySet(),
                 ic.get("max_list_elements"), ic.get("max_derived_columns"));
         DeriveSpec.Stats deriveStats = new DeriveSpec.Stats();
-        Map<String, List<String>> selectorsByKey = declareSegments(cfg, sink, derive);
+        ChildSpec children = ChildSpec.parse(ic.get("children"),
+                cfg.schemas().segments() == null ? null : cfg.schemas().segments().keySet(),
+                ic.get("max_child_rows_per_record"));
+        Set<String> childSegments = children.childSegments();
+        Map<String, List<String>> selectorsByKey = declareSegments(cfg, sink, derive, childSegments);
 
         List<ParseError> errors = new ArrayList<>();
         try (ByteSource src = ByteSource.map(file.toPath())) {
@@ -134,7 +145,7 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
             while (records.hasNext()) {
                 NamedNode record = records.next();
                 List<String> selectors = selectorsByKey.get(record.name());
-                if (selectors == null) {          // not a declared segment → junk candidate
+                if (selectors == null || childSegments.contains(record.name())) {   // not a record segment → junk candidate
                     sink.junk();
                     continue;
                 }
@@ -147,6 +158,7 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
                 System.arraycopy(derived, 0, values, selectors.size(), derived.length);   // derived columns after raw.fields
                 values[values.length - 1] = record.name();   // trailing EVENT_TYPE
                 sink.emit(record.name(), values);
+                explode(record.name(), decoded, children, selectorsByKey, derive, deriveStats, sink);
             }
         }
         if (deriveStats.nonNumeric > 0 || deriveStats.noMatch > 0)
@@ -159,13 +171,42 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
         }
     }
 
+    /** Emit one row per element of each list the parent's {@code children} name; over the cap fails the file. */
+    @SuppressWarnings("unchecked")
+    private static void explode(String parent, Map<String, Object> decoded, ChildSpec children,
+                                Map<String, List<String>> selectorsByKey, DeriveSpec derive,
+                                DeriveSpec.Stats stats, RecordSink sink) throws Exception {
+        long rows = 0;
+        for (ChildSpec.Child c : children.of(parent)) {
+            if (!(resolve(decoded, String.join(".", c.list())) instanceof List<?> list)) continue;
+            List<String> selectors = selectorsByKey.get(c.segment());
+            for (int i = 0; i < list.size(); i++) {
+                if (++rows > children.maxChildRows())
+                    throw new IOException("ASN1-CHILD-TOO-MANY-ROWS: a '" + parent + "' record explodes into more than "
+                            + children.maxChildRows() + " child rows (max_child_rows_per_record)");
+                Map<String, Object> element = list.get(i) instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+                Object[] derived = derive.evaluate(c.segment(), element, stats);
+                Object[] values = new Object[selectors.size() + derived.length + 1];
+                for (int s = 0; s < selectors.size(); s++) {
+                    String sel = selectors.get(s);
+                    values[s] = sel.equals("$index") ? String.valueOf(i)
+                            : sel.startsWith("$parent.") ? scalar(resolve(decoded, sel.substring("$parent.".length())))
+                            : scalar(resolve(element, sel));
+                }
+                System.arraycopy(derived, 0, values, selectors.size(), derived.length);
+                values[values.length - 1] = c.segment();
+                sink.emit(c.segment(), values);
+            }
+        }
+    }
+
     /**
      * Declare every segment's columns up front (raw.fields + the derived {@code EVENT_TYPE}) and
      * return each key's selector list, so the per-record loop never re-walks the config map.
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, List<String>> declareSegments(PipelineConfig cfg, RecordSink sink, DeriveSpec derive)
-            throws Exception {
+    private static Map<String, List<String>> declareSegments(PipelineConfig cfg, RecordSink sink, DeriveSpec derive,
+                                                             Set<String> childSegments) throws Exception {
         if (cfg.schemas().segments() == null || cfg.schemas().segments().isEmpty())
             throw new IllegalArgumentException("Asn1RecordIngester requires at least one segment");
         Map<String, List<String>> selectorsByKey = new LinkedHashMap<>();
@@ -181,6 +222,9 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
                 String name = str(f.get("name"));
                 String selector = str(f.get("selector"));
                 if (selector.isEmpty()) selector = name;   // a field whose path IS its name
+                if (childSegments.contains(key) && !childSelector(selector))
+                    throw new IllegalArgumentException("ASN1-CHILD-BAD-SELECTOR: child segment '" + key + "' field '"
+                            + name + "' uses a reserved '$' selector other than $index or $parent.<path>");
                 columns.add(name);
                 selectors.add(selector);
             }
@@ -191,6 +235,12 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
             selectorsByKey.put(key, selectors);
         }
         return selectorsByKey;
+    }
+
+    /** A child segment's selector: a plain path, {@code $index}, or {@code $parent.<dotted identifiers>}. */
+    private static boolean childSelector(String s) {
+        if (!s.startsWith("$")) return true;
+        return s.equals("$index") || s.matches("[$]parent([.][A-Za-z_][A-Za-z0-9_-]*)+");
     }
 
     /** Walk a dotted selector into the decoded record; missing at any step ⇒ {@code null}. */

@@ -28,8 +28,8 @@ import java.util.Map;
  *   <li><b>Overlay.</b> Every key the referring {@code asn1:} block sets wins, key by key. {@code segments}
  *       is therefore replaced WHOLE, never merged (operator D5 2026-09-25): the record kinds a Pipeline
  *       loads must be readable off one file.</li>
- *   <li><b>{@code derive}</b> (Parsing D9 slice 1) is replaced WHOLE like {@code segments} and validated by
- *       {@link DeriveSpec} on read.</li>
+ *   <li><b>{@code derive}</b> (Parsing D9 slice 1) and <b>{@code children}</b> (slice 2) are replaced WHOLE
+ *       like {@code segments} and validated by {@link DeriveSpec} / {@link ChildSpec} on read.</li>
  *   <li><b>No nesting</b>, and nothing but the {@code asn1:} block: anything else in the file would be
  *       silently ignored, so it is refused.</li>
  * </ul>
@@ -152,10 +152,13 @@ public final class DecodeProfile {
      */
     public static void validateDerive(Map<String, Object> asn1) {
         if (asn1.get("derive") == null && asn1.get("max_list_elements") == null
-                && asn1.get("max_derived_columns") == null) return;
+                && asn1.get("max_derived_columns") == null && asn1.get("children") == null
+                && asn1.get("max_child_rows_per_record") == null) return;
         java.util.Set<String> segs = asn1.get("segments") instanceof Map<?, ?> m
                 ? m.keySet().stream().map(String::valueOf).collect(java.util.stream.Collectors.toSet()) : null;
         DeriveSpec.parse(asn1.get("derive"), segs, asn1.get("max_list_elements"), asn1.get("max_derived_columns"));
+        // Parsing D9 slice 2: the explode block rides the same read-time validation.
+        ChildSpec.parse(asn1.get("children"), segs, asn1.get("max_child_rows_per_record"));
     }
 
     private static String besideProfile(Path profileDir, String ref, String field) {

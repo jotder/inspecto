@@ -1980,7 +1980,8 @@ final class PipelineConfigParser {
         if (!grammarFile.isEmpty()) ic.put("grammar", grammarFile);
         ic.put("root_type", rootType);
         for (String k : new String[]{"strictness", "file_header_length", "record_header_length",
-                "max_value_bytes", "derive", "max_list_elements", "max_derived_columns"})
+                "max_value_bytes", "derive", "max_list_elements", "max_derived_columns", "children",
+                "max_child_rows_per_record"})
             if (a.get(k) != null) ic.put(k, a.get(k));
         DecodeProfile.validateDerive(a);   // Parsing D9 slice 1: closed vocabulary, refused at load
         Map<String, Object> plugin = new LinkedHashMap<>();
