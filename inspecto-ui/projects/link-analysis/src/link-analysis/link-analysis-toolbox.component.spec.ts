@@ -854,6 +854,25 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         expect(c.analysisError()).toBe('This pattern needs a time column — set Time to first_seen.');
     });
 
+    it('LA-DEMO-POLISH-1 (1): a hand-built ordered motif uses the Investigation bound time column when the links carry it', () => {
+        const timed: G6GraphData = {
+            nodes: GRAPH.nodes,
+            edges: GRAPH.edges.map((e, i) => ({ ...e, data: { ...e.data, attrs: { last_seen: `2026-10-0${i + 1}T00:00:00Z` } } })),
+        };
+        const t = make(timed);
+        t.c.loadedPack.set(null);
+        t.c.patternSteps.set([{}, { direction: 'out' }, { direction: 'out', afterPrevious: true }]);
+        t.c.runPattern();
+        expect(t.c.analysisError()).toContain('requires the hops to be in time order');
+        t.fixture.componentRef.setInput('investigationTimeCol', 'last_seen');
+        t.fixture.detectChanges();
+        t.c.loadedPack.set(null);
+        t.c.patternSteps.set([{}, { direction: 'out' }, { direction: 'out', afterPrevious: true }]);
+        t.c.runPattern();
+        expect(t.c.analysisError()).not.toContain('time order');
+        expect(t.c.analysisError()).not.toContain('time column');
+    });
+
     it('LA-DEMO-POLISH-1 (1): an open Investigation bound to a time column the links carry runs; one they lack is named', () => {
         const timed: G6GraphData = {
             nodes: GRAPH.nodes,

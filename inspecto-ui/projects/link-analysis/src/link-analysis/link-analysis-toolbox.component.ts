@@ -1165,7 +1165,11 @@ export class LinkAnalysisToolboxComponent {
             this.analysisError.set(cols.blocked);
             return;
         }
-        const timeAttr = cols.timeAttr;
+        // LA-DEMO-POLISH-1 (1): a hand-built motif falls back to the open Investigation's bound time column when
+        // the links drawn here carry it.
+        const bound = this.investigationTimeCol();
+        const boundCarried = !!bound && edgeTimeIndex(g, bound).size > 0 ? bound : '';
+        const timeAttr = cols.timeAttr || boundCarried;
         const stages = this.branchStages();
         if (stages) {
             this.runBranching(g, stages, timeAttr);
