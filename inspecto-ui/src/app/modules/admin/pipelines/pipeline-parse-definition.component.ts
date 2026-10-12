@@ -179,6 +179,44 @@ export function profileSegmentsOf(profile: Record<string, unknown> | null): Reco
     return out;
 }
 
+/** One derived column of a Decode Profile's `derive` block, for the read-only drawer list. */
+export interface DerivedColumnRow {
+    segment: string;
+    column: string;
+    /** The operation in words (`select ...` / `sum of ... over ...`), never an expression. */
+    operation: string;
+}
+
+/**
+ * The columns a `derive` block (Parsing D9: `segment key -> column -> {select | reduce ...}`, as authored) adds,
+ * flattened to rows in authored order, or `[]` for no / a malformed block. Read-only: a Pipeline replaces the
+ * whole key, never one column, and the server validates the block; this only renders it.
+ */
+export function derivedColumnsOf(derive: unknown): DerivedColumnRow[] {
+    if (!derive || typeof derive !== 'object' || Array.isArray(derive)) return [];
+    const rows: DerivedColumnRow[] = [];
+    for (const [segment, cols] of Object.entries(derive as Record<string, unknown>)) {
+        if (!cols || typeof cols !== 'object' || Array.isArray(cols)) continue;
+        for (const [column, op] of Object.entries(cols as Record<string, unknown>)) {
+            if (!op || typeof op !== 'object') continue;
+            const o = op as Record<string, unknown>;
+            let operation: string;
+            if (o['select'] !== undefined) {
+                const w = o['where'] && typeof o['where'] === 'object' ? Object.entries(o['where'] as object) : [];
+                const nth = o['nth'] !== undefined && String(o['nth']) !== '0' ? ` (match ${o['nth']})` : '';
+                operation =
+                    `select ${o['select']}` +
+                    (w.length ? ` where ${w[0][0]} = ${w[0][1]}` : '') +
+                    ` take ${o['take'] ?? ''}${nth}`;
+            } else {
+                operation = `${o['op'] ?? '?'}${o['of'] !== undefined ? ' of ' + o['of'] : ''} over ${o['reduce'] ?? ''}`;
+            }
+            rows.push({ segment, column, operation });
+        }
+    }
+    return rows;
+}
+
 /**
  * The block the form is SEEDED from on a profile-backed Pipeline: the profile's keys under the Pipeline's
  * own (a blank own key is unset, so the profile's shows). `segments` stays the Pipeline's — it is not a form
@@ -423,6 +461,41 @@ export function withDecodeProfile(
                         </table>
                     } @else {
                         <p class="text-secondary text-xs">Reading the Decode Profile…</p>
+                    }
+                    @if (derivedColumnRows().length) {
+                        <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70" id="derived-columns-heading">
+                            Derived columns
+                            <span class="normal-case font-normal"
+                                >· {{ derivedColumnSummary() }}
+                                @if (ownDeriveSet()) {
+                                    · set by this Pipeline, replacing the profile's
+                                }</span
+                            >
+                        </div>
+                        <table
+                            class="w-full table-fixed text-sm"
+                            data-test="derived-columns"
+                            aria-labelledby="derived-columns-heading"
+                        >
+                            <thead class="sr-only">
+                                <tr>
+                                    <th scope="col">Segment</th>
+                                    <th scope="col">Column</th>
+                                    <th scope="col">Operation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (row of derivedColumnRows(); track row.segment + '.' + row.column) {
+                                    <tr>
+                                        <td class="w-1/4 truncate py-0.5 pr-2 font-mono">{{ row.segment }}</td>
+                                        <td class="w-1/4 truncate py-0.5 pr-2 font-mono">{{ row.column }}</td>
+                                        <td class="truncate py-0.5 font-mono" [title]="row.operation">
+                                            {{ row.operation }}
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     }
                     @if (profileSegmentRows().length) {
                         <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70" id="profile-segments-heading">
@@ -1189,6 +1262,25 @@ export class PipelineParseDefinitionComponent {
     readonly profileError = signal<string | null>(null);
     /** The profile's own `segments`, as `[key, ref]` rows for the read-only list. */
     readonly profileSegmentRows = computed(() => Object.entries(profileSegmentsOf(this.profileValues())));
+    /**
+     * The derived columns in effect: this Pipeline's own `asn1.derive` when it sets one (the key is replaced
+     * whole), else the profile's. Read-only (Parsing D9 slice 3).
+     */
+    readonly derivedColumnRows = computed(() => {
+        const own = (this.parsingBlock()['asn1'] as Record<string, unknown> | undefined)?.['derive'];
+        const ownRows = derivedColumnsOf(own);
+        return ownRows.length ? ownRows : derivedColumnsOf(this.profileValues()?.['derive']);
+    });
+    /** Whether the Pipeline's own `asn1.derive` is the one in effect (it replaces the profile's whole). */
+    readonly ownDeriveSet = computed(
+        () => derivedColumnsOf((this.parsingBlock()['asn1'] as Record<string, unknown> | undefined)?.['derive']).length > 0,
+    );
+    /** "N derived columns on M segments". */
+    readonly derivedColumnSummary = computed(() => {
+        const rows = this.derivedColumnRows();
+        const m = new Set(rows.map((r) => r.segment)).size;
+        return `${rows.length} derived column${rows.length === 1 ? '' : 's'} on ${m} segment${m === 1 ? '' : 's'}`;
+    });
     /** Whether the Pipeline's saved block carries its own `segments` (which replace the profile's whole). */
     readonly ownSegmentsSet = computed(() => Object.keys(this.savedSegmentPaths()).length > 0);
     /** The form's asn1 values and dirty keys, snapshotted on interaction (the editor exposes methods, not signals). */

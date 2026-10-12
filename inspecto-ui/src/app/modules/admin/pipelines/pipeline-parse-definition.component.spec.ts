@@ -17,6 +17,7 @@ import {
     PipelineParseDefinitionComponent,
     decodeProfileOverrides,
     decodeProfileProvenance,
+    derivedColumnsOf,
 } from './pipeline-parse-definition.component';
 
 /**
@@ -2061,6 +2062,39 @@ describe('Decode Profile read-back', () => {
         expect(editor(fixture).error()).toBe('Add at least one segment.');
     });
 
+    const DERIVE = {
+        CCNRecord: {
+            SERVED_MSISDN: {
+                select: 'servedSubscriptionIDs',
+                where: { subscriptionIDType: 0 },
+                take: 'subscriptionIDValue',
+            },
+            DA_CHARGE: { reduce: 'dedicatedAccounts', op: 'sum', of: 'dedicatedAccountValue' },
+        },
+        PGWRecord: { N_SERVICES: { reduce: 'listOfServiceData', op: 'count' } },
+    };
+
+    it('lists the profile’s derived columns read-only, with the count summary', async () => {
+        profileReply = of({ asn1: { ...PROFILE, derive: DERIVE } });
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+        const el = (fixture.nativeElement as HTMLElement).querySelector('[data-test="decode-profile"]')!;
+        const table = el.querySelector('[data-test="derived-columns"]');
+        expect(table?.textContent).toContain('SERVED_MSISDN');
+        expect(table?.textContent).toContain('select servedSubscriptionIDs where subscriptionIDType = 0 take subscriptionIDValue');
+        expect(table?.textContent).toContain('sum of dedicatedAccountValue over dedicatedAccounts');
+        expect(el.textContent).toContain('3 derived columns on 2 segments');
+        expect(el.textContent).not.toContain('set by this Pipeline');
+        expect(table?.querySelector('input,button')).toBeNull();
+        await expectNoA11yViolations(el as HTMLElement);
+    });
+
+    it('shows no derived-columns list when the profile derives nothing', async () => {
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="derived-columns"]')).toBeNull();
+    });
+
     it('reads nothing for a block without a profile', async () => {
         const fixture = await create(asn1Node(), [ASN1_PROFILE_DEF]);
         fixture.detectChanges();
@@ -2088,5 +2122,27 @@ describe('decodeProfileProvenance', () => {
     it('a blank profile value is unset, as on the server', () => {
         const rows = decodeProfileProvenance(keys, { grammar_file: '  ' }, {});
         expect(rows[0]).toMatchObject({ source: 'default' });
+    });
+});
+
+describe('derivedColumnsOf', () => {
+    it('flattens segment, column and a worded operation in authored order', () => {
+        expect(
+            derivedColumnsOf({
+                R: {
+                    A: { select: 'ids.e', where: { t: 1 }, take: 'v', nth: 2 },
+                    B: { reduce: 'u.x', op: 'count' },
+                },
+            }),
+        ).toEqual([
+            { segment: 'R', column: 'A', operation: 'select ids.e where t = 1 take v (match 2)' },
+            { segment: 'R', column: 'B', operation: 'count over u.x' },
+        ]);
+    });
+
+    it('is empty for no or a malformed block', () => {
+        expect(derivedColumnsOf(undefined)).toEqual([]);
+        expect(derivedColumnsOf([])).toEqual([]);
+        expect(derivedColumnsOf({ R: 'x', S: { C: 5 } })).toEqual([]);
     });
 });
