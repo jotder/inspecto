@@ -34,6 +34,9 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/projection"},
             {"POST", "/inv/reference-rows"},
             {"POST", "/inv/case-history"},
+            // LA-EMBED-VIEW-1: the public embed view is anonymous and re-evaluates an Investigation's sealed log per request
+            // (ControlApi throttles it per TOKEN and per IP, on its own buckets).
+            {"GET", "/public/investigations/([^/]+)"},
     };
 
     /** Everything else: Investigation / draft / member / case / alert-rule / identity / Entity List CRUD and
@@ -82,6 +85,9 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/investigations/([^/]+)/members"},
             {"POST", "/inv/investigations/([^/]+)/members"},
             {"POST", "/inv/investigations/([^/]+)/members/revoke"},
+            {"GET", "/inv/investigations/([^/]+)/embeds"},
+            {"POST", "/inv/investigations/([^/]+)/embeds"},
+            {"POST", "/inv/investigations/([^/]+)/embeds/([^/]+)/revoke"},
             {"POST", "/inv/investigations/([^/]+)/drafts"},
             {"GET", "/inv/investigations/([^/]+)/drafts"},
             {"GET", "/inv/investigations/([^/]+)/drafts/([^/]+)"},

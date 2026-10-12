@@ -28,8 +28,9 @@ import java.util.Set;
 public final class AccessPolicies {
     private AccessPolicies() {}
 
-    /** The environment action verbs a policy target may name (plan §4 A1). */
-    public static final Set<String> ACTIONS = Set.of("read", "write", "operate");
+    /** The environment action verbs a policy target may name (plan §4 A1). {@code embed} (LA-EMBED-VIEW-1, operator 2026-10-12 D6)
+     *  is minting or revoking a read-only embed link to an Investigation: a policy can forbid sharing a classified one. */
+    public static final Set<String> ACTIONS = Set.of("read", "write", "operate", "embed");
 
     /**
      * The resource kinds the row-level PEPs pass ({@code RowScope.visible} callers): the operational

@@ -37,6 +37,15 @@ final class RateLimiter {
      *  client's file count in the inbox without throttling a sane one. */
     static RateLimiter push() { return new RateLimiter(60.0, 10.0); }
 
+    /** The embedded-Investigation view's PER-TOKEN budget ({@code GET /public/investigations/{token}}, LA-EMBED-VIEW-1): burst 60, then
+     *  2 requests/second per link, tunable via {@code control.rateLimit.embed.*}. A viewer polls or reloads a read-only page; one
+     *  leaked link cannot spend more than this however many hosts present it. Unknown tokens are bounded by the per-IP
+     *  {@link #callback()} bucket, since each distinct guess would otherwise get a fresh per-token bucket. */
+    static RateLimiter embed() {
+        return new RateLimiter(positive("control.rateLimit.embed.capacity", 60.0),
+                positive("control.rateLimit.embed.refillPerSecond", 2.0));
+    }
+
     /** The expensive Link Analysis budget (projection, traversal, pattern, Graph Run, Index build): same shape
      *  as {@link #standard()} but its own bucket, so a graph session cannot drain ad-hoc SQL and vice versa. */
     static RateLimiter linkAnalysis() {

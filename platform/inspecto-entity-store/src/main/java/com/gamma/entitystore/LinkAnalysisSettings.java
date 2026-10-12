@@ -48,7 +48,60 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
                                    Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
-                                   Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold) {
+                                   Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold, Embed embed) {
+
+    /** The fifteen-knob form that predates {@code embed}: the embed knobs inherit their shipped defaults. */
+    public LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
+                                String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
+                                List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
+                                Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
+                                Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold) {
+        this(projectionNodeCap, analysisNodeCap, suspicionNodeCap, maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove,
+                entityTypes, mergedDistinctCap, seedByDistinctCap, graphRun, index, drafts, maxSetBytes,
+                maxInvestigationBytes, hubThreshold, null);
+    }
+
+    /**
+     * The embedded-Investigation link knobs (LA-EMBED-VIEW-1, operator 2026-10-12 D4; {@code embed} in {@code link-analysis.toon}):
+     * {@code defaultTtlHours} - the lifetime of a link whose mint states none (default {@link #DEFAULT_TTL_HOURS}, 72 h);
+     * {@code maxTtlHours} - the longest a link may live, a larger request is refused with 422 (default and CEILING
+     * {@link #CEILING_TTL_HOURS}, 30 d: a Space may tighten it, never raise it); {@code refuseClassifications} - column
+     * classifications (the strictest of the Investigation's bound source/target columns, strictest-wins) for which minting is
+     * refused with 422 (default none). Every field is optional ({@code null} = the shipped default).
+     */
+    public record Embed(Integer defaultTtlHours, Integer maxTtlHours, List<String> refuseClassifications) {
+        public static final Embed NONE = new Embed(null, null, null);
+        public static final int DEFAULT_TTL_HOURS = 72;
+        public static final int CEILING_TTL_HOURS = 30 * 24;
+
+        public Embed {
+            refuseClassifications = refuseClassifications == null ? null : List.copyOf(refuseClassifications);
+        }
+
+        boolean isNone() {
+            return defaultTtlHours == null && maxTtlHours == null && refuseClassifications == null;
+        }
+
+        /** The longest a link may live, in hours: the stated cap, else {@link #CEILING_TTL_HOURS}. */
+        public int maxTtlHoursInForce() {
+            return maxTtlHours != null ? maxTtlHours : CEILING_TTL_HOURS;
+        }
+
+        /** The lifetime of a link whose mint states none: the stated default, else 72 h, never above the cap in force. */
+        public int defaultTtlHoursInForce() {
+            return Math.min(defaultTtlHours != null ? defaultTtlHours : DEFAULT_TTL_HOURS, maxTtlHoursInForce());
+        }
+
+        /** The classifications minting is refused for, upper-case; empty = none. */
+        public List<String> refuseClassificationsInForce() {
+            return refuseClassifications != null ? refuseClassifications : List.of();
+        }
+
+        /** Whether {@code hours} is a lifetime the Space allows: 1 up to the cap in force. */
+        public boolean allows(long hours) {
+            return hours >= 1 && hours <= maxTtlHoursInForce();
+        }
+    }
 
     /**
      * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
@@ -169,7 +222,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     public static final String FILE = "link-analysis.toon";
-    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -223,6 +276,11 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     /** The index knobs in force: the stated ones; a field never stated is {@code null} inside (use the {@code *InForce} accessors). */
     public Index effectiveIndex() {
         return index != null ? index : Index.NONE;
+    }
+
+    /** The embed-link knobs in force: the stated ones; a field never stated is {@code null} inside (use the {@code *InForce} accessors). */
+    public Embed effectiveEmbed() {
+        return embed != null ? embed : Embed.NONE;
     }
 
     /** The Draft lifecycle knobs in force: the stated ones; a field never stated is {@code null} inside (use the {@code *InForce} accessors). */
@@ -283,6 +341,13 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (drafts.expireAfterDays() != null) x.put("expire_after_days", drafts.expireAfterDays());
             m.put("drafts", x);
         }
+        if (embed != null && !embed.isNone()) {
+            Map<String, Object> x = new LinkedHashMap<>();
+            if (embed.defaultTtlHours() != null) x.put("default_ttl_hours", embed.defaultTtlHours());
+            if (embed.maxTtlHours() != null) x.put("max_ttl_hours", embed.maxTtlHours());
+            if (embed.refuseClassifications() != null) x.put("refuse_classifications", embed.refuseClassifications());
+            m.put("embed", x);
+        }
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
     }
 
@@ -301,10 +366,34 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
                     entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
                     optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")),
-                    optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"), optInt(m, "hub_threshold"));
+                    optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"), optInt(m, "hub_threshold"), embed(m.get("embed")));
         } catch (Exception e) {
             return EMPTY;
         }
+    }
+
+    /**
+     * A stored {@code embed} block, else {@code null} = every knob inherits; a bad value inside costs only that knob.
+     * ⚠ A stored cap above {@link Embed#CEILING_TTL_HOURS} reads as {@code null} (the ceiling): a hand edit cannot raise it. A stored
+     * default above the cap in force is clamped by {@link Embed#defaultTtlHoursInForce}.
+     */
+    @SuppressWarnings("unchecked")
+    private static Embed embed(Object raw) {
+        if (!(raw instanceof Map<?, ?>)) return null;
+        Map<String, Object> g = (Map<String, Object>) raw;
+        Integer max = optInt(g, "max_ttl_hours");
+        if (max != null && max > Embed.CEILING_TTL_HOURS) max = null;
+        List<String> refuse = null;
+        if (g.get("refuse_classifications") instanceof List<?> l) {
+            List<String> out = new java.util.ArrayList<>();
+            for (Object o : l) {
+                String c = com.gamma.util.ColumnClassification.normalise(o);
+                if (c != null) out.add(c);
+            }
+            refuse = out;
+        }
+        Embed r = new Embed(optInt(g, "default_ttl_hours"), max, refuse);
+        return r.isNone() ? null : r;
     }
 
     /** A stored {@code graph_run} block, else {@code null} = every knob inherits; a bad value inside costs only that knob. */

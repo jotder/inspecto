@@ -33,16 +33,25 @@ public final class RowScope {
 
     /** Whether the authenticated caller may see this resolved row. */
     public static boolean visible(HttpExchange ex, String resourceKind, Map<String, Object> resource) {
+        return allowed(ex, "read", resourceKind, resource);
+    }
+
+    /**
+     * Whether the authenticated caller may do {@code abacAction} to this resolved row: {@code true} unless the edition's decider
+     * says DENY (a DENY is audited with the matched policy). Like {@link #visible}, which is this with {@code read}; LA-EMBED-VIEW-1
+     * asks it with {@code embed} so a policy can forbid sharing an Investigation of a given classification.
+     */
+    public static boolean allowed(HttpExchange ex, String abacAction, String resourceKind, Map<String, Object> resource) {
         AccessDecider d = AccessDeciders.active().orElse(null);
         if (d == null) return true;
         if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s)) return true;
         RequestAttrs.attr(ex, AccessDecider.ATTR_MATCHED_POLICY, null);   // clear stale; the decider re-stamps
         String route = ex.getRequestURI().getPath();
-        if (d.decide(ex, s, "read", route, resourceKind, resource) != AccessDecider.Decision.DENY)
+        if (d.decide(ex, s, abacAction, route, resourceKind, resource) != AccessDecider.Decision.DENY)
             return true;
         String policy = RequestAttrs.attr(ex, AccessDecider.ATTR_MATCHED_POLICY) instanceof String p ? p : null;
         String id = resource.get("id") == null ? null : String.valueOf(resource.get("id"));
-        AuditTrail.policyDecision(ex, false, "read", route, resourceKind, id, policy);
+        AuditTrail.policyDecision(ex, false, abacAction, route, resourceKind, id, policy);
         return false;
     }
 

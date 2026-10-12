@@ -168,6 +168,16 @@ public final class Roles {
     public static final String CAN_BUILD_LINK_INDEX = "canBuildLinkIndex";
 
     /**
+     * Minting and revoking a read-only EMBED link to one Link Analysis Investigation
+     * ({@code POST /inv/investigations/{id}/embeds} and {@code .../embeds/{grantId}/revoke}, LA-EMBED-VIEW-1, operator
+     * 2026-10-12 D6): a link hands a masked, live view of the evidence to someone with no login, so it is its own verb and not
+     * {@link #CAN_MANAGE_INCIDENTS}, which every Investigation owner holds. No four-eyes on mint. The Investigation's own rule
+     * still applies on top (only a LEAD of it may mint), and an Access Policy can forbid it with the ABAC action {@code embed}.
+     * Granted in {@link #SEED} to {@code admin} and {@code power}; {@code super} holds everything.
+     */
+    public static final String CAN_SHARE_INVESTIGATION = "canShareInvestigation";
+
+    /**
      * Approving (or declining) a <b>Pending Change</b> — a config change an approval policy held
      * (`ASSURE-MAKER-CHECKER-1`, {@code POST /pending-changes/{id}/approve | decline}). A per-kind policy may
      * demand a further capability on top ({@code approverCapability}); with {@code fourEyes} the approver must
@@ -234,10 +244,10 @@ public final class Roles {
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
                 CAN_OFFER_DATASETS, CAN_OFFER_SIGNALS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
                 CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS,
-                CAN_APPROVE_CHANGES, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX), null));
+                CAN_APPROVE_CHANGES, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX, CAN_SHARE_INVESTIGATION), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
                 CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS,
-                CAN_WORK_INCIDENTS, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX), null));
+                CAN_WORK_INCIDENTS, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX, CAN_SHARE_INVESTIGATION), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
         m.put("business", new Def(Set.of(CAN_TRIAGE_REQUIREMENTS), null));
         return java.util.Collections.unmodifiableMap(m);   // keeps seed iteration order

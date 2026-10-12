@@ -9,6 +9,7 @@ import com.sun.net.httpserver.HttpExchange;
 import java.util.List;
 import java.util.regex.Pattern;
 import com.gamma.spi.auth.GeoCountryResolvers;
+import com.gamma.spi.auth.PublicPaths;
 import com.gamma.spi.auth.RequestAttrs;
 
 /**
@@ -50,6 +51,7 @@ public final class AuditTrail {
      */
     public static void record(HttpExchange ex, String method, String path, int status) {
         try {
+            path = PublicPaths.redact(path);   // a token in a self-verifying public path never reaches the trail
             Action action = classify(method, path);
             if (action == null) return;
             String actor = RequestAttrs.actor(ex);
@@ -116,7 +118,7 @@ public final class AuditTrail {
      *  caller-written {@code X-Actor} header, and trigger T5 keys on this row's actor. */
     public static void authentication(HttpExchange ex, String action, boolean ok, int status, String actor) {
         try {
-            String path = ex.getRequestURI().getPath();
+            String path = PublicPaths.redact(ex.getRequestURI().getPath());
             EventSink.current().emit(located(ex, Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " " + action + (ok ? "" : " (refused, HTTP " + status + ")"))
@@ -161,6 +163,7 @@ public final class AuditTrail {
      *  (`AUDIT-REFUSAL-GAP-1`). Never throws. */
     public static void accessDenied(HttpExchange ex, String method, String path, int status) {
         try {
+            path = PublicPaths.redact(path);   // a token in a self-verifying public path never reaches the trail
             String actor = RequestAttrs.actor(ex);
             // The capability a 403 was refused FOR, when a capability check is what refused it. Set by
             // ApiContext.requireCapability; absent on a 401 (authentication, no capability was reached)
@@ -201,6 +204,7 @@ public final class AuditTrail {
     public static void policyDecision(HttpExchange ex, boolean granted, String abacAction, String route,
                                String resourceType, String resourceId, String policy) {
         try {
+            route = PublicPaths.redact(route);
             String actor = RequestAttrs.actor(ex);
             String verb = granted ? "access.granted" : "access.denied";
             EventSink.current().emit(located(ex, Event.builder(granted ? EventType.AUDIT : EventType.ACCESS_DENIED))

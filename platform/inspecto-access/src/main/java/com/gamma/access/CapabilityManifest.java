@@ -55,6 +55,11 @@ public final class CapabilityManifest {
             // Case work like every Investigation write; the real gate is the handler's LEAD check (403 for a non-lead member).
             new Entry("POST", "/inv/investigations/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/members/revoke", Roles.CAN_MANAGE_INCIDENTS),
+            // InvestigationEmbedRoutes (LA-EMBED-VIEW-1) - a link shows a MASKED live view of one Investigation to someone with no login,
+            // so minting and revoking one is its own verb; the handler's LEAD check (403 for any other member) is the second gate.
+            // The grant LIST is read-shaped (a GET) and the public GET /public/investigations/{token} carries its own credential.
+            new Entry("POST", "/inv/investigations/([^/]+)/embeds", Roles.CAN_SHARE_INVESTIGATION),
+            new Entry("POST", "/inv/investigations/([^/]+)/embeds/([^/]+)/revoke", Roles.CAN_SHARE_INVESTIGATION),
             // DraftRoutes (D7-3) - forking, writing, undoing and discarding a Draft change an analyst's working copy of the evidence,
             // so they are Case work like every Investigation write. NOT self-service-exempt: the capability is the precedent and the
             // handler's actor / role check (the Draft's actor writes; the actor or a lead discards; a reviewer never writes) is the real gate.

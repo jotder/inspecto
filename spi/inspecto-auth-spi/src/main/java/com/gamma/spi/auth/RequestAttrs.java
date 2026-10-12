@@ -77,6 +77,9 @@ public final class RequestAttrs {
     /** Extra {@code Map<String,Object>} attributes a handler adds to its request's AUDIT row (push ingest
      *  records the record count and byte size here — never the payload). */
     public static final String ATTR_AUDIT_ATTRS = "inspecto.auditAttrs";
+    /** The {@link EmbedGrant} a public embedded-Investigation route resolved from its path token (LA-EMBED-VIEW-1). Stamped ONLY by
+     *  that route after a successful lookup; a grant is NOT a {@code Subject}, so no capability gate ever accepts it. */
+    public static final String ATTR_EMBED_GRANT = "inspecto.embedGrant";
 
     // ── the per-exchange attribute SCOPE — the storage behind every ATTR_* above ────────────────
     //

@@ -171,7 +171,7 @@ final class SettingsRoutes implements RouteModule {
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
                 nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body),
-                setBytes(body), investigationBytes(body), nodeCap(body, "hubThreshold"));
+                setBytes(body), investigationBytes(body), nodeCap(body, "hubThreshold"), embed(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -250,6 +250,21 @@ final class SettingsRoutes implements RouteModule {
         draftsInForce.put("hibernateAfterMinutes", inForce.hibernateAfterInForce().toMinutes());
         draftsInForce.put("expireAfterDays", inForce.expireAfterInForce().toDays());
         m.put("draftsInForce", draftsInForce);
+        LinkAnalysisSettings.Embed em = s.embed();
+        Map<String, Object> embed = null;   // LA-EMBED-VIEW-1: null = every knob inherits the shipped default
+        if (em != null) {
+            embed = new LinkedHashMap<>();
+            embed.put("defaultTtlHours", em.defaultTtlHours());
+            embed.put("maxTtlHours", em.maxTtlHours());
+            embed.put("refuseClassifications", em.refuseClassifications());
+        }
+        m.put("embed", embed);
+        LinkAnalysisSettings.Embed emInForce = s.effectiveEmbed();   // read-only echo: what a mint will apply now
+        Map<String, Object> embedInForce = new LinkedHashMap<>();
+        embedInForce.put("defaultTtlHours", emInForce.defaultTtlHoursInForce());
+        embedInForce.put("maxTtlHours", emInForce.maxTtlHoursInForce());
+        embedInForce.put("refuseClassifications", emInForce.refuseClassificationsInForce());
+        m.put("embedInForce", embedInForce);
         return m;
     }
 
@@ -346,6 +361,37 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "drafts.expireAfterDays (" + d.expireAfterInForce().toDays()
                     + " days in force) must be longer than drafts.hibernateAfterMinutes (" + d.hibernateAfterInForce().toMinutes() + " minutes in force)");
         return d;
+    }
+
+    /** The embed-link knobs (LA-EMBED-VIEW-1, D4): absent/null = inherit; {@code defaultTtlHours} and {@code maxTtlHours} are
+     *  1..{@code CEILING_TTL_HOURS} (30 d - a Space may tighten the cap, never raise it), the default may not exceed the cap
+     *  in force, {@code refuseClassifications} is a list of at most 20 classification names; each refused (422), never clamped. */
+    @SuppressWarnings("unchecked")
+    private static LinkAnalysisSettings.Embed embed(Map<String, Object> body) {
+        Object raw = body.get("embed");
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?>))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed must be an object, got '" + raw + "'");
+        Map<String, Object> g = (Map<String, Object>) raw;
+        for (String k : g.keySet())
+            if (!List.of("defaultTtlHours", "maxTtlHours", "refuseClassifications").contains(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed has no key '" + k + "'");
+        int ceiling = LinkAnalysisSettings.Embed.CEILING_TTL_HOURS;
+        List<String> refuse = null;
+        Object rc = g.get("refuseClassifications");
+        if (rc != null) {
+            if (!(rc instanceof List<?> l) || l.size() > 20 || l.stream().anyMatch(o -> !(o instanceof String s) || s.isBlank() || s.length() > 64))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "embed.refuseClassifications must be a list of at most 20 classification names, got '" + rc + "'");
+            refuse = new java.util.ArrayList<>();
+            for (Object o : (List<?>) rc) refuse.add(String.valueOf(o).trim().toUpperCase(java.util.Locale.ROOT));
+        }
+        LinkAnalysisSettings.Embed e = new LinkAnalysisSettings.Embed(rangedInt(g, "defaultTtlHours", "embed.defaultTtlHours", ceiling),
+                rangedInt(g, "maxTtlHours", "embed.maxTtlHours", ceiling), refuse);
+        if (e.defaultTtlHours() != null && e.defaultTtlHours() > e.maxTtlHoursInForce())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed.defaultTtlHours (" + e.defaultTtlHours()
+                    + ") must not exceed embed.maxTtlHours in force (" + e.maxTtlHoursInForce() + ")");
+        return e;
     }
 
     private static Integer rangedInt(Map<String, Object> g, String key, String label, int max) {

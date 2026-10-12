@@ -1322,7 +1322,13 @@ public final class ConfigSpecs {
                         "The Draft lifecycle (D21, D7-Q5): max_open = the most open Drafts one Space holds (1..1000; absent = 50); "
                                 + "hibernate_after_minutes = idle minutes before a Draft hibernates (1..10080; absent = 60); "
                                 + "expire_after_days = idle days before it expires and is closed like a discard (1..3650; absent = 30), "
-                                + "always longer than the hibernation; every key absent = the shipped default.")
+                                + "always longer than the hibernation; every key absent = the shipped default."),
+                FieldSpec.of("embed", "Embedded Investigation links", FieldType.MAP,
+                        "Read-only embed links to one Investigation (LA-EMBED-VIEW-1): default_ttl_hours = the lifetime of a link whose mint "
+                                + "states none (1..720; absent = 72); max_ttl_hours = the longest a link may live, a longer request is refused "
+                                + "with 422 (1..720 - a Space may tighten the 30-day ceiling, never raise it; absent = 720); "
+                                + "refuse_classifications = column classifications (strictest of the bound source/target columns) for which "
+                                + "minting is refused with 422 (absent = none); every key absent = the shipped default.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());
     }

@@ -65,6 +65,7 @@ public interface ApiContext extends WriteRootProvider {
     String ATTR_POD_SCOPED = RequestAttrs.ATTR_POD_SCOPED;
     String ATTR_APPROVED_CHANGE = RequestAttrs.ATTR_APPROVED_CHANGE;
     String ATTR_AUDIT_ATTRS = RequestAttrs.ATTR_AUDIT_ATTRS;
+    String ATTR_EMBED_GRANT = RequestAttrs.ATTR_EMBED_GRANT;
 
     /** JSON bodies at or above this size are gzipped when the client sent {@code Accept-Encoding: gzip}. */
     int GZIP_MIN_BYTES = 1024;

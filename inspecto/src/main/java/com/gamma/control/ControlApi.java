@@ -6,6 +6,7 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.Authenticator;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.PublicPaths;
 import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.Envelope;
@@ -248,10 +249,14 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private final RateLimiter pushLimiter = RateLimiter.push();
     /** The expensive Link Analysis routes' own per-subject bucket - see {@link LinkAnalysisRateClasses}. */
     private final RateLimiter linkAnalysisLimiter = RateLimiter.linkAnalysis();
+    /** The embedded-Investigation public view's PER-TOKEN bucket (LA-EMBED-VIEW-1) - see {@link RateLimiter#embed()}. */
+    private final RateLimiter embedLimiter = RateLimiter.embed();
+    /** ...and its per-IP bucket, so guessing many tokens from one address is throttled too. */
+    private final RateLimiter embedIpLimiter = RateLimiter.callback();
 
     /** Test seam: drive every rate-limit bucket from {@code nanos} (deterministic refill in real-HTTP tests). */
     void useRateLimitClock(java.util.function.LongSupplier nanos) {
-        for (RateLimiter l : new RateLimiter[] {rateLimiter, dashboardLimiter, callbackLimiter, pushLimiter, linkAnalysisLimiter})
+        for (RateLimiter l : new RateLimiter[] {rateLimiter, dashboardLimiter, callbackLimiter, pushLimiter, linkAnalysisLimiter, embedLimiter, embedIpLimiter})
             l.useClock(nanos);
     }
 
@@ -755,7 +760,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_KEY,
             ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_SUBJECT_ISSUER, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
-            ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ApiContext.ATTR_AUDIT_ATTRS, ATTR_EFFECTIVE_PATH,
+            ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ApiContext.ATTR_AUDIT_ATTRS, ApiContext.ATTR_EMBED_GRANT, ATTR_EFFECTIVE_PATH,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
 
     /** Drop the request's whole attribute scope — dispatch's first act (see {@link #correlation}).
@@ -852,7 +857,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                             "fix or remove the Safety Policy file, then retry"))));
         } catch (SpaceManager.NoSpaceHostedException none) {
             // Zero Spaces is a normal state (bundles ship none): a clear 503, never a 500 + stack per request.
-            log.debug("{} {} needs a Space and none is attached", ex.getRequestMethod(), path(ex));
+            log.debug("{} {} needs a Space and none is attached", ex.getRequestMethod(), PublicPaths.redact(path(ex)));
             ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE, ErrorCodes.CAPABILITY_UNAVAILABLE);
             respond(ex, 503, Map.of("error", none.getMessage()));
         } catch (Exception e) {
@@ -863,7 +868,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             // would throw again on the same dead socket. Logged at DEBUG so a routine reload stops
             // filling the operator log with 30-frame stacks that look like a real failure.
             if (isClientDisconnect(e)) {
-                log.debug("{} {} aborted by the client: {}", ex.getRequestMethod(), path(ex), e.getMessage());
+                log.debug("{} {} aborted by the client: {}", ex.getRequestMethod(), PublicPaths.redact(path(ex)), e.getMessage());
                 return;
             }
             fail500(ex, e);
@@ -891,7 +896,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *  ERROR log line under that id. {@link ApiException} bodies are authored by their route and unchanged. */
     private void fail500(HttpExchange ex, Throwable t) throws IOException {
         Object cid = ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID);
-        log.error("{} {} failed (Correlation-ID {})", ex.getRequestMethod(), path(ex), cid, t);
+        log.error("{} {} failed (Correlation-ID {})", ex.getRequestMethod(), PublicPaths.redact(path(ex)), cid, t);
         if (ex.getResponseCode() > 0) return;
         respond(ex, 500, Map.of("error", ServerFaults.internalMessage(cid)));
     }
@@ -935,7 +940,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             // No "this is v1" marker is stamped: ApiContext.v1 derives it from the URI, because a stamped
             // flag survives the request wherever exchange attributes fall back to the shared HttpContext map.
             ApiContext.attr(ex, ApiContext.ATTR_START_NANOS, System.nanoTime());
-            ApiContext.attr(ex, ApiContext.ATTR_SELF_PATH, path);
+            ApiContext.attr(ex, ApiContext.ATTR_SELF_PATH, PublicPaths.redact(path));   // links.self must not echo a path token
             path = path.length() == 7 ? "/" : path.substring(7);
         } else if (path.equals("/api") || path.startsWith("/api/")) {
             respond(ex, 404, Map.of("error", "unknown API version — every route is served under /api/v1"));
@@ -1155,7 +1160,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * {@code /api/v1} like every other business route.
      */
     private static boolean isSelfVerifyingPublic(String path) {
-        return path.startsWith("/public/dashboards/") || path.startsWith("/public/delivery-status/");
+        return path.startsWith("/public/dashboards/") || path.startsWith("/public/delivery-status/")
+                || PublicPaths.isSelfVerifying(path);   // a module-registered prefix (LA-EMBED-VIEW-1: /public/investigations/)
     }
 
     private void authenticate(HttpExchange ex, String path) {
@@ -1217,10 +1223,26 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 || path.equals("/db/query") || path.equals("/bi/query")
                 || path.startsWith("/recon/") || path.startsWith("/agent/")
                 || path.startsWith("/public/delivery-status/")
+                || isEmbedPath(path)
                 || StreamPushRoutes.isPushPath(path)
                 // An Entity's case history scans the un-indexed object attribute bag (bounded, but a full-table
                 // LIKE) — throttled on the standard bucket like the other scan routes.
                 || (method.equals("GET") && path.equals("/objects/by-entity"));
+    }
+
+    /** The embedded-Investigation public view (LA-EMBED-VIEW-1): its token rides the path. */
+    private static boolean isEmbedPath(String path) {
+        return path.startsWith("/public/investigations/");
+    }
+
+    /** The per-token bucket key: a hash of the path, so the limiter never holds the token itself. */
+    private static String embedKey(String path) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(path.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return "embed:" + java.util.HexFormat.of().formatHex(d, 0, 12);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** Per-subject (falling back to the caller's IP when unauthenticated) token-bucket throttle for the
@@ -1230,6 +1252,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private void rateLimit(HttpExchange ex, String path) {
         String method = ex.getRequestMethod();
         if (!isRateLimited(method, path)) return;
+        if (isEmbedPath(path)) {   // LA-EMBED-VIEW-1: one bucket PER TOKEN (keyed by its hash, never the token) and one per caller IP
+            String ip = ApiContext.ip(ex);
+            if (!embedIpLimiter.tryConsume(ip == null ? "unknown" : ip) || !embedLimiter.tryConsume(embedKey(path)))
+                throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded - retry later");
+            return;
+        }
         String key = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> {
             String ip = ApiContext.ip(ex);
             return ip == null ? "unknown" : ip;
@@ -1249,6 +1277,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
     static String actionFor(String method, String path) {
         return "GET".equals(method) || "HEAD".equals(method) ? "read"
                 : Roles.CAN_OPERATE_RUNS.equals(CapabilityManifest.capabilityFor(method, path)) ? "operate"
+                : Roles.CAN_SHARE_INVESTIGATION.equals(CapabilityManifest.capabilityFor(method, path)) ? "embed"   // LA-EMBED-VIEW-1
                 : "write";
     }
 
@@ -1413,7 +1442,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private void logStatic(HttpExchange ex, Path file, int status, int bytes) {
         if (!log.isDebugEnabled()) return;
         log.debug("[UI-STATIC] {} {} -> {} ({} bytes, served={})",
-                ex.getRequestMethod(), ex.getRequestURI().getPath(), status, bytes, file.getFileName());
+                ex.getRequestMethod(), PublicPaths.redact(ex.getRequestURI().getPath()), status, bytes, file.getFileName());
     }
 
     /**
@@ -1424,7 +1453,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      */
     private void logStaticMiss(HttpExchange ex, String why) {
         if (!log.isDebugEnabled()) return;
-        log.debug("[UI-STATIC] {} {} -> 404 ({})", ex.getRequestMethod(), ex.getRequestURI().getPath(), why);
+        log.debug("[UI-STATIC] {} {} -> 404 ({})", ex.getRequestMethod(), PublicPaths.redact(ex.getRequestURI().getPath()), why);
     }
 
     /** True when the last path segment carries a file extension (e.g. {@code main.js}, not {@code dashboard}). */
