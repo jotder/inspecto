@@ -1,6 +1,6 @@
 # Link Analysis next features - scoping (embed view, standing detection, Investigation ops, Collector coverage)
 
-**Status: SCOPING 2026-10-12 - docs only, nothing built, decisions OPEN.** The operator chose to build the four parked
+**Status 2026-10-12: decisions TAKEN (section 6a). Built since: embed API S1-S3 (dark), the `lastWeekday` rule, the coverage S1 pinning test; standing detection closed. Parked: embed SPA + host-wide frame headers, coverage S2-S3.** Originally written as docs-only scoping with decisions open. The operator chose to build the four parked
 Link Analysis rows in BACKLOG section 3.12. This page says, per row, what is genuinely left (checked against code on
 `origin/master` `299becc07`), the smallest build slices, the gates each touches, and the decisions the operator must take
 before a slice starts. It is a plan: when a row ships, distil the as-built facts into

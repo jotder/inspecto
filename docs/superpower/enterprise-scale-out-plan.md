@@ -1,7 +1,7 @@
 # Enterprise Scale-Out on Kubernetes — Design Plan
 
 > **Status: SIGNED 2026-09-10 (operator) — D1′–D13, all recommendations accepted, D9 refined by D8, D13 added by the
-> operator. Nothing here is built yet.** The §2 amendments are applied.
+> operator. ⚠ STATUS STALE (2026-10-12): "nothing built" is no longer true — the shared run lease is built (see `HA-RUNLEASE-*` rows); the extent of Phase A/B was not audited.** The §2 amendments are applied.
 >
 > ✅ **SPIKES RUN 2026-09-10 — S2, S3 and S4 are CLOSED; S1 and S5 are answered in part and their live
 > halves are still owed** (they need a reachable Postgres and an S3-compatible endpoint, which the sandbox

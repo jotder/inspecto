@@ -1,6 +1,6 @@
 # Parked rows chosen for BUILD: scoping (2026-10-12)
 
-**Status: SCOPING ONLY. Nothing here is built, no code changed.** The operator chose to build seven parked
+**Status 2026-10-12: decisions D1-D14 TAKEN (section 9a). Built since: batch same-stem guard (stage 1), `group_by` removed from `derive`, Parsing D9 slices 2-3, Risk Score calculated-column note, D6 script. Parked: batch stage 2, BI-query masking, preview rows, Space-comparison hygiene, the think-aloud run.** Originally scoping only. The operator chose to build seven parked
 BACKLOG rows. Every claim below was re-checked against the tree at `origin/master` `299becc07` (grep / read, no
 Maven, no `ng`). Effort: S = under a day, M = 1-3 days, L = a week or more. "SAFE" = an agent can build it now with no
 operator call; "DECISION" = blocked on an item in the numbered list in section 9.

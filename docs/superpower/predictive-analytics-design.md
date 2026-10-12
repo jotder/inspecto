@@ -1,6 +1,6 @@
 # Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)
 
-**Status 2026-10-12: DESIGN FOR OPERATOR INTERVIEW - nothing built, no decision signed.** Written by a docs-only lane
+**Status 2026-10-12: interview HELD - decisions in section 9a (OD-1..OD-9, OD-14, OD-17 decided; S0 done); no kernel built; P3 design-only.** Written by a docs-only lane
 before any code. The key deliverable is section 9 (open decisions). Row: `PREDICTIVE-ANALYTICS-1` (P3) in
 [BACKLOG](../BACKLOG.md); the later Sales & Marketing BI pack is `PACK-SALES-MARKETING-1`. How an add-on, an optional
 module and an Offering are modelled: [`okf/backend/module-reorganisation-decisions.md`](../okf/backend/module-reorganisation-decisions.md)
