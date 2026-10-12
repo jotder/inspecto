@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ControlApiBiQueryMaskingTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String SECRET = "test-secret-0123456789"; // secret-allow: fixed test fixture value
+    private static final String SECRET = "test-secret-0123456789"; // secret-allow: a fixed test fixture value
     private static final String A = "441700900101", B = "441700900202", C = "441700900303";
 
     private static final Authenticator FAKE = ex -> {
