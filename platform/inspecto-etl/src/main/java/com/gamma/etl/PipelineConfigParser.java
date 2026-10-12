@@ -754,6 +754,7 @@ final class PipelineConfigParser {
                 declaredColumns.addAll(columnNamesOf(schemaCfg));
                 if (table != null && !table.isBlank())
                     Identifiers.validate(table, "schemas[col=" + colCount + "].table");
+                validateIndexSelectors(b, schemaCfg, sourceLabel, "schemas[col=" + colCount + "]");
                 validateFixedWidthSelectors(b.fixedWidth, schemaCfg, "schemas[col=" + colCount + "]");
                 validateTextRegexSelectors(b.textRegex, schemaCfg, "schemas[col=" + colCount + "]");
 
@@ -794,6 +795,7 @@ final class PipelineConfigParser {
                 Identifiers.validateSchema(b.singleSchema, "schema_file");
                 requireZoneForTimestampTz(b.singleSchema, b.sourceTimezone, "schema_file");
                 declaredColumns.addAll(columnNamesOf(b.singleSchema));
+                validateIndexSelectors(b, b.singleSchema, sourceLabel, "schema_file");
                 validateFixedWidthSelectors(b.fixedWidth, b.singleSchema, "schema_file");
                 validateTextRegexSelectors(b.textRegex, b.singleSchema, "schema_file");
             }
@@ -2189,6 +2191,28 @@ final class PipelineConfigParser {
             case "right", "rtrim" -> FixedWidth.Trim.RIGHT;
             default -> FixedWidth.Trim.BOTH;   // "both" / "true" / anything else
         };
+    }
+
+    /**
+     * For the delimited and fixed-width frontends a {@code raw.fields[].selector} is a zero-based
+     * column INDEX. A name would otherwise surface at ingest as a scrubbed NumberFormatException, so
+     * refuse it at load with the Pipeline, schema, column and value. JSON / text_regex / xlsx / parquet
+     * frontends (path or group-name selectors) are exempt.
+     */
+    @SuppressWarnings("unchecked")
+    private static void validateIndexSelectors(Builder b, Map<String, Object> schema,
+                                               String pipeline, String label) {
+        if (b.json != null || b.textRegex != null || b.xlsx != null || b.parquet != null) return;
+        Object raw = schema.get("raw");
+        if (!(raw instanceof Map<?, ?> rm) || !(rm.get("fields") instanceof List<?> fields)) return;
+        for (Object o : fields) {
+            if (!(o instanceof Map<?, ?> f)) continue;
+            String sel = String.valueOf(f.get("selector")).trim();
+            if (!sel.matches("\\d+"))
+                throw new IllegalArgumentException("Config error in " + pipeline + ": " + label
+                        + " column '" + f.get("name") + "' has selector '" + sel
+                        + "' - a selector must be a zero-based column index (0, 1, 2, ...), not a name");
+        }
     }
 
     /**

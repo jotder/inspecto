@@ -156,6 +156,17 @@ class FixedWidthTest {
     }
 
     @Test
+    void nonNumericSelectorFailsLoadWithPlainMessage(@TempDir Path dir) {
+        // Column names instead of indexes: must be refused at load, not as a scrubbed NumberFormatException at ingest.
+        String named = FW_GRAMMAR;   // grammar unchanged; the schema is what is wrong
+        Exception e = assertThrows(IllegalArgumentException.class,
+                () -> load(dir, "named", named, SCHEMA.replace("EVENT_DATE,\"1\",DATE", "EVENT_DATE,\"EVENT_DATE\",DATE")));
+        String m = e.getMessage();
+        assertTrue(m.contains("EVENT_DATE") && m.contains("selector 'EVENT_DATE'") && m.contains("zero-based column index")
+                && m.contains("schema_file"), m);
+    }
+
+    @Test
     void binaryWithoutRecordLengthFailsLoad(@TempDir Path dir) {
         String bin = FW_GRAMMAR.replace("record: line", "record: bytes");
         Exception e = assertThrows(IllegalArgumentException.class, () -> load(dir, "bin", bin));
@@ -188,8 +199,12 @@ class FixedWidthTest {
 
     /** Build + load a pipeline whose processing block embeds {@code procExtra} (the csv_settings/grammar). */
     private static PipelineConfig load(Path dir, String tag, String procExtra) throws Exception {
+        return load(dir, tag, procExtra, SCHEMA);
+    }
+
+    private static PipelineConfig load(Path dir, String tag, String procExtra, String schemaText) throws Exception {
         Path schema = dir.resolve("schema_" + tag + ".toon");
-        Files.writeString(schema, SCHEMA, StandardCharsets.UTF_8);
+        Files.writeString(schema, schemaText, StandardCharsets.UTF_8);
         String d = fwd(dir);
         String pipe =
                 "name: FW_" + tag + "\n" +
