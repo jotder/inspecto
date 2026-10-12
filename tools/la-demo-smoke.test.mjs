@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { moduleRoutePatterns } from './lib/module-routes.mjs';
 import { expectStatus, countLaRoutes, tamperManifest, rateLimitVerdict, poolVerdict, buildProbes, run, EXPECTED_LA_ROUTES,
   TELECOM_DATASETS, TELECOM_LINK_COLUMNS, TELECOM_ALERT_RULES, TELECOM_HUB, TELECOM_PACKS, telecomRegistryVerdict, triggerVerdict,
   expandVerdict, patternVerdict, telecomAlertsVerdict, runTelecom, resolvePresenter, denialReason } from './la-demo-smoke.mjs';
@@ -19,6 +20,14 @@ test('countLaRoutes counts /inv and /geo rows only; a non-inventory is -1', () =
   const routes = [{ pattern: '/inv/index' }, { pattern: '/geo/projection' }, { pattern: '/cases' }, { pattern: '/invoice' }];
   assert.equal(countLaRoutes({ routes }), 2);
   assert.equal(countLaRoutes({}), -1);
+});
+
+test('every route the LA manifests declare is counted by countLaRoutes (the 82-vs-81 mismatch was the /public embed route)', () => {
+  const declared = [...moduleRoutePatterns('la/inspecto-la-api'), ...moduleRoutePatterns('la/inspecto-geo-link')];
+  assert.equal(declared.length, EXPECTED_LA_ROUTES);
+  const routes = declared.map((d) => ({ pattern: d.split(' ')[1] }));
+  assert.equal(countLaRoutes({ routes }), EXPECTED_LA_ROUTES);
+  assert.ok(routes.some((r) => r.pattern.startsWith('/public/')), 'the anonymous embed route is among them');
 });
 
 test('tamperManifest changes every 64-hex hash and keeps the rest', () => {
@@ -250,6 +259,7 @@ test('poolInlineOnly: all-inline runs are a skip, a 429 or a 503 is not', () => 
   assert.equal(poolInlineOnly([200, 429]), false);
   assert.equal(poolInlineOnly([200, 503]), false);
   assert.equal(poolInlineOnly([]), false);
+  assert.equal(poolInlineOnly(Array(19).fill(202)), false);   // a 202 reached the pool
 });
 
 test('driftCsv: header kept, 40 MULE-HUB-01 rows on the drift day, every id unique; driftDay is far-future and per second', () => {

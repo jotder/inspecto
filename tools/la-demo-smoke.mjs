@@ -44,11 +44,12 @@ export function expectStatus(res, want) {
   return null;
 }
 
-/** The inventory's /inv + /geo route count, or -1 when the body is not an inventory. */
+/** The inventory's Link Analysis route count, or -1 when the body is not an inventory. The manifests declare /inv, /geo AND the one
+ *  anonymous /public/investigations/{token} embed route (82 = 76 + 6); counting only /inv|/geo reported 81 against 82. */
 export function countLaRoutes(inventory) {
   const rows = inventory && Array.isArray(inventory.routes) ? inventory.routes : null;
   if (!rows) return -1;
-  return rows.filter((r) => /^\/?(api\/v1\/)?(inv|geo)(\/|$)/.test(String(r.pattern))).length;
+  return rows.filter((r) => /^\/?(api\/v1\/)?(inv|geo|public\/investigations)(\/|$)/.test(String(r.pattern))).length;
 }
 
 /** A manifest that no longer matches the store: every string hash/root field (the server writes `sha256:<64hex>`; a
@@ -129,9 +130,9 @@ export function duplicateBuildVerdict(first, dup) {
   return dup.status === 409 ? null : `second start of the same mapping: expected 409, got ${dup.status} (the first build may have finished already)`;
 }
 
-/** True when every concurrent run was answered inline (200/202): nothing was queued, so no 503 can happen at this graph size. */
+/** True when every concurrent run was answered inline (200; a 202 means the run reached the pool): nothing was queued, so no 503 can happen at this graph size. */
 export function poolInlineOnly(statuses) {
-  return statuses.length > 0 && statuses.every((s) => s === 200 || s === 202);
+  return statuses.length > 0 && statuses.every((s) => s === 200);
 }
 
 // ---- telecom probe group (--telecom) ------------------------------------------------------------------------------
@@ -447,7 +448,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const probes = buildProbes({ space, offSpace });
   if (dryRun) {
     for (const p of probes) log(`  ${(p.as || '(no token)').padEnd(13)} ${p.method} /spaces/${p.space}${p.path}  -> ${JSON.stringify(p.want)}`);
-    log(`  admin         GET /spaces/${space}/audit/route-inventory  -> ${EXPECTED_LA_ROUTES} /inv + /geo routes`);
+    log(`  admin         GET /spaces/${space}/audit/route-inventory  -> ${EXPECTED_LA_ROUTES} Link Analysis routes`);
     log(`  fm.analyst    GET dossier, tamper the manifest, POST dossier/verify  -> verified:false`);
     log(`  fm.analyst    replay hash before/after copying a staged file  ${inbox && staged ? '' : '(SKIPPED: no --staged/--inbox)'}`);
     log(`  fm.analyst    GET ${EMPTY_DATASET} rows (empty) then POST /inv/projection  -> 409 'has no data yet', no IO Error/read_parquet/path  (SKIPPED if it has rows)`);
@@ -499,7 +500,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
 
   const inventory = await call('admin', 'GET', '/audit/route-inventory');
   const n = inventory.status === 200 ? countLaRoutes(inventory.data) : -1;
-  record(`route inventory lists ${EXPECTED_LA_ROUTES} /inv + /geo routes`, n === EXPECTED_LA_ROUTES ? null : `got ${n} (HTTP ${inventory.status})`);
+  record(`route inventory lists ${EXPECTED_LA_ROUTES} Link Analysis routes`, n === EXPECTED_LA_ROUTES ? null : `got ${n} (HTTP ${inventory.status})`);
 
   const dossier = await call('fm.analyst', 'GET', `/inv/investigations/${INV}/dossier`);
   if (dossier.status !== 200 || !dossier.data.manifest) record('tamper verify fails', `no dossier manifest (HTTP ${dossier.status})`);
