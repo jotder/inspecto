@@ -289,8 +289,10 @@ final class ReportJob implements Job {
         // The cap the executor trims to must be the one the SQL's probe was built from: the spec parser clamps to its
         // maximum, so an unclamped `limit` above it would leave the executor waiting for rows the SQL can never return.
         int cap = spec != null ? spec.limit() : limit;
-        return QueryExecutor.run(new QueryExecutor.Request(
+        QueryExecutor.Result raw = QueryExecutor.run(new QueryExecutor.Request(
                 cfg.require("dataset"), relationSql, sql.sql(), cap, 0, List.of(), List.of(), sql.params()));
+        // BI-QUERY-MASKING-1: the file leaves the platform, so classified entity keys are always aliased (no viewer to ask).
+        return ReportRowMasking.provider().map(m -> m.mask(writeRoot, cfg.require("dataset"), dataset, spec, raw)).orElse(raw);
     }
 
     /** The configured row cap (default 10,000), as the request carries it. */
