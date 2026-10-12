@@ -195,6 +195,7 @@ export class LinkAnalysisInvestigationComponent {
 
     /** "Investigate <id>": create, seed, then expand two degrees. Asks for the purpose like every Investigation. */
     async investigatePending(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const p = this.pending();
         if (!p) return;
         if (this.title.invalid || this.purpose.invalid) {
@@ -293,6 +294,7 @@ export class LinkAnalysisInvestigationComponent {
 
     /** "Expand anyway" on one flagged entity (`expandHubs: [id]`), after the confirmation. */
     async expandAnyway(id: string): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const form = this.rungForm();
         const rung = form ? form.rung() : {};
         if (!rung || !(await this.confirmOverride([id]))) return;
@@ -304,6 +306,7 @@ export class LinkAnalysisInvestigationComponent {
     readonly outcomeMessage = degreeOutcomeMessage;
 
     async expandNextDegree(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const held = this.includeHubs() ? this.degree().heldHubs : [];
         const form = this.rungForm();
         const advanced = form ? form.rung() : null;
@@ -426,6 +429,7 @@ export class LinkAnalysisInvestigationComponent {
     };
 
     async start(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const p = this.projection();
         if (!p || this.title.invalid || this.purpose.invalid) return;
         const timeCol = this.timeColumn.value.trim() || this.timeCol();
@@ -449,6 +453,7 @@ export class LinkAnalysisInvestigationComponent {
 
     /** Apply the queued ranked nodes as ONE seed step on the open Investigation, then empty the queue. */
     async seedQueued(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const queued = this.store.queuedSeeds();
         if (!queued.length || !this.store.active()) return;
         const entityType = this.store.activeRef()?.entityType;
@@ -470,6 +475,7 @@ export class LinkAnalysisInvestigationComponent {
     }
 
     seed(): void {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const n = this.store.selected();
         if (!n) return;
         const entityType = this.store.activeRef()?.entityType;
@@ -483,6 +489,7 @@ export class LinkAnalysisInvestigationComponent {
     private readonly rungForm = viewChild(InvestigationExpandRungComponent);
 
     async expand(all = false): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const form = this.rungForm();
         const own = form ? form.rung() : {};
         if (!own) return;
@@ -509,10 +516,12 @@ export class LinkAnalysisInvestigationComponent {
     }
 
     mark(op: 'hide' | 'keep'): void {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         this.store.apply({ op, ids: this.selectedInSet() });
     }
 
     async exclude(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         if (this.reason.invalid) {
             this.reason.markAsTouched();
             return;
@@ -526,6 +535,7 @@ export class LinkAnalysisInvestigationComponent {
     }
 
     async annotate(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         if (this.note.invalid) {
             this.note.markAsTouched();
             return;
@@ -536,6 +546,7 @@ export class LinkAnalysisInvestigationComponent {
 
     /** D-U9: a note on the picked link, named by its `linkId`. */
     async annotateLink(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const linkId = this.linkPick();
         if (!linkId) return;
         if (this.linkNote.invalid) {
@@ -609,6 +620,7 @@ export class LinkAnalysisInvestigationComponent {
     });
 
     async createFork(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const o = this.order();
         if (!o || !this.orderChanged()) return;
         if (await this.store.fork(o)) this.order.set(null);

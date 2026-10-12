@@ -233,6 +233,37 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         }
     });
 
+    it('without the capability Start Investigation is disabled with the reason, and Enter in a field fires no write', async () => {
+        const ro = create({ canManage: false });
+        const purpose = ro.el.querySelector('input[required]') as HTMLInputElement;
+        purpose.value = 'warrant 7';
+        purpose.dispatchEvent(new Event('input'));
+        ro.fixture.detectChanges();
+        expect(ro.button('Start Investigation').disabled).toBe(true);
+        expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
+            'Starting an Investigation needs the Incident management capability',
+        );
+        purpose.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        const title = ro.el.querySelector('input[maxlength]') as HTMLInputElement | null;
+        title?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        await ro.fixture.whenStable();
+        expect(ro.inv.createInvestigation).not.toHaveBeenCalled();
+
+        TestBed.resetTestingModule();
+        const { fixture, store, el, inv } = create({ canManage: false });
+        await openInv(store);
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+        const reason = Array.from(el.querySelectorAll('mat-form-field'))
+            .find((f) => f.textContent?.includes('Reason'))
+            ?.querySelector('input') as HTMLInputElement;
+        reason.value = 'because';
+        reason.dispatchEvent(new Event('input'));
+        reason.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+    });
+
     it('with the capability the read-only note is absent and Seed is enabled', async () => {
         const { fixture, store, el, button } = create();
         await openInv(store);
