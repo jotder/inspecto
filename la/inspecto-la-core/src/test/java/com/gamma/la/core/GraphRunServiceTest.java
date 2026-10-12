@@ -305,6 +305,29 @@ class GraphRunServiceTest {
         settle(b);
     }
 
+    /** The documented default pool (2 running + 16 waiting): 18 concurrent runs are held, the 19th is REJECTED (-> 503 STORE_BUSY). */
+    @Test
+    void theStandardPoolHoldsEighteenAndRefusesTheNineteenth() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        svc = new GraphRunService(new Probe(ctl -> {
+            release.await();
+            return answer();
+        }), Limits.standard());
+        List<RunView> held = new ArrayList<>();
+        for (int i = 0; i < 18; i++) {                          // a distinct scope per run: no cache or in-flight sharing
+            Request r = req("alice", ring(4));
+            held.add(svc.submit(new Request(r.owner(), r.investigationId(), r.relationKey(), "scope-" + i, r.algorithm(),
+                    r.params(), r.weightsSpec(), r.input(), r.budget())));
+        }
+        Request r = req("alice", ring(4));
+        GraphRunException full = assertThrows(GraphRunException.class, () -> svc.submit(new Request(r.owner(),
+                r.investigationId(), r.relationKey(), "scope-19", r.algorithm(), r.params(), r.weightsSpec(), r.input(), r.budget())));
+        assertEquals(Kind.REJECTED, full.kind());
+        assertTrue(full.getMessage().contains("2 running, 16 waiting"), full.getMessage());
+        release.countDown();
+        for (RunView v : held) settle(v);
+    }
+
     @Test
     void aBadRequestIsRefusedBeforeAnyRunExists() {
         svc = new GraphRunService(new Probe(ctl -> answer()), TIGHT);
