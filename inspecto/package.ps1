@@ -324,7 +324,7 @@ if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
 # when the profile is requested, from the repo root (they are siblings of inspecto/, not submodules).
 # Enterprise is a SUPERSET of Professional (the -Pedition-enterprise profile = edition-professional + policy),
 # so it bundles the OIDC jar too — an Enterprise deployment authenticates AND authorizes.
-$demoFlags = $null     # set only in the Demo Auth branch; the bake call reads it behind the same switch
+$demoFlags=$null   # set only in the Demo Auth branch; the bake call reads it behind the same switch
 $oidcJarSrc = $null
 $secretsJarSrc = $null
 $geoCountryJarSrc = $null
