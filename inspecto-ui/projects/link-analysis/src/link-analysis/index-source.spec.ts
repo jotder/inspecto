@@ -95,3 +95,18 @@ describe('index source wording (DR-U4)', () => {
         expect(recursivePathsToGraph({ ...res, source: undefined }, { nodes: [], edges: [] }).state.source).toBeUndefined();
     });
 });
+
+describe('recursivePathsToGraph - the server returns one row per parallel link (DR-D5)', () => {
+    it('shows 36 identical A>B>C rows as one path carrying its count', () => {
+        const row = { nodes: ['A', 'B', 'C'], hops: 2, weight: null };
+        const res = {
+            paths: Array.from({ length: 36 }, () => ({ ...row })),
+            truncated: false,
+            edgeYieldCapped: false,
+            fences: { maxDepth: 6, maxEdgeYield: 5, timeoutMs: 1 },
+        } as unknown as RecursivePathsResult;
+        const { state } = recursivePathsToGraph(res, { nodes: [], edges: [] });
+        expect(state.paths).toHaveLength(1);
+        expect(state.paths[0].count).toBe(36);
+    });
+});
