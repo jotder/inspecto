@@ -1014,7 +1014,14 @@ public final class InvRoutes implements RouteModule {
             }
         }
         int maxDepth = clamp(body.get("maxDepth"), DEFAULT_DEPTH, MAX_DEPTH);
-        int maxEdges = clamp(body.get("maxEdgeYield"), DEFAULT_EDGE_YIELD, MAX_EDGE_YIELD);
+        int maxEdgesIn = clamp(body.get("maxEdgeYield"), DEFAULT_EDGE_YIELD, MAX_EDGE_YIELD);
+        // A DEFAULT is not a declaration (operator 2026-10-11): a caller that sent no maxEdgeYield gets the default clamped to
+        // four_eyes_fan_out_above instead of a refusal; an explicitly declared bound above it is still refused below.
+        if (body.get("maxEdgeYield") == null) {
+            Integer fanOutAbove = LinkAnalysisSettings.forRoot(writeRoot).fourEyesFanOutAbove();
+            if (fanOutAbove != null && maxEdgesIn > fanOutAbove) maxEdgesIn = Math.max(1, fanOutAbove);
+        }
+        int maxEdges = maxEdgesIn;
         int limit = clamp(body.get("limit"), DEFAULT_PATHS, MAX_PATHS);
 
         String relationSql = relationFor(api, ex, writeRoot, datasetId);

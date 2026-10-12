@@ -496,6 +496,23 @@ class ControlApiInvestigationOversightTest {
         }
     }
 
+    @Test
+    void aTraversalThatDeclaresNoMaxEdgeYieldIsClampedToTheFanOutThresholdNotRefused(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        String rp = "/inv/traversal/recursive-paths";
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "four_eyes_fan_out_above: 5\n");
+            // A default is not a declaration: nothing sent -> clamped to the threshold, runs, and says what it used.
+            JsonNode ok = post(c, rp, traversal(null, null));
+            assertTrue(ok.get("paths").size() > 0);
+            assertEquals(5, ok.at("/fences/maxEdgeYield").asInt());
+            // A declared bound above the threshold is still refused, as is one that exceeds only by a default depth.
+            HttpResponse<String> declared = send(c.port, "POST", rp, traversal(null, 10_000), null);
+            assertEquals(403, declared.statusCode(), declared.body());
+            assertTrue(declared.body().contains("fan-out 10000 > 5"), declared.body());
+        }
+    }
+
     private static String projection(int limit) {
         return "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"limit\":" + limit + "}";
     }
