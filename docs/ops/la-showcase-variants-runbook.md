@@ -24,7 +24,7 @@ Prerequisites (verified):
 3. JVM properties (read by `InvestigationStores`): `-Dinvestigations.backend=db`,
    `-Dinvestigations.db.url=jdbc:postgresql://<host>:5432/<db>`, and `-Dinvestigations.db.user` / `.password`;
    each connection property falls back to `-Dinspecto.db.url` / `.user` / `.password`.
-   Pass them with the launcher's operator hook: `INSPECTO_JAVA_OPTS` (`inspecto/package.ps1`, the `serve.*` launchers).
+   Pass them with the launcher's operator hook: `INSPECTO_JAVA_OPTS` (`inspecto/package.ps1`; honoured by `serve.*` and `serve-demo.*`, fallback `EXTRA_JAVA_OPTS`). Not `JAVA_TOOL_OPTIONS`.
    Do not put the password in a committed file.
 
 Steps:
@@ -64,6 +64,6 @@ If you need the demo, use an Enterprise or Professional bundle (filesystem store
 - Variant A has not been run against a live PostgreSQL by this page's author; the property names, the 503
   semantics and the `investigationStoreInForce` echo are from code and `ControlApiSettingsTest` /
   `InvestigationStoresTest`, not from a live boot.
-- Whether `INSPECTO_JAVA_OPTS` is honoured by `serve-demo.*` specifically was not exercised (the
-  `package.ps1` comments say the launchers share one contract).
+- `serve-demo.*` honouring `INSPECTO_JAVA_OPTS` is proved by the static launcher guard
+  (`tools/check-launchers.mjs`), not by a live demo-bundle launch.
 - The Personal 503 for `/inv/*` was not re-probed on a built Personal bundle in this pass.

@@ -1127,7 +1127,7 @@ As-built decisions:
   reaches `healthy`; the emitted file is byte-identical to the packer's here-string.
 
 **Extra JVM flags — `INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`), honored by all six launchers
-since `1768978f`. Whitespace-separated, appended **after** each script's own flags (and, in
+since `1768978f`, and by `serve-demo.sh`/`.bat` (demo bundles). Whitespace-separated, appended **after** each script's own flags (and, in
 `run`/`ura`, before `-jar`/`-cp`), so the mandatory `--enable-native-access=ALL-UNNAMED`, the port,
 the spaces root and the auth wiring cannot be clobbered from the environment. The launch banner
 echoes whatever was passed, so a flag that did not land is visible rather than silent.
