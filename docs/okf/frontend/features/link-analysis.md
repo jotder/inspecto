@@ -351,7 +351,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
     `combo-combined`), and **"combos" is a data-model change**, not a plugin — it needs `comboId` on the
     graph data.
 * **The two graph caps are per-space SETTINGS, not constants** — `GET|PUT /settings/link-analysis`
-  (`link-analysis.toon`, `canAuthorWorkbench`, the same shape as branding and geo). `null` on either
+  (`link-analysis.toon`, `canAuthorWorkbench`, the same shape as branding and geo). **A PUT REPLACES the whole document** (as every settings PUT does, decided 2026-10-12): a key absent from the body is written as `null`, so a body of only `{index:{maxAgeHours:24}}` resets the masking mode and the four-eyes thresholds to the shipped defaults - send the full form (the SPA does). `null` on either
   field means **inherit the shipped default**, never *unbounded*. The shipped values (500 projection,
   2 000 analysis) are **measurements, not truths**: they came from one host, one browser and one
   synthetic graph shape, and a denser graph or a slower laptop moves them.
