@@ -1,9 +1,11 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { IdentityGroupIndex, IdentityImportResult, InvService } from '@inspecto/link-analysis/api/inv.service';
+import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
@@ -21,7 +23,7 @@ const IMPORTED: IdentityImportResult = {
     headHash: 'sha256:def456',
 };
 
-function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
+function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, canManage = true) {
     const inv = {
         listIdentityGroups: vi.fn(() => of(HEAD)),
         importIdentities: vi.fn(() => of(IMPORTED)),
@@ -31,6 +33,7 @@ function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
         providers: [
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
+            { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
             {
                 provide: LA_DATASETS,
                 useValue: { list: () => of([{ id: 'map', name: 'SIM map', sourceName: 'map' }]), get: () => of({}) },
@@ -52,6 +55,27 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         expect(el.textContent).toContain('Chain verified');
         expect(el.querySelector('[aria-label="Identity Fact log head"]')!.textContent).toContain('sha256:abc123');
         await expectNoA11yViolations(el);
+    });
+
+    it('without the Incident management capability there is no import form, no read, and the reason shows', async () => {
+        const { f, el, inv } = create({}, false);
+        await f.whenStable();
+        f.detectChanges();
+        expect(inv.listIdentityGroups).not.toHaveBeenCalled();
+        expect(el.querySelector('form')).toBeNull();
+        expect(el.querySelector('[data-testid="identity-read-only"]')?.textContent).toContain(
+            'Incident management capability',
+        );
+        await expectNoA11yViolations(el);
+    });
+
+    it('with the capability the import form is present and the log is read', async () => {
+        const { f, el, inv } = create({}, true);
+        await f.whenStable();
+        f.detectChanges();
+        expect(inv.listIdentityGroups).toHaveBeenCalled();
+        expect(el.querySelector('form')).not.toBeNull();
+        expect(el.querySelector('[data-testid="identity-read-only"]')).toBeNull();
     });
 
     it('says the chain did NOT verify on a 500 and shows no stale head hash', async () => {

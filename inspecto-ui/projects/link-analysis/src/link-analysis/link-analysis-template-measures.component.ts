@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { LensService } from '@inspecto/core/api';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
@@ -61,17 +62,37 @@ import {
                 <p class="text-secondary m-0">At step {{ m.head.step }}.</p>
             }
             <div class="flex flex-wrap gap-1">
-                <button mat-stroked-button [disabled]="!log()?.entries?.length" (click)="saveTemplate()">
+                <button
+                    mat-stroked-button
+                    [disabled]="!canWrite() || !log()?.entries?.length"
+                    [attr.aria-describedby]="canWrite() ? null : 'templates-read-only'"
+                    (click)="saveTemplate()"
+                >
                     Save as template…
                 </button>
-                <button mat-button (click)="instantiate()">Instantiate a template…</button>
+                <button
+                    mat-button
+                    [disabled]="!canWrite()"
+                    [attr.aria-describedby]="canWrite() ? null : 'templates-read-only'"
+                    (click)="instantiate()"
+                >
+                    Instantiate a template…
+                </button>
             </div>
+            @if (!canWrite()) {
+                <p id="templates-read-only" class="text-secondary m-0" data-testid="templates-read-only">
+                    Read-only: saving or instantiating a template needs the Incident management capability.
+                </p>
+            }
         </section>
     `,
 })
 export class LinkAnalysisTemplateMeasuresComponent {
     private inv = inject(InvService);
     private dialog = inject(MatDialog);
+    private readonly lens = inject(LensService);
+    /** Template writes (`POST .../template`, `.../instantiate`) are gated server-side on `canManageIncidents`. */
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
 
     readonly investigationId = input.required<string>();
     readonly log = input<InvestigationLog | null>(null);

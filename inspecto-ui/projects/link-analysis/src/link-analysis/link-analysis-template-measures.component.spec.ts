@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialog } from '@angular/material/dialog';
@@ -6,6 +6,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationMeasures } from '@inspecto/link-analysis/api/inv.service';
+import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
 import { InstantiateTemplateDialog, WatchMeasureDialog } from './link-analysis-template.dialogs';
@@ -35,7 +36,7 @@ const MEASURES: InvestigationMeasures = {
     cached: false,
 };
 
-async function create(measures: () => unknown = () => of(MEASURES)) {
+async function create(measures: () => unknown = () => of(MEASURES), canManage = true) {
     const open = vi.fn(() => ({ afterClosed: () => of({ id: 'inv-2', header: { title: 'T' } }) }));
     TestBed.configureTestingModule({
         imports: [Host],
@@ -43,6 +44,7 @@ async function create(measures: () => unknown = () => of(MEASURES)) {
             provideNoopAnimations(),
             { provide: InvService, useValue: { investigationMeasures: vi.fn(measures) } },
             { provide: MatDialog, useValue: { open } },
+            { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
         ],
     });
     const f = TestBed.createComponent(Host);
@@ -54,6 +56,25 @@ async function create(measures: () => unknown = () => of(MEASURES)) {
 }
 
 describe('LinkAnalysisTemplateMeasuresComponent (LA-23)', () => {
+    const tplButtons = (el: HTMLElement) =>
+        Array.from(el.querySelectorAll('button')).filter((b) => /template/.test(b.textContent ?? ''));
+
+    it('without the Incident management capability Save and Instantiate are disabled with the reason; with it, enabled', async () => {
+        const ro = await create(() => of(MEASURES), false);
+        const [save, inst] = tplButtons(ro.el);
+        expect(save.disabled).toBe(true);
+        expect(inst.disabled).toBe(true);
+        expect(inst.getAttribute('aria-describedby')).toBe('templates-read-only');
+        expect(ro.el.querySelector('[data-testid="templates-read-only"]')?.textContent).toContain(
+            'Incident management capability',
+        );
+        await expectNoA11yViolations(ro.el);
+        TestBed.resetTestingModule();
+        const rw = await create(() => of(MEASURES), true);
+        expect(tplButtons(rw.el)[1].disabled).toBe(false);
+        expect(rw.el.querySelector('[data-testid="templates-read-only"]')).toBeNull();
+    });
+
     it('renders the Measures strip with values, an em dash for an absent value, and the head step', async () => {
         const { el } = await create();
         const strip = el.querySelector('[aria-label="Measures strip"]')!.textContent!;

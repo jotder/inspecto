@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { firstValueFrom } from 'rxjs';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { apiErrorMessage, LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { LA_DATASETS, LaDataset } from '@inspecto/link-analysis/la-host';
@@ -94,6 +94,12 @@ export function importFieldNames(message: string): string {
                 </dl>
             }
 
+            @if (!canManage()) {
+                <p class="text-secondary m-0" data-testid="identity-read-only">
+                    Read-only: the Identity Fact log and its import need the Incident management capability - reading
+                    it too, because a group read would reveal which identifiers belong together.
+                </p>
+            } @else {
             <form
                 class="flex flex-wrap items-start gap-2"
                 aria-label="Import identity assertions"
@@ -149,6 +155,7 @@ export function importFieldNames(message: string): string {
                     {{ r.skipped.empty }} empty, {{ r.skipped.self }} self-pair.
                 </inspecto-alert>
             }
+            }
         </section>
     `,
 })
@@ -156,6 +163,9 @@ export class LinkAnalysisIdentityComponent implements OnInit {
     private inv = inject(InvService);
     private datasetsPort = inject(LA_DATASETS);
     private rows = inject(DatasetRowsService);
+    private readonly lens = inject(LensService);
+    /** Reads AND writes are gated server-side on `canManageIncidents`; the panel asks the same question. */
+    readonly canManage = computed(() => this.lens.canManageIncidents());
 
     /** The Datasets the mapping can come from, and the picked one's columns (declared, else probed). */
     readonly datasets = signal<LaDataset[]>([]);
@@ -179,6 +189,7 @@ export class LinkAnalysisIdentityComponent implements OnInit {
     }
 
     ngOnInit(): void {
+        if (!this.canManage()) return;
         void this.load();
         this.datasetsPort.list().subscribe({ next: (d) => this.datasets.set(d), error: () => this.datasets.set([]) });
     }
@@ -218,7 +229,7 @@ export class LinkAnalysisIdentityComponent implements OnInit {
     }
 
     async import(): Promise<void> {
-        if (!this.valid()) return;
+        if (!this.valid() || !this.canManage()) return;
         this.busy.set(true);
         this.error.set('');
         this.imported.set(null);

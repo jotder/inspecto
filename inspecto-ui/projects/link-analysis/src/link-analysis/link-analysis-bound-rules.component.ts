@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { LensService } from '@inspecto/core/api';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -107,10 +108,22 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                         </form>
                     } @else {
                         <div>
-                            <button mat-stroked-button type="button" data-test="edit-open" (click)="open(r)">
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-test="edit-open"
+                                [disabled]="!canAuthor()"
+                                [attr.aria-describedby]="canAuthor() ? null : 'bound-rules-read-only'"
+                                (click)="open(r)"
+                            >
                                 Edit rule
                             </button>
                         </div>
+                        @if (!canAuthor()) {
+                            <p id="bound-rules-read-only" class="text-secondary m-0" data-test="bound-rules-read-only">
+                                Read-only: editing an Alert Rule needs the Alert Rule authoring capability.
+                            </p>
+                        }
                     }
                     @if (r.valueMeasure) {
                         <inspecto-link-analysis-standing-detection
@@ -126,6 +139,9 @@ import { isUnavailable } from './link-analysis-template.dialogs';
 })
 export class LinkAnalysisBoundRulesComponent {
     private inv = inject(InvService);
+    private readonly lens = inject(LensService);
+    /** Editing a bound rule (`PUT .../alert-rules/{name}`) is gated server-side on `canAuthorAlertRules`. */
+    readonly canAuthor = computed(() => this.lens.canAuthorAlertRules());
 
     readonly investigation = input.required<InvestigationHeader>();
     /** Bump (or change) to re-read the list — e.g. after a new rule is bound. */

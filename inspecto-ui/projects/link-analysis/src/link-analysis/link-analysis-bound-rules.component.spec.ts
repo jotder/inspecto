@@ -54,7 +54,7 @@ class HostComponent {
     readonly inv = HEADER;
 }
 
-function setup(rules: BoundAlertRule[]) {
+function setup(rules: BoundAlertRule[], canAuthor = true) {
     const inv = {
         boundAlertRules: vi.fn(() => of({ investigation: 'inv-1', rules })),
         editAlertRule: vi.fn(() => of({ rule: {}, current: 1, wouldFire: false, disclosure: 'x' })),
@@ -68,7 +68,7 @@ function setup(rules: BoundAlertRule[]) {
         providers: [
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
-            { provide: LensService, useValue: { canAuthorAlertRules: () => true } },
+            { provide: LensService, useValue: { canAuthorAlertRules: () => canAuthor } },
             { provide: EventsService, useValue: { search: () => of([]) } },
         ],
     });
@@ -83,6 +83,23 @@ function setup(rules: BoundAlertRule[]) {
 }
 
 describe('LinkAnalysisBoundRulesComponent', () => {
+    it('Edit rule is disabled with the reason without Alert Rule authoring, and enabled with it', async () => {
+        const ro = setup([VALUE_RULE], false);
+        await ro.settle();
+        const btn = () => ro.el.querySelector('[data-test=edit-open]') as HTMLButtonElement;
+        expect(btn().disabled).toBe(true);
+        expect(btn().getAttribute('aria-describedby')).toBe('bound-rules-read-only');
+        expect(ro.el.querySelector('[data-test=bound-rules-read-only]')!.textContent).toContain(
+            'Alert Rule authoring capability',
+        );
+        await expectNoA11yViolations(ro.el);
+        TestBed.resetTestingModule();
+        const rw = setup([VALUE_RULE], true);
+        await rw.settle();
+        expect((rw.el.querySelector('[data-test=edit-open]') as HTMLButtonElement).disabled).toBe(false);
+        expect(rw.el.querySelector('[data-test=bound-rules-read-only]')).toBeNull();
+    });
+
     it('lists the bound rules and shows an enabled rule as Enabled after a reload (read-back)', async () => {
         const { el, inv, settle } = setup([VALUE_RULE, SEALED_RULE]);
         await settle();
