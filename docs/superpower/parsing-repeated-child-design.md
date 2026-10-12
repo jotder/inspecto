@@ -1,6 +1,12 @@
 # Parsing D9 — a repeated-child operation for the ASN.1 Decode Profile (design)
 
-**Status 2026-10-11: APPROVED. SLICE 1 BUILT (commit 9c07a0aeb); slices 2-3 open.**
+**Status 2026-10-12: APPROVED. SLICES 1, 2 AND 3 BUILT (1 = `9c07a0aeb`); slice 4 (editor) and the leftovers below stay open.**
+**2026-10-12 as-built:** `group_by` was REMOVED from `derive` (operator D6; a config naming it fails with
+`ASN1-DERIVE-UNKNOWN-OP`). Slice 2: `ChildSpec` (`platform/inspecto-etl`) + `Asn1RecordIngester.explode`;
+`children: {parent segment: {list path: child segment}}`, selectors `$index` / `$parent.<path>`, codes
+`ASN1-CHILD-UNKNOWN-SEGMENT / -BAD-PATH / -SELF / -NESTED / -LIMIT / -BAD-SELECTOR / -TOO-MANY-ROWS`, cap summed
+per record. Slice 3: drawer read-only list (`derivedColumnsOf`). NOT built: preview rows (the ASN.1 preview is a
+Tree with no rows: needs a design call), `ASN1-DERIVE-NOT-IN-GRAMMAR` and a counters channel (operator D5, deferred).
 Operator answers: closed vocabulary, select/reduce first; `group_by` sums groups into one scalar (per-group rows =
 explode, slice 2); read-only drawer in v1; 10 000 defaults; `select` matches the stringified leaf.
 **Slice 1 as-built deviations:** (a) `DeriveSpec` (public, `platform/inspecto-etl`) holds compile + evaluate instead

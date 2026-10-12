@@ -589,7 +589,7 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
   ⚠ "Give it its own segment" is **not available for ASN.1 today**: `Asn1RecordIngester` keys segments by record
   name only (~:124) and NULLs any `List` (~:189), so those columns load NULL. The "cheaper before C1" window has
   passed (C1–C4 shipped 2026-09-25). The design states no numeric threshold. **Operator decided 2026-10-11 to design it —
-  ✅ **designed and operator-approved 2026-10-11; slice 1 SHIPPED** (`derive` select / reduce, backend only):
+  ✅ **designed and operator-approved 2026-10-11; slices 1, 2 and 3 SHIPPED** (`derive` select / reduce, `children` explode, drawer list):
   [`docs/superpower/parsing-repeated-child-design.md`](../../../superpower/parsing-repeated-child-design.md).
   An optional `derive` block under `asn1:` (segment key → column → operation; closed vocabulary, no expression)
   is compiled by `com.gamma.etl.DeriveSpec` (validated on `DecodeProfile.read` and at config load, `ASN1-DERIVE-*`
@@ -597,9 +597,27 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
   after `raw.fields`, before `EVENT_TYPE`; NULL for missing path / empty list / no match / non-numeric (never 0);
   row cardinality unchanged; no `derive` = byte-identical rows. ⚠ As-built gotchas: a `SEQUENCE OF X` decodes as
   `{field: {X: [..]}}`, so the list path is `field.X` (explicit, no auto-unwrap); TOON has no flow syntax, so
-  write `where:` as a nested block and `group_by[1]: leaf` as a TOON array. `max_list_elements` (default 10 000,
-  ceiling 1 000 000) over-cap fails the file. **Still open:** slice 2 `children` explode, slice 3 drawer display,
-  `ASN1-DERIVE-NOT-IN-GRAMMAR`; no editor.
+  write `where:` as a nested block. `max_list_elements` (default 10 000,
+  ceiling 1 000 000) over-cap fails the file. **`group_by` was REMOVED from the `derive` vocabulary 2026-10-12**
+  (operator D6): it never changed the scalar; a config that still names it is refused with
+  `ASN1-DERIVE-UNKNOWN-OP` ("group_by was removed ... use a children explode"). One row per group is the explode.
+  **Slice 2 SHIPPED 2026-10-12** — `children:` (parent segment key → list path → child segment key; validated by
+  `com.gamma.etl.ChildSpec` on `DecodeProfile.read` and at load; replaced whole on overlay): each element of the
+  list becomes a row of a DECLARED child segment, besides the record's own row. The child schema's selectors
+  resolve relative to the child element, plus `$index` (0-based, as a string) and `$parent.<dotted leaf>`; no
+  engine surrogate key (the parent leaf is the join key); any other `$...` selector is refused
+  (`ASN1-CHILD-BAD-SELECTOR`). Codes: `ASN1-CHILD-UNKNOWN-SEGMENT` (parent or child not in `segments`),
+  `-BAD-PATH`, `-SELF`, `-NESTED` (explode is one level), `-LIMIT`; runtime `ASN1-CHILD-TOO-MANY-ROWS` fails the
+  file (never truncates) when one record explodes past `max_child_rows_per_record` (default 10 000, ceiling
+  1 000 000, summed over a record's lists). A child segment is not matched by record name (a record carrying its
+  name is junk); a `derive` on a child segment runs over the child element. TOON accepts the dotted list path as
+  a map key (`usage.usage: Usage`). Tests: `ChildSpecTest`, `Asn1RecordIngesterChildTest` over the synthetic
+  `repeated_child` case. **Slice 3 SHIPPED 2026-10-12** — the Parse drawer lists the effective `derive` read-only
+  ("N derived columns on M segments", segment / column / operation; the Pipeline's own `asn1.derive` wins whole
+  over the profile's). **Still open:** the preview does NOT compute derived columns — the ASN.1 preview is a record
+  Tree (no rows or columns), so where a derived value would appear is an undecided design question; the counters
+  channel stays log-only (operator D5: `RecordSink` is not widened); `ASN1-DERIVE-NOT-IN-GRAMMAR` deferred
+  (D5); no editor.
 - **T2 — signer anchoring** (`-Djobs.packs.trustStore`, SEC-7). Not built. D2 made T1 the required gate.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24
