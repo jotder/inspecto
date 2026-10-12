@@ -360,4 +360,31 @@ describe('summarizeGraphRun', () => {
         );
         expect(h.lines).toEqual(['Hub A: 0.1235', 'Authority A: 0.3333']);
     });
+
+    it('carries the full-precision score for the tooltip only where the display rounded it (LA-DEMO-POLISH-1)', () => {
+        const s = summarizeGraphRun(
+            {
+                ...base,
+                algorithm: 'pageRank',
+                kind: 'SCORES',
+                scores: [
+                    { id: 'a', label: 'A', score: 0.4080267558479552 },
+                    { id: 'x', label: 'X', score: 1 },
+                ],
+            },
+            MAP,
+        );
+        expect(s.fullLines).toEqual(['A: 0.4080267558479552', '']);
+        const h = summarizeGraphRun(
+            {
+                ...base,
+                algorithm: 'hits',
+                kind: 'HITS',
+                hubs: [{ id: 'a', label: 'A', score: 0.123456 }],
+                authorities: [],
+            },
+            MAP,
+        );
+        expect(h.fullLines).toEqual(['Hub A: 0.123456']);
+    });
 });

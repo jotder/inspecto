@@ -250,7 +250,7 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                         } @else if (s.lines.length) {
                             <ol class="mt-1 list-inside list-decimal">
                                 @for (l of s.lines; track $index) {
-                                    <li>{{ l }}</li>
+                                    <li [attr.title]="s.fullLines[$index] || null" [attr.aria-label]="s.fullLines[$index] || null">{{ l }}</li>
                                 }
                             </ol>
                         }

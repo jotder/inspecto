@@ -10,6 +10,8 @@ import { factorLine, round1 } from './node-risk';
 export interface GraphRunSummary {
     headline: string;
     lines: string[];
+    /** Parallel to `lines`: the same line with the full-precision score where `lines` rounded it, else `''` (tooltip + aria-label). */
+    fullLines: string[];
     nodeIds: string[];
     edgeIds: string[];
 }
@@ -19,6 +21,11 @@ const TOP = 10;
 /** A score for display: at most 4 decimals (`0.4080267558479552` -> `0.408`); the raw value stays in the result. */
 export function fmtScore(x: number): number {
     return Number.isFinite(x) ? Math.round(x * 1e4) / 1e4 : x;
+}
+
+/** A scored line (rounded for display) and its full-precision twin, in one place so the two never disagree. */
+function scored(prefix: string, x: number): { line: string; full: string } {
+    return { line: `${prefix}: ${fmtScore(x)}`, full: `${prefix}: ${x}` };
 }
 
 function plural(n: number, one: string, many = one + 's'): string {
@@ -32,9 +39,15 @@ function plural(n: number, one: string, many = one + 's'): string {
 export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): GraphRunSummary {
     const nodeOf = (ids: string[]) => ids.map((i) => map?.node(i)).filter((i): i is string => !!i);
     const edgeOf = (ids: string[]) => ids.map((i) => map?.edge(i)).filter((i): i is string => !!i);
-    const out = (headline: string, lines: string[] = [], nodeIds: string[] = [], edgeIds: string[] = []) => ({
+    const out = (
+        headline: string,
+        lines: (string | { line: string; full: string })[] = [],
+        nodeIds: string[] = [],
+        edgeIds: string[] = [],
+    ) => ({
         headline,
-        lines,
+        lines: lines.map((l) => (typeof l === 'string' ? l : l.line)),
+        fullLines: lines.map((l) => (typeof l === 'string' || l.full === l.line ? '' : l.full)),
         nodeIds,
         edgeIds,
     });
@@ -53,7 +66,7 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             const s = (r.scores ?? []) as GraphScoreView[];
             return out(
                 `${plural(s.length, 'node')} scored.`,
-                s.slice(0, TOP).map((x) => `${x.label}: ${fmtScore(x.score)}`),
+                s.slice(0, TOP).map((x) => scored(x.label, x.score)),
                 nodeOf(s.slice(0, TOP).map((x) => x.id)),
             );
         }
@@ -63,8 +76,8 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             return out(
                 `${plural(h.length, 'hub')} and ${plural(a.length, 'authority', 'authorities')} scored.`,
                 [
-                    ...h.slice(0, 5).map((x) => `Hub ${x.label}: ${fmtScore(x.score)}`),
-                    ...a.slice(0, 5).map((x) => `Authority ${x.label}: ${fmtScore(x.score)}`),
+                    ...h.slice(0, 5).map((x) => scored(`Hub ${x.label}`, x.score)),
+                    ...a.slice(0, 5).map((x) => scored(`Authority ${x.label}`, x.score)),
                 ],
                 nodeOf([...h.slice(0, 5), ...a.slice(0, 5)].map((x) => x.id)),
             );
@@ -136,7 +149,7 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             const l = r.links ?? [];
             return out(
                 `${plural(l.length, 'predicted link')}.`,
-                l.slice(0, TOP).map((x) => `${x.sourceLabel} - ${x.targetLabel}: ${fmtScore(x.score)}`),
+                l.slice(0, TOP).map((x) => scored(`${x.sourceLabel} - ${x.targetLabel}`, x.score)),
                 nodeOf(l.flatMap((x) => [x.source, x.target])),
             );
         }
