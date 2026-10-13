@@ -362,6 +362,7 @@ dotted outline (legend: *Dotted outline: not expanded yet*, with a count). Hover
 marks its entity expanded. An entity a step added is itself unexpanded until you expand it, undoing a step reverts it,
 and a *high connectivity* hub keeps its ring instead (it is already "shown, not expanded"). Use it to pick the next
 node to expand when you go one node at a time.
+Two buttons under that legend row help: *Next unexpanded* selects the next unexpanded entity (so *Expand one hop* acts on it) and *Only unexpanded* draws just the unexpanded frontier until you press it again.
 
 **Choosing neighbours.** With one entity selected, **Choose neighbours…** in the Investigation tab lists its
 neighbours, strongest first, with their event counts and link kinds. Tick some and press **Add selected**, or press
@@ -394,6 +395,8 @@ your step, sealed with who approved it; **Deny…** takes an optional reason (at
 nothing. You never see your own requests there, and the server refuses you deciding them. Where the Investigation
 has members (§9.12) only a lead or reviewer may decide, so only they see it; an owner-only Investigation can be
 decided by any approver. *All decisions* lists the ones already approved or denied.
+
+Before you click, the expand form states what the next expand will read (its row budget and fan-out cap, the profile's presets filling what you leave blank) and says *Will need approval from a second person* when either is above the Space's threshold; with no threshold set (the shipped default) nothing is held. A held request's *waiting for approval* line names the limit crossed and the Settings key (`four_eyes_budget_above`, `four_eyes_fan_out_above`).
 
 ### 9.3 Replay, drift and fork
 
