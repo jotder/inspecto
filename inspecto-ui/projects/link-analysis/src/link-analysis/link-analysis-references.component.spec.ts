@@ -37,8 +37,11 @@ const ONE: InvestigationReferences = {
     ],
 };
 
-function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, canManage = true) {
+function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, canManage = true, role = 'lead') {
     const inv = {
+        investigationMembers: vi.fn(() =>
+            of({ investigationId: 'inv-1', owner: null, members: [], history: [], you: role }),
+        ),
         investigationReferences: vi.fn(() => of(ONE)),
         addInvestigationReference: vi.fn(() => of(ONE)),
         ...overrides,
@@ -140,5 +143,23 @@ describe('LinkAnalysisReferencesComponent', () => {
         expect(el.textContent).toContain('Refused');
         expect(el.textContent).toContain('already recorded');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
+    });
+
+    it('LA-UI-REFERENCE-ROLE-NOTE-1: a reviewer with the capability still cannot add, and is told why', async () => {
+        const r = create({}, true, 'reviewer');
+        await r.c.load();
+        await r.f.whenStable();
+        r.f.detectChanges();
+        expect(r.el.querySelector('[data-testid="references-read-only"]')?.textContent).toContain('reviewer');
+        const add = Array.from(r.el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Add reference');
+        expect(add?.disabled).toBe(true);
+    });
+
+    it('LA-UI-REFERENCE-ROLE-NOTE-1: an analyst with the capability sees no role note', async () => {
+        const r = create({}, true, 'analyst');
+        await r.c.load();
+        await r.f.whenStable();
+        r.f.detectChanges();
+        expect(r.el.querySelector('[data-testid="references-read-only"]')).toBeNull();
     });
 });

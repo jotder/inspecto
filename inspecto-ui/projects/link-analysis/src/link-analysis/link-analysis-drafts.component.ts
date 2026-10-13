@@ -1,5 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { LensService } from '@inspecto/core/api';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+    untracked,
+} from '@angular/core';
+import { LensService, SessionService } from '@inspecto/core/api';
 import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -7,6 +17,7 @@ import {
     DraftStateName,
     InvService,
     InvestigationDraft,
+    InvestigationRole,
 } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -147,9 +158,13 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                             }
                             <button mat-button [disabled]="busy()" (click)="showWorkingSet(d)">Working Set</button>
                             <button mat-button [disabled]="busy()" (click)="showConflicts(d)">Conflicts</button>
-                            <button mat-button [disabled]="busy() || !canWrite()" (click)="rebase(d)">Rebase</button>
-                            <button mat-stroked-button [disabled]="busy() || !canWrite()" (click)="promote(d)">Promote</button>
-                            <button mat-button [disabled]="busy() || !canWrite()" (click)="discard(d)">Discard</button>
+                            <button mat-button [disabled]="busy() || !canRebase(d)" (click)="rebase(d)">Rebase</button>
+                            <button mat-stroked-button [disabled]="busy() || !canFinish(d)" (click)="promote(d)">
+                                Promote
+                            </button>
+                            <button mat-button [disabled]="busy() || !canFinish(d)" (click)="discard(d)">
+                                Discard
+                            </button>
                         </div>
                     }
                     @if (sizes()[d.draftId]; as s) {
@@ -196,6 +211,21 @@ export class LinkAnalysisDraftsComponent {
     private readonly inv = inject(InvService);
     private readonly lens = inject(LensService);
     readonly canWrite = computed(() => this.lens.canManageIncidents());
+    private readonly session = inject(SessionService);
+    /** The caller's role on this Investigation (null until read, or when it cannot be). */
+    private readonly role = signal<InvestigationRole | null>(null);
+
+    /** The server's rule (`DraftRoutes.openDraft`): only a Draft's actor writes or rebases it; its actor or a lead promotes or discards it. */
+    private mine(d: InvestigationDraft): boolean {
+        const me = this.session.actor();
+        return !me || d.actor === me;
+    }
+    canRebase(d: InvestigationDraft): boolean {
+        return this.canWrite() && this.mine(d);
+    }
+    canFinish(d: InvestigationDraft): boolean {
+        return this.canWrite() && (this.mine(d) || this.role() === 'lead');
+    }
 
     readonly drafts = signal<InvestigationDraft[]>([]);
     readonly hidden = signal(false);
@@ -233,11 +263,21 @@ export class LinkAnalysisDraftsComponent {
             if (id !== this.investigationId()) return;
             this.drafts.set(l.items);
             this.hidden.set(false);
+            await this.readRole(id);
             await this.countEffective(id, l.items);
         } catch (err) {
             this.drafts.set([]);
             if ((err as { status?: number } | null)?.status === 404) this.hidden.set(true);
             else this.error.set(draftErrorMessage(err, 'Could not read the Drafts.'));
+        }
+    }
+
+    private async readRole(id: string): Promise<void> {
+        try {
+            const m = await firstValueFrom(this.inv.investigationMembers(id));
+            if (id === this.investigationId()) this.role.set(m.you);
+        } catch {
+            this.role.set(null); // not a member, or the list is not available: only the Draft's own actor may act
         }
     }
 

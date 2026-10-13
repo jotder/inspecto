@@ -6,7 +6,7 @@ import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
 import { LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
-import { InvestigationReferences, InvService } from '@inspecto/link-analysis/api/inv.service';
+import { InvestigationReferences, InvestigationRole, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { investigationErrorMessage } from './investigation-state';
 
 /**
@@ -57,7 +57,11 @@ import { investigationErrorMessage } from './investigation-state';
                 } @else {
                     <p class="text-secondary m-0">No references yet.</p>
                 }
-                <form class="flex flex-wrap items-start gap-2" aria-label="Add a reference" (submit)="$event.preventDefault(); add()">
+                <form
+                    class="flex flex-wrap items-start gap-2"
+                    aria-label="Add a reference"
+                    (submit)="$event.preventDefault(); add()"
+                >
                     <mat-form-field class="w-32" subscriptSizing="dynamic">
                         <mat-label>System</mat-label>
                         <input matInput [formControl]="system" />
@@ -81,8 +85,8 @@ import { investigationErrorMessage } from './investigation-state';
                     <button
                         mat-flat-button
                         type="submit"
-                        [disabled]="busy() || !valid() || !canWrite()"
-                        [attr.aria-describedby]="canWrite() ? null : 'refs-read-only'"
+                        [disabled]="busy() || !valid() || !canAdd()"
+                        [attr.aria-describedby]="canAdd() ? null : 'refs-read-only'"
                     >
                         Add reference
                     </button>
@@ -90,6 +94,11 @@ import { investigationErrorMessage } from './investigation-state';
                 @if (!canWrite()) {
                     <p id="refs-read-only" class="text-secondary m-0" data-testid="references-read-only">
                         Read-only: adding a reference needs the Incident management capability.
+                    </p>
+                } @else if (reviewer()) {
+                    <p id="refs-read-only" class="text-secondary m-0" data-testid="references-read-only">
+                        Read-only: you are a reviewer of this Investigation - only a lead or an analyst adds a
+                        reference.
                     </p>
                 }
             }
@@ -101,6 +110,10 @@ export class LinkAnalysisReferencesComponent {
     private readonly lens = inject(LensService);
     /** Adding is gated server-side on `canManageIncidents`; the form asks the same question. */
     readonly canWrite = computed(() => this.lens.canManageIncidents());
+    /** The caller's role on this Investigation (null until read, or when it cannot be): a reviewer reads, never writes. */
+    private readonly role = signal<InvestigationRole | null>(null);
+    readonly reviewer = computed(() => this.role() === 'reviewer');
+    readonly canAdd = computed(() => this.canWrite() && !this.reviewer());
 
     readonly investigationId = input.required<string>();
 
@@ -116,13 +129,24 @@ export class LinkAnalysisReferencesComponent {
     constructor() {
         // Another Investigation opened: the list on screen belongs to the previous one.
         effect(() => {
-            this.investigationId();
+            const id = this.investigationId();
             untracked(() => {
+                void this.readRole(id);
                 this.data.set(null);
                 this.error.set('');
                 for (const c of [this.system, this.type, this.refId, this.url, this.label]) c.reset('');
             });
         });
+    }
+
+    private async readRole(id: string): Promise<void> {
+        this.role.set(null);
+        try {
+            const m = await firstValueFrom(this.inv.investigationMembers(id));
+            if (id === this.investigationId()) this.role.set(m.you);
+        } catch {
+            this.role.set(null); // not a member, or the list is not available: the server decides on submit
+        }
     }
 
     valid(): boolean {
@@ -136,7 +160,7 @@ export class LinkAnalysisReferencesComponent {
     }
 
     add(): Promise<void> {
-        if (!this.valid() || !this.canWrite()) return Promise.resolve();
+        if (!this.valid() || !this.canAdd()) return Promise.resolve();
         const url = this.url.value.trim();
         const label = this.label.value.trim();
         return this.run('Could not add the reference.', async () => {

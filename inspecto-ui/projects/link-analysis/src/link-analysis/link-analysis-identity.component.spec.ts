@@ -38,7 +38,10 @@ function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, canM
                 provide: LA_DATASETS,
                 useValue: { list: () => of([{ id: 'map', name: 'SIM map', sourceName: 'map' }]), get: () => of({}) },
             },
-            { provide: DatasetRowsService, useValue: { columns: vi.fn(async () => [{ name: 'msisdn' }, { name: 'imsi' }]) } },
+            {
+                provide: DatasetRowsService,
+                useValue: { columns: vi.fn(async () => [{ name: 'msisdn' }, { name: 'imsi' }]) },
+            },
         ],
     });
     const f = TestBed.createComponent(LinkAnalysisIdentityComponent);
@@ -200,5 +203,13 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
 
     it('names the form fields, not the wire names, in a refusal', () => {
         expect(importFieldNames("'bCol' and aType are unknown")).toBe('"Column B" and "Type A" are unknown');
+    });
+
+    it('LA-UI-ENTITY-LISTS-REFRESH-GATE-1: Refresh is disabled without the Incident management capability', async () => {
+        const { f, el } = create({}, false);
+        await f.whenStable();
+        f.detectChanges();
+        const refresh = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Refresh');
+        expect(refresh?.disabled).toBe(true);
     });
 });

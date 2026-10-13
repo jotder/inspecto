@@ -69,7 +69,7 @@ export function importFieldNames(message: string): string {
         <section class="flex flex-col gap-2 text-xs" aria-label="Identity Fact log">
             <div class="flex items-center gap-1">
                 <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Identity Fact log</h3>
-                <button mat-stroked-button class="ml-auto" [disabled]="busy()" (click)="load()">Refresh</button>
+                <button mat-stroked-button class="ml-auto" [disabled]="busy() || !canManage()" (click)="load()">Refresh</button>
             </div>
             @if (error()) {
                 <inspecto-alert variant="error" [title]="chainBroken() ? 'Chain NOT verified' : 'Identity facts'">{{

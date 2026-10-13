@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationDraft } from '@inspecto/link-analysis/api/inv.service';
+import { LensService, SessionService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
 
@@ -54,8 +55,15 @@ const rel = (total: number) => of({ total });
 
 const http = (status: number, message: string) => new HttpErrorResponse({ status, error: { error: { message } } });
 
-async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, items = [DRAFT]) {
+async function create(
+    overrides: Partial<Record<keyof InvService, unknown>> = {},
+    items = [DRAFT],
+    actor: string | null = 'ana-1',
+) {
     const inv = {
+        investigationMembers: vi.fn(() =>
+            of({ investigationId: 'inv-1', owner: 'ana-1', members: [], history: [], you: 'lead' }),
+        ),
         investigationDrafts: vi.fn(() => of({ investigationId: 'inv-1', items, total: items.length })),
         forkDraft: vi.fn(() => of(DRAFT)),
         draftWorkingSet: vi.fn((_i: string, _d: string, of_: string) =>
@@ -70,7 +78,12 @@ async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}
     };
     TestBed.configureTestingModule({
         imports: [Host],
-        providers: [provideNoopAnimations(), { provide: InvService, useValue: inv }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InvService, useValue: inv },
+            { provide: SessionService, useValue: { actor: signal(actor) } },
+            { provide: LensService, useValue: { canManageIncidents: signal(true) } },
+        ],
     });
     const f = TestBed.createComponent(Host);
     f.detectChanges();
@@ -159,7 +172,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         expect(input.placeholder).toBe('Name this Draft (optional)');
         input.value = '  hub of erin-005?  ';
         input.dispatchEvent(new Event('input'));
-        f.detectChanges();   // as a real keystroke would, before the click
+        f.detectChanges(); // as a real keystroke would, before the click
         await click(f, button(el, 'Fork a Draft'));
         expect(inv.forkDraft).toHaveBeenCalledWith('inv-1', undefined, 'hub of erin-005?');
         expect(input.value).toBe('');
@@ -284,5 +297,27 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const { f, el, inv } = await create();
         await click(f, button(el, 'Discard'));
         expect(inv.discardDraft).toHaveBeenCalledWith('inv-1', 'd-1');
+    });
+
+    it('LA-UI-DRAFT-ACTS-GATE-1: a reviewer cannot rebase, promote or discard another actor’s Draft', async () => {
+        const reviewer = {
+            investigationMembers: vi.fn(() =>
+                of({ investigationId: 'inv-1', owner: 'ana-1', members: [], history: [], you: 'reviewer' }),
+            ),
+        };
+        const { el } = await create(reviewer, [DRAFT], 'bob-2');
+        for (const t of ['Rebase', 'Promote', 'Discard']) expect(button(el, t).disabled).toBe(true);
+    });
+
+    it('LA-UI-DRAFT-ACTS-GATE-1: a lead promotes or discards another actor’s Draft but never rebases it', async () => {
+        const { el } = await create({}, [DRAFT], 'bob-2'); // the default mock answers lead
+        expect(button(el, 'Rebase').disabled).toBe(true);
+        expect(button(el, 'Promote').disabled).toBe(false);
+        expect(button(el, 'Discard').disabled).toBe(false);
+    });
+
+    it('LA-UI-DRAFT-ACTS-GATE-1: the Draft’s own actor can rebase, promote and discard it', async () => {
+        const { el } = await create({}, [DRAFT], 'ana-1');
+        for (const t of ['Rebase', 'Promote', 'Discard']) expect(button(el, t).disabled).toBe(false);
     });
 });
