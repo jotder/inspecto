@@ -24,6 +24,7 @@
 | Investigation store | S0–S7 closed | demand-gated items (§2) |
 | Entity model LA-17 | slice 1 + slice 2 built | SPA member browsing, `excludeBy` range/CIDR (§3) |
 | Live detection | LD-1…LD-7 built | operator confirmation of D-LD2…D-LD18; template sharing (§3) |
+| Analyst flow (2026-10-13: one MSISDN, expand one node at a time, seed several and connect them) | **marker and chosen-neighbours built** (`LA-UNEXPANDED-MARKER-1`, `LA-EXPAND-PICK-NEIGHBOURS-1`, not browser-driven); **`LA-SEED-CONNECT-1` not built** | `LA-SEED-CONNECT-1` (all-pairs shortest connection within 3 hops as one sealed `connect` op, then expand from the path nodes), `LA-EXPAND-FOUREYES-CLARITY-1`, the residuals on the two built rows (BACKLOG §3.12) |
 
 ## Separation (option D) — what is NOT yet built or still open
 
