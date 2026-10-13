@@ -153,8 +153,22 @@ Keycloak realm setup (the proven fixture is [`dev-infra/keycloak/inspecto-realm.
    unioned; set `-Dauth.oidc.rolesClaim` only if a protocol mapper flattens roles into another claim, which
    turns the union off. An unrecognised role grants nothing.
 5. Import: `docker compose -f dev-infra/docker-compose.yml up -d keycloak` (dev) or, in production,
-   Keycloak's realm import, which **rejects unknown fields**, so remove the `_comment` keys from the
-   blueprint JSON first.
+   Keycloak's realm import, which **rejects unknown fields** (so the blueprint JSON carries no `_comment`
+   keys; their text is below).
+
+   Notes on `keycloak-realm-blueprint.json` (an illustrative starting point, a partial realm export):
+   - Import it via the admin console (Realm settings > Action > Partial import) or
+     `kcadm.sh create realms -f keycloak-realm-blueprint.json`, then fill in real users / LDAP federation.
+     The role names in it are exactly what `inspecto-oidc`'s `RoleMapper` (`rbac-groundwork.md` §3) understands.
+   - Client `inspecto-spa` is a public SPA client: Authorization Code + PKCE, no client secret (a browser app
+     cannot keep one).
+   - Its roles protocol mapper flattens realm roles into a top-level `roles` claim (`RoleMapper`'s default
+     `-Dauth.oidc.rolesClaim`). Keycloak's own `realm_access.roles` nesting is also read as a fallback, so the
+     mapper is a convenience, not a hard requirement.
+   - The `inspecto-api` client is the OAuth2 audience the backend checks via `-Dauth.oidc.audience=inspecto-api`.
+     It is not a login client itself: `inspecto-spa`'s tokens carry this audience via an audience mapper (add
+     one on `inspecto-spa` in a real realm, or use this clientId as the intended audience directly, per
+     Keycloak's client-scope/audience conventions for the deployment at hand).
 
 Proven 2026-10-13 against Keycloak 26.8.1 (dev realm, container `inspecto-keycloak`, port 8180): the live
 test `OidcKeycloakAgainstRealProviderTest` (2 tests, `-Dkeycloak.issuer=http://localhost:8180/realms/inspecto`);
