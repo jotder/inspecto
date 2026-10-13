@@ -154,11 +154,11 @@ class KpiCompletenessWidgetTest {
                     URI.create("http://localhost:" + api.port() + "/api/v1/spaces/ra/bi/query"))
                     .header("Authorization", "Bearer admin").header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
-            assertEquals(422, r.statusCode(), r.body());
+            assertEquals(409, r.statusCode(), r.body());   // a deleted store is an empty Dataset: the closed "has no data yet" answer
             String abs = root.toAbsolutePath().normalize().toString();
             assertFalse(r.body().toLowerCase().contains(abs.toLowerCase()), r.body());
             assertFalse(r.body().toLowerCase().contains(abs.replace('\\', '/').toLowerCase()), r.body());
-            assertTrue(r.body().contains("data/kpi_completeness"), r.body());
+            assertTrue(r.body().contains("has no data yet") && r.body().contains("kpi_completeness_dataset"), r.body());
         } finally {
             api.close();
             spaces.close();
