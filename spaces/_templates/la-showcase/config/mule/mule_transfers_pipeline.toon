@@ -34,7 +34,8 @@ processing:
 collector:
   discovery: poll
   connector: local
+  # Demo Space: the seeded daily files have deliberate date holes; gap alerts would only add noise to the Alerts page.
   gap_detection:
-    enabled: true
+    enabled: false
     sequence: "TRANSFERS_{yyyyMMdd}"
     file_template: "TRANSFERS_{yyyyMMdd}.csv"
