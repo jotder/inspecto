@@ -127,8 +127,7 @@ final class BiRoutes implements RouteModule {
             QueryExecutor.Result shown = masking.apply(raw, boundText == null ? spec.groupBy() : null, boundText);
             return response(shown, echoSql, masking.describe());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: "
-                    + ServerFaults.sqlMessage(e.getMessage(), api));
+            throw ServerFaults.datasetRead("BI query failed", spec.dataset(), dataset, e, api);
         }
     }
 

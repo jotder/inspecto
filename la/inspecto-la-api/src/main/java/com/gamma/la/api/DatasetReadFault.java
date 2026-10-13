@@ -3,6 +3,7 @@ package com.gamma.la.api;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.util.DatasetNoData;
 import com.gamma.util.DuckDbUtil;
 
 import java.nio.file.Path;
@@ -21,7 +22,6 @@ import java.util.regex.Pattern;
  */
 public final class DatasetReadFault {
 
-    private static final String NO_FILES = "No files found that match the pattern";
     private static final Pattern LEFTOVER_PATH = Pattern.compile(
             "(?<![\\w.])(?:[A-Za-z]:[\\\\/]|/(?=[^\\s'\"/]+/))[^\\s'\"]*");
 
@@ -39,17 +39,13 @@ public final class DatasetReadFault {
      */
     public static ApiException of(String what, String datasetId, Path writeRoot, Exception e) {
         String raw = DuckDbUtil.withoutPendingQueryPreamble(e.getMessage());
-        if (raw != null && raw.contains(NO_FILES)) return noData(datasetId, writeRoot);
+        if (DatasetNoData.matches(raw)) return noData(datasetId, writeRoot);
         return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + ": " + scrub(raw));
     }
 
     /** The closed 409: the Dataset exists and is well-formed, its store simply holds nothing yet. */
     public static ApiException noData(String datasetId, Path writeRoot) {
-        String store = storeOf(datasetId, writeRoot);
-        return new ApiException(409, ErrorCodes.CONFLICT, "Dataset '" + datasetId
-                + "' has no data yet: nothing has been ingested into its store"
-                + (store == null ? "" : " (" + store + ")")
-                + ". Run the Pipeline that fills it, or check the Dataset's physicalRef.");
+        return new ApiException(409, ErrorCodes.CONFLICT, DatasetNoData.message(datasetId, storeOf(datasetId, writeRoot)));
     }
 
     /** {@code message} with every absolute path replaced; {@code null} stays {@code null}. */

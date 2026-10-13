@@ -84,8 +84,9 @@ final class QueryRoutes implements RouteModule {
         String datasetId = ApiContext.str(query, "datasetId");
         String relationSql = null;
         BiResultMasking masking = null;
+        Map<String, Object> datasetContent = null;
         if (datasetId != null) {
-            Map<String, Object> dataset = component(store, "dataset", datasetId)
+            Map<String, Object> dataset = datasetContent = component(store, "dataset", datasetId)
                     .filter(d -> ComponentAccess.canView(ex, d))   // same refusal as BiRoutes: shared-away ⇒ absent
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "query '" + id + "' references unknown dataset '" + datasetId + "'"));
             try {
@@ -109,7 +110,9 @@ final class QueryRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(sql.getMessage(), api));
+            throw datasetId == null
+                    ? new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(sql.getMessage(), api))
+                    : ServerFaults.datasetRead("query failed", datasetId, datasetContent, sql, api);
         } catch (IOException io) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", io);
         }

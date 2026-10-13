@@ -159,7 +159,7 @@ final class ShareRoutes implements RouteModule {
             if (maskingBlock != null) out.put("masking", maskingBlock);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
+            throw ServerFaults.datasetRead("query failed", datasetId, dataset, e, api);
         }
     }
 

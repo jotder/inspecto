@@ -121,6 +121,25 @@ class ControlApiDatasetRowsTest {
         }
     }
 
+    /** An empty file-backed Dataset is calm on every Dataset-reading route: the closed 409, no DuckDB text, SQL or glob. */
+    @Test
+    void anEmptyStoreAnswersAClosed409OnRowsAndBiQuery(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String store = "nodata_" + System.nanoTime();
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "empty_ds", Map.of("physicalRef", store));
+            HttpResponse<String> rows = get(c.port, "/datasets/empty_ds/rows");
+            HttpResponse<String> bi = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/bi/query"))
+                    .POST(BodyPublishers.ofString("{\"dataset\":\"empty_ds\",\"measures\":[{\"agg\":\"count\"}]}")).build(), BodyHandlers.ofString());
+            for (HttpResponse<String> r : List.of(rows, bi)) {
+                assertEquals(409, r.statusCode(), r.body());
+                String message = V1Body.envelope(r.body()).get("error").get("message").asText();
+                assertTrue(message.contains("Dataset 'empty_ds' has no data yet") && message.contains(store), message);
+                for (String leak : List.of("IO Error", "CREATE VIEW", "LINE 1", "read_parquet", "__no_readable_files__", "**", ":\\", ":/"))
+                    assertFalse(r.body().replace('\\', '/').contains(leak), "no '" + leak + "' in: " + r.body());
+            }
+        }
+    }
+
     @Test
     void biQueryGroupsAndAggregatesOnCalculatedColumns(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

@@ -85,8 +85,7 @@ final class KpiRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
-                    "kpi evaluation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
+            throw ServerFaults.datasetRead("kpi evaluation failed", kpi.dataset(), dataset, e, api);
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }

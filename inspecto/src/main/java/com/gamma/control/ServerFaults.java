@@ -79,6 +79,26 @@ public final class ServerFaults {
                 api.dataRoot(), api.writeRoot());
     }
 
+    /**
+     * The one way a control-plane route turns a failed Dataset read into an {@link ApiException}: a file-backed Dataset
+     * whose store holds no files yet answers the closed 409 ({@link com.gamma.util.DatasetNoData}, the same wording
+     * the Link Analysis routes use); any other failure keeps its scrubbed driver text as a 422, so a populated
+     * Dataset's real errors still reach the caller.
+     *
+     * @param what    the route's own phrase ("dataset read failed", "BI query failed"...)
+     * @param dataset the Dataset's stored content, to name its store; may be {@code null}
+     */
+    public static ApiException datasetRead(String what, String datasetId, java.util.Map<String, Object> dataset,
+                                           java.sql.SQLException e, com.gamma.spi.http.ApiContext api) {
+        String raw = com.gamma.util.DuckDbUtil.withoutPendingQueryPreamble(e.getMessage());
+        if (com.gamma.util.DatasetNoData.matches(raw)) {
+            Object ref = dataset == null ? null : dataset.get("physicalRef");
+            String store = ref == null || String.valueOf(ref).isBlank() ? null : String.valueOf(ref).trim();
+            return new ApiException(409, ErrorCodes.CONFLICT, com.gamma.util.DatasetNoData.message(datasetId, store));
+        }
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + ": " + sqlMessage(e.getMessage(), api));
+    }
+
     /** A Windows drive path, or a POSIX absolute path of two or more segments, up to a quote or whitespace. */
     private static final java.util.regex.Pattern LEFTOVER_PATH = java.util.regex.Pattern.compile(
             "(?<![\\w.])(?:[A-Za-z]:[\\\\/]|/(?=[^\\s'\"/]+/))[^\\s'\"]*");

@@ -143,7 +143,7 @@ final class DatasetRoutes implements RouteModule {
         try {
             r = QueryExecutor.run(new QueryExecutor.Request(id, relationSql, sql, limit, 0, List.of(), List.of()));
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dataset read failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
+            throw ServerFaults.datasetRead("dataset read failed", id, dataset, e, api);
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
