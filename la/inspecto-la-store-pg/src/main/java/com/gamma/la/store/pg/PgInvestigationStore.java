@@ -240,6 +240,9 @@ public final class PgInvestigationStore implements InvestigationStore {
             "CREATE TABLE IF NOT EXISTS " + t("la_pending") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), request_id text NOT NULL, "
                     + "body text NOT NULL, PRIMARY KEY (inv, request_id))",
             "CREATE TABLE IF NOT EXISTS " + t("la_template") + " (id text PRIMARY KEY, body text NOT NULL)",
+            // embed grants (LA-EMBED-PG-STORE-1): a sidecar row per grant, opaque JSON holding only the token's SHA-256; never a log entry
+            "CREATE TABLE IF NOT EXISTS " + t("la_embed_grant") + " (id text PRIMARY KEY, inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), "
+                    + "body text NOT NULL)",
             "CREATE TABLE IF NOT EXISTS " + t("la_draft") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), id text NOT NULL, "
                     + "header text NOT NULL, actor text NOT NULL, state text NOT NULL CHECK (state IN ('open','hibernated','discarded','promoted')), "
                     + "marker text, last_access timestamptz NOT NULL, version bigint NOT NULL DEFAULT 0, PRIMARY KEY (inv, id))",
@@ -498,6 +501,33 @@ public final class PgInvestigationStore implements InvestigationStore {
     @Override
     public boolean createTemplate(String id, String json) throws IOException {
         return tx(c -> update(c, "INSERT INTO " + t("la_template") + " (id, body) VALUES (?, ?) ON CONFLICT DO NOTHING", id, json) == 1);
+    }
+
+    @Override
+    public boolean createEmbedGrant(String investigationId, String grantId, String json) throws IOException {
+        if (grantId == null || !EMBED_GRANT_ID.matcher(grantId).matches()) throw new IOException("not a grant id");
+        return tx(c -> {
+            lockInvestigation(c, investigationId);   // also the "no such Investigation" refusal
+            return update(c, "INSERT INTO " + t("la_embed_grant") + " (id, inv, body) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
+                    grantId, investigationId, json) == 1;
+        });
+    }
+
+    @Override
+    public Optional<String> embedGrant(String grantId) throws IOException {
+        if (grantId == null || !EMBED_GRANT_ID.matcher(grantId).matches()) return Optional.empty();
+        return Optional.ofNullable(tx(c -> one(c, "SELECT body FROM " + t("la_embed_grant") + " WHERE id = ?", grantId)));
+    }
+
+    @Override
+    public boolean replaceEmbedGrant(String grantId, String json) throws IOException {
+        if (grantId == null || !EMBED_GRANT_ID.matcher(grantId).matches()) return false;
+        return tx(c -> update(c, "UPDATE " + t("la_embed_grant") + " SET body = ? WHERE id = ?", json, grantId) == 1);
+    }
+
+    @Override
+    public List<String> embedGrants(String investigationId) throws IOException {
+        return tx(c -> strings(c, "SELECT body FROM " + t("la_embed_grant") + " WHERE inv = ? ORDER BY id COLLATE \"C\"", investigationId));
     }
 
     @Override
