@@ -225,10 +225,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 47<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 46<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 47<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 68<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 46<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 67<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
