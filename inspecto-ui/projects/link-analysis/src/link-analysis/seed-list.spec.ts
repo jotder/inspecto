@@ -8,10 +8,11 @@ describe('parseSeedList (LA-SEED-CONNECT-1)', () => {
         expect(r.invalid).toEqual([]);
     });
 
-    it('lists what is not a number instead of dropping it', () => {
-        const r = parseSeedList('5551234567\nhello\n12\n5551234568');
-        expect(r.ids).toEqual(['5551234567', '5551234568']);
-        expect(r.invalid).toEqual(['hello', '12']);
+    it('keeps account ids as typed and lists what is neither a number nor an id', () => {
+        const r = parseSeedList('MULE-HUB-01\nACC-1006, <script>\n5551234567\nMULE-HUB-01');
+        expect(r.ids).toEqual(['MULE-HUB-01', 'ACC-1006', '5551234567']);
+        expect(r.invalid).toEqual(['<script>']);
+        expect(r.duplicates).toBe(1);
     });
 
     it('caps the seeds and names the overflow', () => {

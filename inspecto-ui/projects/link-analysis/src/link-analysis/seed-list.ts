@@ -1,5 +1,15 @@
 import { MSISDN_PATTERN, normaliseMsisdn } from './investigate-number';
 
+/** Any other id (an account, a device): one token of letters, digits and `. : @ _ - + /`, kept exactly as typed. */
+const ID_PATTERN = /^[\w.:@+/-]{1,200}$/;
+
+/** A phone number is normalised (separators dropped); any other id token is kept as typed; null = neither. */
+function seedId(part: string): string | null {
+    const phone = normaliseMsisdn(part);
+    if (MSISDN_PATTERN.test(phone)) return phone;
+    return ID_PATTERN.test(part) ? part : null;
+}
+
 /** The server's seed cap for one `connect` (`ConnectSeeds.MAX_SEEDS`): 20 seeds are 190 pairs from 20 searches. */
 export const MAX_CONNECT_SEEDS = 20;
 /** The server's hop ceiling for one `connect` (`ConnectSeeds.MAX_HOPS`). */
@@ -9,7 +19,7 @@ export const MAX_CONNECT_HOPS = 3;
 export interface SeedList {
     /** Normalised, de-duplicated, in the order pasted, at most {@link MAX_CONNECT_SEEDS}. */
     ids: string[];
-    /** Entries that are not a number (6 to 15 digits, optional `+`), as typed. */
+    /** Entries that are neither a number nor an id token (illegal characters, or over 200), as typed. */
     invalid: string[];
     /** Valid numbers beyond the cap, normalised. */
     overCap: string[];
@@ -18,7 +28,7 @@ export interface SeedList {
 }
 
 /**
- * Read a pasted list of MSISDNs: split on newlines, commas, semicolons, tabs and spaces, normalise each as the one-number flow does
+ * Read a pasted list of MSISDNs or other ids (accounts, devices): split on newlines, commas, semicolons, tabs and spaces, normalise each as the one-number flow does
  * ({@link normaliseMsisdn}), keep the valid ones once each up to the cap. Unknown numbers (not in the Dataset) are not found here -
  * the `connect` step lists the seeds whose first read found no link.
  */
@@ -34,10 +44,10 @@ export function parseSeedList(text: string): SeedList {
         .map((e) => e.trim())
         .filter((e) => e);
     for (const raw of entries) {
-        const parts = MSISDN_PATTERN.test(normaliseMsisdn(raw)) ? [raw] : raw.split(/\s+/);
+        const parts = seedId(raw) !== null ? [raw] : raw.split(/\s+/);
         for (const part of parts) {
-            const id = normaliseMsisdn(part);
-            if (!MSISDN_PATTERN.test(id)) {
+            const id = seedId(part);
+            if (id === null) {
                 invalid.push(part);
                 continue;
             }

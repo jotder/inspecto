@@ -31,7 +31,7 @@ import { MAX_CONNECT_HOPS, MAX_CONNECT_SEEDS, parseSeedList } from './seed-list'
             </h3>
             <form class="flex flex-col gap-2" (ngSubmit)="connect()">
                 <label class="flex flex-col gap-1 text-xs">
-                    Numbers to connect (paste a list: one per line, or separated by commas)
+                    Numbers or ids to connect (paste a list: one per line, or separated by commas)
                     <textarea
                         name="seeds"
                         rows="4"
@@ -43,7 +43,7 @@ import { MAX_CONNECT_HOPS, MAX_CONNECT_SEEDS, parseSeedList } from './seed-list'
                 </label>
                 @if (list().ids.length || list().invalid.length) {
                     <p class="text-secondary m-0 text-xs" data-testid="seed-summary">
-                        {{ list().ids.length }} number{{ list().ids.length === 1 ? '' : 's' }} to connect (up to
+                        {{ list().ids.length }} seed{{ list().ids.length === 1 ? '' : 's' }} to connect (up to
                         {{ maxSeeds }}, within {{ maxHops }} hops).
                         @if (list().duplicates) {
                             {{ list().duplicates }} repeated.
@@ -51,7 +51,7 @@ import { MAX_CONNECT_HOPS, MAX_CONNECT_SEEDS, parseSeedList } from './seed-list'
                     </p>
                 }
                 @if (list().invalid.length) {
-                    <inspecto-alert variant="warning" title="Not numbers, left out">{{
+                    <inspecto-alert variant="warning" title="Not an id, left out">{{
                         list().invalid.join(', ')
                     }}</inspecto-alert>
                 }

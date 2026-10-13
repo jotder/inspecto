@@ -40,10 +40,10 @@ function setup(applyOk = true, step: InvestigationStepResult | null = null) {
 describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
     it('sends ONE connect op with the pasted numbers, normalised, and the hop limit of 3', async () => {
         const { fixture, cmp, store, el } = setup();
-        cmp.text.set('555-111-0001\n5551110002, 5551110002 hello');
+        cmp.text.set('555-111-0001\n5551110002, 5551110002 <bad>');
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="seed-summary"]')?.textContent).toContain('2 numbers to connect');
-        expect(el.textContent).toContain('hello'); // the unusable entry is listed, not dropped
+        expect(el.querySelector('[data-testid="seed-summary"]')?.textContent).toContain('2 seeds to connect');
+        expect(el.textContent).toContain('<bad>'); // the unusable entry is listed, not dropped
         await expectNoA11yViolations(el);
         await cmp.connect();
         expect(store.apply).toHaveBeenCalledTimes(1);
