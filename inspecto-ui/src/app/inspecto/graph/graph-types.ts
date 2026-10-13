@@ -22,6 +22,9 @@ export interface G6Node {
         /** With `highConnectivity`: the flagged entity's sealed contact count (Working Set `contacts`), shown in the
          *  hover text. Absent when the server sent none. */
         contacts?: number;
+        /** Link Analysis: an Investigation's Working Set has this entity but no effective expand has followed its links
+         *  yet (a flagged hub is excluded: its halo already says "not expanded"). Drawn with a dashed outline; absent otherwise. */
+        unexpanded?: boolean;
         /** The Incident/Case this node represents, when the source could resolve one — lights the
          *  detail dialog's "Open record" pivot (ui-design-review R8). Structurally = `ElementObjectRef`. */
         objectRef?: { id: string; type: 'INCIDENT' | 'CASE' };

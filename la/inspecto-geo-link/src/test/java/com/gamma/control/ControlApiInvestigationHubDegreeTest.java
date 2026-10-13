@@ -161,6 +161,29 @@ class ControlApiInvestigationHubDegreeTest {
         return data(send(c, "POST", "/inv/investigations/" + id + "/replay", reread ? "{\"reread\":true}" : "{}"), 200);
     }
 
+    /** entityId -> the working-set row's {@code expanded} flag (LA-UNEXPANDED-MARKER-1). */
+    private Map<String, Boolean> expanded(Ctx c, String id) throws Exception {
+        JsonNode ws = data(send(c, "GET", "/inv/investigations/" + id + "/working-set?of=entities", null), 200);
+        assertTrue(ws.get("columns").toString().endsWith("\"expanded\"]"), ws.get("columns").toString());
+        Map<String, Boolean> out = new TreeMap<>();
+        for (JsonNode r : ws.get("rows")) out.put(r.get("entityId").asText(), r.get("expanded").asBoolean());
+        return out;
+    }
+
+    @Test
+    void anEntityIsExpandedOnlyAfterAnEffectiveExpandFollowedItAndUndoRevertsIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = investigation(c, "u_ds", null, "[\"a\"]", List.of());
+            assertEquals(Map.of("a", false), expanded(c, id), "a seed nobody expanded is still frontier");
+            op(c, id, "{\"op\":\"expand\"}");
+            Map<String, Boolean> after = expanded(c, id);
+            assertTrue(after.get("a"), "the followed node is expanded: " + after);
+            assertFalse(after.get("b"), "its neighbours are new frontier, not expanded: " + after);
+            data(send(c, "POST", "/inv/investigations/" + id + "/undo", ""), 200);
+            assertEquals(Map.of("a", false), expanded(c, id), "undo reverts it");
+        }
+    }
+
     // -- 1. the sealed degree, surfaced ----------------------------------------------------------------------------------
 
     @Test

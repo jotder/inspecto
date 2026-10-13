@@ -1023,6 +1023,10 @@ export class LinkAnalysisComponent implements OnInit {
     readonly hubsDrawn = computed(
         () => this.investigation.canvas()?.nodes.filter((n) => n.data.highConnectivity).length ?? 0,
     );
+    /** Drawn Working Set entities no expand has followed yet (LA-UNEXPANDED-MARKER-1) — the legend's dotted-outline row. */
+    readonly unexpandedDrawn = computed(
+        () => this.investigation.canvas()?.nodes.filter((n) => n.data.unexpanded).length ?? 0,
+    );
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
     readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
     readonly profileOptions = DOMAIN_PROFILES.map((p) => ({ value: p.id, label: p.label, hint: p.description }));
@@ -1962,6 +1966,7 @@ export class LinkAnalysisComponent implements OnInit {
                         ...(node.data.highConnectivity
                             ? [{ label: 'Connectivity', value: this.hubBadgeFor(ids?.serverNode(id) ?? id, node.data.contacts) }]
                             : []),
+                        ...(node.data.unexpanded ? [{ label: 'Expansion', value: 'Not expanded yet' }] : []),
                         // LA-08: which Datasets this (possibly merged) entity was projected from.
                         ...(node.data.provenance?.length
                             ? [{ label: 'Datasets', value: node.data.provenance.join(', ') }]

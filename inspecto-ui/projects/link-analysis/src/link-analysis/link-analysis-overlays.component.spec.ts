@@ -124,3 +124,24 @@ describe('Link Analysis legend - link-kind chips', () => {
         expect(hideLinkKinds(null, ['call'])).toBeNull();
     });
 });
+
+describe('Link Analysis legend - unexpanded row (LA-UNEXPANDED-MARKER-1)', () => {
+    it('shows the dotted-outline row with its count only when something is unexpanded', async () => {
+        TestBed.configureTestingModule({
+            imports: [LinkAnalysisLegendComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const fixture = TestBed.createComponent(LinkAnalysisLegendComponent);
+        fixture.componentRef.setInput('items', [{ kind: 'account', color: 'var(--gamma-primary)', count: 4 }]);
+        fixture.detectChanges();
+        const row = () =>
+            fixture.nativeElement.querySelector('[data-testid="legend-unexpanded"]') as HTMLElement | null;
+        expect(row()).toBeNull();
+
+        fixture.componentRef.setInput('unexpanded', 3);
+        fixture.detectChanges();
+        expect(row()?.textContent).toContain('not expanded yet');
+        expect(row()?.textContent).toContain('3');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});

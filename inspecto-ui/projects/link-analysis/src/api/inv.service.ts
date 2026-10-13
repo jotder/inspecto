@@ -537,6 +537,9 @@ export interface WorkingSetEntity {
     highConnectivity?: boolean;
     /** The sealed hub degree (distinct contacts) — null unless flagged `highConnectivity`; absent in old logs. */
     contacts?: number | null;
+    /** LA-UNEXPANDED-MARKER-1: an effective `expand` already had this entity in its frontier (its links were read,
+     *  even if none came back). `false` = still an unexpanded node; ABSENT on a server that does not send it. */
+    expanded?: boolean;
 }
 
 export interface WorkingSetLink {

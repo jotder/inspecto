@@ -68,6 +68,33 @@ describe('LA-10 investigation-state', () => {
         expect(g.nodes.filter((n) => n.data.highConnectivity).map((n) => n.id)).toEqual([entityId('msisdn', 'hub')]);
     });
 
+    it('marks only the entities no expand has followed yet as unexpanded (LA-UNEXPANDED-MARKER-1)', () => {
+        const ws: WorkingSet = {
+            entities: [
+                entity('a', { expanded: true }),
+                entity('b', { expanded: false }),
+                entity('x', { hop: 1, expanded: false }),
+                entity('hub', { hop: 1, highConnectivity: true, expanded: false }),
+            ],
+            links: [
+                { source: 'a', target: 'x', kind: 'call', count: 1, admittedBy: 2 },
+                { source: 'a', target: 'hub', kind: 'call', count: 1, admittedBy: 2 },
+            ],
+            excluded: [],
+            hash: 'h',
+        };
+        const g = workingSetToGraph(ws, P);
+        const un = g.nodes.filter((n) => n.data.unexpanded).map((n) => n.id);
+        expect(un.sort()).toEqual([entityId('msisdn', 'b'), entityId('msisdn', 'x')].sort());
+        expect(g.nodes.find((n) => n.id === entityId('msisdn', 'a'))!.data.unexpanded).toBeUndefined();
+        expect(g.nodes.find((n) => n.id === entityId('msisdn', 'hub'))!.data.unexpanded).toBeUndefined();
+    });
+
+    it('marks nothing when the server sends no expanded flag at all', () => {
+        const ws: WorkingSet = { entities: [entity('a'), entity('b')], links: [], excluded: [], hash: 'h' };
+        expect(workingSetToGraph(ws, P).nodes.some((n) => n.data.unexpanded)).toBe(false);
+    });
+
     it("carries a flagged entity's contacts onto its canvas node; null contacts carry no count", () => {
         const ws: WorkingSet = {
             entities: [

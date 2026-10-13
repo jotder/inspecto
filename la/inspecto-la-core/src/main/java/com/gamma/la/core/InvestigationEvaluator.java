@@ -138,6 +138,12 @@ public final class InvestigationEvaluator {
          * Display only: never part of {@link #toMap()} or {@link #hash()}, so flagged states hash exactly as before.
          */
         public final TreeMap<String, Long> hubDegree = new TreeMap<>();
+        /**
+         * Entities an effective {@code expand} had in its sealed frontier (LA-UNEXPANDED-MARKER-1): the analyst has already followed
+         * their links, whether or not any came back. Display only, like {@link #hubDegree}: never part of {@link #toMap()} or
+         * {@link #hash()}, so every state hashes exactly as before; an undone step is simply not applied, so it reverts for free.
+         */
+        public final TreeSet<String> expanded = new TreeSet<>();
         /** Per-entity notes (LA-19), in step order per entity. They outlive a later exclusion: a note is history. */
         public final TreeMap<String, List<Annotation>> annotations = new TreeMap<>();
         /** Per-link notes (D-U9 remainder), keyed by the link key; like entity notes they outlive a later exclusion. */
@@ -443,6 +449,7 @@ public final class InvestigationEvaluator {
             c.kept.addAll(kept);
             c.highConnectivity.addAll(highConnectivity);
             c.hubDegree.putAll(hubDegree);
+            c.expanded.addAll(expanded);
             annotations.forEach((k, v) -> c.annotations.put(k, new ArrayList<>(v)));
             linkAnnotations.forEach((k, v) -> c.linkAnnotations.put(k, new ArrayList<>(v)));
             c.window = window;
@@ -558,6 +565,7 @@ public final class InvestigationEvaluator {
                 Map<String, Object> read = (Map<String, Object>) entry.get("read");
                 Map<String, Object> query = (Map<String, Object>) read.get("query");
                 Set<String> frontier = new HashSet<>(strings(query.get("frontier")));
+                for (String f : frontier) if (s.entities.containsKey(f)) s.expanded.add(f);
                 // LA-17 merged traversal: a member value not admitted yet -> the admitted entity it stands for.
                 Map<String, Object> anchorOf = query.get("merged") instanceof Map<?, ?> mg
                         && mg.get("anchorOf") instanceof Map<?, ?> a ? (Map<String, Object>) a : Map.of();
@@ -799,6 +807,7 @@ public final class InvestigationEvaluator {
         s.hidden.remove(id);
         s.highConnectivity.remove(id);
         s.hubDegree.remove(id);
+        s.expanded.remove(id);
         s.links.values().removeIf(l -> l.source().equals(id) || l.target().equals(id));
         s.excluded.put(id, new Exclusion(step, reason));
     }

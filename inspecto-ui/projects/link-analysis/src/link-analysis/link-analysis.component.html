@@ -849,6 +849,7 @@
                             [edgeColors]="edgeColors()"
                             (edgeKindToggle)="toggleLinkKind($event)"
                             [highConnectivity]="hubsDrawn()"
+                            [unexpanded]="unexpandedDrawn()"
                             [open]="legendOpen()"
                             (openChange)="legendOpen.set($event)"
                         ></inspecto-link-analysis-legend>

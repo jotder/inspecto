@@ -173,6 +173,12 @@ Design rules visible in the dependency graph:
   cannot widen the read (fork and template ops were validated when first appended; an approval's were validated at
   request). One "nothing to expand" refusal names the held hubs everywhere; an approval whose frontier is all newly
   flagged says so (409) rather than "left the Working Set".
+  *Expanded state (LA-UNEXPANDED-MARKER-1, 2026-10-13, as built):* `State.expanded` holds every Working Set entity that an effective
+  `expand` had in its SEALED `read.query.frontier` (a step that found nothing still marks it; entities the step ADDED are not in it), kept
+  OUTSIDE `toMap()`/`hash()` like `hubDegree` so no hash changes, dropped with the entity on exclude, and reverted by undo because undo
+  replays without the step. The Working Set entities relation gains the boolean column `expanded` (last column, after `contacts`;
+  `false` = still an unexpanded node). The held hubs are never in a frontier, so they stay `expanded: false`; the SPA draws a flagged hub
+  with its ring only. `InvestigationExpandedFoldTest` and `ControlApiInvestigationHubDegreeTest` pin it.
   *Degree surfaced + from the index (2026-10-11, as built):* the sealed degree now reaches the client, always from the
   SEALED read, never recomputed: the evaluator keeps `State.hubDegree` (id → `read.hubs[].degree` of the LATEST step that
   sealed it — a later read re-flagging it supersedes the first; dropped with the entity on exclude) OUTSIDE `toMap()`/`hash()`, so hashes are unchanged; the Working Set

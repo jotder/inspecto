@@ -10,8 +10,18 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import {
     LinkAnalysisWorkingSetRowsComponent,
     WORKING_SET_PAGE,
+    expandedRow,
     hubRow,
 } from './link-analysis-working-set-rows.component';
+
+describe('expandedRow (LA-UNEXPANDED-MARKER-1)', () => {
+    it('words the flag and leaves other relations and an older server untouched', () => {
+        expect(expandedRow({ entityId: 'a', expanded: true })['expanded']).toBe('Yes');
+        expect(expandedRow({ entityId: 'b', expanded: false })['expanded']).toBe('Not yet');
+        const link = { source: 'a', target: 'b' };
+        expect(expandedRow(link)).toBe(link);
+    });
+});
 
 describe('hubRow (telecom S3)', () => {
     it('walk-through 6 D1: names the threshold and the override through the store-backed badge', () => {

@@ -560,6 +560,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             provenance?: string[];
             highConnectivity?: boolean;
             contacts?: number;
+            unexpanded?: boolean;
         };
         // LA-08: a multi-Dataset projection names the Datasets an element came from.
         const from = data.provenance?.length ? `<br/>from ${esc(data.provenance.join(', '))}` : '';
@@ -573,7 +574,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const hub = data.highConnectivity
             ? `<br/>High connectivity${typeof data.contacts === 'number' ? ` — ${data.contacts.toLocaleString('en')} contact${data.contacts === 1 ? '' : 's'}` : ''}`
             : '';
-        return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}${hub}${from}`;
+        const open = data.unexpanded ? '<br/>Not expanded yet' : '';
+        return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}${hub}${open}${from}`;
     }
 
     /** Tear the live instance down, sweeping any tooltip card its own cleanup left orphaned. */
@@ -737,7 +739,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     lineWidth: 2,
                     // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
                     // sees what the narrower question removed) renders dimmed with a dashed outline.
-                    lineDash: (d) => ((d.data as { missing?: boolean }).missing ? [4, 3] : undefined),
+                    lineDash: (d) => {
+                        const nd = d.data as { missing?: boolean; unexpanded?: boolean };
+                        // LA-UNEXPANDED-MARKER-1: a Working Set entity no expand has followed yet wears a dotted outline.
+                        return nd.missing ? [4, 3] : nd.unexpanded ? [2, 3] : undefined;
+                    },
                     // A high-connectivity entity (Link Analysis hub suppression) wears a wide halo in its own colour.
                     halo: (d) => !!(d.data as { highConnectivity?: boolean }).highConnectivity,
                     haloStroke: (d) => this.nodeColorOf(d),

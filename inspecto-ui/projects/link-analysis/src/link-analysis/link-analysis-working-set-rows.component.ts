@@ -31,6 +31,15 @@ export function hubRow(
 }
 
 /**
+ * An entities row's `expanded` flag in words (LA-UNEXPANDED-MARKER-1): `Yes` once an effective expand followed its links,
+ * else `Not yet`. Rows of other relations, and rows from a server that does not send the flag, pass unchanged.
+ */
+export function expandedRow(r: Record<string, unknown>): Record<string, unknown> {
+    if (!('expanded' in r)) return r;
+    return { ...r, expanded: r['expanded'] === true ? 'Yes' : 'Not yet' };
+}
+
+/**
  * **Link Analysis — Working Set rows** (LA-20, SPA half) over `GET …/working-set`: the Working Set as a derived
  * relation — entities, links or excluded — with the provenance columns (`opSeq`, `seedId`, `hop`, `reason`),
  * paged with true offsets. The route is owner-only and evaluated from the sealed log, so it needs no Dataset read;
@@ -145,7 +154,7 @@ export class LinkAnalysisWorkingSetRowsComponent {
             const store = this.store;
             const threshold = this.laSettings.limits().hubThresholdInForce;
             const rows = p.rows.map((r) =>
-                store ? hubRow(r, (eid, c) => store.hubBadge(eid, c, threshold)) : hubRow(r),
+                expandedRow(store ? hubRow(r, (eid, c) => store.hubBadge(eid, c, threshold)) : hubRow(r)),
             );
             this.rows.set(offset === 0 ? rows : [...this.rows(), ...rows]);
             this.page.set(p);

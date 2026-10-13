@@ -119,6 +119,18 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                         <span class="text-secondary ml-auto tabular-nums">{{ highConnectivity() }}</span>
                     </div>
                 }
+                @if (unexpanded()) {
+                    <!-- LA-UNEXPANDED-MARKER-1: a Working Set entity no expand has followed yet is drawn with a dotted outline -->
+                    <div class="mt-1 flex items-center gap-2" data-testid="legend-unexpanded">
+                        <span
+                            class="inline-block h-3 w-3 shrink-0 rounded-full border-2 border-dotted"
+                            style="border-color: var(--gamma-text-secondary)"
+                            aria-hidden="true"
+                        ></span>
+                        <span>Dotted outline: not expanded yet</span>
+                        <span class="text-secondary ml-auto tabular-nums">{{ unexpanded() }}</span>
+                    </div>
+                }
                 @if (edgeKinds().length) {
                     <!-- one toggle per link kind: pressed = drawn; unpressing hides that kind's links on the canvas -->
                     <ul class="m-0 mt-1 flex list-none flex-wrap gap-1 border-t p-0 pt-1" aria-label="Link kinds">
@@ -185,6 +197,8 @@ export class LinkAnalysisLegendComponent {
     readonly hint = input('');
     /** How many drawn entities an Investigation flagged high connectivity; 0 hides the legend row. */
     readonly highConnectivity = input(0);
+    /** How many drawn Working Set entities no expand has followed yet; 0 hides the legend row. */
+    readonly unexpanded = input(0);
     readonly open = input(true);
     readonly openChange = output<boolean>();
 }

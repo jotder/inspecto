@@ -356,6 +356,13 @@ Clicking a node while an Investigation is open **selects** it for the next op. S
 seeds from the wider picture. Pressing *Seed* returns the canvas to the Working Set, so *Expand one hop*, *Keep*,
 *Hide* and *Exclude* act on the entity you just seeded.
 
+**Not expanded yet.** On an Investigation's canvas an entity that no *expand* has followed yet is drawn with a
+dotted outline (legend: *Dotted outline: not expanded yet*, with a count). Hovering it, or its detail dialog, says
+*Not expanded yet*, and the Working Set's *expanded* column reads *Yes* or *Not yet*. A step that finds nothing still
+marks its entity expanded. An entity a step added is itself unexpanded until you expand it, undoing a step reverts it,
+and a *high connectivity* hub keeps its ring instead (it is already "shown, not expanded"). Use it to pick the next
+node to expand when you go one node at a time.
+
 **High connectivity (hubs).** An entity flagged *high connectivity* is ringed on the canvas (legend: *Ringed: high
 connectivity*), badged with its own sealed count — *High connectivity — 650 contacts (threshold 500), not expanded* —
 in the panel and in the Working Set rows (logs sealed before the count was recorded show *more than 500 contacts*),

@@ -98,6 +98,16 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
             const counts = hits.map((raw) => flagged.get(raw)).filter((c): c is number => typeof c === 'number');
             if (counts.length) n.data.contacts = Math.max(...counts);
         }
+    // LA-UNEXPANDED-MARKER-1: a node none of whose Working Set ids has been expanded is still frontier. Only drawn
+    // when the server reports `expanded` at all (an older server leaves it absent: no entity is marked, never all of them).
+    if (ws.entities.some((e) => e.expanded !== undefined)) {
+        const expanded = new Set(ws.entities.filter((e) => e.expanded).map((e) => e.id));
+        for (const n of g.nodes) {
+            const raws = rawIdsOf(n);
+            if (raws.some((raw) => expanded.has(raw)) || n.data.highConnectivity) continue;
+            if (raws.some((raw) => ws.entities.some((e) => e.id === raw))) n.data.unexpanded = true;
+        }
+    }
     const hidden = new Set(ws.entities.filter((e) => e.hidden).map((e) => e.id));
     const done = (out: ProjectedGraph): ProjectedGraph => {
         if (out.edges.length <= WORKING_SET_LINK_RENDER_CEILING) return out;
