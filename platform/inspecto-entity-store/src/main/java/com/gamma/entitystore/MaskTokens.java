@@ -52,10 +52,13 @@ public final class MaskTokens {
         return HexFormat.of().parseHex(Files.readString(f, StandardCharsets.UTF_8).trim());
     }
 
-    /** The Space's ONE identity key: the fact log's {@code mask.key} under {@code <write root>/audit/entity-facts}. The key
-     *  Link Analysis exploration reads and BI result masking use, so one id has one alias across them (BI-QUERY-MASKING-1). */
+    /** The Space's ONE identity key, in {@code <write root>.secrets/.risk-score-mask.key}: owner-only, outside every exported, imported
+     *  and backed-up tree (the file the Risk Score, Anomaly and evidence maskers already read, so one id has one alias everywhere -
+     *  Link Analysis exploration, Entity Lists, Screening, BI, Risk / Anomaly Scores, audit reads). D-M7, operator 2026-10-13: it
+     *  moved here from {@code audit/entity-facts/mask.key}; a token minted before the move is not the token minted after it. */
     public static byte[] spaceKey(Path writeRoot) throws IOException {
-        return key(writeRoot.resolve("audit").resolve(EntityFactLog.DIR));
+        return com.gamma.util.SpaceSecretKeys.readOrCreate(
+                com.gamma.util.SpaceSecretKeys.keyFile(writeRoot, ".risk-score-mask.key"), "Space identity key");
     }
 
     public static String token(byte[] key, String id) {

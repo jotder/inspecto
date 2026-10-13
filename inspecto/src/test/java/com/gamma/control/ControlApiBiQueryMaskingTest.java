@@ -164,9 +164,13 @@ class ControlApiBiQueryMaskingTest {
             JsonNode r = V1Body.of(bi(c, "revealer", "calls_ds", BY_MSISDN).body());
             assertEquals(3, v.get("rows").size(), "three subscribers, three groups, masked or not");
             assertEquals(r.get("rows").size(), v.get("rows").size());
-            // The Space identity key is the one Link Analysis exploration and Entity Lists use (audit/entity-facts/mask.key).
-            byte[] spaceKey = MaskTokens.key(c.root.resolve("audit").resolve("entity-facts"));
-            assertTrue(Files.isRegularFile(c.root.resolve("audit").resolve("entity-facts").resolve("mask.key")));
+            // The Space identity key (D-M7: <root>.secrets/.risk-score-mask.key) is the one Link Analysis, Entity Lists, Risk and
+            // Anomaly Scores and audit reads use too: one id, one alias.
+            byte[] spaceKey = MaskTokens.spaceKey(c.root);
+            assertTrue(Files.isRegularFile(com.gamma.util.SpaceSecretKeys.keyFile(c.root, ".risk-score-mask.key")));
+            assertFalse(Files.exists(c.root.resolve("audit").resolve("entity-facts").resolve("mask.key")), "the old home is not used");
+            assertEquals(MaskTokens.token(spaceKey, A), com.gamma.mask.EvidenceMasker.forSpace(c.root).tokenFor(A),
+                    "a Risk Score key reads as the same alias as the BI cell");
             assertEquals(Set.of(MaskTokens.token(spaceKey, A), MaskTokens.token(spaceKey, B), MaskTokens.token(spaceKey, C)),
                     Set.copyOf(column(v.get("rows"), "msisdn")));
             // The per-group counts follow the same key: A has two rows, the others one.

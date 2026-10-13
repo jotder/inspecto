@@ -184,7 +184,7 @@ public final class EntityListRoutes implements RouteModule {
         EntityRegistry.EntityList l = current(facts, id);
         if (l == null) throw notFound(id, "");
         boolean masked = masked(root, l);
-        byte[] key = masked ? MaskTokens.key(log.directory()) : null;
+        byte[] key = masked ? log.maskKey() : null;
         Instant now = Instant.now();
         List<Map<String, Object>> out = new ArrayList<>();
         for (String v : values) {
@@ -442,7 +442,7 @@ public final class EntityListRoutes implements RouteModule {
             throws IOException {
         List<String> out = new ArrayList<>(entries);
         if (!out.isEmpty() && masked(root, l)) {
-            byte[] key = MaskTokens.key(log.directory());
+            byte[] key = log.maskKey();
             out.replaceAll(k -> MaskTokens.token(key, k));
             out.sort(null);
         }
@@ -514,14 +514,14 @@ public final class EntityListRoutes implements RouteModule {
         Map<String, Object> out = summary(l);
         List<String> members = new ArrayList<>(l.members());
         if (!members.isEmpty() && masked(root, l)) {
-            byte[] key = MaskTokens.key(log.directory());
+            byte[] key = log.maskKey();
             members.replaceAll(k -> MaskTokens.token(key, k));
             members.sort(null);
         }
         out.put("members", members);
         // ASSURE-ENTITY-LISTS-1: the range entries and every expiring entry, masked like the members.
         boolean masked = masked(root, l);
-        byte[] key = masked && (!l.ranges().isEmpty() || !l.expiresAt().isEmpty()) ? MaskTokens.key(log.directory()) : null;
+        byte[] key = masked && (!l.ranges().isEmpty() || !l.expiresAt().isEmpty()) ? log.maskKey() : null;
         List<String> ranges = new ArrayList<>(l.ranges());
         if (masked) ranges.replaceAll(k -> MaskTokens.token(key, k));
         ranges.sort(null);

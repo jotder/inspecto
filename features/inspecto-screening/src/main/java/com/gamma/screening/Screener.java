@@ -85,7 +85,7 @@ public final class Screener {
             EntityRegistry.EntityList l = all.get(id);
             UnaryOperator<String> shown = UnaryOperator.identity();
             if (EntityListFacts.masked(writeRoot, l)) {
-                if (key == null) key = MaskTokens.key(log.directory());
+                if (key == null) key = log.maskKey();
                 byte[] k = key;
                 shown = e -> MaskTokens.token(k, e);
             }

@@ -65,9 +65,16 @@ public final class EntityFactLog {
     }
 
     private final Path dir;
+    private final Path writeRoot;
 
     public EntityFactLog(Path writeRoot) {
+        this.writeRoot = writeRoot;
         this.dir = writeRoot.resolve("audit").resolve(DIR);
+    }
+
+    /** The Space's ONE identity key ({@link MaskTokens#spaceKey}): what masks an Entity List member here. */
+    public byte[] maskKey() throws IOException {
+        return MaskTokens.spaceKey(writeRoot);
     }
 
     public Path directory() {

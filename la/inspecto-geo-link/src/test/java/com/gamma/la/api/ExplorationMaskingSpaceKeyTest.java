@@ -22,8 +22,8 @@ class ExplorationMaskingSpaceKeyTest {
         String alias = ExplorationMasking.alias(root, "441700900101");
         assertEquals(MaskTokens.token(MaskTokens.spaceKey(root), "441700900101"), alias);
         assertTrue(alias.startsWith("masked:") && alias.length() == 7 + 16, alias);
-        assertTrue(Files.isRegularFile(root.resolve("audit").resolve("entity-facts").resolve("mask.key")),
-                "the Space key lives where the identity fact log keeps it");
+        assertTrue(Files.isRegularFile(com.gamma.util.SpaceSecretKeys.keyFile(root, ".risk-score-mask.key")),
+                "the Space key lives in the secrets directory beside the root, outside every exported tree");
     }
 
     @Test
