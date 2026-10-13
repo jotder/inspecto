@@ -51,6 +51,12 @@ describe('embed view page', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('paints its own scheme background: outside the shell the text tokens were drawn on white (LA-A11Y-AUDIT-1, 2.56:1 live)', async () => {
+        const { el } = await render({});
+        expect(el.style.background).toContain('--gamma-bg-default');
+        expect(el.style.color).toContain('--gamma-text-default');
+    });
+
     it('takes the token out of the address bar once it has been read, and keeps it out of the page', async () => {
         const { el, location } = await render({});
         expect(location.replaceState).toHaveBeenCalledWith(EMBED_SCRUBBED_PATH);

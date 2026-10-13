@@ -110,6 +110,7 @@ describe('LinkAnalysisWorkingSetRowsComponent (LA-20)', () => {
         expect(status).toContain('200 of 250 rows');
         expect(status).toContain('at step 4');
         expect(status).toContain('cached');
+        expect(el.querySelector('[aria-label="Relation status"] [class*="opacity"]'), 'opacity dims the status below 4.5:1 (LA-A11Y-AUDIT-1, 3.55:1 live)').toBeNull();
         expect(el.textContent).toContain('More rows exist');
         await expectNoA11yViolations(el);
     });

@@ -23,7 +23,8 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
     selector: 'la-app-embed-view-page',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    host: { class: 'block' },
+    // The page sits outside the shell that paints the scheme background; without its own the text tokens were drawn on white (axe color-contrast 2.56:1 in dark).
+    host: { class: 'block min-h-screen', style: 'background: var(--gamma-bg-default); color: var(--gamma-text-default)' },
     template: `
         <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4" aria-live="polite">
             @switch (state()) {

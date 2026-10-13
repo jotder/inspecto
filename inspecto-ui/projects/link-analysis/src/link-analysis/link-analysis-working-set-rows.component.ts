@@ -76,7 +76,7 @@ export function expandedRow(r: Record<string, unknown>): Record<string, unknown>
                 @if (page(); as p) {
                     <p class="text-secondary m-0 tabular-nums" aria-label="Relation status">
                         {{ rows().length }} of {{ p.total }} rows · at step {{ p.head.step }}
-                        <span class="opacity-70">· {{ p.cached ? 'cached' : 'evaluated' }}</span>
+                        <span>· {{ p.cached ? 'cached' : 'evaluated' }}</span>
                     </p>
                     @if (p.truncated) {
                         <p class="m-0">More rows exist than are loaded — use “Load more”.</p>

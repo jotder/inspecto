@@ -46,11 +46,14 @@ final class RateLimiter {
                 positive("control.rateLimit.embed.refillPerSecond", 2.0));
     }
 
-    /** The expensive Link Analysis budget (projection, traversal, pattern, Graph Run, Index build): same shape
-     *  as {@link #standard()} but its own bucket, so a graph session cannot drain ad-hoc SQL and vice versa. */
+    /** The expensive Link Analysis budget (projection, traversal, pattern, Graph Run, Index build): its own bucket,
+     *  so a graph session cannot drain ad-hoc SQL and vice versa. Burst 30, then one request per 2 seconds: about 3x
+     *  what an analyst spends (opening an Investigation spends 0, each projection / neighbour list / server algorithm
+     *  / path search / index build is 1; a hard drill-down is about 10 in a minute) - LA-DAILY-INGEST-1, measured
+     *  2026-10-14; a runaway loop is still refused after the first 30. */
     static RateLimiter linkAnalysis() {
-        return new RateLimiter(positive("control.rateLimit.linkAnalysis.capacity", 20.0),
-                positive("control.rateLimit.linkAnalysis.refillPerSecond", 1.0 / 3.0));
+        return new RateLimiter(positive("control.rateLimit.linkAnalysis.capacity", 30.0),
+                positive("control.rateLimit.linkAnalysis.refillPerSecond", 0.5));
     }
 
     /** An operator-tunable budget (operator, 2026-10-06): the system property when it parses to a positive

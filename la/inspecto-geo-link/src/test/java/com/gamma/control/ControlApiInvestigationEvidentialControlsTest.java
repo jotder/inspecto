@@ -254,7 +254,10 @@ class ControlApiInvestigationEvidentialControlsTest {
             post(c, "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"foreign\",\"dataset\":\"other_ds\",\"sourceCol\":\"caller\","
                     + "\"targetCol\":\"callee\",\"timeCol\":\"ts\",\"timeColZone\":\"America/Sao_Paulo\"}");
             var pc = c.svc.configFor(c.svc.pipelines().get(0).name()).orElseThrow();
-            Path batches = Path.of(pc.dirs().batchesFilePath()), lineage = Path.of(pc.dirs().lineageFilePath());
+            // An EARLIER run: the configured path is the run that loaded the config, every other run left its own timestamped pair.
+            Path cfgBatches = Path.of(pc.dirs().batchesFilePath());
+            Path batches = cfgBatches.resolveSibling(cfgBatches.getFileName().toString().replaceFirst("_batches_.*", "_batches_20200101_000000.csv"));
+            Path lineage = batches.resolveSibling(batches.getFileName().toString().replace("_batches_", "_lineage_"));
             Files.createDirectories(batches.getParent());
             Files.createDirectories(lineage.getParent());
             Files.writeString(batches, "consignment_id,pipeline,schema_name,output_table,status\n"
