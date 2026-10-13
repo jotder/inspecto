@@ -26,6 +26,7 @@ function setup(applyOk = true, step: InvestigationStepResult | null = null) {
         error: signal('boom'),
         lastStep: signal<InvestigationStepResult | null>(step),
         apply: vi.fn(async () => applyOk),
+        withPresets: vi.fn((_p: unknown, r: object) => ({ maxFanOut: 50, ...r })),
     };
     TestBed.configureTestingModule({
         imports: [InvestigationConnectOpComponent],
@@ -103,7 +104,7 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         fixture.detectChanges();
         (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Expand from these nodes')) as HTMLButtonElement).click();
         await fixture.whenStable();
-        expect(store.apply).toHaveBeenLastCalledWith({ op: 'expand', ids: ['5551110001', 'm1', '5551110002'] });
+        expect(store.apply).toHaveBeenLastCalledWith({ op: 'expand', ids: ['5551110001', 'm1', '5551110002'], maxFanOut: 50 });
     });
 
     it('shows no table before a connect, and none for a step of another op', () => {

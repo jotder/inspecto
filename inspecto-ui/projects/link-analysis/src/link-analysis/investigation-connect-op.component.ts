@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import type { ConnectPair } from '@inspecto/link-analysis/api/inv.service';
+import type { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { MAX_CONNECT_HOPS, MAX_CONNECT_SEEDS, parseSeedList } from './seed-list';
 
@@ -123,6 +124,8 @@ export class InvestigationConnectOpComponent {
     readonly store = inject(InvestigationSessionStore);
     readonly maxSeeds = MAX_CONNECT_SEEDS;
     readonly maxHops = MAX_CONNECT_HOPS;
+    /** The profile's presets (window, budget, fan-out cap): an expand without them is unbounded and held for four-eyes. */
+    readonly presets = input<DegreePresets>({});
     readonly text = signal('');
     readonly list = computed(() => parseSeedList(this.text()));
     readonly error = signal('');
@@ -161,6 +164,6 @@ export class InvestigationConnectOpComponent {
     /** One `expand` step from the nodes on the connecting routes (they are all in the Working Set). */
     async expandFromRoutes(ids: string[]): Promise<void> {
         this.error.set('');
-        if (!(await this.store.apply({ op: 'expand', ids }))) this.error.set(this.store.error());
+        if (!(await this.store.apply({ op: 'expand', ids, ...this.store.withPresets(this.presets(), {}) }))) this.error.set(this.store.error());
     }
 }
