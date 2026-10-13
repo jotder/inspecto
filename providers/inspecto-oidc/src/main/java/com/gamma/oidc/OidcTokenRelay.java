@@ -91,7 +91,7 @@ public final class OidcTokenRelay implements TokenRelay {
         form.put("code", code);
         form.put("code_verifier", codeVerifier);
         form.put("redirect_uri", redirectUri);
-        return post(form, nonce == null || nonce.isBlank() ? null : nonce);
+        return post(form, nonce == null || nonce.isBlank() ? null : nonce, true);
     }
 
     /**
@@ -122,10 +122,10 @@ public final class OidcTokenRelay implements TokenRelay {
     }
 
     private Optional<Tokens> post(Map<String, String> form) {
-        return post(form, null);
+        return post(form, null, false);
     }
 
-    private Optional<Tokens> post(Map<String, String> form, String expectedNonce) {
+    private Optional<Tokens> post(Map<String, String> form, String expectedNonce, boolean exchange) {
         form.put("client_id", clientId);
         if (clientSecret != null && !clientSecret.isBlank()) form.put("client_secret", clientSecret);
         try {
@@ -142,10 +142,24 @@ public final class OidcTokenRelay implements TokenRelay {
             if (access == null || refresh == null) return Optional.empty();
             if (expectedNonce != null && !nonceMatches(body.path("id_token").asText(null), expectedNonce))
                 return Optional.empty();
+            // A code redeemed WITHOUT a nonce must not slip past the check when the IAM bound one to the sign-in:
+            // the sign-in carried a nonce (the ID token says so), so a caller that omits it is refused.
+            if (exchange && expectedNonce == null && idTokenCarriesNonce(body.path("id_token").asText(null)))
+                return Optional.empty();
             return Optional.of(new Tokens(access, body.path("expires_in").asLong(300),
                     refresh, body.hasNonNull("refresh_expires_in") ? body.get("refresh_expires_in").asLong() : null));
         } catch (Exception e) {
             return Optional.empty();   // IAM unreachable / timeout / malformed — the caller just gets 401
+        }
+    }
+
+    /** True when the ID token is parseable and holds a {@code nonce} claim. */
+    static boolean idTokenCarriesNonce(String idToken) {
+        if (idToken == null || idToken.isBlank()) return false;
+        try {
+            return com.nimbusds.jwt.JWTParser.parse(idToken).getJWTClaimsSet().getClaim("nonce") != null;
+        } catch (Exception e) {
+            return false;
         }
     }
 

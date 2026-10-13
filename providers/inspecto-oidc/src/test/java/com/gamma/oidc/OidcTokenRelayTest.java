@@ -163,6 +163,16 @@ class OidcTokenRelayTest {
     void noNonceSentMeansNoNonceCheck() {
         iamReturnsIdToken(null);
         assertTrue(relay(null).exchangeCode("c", "v", "r", null).isPresent());
+        iamReturnsIdToken(idToken(null));
+        assertTrue(relay(null).exchangeCode("c", "v", "r", null).isPresent(), "id_token without a nonce claim");
+    }
+
+    @Test
+    void omittingTheNonceCannotBypassAnIdTokenThatCarriesOne() {
+        iamReturnsIdToken(idToken("n-1"));
+        assertTrue(relay(null).exchangeCode("c", "v", "r", null).isEmpty(), "omitted");
+        assertTrue(relay(null).exchangeCode("c", "v", "r", " ").isEmpty(), "blank");
+        assertTrue(relay(null).refresh("rt").isPresent(), "a refresh response is never nonce-checked");
     }
 
     @Test

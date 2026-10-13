@@ -1561,7 +1561,7 @@ backend half is `DemoAuthHttpTest`).
 **Not built (D-5).** Real OIDC sign-in for la-app against a real IAM (the Demo User path above and the moved specs cover the SPA half); the
 "licence text" item (nothing in the bundle names the UI flavor to attach it to); `/bootstrap` was proven on a scratch Standard backend,
 not by calling the packaged zip's server; a fifth `LA` edition; module federation (signed no); a second `-Dui.dir`; renaming `gamma`; a mobile or SSR
-build. Filed: `LA-APP-REAL-SIGNIN-1`.
+build. Filed: `LA-APP-REAL-SIGNIN-1` - closed 2026-10-13: the whole flow ran against a real WSO2 IS; setup, pass criteria and the one limit (the browser pane cannot pass the IdP certificate page) are in [`ops/la-app-real-signin-runbook.md`](../../../ops/la-app-real-signin-runbook.md).
 
 ## Integration design record (D-6: decisions and the deferral)
 
