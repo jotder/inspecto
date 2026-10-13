@@ -7,6 +7,8 @@ import com.gamma.service.SpaceManager;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -49,6 +51,24 @@ final class ExchangeRefResolver implements SharedRefResolver {
             return Files.isDirectory(pinned) ? Optional.of(pinned) : Optional.empty();
         }
         return ExchangeSnapshots.currentDir(itemDir).filter(Files::isDirectory);
+    }
+
+    /** Snapshot mode only: the classification the owner's current snapshot carries; a live grant, or a snapshot that predates it, is unknown. */
+    @Override
+    public Optional<Map<String, String>> classification(String owner, String item) {
+        Exchange ex = Exchange.under(spaces.containerRoot());
+        if (!ex.enabled()) return Optional.empty();
+        Optional<ShareGrant> granted = ex.activeGrant(EventLog.currentSpaceId(), owner, "dataset", item);
+        if (granted.isEmpty() || ShareGrant.LIVE.equals(granted.get().mode())) return Optional.empty();
+        Optional<ExchangeSnapshots.SnapshotMeta> meta = ExchangeSnapshots.readCurrent(ExchangeSnapshots.itemDir(ex.dir(), owner, item));
+        if (meta.isEmpty() || meta.get().columns().isEmpty()) return Optional.empty();
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map<String, Object> c : meta.get().columns()) {
+            Object cls = c.get("classification");
+            if (cls == null || c.get("name") == null) return Optional.empty();   // predates the carry: unknown
+            out.put(String.valueOf(c.get("name")).trim().toLowerCase(java.util.Locale.ROOT), String.valueOf(cls));
+        }
+        return Optional.of(out);
     }
 
     /** The owner Space's at-rest Table directory for {@code item} (live-mode read target). */

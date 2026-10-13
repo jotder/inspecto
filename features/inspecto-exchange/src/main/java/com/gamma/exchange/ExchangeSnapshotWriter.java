@@ -1,6 +1,7 @@
 package com.gamma.exchange;
 
 import com.gamma.exchange.ExchangeSnapshots.SnapshotMeta;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
@@ -87,6 +88,7 @@ public final class ExchangeSnapshotWriter {
             }
             columns = describe(st, unix(tmp));
         }
+        classify(columns, dataset, item, ownerRegistry, ownerViews);
         Files.move(tmp, finalFile, StandardCopyOption.ATOMIC_MOVE);
 
         SnapshotMeta meta = new SnapshotMeta(version, rows, Instant.now().toString(), columns);
@@ -103,6 +105,38 @@ public final class ExchangeSnapshotWriter {
         }
         ExchangeSnapshots.prune(itemDir, version, KEEP_VERSIONS, System.currentTimeMillis(), pinned);
         return meta;
+    }
+
+    /**
+     * BI-QUERY-MASKING-1 (D-M6): carry the owner's classification in the snapshot meta so the consumer's masking BI routes can
+     * judge it under the CONSUMER's entity types and reveal capability. Per column: the class (own declaration, lineage, pipeline
+     * schema; strictest wins), {@code NONE} when clean, {@code UNKNOWN} when the owner's lineage cannot be traced (fail closed).
+     */
+    private static void classify(List<Map<String, Object>> columns, Map<String, Object> dataset, String item,
+                                 Path ownerRegistry, Path ownerViews) {
+        ComponentStore store = new ComponentStore(ownerRegistry);
+        Path configRoot = ownerRegistry.toAbsolutePath().getParent();
+        Map<String, String> cls = new java.util.HashMap<>();
+        if (dataset.get("columns") instanceof List<?> own)
+            for (Object o : own)
+                if (o instanceof Map<?, ?> c && c.get("name") != null && c.get("classification") != null)
+                    cls.put(String.valueOf(c.get("name")).trim().toLowerCase(java.util.Locale.ROOT),
+                            String.valueOf(c.get("classification")).trim().toUpperCase(java.util.Locale.ROOT));
+        Map<String, String> traced = new java.util.HashMap<>(
+                EvidenceMasker.lineageClassification(item, dataset, store, new ViewStore(ownerViews)));
+        traced.putAll(EvidenceMasker.schemaClassification(configRoot, EvidenceMasker.datasetStores(dataset), c -> true));
+        boolean unknown = traced.containsKey(EvidenceMasker.UNKNOWN_LINEAGE);
+        traced.remove(EvidenceMasker.UNKNOWN_LINEAGE);
+        cls.putAll(traced);
+        if (!traced.isEmpty() && (hasText(dataset.get("view")) || hasText(dataset.get("sql")))) unknown = true;
+        for (Map<String, Object> c : columns) {
+            String name = String.valueOf(c.get("name")).trim().toLowerCase(java.util.Locale.ROOT);
+            c.put("classification", cls.getOrDefault(name, unknown ? "UNKNOWN" : "NONE"));
+        }
+    }
+
+    private static boolean hasText(Object v) {
+        return v != null && !String.valueOf(v).isBlank();
     }
 
     /** Every version a grant of {@code owner/item} currently pins — prune must never delete one. */

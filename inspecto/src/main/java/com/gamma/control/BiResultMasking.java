@@ -5,6 +5,7 @@ import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.MaskTokens;
 import com.gamma.mask.EvidenceMasker;
+import com.gamma.query.SharedRefResolver;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.MeasureCompiler;
@@ -28,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -84,6 +86,15 @@ final class BiResultMasking {
         this.basis = basis;
     }
 
+    /** The {@code shared/<owner>/<item>} refs a Dataset reads directly. */
+    private static List<String> sharedRefs(Map<String, Object> dataset) {
+        List<String> refs = new ArrayList<>();
+        for (String k : List.of("physicalRef", "sourceName"))
+            if (dataset.get(k) != null && String.valueOf(dataset.get(k)).trim().startsWith("shared/"))
+                refs.add(String.valueOf(dataset.get(k)).trim());
+        return refs;
+    }
+
     /** True when the caller may see raw keys: holds {@link #REVEAL}, or no Subject is attached (Personal edition). */
     static boolean mayReveal(HttpExchange ex) {
         return ApiContext.subject(ex).map(s -> s.capabilities().contains(REVEAL)).orElse(true);
@@ -121,6 +132,19 @@ final class BiResultMasking {
                 writeRoot, EvidenceMasker.datasetStores(dataset), claim).entrySet()) {
             if (EvidenceMasker.UNKNOWN_LINEAGE.equals(e.getKey())) unknown = true;
             else masked.add(e.getKey());
+        }
+        // BI-QUERY-MASKING-1 (D-M6): a Dataset over another Space's shared snapshot carries the OWNER's classification, judged
+        // here under THIS Space's entity types. A ref whose classification is not known (live grant, older snapshot) fails closed.
+        for (String ref : sharedRefs(dataset)) {
+            String[] parts = ref.split("/");
+            Optional<Map<String, String>> carried = parts.length == 3
+                    ? SharedRefResolver.global().classification(parts[1], parts[2]) : Optional.empty();
+            if (carried.isEmpty()) { unknown = true; continue; }
+            for (Map.Entry<String, String> e : carried.get().entrySet()) {
+                if ("UNKNOWN".equals(e.getValue())) unknown = true;
+                else if (!"NONE".equals(e.getValue()) && claim.test(e.getValue())) masked.add(e.getKey());
+            }
+            if (notBlank(dataset.get("view")) || notBlank(dataset.get("sql"))) unknown = true;   // a rename cannot be traced
         }
         // A view or virtual Dataset over a store with classified columns: a rename cannot be traced (EvidenceMasker's rule).
         if (!lineage.isEmpty() && (notBlank(dataset.get("view")) || notBlank(dataset.get("sql")))) unknown = true;

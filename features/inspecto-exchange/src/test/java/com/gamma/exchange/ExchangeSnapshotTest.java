@@ -48,6 +48,34 @@ class ExchangeSnapshotTest {
     }
 
     @Test
+    void theSnapshotCarriesTheOwnersColumnClassification(@TempDir Path spacesRoot) throws Exception {
+        Path registry = spacesRoot.resolve("finance").resolve("config").resolve("registry");
+        Path dataRoot = spacesRoot.resolve("finance").resolve("data");
+        Files.createDirectories(dataRoot.resolve("calls"));
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement s = c.createStatement()) {
+            s.execute("COPY (SELECT * FROM (VALUES ('441700900101',1.0)) t(msisdn,amount)) TO "
+                    + "'" + unix(dataRoot.resolve("calls").resolve("part.parquet")) + "' (FORMAT PARQUET)");
+        }
+        new ComponentStore(registry).write("dataset", "calls", Map.of("physicalRef", "calls", "columns", java.util.List.of(
+                Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "amount"))));
+        Files.createDirectories(dataRoot.resolve("plainstore"));
+        Files.copy(dataRoot.resolve("calls").resolve("part.parquet"), dataRoot.resolve("plainstore").resolve("part.parquet"));
+        new ComponentStore(registry).write("dataset", "plain", Map.of("physicalRef", "plainstore"));
+        Path shared = Exchange.under(spacesRoot).dir();
+        Path views = spacesRoot.resolve("finance").resolve("views");
+
+        Map<String, Object> byName = new java.util.HashMap<>();
+        ExchangeSnapshotWriter.publish(shared, "finance", registry, dataRoot, views, "calls")
+                .columns().forEach(c -> byName.put(String.valueOf(c.get("name")), c.get("classification")));
+        assertEquals("MSISDN", byName.get("msisdn"));
+        assertEquals("NONE", byName.get("amount"), "a clean column is carried as clean, not left blank (blank means a pre-carry snapshot)");
+
+        // The negative control: the same data under a Dataset over a store nothing classifies carries NONE everywhere.
+        ExchangeSnapshotWriter.publish(shared, "finance", registry, dataRoot, views, "plain")
+                .columns().forEach(c -> assertEquals("NONE", c.get("classification")));
+    }
+
+    @Test
     void publishThenResolveThroughGrant(@TempDir Path spacesRoot) throws Exception {
         SnapshotMeta meta = seedAndPublish(spacesRoot);
         assertEquals(2, meta.rows(), "snapshot captured both rows");

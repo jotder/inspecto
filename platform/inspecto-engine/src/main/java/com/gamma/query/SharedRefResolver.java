@@ -1,6 +1,7 @@
 package com.gamma.query;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -22,6 +23,16 @@ public interface SharedRefResolver {
      * when there is no active grant, no published snapshot, or sharing is unavailable.
      */
     Optional<Path> resolveSnapshot(String owner, String item);
+
+    /**
+     * The owner's column classification of {@code owner/item} as carried by its published snapshot (BI-QUERY-MASKING-1, D-M6):
+     * lower-cased column name to class, with {@code NONE} for a clean column and {@code UNKNOWN} for one whose lineage the owner
+     * could not trace. Empty when the classification is not known (a live grant, a snapshot published before it was carried,
+     * no grant): the caller must then treat the whole relation as possibly classified (fail closed).
+     */
+    default Optional<Map<String, String>> classification(String owner, String item) {
+        return Optional.empty();
+    }
 
     /** The fail-closed default: nothing resolves. */
     SharedRefResolver NONE = (owner, item) -> Optional.empty();

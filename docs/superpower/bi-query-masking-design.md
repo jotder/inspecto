@@ -219,7 +219,7 @@ the same helper and adds the `masking` block. A hole whose `field` is a masked c
   when the text names a masked column (or the lineage is untraceable). The author's declared defaults stay trusted and a
   parameter over an unclassified column is unaffected.
 
-### 11.6 Exchange snapshots - NOT built (needs decision D-M6)
+### 11.6 Exchange snapshots - BUILT 2026-10-13 as option (a) (D-M6, operator); the analysis below is the decision record
 `ExchangeSnapshotWriter.publish` copies the owner's WHOLE Dataset to `snapshot.parquet` and records column name / type / role
 only. Two facts make this a product decision rather than a patch:
 1. Classification does not travel. The consumer Space reads the snapshot through a shared ref whose own Dataset declares no
@@ -234,7 +234,7 @@ CONSUMER's reveal capability (raw stays on disk, no join break; the file itself 
 (b) alias at publish under a key shared by both Spaces (breaks nothing that joins on alias, breaks raw joins); (c) refuse to
 offer a Dataset with a masked column unless the grant carries an explicit `revealKeys` (strictest). The module boundary also
 applies: `inspecto-exchange` cannot see the entity store, so (b) and (c) need a seam like 11.2 and (a) needs only metadata.
-No code was changed for this item.
+As built: the snapshot meta carries `classification` per column (`NONE` when clean, `UNKNOWN` when the owner's lineage is untraceable); the consumer judges it under its own entity types; a live grant or a snapshot without the field fails closed.
 
 ### 11.7 Still open (not built, no decision needed beyond filing)
 * `query_author` was checked 2026-10-13: it returns a validated SQL draft and never executes it, so it returns no rows (not a hole).
