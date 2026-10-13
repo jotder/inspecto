@@ -1365,7 +1365,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         }
         if (!target.startsWith(uiDir)) { logStaticMiss(ex, "outside the ui root"); return false; }
         if (Files.isRegularFile(target)) { writeFile(ex, target); return true; }
-        if (!hasExtension(rel)) {                                            // SPA deep link
+        if (!hasExtension(rel) || path.startsWith("/embed/")) {            // SPA deep link (an embed token is <grantId>.<secret>: the dot is not an extension)
             Path index = uiDir.resolve("index.html");
             if (Files.isRegularFile(index)) { writeFile(ex, index); return true; }
         }
@@ -1676,6 +1676,21 @@ public final class ControlApi implements AutoCloseable, HostContext {
         } catch (SpaceManager.NoSpaceHostedException none) {
             return java.util.Set.of();
         }
+    }
+
+    @Override public java.util.Map<Path, java.util.Set<String>> attachedSpaceRoots() {
+        java.util.Map<Path, java.util.Set<String>> out = new java.util.LinkedHashMap<>();
+        for (var ctx : spaces.all()) {
+            Path root = ctx.root().config();
+            if (root != null) out.put(root, ModuleSettings.disabled(root));
+        }
+        try {
+            Path current = writeRoot();   // a single legacy Space has no config root of its own: the host's write root stands in for it
+            if (current != null && !out.containsKey(current)) out.put(current, ModuleSettings.disabled(current));
+        } catch (SpaceManager.NoSpaceHostedException none) {
+            // no Space hosted: nothing more to add
+        }
+        return out;
     }
 
     @Override public java.util.Set<String> registeredFeatures() { return java.util.Collections.unmodifiableSet(registeredFeatures); }

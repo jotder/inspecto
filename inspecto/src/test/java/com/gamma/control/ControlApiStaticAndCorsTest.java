@@ -152,6 +152,19 @@ class ControlApiStaticAndCorsTest {
     }
 
     @Test
+    void anEmbedRouteWithADotInItsTokenIsStillAnSpaDeepLinkButADottedAssetPathElsewhereIs404(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(spaDir(dir).toString(), null)) {
+            HttpResponse<String> embed = send(c.port, "GET", "/embed/inv/AbC123.sEcReT_x-y");   // an embed token is <grantId>.<secret>
+            assertEquals(200, embed.statusCode(), "the viewer route must load the SPA shell: " + embed.body());
+            assertTrue(ctype(embed).startsWith("text/html"));
+            assertTrue(embed.body().contains("Inspecto UI"));
+            HttpResponse<String> missing = send(c.port, "GET", "/dashboard/missing.js");
+            assertEquals(404, missing.statusCode(), "a missing asset elsewhere is still a 404, not the shell");
+            assertFalse(missing.body().contains("Inspecto UI"));
+        }
+    }
+
+    @Test
     void unknownApiPathStaysJson404NotIndex(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
             // matches the /runs/{n}/commits route → handler 404 (no such pipeline), as JSON

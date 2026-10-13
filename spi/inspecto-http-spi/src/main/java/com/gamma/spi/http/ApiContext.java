@@ -336,6 +336,16 @@ public interface ApiContext extends WriteRootProvider {
     /** The configured write root, or {@code null} when filesystem writes are disabled. */
     Path writeRoot();
 
+    /**
+     * Every attached Space's config root mapped to the feature ids that Space has switched off - for the ONE kind of route that is
+     * addressed by a credential and not by a Space (the public embed view, whose token does not say which Space it lives in). The default
+     * is the current Space alone ({@link #writeRoot()} and {@link #disabledFeatures()}); empty when writes are disabled.
+     */
+    default java.util.Map<Path, java.util.Set<String>> attachedSpaceRoots() {
+        Path root = writeRoot();
+        return root == null ? java.util.Map.of() : java.util.Map.of(root, disabledFeatures());
+    }
+
     /** The bound space's data directory (where partition stores live), or {@code null} if unavailable.
      *  Used by query execution to resolve a dataset's {@code physicalRef} to its at-rest Parquet (W4). */
     Path dataRoot();

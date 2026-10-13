@@ -68,22 +68,34 @@ public final class PublicInvestigationRoutes implements RouteModule {
         harden(ex);
         ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, null);   // the holder is never a Subject, even if the caller also sent a session
         Instant now = Instant.now();
-        Path root;
-        InvestigationStore store;
-        try {
-            root = api.writeRoot();
-            if (root == null) throw notFound();
-            store = InvestigationStores.of(root);
-        } catch (RuntimeException unavailable) {
-            throw notFound();
-        }
         if (!EmbedGrants.enabled()) throw denied(ex, null, token, "DISABLED");
 
-        EmbedGrants.Resolution r;
-        try {
-            r = EmbedGrants.resolve(store, token, now);
-        } catch (IOException | RuntimeException broken) {
-            throw denied(ex, null, token, "STORE_UNAVAILABLE");
+        // The token does not name its Space (it is <grantId>.<secret>; a Space hint would make the token longer, the id guessable per Space
+        // and change nothing about the hash-at-rest), so the grant is looked up in EVERY attached Space whose geoLink module is on. Every
+        // Space is always asked - no early exit - so a hit costs the same as a miss, and a Space that is down only hides its own grants.
+        Path root = null;
+        InvestigationStore store = null;
+        EmbedGrants.Resolution r = null;
+        boolean broken = false;
+        for (var space : api.attachedSpaceRoots().entrySet()) {
+            if (space.getValue().contains("geoLink")) continue;
+            try {
+                InvestigationStore candidate = InvestigationStores.of(space.getKey());
+                EmbedGrants.Resolution found = EmbedGrants.resolve(candidate, token, now);
+                if (root == null && (found.record() != null || found.ok())) {
+                    root = space.getKey();
+                    store = candidate;
+                    r = found;
+                } else if (r == null && root == null && found.denied() == EmbedGrants.Denied.MALFORMED) {
+                    r = found;
+                }
+            } catch (IOException | RuntimeException unavailable) {
+                broken = true;
+            }
+        }
+        if (root == null) {
+            if (r != null) throw denied(ex, null, token, r.denied().name());
+            throw denied(ex, null, token, broken ? "STORE_UNAVAILABLE" : "UNKNOWN");
         }
         if (!r.ok()) throw denied(ex, null, token, r.denied().name());
         Map<String, Object> rec = r.record();
