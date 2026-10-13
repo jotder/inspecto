@@ -13,10 +13,44 @@
 # RELOCATABILITY: the baked folder is scanned for the temp root it was built under; any hit THROWS (the bundle gets unzipped
 # anywhere). Persisted state that is regenerable is dropped before the copy (see $regenerable).
 
+# ROOT CAUSE of "the packaging pwsh dies right after 'seeding la-showcase'": Start-Process (-WindowStyle Hidden, redirected output) does NOT
+# give the child its own console - it inherits the packaging pwsh's. The stop helper then attached to THAT console and sent
+# GenerateConsoleCtrlEvent(0,0) (Ctrl+C to every process on it), killing the packaging script itself. So the server is now created with
+# CREATE_NEW_CONSOLE (own, hidden console): a Ctrl+C there reaches only the server, never the parent.
+function Start-BakeServer {
+    param([Parameter(Mandatory)][string]$Java, [Parameter(Mandatory)][string[]]$JvmArgs, [Parameter(Mandatory)][string]$WorkDir, [Parameter(Mandatory)][string]$Log)
+    if (-not ('Inspecto.NC' -as [type])) {
+        Add-Type -Namespace Inspecto -Name NC -MemberDefinition @"
+[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] public struct SI { public int cb; public string r; public string d; public string t; public int x, y, xs, ys, xc, yc, fa, fl; public short sw, cr; public IntPtr rr, si, so, se; }
+[StructLayout(LayoutKind.Sequential)] public struct PI { public IntPtr hp, ht; public uint pid, tid; }
+[DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CreateProcessW(string app, System.Text.StringBuilder cmd, IntPtr pa, IntPtr ta, bool inh, uint flags, IntPtr env, string cwd, ref SI si, out PI pi);
+[DllImport("kernel32.dll")] public static extern bool SetHandleInformation(IntPtr h, uint mask, uint flags);
+[DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+"@
+    }
+    $Java = (Get-Command $Java -ErrorAction Stop).Source   # absolute: CreateProcess resolves a bare/relative name against the NEW cwd
+    $q = { param($a) '"' + $a + '"' }
+    # java is created DIRECTLY (not via cmd) so the returned pid is the JVM's; stdout/stderr go to inheritable file handles.
+    $so = [System.IO.File]::Open($Log, 'Create', 'Write', 'ReadWrite'); $se = [System.IO.File]::Open("$Log.err", 'Create', 'Write', 'ReadWrite')
+    try {
+        foreach ($f in @($so, $se)) { [void][Inspecto.NC]::SetHandleInformation($f.SafeFileHandle.DangerousGetHandle(), 1, 1) }
+        $si = New-Object Inspecto.NC+SI; $si.cb = [Runtime.InteropServices.Marshal]::SizeOf($si); $si.fl = 0x101; $si.sw = 0   # STARTF_USESHOWWINDOW|USESTDHANDLES, SW_HIDE
+        $si.so = $so.SafeFileHandle.DangerousGetHandle(); $si.se = $se.SafeFileHandle.DangerousGetHandle(); $si.si = [IntPtr]::Zero
+        $pi = New-Object Inspecto.NC+PI
+        $cmd = [System.Text.StringBuilder]::new((@($Java) + $JvmArgs | ForEach-Object { & $q $_ }) -join ' ')
+        $ok = [Inspecto.NC]::CreateProcessW($Java, $cmd, [IntPtr]::Zero, [IntPtr]::Zero, $true, 0x10, [IntPtr]::Zero, $WorkDir, [ref]$si, [ref]$pi)   # 0x10 = CREATE_NEW_CONSOLE
+        $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    } finally { $so.Dispose(); $se.Dispose() }
+    if (-not $ok) { throw "demo bake: CreateProcess failed for '$Java' (Win32 error $err)" }
+    [void][Inspecto.NC]::CloseHandle($pi.ht); [void][Inspecto.NC]::CloseHandle($pi.hp)
+    return [System.Diagnostics.Process]::GetProcessById([int]$pi.pid)
+}
+
 function Stop-BakeServer {
     param([Parameter(Mandatory)][System.Diagnostics.Process]$Proc)
     if ($Proc.HasExited) { return $true }
-    # Ctrl+C from a helper process that attaches to the server's console (Process.Kill is TerminateProcess: no shutdown hook).
+    # Ctrl+C from a helper process that attaches to the server's OWN console (see Start-BakeServer; Process.Kill is
+    # TerminateProcess: no shutdown hook). The event reaches only that private console's processes.
     $helper = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-bake-stop-$($Proc.Id).ps1"
     Set-Content -Path $helper -Value @'
 param([uint32]$TargetPid)
@@ -74,9 +108,7 @@ function Invoke-DemoSpaceBake {
         if (Test-Path $ext) { $jvm += "-Dduckdb.extension.dir=$ext" }
         $log = Join-Path $work 'server.log'
         Write-Host "Demo bake: booting the staged bundle on 127.0.0.1:$Port with a scaffolded la-showcase ..." -ForegroundColor Cyan
-        # A NEW (hidden) console, so the graceful stop can attach to it; output goes to files.
-        $proc = Start-Process -FilePath $Java -WorkingDirectory $cwd -PassThru -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError "$log.err" `
-            -ArgumentList ($jvm + @('-cp', $cp, 'com.gamma.control.ControlApi'))
+        $proc = Start-BakeServer -Java $Java -JvmArgs ($jvm + @('-cp', $cp, 'com.gamma.control.ControlApi')) -WorkDir $cwd -Log $log
         $healthy = $false
         foreach ($i in 1..120) {
             if ($proc.HasExited) { break }
@@ -93,7 +125,7 @@ function Invoke-DemoSpaceBake {
         if ($LASTEXITCODE -ne 0) { throw "demo bake: the seed script failed (exit $LASTEXITCODE) - refusing to ship a half-seeded demo. Server log: $log" }
 
         if (-not (Stop-BakeServer -Proc $proc)) {
-            $proc.Kill(); $proc.WaitForExit(5000)
+            & taskkill /F /T /PID $proc.Id 2>&1 | Out-Null; $proc.WaitForExit(5000)
             throw "demo bake: the server did not stop gracefully (Ctrl+C) within 45 s - refusing to copy a Space whose DuckDB files may not be checkpointed."
         }
         $proc = $null
@@ -142,7 +174,7 @@ function Invoke-DemoSpaceBake {
         $n = @(Get-ChildItem -Path $dest -Recurse -File).Count
         Write-Host "Demo bake: spaces\la-showcase baked ($n files, no build-time path embedded)" -ForegroundColor Green
     } finally {
-        if ($proc -and -not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit(5000) }
+        if ($proc -and -not $proc.HasExited) { & taskkill /F /T /PID $proc.Id 2>&1 | Out-Null; $proc.WaitForExit(5000) }
         if (-not $keep) { Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }

@@ -252,3 +252,72 @@ test('each stage is skipped by its flag, and none runs when the plan itself fail
   assert.ok(r.failed.length);
   assert.deepEqual(r.summary, {});
 });
+
+// ---- LA-DEMO-SEED-RACE: a seed run right after /health must wait for the Space, then be safe to re-run ----
+const res = (status, data = {}) => ({ ok: status < 300, status, json: async () => ({ data }) });
+/** A fake server whose Investigation store "loads" after `warm` reads: until then the list is empty, create says 409, by-id says 404. */
+function racy({ warm = 3, onDisk = true, cases = [] } = {}) {
+  const calls = []; let reads = 0; let invCreated = false; const caseRows = [...cases];
+  const fetchFn = async (url, init = {}) => {
+    const method = init.method || 'GET'; const u = url.replace('http://h/api/v1', '');
+    calls.push({ method, u, body: init.body ? JSON.parse(init.body) : undefined });
+    if (u === '/auth/exchange') return res(200, { accessToken: 't' });
+    const loaded = reads >= warm;
+    if (u.startsWith('/spaces/s/inv/investigations?')) { reads++; return res(200, { items: loaded && onDisk ? [{ id: INV, headStep: 0 }] : [] }); }
+    if (u === `/spaces/s/inv/investigations/${INV}` && method === 'GET') { reads++; return (loaded || invCreated) ? res(200, { id: INV, headStep: 0 }) : res(404); }
+    if (u === '/spaces/s/inv/investigations' && method === 'POST') { if (onDisk && !loaded) return res(409); invCreated = true; return res(201); }
+    if (u === '/spaces/s/objects?limit=200') return res(200, { items: caseRows });
+    if (u === '/spaces/s/cases/from-entities') { caseRows.push({ id: 'CASE-9', title: 'Mule ring around MULE-HUB-01', type: 'CASE' }); return res(200, { case: { id: 'CASE-9' } }); }
+    if (u === '/spaces/s/inv/entity-identities' && method === 'GET') return res(200, { items: [] });
+    return res(200);
+  };
+  return { fetchFn, calls };
+}
+const noWait = { sleep: async () => {}, stages: OFF };
+
+test('race: 409 on create with an unreadable Investigation waits until it is readable, and no op is sent before that', async () => {
+  const m = racy({ warm: 4 });
+  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
+  assert.deepEqual(r.failed, []);
+  const firstOp = m.calls.findIndex((c) => c.u.endsWith('/ops'));
+  const lastBy404 = m.calls.map((c, i) => [c, i]).filter(([c]) => c.u === `/spaces/s/inv/investigations/${INV}`).pop()[1];
+  assert.ok(firstOp > lastBy404, 'every read of the Investigation precedes the first op');
+  assert.ok(r.skipped.includes('investigation'));
+});
+
+test('race: a created Investigation that never becomes readable fails loudly instead of 404ing every op', async () => {
+  const fetchFn = async (url, init = {}) => {
+    const u = url.replace('http://h/api/v1', '');
+    if (u === '/auth/exchange') return res(200, { accessToken: 't' });
+    if (u.startsWith('/spaces/s/inv/investigations?')) return res(200, { items: [] });
+    if (u === '/spaces/s/inv/investigations' && init.method === 'POST') return res(201);
+    if (u === `/spaces/s/inv/investigations/${INV}`) return res(404);
+    return res(200);
+  };
+  const r = await run({ fetchFn, base: 'http://h', space: 's', apply: true, readyTries: 3, ...noWait });
+  assert.match(r.failed[0], /not readable/);
+  assert.equal(r.done.filter((d) => d.startsWith('op-')).length, 0);
+});
+
+test('race: the list route failing at first (Space still loading) is retried, not fatal', async () => {
+  let n = 0; const m = mock();
+  const f = (url, init) => (url.includes('/inv/investigations?') && n++ < 2 ? Promise.resolve(res(503)) : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, ...noWait });
+  assert.deepEqual(r.failed, []);
+  assert.ok(n >= 3);
+});
+
+test('rerun: an unlinked Case left by a half-finished run is reused, not duplicated', async () => {
+  const m = racy({ warm: 0, cases: [{ id: 'CASE-1', title: 'Mule ring around MULE-HUB-01', type: 'CASE' }] });
+  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
+  assert.equal(m.calls.filter((c) => c.u === '/spaces/s/cases/from-entities').length, 0);
+  assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-1' });
+  assert.ok(r.skipped.includes('case'));
+});
+
+test('rerun: two full applies against one server open exactly one Case', async () => {
+  const m = racy({ warm: 0, onDisk: false });
+  await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
+  await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
+  assert.equal(m.calls.filter((c) => c.u === '/spaces/s/cases/from-entities').length, 1);
+});

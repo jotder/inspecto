@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 export const INV = 'mule-hub-case';
 export const DATASET = 'mule_transfers_dataset';
+const CASE_TITLE = 'Mule ring around MULE-HUB-01';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 /** The seeded state as an ordered list of steps. `skip(state)` lets a step opt out when the thing already exists. */
@@ -60,7 +61,7 @@ export function buildPlan() {
     { id: 'identity', as: 'fm.analyst', method: 'POST', path: '/inv/entity-identities', body: {
       a: 'account:MULE-HUB-01', b: 'account:ACC-1006', reason: 'same KYC document (showcase)' } },
     { id: 'case', as: 'fm.analyst', method: 'POST', path: '/cases/from-entities', body: {
-      title: 'Mule ring around MULE-HUB-01', entities: [{ id: 'entity:account:MULE-HUB-01', dataset: DATASET }] } },
+      title: CASE_TITLE, entities: [{ id: 'entity:account:MULE-HUB-01', dataset: DATASET }] } },
     { id: 'case-assign', as: 'fm.analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'fm.manager' } },
     { id: 'case-link', as: 'fm.analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
     { id: 'template', as: 'fm.analyst', method: 'POST', path: `${base}/template`, body: { id: 'mule-ring-template', title: 'Mule ring (hub + relays)' } },
@@ -79,7 +80,7 @@ const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, lines }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', apply = false, log = () => {},
-  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 30, alertWaitTries = 20, stages = {} } = {}) {
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 30, alertWaitTries = 20, readyTries = 60, stages = {} } = {}) {
   const want = { pending: true, alert: true, draft: true, ...stages };
   const plan = buildPlan();
   const out = { done: [], skipped: [], failed: [], warnings: [], summary: {} };
@@ -110,11 +111,22 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   };
 
   // What already exists decides what is skipped (ops are not idempotent: each POST appends a step).
-  const listed = await call('fm.analyst', 'GET', '/inv/investigations?limit=200');
+  // READINESS (LA-DEMO-SEED-RACE, 2026-10-13): right after /health first answers, the Space's Investigation store may not be loaded:
+  // the LIST can answer 200 with no items while the create answers 409 (it is on disk) and every op 404s. So the list is polled until
+  // it answers 200 (not merely once), and every Investigation is re-read by id before a write is trusted (see `readable`).
+  const sleepRetry = async (fn, tries) => { let last; for (let i = 0; i < tries; i++) { try { last = await fn(); } catch (e) { last = { status: 0, data: String(e.message || e) }; } if (last.status === 200) return last; await sleep(1000); } return last; };
+  const listed = await sleepRetry(() => call('fm.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
   if (listed.status !== 200) throw new Error(`cannot list Investigations as fm.analyst (${listed.status}): is the Space '${space}' created from the la-showcase template?`);
-  const existing = (listed.data.items || []).find((i) => i.id === INV);
-  const headStep = existing ? existing.headStep || 0 : 0;
+  const readable = async () => (await sleepRetry(() => call('fm.analyst', 'GET', `/inv/investigations/${INV}`), readyTries));
+  let existing = (listed.data.items || []).find((i) => i.id === INV);
+  let headStep = existing ? existing.headStep || 0 : 0;
   const state = { case: existing && existing.caseRef ? existing.caseRef : null, caseExisted: !!(existing && existing.caseRef) };
+  const adopt = (inv) => { existing = inv; headStep = inv.headStep || 0; if (inv.caseRef) { state.case = inv.caseRef; state.caseExisted = true; } };
+  const findCase = async () => {   // an UNLINKED Case a half-finished earlier run made: reuse it instead of opening a second
+    const r = await call('fm.analyst', 'GET', '/objects?limit=200');
+    const rows = r.status === 200 ? (Array.isArray(r.data) ? r.data : (r.data && r.data.items) || []) : [];
+    return rows.find((o) => o && o.title === CASE_TITLE && (!o.type || String(o.type).toUpperCase() === 'CASE'));
+  };
 
   for (const s of plan) {
     if (s.id === 'investigation' && existing) { out.skipped.push(s.id); continue; }
@@ -127,6 +139,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
       const have = await call(s.as, 'GET', '/inv/entity-identities');
       if (have.status === 200 && JSON.stringify(have.data).includes('ACC-1006')) { out.skipped.push(s.id); continue; }
     }
+    if (s.id === 'case' && !state.case) { const c = await findCase(); if (c) { state.case = c.id; out.skipped.push('case'); log(`  case: reusing ${c.id}`); continue; } }
     let r = await call(s.as, s.method, p, body);
     // Right after boot the Dataset's first ingest may not have landed yet: the create answers 422 "cannot read the
     // columns" (LA-DEMO-POLISH-1 (7)). Wait for it instead of failing the whole seed.
@@ -134,6 +147,11 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
       log(`  ${s.id}: 422, waiting for the first ingest of ${DATASET} (${i}/${ingestWaitTries - 1})`);
       await sleep(2000);
       r = await call(s.as, s.method, p, body);
+    }
+    if (s.id === 'investigation' && (r.status < 300 || r.status === 409)) {
+      const rd = await readable();   // created or "already there": either way it must be READABLE before any op is sent
+      if (rd.status !== 200) { out.failed.push(`investigation: ${r.status === 409 ? 'exists (409)' : 'created'} but not readable by id (HTTP ${rd.status}) after ${readyTries} tries`); log(`  ${s.id}: not readable`); break; }
+      if (r.status === 409) { adopt(rd.data); if (!out.skipped.includes(s.id)) out.skipped.push(s.id); log(`  ${s.id}: 409, now readable (head step ${headStep})`); continue; }
     }
     if (s.id === 'case' && r.status < 300) state.case = r.data.case.id;
     if (r.status === 409) out.skipped.push(s.id);                 // already exists (list, template, rule, member, pending)
