@@ -160,6 +160,7 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
         const conflict = create({ bootstrapError: msg });
         expect(conflict.el.querySelector('[data-testid="startup-error"]')?.textContent).toContain(msg);
         expect(conflict.el.querySelector('[data-testid="no-space"]')).toBeNull();
+        expect(conflict.el.textContent).not.toMatch(/secured|single sign-on/i);
     });
 
     // R2-17: a demo build is shown to a business audience. "This workspace is secured … single sign-on"

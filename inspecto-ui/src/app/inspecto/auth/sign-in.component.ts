@@ -81,13 +81,16 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     </div>
                     <h2 class="mt-5 text-2xl font-semibold">Sign in</h2>
                     <!-- R2-17: demo sign-in is NOT secured and has no SSO — never claim either above its warning. -->
-                    <p class="text-secondary mt-2">
-                        @if (demo()) {
-                            Choose a Demo User to continue.
-                        } @else {
-                            This workspace is secured. Continue with your organisation's single sign-on.
-                        }
-                    </p>
+                    <!-- A startup error means no sign-in works: the "secured / single sign-on" line would sit beside it and mislead. -->
+                    @if (!startupError()) {
+                        <p class="text-secondary mt-2">
+                            @if (demo()) {
+                                Choose a Demo User to continue.
+                            } @else {
+                                This workspace is secured. Continue with your organisation's single sign-on.
+                            }
+                        </p>
+                    }
                     @if (!configured() && !startupError()) {
                         <inspecto-alert class="mt-4 block text-left" variant="error" title="Single sign-on isn't set up">
                             This workspace can't start sign-in because single sign-on hasn't been configured yet. Ask
