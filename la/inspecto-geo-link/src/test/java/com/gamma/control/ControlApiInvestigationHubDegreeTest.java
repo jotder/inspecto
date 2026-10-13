@@ -179,6 +179,10 @@ class ControlApiInvestigationHubDegreeTest {
             Map<String, Boolean> after = expanded(c, id);
             assertTrue(after.get("a"), "the followed node is expanded: " + after);
             assertFalse(after.get("b"), "its neighbours are new frontier, not expanded: " + after);
+            // the SPA reads the replayed Working Set, not the relation: it carries the flag too, and the hash is unchanged by it
+            JsonNode replayed = replay(c, id, false).at("/workingSet/entities");
+            for (JsonNode e : replayed) assertEquals(after.get(e.get("id").asText()), e.get("expanded").asBoolean(), e.toString());
+            assertTrue(replay(c, id, true).get("equivalent").asBoolean(), "the flag never entered the hash");
             data(send(c, "POST", "/inv/investigations/" + id + "/undo", ""), 200);
             assertEquals(Map.of("a", false), expanded(c, id), "undo reverts it");
         }

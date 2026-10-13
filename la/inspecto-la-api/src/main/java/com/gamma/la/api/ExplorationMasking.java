@@ -120,9 +120,15 @@ final class ExplorationMasking {
         return BOOK.get(writeRoot + "\u0000" + alias);
     }
 
-    /** The exploration alias of {@code raw} under this Space's key - what a Working Set row carries beside its own. */
+    /**
+     * The exploration alias of {@code raw} under this Space's key - what a Working Set row carries beside its own. An alias handed
+     * out is one the server can resolve: it enters the {@link #BOOK} like {@link #out} does, so the Neighbours list of an
+     * Investigation entity (LA-EXPAND-PICK-NEIGHBOURS-1) can send it back without a prior exploration read.
+     */
     static String alias(Path writeRoot, String raw) {
-        return MaskTokens.token(spaceKey(writeRoot), raw);
+        String alias = MaskTokens.token(spaceKey(writeRoot), raw);
+        BOOK.put(writeRoot + "\u0000" + alias, raw);
+        return alias;
     }
 
     private static byte[] spaceKey(Path writeRoot) {

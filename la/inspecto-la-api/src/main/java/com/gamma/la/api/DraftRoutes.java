@@ -393,6 +393,7 @@ public final class DraftRoutes implements RouteModule {
             }
         }
         Map<String, Object> ws = new LinkedHashMap<>(s.toMap());
+        InvestigationRoutes.stampExpanded(ws, s);
         ws.put("hash", s.hash());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("investigationId", invId);

@@ -779,6 +779,7 @@ public final class InvestigationRoutes implements RouteModule {
                 b -> b.attr("investigationId", id).attr("equivalent", mismatches.isEmpty())
                         .attr("reread", reread).attr("diverged", div));
         Map<String, Object> ws = new LinkedHashMap<>(s.toMap());
+        stampExpanded(ws, s);
         ws.put("hash", s.hash());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
@@ -790,6 +791,18 @@ public final class InvestigationRoutes implements RouteModule {
         out.put("drift", drift);
         out.put("diverged", diverged);
         return masked(inv, out);
+    }
+
+    /**
+     * LA-UNEXPANDED-MARKER-1: each entity of a replayed Working Set says whether an effective expand followed it
+     * ({@code expanded}). Display only and added AFTER {@code toMap()}, so it never enters the hash; masked with the rest.
+     */
+    @SuppressWarnings("unchecked")
+    static void stampExpanded(Map<String, Object> ws, InvestigationEvaluator.State s) {
+        if (ws.get("entities") instanceof List<?> es)
+            for (Object o : es)
+                if (o instanceof Map<?, ?> m && m.get("id") != null)
+                    ((Map<String, Object>) m).put("expanded", s.expanded.contains(String.valueOf(m.get("id"))));
     }
 
     /** {@code GET /inv/investigations/{id}/log?limit=n} — bounded; the TRUE total ships beside it. */

@@ -429,6 +429,11 @@ export class InvestigationSessionStore {
         const h = this.header();
         if (!h) return;
         this.neighbours.set({ of: value, rows: [], truncated: false, loading: true, error: '' });
+        // DR-D2: on a masked Space this read speaks the Space's alias, the Working Set this Investigation's own - the
+        // Working Set's `exploreAliases` pairs them. Send the Space's alias, show this Investigation's wherever it has one.
+        const toExplore = this.workingSet()?.exploreAliases ?? {};
+        const back = new Map(Object.entries(toExplore).map(([inv, explore]) => [explore, inv]));
+        const sent = toExplore[value] ?? value;
         try {
             const res = await firstValueFrom(
                 this.inv.neighbors({
@@ -436,13 +441,13 @@ export class InvestigationSessionStore {
                     sourceCol: h.sourceCol,
                     targetCol: h.targetCol,
                     linkKindCol: h.linkKindCol ?? undefined,
-                    value,
+                    value: sent,
                 }),
             );
             if (this.neighbours()?.of !== value) return; // another entity was picked meanwhile
             this.neighbours.set({
                 of: value,
-                rows: rankNeighbours(res.rows, value),
+                rows: rankNeighbours(res.rows, sent).map((n) => ({ ...n, id: back.get(n.id) ?? n.id })),
                 truncated: res.truncated,
                 loading: false,
                 error: '',

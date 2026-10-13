@@ -242,6 +242,26 @@ class ControlApiExplorationMaskingTest {
         }
     }
 
+    @Test
+    void anExplorationAliasTheWorkingSetNamesIsResolvableWithoutAnyExplorationRead(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        // LA-EXPAND-PICK-NEIGHBOURS-1 (live finding): an Investigation seeded by RAW id has never had an exploration read mint
+        // its Space alias, yet the Working Set names that alias - the Neighbours list sends it back, so it must resolve.
+        try (Ctx c = open(cfg, root, plain())) {
+            settings(c, "masking_mode: all\n");
+            assertEquals(200, send(c, "POST", "/inv/investigations", "{\"id\":\"case-n\",\"purpose\":\"alias resolves\","
+                    + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}").statusCode());
+            assertEquals(200, send(c, "POST", "/inv/investigations/case-n/ops",
+                    "{\"op\":\"seed\",\"ids\":[\"" + A + "\"]}").statusCode());
+            JsonNode ws = ok(c, "GET", "/inv/investigations/case-n/working-set", null, false);
+            String invAlias = ws.at("/rows/0/entityId").asText();
+            String spaceAlias = ws.at("/exploreAliases").get(invAlias).asText();
+            JsonNode nb = ok(c, "POST", PROJECTION + "/neighbors", "{" + BASE + ",\"value\":\"" + spaceAlias + "\"}", false);
+            assertTrue(nb.get("rows").size() > 0, "the alias the Working Set named resolved to its entity: " + nb);
+            for (String raw : RAW) assertFalse(nb.toString().contains(raw), "the neighbours read leaked " + raw);
+        }
+    }
+
     /**
      * Live walk-through 6: a pattern run on an Investigation canvas ({@code investigationId}) answers that Investigation's
      * pseudonyms — the Working Set's — so its matches line up with the canvas; a non-member is told nothing exists; and

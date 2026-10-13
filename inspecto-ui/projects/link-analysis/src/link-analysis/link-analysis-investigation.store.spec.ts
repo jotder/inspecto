@@ -892,6 +892,29 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         expect(store.neighbours()).toBeNull();
     });
 
+    it('on a masked Space sends the Space alias and shows this Investigation alias where the Working Set has one', async () => {
+        const { store, inv, logs, sets } = setup();
+        const neighbors = vi.fn();
+        (inv as unknown as { neighbors: unknown }).neighbors = neighbors;
+        await store.start(P, 'warrant 7', 'Burners');
+        inv.appendInvestigationOp.mockImplementation(() => {
+            logs['inv-1'].entries.push(entry(1, { op: 'seed' }));
+            sets['inv-1'] = { ...ws(['masked:inv-a', 'masked:inv-b']), exploreAliases: { 'masked:inv-a': 'masked:sp-a', 'masked:inv-b': 'masked:sp-b' } };
+            return of(step(1, 'seed'));
+        });
+        await store.apply({ op: 'seed', ids: ['masked:inv-a'] });
+        neighbors.mockReturnValueOnce(
+            rowsFor([
+                { source: 'masked:sp-a', target: 'masked:sp-b', count: 4 },
+                { source: 'masked:sp-z', target: 'masked:sp-a', count: 2 },
+            ]),
+        );
+        await store.loadNeighbours('masked:inv-a');
+        expect(neighbors).toHaveBeenCalledWith(expect.objectContaining({ value: 'masked:sp-a' }));
+        // b is in the Working Set: shown (and sent back) under this Investigation's alias; z is not: the Space's alias stands
+        expect(store.neighbours()?.rows.map((r) => r.id)).toEqual(['masked:inv-b', 'masked:sp-z']);
+    });
+
     it('states a failed read in words and keeps nothing', async () => {
         const { store, inv } = setup();
         (inv as unknown as { neighbors: unknown }).neighbors = vi.fn(() =>
