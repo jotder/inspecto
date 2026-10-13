@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +37,7 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
     public Optional<List<Delivery>> deliveries(ApiContext api, Map<String, Object> dataset) {
         Set<String> stores = EvidenceMasker.datasetStores(dataset);
         if (stores.isEmpty()) return Optional.empty();
+        Set<String> origins = origins(stores);
         var service = HostContext.of(api).service();
         Map<String, Map<String, Long>> byCollector = new TreeMap<>();   // collector -> day -> rows
         for (var pv : service.pipelines()) {
@@ -44,7 +46,12 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
             Path batches = Path.of(cfg.get().dirs().batchesFilePath()), lineage = Path.of(cfg.get().dirs().lineageFilePath());
             if (!Files.exists(batches) || !Files.exists(lineage)) continue;
             Set<String> mine = new HashSet<>();
-            for (Map<String, String> b : read(batches)) if (stores.contains(b.get("output_table"))) mine.add(b.get("consignment_id"));
+            boolean owns = ownsOrigin(cfg.get(), origins);
+            for (Map<String, String> b : read(batches)) {
+                String table = b.get("output_table");
+                if (stores.contains(table) || (owns && (table == null || table.isBlank()) && "SUCCESS".equalsIgnoreCase(b.get("status"))))
+                    mine.add(b.get("consignment_id"));
+            }
             if (mine.isEmpty()) continue;
             Map<String, Long> days = byCollector.computeIfAbsent(cfg.get().collector().id(), k -> new LinkedHashMap<>());
             for (Map<String, String> r : read(lineage)) {
@@ -56,6 +63,29 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
         List<Delivery> out = new ArrayList<>();
         byCollector.forEach((c, days) -> days.forEach((d, n) -> out.add(new Delivery(c, d, n))));
         return out.isEmpty() ? Optional.empty() : Optional.of(out);
+    }
+
+    /** The Catalog's origin names for a Dataset: its {@code sourceName} and the head segment of its {@code physicalRef}, lower-cased. */
+    static Set<String> origins(Set<String> stores) {
+        Set<String> out = new HashSet<>();
+        for (String s : stores) {
+            int slash = s.indexOf('/');
+            out.add((slash < 0 ? s : s.substring(0, slash)).trim().toLowerCase(Locale.ROOT));
+        }
+        return out;
+    }
+
+    /**
+     * LA-COVERAGE-NOT-ASSESSED-1: a single-schema or segmented Pipeline writes no {@code output_table} (it has no selector
+     * table to name), so its batches cannot join on a store name. Its identity is the Catalog's origin rule instead: the
+     * Pipeline IS the origin when its Stream (default its own name) is the Dataset's origin. A selector Pipeline never takes
+     * this path: its batches name their table, and a blank one is a batch that wrote nothing.
+     */
+    static boolean ownsOrigin(PipelineConfig cfg, Set<String> origins) {
+        if (cfg.schemas().selector() != null && cfg.schemas().selector().hasSchemas()) return false;
+        for (String name : new String[]{cfg.identity().pipelineName(), cfg.stream()})
+            if (name != null && origins.contains(name.trim().toLowerCase(Locale.ROOT))) return true;
+        return false;
     }
 
     static String day(String partition) {

@@ -238,6 +238,44 @@ class ControlApiInvestigationEvidentialControlsTest {
         }
     }
 
+    /**
+     * LA-COVERAGE-NOT-ASSESSED-1: a single-schema Pipeline records an EMPTY output_table, so the store join never sees it.
+     * The Pipeline's own identity (its name / Stream is the Dataset's origin) attributes its SUCCESS batches; a Dataset
+     * over some OTHER origin must stay not-assessed from the very same audit files (a wrong "covered" is worse).
+     */
+    @Test
+    void coverageAttributesASingleSchemaPipelineByIdentityAndNotAnyOtherOrigin(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            ComponentStore reg = new ComponentStore(root.resolve("registry"));
+            reg.write("dataset", "mini_ds", Map.of("view", "calls_view", "physicalRef", "mini_etl/events"));
+            reg.write("dataset", "other_ds", Map.of("view", "calls_view", "physicalRef", "somebody_else"));
+            post(c, "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"mine\",\"dataset\":\"mini_ds\",\"sourceCol\":\"caller\","
+                    + "\"targetCol\":\"callee\",\"timeCol\":\"ts\",\"timeColZone\":\"America/Sao_Paulo\"}");
+            post(c, "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"foreign\",\"dataset\":\"other_ds\",\"sourceCol\":\"caller\","
+                    + "\"targetCol\":\"callee\",\"timeCol\":\"ts\",\"timeColZone\":\"America/Sao_Paulo\"}");
+            var pc = c.svc.configFor(c.svc.pipelines().get(0).name()).orElseThrow();
+            Path batches = Path.of(pc.dirs().batchesFilePath()), lineage = Path.of(pc.dirs().lineageFilePath());
+            Files.createDirectories(batches.getParent());
+            Files.createDirectories(lineage.getParent());
+            Files.writeString(batches, "consignment_id,pipeline,schema_name,output_table,status\n"
+                    + "b1,mini_etl,mini,,SUCCESS\n" + "b2,mini_etl,mini,,FAILED\n");
+            Files.writeString(lineage, "consignment_id,src_id,input_file,output_file,partition,row_count\n"
+                    + "b1,0,f1.csv,o1,year=2026/month=09/day=01,10\n"
+                    + "b1,1,f2.csv,o2,year=2026/month=09/day=02,5\n"
+                    + "b2,0,f3.csv,o3,year=2026/month=09/day=03,99\n");
+            String q = "?" + RANGE + "&timezone=America/Sao_Paulo";
+
+            JsonNode col = data(send(c.port, "GET", "/inv/investigations/mine/coverage" + q, null, null)).get("collectors");
+            assertTrue(col.get("assessed").asBoolean(), col.toString());
+            assertEquals(pc.collector().id(), col.at("/collectors/0/collector").asText());
+            assertEquals(2, col.at("/collectors/0/coveredDays").asInt(), "the FAILED batch's day is not delivered");
+            assertEquals("[\"2026-09-03\",\"2026-09-04\",\"2026-09-05\"]", col.at("/collectors/0/missingDays").toString());
+
+            JsonNode other = data(send(c.port, "GET", "/inv/investigations/foreign/coverage" + q, null, null)).get("collectors");
+            assertFalse(other.get("assessed").asBoolean(), "a Dataset this Pipeline never fed must not read as covered: " + other);
+        }
+    }
+
     @Test
     void coverageRefusesWhatItCannotAssess(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
