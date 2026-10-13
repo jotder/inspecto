@@ -1333,7 +1333,9 @@ public final class ConfigSpecs {
                                 + "states none (1..8760; absent = 72, never above the cap); max_ttl_hours = the longest a link may live, a longer request is refused "
                                 + "with 422 (1..8760 = 365 days; absent = 720 = 30 days); "
                                 + "refuse_classifications = column classifications (strictest of the bound source/target columns) for which "
-                                + "minting is refused with 422 (absent = none); every key absent = the shipped default.")
+                                + "minting is refused with 422 (absent = none); "
+                                + "frame_ancestors = the https origins (host[:port], no wildcard) allowed to FRAME the embed viewer page "
+                                + "(absent = none: link-only); every key absent = the shipped default.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());
     }

@@ -157,7 +157,7 @@ public final class DossierRoutes implements RouteModule {
             case "html" -> {
                 // LA-DOSSIER-OUTPUT-1: printable, self-contained; the CSP forbids any fetch or script even if an
                 // escaping bug ever let markup through.
-                ex.getResponseHeaders().set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'");
+                ex.getResponseHeaders().set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
                 yield ApiContext.respondText(ex, DossierHtml.render(out), "text/html; charset=utf-8");
             }
             default -> out;

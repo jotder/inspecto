@@ -263,6 +263,7 @@ final class SettingsRoutes implements RouteModule {
             embed.put("defaultTtlHours", em.defaultTtlHours());
             embed.put("maxTtlHours", em.maxTtlHours());
             embed.put("refuseClassifications", em.refuseClassifications());
+            embed.put("frameAncestors", em.frameAncestors());
         }
         m.put("embed", embed);
         LinkAnalysisSettings.Embed emInForce = s.effectiveEmbed();   // read-only echo: what a mint will apply now
@@ -270,6 +271,7 @@ final class SettingsRoutes implements RouteModule {
         embedInForce.put("defaultTtlHours", emInForce.defaultTtlHoursInForce());
         embedInForce.put("maxTtlHours", emInForce.maxTtlHoursInForce());
         embedInForce.put("refuseClassifications", emInForce.refuseClassificationsInForce());
+        embedInForce.put("frameAncestors", emInForce.frameAncestorsInForce());
         m.put("embedInForce", embedInForce);
         return m;
     }
@@ -380,7 +382,7 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed must be an object, got '" + raw + "'");
         Map<String, Object> g = (Map<String, Object>) raw;
         for (String k : g.keySet())
-            if (!List.of("defaultTtlHours", "maxTtlHours", "refuseClassifications").contains(k))
+            if (!List.of("defaultTtlHours", "maxTtlHours", "refuseClassifications", "frameAncestors").contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed has no key '" + k + "'");
         int ceiling = LinkAnalysisSettings.Embed.CEILING_TTL_HOURS;
         List<String> refuse = null;
@@ -392,8 +394,22 @@ final class SettingsRoutes implements RouteModule {
             refuse = new java.util.ArrayList<>();
             for (Object o : (List<?>) rc) refuse.add(String.valueOf(o).trim().toUpperCase(java.util.Locale.ROOT));
         }
+        List<String> frames = null;
+        Object fa = g.get("frameAncestors");
+        if (fa != null) {
+            if (!(fa instanceof List<?> l) || l.size() > 20)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed.frameAncestors must be a list of at most 20 origins, got '" + fa + "'");
+            frames = new java.util.ArrayList<>();
+            for (Object o : l) {
+                String origin = LinkAnalysisSettings.Embed.normaliseOrigin(o);
+                if (origin == null)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed.frameAncestors entry '" + o
+                            + "' is not an origin: use https://host[:port] (http only for localhost), no wildcard, path or query");
+                if (!frames.contains(origin)) frames.add(origin);
+            }
+        }
         LinkAnalysisSettings.Embed e = new LinkAnalysisSettings.Embed(rangedInt(g, "defaultTtlHours", "embed.defaultTtlHours", ceiling),
-                rangedInt(g, "maxTtlHours", "embed.maxTtlHours", ceiling), refuse);
+                rangedInt(g, "maxTtlHours", "embed.maxTtlHours", ceiling), refuse, frames);
         if (e.defaultTtlHours() != null && e.defaultTtlHours() > e.maxTtlHoursInForce())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "embed.defaultTtlHours (" + e.defaultTtlHours()
                     + ") must not exceed embed.maxTtlHours in force (" + e.maxTtlHoursInForce() + ")");

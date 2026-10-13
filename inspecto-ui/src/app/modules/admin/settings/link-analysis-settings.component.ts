@@ -104,6 +104,13 @@ function parseClasses(text: string | null): string[] {
     return (text ?? '').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
+/** An allowed framing origin as the server accepts it: https://host[:port] (http only for localhost), no wildcard, path or query. */
+const ORIGIN_RE = /^(https:\/\/[a-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1))(:\d{1,5})?$/i;
+function embedOriginsValid(c: AbstractControl): ValidationErrors | null {
+    const o = parseClasses(c.value as string | null);
+    return o.length <= EMBED_REFUSE_MAX && o.every((x) => ORIGIN_RE.test(x)) ? null : { embedOrigins: true };
+}
+
 /** At most 20 names of at most 64 characters (server 422 otherwise). */
 function embedClassesValid(c: AbstractControl): ValidationErrors | null {
     const names = parseClasses(c.value as string | null);
@@ -434,6 +441,15 @@ function expiryAfterHibernation(
                                 <mat-error>At most {{ embedRefuseMax }} names of at most {{ embedNameMax }} characters each.</mat-error>
                             }
                         </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Sites that may frame the viewer page</mat-label>
+                            <input matInput type="text" formControlName="frameAncestors" [readonly]="!canEdit()"
+                                placeholder="e.g. https://portal.example.com" />
+                            <mat-hint>In force: {{ embedFramesInForce() }}. Comma separated https origins; blank = nobody (link only). The data route itself is never framed.</mat-hint>
+                            @if (form.controls.embed.controls.frameAncestors.invalid) {
+                                <mat-error>At most {{ embedRefuseMax }} origins, each https://host[:port] with no wildcard or path.</mat-error>
+                            }
+                        </mat-form-field>
                         @if (form.controls.embed.hasError('embedDefaultAboveMax')) {
                             <p class="text-warn text-sm" role="alert">The default lifetime must not exceed the longest lifetime.</p>
                         }
@@ -521,6 +537,10 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         const c = this.embedInForce()?.refuseClassifications ?? [];
         return c.length ? c.join(', ') : 'none';
     });
+    readonly embedFramesInForce = computed(() => {
+        const c = this.embedInForce()?.frameAncestors ?? [];
+        return c.length ? c.join(', ') : 'nobody';
+    });
     readonly storeLabel = computed(() => {
         const b = this.served()?.investigationStoreInForce;
         return b === 'db' ? 'PostgreSQL' : b === 'fs' ? 'filesystem' : 'not reported';
@@ -555,6 +575,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 defaultTtlHours: new FormControl<number | null>(null, embedTtlValidators),
                 maxTtlHours: new FormControl<number | null>(null, embedTtlValidators),
                 refuseClassifications: new FormControl<string>('', embedClassesValid),
+                frameAncestors: new FormControl<string>('', embedOriginsValid),
             },
             embedDefaultWithinMax,
         ),
@@ -677,7 +698,9 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         else delete body['index'];
         // Blank = inherit; no stated key at all = no block (the PUT replaces, so a cleared block must not be sent back).
         const classes = parseClasses(v.embed.refuseClassifications);
+        const frames = parseClasses(v.embed.frameAncestors);
         const embed = {
+            frameAncestors: frames.length ? frames : null,
             defaultTtlHours: num(v.embed.defaultTtlHours),
             maxTtlHours: num(v.embed.maxTtlHours),
             refuseClassifications: classes.length ? classes : null,
@@ -743,6 +766,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 defaultTtlHours: s.embed?.defaultTtlHours ?? null,
                 maxTtlHours: s.embed?.maxTtlHours ?? null,
                 refuseClassifications: (s.embed?.refuseClassifications ?? []).join(', '),
+                frameAncestors: (s.embed?.frameAncestors ?? []).join(', '),
             },
             graphRun: {
                 maxNodes: s.graphRun?.maxNodes ?? null,

@@ -8,7 +8,7 @@ import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.com
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { EmbedGrantList, EmbedGrantSummary, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { EmbedMintData, LinkAnalysisEmbedMintDialog, embedErrorMessage } from './link-analysis-embed-mint.dialog';
+import { EMBED_SCOPES, EmbedMintData, LinkAnalysisEmbedMintDialog, embedErrorMessage } from './link-analysis-embed-mint.dialog';
 
 const FLAG_HINT = 'Embed links are disabled on this host; set -Dla.embed.enabled=true to enable them.';
 
@@ -49,6 +49,7 @@ const FLAG_HINT = 'Embed links are disabled on this host; set -Dla.embed.enabled
                                 <inspecto-status-badge [value]="tone(g)" [label]="g.status"></inspecto-status-badge>
                                 <span class="text-secondary">expires {{ g.expiresAt }}</span>
                                 <span class="text-secondary">{{ g.viewCount }} views</span>
+                                <span class="text-secondary">{{ scopeLabel(g) }}, masking {{ g.maskingMode ?? 'as the Space' }}</span>
                                 @if (g.status === 'active' && canMint()) {
                                     <button
                                         mat-button
@@ -110,6 +111,10 @@ export class LinkAnalysisEmbedComponent {
             const id = this.investigationId();
             untracked(() => this.load(id));
         });
+    }
+
+    scopeLabel(g: EmbedGrantSummary): string {
+        return (EMBED_SCOPES.find((s) => s.value === (g.scope ?? 'full'))?.label ?? 'full view').toLowerCase();
     }
 
     tone(g: EmbedGrantSummary): string {

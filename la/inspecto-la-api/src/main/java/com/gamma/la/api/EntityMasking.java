@@ -95,6 +95,20 @@ final class EntityMasking {
         tokenOf.forEach((raw, token) -> rawOf.put(token, raw));
     }
 
+    /** The stricter of two masking modes: {@code none} < {@code typed} < {@code all} (an unknown mode counts as the strictest). */
+    static String stricter(String a, String b) {
+        if (b == null) return a;
+        return rank(b) > rank(a) ? b : a;
+    }
+
+    private static int rank(String mode) {
+        return switch (mode) {
+            case "none" -> 0;
+            case "typed" -> 1;
+            default -> 2;
+        };
+    }
+
     /** The masking in force for one Investigation, from its sealed log (read here) plus any {@code extraIds}. */
     static EntityMasking of(InvestigationRoutes.Inv inv, Collection<String> extraIds) throws IOException {
         List<Map<String, Object>> log = new ArrayList<>();
@@ -107,8 +121,14 @@ final class EntityMasking {
 
     static EntityMasking of(InvestigationRoutes.Inv inv, List<Map<String, Object>> log, Collection<String> extraIds)
             throws IOException {
+        return of(inv, log, extraIds, null);
+    }
+
+    /** {@code modeFloor}: a per-link mode (an embed link may be stricter than its Space, never looser); null = the Space's. */
+    static EntityMasking of(InvestigationRoutes.Inv inv, List<Map<String, Object>> log, Collection<String> extraIds, String modeFloor)
+            throws IOException {
         LinkAnalysisSettings settings = LinkAnalysisSettings.forRoot(inv.writeRoot());
-        String mode = settings.effectiveMaskingMode();
+        String mode = stricter(settings.effectiveMaskingMode(), modeFloor);
         List<EntityTypes.EntityType> types = settings.effectiveEntityTypes();
         Set<String> universe = new TreeSet<>(extraIds);
         Set<String> typedSeeds = new TreeSet<>();

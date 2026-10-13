@@ -536,6 +536,13 @@ class ControlApiSettingsTest {
                     "{\"embed\":{\"bogus\":1}}", "{\"embed\":7}"})
                 assertEquals(422, send(c.port, "PUT", path, bad).statusCode(), bad);
             assertEquals(24, json(send(c.port, "GET", path, null)).get("embed").get("defaultTtlHours").asInt(), "a refused write left the file as it was");
+            assertEquals(200, send(c.port, "PUT", path, "{\"embed\":{\"frameAncestors\":[\"https://Portal.Example.com\",\"https://portal.example.com\"]}}").statusCode());
+            JsonNode framed = json(send(c.port, "GET", path, null));
+            assertEquals(1, framed.get("embedInForce").get("frameAncestors").size(), "normalised and de-duplicated");
+            assertEquals("https://portal.example.com", framed.get("embedInForce").get("frameAncestors").get(0).asText());
+            for (String bad : new String[] {"{\"embed\":{\"frameAncestors\":[\"*\"]}}", "{\"embed\":{\"frameAncestors\":[\"http://portal.example.com\"]}}",
+                    "{\"embed\":{\"frameAncestors\":[\"https://a.example/x\"]}}", "{\"embed\":{\"frameAncestors\":\"https://a.example\"}}"})
+                assertEquals(422, send(c.port, "PUT", path, bad).statusCode(), bad);
             assertEquals(200, send(c.port, "PUT", path, "{\"embed\":{\"defaultTtlHours\":72,\"maxTtlHours\":8760}}").statusCode(), "a Space admin may raise the cap to 365 d");
             assertEquals(8760, json(send(c.port, "GET", path, null)).get("embedInForce").get("maxTtlHours").asInt());
         }

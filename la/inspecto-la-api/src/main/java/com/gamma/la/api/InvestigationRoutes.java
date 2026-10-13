@@ -2344,10 +2344,23 @@ public final class InvestigationRoutes implements RouteModule {
         return purpose.trim();
     }
 
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> logOf(Inv inv) throws IOException {
+        List<Map<String, Object>> log = new ArrayList<>();
+        for (String line : inv.logLines()) log.add(com.gamma.spi.http.ApiContext.JSON.readValue(line, Map.class));
+        return log;
+    }
+
     /** The response, masked per the Space's {@code maskingMode}, with a {@code masking} note saying what was (D-U6). */
     @SuppressWarnings("unchecked")
     static Object masked(Inv inv, Object out) throws IOException {
-        EntityMasking mask = EntityMasking.of(inv, List.of());
+        return masked(inv, out, null);
+    }
+
+    /** {@link #masked(Inv, Object)} at a per-link floor: the stricter of the Space's mode and {@code modeFloor} (an embed link). */
+    @SuppressWarnings("unchecked")
+    static Object masked(Inv inv, Object out, String modeFloor) throws IOException {
+        EntityMasking mask = modeFloor == null ? EntityMasking.of(inv, List.of()) : EntityMasking.of(inv, logOf(inv), List.of(), modeFloor);
         // DR-D2: a Working Set in the answer names, per masked entity, the alias the query graph shows for it (the Space's key)
         Map<String, String> exploreAliases = new LinkedHashMap<>();
         if (mask.masking() && out instanceof Map<?, ?> o && o.get("workingSet") instanceof Map<?, ?> ws

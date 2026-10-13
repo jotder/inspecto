@@ -340,6 +340,44 @@ class ControlApiInvestigationEmbedTest {
     }
 
     @Test
+    void aLinkCanBeNarrowedInScopeAndStricterInMaskingThanItsSpaceNeverLooser(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        enable();
+        try (Ctx c = open(cfg, root)) {
+            investigation(c);
+            settings(root, "none", null);
+            String defaults = mint(c, "{}");
+            assertEquals("full", ok(c, "GET", INV + "/embeds", null, L).at("/grants/0/scope").asText(), "the default scope shows everything");
+
+            JsonNode minted = ok(c, "POST", INV + "/embeds", "{\"scope\":\"working_set\",\"masking_mode\":\"all\"}", L);
+            assertEquals("working_set", minted.get("scope").asText());
+            assertEquals("all", minted.get("maskingMode").asText());
+            JsonNode narrow = JSON.readTree(pub(c, minted.get("token").asText()).body()).get("data");
+            assertEquals(0, narrow.get("annotations").size(), "working_set: no notes");
+            assertEquals(0, narrow.get("references").size());
+            assertEquals("working_set", narrow.at("/link/scope").asText());
+            for (JsonNode e : narrow.at("/workingSet/entities"))
+                assertTrue(e.get("entityId").asText().startsWith("masked:"), "the link is stricter than its 'none' Space: " + e);
+            JsonNode wide = JSON.readTree(pub(c, defaults).body()).get("data");
+            assertEquals("a", wide.at("/workingSet/entities/0/entityId").asText(), "the other link follows the Space");
+            assertEquals(1, wide.get("annotations").size());
+
+            JsonNode notes = ok(c, "POST", INV + "/embeds", "{\"scope\":\"with_notes\"}", L);
+            assertEquals(1, JSON.readTree(pub(c, notes.get("token").asText()).body()).at("/data/annotations").size());
+
+            assertEquals(422, status(c, "POST", INV + "/embeds", "{\"scope\":\"everything\"}", L));
+            assertEquals(422, status(c, "POST", INV + "/embeds", "{\"masking_mode\":\"bogus\"}", L));
+            settings(root, "all", null);   // the Space tightens: a link that asks for LESS masking than the Space is refused
+            assertEquals(422, status(c, "POST", INV + "/embeds", "{\"masking_mode\":\"none\"}", L), "a link cannot be looser than the Space");
+            assertEquals(422, status(c, "POST", INV + "/embeds", "{\"masking_mode\":\"typed\"}", L));
+            assertEquals(200, status(c, "POST", INV + "/embeds", "{\"masking_mode\":\"all\"}", L));
+            assertEquals(404, status(c, "POST", INV + "/embeds", "{\"scope\":\"working_set\"}", S), "the gates are unchanged");
+            JsonNode after = JSON.readTree(pub(c, defaults).body()).get("data");   // a stricter Space never revokes; it masks the old link too
+            assertTrue(after.at("/workingSet/entities/0/entityId").asText().startsWith("masked:"), after.toString());
+        }
+    }
+
+    @Test
     void everyKindOfBadTokenIsTheSameFourOhFourAndAValidSubjectOnThePublicPathChangesNothing(@TempDir Path cfg, @TempDir Path root)
             throws Exception {
         subjects();

@@ -309,7 +309,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // boundary so error/preflight responses still carry the Correlation-ID + CORS headers; path
         // normalization → space binding then feed the terminal route dispatch.
         this.pipeline = compose(this::routeDispatch,
-                this::correlation, this::cors, this::errorBoundary,
+                this::correlation, this::cors, this::frameHeaders, this::errorBoundary,
                 this::normalizePath, this::bindSpace);
         this.http.createContext("/", this::dispatch);
         // Fail-closed at the edge (W6): resolve the edition's Authenticator now, not on the first
@@ -817,6 +817,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
             applyCors(ex);
             if ("OPTIONS".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(204, -1); return; }
         }
+        next.proceed(ex);
+    }
+
+    /** Host-wide frame-deny (LA-EMBED-FRAME-HEADERS-1), inert unless -Dcontrol.frameDeny=true; never on an embed route. */
+    private void frameHeaders(HttpExchange ex, Chain next) throws Exception {
+        if (FrameHeaders.hostDeny() && !FrameHeaders.isEmbedPath(ex.getRequestURI().getPath())) FrameHeaders.denyFraming(ex);
         next.proceed(ex);
     }
 
@@ -1367,10 +1373,36 @@ public final class ControlApi implements AutoCloseable, HostContext {
         if (Files.isRegularFile(target)) { writeFile(ex, target); return true; }
         if (!hasExtension(rel) || path.startsWith("/embed/")) {            // SPA deep link (an embed token is <grantId>.<secret>: the dot is not an extension)
             Path index = uiDir.resolve("index.html");
-            if (Files.isRegularFile(index)) { writeFile(ex, index); return true; }
+            if (Files.isRegularFile(index)) {
+                if (path.startsWith("/embed/")) writeEmbedShell(ex, index);
+                else writeFile(ex, index);
+                return true;
+            }
         }
         logStaticMiss(ex, "no such file under the ui root");
         return false;
+    }
+
+    /**
+     * The embed viewer page (LA-EMBED-FRAME-HEADERS-1): the SPA index with no third-party link, under a strict CSP and no-referrer. The
+     * only origins that may frame it are the ones a Space states (embed.frame_ancestors, union of the attached Spaces whose
+     * Link Analysis module is on); none stated = nobody. The token in the URL is never read or logged here.
+     */
+    private void writeEmbedShell(HttpExchange ex, Path index) throws IOException {
+        List<String> origins = new java.util.ArrayList<>();
+        for (var space : attachedSpaceRoots().entrySet()) {
+            if (space.getValue().contains("geoLink")) continue;
+            for (String o : com.gamma.entitystore.LinkAnalysisSettings.forRoot(space.getKey()).effectiveEmbed().frameAncestorsInForce())
+                if (!origins.contains(o)) origins.add(o);
+        }
+        FrameHeaders.embedShell(ex, origins);
+        byte[] bytes = FrameHeaders.sanitiseShell(Files.readAllBytes(index));
+        ex.getResponseHeaders().set("Content-Type", contentType("index.html"));
+        ex.sendResponseHeaders(200, bytes.length);
+        try (OutputStream body = ex.getResponseBody()) {
+            body.write(bytes);
+        }
+        logStatic(ex, index, 200, bytes.length);
     }
 
     /**

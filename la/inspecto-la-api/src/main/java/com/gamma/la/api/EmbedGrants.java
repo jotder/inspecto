@@ -68,6 +68,19 @@ final class EmbedGrants {
     /** Mint a grant for {@code investigationId}: store the record (hash only) and return the token once. */
     static Minted mint(InvestigationStore store, String investigationId, String issuedBy, Instant now, long ttlHours,
                        String label, String maskingModeAtMint) throws IOException {
+        return mint(store, investigationId, issuedBy, now, ttlHours, label, maskingModeAtMint, SCOPE_FULL, maskingModeAtMint);
+    }
+
+    /** What a link shows beyond the Working Set (entities + links, always): {@code working_set} only, {@code with_notes}, or {@code full} (notes + references). */
+    static final String SCOPE_FULL = "full";
+    static final List<String> SCOPES = List.of("working_set", "with_notes", SCOPE_FULL);
+
+    /**
+     * {@code scope}: one of {@link #SCOPES}. {@code linkMasking}: the masking mode THIS link applies, never looser than the Space's
+     * ({@code maskingModeAtMint}); the view masks at the stricter of the two, and the liveness check still tracks only the Space.
+     */
+    static Minted mint(InvestigationStore store, String investigationId, String issuedBy, Instant now, long ttlHours,
+                       String label, String maskingModeAtMint, String scope, String linkMasking) throws IOException {
         purgeExpired(store, investigationId, now);
         long active = store.embedGrants(investigationId).stream().filter(j -> "active".equals(status(parse(j), now))).count();
         if (active >= MAX_ACTIVE)
@@ -85,6 +98,8 @@ final class EmbedGrants {
             rec.put("label", label);
             rec.put("tokenSha256", sha256(token));
             rec.put("maskingModeAtMint", maskingModeAtMint);
+            rec.put("scope", scope);
+            rec.put("maskingMode", linkMasking);
             rec.put("viewCount", 0L);
             if (store.createEmbedGrant(investigationId, grantId, write(rec))) {
                 rec.remove("tokenSha256");   // the caller of mint never needs, and a response must never carry, the hash
@@ -209,6 +224,8 @@ final class EmbedGrants {
         for (String k : List.of("grantId", "label", "issuedBy", "issuedAt", "expiresAt"))
             m.put(k, rec.get(k));
         m.put("status", status(rec, now));
+        m.put("scope", rec.get("scope") == null ? SCOPE_FULL : rec.get("scope"));   // a grant minted before scopes existed shows everything
+        m.put("maskingMode", rec.get("maskingMode") == null ? rec.get("maskingModeAtMint") : rec.get("maskingMode"));
         for (String k : List.of("revokedAt", "revokedBy", "revokedReason", "lastViewAt"))
             if (rec.get(k) != null) m.put(k, rec.get(k));
         m.put("viewCount", rec.get("viewCount") instanceof Number n ? n.longValue() : 0L);

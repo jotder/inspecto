@@ -885,6 +885,8 @@ export interface InvestigationCaseLink {
 
 export type InvestigationRole = 'lead' | 'analyst' | 'reviewer';
 
+export type EmbedScope = 'working_set' | 'with_notes' | 'full';
+
 /** One embed link of an Investigation as the list reads it - never the token (LA-EMBED-SPA-1). */
 export interface EmbedGrantSummary {
     grantId: string;
@@ -893,6 +895,10 @@ export interface EmbedGrantSummary {
     issuedAt: string;
     expiresAt: string;
     status: 'active' | 'expired' | 'revoked';
+    /** What the link shows beyond the Working Set (S4). */
+    scope?: EmbedScope;
+    /** The masking mode this link applies (never looser than the Space's). */
+    maskingMode?: string;
     viewCount: number;
     lastViewAt?: string;
     revokedAt?: string;
@@ -915,6 +921,7 @@ export interface EmbedMinted {
     expiresAt: string;
     label: string | null;
     maskingMode: string;
+    scope?: EmbedScope;
     note: string;
 }
 
@@ -1679,7 +1686,7 @@ export class InvService {
     }
 
     /** Mint a read-only embed link - lead + `canShareInvestigation`; the token is in the answer once. */
-    mintInvestigationEmbed(id: string, body: { label?: string; ttl_hours?: number }): Observable<EmbedMinted> {
+    mintInvestigationEmbed(id: string, body: { label?: string; ttl_hours?: number; scope?: EmbedScope; masking_mode?: string }): Observable<EmbedMinted> {
         return this.http.post<EmbedMinted>(invPath(id, 'embeds'), body);
     }
 

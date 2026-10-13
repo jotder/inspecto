@@ -50,4 +50,15 @@ class LinkAnalysisEmbedSettingsTest {
         assertNull(read(dir, "embed:\n").embed(), "an empty key arrives as {}: no knob");
         assertEquals(72, read(dir, "embed:\n  default_ttl_hours: 0\n").effectiveEmbed().defaultTtlHoursInForce(), "a non-positive knob costs only that knob");
     }
+
+    @Test
+    void frameAncestorsAreCanonicalOriginsAndABadEntryIsDroppedNeverWidened(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), read(dir, "masking_mode: none").effectiveEmbed().frameAncestorsInForce(), "nobody by default");
+        new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new LinkAnalysisSettings.Embed(null, null, null, List.of("https://Portal.Example.com", "*", "http://evil.example", "https://a.example/p")))
+                .write(dir.resolve(LinkAnalysisSettings.FILE));
+        assertEquals(List.of("https://portal.example.com"), LinkAnalysisSettings.forRoot(dir).effectiveEmbed().frameAncestorsInForce());
+        assertEquals("http://127.0.0.1:4200", LinkAnalysisSettings.Embed.normaliseOrigin("http://127.0.0.1:4200"));
+        assertNull(LinkAnalysisSettings.Embed.normaliseOrigin("https://a.example;frame-src *"));
+    }
 }

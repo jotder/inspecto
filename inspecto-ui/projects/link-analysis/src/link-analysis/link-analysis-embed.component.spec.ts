@@ -193,10 +193,22 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
         const d = await openDialog(c);
         (d.querySelector('#embed-label') as HTMLInputElement).value = 'Auditor';
         d.querySelector('#embed-label')!.dispatchEvent(new Event('input'));
+        const scope = d.querySelector('#embed-scope') as HTMLSelectElement;
+        scope.value = 'with_notes';
+        scope.dispatchEvent(new Event('change'));
+        const masking = d.querySelector('#embed-masking') as HTMLSelectElement;
+        expect([...masking.options].map((o) => o.value), 'a link is never offered looser masking than the Space').toEqual(['typed', 'all']);
+        masking.value = 'all';
+        masking.dispatchEvent(new Event('change'));
         button(d, 'Create link')!.click();
         await new Promise((r) => setTimeout(r));
         await settle(c.f);
-        expect(c.inv.mintInvestigationEmbed).toHaveBeenCalledWith('inv-1', { ttl_hours: 24, label: 'Auditor' });
+        expect(c.inv.mintInvestigationEmbed).toHaveBeenCalledWith('inv-1', {
+            ttl_hours: 24,
+            label: 'Auditor',
+            scope: 'with_notes',
+            masking_mode: 'all',
+        });
         const field = d.querySelector('#embed-link-field') as HTMLInputElement;
         expect(field.value).toBe(location.origin + '/embed/inv/' + encodeURIComponent(TOKEN));
         expect(field.value).not.toContain('/public/investigations');

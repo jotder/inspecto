@@ -114,7 +114,7 @@ public final class PublicInvestigationRoutes implements RouteModule {
                 (String) rec.get("label"));
         ApiContext.attr(ex, ApiContext.ATTR_EMBED_GRANT, grant);
 
-        Map<String, Object> out = build(inv, grant);
+        Map<String, Object> out = build(inv, grant, rec);
         EmbedGrants.viewed(store, grantId, now);
         int step = out.get("head") instanceof Map<?, ?> h && h.get("step") instanceof Number n ? n.intValue() : 0;
         emit(LinkEventTypes.LINK_EMBED_VIEWED, grant.actor(), "link.embed.viewed", "link.embed.viewed - " + invId + " " + grantId, ex,
@@ -158,13 +158,15 @@ public final class PublicInvestigationRoutes implements RouteModule {
 
     /** The masked view: header, Working Set, notes and references - evaluated from the sealed log, masked as the Space masks. */
     @SuppressWarnings("unchecked")
-    static Map<String, Object> build(InvestigationRoutes.Inv inv, EmbedGrant grant) throws IOException {
+    static Map<String, Object> build(InvestigationRoutes.Inv inv, EmbedGrant grant, Map<String, Object> rec) throws IOException {
+        String scope = rec.get("scope") == null ? EmbedGrants.SCOPE_FULL : String.valueOf(rec.get("scope"));
+        String floor = rec.get("maskingMode") == null ? null : String.valueOf(rec.get("maskingMode"));
         List<Map<String, Object>> log = new ArrayList<>();
         for (String line : inv.logLines()) log.add(ApiContext.JSON.readValue(line, Map.class));
         InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(log, -1, null);
         int headStep = log.isEmpty() ? 0 : ((Number) log.get(log.size() - 1).get("step")).intValue();
         Map<String, List<Map<String, Object>>> tables = WorkingSetRoutes.tables(s);
-        EntityMasking mask = EntityMasking.of(inv, log, List.of());
+        EntityMasking mask = EntityMasking.of(inv, log, List.of(), floor);
 
         Map<String, Object> out = new LinkedHashMap<>();
         Map<String, Object> hdr = new LinkedHashMap<>();
@@ -212,17 +214,19 @@ public final class PublicInvestigationRoutes implements RouteModule {
                 notes.add(n);
             });
         });
-        out.put("annotations", notes);
-        try {
+        out.put("annotations", "working_set".equals(scope) ? List.of() : notes);
+        if (!EmbedGrants.SCOPE_FULL.equals(scope)) out.put("references", List.of());
+        else try {
             out.put("references", InvestigationReferenceRoutes.parse(inv.store().references(inv.id())));
         } catch (RuntimeException unreadable) {
             out.put("references", List.of());
         }
         Map<String, Object> g = new LinkedHashMap<>();
         g.put("expiresAt", grant.expiresAt().toString());
+        g.put("scope", scope);
         out.put("link", g);
 
-        Map<String, Object> masked = (Map<String, Object>) InvestigationRoutes.masked(inv, out);   // the Space's masking, the one path
+        Map<String, Object> masked = (Map<String, Object>) InvestigationRoutes.masked(inv, out, floor);   // the Space's masking, the one path
         return masked;
     }
 

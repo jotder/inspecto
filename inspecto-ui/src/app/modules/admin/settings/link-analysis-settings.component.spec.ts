@@ -506,13 +506,30 @@ describe('LinkAnalysisSettingsComponent', () => {
             c.form.controls.embed.patchValue({ defaultTtlHours: 24, maxTtlHours: 8760, refuseClassifications: ' pii ,, Secret ' });
             submit();
             expect((api.save.mock.calls[0][0] as unknown as Record<string, unknown>)['embed']).toEqual({
-                defaultTtlHours: 24, maxTtlHours: 8760, refuseClassifications: ['pii', 'Secret'],
+                defaultTtlHours: 24, maxTtlHours: 8760, refuseClassifications: ['pii', 'Secret'], frameAncestors: null,
             });
             c.form.controls.embed.patchValue({ defaultTtlHours: null, maxTtlHours: null, refuseClassifications: '' });
             submit();
             const body = api.save.mock.calls[1][0] as unknown as Record<string, unknown>;
             expect(body).not.toHaveProperty('embed');
             expect(body).not.toHaveProperty('embedInForce');
+        });
+
+        it('sends the sites allowed to frame the viewer as a list, and refuses anything that is not an https origin', () => {
+            const { c, api, submit } = setup({ served: EMBED });
+            c.form.controls.embed.patchValue({ frameAncestors: ' https://portal.example.com , https://b.example:8443 ' });
+            submit();
+            expect((api.save.mock.calls[0][0] as unknown as { embed: { frameAncestors: string[] } }).embed.frameAncestors).toEqual([
+                'https://portal.example.com',
+                'https://b.example:8443',
+            ]);
+            for (const bad of ['*', 'http://portal.example.com', 'https://a.example/path', 'https://*.example.com'])
+                {
+                    c.form.controls.embed.patchValue({ frameAncestors: bad });
+                    expect(c.form.controls.embed.controls.frameAncestors.invalid, bad).toBe(true);
+                }
+            c.form.controls.embed.patchValue({ frameAncestors: 'http://localhost:4200' });
+            expect(c.form.controls.embed.controls.frameAncestors.invalid).toBe(false);
         });
 
         it.each([
@@ -583,7 +600,7 @@ describe('LinkAnalysisSettingsComponent', () => {
         walk(c.form, '');
         return out;
     };
-    const CONTROL_COUNT = 27;
+    const CONTROL_COUNT = 28;
 
     it('read only: EVERY control is disabled, Save is gone, the reason is described, and save() cannot fire (a11y)', async () => {
         const { el, c, api, fixture } = setup({ canEdit: false });

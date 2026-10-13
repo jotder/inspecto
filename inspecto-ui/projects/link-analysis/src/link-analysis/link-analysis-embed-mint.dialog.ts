@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { firstValueFrom } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
-import { InvService } from '@inspecto/link-analysis/api/inv.service';
+import { EmbedScope, InvService } from '@inspecto/link-analysis/api/inv.service';
 
 export interface EmbedMintData {
     investigationId: string;
@@ -12,6 +12,27 @@ export interface EmbedMintData {
     maxTtlHours: number;
     /** The Space's masking mode in force, for the plain statement of what the link shows. */
     maskingMode: string;
+}
+
+export const EMBED_SCOPES: { value: EmbedScope; label: string }[] = [
+    { value: 'working_set', label: 'Entities and links only' },
+    { value: 'with_notes', label: 'Entities, links and analyst notes' },
+    { value: 'full', label: 'Entities, links, notes and references' },
+];
+
+const MASKING_RANK: Record<string, number> = { none: 0, typed: 1, all: 2 };
+const MASKING_LABEL: Record<string, string> = {
+    none: 'No masking',
+    typed: 'Mask ids of masked entity types',
+    all: 'Mask every entity id',
+};
+
+/** The masking modes a link may use: the Space's own and every stricter one - never a looser one (the server refuses it). */
+export function embedMaskingChoices(spaceMode: string): { value: string; label: string }[] {
+    const floor = MASKING_RANK[spaceMode] ?? 2;
+    return Object.keys(MASKING_RANK)
+        .filter((m) => MASKING_RANK[m] >= floor)
+        .map((m) => ({ value: m, label: MASKING_LABEL[m] + (m === spaceMode ? " (this Space's setting)" : '') }));
 }
 
 /** A refused embed call in an analyst's words; the server's own reason is always kept. */
@@ -53,9 +74,9 @@ export function embedAbsoluteLink(token: string): string {
         <h2 mat-dialog-title>Share an Investigation by link</h2>
         <mat-dialog-content class="flex w-[34rem] max-w-full flex-col gap-3 text-sm">
             <p class="m-0">
-                The link shows a <strong>read-only, sealed view</strong>; ids are masked per this Space's masking mode:
-                <strong>{{ data.maskingMode }}</strong
-                >. Anyone with the link can read it until it expires or you revoke it; it cannot be framed on other
+                The link shows a <strong>read-only, sealed view</strong>; ids are masked at least as this Space masks them
+                (<strong>{{ data.maskingMode }}</strong
+                >). Anyone with the link can read it until it expires or you revoke it; it cannot be framed on other
                 sites.
             </p>
             @if (error()) {
@@ -89,6 +110,35 @@ export function embedAbsoluteLink(token: string): string {
                         [value]="label()"
                         (input)="label.set($any($event.target).value)"
                     />
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label for="embed-scope" class="font-semibold">What the link shows</label>
+                    <select
+                        id="embed-scope"
+                        class="rounded border px-1 py-1"
+                        style="border-color: var(--gamma-border)"
+                        [value]="scope()"
+                        (change)="scope.set($any($event.target).value)"
+                    >
+                        @for (s of scopes; track s.value) {
+                            <option [value]="s.value" [selected]="s.value === scope()">{{ s.label }}</option>
+                        }
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label for="embed-masking" class="font-semibold">Masking for this link</label>
+                    <select
+                        id="embed-masking"
+                        class="rounded border px-1 py-1"
+                        style="border-color: var(--gamma-border)"
+                        [value]="masking()"
+                        (change)="masking.set($any($event.target).value)"
+                    >
+                        @for (m of maskingChoices; track m.value) {
+                            <option [value]="m.value" [selected]="m.value === masking()">{{ m.label }}</option>
+                        }
+                    </select>
+                    <span class="text-secondary text-xs">A link can be stricter than the Space, never looser.</span>
                 </div>
                 <div class="flex flex-col gap-1">
                     <label for="embed-ttl" class="font-semibold">Lifetime (hours)</label>
@@ -136,6 +186,10 @@ export class LinkAnalysisEmbedMintDialog implements OnDestroy {
 
     readonly label = signal('');
     readonly ttl = signal(String(this.data.defaultTtlHours));
+    readonly scopes = EMBED_SCOPES;
+    readonly scope = signal<EmbedScope>('full');
+    readonly maskingChoices = embedMaskingChoices(this.data.maskingMode);
+    readonly masking = signal(this.data.maskingMode);
     readonly busy = signal(false);
     readonly error = signal('');
     readonly copied = signal('');
@@ -156,7 +210,11 @@ export class LinkAnalysisEmbedMintDialog implements OnDestroy {
         this.busy.set(true);
         this.error.set('');
         try {
-            const body: { label?: string; ttl_hours: number } = { ttl_hours: Number(this.ttl()) };
+            const body: { label?: string; ttl_hours: number; scope: EmbedScope; masking_mode: string } = {
+                ttl_hours: Number(this.ttl()),
+                scope: this.scope(),
+                masking_mode: this.masking(),
+            };
             const label = this.label().trim();
             if (label) body.label = label;
             const m = await firstValueFrom(this.inv.mintInvestigationEmbed(this.data.investigationId, body));

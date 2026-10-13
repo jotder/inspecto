@@ -78,13 +78,16 @@ public final class InvestigationEmbedRoutes implements RouteModule {
                     "embed links are disabled; set -D" + EmbedGrants.ENABLED_PROPERTY + "=true to enable them");
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);   // lead only; R3 + PDP read; 404 for a non-member
         for (String k : body.keySet())
-            if (!List.of("ttl_hours", "label").contains(k))
+            if (!List.of("ttl_hours", "label", "scope", "masking_mode").contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, k.equals("frame_ancestors")
                         ? "embed links are link-only: they cannot be framed, so there is no frame_ancestors"
-                        : "body has no field '" + k + "' (ttl_hours, label)");
+                        : "body has no field '" + k + "' (ttl_hours, label, scope, masking_mode)");
         LinkAnalysisSettings.Embed cfg = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveEmbed();
         long ttl = ttlHours(body.get("ttl_hours"), cfg);
         String label = label(body.get("label"));
+        String scope = scope(body.get("scope"));
+        String spaceMode = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveMaskingMode();
+        String linkMode = linkMasking(body.get("masking_mode"), spaceMode);
 
         String classification = classification(inv);
         List<String> refused = cfg.refuseClassificationsInForce();
@@ -101,12 +104,12 @@ public final class InvestigationEmbedRoutes implements RouteModule {
 
         Instant now = Instant.now();
         String actor = ApiContext.actor(ex);
-        String mode = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveMaskingMode();
-        EmbedGrants.Minted minted = EmbedGrants.mint(inv.store(), id, actor, now, ttl, label, mode);
+        String mode = spaceMode;
+        EmbedGrants.Minted minted = EmbedGrants.mint(inv.store(), id, actor, now, ttl, label, mode, scope, linkMode);
         Map<String, Object> rec = minted.record();
         emit(ex, LinkEventTypes.LINK_EMBED_MINTED, "link.embed.minted", "link.embed.minted - " + id + " " + rec.get("grantId"),
                 b -> b.attr("investigationId", id).attr("grantId", rec.get("grantId")).attr("issuedBy", actor)
-                        .attr("expiresAt", rec.get("expiresAt")).attr("ttlHours", ttl).attr("maskingMode", mode));
+                        .attr("expiresAt", rec.get("expiresAt")).attr("ttlHours", ttl).attr("maskingMode", linkMode).attr("scope", scope));
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("grantId", rec.get("grantId"));
@@ -115,7 +118,8 @@ public final class InvestigationEmbedRoutes implements RouteModule {
         out.put("url", EmbedGrants.PREFIX + minted.token());
         out.put("expiresAt", rec.get("expiresAt"));
         out.put("label", label);
-        out.put("maskingMode", mode);
+        out.put("maskingMode", linkMode);
+        out.put("scope", scope);
         out.put("note", "the token is shown once and is not stored; anyone holding the link sees this Investigation, masked as the Space masks it, "
                 + "until it expires or is revoked - and can copy what they see");
         return out;
@@ -146,6 +150,24 @@ public final class InvestigationEmbedRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'ttl_hours' must be 1.." + cfg.maxTtlHoursInForce()
                     + " (this Space's maximum), got " + v);
         return v;
+    }
+
+    /** {@code scope}: absent = {@code full}; else one of {@link EmbedGrants#SCOPES}, 422 otherwise. */
+    private static String scope(Object raw) {
+        if (raw == null) return EmbedGrants.SCOPE_FULL;
+        if (raw instanceof String s && EmbedGrants.SCOPES.contains(s)) return s;
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'scope' must be one of " + EmbedGrants.SCOPES + ", got '" + raw + "'");
+    }
+
+    /** {@code masking_mode}: absent = the Space's; else none|typed|all and never looser than the Space's (422), so a link can only be stricter. */
+    private static String linkMasking(Object raw, String spaceMode) {
+        if (raw == null) return spaceMode;
+        if (!(raw instanceof String s) || !List.of("none", "typed", "all").contains(s))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'masking_mode' must be none, typed or all, got '" + raw + "'");
+        if (!EntityMasking.stricter(spaceMode, s).equals(s) && !s.equals(spaceMode))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'masking_mode' " + s + " is looser than this Space's masking ("
+                    + spaceMode + "); a link can be stricter, never looser");
+        return s;
     }
 
     private static String label(Object raw) {

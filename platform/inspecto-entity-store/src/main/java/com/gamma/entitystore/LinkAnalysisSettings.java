@@ -69,20 +69,47 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * classifications (the strictest of the Investigation's bound source/target columns, strictest-wins) for which minting is
      * refused with 422 (default none). Every field is optional ({@code null} = the shipped default).
      */
-    public record Embed(Integer defaultTtlHours, Integer maxTtlHours, List<String> refuseClassifications) {
-        public static final Embed NONE = new Embed(null, null, null);
+    public record Embed(Integer defaultTtlHours, Integer maxTtlHours, List<String> refuseClassifications, List<String> frameAncestors) {
+        public static final Embed NONE = new Embed(null, null, null, null);
         public static final int DEFAULT_TTL_HOURS = 72;
         public static final int DEFAULT_MAX_TTL_HOURS = 30 * 24;
         /** The hard validation ceiling of {@code max_ttl_hours} (365 d): a Space may raise its cap above the 30 d default, never past this. */
         public static final int CEILING_TTL_HOURS = 365 * 24;
 
+        public Embed(Integer defaultTtlHours, Integer maxTtlHours, List<String> refuseClassifications) {
+            this(defaultTtlHours, maxTtlHours, refuseClassifications, null);
+        }
+
         public Embed {
             refuseClassifications = refuseClassifications == null ? null : List.copyOf(refuseClassifications);
+            frameAncestors = frameAncestors == null ? null : List.copyOf(frameAncestors);
         }
 
         boolean isNone() {
-            return defaultTtlHours == null && maxTtlHours == null && refuseClassifications == null;
+            return defaultTtlHours == null && maxTtlHours == null && refuseClassifications == null && frameAncestors == null;
         }
+
+        /** The origins that may frame the embed shell (LA-EMBED-FRAME-HEADERS-1), normalised; empty = nobody (link-only). */
+        public List<String> frameAncestorsInForce() {
+            return frameAncestors != null ? frameAncestors : List.of();
+        }
+
+        /**
+         * One frame-ancestor origin in its canonical form, or {@code null} when it is not an origin this host will put in a CSP:
+         * {@code https://host[:port]} (plain {@code http} only for localhost / 127.0.0.1), no wildcard, path, query, userinfo, space or
+         * quote - anything that could widen the header or smuggle a second directive.
+         */
+        public static String normaliseOrigin(Object raw) {
+            if (!(raw instanceof String s)) return null;
+            String v = s.strip().toLowerCase(java.util.Locale.ROOT);
+            java.util.regex.Matcher m = ORIGIN.matcher(v);
+            if (!m.matches()) return null;
+            boolean local = m.group(2).equals("localhost") || m.group(2).equals("127.0.0.1");
+            return m.group(1).equals("http") && !local ? null : v;
+        }
+
+        private static final java.util.regex.Pattern ORIGIN =
+                java.util.regex.Pattern.compile("(https?)://((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?::[0-9]{1,5})?");
 
         /** The longest a link may live, in hours: the stated cap, else {@link #DEFAULT_MAX_TTL_HOURS}. */
         public int maxTtlHoursInForce() {
@@ -367,6 +394,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (embed.defaultTtlHours() != null) x.put("default_ttl_hours", embed.defaultTtlHours());
             if (embed.maxTtlHours() != null) x.put("max_ttl_hours", embed.maxTtlHours());
             if (embed.refuseClassifications() != null) x.put("refuse_classifications", embed.refuseClassifications());
+            if (embed.frameAncestors() != null) x.put("frame_ancestors", embed.frameAncestors());
             m.put("embed", x);
         }
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
@@ -413,7 +441,15 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             }
             refuse = out;
         }
-        Embed r = new Embed(optInt(g, "default_ttl_hours"), max, refuse);
+        List<String> frames = null;
+        if (g.get("frame_ancestors") instanceof List<?> l) {   // a bad entry is DROPPED (fewer origins = stricter), never widened
+            frames = new java.util.ArrayList<>();
+            for (Object o : l) {
+                String origin = Embed.normaliseOrigin(o);
+                if (origin != null && !frames.contains(origin)) frames.add(origin);
+            }
+        }
+        Embed r = new Embed(optInt(g, "default_ttl_hours"), max, refuse, frames);
         return r.isNone() ? null : r;
     }
 
