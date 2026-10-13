@@ -606,6 +606,26 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
     });
 });
 
+describe('LinkAnalysisToolboxComponent - entity scores', () => {
+    it('Factors reads the score of the node label (the raw key), not the entity:<key> node id', () => {
+        const graph: G6GraphData = {
+            nodes: [
+                { id: 'entity:a1', data: { label: 'A1', kind: 'entity' } },
+                { id: 'entity:b2', data: { label: 'B2', kind: 'entity' } },
+            ],
+            edges: [{ id: 'e', source: 'entity:a1', target: 'entity:b2', data: { kind: 'link' } }],
+        };
+        const { c, fixture } = make(graph);
+        c.tab.set('scoring');
+        c.runScoring();
+        c.riskModel.set('m');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        (el.querySelector('tbody button[aria-label^="Show the Risk Score of"]') as HTMLButtonElement).click();
+        expect(['A1', 'B2']).toContain(c.riskEntity());
+    });
+});
+
 describe('LinkAnalysisToolboxComponent - DR-D5 results', () => {
     it('Telecom profile: the pack defaults to the Space telecom pack, and never overrides a pick', () => {
         const chain: ComponentDef = {

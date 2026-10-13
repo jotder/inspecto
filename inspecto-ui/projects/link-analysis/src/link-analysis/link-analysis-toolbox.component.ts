@@ -614,7 +614,7 @@ export class LinkAnalysisToolboxComponent {
     readonly suspicion = signal<SuspicionScore[]>([]);
     /** ASSURE-RISK-SCORE-1: a saved risk-score model to read an entity's server-side Risk Score from. */
     readonly riskModel = signal('');
-    /** The node whose Risk Score factor breakdown is shown (its id is the entity key). */
+    /** The entity key whose Risk / Anomaly Score is shown: the node's label (its raw value) - the node id is `entity:<normalised key>`, which no score store holds. */
     readonly riskEntity = signal<string | null>(null);
 
     /**

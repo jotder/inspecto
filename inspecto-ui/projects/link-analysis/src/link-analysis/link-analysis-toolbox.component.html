@@ -902,7 +902,7 @@
                                                         <button
                                                             mat-button
                                                             [attr.aria-label]="'Show the Risk Score of ' + r.label"
-                                                            (click)="riskEntity.set(r.id)"
+                                                            (click)="riskEntity.set(r.label || r.id)"
                                                         >
                                                             Factors
                                                         </button>
