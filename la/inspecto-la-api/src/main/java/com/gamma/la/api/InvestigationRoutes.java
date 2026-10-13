@@ -133,6 +133,8 @@ public final class InvestigationRoutes implements RouteModule {
     private static final List<String> DIRECTIONS = List.of("either", "out", "in", "reciprocal");
     private static final int MAX_IDS = 1_000;
     private static final int MAX_ID_LENGTH = 512;
+    /** LA-EXPAND-PICK-NEIGHBOURS-1: an expand restricted to at most this many chosen neighbours is never held for four-eyes (operator, 2026-10-13). */
+    static final int ONLY_EXEMPT_MAX = 50;
     private static final int MAX_NOTE_LENGTH = 2_000;
     private static final int MAX_PURPOSE_LENGTH = 1_000;
     private static final int MAX_REVEAL = 100;
@@ -1083,6 +1085,7 @@ public final class InvestigationRoutes implements RouteModule {
         q.put("candidateDegreeMin", p.get("candidateDegreeMin"));
         q.put("candidateDegreeMax", p.get("candidateDegreeMax"));
         q.put("maxFanOut", p.get("maxFanOut"));
+        if (p.get("only") instanceof List<?> only && !only.isEmpty()) q.put("only", new ArrayList<>(only));   // only when stated: older rungs seal unchanged
         return q;
     }
 
@@ -1142,6 +1145,7 @@ public final class InvestigationRoutes implements RouteModule {
         Integer degMax = query.get("candidateDegreeMax") instanceof Number n ? n.intValue() : null;
         Integer fanOut = query.get("maxFanOut") instanceof Number n ? n.intValue() : null;
         List<String> kinds = query.get("linkKinds") == null ? null : strings(query.get("linkKinds"));
+        List<String> only = query.get("only") == null ? List.of() : strings(query.get("only"));   // LA-EXPAND-PICK-NEIGHBOURS-1
         String direction = String.valueOf(query.get("direction"));
         int budget = ((Number) query.get("budget")).intValue();
         boolean timed = window != null || minDays != null;
@@ -1152,7 +1156,7 @@ public final class InvestigationRoutes implements RouteModule {
         // D-3 step 6: a SIMPLE rung is answered from the edge index when - and only when - it can answer exactly
         // (IndexedExpand); anything else, and every index failure, falls through to the CTE below untouched. The R3 gate above has run.
         IndexedRead.Outcome<IndexedExpand.Result> indexed = null;
-        if (!frontier.isEmpty()) {
+        if (!frontier.isEmpty() && only.isEmpty()) {   // a rung restricted to chosen neighbours is answered by the flat read below, exactly
             Map<String, Object> hdr = inv.header();
             indexed = IndexedExpand.attempt(inv.writeRoot(), api.dataRoot(), relationSql, new IndexedExpand.Request(dataset,
                     String.valueOf(hdr.get("sourceCol")), String.valueOf(hdr.get("targetCol")),
@@ -1209,6 +1213,9 @@ public final class InvestigationRoutes implements RouteModule {
                    .append(" OR (deg.d >= CAST(? AS BIGINT) AND deg.d <= CAST(? AS BIGINT)))");
                 binds.add(Integer.toString(degMin == null ? 0 : degMin));
                 binds.add(Long.toString(degMax == null ? Long.MAX_VALUE : degMax));
+            }
+            if (!only.isEmpty()) {   // before the per-anchor rank, so the fan-out cap, truncation and the budget count only the chosen neighbours
+                sql.append(" AND CAST(c.other AS VARCHAR) IN ").append(com.gamma.la.storage.IndexReader.idRelation(only, binds));
             }
             sql.append(")");
             sql.append(" SELECT s AS source, t AS target, k AS kind, cnt, ");
@@ -1812,6 +1819,21 @@ public final class InvestigationRoutes implements RouteModule {
         if (includeHubs != null && !(includeHubs instanceof Boolean))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'includeHubs' must be a boolean, got " + includeHubs);
         if (Boolean.TRUE.equals(includeHubs)) p.put("includeHubs", true);
+        // LA-EXPAND-PICK-NEIGHBOURS-1: restrict the read to chosen neighbours; sealed only when stated, so an older rung seals as before.
+        Object only = body.get("only");
+        if (only != null) {
+            if (!(only instanceof List<?> l) || l.size() > MAX_IDS)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'only' must be a list of at most " + MAX_IDS + " neighbour ids");
+            java.util.TreeSet<String> chosen = new java.util.TreeSet<>();
+            for (Object o : l) {
+                String v = o == null ? "" : String.valueOf(o);
+                if (v.isBlank() || v.length() > MAX_ID_LENGTH)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every 'only' id must be a non-blank string of at most "
+                            + MAX_ID_LENGTH + " chars");
+                chosen.add(v);
+            }
+            if (!chosen.isEmpty()) p.put("only", new ArrayList<>(chosen));
+        }
         Object expandHubs = body.get("expandHubs");
         if (expandHubs != null) {
             if (!(expandHubs instanceof List<?> l) || l.size() > MAX_IDS)
@@ -2246,7 +2268,7 @@ public final class InvestigationRoutes implements RouteModule {
     /** An op body whose {@code ids} (and an expand's {@code expandHubs}) may carry pseudonyms this Investigation issued, each resolved to its entity. */
     private static Map<String, Object> resolvePseudonyms(Inv inv, Map<String, Object> body) throws IOException {
         Map<String, Object> out = body;
-        for (String key : List.of("ids", "expandHubs")) {
+        for (String key : List.of("ids", "expandHubs", "only")) {
             if (!(body.get(key) instanceof List<?> l)
                     || l.stream().noneMatch(o -> o instanceof String v && v.startsWith(EntityMasking.TOKEN_PREFIX)))
                 continue;
@@ -2274,6 +2296,8 @@ public final class InvestigationRoutes implements RouteModule {
      */
     private static Map<String, Object> sensitivity(Inv inv, Map<String, Object> params) {
         LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(inv.writeRoot());
+        // LA-EXPAND-PICK-NEIGHBOURS-1 (operator 2026-10-13): a short list of chosen neighbours is exempt from four-eyes
+        if (params.get("only") instanceof List<?> chosen && !chosen.isEmpty() && chosen.size() <= ONLY_EXEMPT_MAX) return null;
         List<String> exceeded = new ArrayList<>();
         int budget = ((Number) params.get("budget")).intValue();
         if (s.fourEyesBudgetAbove() != null && budget > s.fourEyesBudgetAbove())

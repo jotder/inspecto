@@ -565,7 +565,9 @@ public final class InvestigationEvaluator {
                 Map<String, Object> read = (Map<String, Object>) entry.get("read");
                 Map<String, Object> query = (Map<String, Object>) read.get("query");
                 Set<String> frontier = new HashSet<>(strings(query.get("frontier")));
-                for (String f : frontier) if (s.entities.containsKey(f)) s.expanded.add(f);
+                // a rung restricted to chosen neighbours leaves the rest of the entity's links unread: it is not "expanded"
+                if (!(query.get("only") instanceof List<?> chosen && !chosen.isEmpty()))
+                    for (String f : frontier) if (s.entities.containsKey(f)) s.expanded.add(f);
                 // LA-17 merged traversal: a member value not admitted yet -> the admitted entity it stands for.
                 Map<String, Object> anchorOf = query.get("merged") instanceof Map<?, ?> mg
                         && mg.get("anchorOf") instanceof Map<?, ?> a ? (Map<String, Object>) a : Map.of();

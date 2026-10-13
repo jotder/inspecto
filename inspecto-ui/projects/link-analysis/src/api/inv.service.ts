@@ -323,6 +323,9 @@ export interface ExpandRung {
     includeHubs?: boolean;
     /** The analyst's override for the named flagged entities only. Sealed in the op's params. */
     expandHubs?: string[];
+    /** LA-EXPAND-PICK-NEIGHBOURS-1: read ONLY the links to these neighbours (ids as the Neighbours list returned them).
+     *  Sealed in the step; the entity stays "not expanded". A list of at most 50 is never held for four-eyes. */
+    only?: string[];
 }
 
 /** `POST /inv/investigations` — bound to one Dataset + the projection's columns. */

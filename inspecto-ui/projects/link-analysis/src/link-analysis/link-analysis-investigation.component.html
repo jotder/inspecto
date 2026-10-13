@@ -482,6 +482,88 @@
                         Hide
                     </button>
                 </div>
+                @if (selectedInSet().length === 1) {
+                    <div class="flex flex-col gap-1" data-testid="neighbours-section">
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-testid="neighbours-toggle"
+                            [attr.aria-expanded]="neighboursOpen()"
+                            [disabled]="store.busy()"
+                            (click)="toggleNeighbours()"
+                        >
+                            {{ neighboursOpen() ? 'Hide neighbours' : 'Choose neighbours…' }}
+                        </button>
+                        @if (neighboursOpen()) {
+                            @if (neighbourList(); as list) {
+                                @if (list.loading) {
+                                    <p class="text-secondary m-0 text-xs" role="status">Reading neighbours…</p>
+                                } @else if (list.error) {
+                                    <inspecto-alert variant="warning">{{ list.error }}</inspecto-alert>
+                                } @else if (!list.rows.length) {
+                                    <p class="text-secondary m-0 text-xs">No neighbours found for this entity.</p>
+                                } @else {
+                                    <p class="text-secondary m-0 text-xs">
+                                        {{ list.rows.length }} neighbour{{ list.rows.length === 1 ? '' : 's' }}, strongest
+                                        first. This is one read of the whole Dataset (no time window); the step you add
+                                        reads only the neighbours you choose.
+                                        @if (list.truncated) {
+                                            <strong>The list is cut at the row limit, so it may be incomplete.</strong>
+                                        }
+                                    </p>
+                                    <ul
+                                        class="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-auto p-0 text-xs"
+                                        data-testid="neighbour-list"
+                                    >
+                                        @for (nb of list.rows.slice(0, neighbourRows); track nb.id) {
+                                            <li>
+                                                <label class="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        [checked]="picked().has(nb.id)"
+                                                        [disabled]="!canWrite() || store.busy()"
+                                                        (change)="togglePicked(nb.id)"
+                                                    />
+                                                    <span class="font-mono">{{ nb.id }}</span>
+                                                    <span class="text-secondary ml-auto tabular-nums">
+                                                        {{ nb.count }} event{{ nb.count === 1 ? '' : 's' }}@if (nb.kinds.length) {
+                                                            · {{ nb.kinds.join(', ') }}
+                                                        }
+                                                    </span>
+                                                </label>
+                                            </li>
+                                        }
+                                    </ul>
+                                    @if (list.rows.length > neighbourRows) {
+                                        <p class="text-secondary m-0 text-xs">
+                                            Showing the first {{ neighbourRows }} of {{ list.rows.length }}.
+                                        </p>
+                                    }
+                                    <div class="flex flex-wrap gap-1">
+                                        <button
+                                            mat-stroked-button
+                                            type="button"
+                                            data-testid="neighbours-add-selected"
+                                            [disabled]="!canWrite() || store.busy() || !picked().size"
+                                            (click)="addNeighbours()"
+                                        >
+                                            Add selected ({{ picked().size }})
+                                        </button>
+                                        <button
+                                            mat-stroked-button
+                                            type="button"
+                                            data-testid="neighbours-add-strongest"
+                                            [disabled]="!canWrite() || store.busy()"
+                                            (click)="addNeighbours(true)"
+                                        >
+                                            Add the {{ strongestCount }} strongest
+                                        </button>
+                                    </div>
+                                }
+                            }
+                        }
+                    </div>
+                }
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Reason to exclude</mat-label>
                     <input matInput [formControl]="reason" (keydown.enter)="exclude()" />

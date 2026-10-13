@@ -373,6 +373,8 @@ public final class InvestigationTime {
                     + "–" + (q.get("candidateDegreeMax") == null ? "any" : q.get("candidateDegreeMax"))
                     + (q.get("window") != null ? " within the window" : ""));
         if (q.get("maxFanOut") != null) parts.add("at most " + q.get("maxFanOut") + " links per entity, strongest first");
+        if (q.get("only") instanceof List<?> only && !only.isEmpty())
+            parts.add("restricted to " + only.size() + " chosen neighbour" + (only.size() == 1 ? "" : "s"));
         return parts.isEmpty() ? "" : " (" + String.join("; ", parts) + ")";
     }
 

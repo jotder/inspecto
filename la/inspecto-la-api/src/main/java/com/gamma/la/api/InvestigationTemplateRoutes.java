@@ -144,6 +144,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
                             "exact", new HashSet<>(named).equals(state.entities.keySet())));
                 t.putAll(p);   // the rung (§2.4) is method, not case data — it travels whole
                 t.remove("ids");
+                t.remove("only");   // the chosen neighbours are case data, like the named frontier
             } else if (op.equals("window")) {
                 // LA-13: a window is a PARAMETER with the authored window as its default — a template re-run over
                 // another period says so, and one that does not re-reads the period the method was written for.

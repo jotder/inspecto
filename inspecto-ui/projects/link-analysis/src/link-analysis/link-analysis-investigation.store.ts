@@ -21,6 +21,7 @@ import {
     workingSetToGraph,
 } from './investigation-state';
 import { ProjectedGraph } from './entity-projection';
+import { NeighbourRow, rankNeighbours } from './neighbour-ranking';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { QueuedSeed } from './la-starter';
@@ -408,6 +409,72 @@ export class InvestigationSessionStore {
                 outcome,
             ]);
         }
+        return true;
+    }
+
+    /**
+     * LA-EXPAND-PICK-NEIGHBOURS-1: the selected entity's neighbours, a READ-ONLY hint for choosing what to expand to (nothing
+     * is written until the analyst adds some). It reads one hop of the whole Dataset - no window, at most the route's row
+     * limit - so the server's sealed expand stays authoritative; `truncated` says the list is cut.
+     */
+    readonly neighbours = signal<{
+        of: string;
+        rows: NeighbourRow[];
+        truncated: boolean;
+        loading: boolean;
+        error: string;
+    } | null>(null);
+
+    async loadNeighbours(value: string): Promise<void> {
+        const h = this.header();
+        if (!h) return;
+        this.neighbours.set({ of: value, rows: [], truncated: false, loading: true, error: '' });
+        try {
+            const res = await firstValueFrom(
+                this.inv.neighbors({
+                    dataset: h.dataset,
+                    sourceCol: h.sourceCol,
+                    targetCol: h.targetCol,
+                    linkKindCol: h.linkKindCol ?? undefined,
+                    value,
+                }),
+            );
+            if (this.neighbours()?.of !== value) return; // another entity was picked meanwhile
+            this.neighbours.set({
+                of: value,
+                rows: rankNeighbours(res.rows, value),
+                truncated: res.truncated,
+                loading: false,
+                error: '',
+            });
+        } catch (err) {
+            if (this.neighbours()?.of !== value) return;
+            this.neighbours.set({
+                of: value,
+                rows: [],
+                truncated: false,
+                loading: false,
+                error: investigationErrorMessage(err, 'The neighbours could not be read.'),
+            });
+        }
+    }
+
+    clearNeighbours(): void {
+        this.neighbours.set(null);
+    }
+
+    /**
+     * One hop from `id` to ONLY the chosen neighbours (`only`), recorded as one `expand` step. `throughHub` is the analyst's
+     * confirmed override for a flagged `id` (the caller has asked); it is sealed in the step like "Expand anyway".
+     */
+    async expandPicked(id: string, only: string[], rung: ExpandRung = {}, throughHub = false): Promise<boolean> {
+        const rest: ExpandRung = { ...rung };
+        delete rest.includeHubs; // the override names this entity only
+        delete rest.expandHubs;
+        if (!(await this.apply({ op: 'expand', ids: [id], ...rest, only, ...(throughHub ? { expandHubs: [id] } : {}) })))
+            return false;
+        const step = this.lastStep();
+        if (throughHub && step && step.status !== 'pending') this.lastOverride.set({ step: step.step, ids: [id] });
         return true;
     }
 

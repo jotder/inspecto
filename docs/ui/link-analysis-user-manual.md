@@ -363,6 +363,15 @@ marks its entity expanded. An entity a step added is itself unexpanded until you
 and a *high connectivity* hub keeps its ring instead (it is already "shown, not expanded"). Use it to pick the next
 node to expand when you go one node at a time.
 
+**Choosing neighbours.** With one entity selected, **Choose neighbours…** in the Investigation tab lists its
+neighbours, strongest first, with their event counts and link kinds. Tick some and press **Add selected**, or press
+**Add the 10 strongest**: one *expand* step then follows the links to ONLY those neighbours and records which ones.
+The list is a one-hop read of the whole Dataset with no time window and a row limit (it says when it is cut), so
+treat it as a guide; the step you add uses the window and caps of the expand settings. A restricted step leaves the
+entity *not expanded yet* (it still has unchosen neighbours), a list of 50 or fewer neighbours is never held for a
+second approver, and a longer list is judged like any other expand. On a *high connectivity* hub the same override
+confirmation as *Expand anyway* is asked first.
+
 **High connectivity (hubs).** An entity flagged *high connectivity* is ringed on the canvas (legend: *Ringed: high
 connectivity*), badged with its own sealed count — *High connectivity — 650 contacts (threshold 500), not expanded* —
 in the panel and in the Working Set rows (logs sealed before the count was recorded show *more than 500 contacts*),

@@ -862,3 +862,68 @@ describe('InvestigationSessionStore - walk-through 6', () => {
         );
     });
 });
+
+describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
+    const rowsFor = (rows: { source: string; target: string; count: number }[]) =>
+        of({ rows: rows.map((r) => ({ ...r, kind: 'call' })), truncated: false });
+
+    it('reads the selected entity once, ranks its neighbours and ignores a read for another selection', async () => {
+        const { store, inv } = setup();
+        const neighbors = vi.fn();
+        (inv as unknown as { neighbors: unknown }).neighbors = neighbors;
+        await store.start(P, 'warrant 7', 'Burners');
+        neighbors.mockReturnValueOnce(
+            rowsFor([
+                { source: 'a', target: 'b', count: 1 },
+                { source: 'c', target: 'a', count: 7 },
+            ]),
+        );
+        await store.loadNeighbours('a');
+        expect(neighbors).toHaveBeenCalledWith({
+            dataset: 'calls',
+            sourceCol: 'A',
+            targetCol: 'B',
+            linkKindCol: undefined,
+            value: 'a',
+        });
+        expect(store.neighbours()).toMatchObject({ of: 'a', loading: false, error: '', truncated: false });
+        expect(store.neighbours()?.rows.map((r) => r.id)).toEqual(['c', 'b']);
+        store.clearNeighbours();
+        expect(store.neighbours()).toBeNull();
+    });
+
+    it('states a failed read in words and keeps nothing', async () => {
+        const { store, inv } = setup();
+        (inv as unknown as { neighbors: unknown }).neighbors = vi.fn(() =>
+            throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'too many contacts' } } })),
+        );
+        await store.start(P, 'warrant 7', 'Burners');
+        await store.loadNeighbours('a');
+        expect(store.neighbours()?.rows).toEqual([]);
+        expect(store.neighbours()?.error).not.toBe('');
+    });
+
+    it('expandPicked sends ONE expand from the entity with only the chosen ids, and the hub override only when told', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7', 'Burners');
+        inv.appendInvestigationOp.mockImplementation(() => {
+            logs['inv-1'].entries.push(entry(1, { op: 'expand' }));
+            sets['inv-1'] = ws(['a']);
+            return of(step(1, 'expand'));
+        });
+        expect(await store.expandPicked('a', ['b', 'c'], { budget: 100, includeHubs: true, expandHubs: ['x'] })).toBe(true);
+        expect(inv.appendInvestigationOp).toHaveBeenLastCalledWith('inv-1', {
+            op: 'expand',
+            ids: ['a'],
+            budget: 100,
+            only: ['b', 'c'],
+        });
+        await store.expandPicked('h', ['b'], {}, true);
+        expect(inv.appendInvestigationOp).toHaveBeenLastCalledWith('inv-1', {
+            op: 'expand',
+            ids: ['h'],
+            only: ['b'],
+            expandHubs: ['h'],
+        });
+    });
+});

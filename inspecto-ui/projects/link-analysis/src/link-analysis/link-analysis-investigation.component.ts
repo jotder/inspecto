@@ -49,6 +49,7 @@ import {
     suspectTitle,
     windowLabel,
 } from './investigate-number';
+import { STRONGEST_NEIGHBOURS } from './neighbour-ranking';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
@@ -515,6 +516,60 @@ export class LinkAnalysisInvestigationComponent {
             if (scope.length && step && step.status !== 'pending')
                 this.store.lastOverride.set({ step: step.step, ids: scope });
         }
+    }
+
+    // ── LA-EXPAND-PICK-NEIGHBOURS-1: expand to the neighbours the analyst chooses ──
+    readonly neighboursOpen = signal(false);
+    /** Neighbour ids ticked in the list (cleared whenever a list is read or a step is added). */
+    readonly picked = signal<ReadonlySet<string>>(new Set());
+    /** The list for the entity selected NOW; a list read for another selection is not shown. */
+    readonly neighbourList = computed(() => {
+        const list = this.store.neighbours();
+        return list && list.of === this.selectedInSet()[0] ? list : null;
+    });
+    /** Rows drawn at most: a busy number has thousands, and "Add the strongest" needs no scrolling. */
+    readonly neighbourRows = 200;
+    readonly strongestCount = STRONGEST_NEIGHBOURS;
+
+    toggleNeighbours(): void {
+        const open = !this.neighboursOpen();
+        this.neighboursOpen.set(open);
+        if (open) void this.readNeighbours();
+    }
+
+    async readNeighbours(): Promise<void> {
+        const id = this.selectedInSet()[0];
+        if (!id) return;
+        this.picked.set(new Set());
+        await this.store.loadNeighbours(id);
+    }
+
+    togglePicked(id: string): void {
+        this.picked.update((p) => {
+            const next = new Set(p);
+            if (!next.delete(id)) next.add(id);
+            return next;
+        });
+    }
+
+    /** Add the ticked neighbours, or the strongest ones (`strongest`), as ONE expand step from the selected entity. */
+    async addNeighbours(strongest = false): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
+        const from = this.selectedInSet()[0];
+        const list = this.neighbourList();
+        if (!from || !list) return;
+        const only = strongest ? list.rows.slice(0, STRONGEST_NEIGHBOURS).map((n) => n.id) : [...this.picked()];
+        if (!only.length) return;
+        const form = this.rungForm();
+        const own = form ? form.rung() : {};
+        if (!own) return;
+        const rung = this.store.withPresets(this.degreePresets(), own);
+        // A flagged hub is only reached through the same confirmed override as "Expand anyway".
+        const throughHub = this.selectedHubs().includes(from) && !this.isOverridden(from);
+        if (throughHub && !(await this.confirmOverride([from]))) return;
+        const ok = await this.store.expandPicked(from, only, rung, throughHub);
+        if (!ok) form?.fail(this.store.error());
+        else this.picked.set(new Set());
     }
 
     mark(op: 'hide' | 'keep'): void {

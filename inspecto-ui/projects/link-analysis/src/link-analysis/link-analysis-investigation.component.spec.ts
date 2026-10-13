@@ -989,3 +989,63 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(spy).toHaveBeenCalledWith(expect.anything(), expect.any(Number), false, { minEvents: 1 });
     });
 });
+
+describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
+    const stepResult = (step: number) =>
+        of({
+            step,
+            op: 'expand',
+            delta: { admitted: [], removed: [], linksAdded: 0, linksRemoved: 0, hidden: [], kept: [], excluded: [] },
+            truncated: false,
+            workingSet: { entities: 3, links: 2, excluded: 0, hash: '' },
+        });
+    it('lists the neighbours of the selected entity strongest first, and Add selected sends ONE restricted expand', async () => {
+        const { fixture, store, el, inv } = create();
+        (inv as unknown as { neighbors: unknown }).neighbors = vi.fn(() =>
+            of({
+                rows: [
+                    { source: 'a', target: 'b', kind: 'call', count: 3 },
+                    { source: 'c', target: 'a', kind: 'call', count: 9 },
+                ],
+                truncated: false,
+            }),
+        );
+        await openInv(store);
+        inv.appendInvestigationOp.mockReturnValue(stepResult(3) as never);
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+
+        (el.querySelector('[data-testid="neighbours-toggle"]') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const rows = Array.from(el.querySelectorAll('[data-testid="neighbour-list"] li')).map((li) =>
+            (li.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        );
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toContain('c');
+        expect(rows[0]).toContain('9 events');
+        expect((el.querySelector('[data-testid="neighbours-add-selected"]') as HTMLButtonElement).disabled).toBe(true);
+
+        const boxes = Array.from(el.querySelectorAll('[data-testid="neighbour-list"] input[type="checkbox"]'));
+        (boxes[1] as HTMLInputElement).click(); // b
+        fixture.detectChanges();
+        (el.querySelector('[data-testid="neighbours-add-selected"]') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(inv.appendInvestigationOp).toHaveBeenCalledWith(
+            'inv-1',
+            expect.objectContaining({ op: 'expand', ids: ['a'], only: ['b'] }),
+        );
+        await expectNoA11yViolations(el);
+    });
+
+    it('is offered only for one selected Working Set entity, and Add is disabled without the capability', async () => {
+        const { fixture, store, el } = create({ canManage: false });
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="neighbours-section"]')).toBeNull();
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="neighbours-section"]')).not.toBeNull();
+    });
+});

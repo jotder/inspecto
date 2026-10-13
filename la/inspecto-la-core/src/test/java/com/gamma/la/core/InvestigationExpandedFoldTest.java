@@ -50,6 +50,18 @@ class InvestigationExpandedFoldTest {
     }
 
     @Test
+    void anExpandRestrictedToChosenNeighboursLeavesTheEntityUnexpanded() {
+        // LA-EXPAND-PICK-NEIGHBOURS-1: the rest of a's links are unread, so a is still frontier; a later full expand clears it
+        Map<String, Object> restricted = Map.of("kind", "op", "op", "expand", "step", 2, "params", Map.of(),
+                "read", Map.of("query", Map.of("frontier", List.of("a"), "only", List.of("x")),
+                        "rows", List.of(Map.of("source", "a", "target", "x", "count", 1))));
+        InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(List.of(seed(1, "a"), restricted), -1, null);
+        assertEquals(Set.of(), s.expanded);
+        assertEquals(Set.of("a", "x"), s.entities.keySet(), "the chosen neighbour was admitted");
+        assertEquals(Set.of("a"), InvestigationEvaluator.evaluate(List.of(seed(1, "a"), restricted, expand(3, "a", "x", "y")), -1, null).expanded);
+    }
+
+    @Test
     void theExpandedSetNeverEntersTheHash() {
         List<Map<String, Object>> log = List.of(seed(1, "a"), expand(2, "a", "x"));
         InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(log, -1, null);
