@@ -57,6 +57,19 @@ final class TemplateSeedGate {
             throw new ApiException(denied.status, denied.errorCode, "template refused: " + denied.getMessage()
                     + "; nothing was created");
         }
+        // The kind validators read the STAGED Space's Pipelines (e.g. an Anomaly Model's peers.by lineage check), and
+        // the calling thread's policy is the CALLER's Space, whose roots exclude the staged one - so every relative
+        // `dirs.*` read "outside the allowed roots", the Pipeline read as unloadable and lineage failed closed.
+        // Judge the whole seed against the new Space's own root.
+        com.gamma.config.safety.SafetyPolicy.runWithPinned(new com.gamma.config.safety.SafetyPolicy.Pin(
+                com.gamma.util.CurrentSpace.id(), stagedPolicy(config), com.gamma.config.safety.SafetyPolicy.effectiveTier()),
+                () -> {
+                    requireSeed(ex, spaceBase, config);
+                    return null;
+                });
+    }
+
+    private static void requireSeed(HttpExchange ex, Path spaceBase, Path config) {
         Path data = spaceBase.resolve("data");
         Supplier<Path> dataRoot = () -> data;
         Map<String, String> carried = DecisionRuleGuard.carriedConnections(configEntries(config));
@@ -149,12 +162,7 @@ final class TemplateSeedGate {
         // LA-DEMO-POLISH-1 (6): the calling thread is bound to the CALLER's Space, whose policy roots do not include
         // the staged new Space - every relative `dirs.*` resolved there read "outside the allowed roots". Tests never
         // saw it because surefire adds java.io.tmpdir to assist.safety.roots. Judge against the new Space's own root.
-        com.gamma.config.safety.SafetyPolicy caller = com.gamma.config.safety.SafetyPolicy.defaultPolicy();
-        List<Path> roots = new java.util.ArrayList<>(caller.allowedRoots());
-        roots.add(config.getParent().toAbsolutePath().normalize());
-        com.gamma.config.safety.SafetyPolicy policy = new com.gamma.config.safety.SafetyPolicy(roots,
-                caller.denyRoots(), caller.maxThreads(), caller.maxBatchFiles(), caller.maxBatchBytes(),
-                caller.allowedFormats(), caller.allowedCompression(), caller.advanceState());
+        com.gamma.config.safety.SafetyPolicy policy = stagedPolicy(config);
         for (Path file : configFiles(config)) {
             String name = file.getFileName().toString();
             Path parent = file.getParent();
@@ -173,6 +181,16 @@ final class TemplateSeedGate {
                 if (f.severity() == com.gamma.config.spec.Severity.ERROR)
                     throw refused(type, name, f.fieldPath() + ": " + f.message());
         }
+    }
+
+    /** The calling thread's Safety Policy widened by the staged Space's own root (the caller's Space cannot reach it). */
+    private static com.gamma.config.safety.SafetyPolicy stagedPolicy(Path config) {
+        com.gamma.config.safety.SafetyPolicy caller = com.gamma.config.safety.SafetyPolicy.defaultPolicy();
+        List<Path> roots = new java.util.ArrayList<>(caller.allowedRoots());
+        roots.add(config.getParent().toAbsolutePath().normalize());
+        return new com.gamma.config.safety.SafetyPolicy(roots,
+                caller.denyRoots(), caller.maxThreads(), caller.maxBatchFiles(), caller.maxBatchBytes(),
+                caller.allowedFormats(), caller.allowedCompression(), caller.advanceState());
     }
 
     private static List<Path> configFiles(Path config) {
