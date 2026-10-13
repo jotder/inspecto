@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of, tap } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 
 /**
@@ -159,9 +159,13 @@ export class SpacesService {
             tap(({ meta, spaces }) => {
                 this.multiSpace.set(meta.multiSpace);
                 this.availableSpaces.set(spaces);
-                this.reconcile(meta.multiSpace, spaces);
             }),
-            map(({ spaces }) => spaces),
+            switchMap(({ meta, spaces }) =>
+                this.fallbackSpace(meta.multiSpace, spaces).pipe(
+                    tap((fallback) => this.reconcile(meta.multiSpace, spaces, fallback)),
+                    map(() => spaces),
+                ),
+            ),
         );
     }
 
@@ -249,14 +253,34 @@ export class SpacesService {
         return localStorage.getItem(STORAGE_KEY);
     }
 
-    private reconcile(multiSpace: boolean, spaces: Space[]): void {
+    /**
+     * D7: with no still-valid saved choice and no `default` Space, the first Space alphabetically used to win even
+     * when the signed-in subject holds nothing there. Ask each Space's own bootstrap (capped) and take the first
+     * where the subject holds any capability; null = no preference (fall back to the first Space).
+     */
+    private fallbackSpace(multiSpace: boolean, spaces: Space[]): Observable<string | null> {
+        const saved = this.currentSpaceId();
+        if (!multiSpace || (saved && spaces.some((s) => s.id === saved))) return of(null);
+        if (spaces.length < 2 || spaces.some((s) => s.id === 'default')) return of(null);
+        const probes = spaces.slice(0, 12).map((s) =>
+            this.http
+                .get<{ session?: { capabilities?: string[] } }>(apiUrl(`/spaces/${encodeURIComponent(s.id)}/bootstrap`))
+                .pipe(
+                    map((b) => (b.session?.capabilities?.length ?? 0) > 0),
+                    catchError(() => of(false)),
+                ),
+        );
+        return forkJoin(probes).pipe(map((held) => spaces[held.findIndex(Boolean)]?.id ?? null));
+    }
+
+    private reconcile(multiSpace: boolean, spaces: Space[], preferred: string | null = null): void {
         if (!multiSpace) {
             this.selectSpace(null); // single-tenant: no prefix, byte-identical default namespace
             return;
         }
         const saved = this.currentSpaceId();
         if (saved && spaces.some((s) => s.id === saved)) return; // still valid — keep it
-        const fallback = spaces.find((s) => s.id === 'default')?.id ?? spaces[0]?.id ?? null;
+        const fallback = spaces.find((s) => s.id === 'default')?.id ?? preferred ?? spaces[0]?.id ?? null;
         this.selectSpace(fallback);
     }
 }

@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../../environments/environment';
+import { SpacesService } from '../api/spaces.service';
 import { RESUMABLE_KEY, SessionService } from './session.service';
 
 const base = environment.apiBaseUrl + '/v1'; // W7: apiUrl() builds /api/v1 paths
@@ -509,5 +510,39 @@ describe('SessionService (W6d edition switch)', () => {
 
         expect(assign).not.toHaveBeenCalled();
         assign.mockRestore();
+    });
+
+    // D3: the unscoped /bootstrap is Space-agnostic (empty capabilities for a Space-granted subject); the
+    // capabilities must come from the CURRENT Space's own bootstrap, and be re-read when the Space changes.
+    it('reads capabilities from the current Space bootstrap, and re-reads them when the Space changes (D3)', async () => {
+        const spaces = TestBed.inject(SpacesService);
+        svc.authenticated.set(true);
+        spaces.selectSpace('fm');
+        TestBed.tick();
+        httpMock
+            .expectOne(`${base}/spaces/fm/bootstrap`)
+            .flush({ session: { authenticated: true, actor: 'fm.analyst', capabilities: ['incident.manage'] } });
+        await tick();
+        expect(svc.capabilities()).toEqual(['incident.manage']);
+
+        spaces.selectSpace('ra');
+        TestBed.tick();
+        httpMock
+            .expectOne(`${base}/spaces/ra/bootstrap`)
+            .flush({ session: { authenticated: true, actor: 'fm.analyst', capabilities: [] } });
+        await tick();
+        expect(svc.capabilities()).toEqual([]);
+    });
+
+    it('falls back to the unscoped bootstrap when the current Space is unknown to the server', async () => {
+        const spaces = TestBed.inject(SpacesService);
+        svc.authenticated.set(true);
+        spaces.selectSpace('gone');
+        TestBed.tick();
+        httpMock.expectOne(`${base}/spaces/gone/bootstrap`).flush({}, { status: 404, statusText: 'x' });
+        await tick();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ session: { authenticated: true, capabilities: ['a'] } });
+        await tick();
+        expect(svc.capabilities()).toEqual(['a']);
     });
 });

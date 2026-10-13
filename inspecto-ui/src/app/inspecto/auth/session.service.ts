@@ -1,6 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
+import { SpacesService } from '../api/spaces.service';
 import { catchError, firstValueFrom, map, Observable, of, tap } from 'rxjs';
 import { APP_ENVIRONMENT } from '../api/app-environment';
 import { apiErrorMessage, apiUrl } from '../api/api-base';
@@ -96,6 +97,20 @@ export class SessionService {
     private http = inject(HttpClient);
     private router = inject(Router);
     private environment = inject(APP_ENVIRONMENT);
+    private spaces = inject(SpacesService);
+    /** The Space whose grants {@link capabilities} currently hold (null = the unscoped bootstrap). */
+    private capabilitiesSpace: string | null = null;
+
+    constructor() {
+        // D3: capabilities are per-Space grants and the unscoped `/bootstrap` is Space-agnostic (empty for a
+        // Space-granted subject), so a Space switch that does not reload the page must re-read them.
+        effect(() => {
+            const id = this.spaces.currentSpaceId();
+            untracked(() => {
+                if (id !== this.capabilitiesSpace && this.authenticated()) void this.loadSessionFromBootstrap();
+            });
+        });
+    }
 
     /** 'none' (Personal / offline) or 'oidc' (Professional). Drives {@link loginRequired} + {@link authGuard}. */
     readonly authMode = signal<'none' | 'oidc'>('none');
@@ -468,8 +483,19 @@ export class SessionService {
     }
 
     private async loadSessionFromBootstrap(): Promise<void> {
+        // D3: read the current Space's own bootstrap (its capabilities are the subject's grants THERE); a Space the
+        // server no longer knows falls back to the unscoped read rather than failing the session.
+        const space = this.spaces.currentSpaceId();
+        this.capabilitiesSpace = space;
+        const unscoped = this.http
+            .get<Bootstrap>(apiUrl('/bootstrap'))
+            .pipe(catchError((e: unknown) => this.bootstrapFailed(e)));
         const boot = await firstValueFrom(
-            this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError((e: unknown) => this.bootstrapFailed(e))),
+            space
+                ? this.http
+                      .get<Bootstrap>(apiUrl(`/spaces/${encodeURIComponent(space)}/bootstrap`))
+                      .pipe(catchError(() => unscoped))
+                : unscoped,
         );
         // An unread session is not a signed-in one: `?? true` held only for a payload that omits the slice.
         const authenticated = this.bootstrapError() === null && (boot.session?.authenticated ?? true);

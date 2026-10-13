@@ -43,7 +43,18 @@ describe('SpacesService', () => {
         httpMock.expectOne(`${base}/spaces`).flush(SPACES);
         expect(svc.multiSpace()).toBe(true);
         expect(svc.availableSpaces().length).toBe(2);
-        expect(svc.currentSpaceId()).toBe('alpha'); // no 'default' present → first space
+        // D7: no 'default' → probe each Space's bootstrap; none holds a capability (anonymous) → first space
+        for (const id of ['alpha', 'beta']) httpMock.expectOne(`${base}/spaces/${id}/bootstrap`).flush({ session: {} });
+        expect(svc.currentSpaceId()).toBe('alpha');
+    });
+
+    it('refresh() picks the first Space where the subject holds a capability, not the alphabetical first (D7)', () => {
+        svc.refresh().subscribe();
+        httpMock.expectOne(`${base}/spaces/_meta`).flush({ multiSpace: true });
+        httpMock.expectOne(`${base}/spaces`).flush(SPACES);
+        httpMock.expectOne(`${base}/spaces/alpha/bootstrap`).flush({ session: { capabilities: [] } });
+        httpMock.expectOne(`${base}/spaces/beta/bootstrap`).flush({ session: { capabilities: ['x'] } });
+        expect(svc.currentSpaceId()).toBe('beta');
     });
 
     it('refresh() survives a 200 carrying a non-array body', () => {
