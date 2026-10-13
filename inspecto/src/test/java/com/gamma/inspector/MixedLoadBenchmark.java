@@ -129,6 +129,18 @@ class MixedLoadBenchmark {
             System.out.printf("readers during ing.: %s%n", r3);
             assertEquals(0, r1.errors + r3.errors, "every /bi/query must answer 200 under load");
             assertTrue(r3.count > 0, "readers must complete at least one query during ingest");
+
+            // Nightly floors (ASSURE-OPERABILITY-1): the nightly workflow passes both so a regression fails the
+            // job. Unset = no floor (manual runs). The ingest floor applies to the rate WHILE readers run; the
+            // ceiling to the readers' p95 during that ingest.
+            long floor = Long.getLong("bench.mixedFloorRowsPerSec", 0L);
+            if (floor > 0)
+                assertTrue(i3 >= floor, String.format(
+                        "ingest under reader load %,.0f rows/s is below the floor %,d rows/s", i3, floor));
+            long ceiling = Long.getLong("bench.readerP95CeilingMs", 0L);
+            if (ceiling > 0)
+                assertTrue(r3.p95 <= ceiling, String.format(
+                        "reader p95 during ingest %d ms is above the ceiling %d ms", r3.p95, ceiling));
         } finally {
             api.close();
             svc.close();

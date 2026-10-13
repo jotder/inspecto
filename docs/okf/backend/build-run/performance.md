@@ -372,6 +372,24 @@ beyond ~4 readers the extra threads only queue (p50 doubles from 4 to 8). ⚠ Th
 differ 1.7× between runs on the same host — the dev host is shared, so compare phases *within* a run, not
 across runs. These are single runs on a developer box, not customer sizing (which stays parked).
 
+### Nightly mixed-load floor (2026-10-14)
+
+`nightly-perf.yml` job `mixed-load-floor` runs `MixedLoadBenchmark` at 1M rows with 4 readers and fails when
+ingest under reader load drops below **30,000 rows/s** (`-Dbench.mixedFloorRowsPerSec`) or reader p95 during
+that ingest exceeds **5,000 ms** (`-Dbench.readerP95CeilingMs`); both are unset = unchecked for manual runs.
+Three runs on the 12-core Windows dev host, JDK 27, 2026-10-14:
+
+| run | ingest alone | ingest + readers | reader p95 alone | reader p95 during ingest | errors |
+|---|---|---|---|---|---|
+| 1 | 316,380 rows/s | 243,624 rows/s (77%) | 450 ms | 639 ms | 0 |
+| 2 | 326,372 rows/s | 263,119 rows/s (81%) | 402 ms | 528 ms | 0 |
+| 3 | 304,336 rows/s | 253,346 rows/s (83%) | 485 ms | 633 ms | 0 |
+
+Both thresholds sit ~8x outside the worst run because the 4-vCPU hosted runner shares its cores between the
+ingest and four CPU-bound readers. Negatives checked: a floor of 1,000,000,000 and a ceiling of 1 ms each fail
+the test; the real thresholds pass. Nightly + on-demand only (never `ci.yml`). ⚠ No runner number exists yet:
+tighten only from the logged `ingest under reader load` figure of a real run.
+
 ## DuckDB version comparison harness
 
 Like-for-like timing of the SAME workloads on two DuckDB versions (built for the 1.5.x to 2.0.x move). Run each side on an
