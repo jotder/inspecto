@@ -268,7 +268,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const args = process.argv.slice(2);
   const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
   if (args.includes('--scaffold')) {
-    const made = scaffold(opt('--scaffold'));
+    const root = opt('--scaffold');
+    if (!root || root.startsWith('--')) { console.error('--scaffold needs the spaces root: node tools/seed-la-showcase.mjs --scaffold <spacesRoot> (offline, before the server starts; it is not a flag of the --apply run)'); process.exit(2); }
+    const made = scaffold(root);
     console.log(made.length ? `scaffolded: ${made.join(', ')}` : 'nothing to do: the Spaces already exist');
   } else {
     const stages = { pending: !args.includes('--no-pending'), alert: !args.includes('--no-alert'), draft: !args.includes('--no-draft') };

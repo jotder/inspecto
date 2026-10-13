@@ -74,9 +74,15 @@ If you need the demo, use an Enterprise or Professional bundle (filesystem store
 
 ## Not verified
 
-- Variant A has not been run against a live PostgreSQL by this page's author; the property names, the 503
-  semantics and the `investigationStoreInForce` echo are from code and `ControlApiSettingsTest` /
-  `InvestigationStoresTest`, not from a live boot.
+- Variant A was RUN LIVE 2026-10-13 (la-seed-ingest lane): PostgreSQL 18 from `dev-infra/docker-compose.yml`, the contract test
+  `PgInvestigationStoreContractTest` 45 run / 0 failed / 0 skipped (recipe in its javadoc; add `&loginTimeout=10` to the URL), then an
+  Enterprise `-Ui la-app -NoBakeDemo` bundle with `INSPECTO_JAVA_OPTS="-Dla.embed.enabled=true -Dinvestigations.backend=db
+  -Dinvestigations.db.url=jdbc:postgresql://localhost:5432/postgres?loginTimeout=10 -Dinvestigations.db.user=... -Dinvestigations.db.password=..."`;
+  `seed-la-showcase.mjs --scaffold <bundle>\spaces` before start, `--apply` after: 0 failed, `la-demo-smoke` 17/17 (also after a
+  restart: the log reads back, the manifest verifies, a tamper is detected), `investigationStoreInForce: db`, `space_la_showcase`
+  holding la_log 9 / la_set 9 / la_member 3 / la_draft 1 / la_pending 1. No store defect found. Tips: `--scaffold` takes the spaces
+  root as its own argument (it is not a flag of the `--apply` run; it now refuses a missing root); drop the throwaway schema after
+  (`drop schema space_la_showcase cascade`). A browser pass on the `db` variant was not repeated (the SPA calls the same routes).
 - `serve-demo.*` honouring `INSPECTO_JAVA_OPTS` is proved by the static launcher guard
   (`tools/check-launchers.mjs`), not by a live demo-bundle launch.
 - The Personal 503 for `/inv/*`: proved over real HTTP on the Personal build by `NoGeoLinkShipsInThePersonalBuildTest` (every `la-api`/`geo-link` stub path, 503 naming the module; 3/3, 2026-10-13) plus `AbsentModuleRoutesTest` 3/3. Not re-probed on a built Personal *bundle* (same classpath, so no new information expected).
