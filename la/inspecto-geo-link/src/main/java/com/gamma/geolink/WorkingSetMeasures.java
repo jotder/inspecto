@@ -194,7 +194,15 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
 
     /** The hash a binding records: SHA-256 of the rule's canonical JSON — any edit to the rule breaks the match. */
     static String ruleHash(AlertRule rule) {
-        return InvestigationEvaluator.sha256(InvestigationEvaluator.canonical(rule.toMap()));
+        Map<String, Object> m = new java.util.LinkedHashMap<>(rule.toMap());
+        // the Measure block's numbers are doubles when bound from JSON but Integers once the rule is re-read from its TOON file
+        // (10000 vs 10000.0) - hashed as written, a restart made every bound value-Measure rule read as "changed since it was bound"
+        if (m.get("valueMeasure") instanceof Map<?, ?> vm) {
+            Map<String, Object> norm = new java.util.LinkedHashMap<>();
+            vm.forEach((k, v) -> norm.put(String.valueOf(k), v instanceof Number n ? (Object) n.doubleValue() : v));
+            m.put("valueMeasure", norm);
+        }
+        return InvestigationEvaluator.sha256(InvestigationEvaluator.canonical(m));
     }
 
     @Override

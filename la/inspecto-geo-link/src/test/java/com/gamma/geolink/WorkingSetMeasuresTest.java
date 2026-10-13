@@ -66,4 +66,27 @@ class WorkingSetMeasuresTest {
     void theAlertRulesRelationListIsTheWorkingSetsRelations() {
         assertEquals(WorkingSetRoutes.COLUMNS.keySet(), AlertRule.INVESTIGATION_RELATIONS);
     }
+
+    private static AlertRule valueRule(Object minInbound) {
+        Map<String, Object> vm = new java.util.LinkedHashMap<>();
+        vm.put("name", "passThrough");
+        vm.put("valueCol", "AMOUNT");
+        vm.put("minInbound", minInbound);
+        vm.put("minRatio", 0.9);
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("name", "r1");
+        m.put("investigation", "inv1");
+        m.put("valueMeasure", vm);
+        m.put("comparator", "gte");
+        m.put("threshold", 1);
+        m.put("severity", "CRITICAL");
+        return AlertRule.fromMap(m);
+    }
+
+    @Test
+    void aBindingHashSurvivesTheRuleBeingReadBackWithAWholeNumberAsAnInteger() {
+        // the bind path hands the Measure's numbers over as doubles; a rule re-read from its TOON file brings 10000 back as an Integer
+        assertEquals(WorkingSetMeasures.ruleHash(valueRule(10000.0)), WorkingSetMeasures.ruleHash(valueRule(10000)),
+                "a restart must not make the bound rule read as 'changed since it was bound'");
+    }
 }
