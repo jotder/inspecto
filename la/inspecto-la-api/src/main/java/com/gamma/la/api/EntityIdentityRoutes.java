@@ -472,7 +472,7 @@ public final class EntityIdentityRoutes implements RouteModule {
 
         private String render(String typedKey) throws IOException {
             if (!masked(typedKey)) return typedKey;
-            if (key == null) key = EntityMasking.key(log.directory());
+            if (key == null) key = log.maskKey();
             return EntityMasking.token(key, typedKey);
         }
 

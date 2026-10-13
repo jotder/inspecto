@@ -370,7 +370,7 @@ public final class ValueMeasures {
         if (!AGENT_TYPE.equals(l.entityType()))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + AGENT_LIST + "' must name an Entity "
                     + "List of Entity Type '" + AGENT_TYPE + "'; '" + s.agentList() + "' is '" + l.entityType() + "'");
-        byte[] key = EntityListFacts.masked(writeRoot, l) ? EntityMasking.key(log.directory()) : null;
+        byte[] key = EntityListFacts.masked(writeRoot, l) ? log.maskKey() : null;
         return new Agents(l.normaliser(), Set.copyOf(l.liveMembers(java.time.Instant.now())), key,
                 head.headSeq(), head.headHash());
     }

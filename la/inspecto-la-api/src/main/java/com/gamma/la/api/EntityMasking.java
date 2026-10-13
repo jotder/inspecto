@@ -319,13 +319,6 @@ final class EntityMasking {
         return types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(c))).findFirst();
     }
 
-    /** The per-Investigation HMAC key, created on first use. Never served. The algorithm lives in {@link MaskTokens}
-     *  (inspecto-entity-list, SEP-08), which {@code EntityListRoutes} shares to key Entity List members the same way,
-     *  with one key per Space fact log. */
-    static byte[] key(Path dir) throws IOException {
-        return MaskTokens.key(dir);
-    }
-
     static String token(byte[] key, String id) {
         return MaskTokens.token(key, id);
     }
