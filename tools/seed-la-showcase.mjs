@@ -117,7 +117,16 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const sleepRetry = async (fn, tries) => { let last; for (let i = 0; i < tries; i++) { try { last = await fn(); } catch (e) { last = { status: 0, data: String(e.message || e) }; } if (last.status === 200) return last; await sleep(1000); } return last; };
   const listed = await sleepRetry(() => call('fm.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
   if (listed.status !== 200) throw new Error(`cannot list Investigations as fm.analyst (${listed.status}): is the Space '${space}' created from the la-showcase template?`);
-  const readable = async () => (await sleepRetry(() => call('fm.analyst', 'GET', `/inv/investigations/${INV}`), readyTries));
+  // There is NO by-id GET for an Investigation (only the list and the /log, /ops, ... sub-routes), so "readable" = the LIST shows the id.
+  const readable = async () => {
+    for (let i = 0; i < readyTries; i++) {
+      let r; try { r = await call('fm.analyst', 'GET', '/inv/investigations?limit=200'); } catch (e) { r = { status: 0, data: String(e.message || e) }; }
+      const item = r.status === 200 ? (r.data.items || []).find((x) => x.id === INV) : null;
+      if (item) return { status: 200, data: item };
+      await sleep(1000);
+    }
+    return { status: 404, data: {} };
+  };
   let existing = (listed.data.items || []).find((i) => i.id === INV);
   let headStep = existing ? existing.headStep || 0 : 0;
   const state = { case: existing && existing.caseRef ? existing.caseRef : null, caseExisted: !!(existing && existing.caseRef) };
@@ -150,7 +159,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     }
     if (s.id === 'investigation' && (r.status < 300 || r.status === 409)) {
       const rd = await readable();   // created or "already there": either way it must be READABLE before any op is sent
-      if (rd.status !== 200) { out.failed.push(`investigation: ${r.status === 409 ? 'exists (409)' : 'created'} but not readable by id (HTTP ${rd.status}) after ${readyTries} tries`); log(`  ${s.id}: not readable`); break; }
+      if (rd.status !== 200) { out.failed.push(`investigation: ${r.status === 409 ? 'exists (409)' : 'created'} but not listed (HTTP ${rd.status}) after ${readyTries} tries`); log(`  ${s.id}: not listed`); break; }
       if (r.status === 409) { adopt(rd.data); if (!out.skipped.includes(s.id)) out.skipped.push(s.id); log(`  ${s.id}: 409, now readable (head step ${headStep})`); continue; }
     }
     if (s.id === 'case' && r.status < 300) state.case = r.data.case.id;

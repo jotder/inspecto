@@ -8,15 +8,16 @@ import { run, buildPlan, scaffold, INV } from './seed-la-showcase.mjs';
 
 const OFF = { pending: false, alert: false, draft: false };
 function mock(listItems = []) {
-  const calls = [];
+  const calls = []; let created = false;
   const fetchFn = async (url, init = {}) => {
     const method = init.method || 'GET';
     const u = url.replace('http://h/api/v1', '');
+    if (u === '/spaces/s/inv/investigations' && method === 'POST') created = true;
     const auth = init.headers && init.headers.authorization;
     calls.push({ method, u, auth, body: init.body ? JSON.parse(init.body) : undefined });
     let data = {};
     if (u === '/auth/exchange') data = { accessToken: 'tok-' + JSON.parse(init.body).code };
-    else if (u.startsWith('/spaces/s/inv/investigations?')) data = { items: listItems };
+    else if (u.startsWith('/spaces/s/inv/investigations?')) data = { items: created && !listItems.length ? [{ id: INV, headStep: 0 }] : listItems };
     else if (u === '/spaces/s/inv/entity-identities' && method === 'GET') data = { items: [] };
     else if (u === '/spaces/s/cases/from-entities') data = { case: { id: 'CASE-7' } };
     return { ok: true, status: 200, json: async () => ({ data }) };
@@ -255,7 +256,7 @@ test('each stage is skipped by its flag, and none runs when the plan itself fail
 
 // ---- LA-DEMO-SEED-RACE: a seed run right after /health must wait for the Space, then be safe to re-run ----
 const res = (status, data = {}) => ({ ok: status < 300, status, json: async () => ({ data }) });
-/** A fake server whose Investigation store "loads" after `warm` reads: until then the list is empty, create says 409, by-id says 404. */
+/** A fake server whose Investigation store "loads" after `warm` reads: until then the list is empty, create says 409, by-id does not exist. */
 function racy({ warm = 3, onDisk = true, cases = [] } = {}) {
   const calls = []; let reads = 0; let invCreated = false; const caseRows = [...cases];
   const fetchFn = async (url, init = {}) => {
@@ -263,8 +264,7 @@ function racy({ warm = 3, onDisk = true, cases = [] } = {}) {
     calls.push({ method, u, body: init.body ? JSON.parse(init.body) : undefined });
     if (u === '/auth/exchange') return res(200, { accessToken: 't' });
     const loaded = reads >= warm;
-    if (u.startsWith('/spaces/s/inv/investigations?')) { reads++; return res(200, { items: loaded && onDisk ? [{ id: INV, headStep: 0 }] : [] }); }
-    if (u === `/spaces/s/inv/investigations/${INV}` && method === 'GET') { reads++; return (loaded || invCreated) ? res(200, { id: INV, headStep: 0 }) : res(404); }
+    if (u.startsWith('/spaces/s/inv/investigations?')) { reads++; return res(200, { items: (loaded && onDisk) || invCreated ? [{ id: INV, headStep: 0 }] : [] }); }
     if (u === '/spaces/s/inv/investigations' && method === 'POST') { if (onDisk && !loaded) return res(409); invCreated = true; return res(201); }
     if (u === '/spaces/s/objects?limit=200') return res(200, { items: caseRows });
     if (u === '/spaces/s/cases/from-entities') { caseRows.push({ id: 'CASE-9', title: 'Mule ring around MULE-HUB-01', type: 'CASE' }); return res(200, { case: { id: 'CASE-9' } }); }
@@ -280,7 +280,7 @@ test('race: 409 on create with an unreadable Investigation waits until it is rea
   const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
   assert.deepEqual(r.failed, []);
   const firstOp = m.calls.findIndex((c) => c.u.endsWith('/ops'));
-  const lastBy404 = m.calls.map((c, i) => [c, i]).filter(([c]) => c.u === `/spaces/s/inv/investigations/${INV}`).pop()[1];
+  const lastBy404 = m.calls.map((c, i) => [c, i]).filter(([c]) => c.u.startsWith('/spaces/s/inv/investigations?')).pop()[1];
   assert.ok(firstOp > lastBy404, 'every read of the Investigation precedes the first op');
   assert.ok(r.skipped.includes('investigation'));
 });
@@ -291,11 +291,10 @@ test('race: a created Investigation that never becomes readable fails loudly ins
     if (u === '/auth/exchange') return res(200, { accessToken: 't' });
     if (u.startsWith('/spaces/s/inv/investigations?')) return res(200, { items: [] });
     if (u === '/spaces/s/inv/investigations' && init.method === 'POST') return res(201);
-    if (u === `/spaces/s/inv/investigations/${INV}`) return res(404);
     return res(200);
   };
   const r = await run({ fetchFn, base: 'http://h', space: 's', apply: true, readyTries: 3, ...noWait });
-  assert.match(r.failed[0], /not readable/);
+  assert.match(r.failed[0], /not listed/);
   assert.equal(r.done.filter((d) => d.startsWith('op-')).length, 0);
 });
 
