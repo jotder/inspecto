@@ -6,113 +6,9 @@
         [subtitle]="graph() ? '' : 'Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it.'"
         [terms]="['Entity', 'Link', 'Dataset', 'Pipeline']"
     >
-        <!-- the active query as chips lives IN the title row (canvas height): edit-to-change + the counts; with a graph they replace the one-line subtitle so the row does not wrap -->
-        <div
-            badge
-            class="flex min-w-0 flex-1 items-center gap-2"
-            role="group"
-            aria-label="Active query"
-            data-testid="la-status"
-        >
-            @if (graph()) {
-                <mat-icon class="icon-size-4 shrink-0" svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                <span class="shrink-0 text-sm font-medium">{{ sourceLabel() }}</span>
-                <!-- one line: a narrow window clips the chips instead of wrapping the title row onto a second and third -->
-                <div class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
-                    @for (item of querySummary(); track item.label) {
-                        <inspecto-chip>
-                            <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
-                            <span class="text-secondary">{{ item.label }}:</span>
-                            {{ item.value }}
-                        </inspecto-chip>
-                    }
-                </div>
-                <button
-                    mat-icon-button
-                    class="shrink-0"
-                    (click)="editQuery()"
-                    matTooltip="Change the query"
-                    aria-label="Change the query"
-                >
-                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
-                </button>
-                <span class="text-secondary shrink-0 whitespace-nowrap text-xs">
-                    {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
-                </span>
-            }
-        </div>
-        <ng-container actions>
-            <button
-                mat-icon-button
-                (click)="toggleCanvasMaximized()"
-                [matTooltip]="
-                    canvasMaximized()
-                        ? 'Show the query and toolbox panels'
-                        : 'Hide the query and toolbox panels (more room for the canvas)'
-                "
-                [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
-            >
-                <mat-icon
-                    [svgIcon]="
-                        canvasMaximized() ? 'heroicons_outline:view-columns' : 'heroicons_outline:arrows-pointing-out'
-                    "
-                ></mat-icon>
-            </button>
-        </ng-container>
-    </inspecto-page-header>
-
-    <div class="mt-1 flex min-h-0 flex-auto flex-col gap-2">
-        @if (loadError()) {
-            <inspecto-alert variant="error" title="Query failed">{{ loadError() }}</inspecto-alert>
-        }
-        @if (importDraft(); as draft) {
-            <div class="flex flex-col gap-2">
-                <inspecto-la-host-slot
-                    [component]="transfer.banner"
-                    [inputs]="{ draft: draft, stored: draftStored() }"
-                    [outputs]="transferBannerOutputs"
-                />
-                <div class="flex justify-end">
-                    <button type="button" mat-flat-button color="primary" [disabled]="saving()" (click)="saveDraft()">
-                        Save draft as “{{ draft.id }}”
-                    </button>
-                </div>
-            </div>
-        }
-        @if (omittedLinks(); as omitted) {
-            <inspecto-alert variant="warning" title="Links left off the canvas">
-                The Working Set has {{ ((canvasData()?.edges?.length ?? 0) + omitted).toLocaleString() }} links; the
-                canvas draws the heaviest {{ (canvasData()?.edges?.length ?? 0).toLocaleString() }} (render limit).
-            </inspecto-alert>
-        }
-        @if (truncated() && !workingSetCanvas()) {
-            <inspecto-alert variant="warning" title="Truncated">
-                The projection hit the node cap — narrow the dataset or filter to see everything.
-            </inspecto-alert>
-        }
-        @if (expandSourceNote(); as note) {
-            <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-source">
-                Last neighbour expand: {{ note }}
-            </p>
-        }
-        @if (mappingSummary().length) {
-            <p class="text-secondary m-0 flex flex-wrap gap-x-4 text-xs" aria-label="Rows per mapping">
-                @for (m of mappingSummary(); track $index) {
-                    <span class="tabular-nums"
-                        >{{ m.dataset }} ({{ m.role }}): {{ m.rows }} rows
-                        @if (m.truncated) {
-                            <span class="text-warn">· truncated</span>
-                        }
-                    </span>
-                }
-            </p>
-        }
-
-        <!-- ══ row: [tool rail] │ workspace — the rail is a labelled nav docked on the LEFT edge (canvas height);
-             under the md breakpoint it wraps back into a row above the stacked workspace ══ -->
-        <div class="flex min-h-0 flex-auto gap-2 max-md:flex-col">
+        <div badge class="flex min-w-0 flex-1 items-center">
         <nav
-            class="flex shrink-0 flex-col items-center gap-1 overflow-y-auto rounded-lg border py-1 md:w-12 max-md:flex-row max-md:flex-wrap max-md:gap-2 max-md:overflow-visible max-md:border-0 max-md:py-0"
+            class="flex min-w-0 flex-row flex-wrap items-center gap-1 rounded-lg border px-1"
             style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
             aria-label="Link Analysis tools"
             data-testid="la-tool-rail"
@@ -710,7 +606,92 @@
                     </button>
                 </mat-menu>
             }
+            @if (graph()) {
+                <!-- the data table below the canvas is hidden entirely until this is pressed -->
+                <button
+                    mat-icon-button
+                    (click)="bottomOpen.set(!bottomOpen())"
+                    [color]="bottomOpen() ? 'primary' : undefined"
+                    [attr.aria-pressed]="bottomOpen()"
+                    aria-controls="bottom-panel-body"
+                    [matTooltip]="bottomOpen() ? 'Hide the data table' : 'Show the data table'"
+                    [attr.aria-label]="bottomOpen() ? 'Hide the rows' : 'Show the rows'"
+                >
+                    <mat-icon svgIcon="heroicons_outline:table-cells"></mat-icon>
+                </button>
+            }
         </nav>
+        </div>
+        <ng-container actions>
+            <button
+                mat-icon-button
+                (click)="toggleCanvasMaximized()"
+                [matTooltip]="
+                    canvasMaximized()
+                        ? 'Show the query and toolbox panels'
+                        : 'Hide the query and toolbox panels (more room for the canvas)'
+                "
+                [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
+            >
+                <mat-icon
+                    [svgIcon]="
+                        canvasMaximized() ? 'heroicons_outline:view-columns' : 'heroicons_outline:arrows-pointing-out'
+                    "
+                ></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
+
+    <div class="mt-1 flex min-h-0 flex-auto flex-col gap-2">
+        @if (loadError()) {
+            <inspecto-alert variant="error" title="Query failed">{{ loadError() }}</inspecto-alert>
+        }
+        @if (importDraft(); as draft) {
+            <div class="flex flex-col gap-2">
+                <inspecto-la-host-slot
+                    [component]="transfer.banner"
+                    [inputs]="{ draft: draft, stored: draftStored() }"
+                    [outputs]="transferBannerOutputs"
+                />
+                <div class="flex justify-end">
+                    <button type="button" mat-flat-button color="primary" [disabled]="saving()" (click)="saveDraft()">
+                        Save draft as “{{ draft.id }}”
+                    </button>
+                </div>
+            </div>
+        }
+        @if (omittedLinks(); as omitted) {
+            <inspecto-alert variant="warning" title="Links left off the canvas">
+                The Working Set has {{ ((canvasData()?.edges?.length ?? 0) + omitted).toLocaleString() }} links; the
+                canvas draws the heaviest {{ (canvasData()?.edges?.length ?? 0).toLocaleString() }} (render limit).
+            </inspecto-alert>
+        }
+        @if (truncated() && !workingSetCanvas()) {
+            <inspecto-alert variant="warning" title="Truncated">
+                The projection hit the node cap — narrow the dataset or filter to see everything.
+            </inspecto-alert>
+        }
+        @if (expandSourceNote(); as note) {
+            <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-source">
+                Last neighbour expand: {{ note }}
+            </p>
+        }
+        @if (mappingSummary().length) {
+            <p class="text-secondary m-0 flex flex-wrap gap-x-4 text-xs" aria-label="Rows per mapping">
+                @for (m of mappingSummary(); track $index) {
+                    <span class="tabular-nums"
+                        >{{ m.dataset }} ({{ m.role }}): {{ m.rows }} rows
+                        @if (m.truncated) {
+                            <span class="text-warn">· truncated</span>
+                        }
+                    </span>
+                }
+            </p>
+        }
+
+        <!-- ══ row: [tool rail] │ workspace — the rail is a labelled nav docked on the LEFT edge (canvas height);
+             under the md breakpoint it wraps back into a row above the stacked workspace ══ -->
+        <div class="flex min-h-0 flex-auto gap-2 max-md:flex-col" [class]="bottomOpen() ? 'h-[28rem] flex-none' : ''">
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
@@ -764,24 +745,6 @@
                             (run)="run()"
                             (edit)="editQuery()"
                         ></inspecto-link-analysis-query-panel>
-
-                        <!-- Filter predicate — the two-stage loop over the loaded graph (hidden until one exists). -->
-                        @if (graph()) {
-                            <inspecto-link-analysis-filter
-                                class="mt-4 border-t pt-3"
-                                [where]="filterWhere()"
-                                [columns]="filterColumns()"
-                                [localMatch]="localMatch()"
-                                [pushState]="pushState()"
-                                [truncated]="truncated()"
-                                [busy]="pushing()"
-                                (changed)="onFilterChanged()"
-                                (applyLocal)="applyFilterLocally()"
-                                (pushToServer)="pushFilter()"
-                                (clear)="clearFilter()"
-                                (advanced)="openAdvancedSearch()"
-                            ></inspecto-link-analysis-filter>
-                        }
                     </div>
                 } @else {
                     <button
@@ -1267,44 +1230,56 @@
 
         </div>
 
-        <!-- ══ Data strip: the displayed graph as rows (links or nodes) ══ -->
+        <!-- ══ Data strip: the displayed graph as rows (links or nodes); hidden entirely until the table icon in the toolbox is pressed ══ -->
+        @if (bottomOpen()) {
         <div class="shrink-0 rounded-lg border">
-            <div class="flex flex-wrap items-center gap-2 px-3 py-1">
-                <span class="text-sm font-medium">Data</span>
-                @if (bottomOpen()) {
-                    <mat-button-toggle-group
-                        class="ml-2"
-                        [value]="tableMode()"
-                        (change)="tableMode.set($event.value)"
-                        aria-label="Table contents"
-                    >
-                        <mat-button-toggle value="links">Links</mat-button-toggle>
-                        <mat-button-toggle value="nodes">Nodes</mat-button-toggle>
-                    </mat-button-toggle-group>
-                    <span class="text-secondary text-xs">{{ tableRows().length }} rows</span>
-                }
-                <button
-                    mat-icon-button
-                    class="ml-auto"
-                    (click)="bottomOpen.set(!bottomOpen())"
-                    [disabled]="!graph()"
-                    [attr.aria-expanded]="bottomOpen()"
-                    aria-controls="bottom-panel-body"
-                    [matTooltip]="bottomOpen() ? 'Hide the rows' : 'Show the rows'"
-                    [attr.aria-label]="bottomOpen() ? 'Hide the rows' : 'Show the rows'"
-                >
-                    <mat-icon
-                        [svgIcon]="bottomOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-up'"
-                    ></mat-icon>
-                </button>
-            </div>
-            @if (bottomOpen()) {
-                <div id="bottom-panel-body" class="border-t px-3 py-3">
+                <div id="bottom-panel-body" class="px-3 py-3">
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                        <mat-button-toggle-group
+                            [value]="tableMode()"
+                            (change)="tableMode.set($event.value)"
+                            aria-label="Table contents"
+                        >
+                            <mat-button-toggle value="links">Links</mat-button-toggle>
+                            <mat-button-toggle value="nodes">Nodes</mat-button-toggle>
+                        </mat-button-toggle-group>
+                        <span class="text-secondary text-xs">{{ tableRows().length }} rows</span>
+                        <button
+                            mat-stroked-button
+                            class="ml-auto !min-h-0 !px-2 !py-0.5 text-xs"
+                            (click)="filterOpen.set(!filterOpen())"
+                            [attr.aria-expanded]="filterOpen()"
+                            [disabled]="!graph()"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:funnel"></mat-icon>
+                            Filter
+                        </button>
+                        <button mat-icon-button (click)="bottomOpen.set(false)" matTooltip="Hide the rows" aria-label="Hide the rows">
+                            <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        </button>
+                    </div>
+                    <!-- Filter predicate — the two-stage loop over the loaded graph, sat on the table it narrows. -->
+                    @if (graph() && filterOpen()) {
+                        <inspecto-link-analysis-filter
+                            class="mb-3 block"
+                            [where]="filterWhere()"
+                            [columns]="filterColumns()"
+                            [localMatch]="localMatch()"
+                            [pushState]="pushState()"
+                            [truncated]="truncated()"
+                            [busy]="pushing()"
+                            (changed)="onFilterChanged()"
+                            (applyLocal)="applyFilterLocally()"
+                            (pushToServer)="pushFilter()"
+                            (clear)="clearFilter()"
+                            (advanced)="openAdvancedSearch()"
+                        ></inspecto-link-analysis-filter>
+                    }
                     <inspecto-data-table
                         stateKey="link-analysis-rows"
                         tier="standard"
                         [rows]="tableRows()"
-                        height="15rem"
+                        height="11rem"
                         [pageSize]="10"
                         exportName="link-analysis"
                         sourceName="link-analysis"
@@ -1312,7 +1287,43 @@
                         (rowClick)="onTableRow($event)"
                     ></inspecto-data-table>
                 </div>
+        </div>
+        }
+        <!-- ══ Status bar (footer): the active query as chips — edit-to-change + the counts ══ -->
+        <div class="shrink-0 rounded-lg border px-3 py-1">
+        <div
+            class="flex min-w-0 flex-1 items-center gap-2"
+            role="group"
+            aria-label="Active query"
+            data-testid="la-status"
+        >
+            @if (graph()) {
+                <mat-icon class="icon-size-4 shrink-0" svgIcon="heroicons_outline:circle-stack"></mat-icon>
+                <span class="shrink-0 text-sm font-medium">{{ sourceLabel() }}</span>
+                <!-- one line: a narrow window clips the chips instead of wrapping the title row onto a second and third -->
+                <div class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
+                    @for (item of querySummary(); track item.label) {
+                        <inspecto-chip>
+                            <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
+                            <span class="text-secondary">{{ item.label }}:</span>
+                            {{ item.value }}
+                        </inspecto-chip>
+                    }
+                </div>
+                <button
+                    mat-icon-button
+                    class="shrink-0"
+                    (click)="editQuery()"
+                    matTooltip="Change the query"
+                    aria-label="Change the query"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                </button>
+                <span class="text-secondary shrink-0 whitespace-nowrap text-xs">
+                    {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
+                </span>
             }
+        </div>
         </div>
     </div>
 </div>

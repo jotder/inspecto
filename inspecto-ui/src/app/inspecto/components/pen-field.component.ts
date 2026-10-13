@@ -1,0 +1,177 @@
+import {
+    ChangeDetectionStrategy,
+    Component,
+    ElementRef,
+    computed,
+    forwardRef,
+    input,
+    signal,
+    viewChild,
+} from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
+
+/**
+ * **Pen-style field** — one compact property row: `label · value · ✎`. The value reads as text; the pencil (or a
+ * click on the value) swaps it for an input, committed on Enter / blur and dropped on Escape. A `ControlValueAccessor`,
+ * so `formControlName` / `[formControl]` / `[ngModel]` bind exactly as a `matInput` did.
+ *
+ * **Defaults:** when the value is empty and a `default` is declared, the row shows it as a ghost ("↳ 2"), and while
+ * editing, pressing **→** in an empty box (or at the end of a typed prefix of it) fills the default in without typing.
+ * A default is only ever a suggestion — it is never written until the author accepts it.
+ *
+ * Like `<inspecto-option-picker>` it renders its own label and error line; do not wrap it in a `mat-form-field`.
+ */
+@Component({
+    selector: 'inspecto-pen-field',
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [MatIconModule],
+    providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => PenFieldComponent), multi: true }],
+    host: { class: 'block min-w-0' },
+    template: `
+        <div class="flex min-h-8 min-w-0 items-center gap-2">
+            @if (label()) {
+                <span class="text-secondary shrink-0 text-xs"
+                    >{{ label() }}
+                    @if (required()) {
+                        <span class="text-warn"> *</span>
+                    }
+                </span>
+            }
+            @if (editing()) {
+                <input
+                    #box
+                    class="min-w-0 flex-1 rounded border px-1.5 py-0.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                    style="background: transparent; color: inherit"
+                    [type]="type()"
+                    [attr.min]="min()"
+                    [attr.max]="max()"
+                    [attr.aria-label]="ariaLabel() || label()"
+                    [placeholder]="placeholder()"
+                    [value]="draft()"
+                    (input)="draft.set($any($event.target).value)"
+                    (keydown)="onKey($event)"
+                    (blur)="commit()"
+                />
+                @if (hasDefault() && draft() === '') {
+                    <span class="text-secondary shrink-0 text-xs" aria-hidden="true">→ {{ defaultText() }}</span>
+                }
+            } @else {
+                <button
+                    type="button"
+                    class="hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                    [class.font-mono]="mono()"
+                    [disabled]="disabled()"
+                    [attr.aria-label]="'Edit ' + (ariaLabel() || label())"
+                    (click)="startEditing()"
+                >
+                    @if (text() !== '') {
+                        {{ text() }}
+                    } @else if (hasDefault()) {
+                        <span class="text-secondary italic">{{ defaultText() }}</span>
+                    } @else {
+                        <span class="text-secondary">{{ placeholder() || '—' }}</span>
+                    }
+                </button>
+                @if (!readOnly() && !disabled()) {
+                    <button
+                        type="button"
+                        class="pen-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                        [attr.aria-label]="'Edit ' + (ariaLabel() || label())"
+                        (click)="startEditing()"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil"></mat-icon>
+                    </button>
+                }
+            }
+        </div>
+        @if (error()) {
+            <p class="text-warn m-0 text-xs" role="alert">{{ error() }}</p>
+        }
+    `,
+})
+export class PenFieldComponent implements ControlValueAccessor {
+    readonly label = input('');
+    readonly type = input<'text' | 'number'>('text');
+    /** Suggested value shown as a ghost while empty; **→** accepts it. */
+    readonly default = input<string | number | null>(null);
+    readonly placeholder = input('');
+    readonly min = input<number | null>(null);
+    readonly max = input<number | null>(null);
+    readonly required = input(false);
+    readonly readOnly = input(false);
+    readonly mono = input(false);
+    readonly ariaLabel = input('');
+    /** Explicit error line (a host validating on submit renders its own message here). */
+    readonly error = input('');
+
+    protected readonly value = signal<string | number | null>(null);
+    protected readonly disabled = signal(false);
+    protected readonly editing = signal(false);
+    protected readonly draft = signal('');
+    private readonly box = viewChild<ElementRef<HTMLInputElement>>('box');
+
+    protected readonly text = computed(() => (this.value() ?? '') + '');
+    protected readonly hasDefault = computed(() => this.default() !== null && this.default() !== '');
+    protected readonly defaultText = computed(() => (this.default() ?? '') + '');
+
+    private onChange: (v: string | number | null) => void = () => undefined;
+    private onTouched: () => void = () => undefined;
+
+    writeValue(v: string | number | null): void {
+        this.value.set(v ?? null);
+    }
+    registerOnChange(fn: (v: string | number | null) => void): void {
+        this.onChange = fn;
+    }
+    registerOnTouched(fn: () => void): void {
+        this.onTouched = fn;
+    }
+    setDisabledState(d: boolean): void {
+        this.disabled.set(d);
+    }
+
+    protected startEditing(): void {
+        if (this.readOnly() || this.disabled()) return;
+        this.draft.set(this.text());
+        this.editing.set(true);
+        queueMicrotask(() => this.box()?.nativeElement.focus());
+    }
+
+    protected onKey(e: KeyboardEvent): void {
+        const el = e.target as HTMLInputElement;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            this.commit();
+        } else if (e.key === 'Escape') {
+            e.stopPropagation();
+            this.editing.set(false);
+        } else if (e.key === 'ArrowRight' && this.hasDefault()) {
+            const d = this.defaultText();
+            // Number inputs expose no caret, so → there only fires on an empty box.
+            const atEnd = el.type === 'number' ? el.value === '' : el.selectionStart === el.value.length;
+            if (atEnd && d.startsWith(el.value) && el.value !== d) {
+                e.preventDefault();
+                this.draft.set(d);
+                el.value = d;
+            }
+        }
+    }
+
+    protected commit(): void {
+        if (!this.editing()) return;
+        this.editing.set(false);
+        const raw = this.draft().trim();
+        let next: string | number | null = raw;
+        if (this.type() === 'number') {
+            const n = Number(raw);
+            next = raw === '' || Number.isNaN(n) ? (this.default() as number | null) : n;
+        }
+        if (next !== this.value()) {
+            this.value.set(next);
+            this.onChange(next);
+        }
+        this.onTouched();
+    }
+}

@@ -1,10 +1,5 @@
 @if (queryOpen()) {
-    <form
-        [formGroup]="queryForm"
-        (ngSubmit)="run.emit()"
-        class="flex flex-wrap items-start gap-3"
-        aria-label="Graph query"
-    >
+    <form [formGroup]="queryForm" (ngSubmit)="run.emit()" class="flex flex-col gap-0.5" aria-label="Graph query">
         @if (masking(); as m) {
             <span
                 class="rounded-md border px-2 py-0.5 text-xs"
@@ -15,8 +10,7 @@
             >
         }
         <inspecto-option-picker
-            class="w-56"
-            [outlined]="true"
+            class="w-full"
             label="Graph source"
             [options]="sourceOptions()"
             [ngModel]="sourceId()"
@@ -28,23 +22,20 @@
             @case ('entity-projection') {
                 <inspecto-option-picker
                     #datasetPicker
-                    class="w-56"
-                    [outlined]="true"
+                    class="w-full"
                     label="Dataset"
                     formControlName="datasetId"
                     [options]="datasetOptions()"
                     help="Datasets that look like links (from/to columns) are listed first."
                 ></inspecto-option-picker>
                 <inspecto-option-picker
-                    class="w-56"
-                    [outlined]="true"
+                    class="w-full"
                     label="Source entity column"
                     formControlName="sourceCol"
                     [options]="columnOptions()"
                 ></inspecto-option-picker>
                 <inspecto-option-picker
-                    class="w-56"
-                    [outlined]="true"
+                    class="w-full"
                     label="Target entity column"
                     formControlName="targetCol"
                     [options]="columnOptions()"
@@ -56,54 +47,53 @@
                     </p>
                 }
                 <inspecto-option-picker
-                    class="w-56"
-                    [outlined]="true"
+                    class="w-full"
                     label="Link type column (optional)"
                     formControlName="linkKindCol"
                     [options]="optionalColumnOptions()"
                 ></inspecto-option-picker>
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>Attribute columns (optional)</mat-label>
-                    <mat-icon matPrefix class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
-                    <mat-select formControlName="attrCols" multiple>
-                        @for (c of datasetColumns(); track c) {
-                            <mat-option [value]="c">{{ c }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-pen-multi
+                    class="w-full"
+                    label="Attribute columns (optional)"
+                    formControlName="attrCols"
+                    [options]="columnOptions()"
+                ></inspecto-pen-multi>
                 @if (extraMappings.length) {
-                    <mat-form-field subscriptSizing="dynamic" class="w-40">
-                        <mat-label>Entity type</mat-label>
-                        <mat-icon matPrefix class="icon-size-5" svgIcon="heroicons_outline:identification"></mat-icon>
-                        <input matInput formControlName="entityType" placeholder="e.g. person" />
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        class="w-full"
+                        label="Entity type"
+                        formControlName="entityType"
+                        placeholder="e.g. person"
+                    ></inspecto-pen-field>
                 }
 
                 <!-- ── extra mappings (multi-entity/multi-dataset merge) ── -->
                 @for (m of extraMappings.controls; track $index; let i = $index) {
                     <div [formGroup]="m" class="flex w-full flex-wrap items-center gap-2 rounded-lg border p-2">
                         <inspecto-option-picker
-                            class="w-48"
+                            class="w-full"
                             label="Dataset"
                             formControlName="datasetId"
                             [options]="datasetOptions()"
                         ></inspecto-option-picker>
                         <inspecto-option-picker
-                            class="w-40"
+                            class="w-full"
                             label="Source column"
                             formControlName="sourceCol"
                             [options]="extraMappingColumnOptions()[i] ?? []"
                         ></inspecto-option-picker>
                         <inspecto-option-picker
-                            class="w-40"
+                            class="w-full"
                             label="Target column"
                             formControlName="targetCol"
                             [options]="extraMappingColumnOptions()[i] ?? []"
                         ></inspecto-option-picker>
-                        <mat-form-field subscriptSizing="dynamic" class="w-40">
-                            <mat-label>Entity type</mat-label>
-                            <input matInput formControlName="entityType" placeholder="e.g. account" />
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            class="w-full"
+                            label="Entity type"
+                            formControlName="entityType"
+                            placeholder="e.g. account"
+                        ></inspecto-pen-field>
                         <button
                             mat-icon-button
                             type="button"
@@ -133,35 +123,35 @@
                         role="group"
                     >
                         <inspecto-option-picker
-                            class="w-48"
+                            class="w-full"
                             label="Node Dataset"
                             formControlName="datasetId"
                             [options]="datasetOptions()"
                         ></inspecto-option-picker>
                         <inspecto-option-picker
-                            class="w-40"
+                            class="w-full"
                             label="Id column"
                             formControlName="idColumn"
                             [options]="nodeMappingColumns()[i] ?? []"
                         ></inspecto-option-picker>
                         <inspecto-option-picker
-                            class="w-40"
+                            class="w-full"
                             label="Label column (optional)"
                             formControlName="labelColumn"
                             [options]="nodeLabelColumnOptions()[i] ?? []"
                         ></inspecto-option-picker>
-                        <mat-form-field subscriptSizing="dynamic" class="w-40">
-                            <mat-label>Category (optional)</mat-label>
-                            <input matInput formControlName="category" placeholder="e.g. person" />
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic" class="w-48">
-                            <mat-label>Attribute columns (optional)</mat-label>
-                            <mat-select formControlName="attributes" multiple>
-                                @for (c of nodeMappingColumns()[i] ?? []; track c.value) {
-                                    <mat-option [value]="c.value">{{ c.label }}</mat-option>
-                                }
-                            </mat-select>
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            class="w-full"
+                            label="Category (optional)"
+                            formControlName="category"
+                            placeholder="e.g. person"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-multi
+                            class="w-full"
+                            label="Attribute columns (optional)"
+                            formControlName="attributes"
+                            [options]="nodeMappingColumns()[i] ?? []"
+                        ></inspecto-pen-multi>
                         <button
                             mat-icon-button
                             type="button"
@@ -181,35 +171,35 @@
                         role="group"
                     >
                         <inspecto-option-picker
-                            class="w-48"
+                            class="w-full"
                             label="Edge Dataset"
                             formControlName="datasetId"
                             [options]="datasetOptions()"
                         ></inspecto-option-picker>
                         <inspecto-option-picker
-                            class="w-40"
+                            class="w-full"
                             label="Source column"
                             formControlName="sourceColumn"
                             [options]="edgeMappingColumns()[i] ?? []"
                         ></inspecto-option-picker>
                         <inspecto-option-picker
-                            class="w-40"
+                            class="w-full"
                             label="Target column"
                             formControlName="targetColumn"
                             [options]="edgeMappingColumns()[i] ?? []"
                         ></inspecto-option-picker>
-                        <mat-form-field subscriptSizing="dynamic" class="w-40">
-                            <mat-label>Link type (optional)</mat-label>
-                            <input matInput formControlName="type" placeholder="e.g. called" />
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic" class="w-48">
-                            <mat-label>Attribute columns (optional)</mat-label>
-                            <mat-select formControlName="attributes" multiple>
-                                @for (c of edgeMappingColumns()[i] ?? []; track c.value) {
-                                    <mat-option [value]="c.value">{{ c.label }}</mat-option>
-                                }
-                            </mat-select>
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            class="w-full"
+                            label="Link type (optional)"
+                            formControlName="type"
+                            placeholder="e.g. called"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-multi
+                            class="w-full"
+                            label="Attribute columns (optional)"
+                            formControlName="attributes"
+                            [options]="edgeMappingColumns()[i] ?? []"
+                        ></inspecto-pen-multi>
                         <button
                             mat-icon-button
                             type="button"
@@ -243,44 +233,47 @@
                 </button>
             }
             @case ('lineage') {
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>Root node (optional)</mat-label>
-                    <mat-icon matPrefix class="icon-size-5" svgIcon="heroicons_outline:viewfinder-circle"></mat-icon>
-                    <input matInput formControlName="from" placeholder="e.g. table:cdr" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>Depth</mat-label>
-                    <mat-icon matPrefix class="icon-size-5" svgIcon="heroicons_outline:hashtag"></mat-icon>
-                    <input matInput type="number" min="1" max="10" formControlName="depth" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="w-full"
+                    label="Root node (optional)"
+                    formControlName="from"
+                    placeholder="e.g. table:cdr"
+                ></inspecto-pen-field>
+                <inspecto-pen-field
+                    class="w-full"
+                    label="Depth"
+                    formControlName="depth"
+                    type="number"
+                    [min]="1"
+                    [max]="10"
+                    [default]="2"
+                ></inspecto-pen-field>
                 <inspecto-option-picker
-                    class="w-56"
+                    class="w-full"
                     label="Direction"
                     formControlName="direction"
                     [options]="directionOptions"
                 ></inspecto-option-picker>
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>Extra roots (optional, comma-separated)</mat-label>
-                    <mat-icon matPrefix class="icon-size-5" svgIcon="heroicons_outline:plus"></mat-icon>
-                    <input matInput formControlName="extraRoots" placeholder="e.g. table:orders, table:invoices" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="w-full"
+                    label="Extra roots (optional, comma-separated)"
+                    formControlName="extraRoots"
+                    placeholder="e.g. table:orders, table:invoices"
+                ></inspecto-pen-field>
             }
             @case ('provenance') {
                 <inspecto-option-picker
-                    class="w-56"
+                    class="w-full"
                     label="Pipeline"
                     formControlName="pipeline"
                     [options]="pipelineOptions()"
                 ></inspecto-option-picker>
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>Extra pipelines (optional)</mat-label>
-                    <mat-icon matPrefix class="icon-size-5" svgIcon="heroicons_outline:plus"></mat-icon>
-                    <mat-select formControlName="extraPipelines" multiple>
-                        @for (p of pipelines(); track p.name) {
-                            <mat-option [value]="p.name">{{ p.name }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-pen-multi
+                    class="w-full"
+                    label="Extra pipelines (optional)"
+                    formControlName="extraPipelines"
+                    [options]="pipelineOptions()"
+                ></inspecto-pen-multi>
                 <mat-checkbox formControlName="counts" class="self-center"
                     >Weight edges by last run's record counts</mat-checkbox
                 >

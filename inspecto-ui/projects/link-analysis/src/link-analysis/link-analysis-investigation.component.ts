@@ -1,3 +1,4 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import {
     ChangeDetectionStrategy,
     Component,
@@ -94,7 +95,7 @@ export const APPROVAL_POLL_MS = 15_000;
     selector: 'inspecto-link-analysis-investigation',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
+    imports: [PenFieldComponent, 
         FormsModule,
         ReactiveFormsModule,
         MatButtonModule,

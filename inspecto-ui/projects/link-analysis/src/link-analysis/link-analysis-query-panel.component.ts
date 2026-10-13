@@ -17,8 +17,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { PenMultiComponent } from '@inspecto/core/components/pen-multi.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { QueryConditionGroupComponent } from '@inspecto/core/query/query-condition-group.component';
 import { ColumnMeta, ConditionGroup, emptyGroup } from '@inspecto/core/query/query-types';
@@ -54,14 +54,14 @@ export interface QuerySummaryItem {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        PenFieldComponent,
+        PenMultiComponent,
         FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
-        MatSelectModule,
         LaHostSlotComponent,
         InspectoOptionPickerComponent,
         QueryConditionGroupComponent,

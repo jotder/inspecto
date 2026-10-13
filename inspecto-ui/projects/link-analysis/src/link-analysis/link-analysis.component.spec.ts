@@ -1087,7 +1087,10 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
         c.investigation.activeId.set('inv-8');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         const ent = (id: string, expanded: boolean) => ({ id, type: 'x', hop: 0, seed: 's', admittedBy: 1, expanded });
         c.investigation.workingSet.set({
             entities: [ent('ws-a', true), ent('ws-b', false), ent('ws-c', false)],
@@ -1107,7 +1110,12 @@ describe('LinkAnalysisComponent', () => {
         expect(picked()).toBe('ws-b');
 
         c.onlyUnexpanded.set(true);
-        expect(c.canvasData()!.nodes.map((n) => n.data.label).sort()).toEqual(['ws-b', 'ws-c']);
+        expect(
+            c
+                .canvasData()!
+                .nodes.map((n) => n.data.label)
+                .sort(),
+        ).toEqual(['ws-b', 'ws-c']);
         c.onlyUnexpanded.set(false);
         expect(c.canvasData()!.nodes).toHaveLength(3);
     });
@@ -1475,14 +1483,25 @@ describe('LinkAnalysisComponent', () => {
             return { fixture, el, rail: el.querySelector('nav[data-testid="la-tool-rail"]') as HTMLElement };
         };
 
-        it('is a labelled nav that sits BEFORE the workspace in the same row, so the canvas starts at the title row', async () => {
+        it('is a labelled nav in the page header, so the canvas starts right under the title row', async () => {
             const { el, rail } = await ready();
             expect(rail.getAttribute('aria-label')).toBe('Link Analysis tools');
+            expect(rail.closest('inspecto-page-header header')).toBeTruthy();
             const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
-            expect(rail.parentElement).toBe(workspace.parentElement); // one row: [rail | workspace]
             expect(rail.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-            expect(rail.classList).toContain('flex-col');
-            expect(rail.classList).toContain('max-md:flex-row'); // stacked layout keeps a wrapped row
+            expect(rail.classList).toContain('flex-row');
+        });
+
+        it('has a table icon that shows and hides the data table below the canvas completely', async () => {
+            const { fixture, el, rail } = await ready();
+            expect(el.querySelector('#bottom-panel-body')).toBeNull();
+            const toggle = rail.querySelector('button[aria-controls="bottom-panel-body"]') as HTMLButtonElement;
+            toggle.click();
+            fixture.detectChanges();
+            expect(el.querySelector('#bottom-panel-body')).toBeTruthy();
+            toggle.click();
+            fixture.detectChanges();
+            expect(el.querySelector('#bottom-panel-body')).toBeNull();
         });
 
         it('keeps every action reachable by its accessible name', async () => {
@@ -1628,7 +1647,10 @@ describe('LinkAnalysisComponent', () => {
             expect(el.querySelector('[data-testid="graph-list-toggle"]')).toBeNull();
             openWorkingSet(c, ['ws-a', 'ws-b']);
             fixture.detectChanges();
-            for (const label of ['Display options (labels, colors, shapes and line styles)', 'Fit the graph to the screen'])
+            for (const label of [
+                'Display options (labels, colors, shapes and line styles)',
+                'Fit the graph to the screen',
+            ])
                 expect(el.querySelector(`button[aria-label="${label}"]`)).not.toBeNull();
             expect(el.querySelector('button[aria-label="View the graph in full screen"]')).not.toBeNull();
             const toggle = el.querySelector('[data-testid="graph-list-toggle"]') as HTMLButtonElement;
@@ -1858,9 +1880,9 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             expect(aside.classList).toContain('overflow-hidden');
             expect(aside.querySelector('.overflow-y-auto')).toBeTruthy(); // the dock body scrolls inside
         }
-        expect(el.querySelector('nav[data-testid="la-tool-rail"]')!.classList).toContain('overflow-y-auto');
+        // the data strip is hidden entirely until the toolbox table icon is pressed; the status bar is the footer strip
         const strip = Array.from(el.querySelectorAll<HTMLElement>('div.shrink-0.rounded-lg.border')).find((d) =>
-            d.textContent?.includes('Data'),
+            d.querySelector('[data-testid="la-status"]'),
         );
         expect(strip).toBeTruthy();
     });
@@ -1876,7 +1898,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         expect((el.firstElementChild as HTMLElement).className).toContain(',35rem)]');
     });
 
-    it('puts the active-query status chips in the page-header title row, not in a row above the canvas', async () => {
+    it('puts the active-query status chips in the status bar at the footer, not in the header', async () => {
         const { fixture } = create({ stubGraph: true });
         fixture.detectChanges();
         await runQuery(fixture);
@@ -1884,7 +1906,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         const el = fixture.nativeElement as HTMLElement;
         const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
         expect(status).toBeTruthy();
-        expect(status.closest('inspecto-page-header header')).toBeTruthy();
+        expect(status.closest('inspecto-page-header header')).toBeNull();
         expect(status.textContent).toContain('nodes');
         expect(status.querySelector('button[aria-label="Change the query"]')).toBeTruthy();
         expect(el.querySelectorAll('[aria-label="Active query"]').length).toBe(1); // no second, separate panel

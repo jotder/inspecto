@@ -1,3 +1,4 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,7 +21,7 @@ import { investigationErrorMessage } from './investigation-state';
     selector: 'inspecto-link-analysis-references',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, InspectoAlertComponent],
+    imports: [PenFieldComponent, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, InspectoAlertComponent],
     host: { class: 'block' },
     template: `
         <section
@@ -62,26 +63,11 @@ import { investigationErrorMessage } from './investigation-state';
                     aria-label="Add a reference"
                     (submit)="$event.preventDefault(); add()"
                 >
-                    <mat-form-field class="w-32" subscriptSizing="dynamic">
-                        <mat-label>System</mat-label>
-                        <input matInput [formControl]="system" />
-                    </mat-form-field>
-                    <mat-form-field class="w-32" subscriptSizing="dynamic">
-                        <mat-label>Type</mat-label>
-                        <input matInput [formControl]="type" />
-                    </mat-form-field>
-                    <mat-form-field class="w-40" subscriptSizing="dynamic">
-                        <mat-label>Id</mat-label>
-                        <input matInput [formControl]="refId" />
-                    </mat-form-field>
-                    <mat-form-field class="w-56" subscriptSizing="dynamic">
-                        <mat-label>URL (optional, http or https)</mat-label>
-                        <input matInput [formControl]="url" />
-                    </mat-form-field>
-                    <mat-form-field class="w-48" subscriptSizing="dynamic">
-                        <mat-label>Label (optional)</mat-label>
-                        <input matInput [formControl]="label" />
-                    </mat-form-field>
+                    <inspecto-pen-field class="w-full" label="System" [formControl]="system"></inspecto-pen-field>
+                    <inspecto-pen-field class="w-full" label="Type" [formControl]="type"></inspecto-pen-field>
+                    <inspecto-pen-field class="w-full" label="Id" [formControl]="refId"></inspecto-pen-field>
+                    <inspecto-pen-field class="w-full" label="URL (optional, http or https)" [formControl]="url"></inspecto-pen-field>
+                    <inspecto-pen-field class="w-full" label="Label (optional)" [formControl]="label"></inspecto-pen-field>
                     <button
                         mat-flat-button
                         type="submit"

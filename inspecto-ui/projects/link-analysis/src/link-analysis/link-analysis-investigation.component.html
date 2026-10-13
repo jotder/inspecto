@@ -19,10 +19,7 @@
             <button mat-stroked-button [disabled]="listBusy()" (click)="listInvestigations()">
                 List Investigations
             </button>
-            <mat-form-field class="min-w-0 flex-1" subscriptSizing="dynamic">
-                <mat-label>Open by id</mat-label>
-                <input matInput [formControl]="openId" (keydown.enter)="openById()" />
-            </mat-form-field>
+            <inspecto-pen-field class="min-w-full flex-1" label="Open by id" [formControl]="openId" (keydown.enter)="openById()"></inspecto-pen-field>
             <button mat-button [disabled]="!openId.value.trim() || store.busy()" (click)="openById()">Open</button>
         </div>
         @if (listError()) {

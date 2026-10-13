@@ -424,7 +424,7 @@ export class LinkAnalysisComponent implements OnInit {
     // ── workspace layout: [query dock] │ canvas │ [toolbox dock], Data as a bottom strip ──
     /** Full query form vs its collapsed selected-values summary (auto-collapses after a run). */
     readonly queryOpen = signal(true);
-    /** The left dock (Query + Filter); collapses to an icon rail. */
+    /** The left dock (Query); collapses to an icon rail. */
     readonly queryDockOpen = signal(true);
     /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
     readonly toolboxDockOpen = signal(initialToolboxOpen());
@@ -1039,6 +1039,8 @@ export class LinkAnalysisComponent implements OnInit {
     // ── fullscreen (whole studio or just the canvas zone) + the Data strip below the workspace ──
     readonly fullscreen = signal<'app' | 'graph' | null>(null);
     readonly bottomOpen = signal(false);
+    /** The Filter predicate editor inside the data strip; collapsed so the strip stays short. */
+    readonly filterOpen = signal(false);
     readonly tableMode = signal<'links' | 'nodes'>('links');
 
     // ── canvas overlays: legend (kind → colour → count) and the working set tiles ──

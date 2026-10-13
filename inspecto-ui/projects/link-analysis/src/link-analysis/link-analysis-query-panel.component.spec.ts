@@ -442,10 +442,10 @@ describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-
         expect(c.queryForm.getRawValue()).toMatchObject({ sourceCol: '', targetCol: '' });
     });
 
-    it('the pickers are outlined, and Derive mapping is explained in plain words', () => {
+    it('the pickers are compact pen-style rows, and Derive mapping is explained in plain words', () => {
         const { fixture } = withDatasets();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelectorAll('button[data-outlined]').length).toBeGreaterThanOrEqual(5);
+        expect(el.querySelectorAll('button[data-outlined]')).toHaveLength(0);
         const help = el.querySelector('[data-testid="derive-mapping-help"]') as HTMLElement;
         expect(help.textContent).toContain('needs permission to author configuration');
         expect(help.textContent).toContain('use the columns filled in above');

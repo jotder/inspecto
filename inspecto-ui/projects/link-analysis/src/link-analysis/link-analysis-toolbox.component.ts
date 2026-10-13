@@ -1,3 +1,4 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { DecimalPipe } from '@angular/common';
 import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { RiskScorePanelComponent } from '@inspecto/core/components/risk-score-panel.component';
@@ -205,7 +206,7 @@ type CentralityMetric =
     selector: 'inspecto-link-analysis-toolbox',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
+    imports: [PenFieldComponent, 
         ChipComponent,
         DecimalPipe,
         MatButtonModule,
