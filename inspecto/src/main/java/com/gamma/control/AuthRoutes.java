@@ -34,19 +34,21 @@ import com.gamma.access.AuditTrail;
  * <pre>
  *   POST /auth/exchange  {code, codeVerifier, redirectUri[, nonce]} → 200 {accessToken, expiresIn} + Set-Cookie
  *   POST /auth/refresh   (cookie)                          → 200 {accessToken, expiresIn} + rotated cookie
- *   POST /auth/logout    (cookie)                          → 200 {loggedOut} + cleared cookie; best-effort revoke
+ *   POST /auth/logout    (cookie)[{postLogoutRedirectUri}] → 200 {loggedOut[, endSessionUrl]} + cleared cookies; best-effort revoke
  * </pre>
  */
 final class AuthRoutes implements RouteModule {
 
     /** The refresh-token cookie. Value is the IAM's opaque/JWT refresh token, never decoded here. */
     static final String COOKIE = "inspecto_rt";
+    /** The ID-token cookie (HttpOnly, never readable by the SPA): kept only to build the logout {@code id_token_hint}. */
+    static final String ID_COOKIE = "inspecto_idt";
 
     @Override
     public void register(ApiContext api) {
         api.post("/auth/exchange", (e, m) -> exchange(e, api.body(e)));
         api.post("/auth/refresh", (e, m) -> refresh(e));
-        api.post("/auth/logout", (e, m) -> logout(e));
+        api.post("/auth/logout", (e, m) -> logout(e, api.body(e)));
     }
 
     private Object exchange(HttpExchange ex, Map<String, Object> body) {
@@ -69,7 +71,7 @@ final class AuthRoutes implements RouteModule {
     private Object refresh(HttpExchange ex) {
         TokenRelay relay = relay();   // capability check first: on Personal this is 503, never a cookie-derived 401
         requireSameOrigin(ex);
-        String rt = cookie(ex);
+        String rt = cookie(ex, COOKIE);
         if (rt == null) throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "no session");
         TokenRelay.Tokens t = relay.refresh(rt).orElseThrow(() -> {
             clearCookie(ex);   // a dead refresh token is gone for good — don't leave the stale cookie behind
@@ -80,15 +82,19 @@ final class AuthRoutes implements RouteModule {
         return respondWithSession(ex, t);
     }
 
-    private Object logout(HttpExchange ex) {
+    private Object logout(HttpExchange ex, Map<String, Object> body) {
         TokenRelay relay = relay();   // capability check first: on Personal this is 503, not a no-op 200
         requireSameOrigin(ex);
-        String rt = cookie(ex);
+        String rt = cookie(ex, COOKIE);
+        String idToken = cookie(ex, ID_COOKIE);
         if (rt != null) relay.revoke(rt);
         clearCookie(ex);
         AuditTrail.authentication(ex, "auth.logout", true, 200);
-        return Map.of("loggedOut", true);
-
+        // With the ID token the provider can end its SSO session without a confirmation page; without it the SPA
+        // falls back to the hint-less redirect it has always built.
+        String url = idToken == null ? null
+                : relay.endSessionUrl(idToken, ApiContext.str(body, "postLogoutRedirectUri")).orElse(null);
+        return url == null ? Map.of("loggedOut", true) : Map.of("loggedOut", true, "endSessionUrl", url);
     }
 
     /**
@@ -113,7 +119,8 @@ final class AuthRoutes implements RouteModule {
      *  the refresh token itself never appears in a response body. */
     private static Object respondWithSession(HttpExchange ex, TokenRelay.Tokens t) {
         long maxAge = t.refreshExpiresInSeconds() != null ? t.refreshExpiresInSeconds() : -1;
-        setCookie(ex, t.refreshToken(), maxAge);
+        setCookie(ex, COOKIE, t.refreshToken(), maxAge);
+        if (t.idToken() != null && !t.idToken().isBlank()) setCookie(ex, ID_COOKIE, t.idToken(), maxAge);
         return Map.of("accessToken", t.accessToken(), "expiresIn", t.expiresInSeconds());
     }
 
@@ -136,8 +143,8 @@ final class AuthRoutes implements RouteModule {
 
     /** {@code maxAge < 0} ⇒ a session cookie (no Max-Age attribute). {@code Secure} rides only on TLS
      *  exchanges — a plain-HTTP dev server would otherwise set a cookie the browser refuses to return. */
-    private static void setCookie(HttpExchange ex, String value, long maxAge) {
-        StringBuilder c = new StringBuilder(COOKIE).append('=').append(value)
+    private static void setCookie(HttpExchange ex, String name, String value, long maxAge) {
+        StringBuilder c = new StringBuilder(name).append('=').append(value)
                 .append("; Path=/; HttpOnly; SameSite=Strict");
         if (maxAge >= 0) c.append("; Max-Age=").append(maxAge);
         if (ex instanceof HttpsExchange) c.append("; Secure");
@@ -145,17 +152,17 @@ final class AuthRoutes implements RouteModule {
     }
 
     private static void clearCookie(HttpExchange ex) {
-        String c = COOKIE + "=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
-                + (ex instanceof HttpsExchange ? "; Secure" : "");
-        ex.getResponseHeaders().add("Set-Cookie", c);
+        for (String name : new String[] {COOKIE, ID_COOKIE})
+            ex.getResponseHeaders().add("Set-Cookie", name + "=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
+                    + (ex instanceof HttpsExchange ? "; Secure" : ""));
     }
 
     /** The refresh token from the request's {@code Cookie} header(s), or {@code null}. */
-    private static String cookie(HttpExchange ex) {
+    private static String cookie(HttpExchange ex, String name) {
         for (String header : ex.getRequestHeaders().getOrDefault("Cookie", java.util.List.of()))
             for (String pair : header.split(";")) {
                 int eq = pair.indexOf('=');
-                if (eq > 0 && pair.substring(0, eq).trim().equals(COOKIE)) {
+                if (eq > 0 && pair.substring(0, eq).trim().equals(name)) {
                     String v = pair.substring(eq + 1).trim();
                     if (!v.isEmpty()) return v;
                 }

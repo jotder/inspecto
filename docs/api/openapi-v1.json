@@ -1249,7 +1249,7 @@
       "post" : {
         "tags" : [ "Session & Identity" ],
         "summary" : "End the session",
-        "description" : "Best-effort revocation of the refresh token at the IAM, then clears the session cookie. Idempotent — succeeds with or without a live session. 503 on Personal.",
+        "description" : "Best-effort revocation of the refresh token at the IAM, then clears the session cookies. The optional body {postLogoutRedirectUri} is placed on the end-session URL returned as endSessionUrl. Idempotent — succeeds with or without a live session. 503 on Personal.",
         "operationId" : "logout",
         "responses" : {
           "200" : {
@@ -1267,6 +1267,10 @@
                         "properties" : {
                           "loggedOut" : {
                             "type" : "boolean"
+                          },
+                          "endSessionUrl" : {
+                            "type" : "string",
+                            "description" : "The provider's end-session URL carrying id_token_hint, client_id and post_logout_redirect_uri; present only when the session held an ID token and the provider has an end-session endpoint."
                           }
                         }
                       }

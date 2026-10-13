@@ -408,9 +408,10 @@ export class SessionService {
      * provider if one can be — RP-Initiated Logout 1.0: redirect to `end_session_endpoint` with
      * `client_id` + `post_logout_redirect_uri`, and the provider returns the browser to `/sign-in`.
      *
-     * `id_token_hint` is deliberately absent: the id token lives behind the BFF (the SPA only ever holds
-     * a short-lived access token), and the spec accepts `client_id` in its place when the RP is
-     * identified that way. Without this redirect the Inspecto session ends but the IdP's does not, so
+     * `id_token_hint` is added by the BACKEND: the id token lives behind the BFF (an HttpOnly cookie the SPA
+     * cannot read), so `/auth/logout` returns the full `endSessionUrl` with the hint when it holds one, and the
+     * SPA just follows it. When it does not (no hint available) the SPA builds the hint-less URL below and the
+     * provider may show its "log out?" confirmation page. Without this redirect the Inspecto session ends but the IdP's does not, so
      * the next sign-in completes with no credential prompt — which is what the console did between
      * `ca3680df` and 2026-07-26.
      *
@@ -419,10 +420,16 @@ export class SessionService {
      */
     logout(): void {
         this.http
-            .post(apiUrl('/auth/logout'), {})
+            .post<{ endSessionUrl?: string }>(apiUrl('/auth/logout'), {
+                postLogoutRedirectUri: `${window.location.origin}/sign-in`,
+            })
             .pipe(catchError(() => of(null)))
-            .subscribe(() => {
+            .subscribe((res) => {
                 this.onAuthLost();
+                if (res?.endSessionUrl && !this.oidc?.mock) {
+                    this.redirect(res.endSessionUrl);
+                    return;
+                }
                 const endSession = this.oidc?.endSessionUrl;
                 if (!endSession || this.oidc?.mock) {
                     this.router.navigate(['/sign-in']);

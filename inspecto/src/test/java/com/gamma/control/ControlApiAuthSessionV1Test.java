@@ -225,6 +225,37 @@ class ControlApiAuthSessionV1Test {
     }
 
     @Test
+    void logoutReturnsTheEndSessionUrlWithTheHintFromTheIdTokenCookie(@TempDir Path cfg) throws Exception {
+        TokenRelays.forTest(new TokenRelay() {
+            @Override public Optional<Tokens> exchangeCode(String code, String verifier, String redirectUri) {
+                return Optional.of(new Tokens("at-1", 300, "rt-1", 1800L, "id-1"));
+            }
+            @Override public Optional<Tokens> refresh(String rt) { return Optional.empty(); }
+            @Override public Optional<String> endSessionUrl(String idToken, String postLogout) {
+                return Optional.of("https://idp/logout?id_token_hint=" + idToken + "&post=" + postLogout);
+            }
+        });
+        try (Ctx c = open(cfg)) {
+            HttpResponse<String> ex = post(c.port, "/auth/exchange",
+                    "{\"code\":\"x\",\"codeVerifier\":\"v\",\"redirectUri\":\"r\"}");
+            assertTrue(ex.headers().allValues("Set-Cookie").stream()
+                    .anyMatch(h -> h.startsWith(AuthRoutes.ID_COOKIE + "=id-1") && h.contains("HttpOnly")), "ID token is HttpOnly");
+            assertFalse(ex.body().contains("id-1"), "the browser body never carries the ID token");
+
+            HttpResponse<String> r = post(c.port, "/auth/logout", "{\"postLogoutRedirectUri\":\"https://app/sign-in\"}",
+                    "Cookie", AuthRoutes.COOKIE + "=rt-1; " + AuthRoutes.ID_COOKIE + "=id-1");
+            assertEquals(200, r.statusCode());
+            assertEquals("https://idp/logout?id_token_hint=id-1&post=https://app/sign-in",
+                    V1Body.of(r.body()).get("endSessionUrl").asText());
+            assertTrue(r.headers().allValues("Set-Cookie").stream()
+                    .anyMatch(h -> h.startsWith(AuthRoutes.ID_COOKIE + "=;") && h.contains("Max-Age=0")), "ID cookie cleared");
+
+            HttpResponse<String> noHint = post(c.port, "/auth/logout", null, "Cookie", AuthRoutes.COOKIE + "=rt-1");
+            assertFalse(V1Body.of(noHint.body()).has("endSessionUrl"), "no ID token cookie: today's behaviour");
+        }
+    }
+
+    @Test
     void crossOriginCallIsRejectedWhenAnOriginIsConfigured(@TempDir Path cfg) throws Exception {
         TokenRelays.forTest(FAKE);
         System.setProperty("auth.origin", "https://inspecto.internal");

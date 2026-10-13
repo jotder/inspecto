@@ -481,6 +481,24 @@ describe('SessionService (W6d edition switch)', () => {
         assign.mockRestore();
     });
 
+    it('logout follows the backend endSessionUrl (carrying id_token_hint) and asks for the post-logout redirect', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({
+            authorizeUrl: 'https://idp/authorize',
+            clientId: 'spa-1',
+            endSessionUrl: 'https://idp/logout',
+        });
+
+        svc.logout();
+        const req = httpMock.expectOne(`${base}/auth/logout`);
+        expect(req.request.body).toEqual({ postLogoutRedirectUri: `${window.location.origin}/sign-in` });
+        req.flush({ loggedOut: true, endSessionUrl: 'https://idp/logout?id_token_hint=ID.TOKEN&client_id=spa-1' });
+        await tick();
+
+        expect(assign.mock.calls[0][0]).toBe('https://idp/logout?id_token_hint=ID.TOKEN&client_id=spa-1');
+        assign.mockRestore();
+    });
+
     it('logout stays in-app when the provider declares no end_session_endpoint', async () => {
         const assign = spyOnRedirect();
         await signedInWith({

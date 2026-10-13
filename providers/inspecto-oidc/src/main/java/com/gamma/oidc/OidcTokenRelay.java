@@ -114,6 +114,19 @@ public final class OidcTokenRelay implements TokenRelay {
     }
 
     @Override
+    public Optional<String> endSessionUrl(String idToken, String postLogoutRedirectUri) {
+        String endSession = OidcConfig.get("endSessionUrl");
+        if (endSession == null || endSession.isBlank() || idToken == null || idToken.isBlank()) return Optional.empty();
+        Map<String, String> q = new LinkedHashMap<>();
+        q.put("id_token_hint", idToken);
+        q.put("client_id", clientId);
+        if (postLogoutRedirectUri != null && !postLogoutRedirectUri.isBlank())
+            q.put("post_logout_redirect_uri", postLogoutRedirectUri);
+        String base = endSession.trim();
+        return Optional.of(base + (base.contains("?") ? "&" : "?") + encode(q));
+    }
+
+    @Override
     public Optional<Tokens> refresh(String refreshToken) {
         Map<String, String> form = new LinkedHashMap<>();
         form.put("grant_type", "refresh_token");
@@ -147,7 +160,8 @@ public final class OidcTokenRelay implements TokenRelay {
             if (exchange && expectedNonce == null && idTokenCarriesNonce(body.path("id_token").asText(null)))
                 return Optional.empty();
             return Optional.of(new Tokens(access, body.path("expires_in").asLong(300),
-                    refresh, body.hasNonNull("refresh_expires_in") ? body.get("refresh_expires_in").asLong() : null));
+                    refresh, body.hasNonNull("refresh_expires_in") ? body.get("refresh_expires_in").asLong() : null,
+                    body.path("id_token").asText(null)));
         } catch (Exception e) {
             return Optional.empty();   // IAM unreachable / timeout / malformed — the caller just gets 401
         }

@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -188,6 +189,25 @@ class OidcTokenRelayTest {
             assertFalse(m.toString().contains("s3cret"));
         } finally {
             System.clearProperty("auth.oidc.authorizeUrl");
+            System.clearProperty("auth.oidc.endSessionUrl");
+        }
+    }
+
+    @Test
+    void theIdTokenIsCarriedAndTheEndSessionUrlBuiltWithTheHint() {
+        iamReturnsIdToken(idToken(null));
+        OidcTokenRelay r = relay(null);
+        String id = r.refresh("rt").orElseThrow().idToken();
+        assertNotNull(id, "the relay hands the ID token to the backend, which keeps it in an HttpOnly cookie");
+        try {
+            assertTrue(r.endSessionUrl(id, "https://app/sign-in").isEmpty(), "no end-session endpoint: no URL");
+            System.setProperty("auth.oidc.endSessionUrl", "https://idp/logout");
+            String url = r.endSessionUrl(id, "https://app/sign-in").orElseThrow();
+            assertTrue(url.startsWith("https://idp/logout?id_token_hint=" + URLEncoder.encode(id, StandardCharsets.UTF_8)), url);
+            assertTrue(url.contains("&client_id=inspecto-spa"), url);
+            assertTrue(url.contains("&post_logout_redirect_uri=https%3A%2F%2Fapp%2Fsign-in"), url);
+            assertTrue(r.endSessionUrl(null, "https://app/sign-in").isEmpty(), "no ID token: fall back");
+        } finally {
             System.clearProperty("auth.oidc.endSessionUrl");
         }
     }

@@ -18,7 +18,12 @@ public interface TokenRelay {
     /** One successful exchange/refresh result. {@code refreshExpiresInSeconds} may be {@code null}
      *  when the IAM does not report it (the cookie then falls back to a session lifetime). */
     record Tokens(String accessToken, long expiresInSeconds,
-                  String refreshToken, Long refreshExpiresInSeconds) {}
+                  String refreshToken, Long refreshExpiresInSeconds, String idToken) {
+        /** A result with no ID token (a relay that never sees one, e.g. the demo relay). */
+        public Tokens(String accessToken, long expiresInSeconds, String refreshToken, Long refreshExpiresInSeconds) {
+            this(accessToken, expiresInSeconds, refreshToken, refreshExpiresInSeconds, null);
+        }
+    }
 
     /** Redeem an Authorization-Code+PKCE {@code code}. Empty ⇒ the IAM rejected it (expired, wrong
      *  verifier/redirect) — the caller gets {@code 401}, never the IAM's error detail. */
@@ -36,6 +41,15 @@ public interface TokenRelay {
 
     /** Mint a fresh access token from a refresh token. Empty ⇒ rejected (expired/revoked) — 401. */
     Optional<Tokens> refresh(String refreshToken);
+
+    /**
+     * The provider's RP-Initiated Logout URL carrying {@code id_token_hint}, {@code client_id} and
+     * {@code post_logout_redirect_uri}, so the provider ends its SSO session without a confirmation page. Empty (the
+     * default) when the provider has no end-session endpoint or there is no ID token: the caller then falls back to
+     * what the SPA can build without the hint. The ID token is held server-side (an HttpOnly cookie); it is read only
+     * to build this one redirect.
+     */
+    default Optional<String> endSessionUrl(String idToken, String postLogoutRedirectUri) { return Optional.empty(); }
 
     /** Best-effort revocation on logout; default no-op (the cookie is cleared regardless). */
     default void revoke(String refreshToken) {}
