@@ -21,7 +21,7 @@ import {
     workingSetToGraph,
 } from './investigation-state';
 import { ProjectedGraph } from './entity-projection';
-import { NeighbourRow, rankNeighbours } from './neighbour-ranking';
+import { NeighbourRow } from './neighbour-ranking';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { QueuedSeed } from './la-starter';
@@ -414,41 +414,58 @@ export class InvestigationSessionStore {
 
     /**
      * LA-EXPAND-PICK-NEIGHBOURS-1: the selected entity's neighbours, a READ-ONLY hint for choosing what to expand to (nothing
-     * is written until the analyst adds some). It reads one hop of the whole Dataset - no window, at most the route's row
-     * limit - so the server's sealed expand stays authoritative; `truncated` says the list is cut.
+     * is written until the analyst adds some). The server folds them per neighbour, strongest first, and says the REAL
+     * `total`; the list is read a window at a time (`moreNeighbours`) and is never held by the four-eyes fan-out threshold.
      */
     readonly neighbours = signal<{
         of: string;
         rows: NeighbourRow[];
-        truncated: boolean;
+        /** The entity's real number of distinct neighbours. */
+        total: number;
+        hasMore: boolean;
         loading: boolean;
         error: string;
     } | null>(null);
 
     async loadNeighbours(value: string): Promise<void> {
+        this.neighbours.set({ of: value, rows: [], total: 0, hasMore: false, loading: true, error: '' });
+        await this.readNeighbourWindow(value, 0);
+    }
+
+    /** The next window of the list already shown. */
+    async moreNeighbours(): Promise<void> {
+        const cur = this.neighbours();
+        if (!cur || cur.loading || !cur.hasMore) return;
+        this.neighbours.set({ ...cur, loading: true });
+        await this.readNeighbourWindow(cur.of, cur.rows.length);
+    }
+
+    private async readNeighbourWindow(value: string, offset: number): Promise<void> {
         const h = this.header();
         if (!h) return;
-        this.neighbours.set({ of: value, rows: [], truncated: false, loading: true, error: '' });
         // DR-D2: on a masked Space this read speaks the Space's alias, the Working Set this Investigation's own - the
         // Working Set's `exploreAliases` pairs them. Send the Space's alias, show this Investigation's wherever it has one.
         const toExplore = this.workingSet()?.exploreAliases ?? {};
         const back = new Map(Object.entries(toExplore).map(([inv, explore]) => [explore, inv]));
         const sent = toExplore[value] ?? value;
+        const before = this.neighbours()?.rows ?? [];
         try {
             const res = await firstValueFrom(
-                this.inv.neighbors({
+                this.inv.neighbourList({
                     dataset: h.dataset,
                     sourceCol: h.sourceCol,
                     targetCol: h.targetCol,
                     linkKindCol: h.linkKindCol ?? undefined,
                     value: sent,
+                    offset,
                 }),
             );
             if (this.neighbours()?.of !== value) return; // another entity was picked meanwhile
             this.neighbours.set({
                 of: value,
-                rows: rankNeighbours(res.rows, sent).map((n) => ({ ...n, id: back.get(n.id) ?? n.id })),
-                truncated: res.truncated,
+                rows: [...before, ...res.neighbours.map((n) => ({ ...n, id: back.get(n.id) ?? n.id }))],
+                total: res.total || this.neighbours()?.total || 0,
+                hasMore: res.hasMore,
                 loading: false,
                 error: '',
             });
@@ -456,8 +473,9 @@ export class InvestigationSessionStore {
             if (this.neighbours()?.of !== value) return;
             this.neighbours.set({
                 of: value,
-                rows: [],
-                truncated: false,
+                rows: before,
+                total: this.neighbours()?.total ?? 0,
+                hasMore: false,
                 loading: false,
                 error: investigationErrorMessage(err, 'The neighbours could not be read.'),
             });

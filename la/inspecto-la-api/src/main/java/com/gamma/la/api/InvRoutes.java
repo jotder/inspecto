@@ -584,7 +584,74 @@ public final class InvRoutes implements RouteModule {
     private Object neighbors(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         String value = ApiContext.str(body, "value");
         if (value == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'value'");
+        if (Boolean.TRUE.equals(body.get("list"))) return neighbourList(api, ex, body, value);
         return project(api, ex, body, value);
+    }
+
+    /** LA-EXPAND-PICK-NEIGHBOURS-1: neighbours per page in the {@code list} form of the neighbours read (default / ceiling). */
+    private static final int NEIGHBOUR_PAGE_DEFAULT = 50;
+    private static final int NEIGHBOUR_PAGE_MAX = 200;
+
+    /**
+     * The {@code list} form of {@code POST /inv/projection/neighbors}: ONE entity's neighbours folded per neighbour (events,
+     * link kinds), strongest first, with the REAL total of distinct neighbours and a window ({@code offset}, {@code limit}).
+     * It is a read-only hint for choosing what an expand reads, so it is never held by the four-eyes FAN-OUT threshold (the
+     * row-budget bound still applies to the page size): a hub's list must be readable, only the expand is held. Ids leave as
+     * aliases when the Space masks them; the flat read is used (the index serves no listing).
+     */
+    private Object neighbourList(ApiContext api, HttpExchange ex, Map<String, Object> body, String value) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
+        String datasetId = ApiContext.str(body, "dataset");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        String sourceCol = ident(body, "sourceCol", true);
+        String targetCol = ident(body, "targetCol", true);
+        String kindCol = ident(body, "linkKindCol", false);
+        int limit = body.get("limit") instanceof Number n
+                ? Math.max(1, Math.min(NEIGHBOUR_PAGE_MAX, n.intValue())) : NEIGHBOUR_PAGE_DEFAULT;
+        int offset = body.get("offset") instanceof Number n ? Math.max(0, n.intValue()) : 0;
+        String relationSql = relationFor(api, ex, writeRoot, datasetId);
+        ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+        String of = mask.in(value);
+        DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), datasetId, relationSql);
+        refuseIfSensitive(writeRoot, "a neighbour list (limit " + limit + ")", limit, 0);
+        String edges = edgeSql(datasetId, sourceCol, targetCol, kindCol, List.of(),
+                " AND (CAST(" + q(sourceCol) + " AS VARCHAR) = ? OR CAST(" + q(targetCol) + " AS VARCHAR) = ?)", filter);
+        String kinds = kindCol != null ? ", STRING_AGG(DISTINCT kind, ',' ORDER BY kind) AS kinds" : "";
+        String sql = "SELECT other, SUM(cnt) AS cnt" + kinds + ", COUNT(*) OVER () AS total FROM ("
+                + "SELECT CASE WHEN source = ? THEN target ELSE source END AS other" + (kindCol != null ? ", kind" : "")
+                + ", cnt FROM (" + edges.replaceFirst(" ORDER BY cnt DESC, source, target$", "") + ") e WHERE NOT (source = ? AND target = ?)"
+                + ") GROUP BY other ORDER BY cnt DESC, other";
+        // Bind order is text order: the CASE, the edge read's neighbour pair, its filter, then the self-link exclusion.
+        List<String> binds = new ArrayList<>(List.of(of, of, of));
+        binds.addAll(filter.binds());
+        binds.addAll(List.of(of, of));
+        try {
+            DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
+                    datasetId, relationSql, sql, limit, offset, List.of(), List.of(), binds));
+            List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
+            long total = 0;
+            for (Map<String, Object> row : r.rows()) {
+                Map<String, Object> o = new LinkedHashMap<>();
+                o.put("id", mask.active() ? mask.out(row.get("other")) : row.get("other"));
+                o.put("count", row.get("cnt"));
+                Object k = row.get("kinds");
+                o.put("kinds", k == null ? List.of() : List.of(String.valueOf(k).split(",")));
+                rows.add(o);
+                if (row.get("total") instanceof Number t) total = t.longValue();
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("masking", mask.describe());
+            out.put("neighbours", rows);
+            // A page past the end has no row to carry the total: say 0 rather than guess (the caller keeps its first page's).
+            out.put("total", total);
+            out.put("offset", offset);
+            out.put("limit", limit);
+            out.put("hasMore", r.truncated());
+            audit(ex, datasetId, of, rows.size(), r.truncated(), null);
+            return out;
+        } catch (SQLException e) {
+            throw DatasetReadFault.of("neighbour list failed", datasetId, writeRoot, e);
+        }
     }
 
     /** LA-08 bound on the query count: one DuckDB query per mapping. */

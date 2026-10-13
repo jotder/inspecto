@@ -864,18 +864,18 @@ describe('InvestigationSessionStore - walk-through 6', () => {
 });
 
 describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
-    const rowsFor = (rows: { source: string; target: string; count: number }[]) =>
-        of({ rows: rows.map((r) => ({ ...r, kind: 'call' })), truncated: false });
+    const page = (neighbours: { id: string; count: number }[], total = neighbours.length, hasMore = false) =>
+        of({ neighbours: neighbours.map((n) => ({ ...n, kinds: ['call'] })), total, offset: 0, limit: 50, hasMore });
 
     it('reads the selected entity once, ranks its neighbours and ignores a read for another selection', async () => {
         const { store, inv } = setup();
         const neighbors = vi.fn();
-        (inv as unknown as { neighbors: unknown }).neighbors = neighbors;
+        (inv as unknown as { neighbourList: unknown }).neighbourList = neighbors;
         await store.start(P, 'warrant 7', 'Burners');
         neighbors.mockReturnValueOnce(
-            rowsFor([
-                { source: 'a', target: 'b', count: 1 },
-                { source: 'c', target: 'a', count: 7 },
+            page([
+                { id: 'c', count: 7 },
+                { id: 'b', count: 1 },
             ]),
         );
         await store.loadNeighbours('a');
@@ -885,8 +885,9 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
             targetCol: 'B',
             linkKindCol: undefined,
             value: 'a',
+            offset: 0,
         });
-        expect(store.neighbours()).toMatchObject({ of: 'a', loading: false, error: '', truncated: false });
+        expect(store.neighbours()).toMatchObject({ of: 'a', loading: false, error: '', total: 2, hasMore: false });
         expect(store.neighbours()?.rows.map((r) => r.id)).toEqual(['c', 'b']);
         store.clearNeighbours();
         expect(store.neighbours()).toBeNull();
@@ -895,7 +896,7 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
     it('on a masked Space sends the Space alias and shows this Investigation alias where the Working Set has one', async () => {
         const { store, inv, logs, sets } = setup();
         const neighbors = vi.fn();
-        (inv as unknown as { neighbors: unknown }).neighbors = neighbors;
+        (inv as unknown as { neighbourList: unknown }).neighbourList = neighbors;
         await store.start(P, 'warrant 7', 'Burners');
         inv.appendInvestigationOp.mockImplementation(() => {
             logs['inv-1'].entries.push(entry(1, { op: 'seed' }));
@@ -904,9 +905,9 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         });
         await store.apply({ op: 'seed', ids: ['masked:inv-a'] });
         neighbors.mockReturnValueOnce(
-            rowsFor([
-                { source: 'masked:sp-a', target: 'masked:sp-b', count: 4 },
-                { source: 'masked:sp-z', target: 'masked:sp-a', count: 2 },
+            page([
+                { id: 'masked:sp-b', count: 4 },
+                { id: 'masked:sp-z', count: 2 },
             ]),
         );
         await store.loadNeighbours('masked:inv-a');
@@ -915,9 +916,24 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         expect(store.neighbours()?.rows.map((r) => r.id)).toEqual(['masked:inv-b', 'masked:sp-z']);
     });
 
+    it('shows the real total, and Show more reads the next window and appends it', async () => {
+        const { store, inv } = setup();
+        const neighbors = vi.fn();
+        (inv as unknown as { neighbourList: unknown }).neighbourList = neighbors;
+        await store.start(P, 'warrant 7', 'Burners');
+        neighbors.mockReturnValueOnce(page([{ id: 'b', count: 3 }], 3, true));
+        await store.loadNeighbours('a');
+        expect(store.neighbours()).toMatchObject({ total: 3, hasMore: true });
+        neighbors.mockReturnValueOnce(page([{ id: 'c', count: 2 }, { id: 'd', count: 1 }], 3, false));
+        await store.moreNeighbours();
+        expect(neighbors).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1 }));
+        expect(store.neighbours()?.rows.map((r) => r.id)).toEqual(['b', 'c', 'd']);
+        expect(store.neighbours()).toMatchObject({ total: 3, hasMore: false });
+    });
+
     it('states a failed read in words and keeps nothing', async () => {
         const { store, inv } = setup();
-        (inv as unknown as { neighbors: unknown }).neighbors = vi.fn(() =>
+        (inv as unknown as { neighbourList: unknown }).neighbourList = vi.fn(() =>
             throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'too many contacts' } } })),
         );
         await store.start(P, 'warrant 7', 'Burners');

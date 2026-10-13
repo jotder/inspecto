@@ -1001,13 +1001,16 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         });
     it('lists the neighbours of the selected entity strongest first, and Add selected sends ONE restricted expand', async () => {
         const { fixture, store, el, inv } = create();
-        (inv as unknown as { neighbors: unknown }).neighbors = vi.fn(() =>
+        (inv as unknown as { neighbourList: unknown }).neighbourList = vi.fn(() =>
             of({
-                rows: [
-                    { source: 'a', target: 'b', kind: 'call', count: 3 },
-                    { source: 'c', target: 'a', kind: 'call', count: 9 },
+                neighbours: [
+                    { id: 'c', count: 9, kinds: ['call'] },
+                    { id: 'b', count: 3, kinds: ['call'] },
                 ],
-                truncated: false,
+                total: 2,
+                offset: 0,
+                limit: 50,
+                hasMore: false,
             }),
         );
         await openInv(store);

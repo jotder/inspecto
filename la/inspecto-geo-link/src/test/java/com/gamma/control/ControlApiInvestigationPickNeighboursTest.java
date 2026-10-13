@@ -171,4 +171,37 @@ class ControlApiInvestigationPickNeighboursTest {
             assertEquals(0, none.at("/read/rowCount").asInt());
         }
     }
+
+    private static final String LIST = "{\"dataset\":\"p_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\",\"list\":true,";
+
+    @Test
+    void theNeighbourListHasTheRealTotalAWindowAndIsNeverHeldByTheFanOutThreshold(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            // h has 6 distinct neighbours (a + x1..x5); a fan-out threshold of 1 refuses the flat read but never the list
+            Files.writeString(c.root().resolve("link-analysis.toon"), DISABLED + "four_eyes_fan_out_above: 1\n");
+            assertEquals(403, send(c, "POST", "/inv/projection/neighbors",
+                    LIST.replace("\"list\":true,", "") + "\"value\":\"h\"}").statusCode());
+            JsonNode d = data(send(c, "POST", "/inv/projection/neighbors", LIST + "\"value\":\"h\",\"limit\":4}"), 200);
+            assertEquals(6, d.get("total").asInt(), d.toString());
+            assertEquals(4, d.get("neighbours").size());
+            assertTrue(d.get("hasMore").asBoolean());
+            // every link is one row, so ties break by id
+            assertEquals("a", d.at("/neighbours/0/id").asText());
+            assertEquals("x1", d.at("/neighbours/1/id").asText());
+            assertEquals("voice", d.at("/neighbours/0/kinds/0").asText());
+            // the next window, and a window past the end
+            JsonNode next = data(send(c, "POST", "/inv/projection/neighbors", LIST + "\"value\":\"h\",\"limit\":4,\"offset\":4}"), 200);
+            assertEquals(2, next.get("neighbours").size());
+            assertFalse(next.get("hasMore").asBoolean());
+            assertEquals(6, next.get("total").asInt());
+            // a self-link is no neighbour: a has h and b only
+            JsonNode ofA = data(send(c, "POST", "/inv/projection/neighbors", LIST + "\"value\":\"a\"}"), 200);
+            assertEquals(2, ofA.get("total").asInt());
+            assertEquals("b", ofA.at("/neighbours/0/id").asText(), "two rows to b outrank one to h: " + ofA);
+            assertEquals(2, ofA.at("/neighbours/0/count").asInt());
+            // unknown dataset and missing value keep their gates
+            assertEquals(404, send(c, "POST", "/inv/projection/neighbors", LIST.replace("p_ds", "nope") + "\"value\":\"a\"}").statusCode());
+            assertEquals(422, send(c, "POST", "/inv/projection/neighbors", LIST + "\"limit\":3}").statusCode());
+        }
+    }
 }

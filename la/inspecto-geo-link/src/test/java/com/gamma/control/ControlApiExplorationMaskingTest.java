@@ -137,6 +137,11 @@ class ControlApiExplorationMaskingTest {
             }
             assertTrue(seen.stream().allMatch(s -> s.startsWith("masked:")), seen.toString());
 
+            // the windowed neighbour list (LA-EXPAND-PICK-NEIGHBOURS-1) speaks aliases too, and is found through one
+            JsonNode list = ok(c, "POST", PROJECTION + "/neighbors", "{" + BASE + ",\"list\":true,\"value\":\"" + aliasA + "\"}", false);
+            assertEquals(2, list.get("total").asInt());
+            for (JsonNode n : list.get("neighbours")) assertTrue(n.get("id").asText().startsWith("masked:"), n.toString());
+
             JsonNode multi = ok(c, "POST", PROJECTION + "/multi", "{\"nodes\":[{\"dataset\":\"calls_ds\",\"idColumn\":\"caller\","
                     + "\"labelColumn\":\"caller\"}],\"edges\":[{\"dataset\":\"calls_ds\",\"sourceColumn\":\"caller\","
                     + "\"targetColumn\":\"callee\"}]}", false);

@@ -2543,6 +2543,9 @@ public final class InvestigationRoutes implements RouteModule {
         StringBuilder s = new StringBuilder("Expand one hop from ")
                 .append(ids.isEmpty() ? "the current Working Set" : ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies") + " (" + list(ids) + ")")
                 .append(" over ").append(dataset);
+        List<String> only = strings(p.get("only"));   // LA-EXPAND-PICK-NEIGHBOURS-1: a held list longer than the exempt size reads as what it is
+        if (!only.isEmpty()) s.append(", restricted to ").append(only.size()).append(" chosen neighbour").append(only.size() == 1 ? "" : "s")
+                .append(" (").append(list(only)).append(")");
         if (p.get("direction") != null) s.append(", direction ").append(p.get("direction"));
         if (!strings(p.get("linkKinds")).isEmpty()) s.append(", link kinds ").append(list(strings(p.get("linkKinds"))));
         if (p.get("budget") != null) s.append(", reading at most ").append(p.get("budget")).append(" link rows");

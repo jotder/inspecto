@@ -504,18 +504,15 @@
                                     <p class="text-secondary m-0 text-xs">No neighbours found for this entity.</p>
                                 } @else {
                                     <p class="text-secondary m-0 text-xs">
-                                        {{ list.rows.length }} neighbour{{ list.rows.length === 1 ? '' : 's' }}, strongest
-                                        first. This is one read of the whole Dataset (no time window); the step you add
-                                        reads only the neighbours you choose.
-                                        @if (list.truncated) {
-                                            <strong>The list is cut at the row limit, so it may be incomplete.</strong>
-                                        }
+                                        {{ list.total }} neighbour{{ list.total === 1 ? '' : 's' }}, strongest first
+                                        (the whole Dataset, no time window). Reading this list is never held for approval;
+                                        the step you add reads only the neighbours you choose.
                                     </p>
                                     <ul
                                         class="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-auto p-0 text-xs"
                                         data-testid="neighbour-list"
                                     >
-                                        @for (nb of list.rows.slice(0, neighbourRows); track nb.id) {
+                                        @for (nb of list.rows; track nb.id) {
                                             <li>
                                                 <label class="flex items-center gap-2">
                                                     <input
@@ -534,10 +531,16 @@
                                             </li>
                                         }
                                     </ul>
-                                    @if (list.rows.length > neighbourRows) {
-                                        <p class="text-secondary m-0 text-xs">
-                                            Showing the first {{ neighbourRows }} of {{ list.rows.length }}.
-                                        </p>
+                                    @if (list.hasMore) {
+                                        <button
+                                            mat-button
+                                            type="button"
+                                            data-testid="neighbours-more"
+                                            [disabled]="store.busy() || list.loading"
+                                            (click)="store.moreNeighbours()"
+                                        >
+                                            Show more ({{ list.rows.length }} of {{ list.total }})
+                                        </button>
                                     }
                                     <div class="flex flex-wrap gap-1">
                                         <button

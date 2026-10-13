@@ -534,8 +534,6 @@ export class LinkAnalysisInvestigationComponent {
         const list = this.store.neighbours();
         return list && list.of === this.selectedInSet()[0] ? list : null;
     });
-    /** Rows drawn at most: a busy number has thousands, and "Add the strongest" needs no scrolling. */
-    readonly neighbourRows = 200;
     readonly strongestCount = STRONGEST_NEIGHBOURS;
 
     toggleNeighbours(): void {

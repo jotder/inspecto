@@ -70,6 +70,25 @@ export interface NeighborsRequest extends ProjectionRequest {
     value: string;
 }
 
+/** {@code POST /inv/projection/neighbors} with {@code list: true}: one page of an entity's neighbours (LA-EXPAND-PICK-NEIGHBOURS-1). */
+export interface NeighbourListRequest extends NeighborsRequest {
+    /** Neighbours to skip (default 0). */
+    offset?: number;
+    /** Page size (server default 50, ceiling 200). */
+    limit?: number;
+}
+
+export interface NeighbourListResult {
+    /** Strongest first (events across every link kind), ties by id; ids are aliases when the Space masks them. */
+    neighbours: { id: string; count: number; kinds: string[] }[];
+    /** The entity's REAL number of distinct neighbours (0 on a page past the end). */
+    total: number;
+    offset: number;
+    limit: number;
+    hasMore: boolean;
+    masking?: MaskingNote;
+}
+
 export interface MultiProjectionRequest {
     nodes?: MultiNodeMapping[];
     edges?: MultiEdgeMapping[];
@@ -1525,6 +1544,11 @@ export class InvService {
     /** Phase E incremental expand: the one-hop neighborhood of `req.value` within the mapping. */
     neighbors(req: NeighborsRequest): Observable<ProjectionResult> {
         return this.noted(this.http.post<ProjectionResult>(apiUrl('/inv/projection/neighbors'), req));
+    }
+
+    /** LA-EXPAND-PICK-NEIGHBOURS-1: a window of the entity's neighbours with the real total; never held by the fan-out threshold. */
+    neighbourList(req: NeighbourListRequest): Observable<NeighbourListResult> {
+        return this.noted(this.http.post<NeighbourListResult>(apiUrl('/inv/projection/neighbors'), { ...req, list: true }));
     }
 
     /** LA-08: node + edge mappings over several Datasets in one call. One unviewable Dataset ⇒ the whole call 404s. */

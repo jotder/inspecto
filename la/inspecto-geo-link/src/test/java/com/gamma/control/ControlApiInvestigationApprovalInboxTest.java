@@ -184,6 +184,22 @@ class ControlApiInvestigationApprovalInboxTest {
     }
 
     @Test
+    void aHeldListOfChosenNeighboursNamesTheRestrictionInTheSummary(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(c, "POST", "/inv/investigations", "{\"id\":\"case-o\",\"title\":\"Case o\",\"purpose\":\"Fraud referral FR-7\","
+                    + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}", OWNER);
+            data(c, "POST", "/inv/investigations/case-o/ops", seedA(), OWNER);
+            StringBuilder many = new StringBuilder();
+            for (int i = 0; i < 51; i++) many.append(i == 0 ? "" : ",").append("\"n").append(i).append('"');
+            JsonNode pending = data(c, "POST", "/inv/investigations/case-o/ops",
+                    "{\"op\":\"expand\",\"budget\":500,\"only\":[" + many + "]}", OWNER);
+            assertEquals("pending", pending.get("status").asText(), pending.toString());
+            String summary = data(c, "GET", "/inv/pending", null, LEAD).at("/items/0/summary").asText();
+            assertTrue(summary.contains("restricted to 51 chosen neighbours"), summary);
+        }
+    }
+
+    @Test
     void aMembershipRecordLimitsTheInboxToLeadsAndReviewers(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             held(c, "case-a", seedA());
