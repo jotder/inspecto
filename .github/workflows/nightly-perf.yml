@@ -50,3 +50,37 @@ jobs:
         with:
           name: nightly-perf
           path: platform/inspecto-engine/target/surefire-reports/*PluginIngestBenchmark*
+
+  # Mixed ingest + dashboard load floor (ASSURE-OPERABILITY-1, 2026-10-14). MixedLoadBenchmark: the same
+  # 1M-row streaming ingest while 4 threads loop POST /api/v1/bi/query on a real ControlApi. Measured locally
+  # 2026-10-14 (3 runs, 12-core Windows dev host, JDK 27): ingest under reader load 243,624 / 263,119 /
+  # 253,346 rows/s (77-83% of solo); reader p95 during ingest 639 / 528 / 633 ms; 0 errors.
+  # Floor 30,000 rows/s (~8x under the slowest run) and p95 ceiling 5,000 ms (~8x over the slowest): the shared
+  # 4-vCPU runner runs ingest and four CPU-bound readers on the same cores. Both negatives were checked
+  # (floor 1e9 and ceiling 1 ms each fail). Tighten only from runner numbers (printed in the log).
+  mixed-load-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 27
+        uses: actions/setup-java@v4
+        with:
+          distribution: oracle
+          java-version: '27'
+          cache: maven
+
+      - name: MixedLoadBenchmark at 1M rows, 4 readers, floor 30,000 rows/s, p95 ceiling 5,000 ms
+        run: >-
+          mvn --batch-mode --no-transfer-progress -pl :inspecto-processor -am test -Pedition-enterprise
+          -Dtest=MixedLoadBenchmark -Dsurefire.failIfNoSpecifiedTests=false
+          -Dbench.run=true -Dbench.rows=1000000 -Dbench.readers=4
+          -Dbench.mixedFloorRowsPerSec=30000 -Dbench.readerP95CeilingMs=5000
+
+      - name: Upload benchmark output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-mixed-load
+          path: inspecto/target/surefire-reports/*MixedLoadBenchmark*
