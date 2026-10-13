@@ -298,6 +298,26 @@ test('race: a created Investigation that never becomes readable fails loudly ins
   assert.equal(r.done.filter((d) => d.startsWith('op-')).length, 0);
 });
 
+test('race: a spurious 409 with nothing listed re-sends the create until it is a real create', async () => {
+  let posts = 0; let made = false; const calls = [];
+  const fetchFn = async (url, init = {}) => {
+    const u = url.replace('http://h/api/v1', ''); const method = init.method || 'GET';
+    calls.push({ method, u });
+    if (u === '/auth/exchange') return res(200, { accessToken: 't' });
+    if (u.startsWith('/spaces/s/inv/investigations?')) return res(200, { items: made ? [{ id: INV, headStep: 0 }] : [] });
+    if (u === '/spaces/s/inv/investigations' && method === 'POST') { posts++; if (posts < 3) return res(409); made = true; return res(200); }
+    if (u === '/spaces/s/objects?limit=200') return res(200, { items: [] });
+    if (u === '/spaces/s/cases/from-entities') return res(200, { case: { id: 'CASE-3' } });
+    if (u === '/spaces/s/inv/entity-identities' && method === 'GET') return res(200, { items: [] });
+    return res(200);
+  };
+  const r = await run({ fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
+  assert.deepEqual(r.failed, []);
+  assert.ok(posts >= 3, 'the create was re-sent');
+  const firstOp = calls.findIndex((c) => c.u.endsWith('/ops'));
+  assert.ok(firstOp > calls.findIndex((c) => c.method === 'POST' && c.u === '/spaces/s/inv/investigations' ) && made, 'no op before the Investigation exists');
+});
+
 test('race: the list route failing at first (Space still loading) is retried, not fatal', async () => {
   let n = 0; const m = mock();
   const f = (url, init) => (url.includes('/inv/investigations?') && n++ < 2 ? Promise.resolve(res(503)) : m.fetchFn(url, init));

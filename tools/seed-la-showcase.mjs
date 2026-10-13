@@ -118,11 +118,14 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const listed = await sleepRetry(() => call('fm.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
   if (listed.status !== 200) throw new Error(`cannot list Investigations as fm.analyst (${listed.status}): is the Space '${space}' created from the la-showcase template?`);
   // There is NO by-id GET for an Investigation (only the list and the /log, /ops, ... sub-routes), so "readable" = the LIST shows the id.
-  const readable = async () => {
+  // A create answered 409 "already exists" can be spurious for a few seconds after /health (live-proven 2026-10-13: nothing on disk, nothing
+  // listed, a later create returned 200), so while the id is not listed the create is RE-SENT every third try; a 2xx there is a real create.
+  const readable = async (redo) => {
     for (let i = 0; i < readyTries; i++) {
       let r; try { r = await call('fm.analyst', 'GET', '/inv/investigations?limit=200'); } catch (e) { r = { status: 0, data: String(e.message || e) }; }
       const item = r.status === 200 ? (r.data.items || []).find((x) => x.id === INV) : null;
       if (item) return { status: 200, data: item };
+      if (redo && i % 3 === 2) { try { const c = await redo(); if (c.status < 300) { r = await call('fm.analyst', 'GET', '/inv/investigations?limit=200'); const it = r.status === 200 ? (r.data.items || []).find((x) => x.id === INV) : null; if (it) return { status: 200, data: it }; } } catch { /* keep polling */ } }
       await sleep(1000);
     }
     return { status: 404, data: {} };
@@ -158,7 +161,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
       r = await call(s.as, s.method, p, body);
     }
     if (s.id === 'investigation' && (r.status < 300 || r.status === 409)) {
-      const rd = await readable();   // created or "already there": either way it must be READABLE before any op is sent
+      const rd = await readable(r.status === 409 ? () => call(s.as, s.method, p, body) : undefined);   // created or "already there": either way it must be READABLE before any op is sent
       if (rd.status !== 200) { out.failed.push(`investigation: ${r.status === 409 ? 'exists (409)' : 'created'} but not listed (HTTP ${rd.status}) after ${readyTries} tries`); log(`  ${s.id}: not listed`); break; }
       if (r.status === 409) { adopt(rd.data); if (!out.skipped.includes(s.id)) out.skipped.push(s.id); log(`  ${s.id}: 409, now readable (head step ${headStep})`); continue; }
     }
