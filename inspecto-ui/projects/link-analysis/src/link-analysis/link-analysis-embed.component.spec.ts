@@ -166,7 +166,7 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
         const d = await openDialog(c);
         expect(d.textContent).toContain('read-only, sealed view');
         expect(d.textContent).toContain('typed');
-        expect(d.textContent).toContain('cannot be framed on other sites');
+        expect(d.textContent).toContain('only if this Space lists that site');
         const ttl = d.querySelector('#embed-ttl') as HTMLInputElement;
         expect(ttl.value).toBe('24');
         const create$ = () => button(d, 'Create link')!;

@@ -3,6 +3,7 @@ import { HttpBackend, HttpErrorResponse, HttpRequest, HttpResponse, provideHttpC
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { provideAppEnvironment } from '@inspecto/core/api/app-environment';
 import { EMBED_SCRUBBED_PATH, EmbedViewPageComponent } from './embed-view.page';
 import { EmbedView, EmbedViewService } from './embed-view.service';
@@ -47,6 +48,7 @@ describe('embed view page', () => {
         expect(el.querySelectorAll('svg line').length).toBe(1);
         expect(el.querySelector('a, form, textarea, select'), 'no link out and no write control').toBeNull();
         expect(el.querySelectorAll('tbody tr').length).toBe(3);
+        await expectNoA11yViolations(el);
     });
 
     it('takes the token out of the address bar once it has been read, and keeps it out of the page', async () => {

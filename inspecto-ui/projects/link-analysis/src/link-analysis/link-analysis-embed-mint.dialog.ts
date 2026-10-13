@@ -76,8 +76,8 @@ export function embedAbsoluteLink(token: string): string {
             <p class="m-0">
                 The link shows a <strong>read-only, sealed view</strong>; ids are masked at least as this Space masks them
                 (<strong>{{ data.maskingMode }}</strong
-                >). Anyone with the link can read it until it expires or you revoke it; it cannot be framed on other
-                sites.
+                >). Anyone with the link can read it until it expires or you revoke it; it can be shown inside another site only
+                if this Space lists that site.
             </p>
             @if (error()) {
                 <inspecto-alert variant="error" title="Share">{{ error() }}</inspecto-alert>

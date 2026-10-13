@@ -54,7 +54,9 @@ export const appConfig: ApplicationConfig = {
         },
         // `GET /bootstrap` once, before routing: the auth mode, the module flags (`LA_FEATURES` reads them) and, under
         // OIDC, a session resumed from the refresh cookie. Never rejects.
-        provideAppInitializer(() => inject(SessionService).init()),
+        // The shared-Investigation viewer (`/embed/...`) is anonymous and talks to nothing but its one public read, so it skips the
+        // bootstrap, the session refresh and the Space bootstrap: a stranger's browser makes no session call at all (LA-EMBED-SPA-1).
+        provideAppInitializer(() => (location.pathname.startsWith('/embed/') ? undefined : inject(SessionService).init())),
         ...provideLaAppHostServices(),
         provideIcons(),
         provideGamma({

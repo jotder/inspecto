@@ -23,6 +23,7 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
     selector: 'la-app-embed-view-page',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
+    host: { class: 'block' },
     template: `
         <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4" aria-live="polite">
             @switch (state()) {
@@ -60,9 +61,9 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                         <section aria-labelledby="embed-graph" class="flex flex-col gap-2">
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 id="embed-graph" class="m-0 mr-auto text-lg font-semibold">Graph</h2>
-                                <button type="button" (click)="zoomBy(1.4)" aria-label="Zoom in">+</button>
-                                <button type="button" (click)="zoomBy(1 / 1.4)" aria-label="Zoom out">-</button>
-                                <button type="button" (click)="resetView()">Reset view</button>
+                                <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="zoomBy(1.4)" aria-label="Zoom in">+</button>
+                                <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="zoomBy(1 / 1.4)" aria-label="Zoom out">-</button>
+                                <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="resetView()">Reset view</button>
                             </div>
                             @if (graph(); as g) {
                                 <div
@@ -104,9 +105,9 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                             @if (showLabel(g, n.id)) {
                                                 <text
                                                     [attr.x]="n.x"
-                                                    [attr.y]="n.y - nodeR() * 1.8"
+                                                    [attr.y]="n.y - nodeR() * 1.6"
                                                     text-anchor="middle"
-                                                    [attr.font-size]="nodeR() * 2.2"
+                                                    [attr.font-size]="labelSize()"
                                                     fill="currentColor"
                                                 >{{ n.id }}</text>
                                             }
@@ -163,6 +164,8 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                             <td>
                                                 <button
                                                     type="button"
+                                                    class="rounded border px-2 py-1"
+                                                    style="border-color: var(--gamma-border)"
                                                     (click)="select(e.entityId)"
                                                     [attr.aria-pressed]="e.entityId === selected()"
                                                     [attr.aria-label]="'Highlight ' + e.entityId + ' on the graph'"
@@ -176,9 +179,9 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                             </table>
                             @if (pageCount() > 1) {
                                 <div class="flex items-center gap-2 text-sm">
-                                    <button type="button" [disabled]="page() === 0" (click)="goto(page() - 1)">Previous</button>
+                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" [disabled]="page() === 0" (click)="goto(page() - 1)">Previous</button>
                                     <span>Page {{ page() + 1 }} of {{ pageCount() }}</span>
-                                    <button type="button" [disabled]="page() >= pageCount() - 1" (click)="goto(page() + 1)">Next</button>
+                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" [disabled]="page() >= pageCount() - 1" (click)="goto(page() + 1)">Next</button>
                                 </div>
                             }
                         </section>
@@ -242,7 +245,8 @@ export class EmbedViewPageComponent {
     });
     protected readonly truncated = computed(() => (this.laidOut()?.edges.length ?? 0) > EDGE_LIMIT);
     protected readonly rings = computed(() => new Set(this.graph()?.nodes.map((n) => n.hop)).size);
-    protected readonly nodeR = computed(() => Math.max(3, (this.graph()?.extent ?? 200) / 90));
+    protected readonly nodeR = computed(() => Math.max(3, (this.graph()?.extent ?? 200) / 70));
+    protected readonly labelSize = computed(() => (this.graph()?.extent ?? 200) / 22);
 
     // view state: zoom and pan in drawing units, the selected entity, the table filter and page
     protected readonly zoom = signal(1);
