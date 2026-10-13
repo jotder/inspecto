@@ -296,3 +296,29 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
    expand (`maxFanOut` 5) so none is pending after seeding. The scene S8 therefore creates the request live.
 4. **Smoke wording:** the task brief expects "N/N pass"; the runner prints `N/N probes passed`.
 5. **Alert -> Open Investigation** is described by the plan and manual as part of the product but is rendered by the gamma host SPA only, not the la-app.
+
+## 6. Rehearsal record: fresh full bake, 2026-10-13
+
+Bundle: `package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` WITH the built-in bake, built from `origin/master` (`79212c613` plus later docs); served with `serve-demo.bat PORT=8107` and `-Dla.embed.enabled=true`; driven in the built-in browser as the Demo Users. Scripted smoke: `15/16` plain and `29/30` with `--telecom --embed`; the single FAIL is the `la-showcase-off` probe, because a baked bundle ships no `la-showcase-off` Space (expected, see §0 step 2).
+
+| # | Beat | Result | Evidence |
+|---|---|---|---|
+| 1 | Bake path | PASS | Bake booted, seeded, rebased 357 files; the old spurious 409 now logs "investigation: 409, now readable (head step 0)" and carries on |
+| 2 | Sign in as `fm.analyst` (full reload returns to the deep link) | PASS | picker lists 5 Demo Users; Link Analysis menu present |
+| 3 | Start an Investigation from *Explore a Dataset* | FAIL then PASS | first press refused (422, DATE time column prefilled); typing `BOOKED_AT` works. Filed P2 `LA-EXPLORE-TIMECOL-DATE-1` |
+| 4 | Seed ONE entity, **Expand one hop** | PASS | Working Set 1 -> 7 entities, 6 links |
+| 5 | Unexpanded marker | PASS | 6 dotted nodes, legend "Dotted outline: not expanded yet", count in the legend |
+| 6 | **Choose neighbours** | PASS | 2 neighbours listed; *Add the 10 strongest* -> step "restricted to 2 chosen neighbours", 7 -> 8 entities |
+| 7 | Direction | PASS | set Outgoing; step text "direction out" |
+| 8 | Hide / show a link kind | PASS | legend chip `crypto` on `mule-hub-case`: 7 -> 6 -> 7 links drawn |
+| 9 | Several seeds + **Connect seeds** | PASS | 5 pasted ids: "6 of 10 pairs connected within 3 hops; 4 not connected", the unknown id named under "No links found for" |
+| 10 | **Expand from these nodes (4)** | PASS | one sealed step, 25 -> 26 entities, not held for four-eyes |
+| 11 | Undo, then reopen | PASS | "Undid step 7", 26 -> 25; reopening keeps the log |
+| 12 | Dossier build and verify | PASS | "Verified", "Log intact"; tampered manifest is the smoke probe (PASS) |
+| 13 | Detection / Alert path | PASS | Alert `mule-pass-through` (13 breaching, aggregate only, no ids); *Open Investigation* lands on `mule-hub-case`. The Alerts page IS in the la-app now (S12's claim is out of date) |
+| 14 | Masked persona view | PASS | `fm.analyst` sees `masked:<hex>` everywhere; `ra.analyst` read-only 403 and non-member 404 are smoke probes. Admin Reveal not re-driven this pass |
+| 15 | Four-eyes (S8) | PASS | the bake leaves a pending request `p1`; `fm.analyst` approve is 403, `fm.manager` approve is 200 and runs the expand |
+| 16 | *Investigate a number* `99979100001` | PASS with a note | two degrees in seconds, but 895 nodes / 2,901 links (hairball); filed P3 `LA-INVESTIGATE-NUMBER-HAIRBALL-1` |
+
+Not rehearsed this pass: Drafts cycle, Compare and seal, Settings editing, embed curl transcript (S14), Postgres/Personal variants.
+
