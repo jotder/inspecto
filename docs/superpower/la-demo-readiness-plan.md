@@ -163,7 +163,7 @@ showcase corpus is smaller than the `demo` Space's: step 1's figures (170 nodes,
 Trigger signal is `pipeline.commit` for file ingest (also fixed in `ingestion.md` and the frontend concept); 82 routes
 (69 + 6); Identity reads are capability-gated and `/import` has no UI; Graph Run and Index capabilities gate only the
 starting POST (cancel is owner-or-admin); gate order gains the idempotency step and the linked-Case READ path; rate
-limit numbers (capacity 20, refill 1 per 3 s); Standard is a Professional alias; the Postgres store needs
+limit numbers (capacity 30, refill 1 per 2 s since 2026-10-14); Standard is a Professional alias; the Postgres store needs
 `-Dinvestigations.backend=db`; Drafts heavy-op permits are `max(1, min(4, cores/3))`; cost class is a hint and the node
 ceiling is the inline-versus-job threshold; `REJECTED` is HTTP 503; defaults are Space settings; the filesystem path is
 `audit/snapshots/investigations/<id>/`; "engine names no la-* class" is grep-true but unguarded.

@@ -222,7 +222,7 @@ Confidence: PROVEN to 10^8 on a synthetic corpus; 10^9 is NOT YET.
 It is refused or limited out loud, never silently trimmed. A Graph Run has a size and time budget (shipped default
 50,000 nodes, 500,000 edges, 30 seconds; Space ceiling 500,000 nodes, 5,000,000 edges, 300 seconds) and ends
 `BUDGET_EXCEEDED` with no result when exceeded. The Run pool is 2 running plus 16 waiting; the next request beyond
-that is refused with 503. Expensive exploration calls share a per-person bucket of 20, refilling one per 3
+that is refused with 503. Expensive exploration calls share a per-person bucket of 30, refilling one per 2
 seconds (429). Large expansions go to four-eyes.
 Evidence: backend §5 (Budgets, Pool), §6.1 step 2, §9; `ControlApiGraphRunTest
 .aBudgetExceededRunIs200WithTheNumbersAndNeverAResultKey`; `LinkAnalysisRateClassCoverageTest`.
