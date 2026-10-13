@@ -43,21 +43,23 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
         for (var pv : service.pipelines()) {
             Optional<PipelineConfig> cfg = service.configFor(pv.name());
             if (cfg.isEmpty() || cfg.get().dirs().batchesFilePath() == null || cfg.get().dirs().lineageFilePath() == null) continue;
-            Path batches = Path.of(cfg.get().dirs().batchesFilePath()), lineage = Path.of(cfg.get().dirs().lineageFilePath());
-            if (!Files.exists(batches) || !Files.exists(lineage)) continue;
-            Set<String> mine = new HashSet<>();
-            boolean owns = ownsOrigin(cfg.get(), origins);
-            for (Map<String, String> b : read(batches)) {
-                String table = b.get("output_table");
-                if (stores.contains(table) || (owns && (table == null || table.isBlank()) && "SUCCESS".equalsIgnoreCase(b.get("status"))))
-                    mine.add(b.get("consignment_id"));
-            }
-            if (mine.isEmpty()) continue;
-            Map<String, Long> days = byCollector.computeIfAbsent(cfg.get().collector().id(), k -> new LinkedHashMap<>());
-            for (Map<String, String> r : read(lineage)) {
-                if (!mine.contains(r.get("consignment_id"))) continue;
-                String day = day(r.get("partition"));
-                if (day != null) days.merge(day, count(r.get("row_count")), Long::sum);
+            Map<String, Long> days = null;
+            // The configured path is for the run that LOADED the config; every earlier run left its own timestamped pair.
+            for (Path[] run : runs(Path.of(cfg.get().dirs().batchesFilePath()), Path.of(cfg.get().dirs().lineageFilePath()))) {
+                Set<String> mine = new HashSet<>();
+                boolean owns = ownsOrigin(cfg.get(), origins);
+                for (Map<String, String> b : read(run[0])) {
+                    String table = b.get("output_table");
+                    if (stores.contains(table) || (owns && (table == null || table.isBlank()) && "SUCCESS".equalsIgnoreCase(b.get("status"))))
+                        mine.add(b.get("consignment_id"));
+                }
+                if (mine.isEmpty()) continue;
+                if (days == null) days = byCollector.computeIfAbsent(cfg.get().collector().id(), k -> new LinkedHashMap<>());
+                for (Map<String, String> r : read(run[1])) {
+                    if (!mine.contains(r.get("consignment_id"))) continue;
+                    String day = day(r.get("partition"));
+                    if (day != null) days.merge(day, count(r.get("row_count")), Long::sum);
+                }
             }
         }
         List<Delivery> out = new ArrayList<>();
@@ -86,6 +88,33 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
         for (String name : new String[]{cfg.identity().pipelineName(), cfg.stream()})
             if (name != null && origins.contains(name.trim().toLowerCase(Locale.ROOT))) return true;
         return false;
+    }
+
+    /**
+     * Every (batches, lineage) pair of one Pipeline: {@code <name>_batches_<runTimestamp>.csv} with the lineage CSV of the
+     * SAME run (consignment ids repeat across runs, so a pair never crosses runs). The configured pair is included when it
+     * exists; a missing sibling skips that run.
+     */
+    static List<Path[]> runs(Path configuredBatches, Path configuredLineage) {
+        List<Path[]> out = new ArrayList<>();
+        Path dir = configuredBatches.toAbsolutePath().getParent();
+        String file = configuredBatches.getFileName().toString();
+        int at = file.lastIndexOf("_batches_");
+        if (dir == null || at < 0 || !Files.isDirectory(dir)) {
+            if (Files.exists(configuredBatches) && Files.exists(configuredLineage)) out.add(new Path[]{configuredBatches, configuredLineage});
+            return out;
+        }
+        String prefix = file.substring(0, at + "_batches_".length());
+        try (var ls = Files.list(dir)) {
+            ls.filter(f -> f.getFileName().toString().startsWith(prefix) && f.getFileName().toString().endsWith(".csv"))
+                    .sorted().forEach(b -> {
+                        Path l = b.resolveSibling(b.getFileName().toString().replaceFirst("_batches_", "_lineage_"));
+                        if (Files.exists(l)) out.add(new Path[]{b, l});
+                    });
+        } catch (Exception ignored) {
+            // best-effort, like read()
+        }
+        return out;
     }
 
     static String day(String partition) {
