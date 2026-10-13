@@ -24,7 +24,7 @@ import java.util.function.Function;
  *
  * <p>Needs {@code -Dinspecto.bench.dir=<dir>} (parquet inputs and indexes go there, outside the repo). Knobs
  * {@code inspecto.bench.*}: {@code idxDir} (index parent, default = dir; used by tools/bench-duckdb.ps1 for a per-label index), {@code edges} (10000000), {@code deltaEdges} (100000 per appended file), {@code maxDeltas} (8),
- * {@code buildMemory} (8GB), {@code samples} (60 keys per series), {@code skipDeltas} (false). Results print as
+ * {@code buildMemory} (8GB), {@code threads} (DuckDB build threads, default all), {@code samples} (60 keys per series), {@code skipDeltas} (false). Results print as
  * {@code SCALE ...} lines. Run: {@code mvn -o -pl :inspecto-la-storage test -Dtest=IndexScaleBench
  * -Dinspecto.bench.dir=<dir> -Dinspecto.bench.edges=10000000 -Dsurefire.failIfNoSpecifiedTests=false}.
  *
@@ -89,7 +89,8 @@ class IndexScaleBench {
     private static IndexBuilder.Result build(Path data, IndexStore store, IndexBuilder.Mode mode, List<String> files, String memory) throws Exception {
         Function<List<String>, String> delta = added -> relation(data, added);
         return IndexBuilder.build(new IndexBuilder.Request(DS, M, relation(data, files), store, "fp-" + files.size(),
-                new IndexBuilder.Options(null, memory, null, null, null), stamps(data, files), mode, delta, List.of(data)));
+                new IndexBuilder.Options(null, memory, System.getProperty("inspecto.bench.threads") == null ? null : Integer.valueOf(System.getProperty("inspecto.bench.threads")), null,
+                        pr -> System.out.printf("SCALE progress %s %d/%d at %tT%n", pr.phase(), pr.step(), pr.steps(), new java.util.Date())), stamps(data, files), mode, delta, List.of(data)));
     }
 
     private static String pct(long[] ns) {
