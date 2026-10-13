@@ -88,4 +88,42 @@ class ControlApiReplayDriftOnFileAppendTest {
             System.clearProperty("assist.write.root");
         }
     }
+
+    /**
+     * LA-DEMO-POLISH-1 item 8: drift is per READ QUERY, not per Dataset. A file whose rows no step's query selects (here: an
+     * entity the Investigation never reached) changes the Dataset but not the rows any sealed read returned, so a re-read
+     * agrees. Pinned so a later change that fingerprints the whole Dataset is a deliberate one.
+     */
+    @Test
+    void aFileWhoseRowsNoSealedReadSelectsIsNotDrift(@TempDir Path cfg, @TempDir Path root, @TempDir Path inbox) throws Exception {
+        Files.writeString(inbox.resolve("DAY1.csv"), "caller,callee,channel\nalice,bob,sms\nalice,carol,call\n");
+        Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
+        System.setProperty("assist.write.root", root.toString());
+        try {
+            CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+            ControlApi api = new ControlApi(svc, 0);
+            api.start();
+            try {
+                String glob = inbox.toAbsolutePath().toString().replace('\\', '/') + "/*.csv";
+                new ViewStore(root.resolve("views")).write(new ViewDefinition("files_view", "flow-x", List.of(),
+                        "SELECT caller, callee, channel FROM read_csv('" + glob + "', header=true)", "2026-09-23T00:00:00Z"));
+                new ComponentStore(root.resolve("registry")).write("dataset", "files_ds", Map.of("view", "files_view"));
+                int port = api.port();
+                post(port, "/inv/investigations", "{\"purpose\":\"item-8\",\"id\":\"drift-b\",\"dataset\":\"files_ds\","
+                        + "\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}");
+                post(port, "/inv/investigations/drift-b/ops", "{\"op\":\"seed\",\"ids\":[\"alice\"]}");
+                post(port, "/inv/investigations/drift-b/ops", "{\"op\":\"expand\"}");
+
+                Files.writeString(inbox.resolve("DAY2.csv"), "caller,callee,channel\nxavier,yara,call\n");
+
+                JsonNode reread = post(port, "/inv/investigations/drift-b/replay", "{\"reread\":true}");
+                assertFalse(reread.get("diverged").asBoolean(), "rows no sealed read selects are not drift: " + reread);
+            } finally {
+                api.close();
+                svc.close();
+            }
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
 }
