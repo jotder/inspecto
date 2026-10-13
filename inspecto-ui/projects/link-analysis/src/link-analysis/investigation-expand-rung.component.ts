@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -9,6 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import type { ExpandRung } from '@inspecto/link-analysis/api/inv.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import type { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
+import { FourEyesLimits, expandApproval } from './investigate-number';
 import { InvestigationWindowFieldsComponent } from './investigation-window-fields.component';
 import {
     EXPAND_DIRECTIONS,
@@ -134,6 +136,18 @@ import {
                 shown in the log and the Dossier.
             </p>
         }
+        @if (approval(); as a) {
+            <p class="text-secondary m-0 text-xs" data-testid="expand-effective">
+                This expand reads at most {{ a.budget.toLocaleString('en') }} rows, fan-out
+                {{ a.fanOut === null ? 'unbounded' : 'capped at ' + a.fanOut.toLocaleString('en') }}.
+            </p>
+            @if (a.exceeded.length) {
+                <p class="text-warn m-0 text-xs" role="status" data-testid="expand-needs-approval">
+                    Will need approval from a second person: {{ a.exceeded.join('; ') }}. Lower it here, or change the
+                    limit in Settings &gt; Link Analysis.
+                </p>
+            }
+        }
         @if (error()) {
             <inspecto-alert variant="error" title="Expand refused">{{ error() }}</inspecto-alert>
         }
@@ -141,6 +155,25 @@ import {
 })
 export class InvestigationExpandRungComponent {
     readonly form = rungForm();
+    /** The profile's preset budget and fan-out cap: they fill whatever the form leaves blank, as the host sends them. */
+    readonly presets = input<DegreePresets>({});
+    /** The Space's four-eyes thresholds; null = not known yet (no estimate is shown). */
+    readonly limits = input<FourEyesLimits | null>(null);
+    private readonly raw = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+    /** What the next expand will read and whether the Space will hold it for a second approver. */
+    readonly approval = computed(() => {
+        const limits = this.limits();
+        if (!limits) return null;
+        const v = this.raw();
+        const pick = (typed: unknown, preset: number | undefined): number | undefined => {
+            const n = typed === null || typed === undefined || String(typed).trim() === '' ? NaN : Number(typed);
+            return Number.isFinite(n) ? n : preset;
+        };
+        return expandApproval(
+            { budget: pick(v.budget, this.presets().budget), maxFanOut: pick(v.maxFanOut, this.presets().maxFanOut) },
+            limits,
+        );
+    });
     readonly open = signal(false);
     readonly error = signal('');
     readonly maxBudget = MAX_EXPAND_BUDGET;

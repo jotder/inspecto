@@ -845,6 +845,12 @@ export class LinkAnalysisComponent implements OnInit {
     readonly canvasData = computed<G6GraphData | null>(() => {
         const g = hideLinkKinds(this.canvasSource(), this.hiddenLinkKinds());
         const hidden = new Set(this.hiddenNodeIds());
+        // LA-UNEXPANDED-MARKER-1 (b): "Only unexpanded" keeps just the frontier (and the picked node, so a pick never vanishes)
+        if (g && this.onlyUnexpanded() && this.investigation.canvas()) {
+            const keep = g.nodes.filter((n) => n.data.unexpanded || n.id === this.investigation.selected()?.id);
+            if (keep.some((n) => n.data.unexpanded))
+                for (const n of g.nodes) if (!keep.includes(n)) hidden.add(n.id);
+        }
         if (!g || !hidden.size) return g;
         return {
             ...g,
@@ -852,6 +858,20 @@ export class LinkAnalysisComponent implements OnInit {
             edges: g.edges.filter((e) => !hidden.has(e.source) && !hidden.has(e.target)),
         };
     });
+    /** The legend's "Only unexpanded" switch: draw just the Working Set's unexpanded frontier. */
+    readonly onlyUnexpanded = signal(false);
+
+    /** "Next unexpanded": pick the next unexpanded Working Set node (by id, wrapping) so Expand one hop acts on it. */
+    selectNextUnexpanded(): void {
+        const frontier = (this.investigation.canvas()?.nodes ?? [])
+            .filter((n) => n.data.unexpanded)
+            .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        if (!frontier.length) return;
+        const at = frontier.findIndex((n) => n.id === this.investigation.selected()?.id);
+        const next = frontier[(at + 1) % frontier.length];
+        this.investigation.selected.set(next);
+        this.focusNode(next.id);
+    }
 
     toggleLinkKind(kind: string): void {
         this.hiddenLinkKinds.update((hidden) => toggleHiddenKind(hidden, kind));

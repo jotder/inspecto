@@ -850,6 +850,9 @@
                             (edgeKindToggle)="toggleLinkKind($event)"
                             [highConnectivity]="hubsDrawn()"
                             [unexpanded]="unexpandedDrawn()"
+                            [onlyUnexpanded]="onlyUnexpanded()"
+                            (onlyUnexpandedChange)="onlyUnexpanded.set($event)"
+                            (nextUnexpanded)="selectNextUnexpanded()"
                             [open]="legendOpen()"
                             (openChange)="legendOpen.set($event)"
                         ></inspecto-link-analysis-legend>

@@ -1081,6 +1081,36 @@ describe('LinkAnalysisComponent', () => {
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
     });
+    it('LA-UNEXPANDED-MARKER-1 (b): Next unexpanded picks each unexpanded node in turn; Only unexpanded draws just the frontier', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-8');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        const ent = (id: string, expanded: boolean) => ({ id, type: 'x', hop: 0, seed: 's', admittedBy: 1, expanded });
+        c.investigation.workingSet.set({
+            entities: [ent('ws-a', true), ent('ws-b', false), ent('ws-c', false)],
+            links: [
+                { source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 },
+                { source: 'ws-a', target: 'ws-c', kind: 'k', count: 1 },
+            ],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        const picked = () => c.investigation.selected()?.data.label;
+        c.selectNextUnexpanded();
+        expect(picked()).toBe('ws-b');
+        c.selectNextUnexpanded();
+        expect(picked()).toBe('ws-c');
+        c.selectNextUnexpanded(); // wraps
+        expect(picked()).toBe('ws-b');
+
+        c.onlyUnexpanded.set(true);
+        expect(c.canvasData()!.nodes.map((n) => n.data.label).sort()).toEqual(['ws-b', 'ws-c']);
+        c.onlyUnexpanded.set(false);
+        expect(c.canvasData()!.nodes).toHaveLength(3);
+    });
     it('evidence: Attach to Case is on the rail with only an Investigation canvas open (no query graph) and seals the Working Set', async () => {
         const { fixture } = create();
         fixture.detectChanges();

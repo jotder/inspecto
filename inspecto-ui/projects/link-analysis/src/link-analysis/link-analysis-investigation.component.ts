@@ -157,6 +157,11 @@ export class LinkAnalysisInvestigationComponent {
     readonly pending = input<PendingInvestigation | null>(null);
     /** The current profile's "Expand next degree" rung and the degree it stops at. */
     readonly degreePresets = input<DegreePresets>({});
+    /** The Space's four-eyes thresholds, for the expand form's "will need approval" note. */
+    readonly fourEyesLimits = computed(() => {
+        const l = this.laSettings.limits();
+        return { budgetAbove: l.fourEyesBudgetAbove ?? null, fanOutAbove: l.fourEyesFanOutAbove ?? null };
+    });
     readonly maxDegree = input(DEFAULT_MAX_DEGREE);
     /** The pending investigation was created (or abandoned) — the host drops it. */
     readonly pendingDone = output<void>();

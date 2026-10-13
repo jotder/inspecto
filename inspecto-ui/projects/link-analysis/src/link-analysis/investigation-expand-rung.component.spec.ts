@@ -102,4 +102,28 @@ describe('InvestigationExpandRungComponent (LA-SPA-OWED-SURFACES-1)', () => {
         cmp.form.patchValue({ window: 'inherit' });
         expect(cmp.rung()).toEqual({});
     });
+
+    it('says before the click what the expand reads and whether it will need approval (LA-EXPAND-FOUREYES-CLARITY-1)', () => {
+        const { fixture, cmp, el } = setup();
+        fixture.componentRef.setInput('limits', { budgetAbove: null, fanOutAbove: 2000 });
+        fixture.componentRef.setInput('presets', { budget: 10000, maxFanOut: 500 });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="expand-effective"]')!.textContent).toContain('10,000 rows, fan-out capped at 500');
+        expect(el.querySelector('[data-testid="expand-needs-approval"]')).toBeNull();
+
+        cmp.form.patchValue({ maxFanOut: 3000 });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="expand-needs-approval"]')!.textContent).toContain('four_eyes_fan_out_above');
+
+        fixture.componentRef.setInput('presets', {});
+        cmp.form.patchValue({ maxFanOut: null });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="expand-effective"]')!.textContent).toContain('fan-out unbounded');
+        expect(el.querySelector('[data-testid="expand-needs-approval"]')).not.toBeNull();
+    });
+
+    it('shows no estimate before the Space limits are known', () => {
+        const { el } = setup();
+        expect(el.querySelector('[data-testid="expand-effective"]')).toBeNull();
+    });
 });

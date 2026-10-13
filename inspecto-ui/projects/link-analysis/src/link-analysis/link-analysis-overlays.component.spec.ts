@@ -144,4 +144,34 @@ describe('Link Analysis legend - unexpanded row (LA-UNEXPANDED-MARKER-1)', () =>
         expect(row()?.textContent).toContain('3');
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    it('offers Next unexpanded and an Only unexpanded switch beside the dotted-outline row (LA-UNEXPANDED-MARKER-1 b)', async () => {
+        TestBed.configureTestingModule({
+            imports: [LinkAnalysisLegendComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const fixture = TestBed.createComponent(LinkAnalysisLegendComponent);
+        fixture.componentRef.setInput('items', [{ kind: 'account', color: 'var(--gamma-primary)', count: 4 }]);
+        fixture.componentRef.setInput('unexpanded', 2);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const next = el.querySelector('[data-testid="next-unexpanded"]') as HTMLButtonElement;
+        const only = el.querySelector('[data-testid="only-unexpanded"]') as HTMLButtonElement;
+        let nexts = 0;
+        let switched: boolean | null = null;
+        fixture.componentInstance.nextUnexpanded.subscribe(() => nexts++);
+        fixture.componentInstance.onlyUnexpandedChange.subscribe((v) => (switched = v));
+        next.click();
+        only.click();
+        expect(nexts).toBe(1);
+        expect(switched).toBe(true);
+        expect(only.getAttribute('aria-pressed')).toBe('false');
+        fixture.componentRef.setInput('onlyUnexpanded', true);
+        fixture.detectChanges();
+        expect(only.getAttribute('aria-pressed')).toBe('true');
+        await expectNoA11yViolations(el);
+        fixture.componentRef.setInput('unexpanded', 0);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="legend-unexpanded-aid"]')).toBeNull();
+    });
 });

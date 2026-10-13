@@ -342,6 +342,8 @@ export interface DegreeOutcome {
     hubsOverridden?: number;
     /** D-U7: the expand was held for four-eyes approval — the pending request's id; nothing was read. */
     awaitingApproval?: string;
+    /** The server's plain-language reasons the expand was held (`budget 500 > 100`); names the threshold crossed. */
+    heldFor?: string[];
     /** The held request was decided elsewhere (read back from the log's `pending` list); absent = still waiting. */
     decision?: 'approved' | 'denied';
     /** On a deny, the reason when one was given. */
@@ -350,6 +352,51 @@ export interface DegreeOutcome {
     override?: string;
     /** A one-hop expand from the panel (not the ladder's next degree): what it expanded from, in words. */
     oneHop?: string;
+}
+
+/** The server's default row budget for an expand that states none (`InvestigationRoutes.DEFAULT_EXPAND_BUDGET`). */
+export const DEFAULT_EXPAND_BUDGET = 2000;
+
+const BUDGET_KEY = 'four_eyes_budget_above';
+const FAN_OUT_KEY = 'four_eyes_fan_out_above';
+
+/** The Space's four-eyes thresholds (`null` = none set, the shipped default: nothing is held on that count). */
+export interface FourEyesLimits {
+    budgetAbove: number | null;
+    fanOutAbove: number | null;
+}
+
+/**
+ * Whether an expand with this rung will be HELD for a second approver, mirroring the server's rule
+ * (`InvestigationRoutes.sensitivity`): the row budget above `four_eyes_budget_above`, or the fan-out cap above
+ * `four_eyes_fan_out_above` — a blank cap is unbounded and exceeds any fan-out threshold. `exceeded` is empty when
+ * the expand runs straight away. The server stays the gate; this only tells the analyst before the click.
+ */
+export function expandApproval(
+    rung: ExpandRung,
+    limits: FourEyesLimits,
+): { budget: number; fanOut: number | null; exceeded: string[] } {
+    const budget = rung.budget ?? DEFAULT_EXPAND_BUDGET;
+    const fanOut = rung.maxFanOut ?? null;
+    const exceeded: string[] = [];
+    if (limits.budgetAbove != null && budget > limits.budgetAbove)
+        exceeded.push(`row budget ${budget.toLocaleString('en')} is above ${limits.budgetAbove.toLocaleString('en')} (${BUDGET_KEY})`);
+    if (limits.fanOutAbove != null && (fanOut === null || fanOut > limits.fanOutAbove))
+        exceeded.push(
+            fanOut === null
+                ? `fan-out is unbounded, above ${limits.fanOutAbove.toLocaleString('en')} (${FAN_OUT_KEY})`
+                : `fan-out cap ${fanOut.toLocaleString('en')} is above ${limits.fanOutAbove.toLocaleString('en')} (${FAN_OUT_KEY})`,
+        );
+    return { budget, fanOut, exceeded };
+}
+
+/** The held request's reasons (server wording `budget 500 > 100`) with the Settings key that controls each. */
+export function thresholdWords(heldFor: readonly string[]): string {
+    const named = heldFor.map((r) => {
+        const key = r.startsWith('budget') ? BUDGET_KEY : r.startsWith('maxFanOut') ? FAN_OUT_KEY : null;
+        return key ? `${r}, set by ${key}` : r;
+    });
+    return `${named.join('; ')} - Settings > Link Analysis`;
 }
 
 /** What a non-ladder expand named, in words: the one entity, a count, or every entity (no ids). */
@@ -481,6 +528,7 @@ export function reconcileApprovals(
             truncated: false,
             fanOutCapped: 0,
             awaitingApproval: p.id,
+            ...(p.sensitivity?.exceeded?.length ? { heldFor: p.sensitivity.exceeded } : {}),
         });
         changed = true;
     }
@@ -583,6 +631,7 @@ export function degreeOutcome(
             budget: rung.budget,
             maxFanOut: rung.maxFanOut ?? undefined,
             awaitingApproval: step.pending?.id ?? 'pending',
+            ...(step.pending?.sensitivity?.exceeded?.length ? { heldFor: step.pending.sensitivity.exceeded } : {}),
         };
     return {
         degree,
@@ -620,7 +669,9 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
     if (o.decision === 'denied')
         return `${head}: request ${o.awaitingApproval} was denied${o.reason ? ` (${o.reason})` : ''} — nothing was read.`;
     if (o.awaitingApproval)
-        return `${head}: waiting for approval — this expand exceeds the Space's four-eyes limit, so it runs once a second person approves request ${o.awaitingApproval}.`;
+        return `${head}: waiting for approval — this expand exceeds ${
+            o.heldFor?.length ? `the Space's four-eyes limit (${thresholdWords(o.heldFor)})` : "the Space's four-eyes limit"
+        }, so it runs once a second person approves request ${o.awaitingApproval}.`;
     const parts = [
         `${o.override || o.oneHop ? head : `Degree ${o.degree}`}${o.range ? ` (${o.range})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
     ];

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { InvestigationStepResult, WorkingSet, WorkingSetEntity } from '@inspecto/link-analysis/api/inv.service';
 import { domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 import {
+    expandApproval,
+    thresholdWords,
     DegreeOutcome,
     MAX_EXPAND_FRONTIER,
     admittedHop,
@@ -587,5 +589,48 @@ describe('investigate-number - walk-through 6 fixes', () => {
         // the ladder keeps its own line
         const ladder = reconcileApprovals([], [{ id: 'r8', status: 'pending', params: { ids: ['b'] } }] as never, set);
         expect(degreeOutcomeMessage(ladder[0])).toMatch(/^Degree 3: waiting for approval/);
+    });
+});
+
+describe('investigate-number - four-eyes clarity (LA-EXPAND-FOUREYES-CLARITY-1)', () => {
+    const none = { budgetAbove: null, fanOutAbove: null };
+    // spaces/_templates/la-showcase/config/link-analysis.toon: four_eyes_fan_out_above 2000, no budget threshold
+    const showcase = { budgetAbove: null, fanOutAbove: 2000 };
+
+    it('a default one-hop expand is never held under the shipped defaults (no threshold set)', () => {
+        const a = expandApproval({}, none);
+        expect(a).toEqual({ budget: 2000, fanOut: null, exceeded: [] });
+    });
+
+    it("the telecom profile's presets stay under la-showcase's fan-out threshold", () => {
+        const p = domainProfile('telecom').investigate!.expand;
+        expect(expandApproval({ budget: p.budget, maxFanOut: p.maxFanOut }, showcase).exceeded).toEqual([]);
+    });
+
+    it('a blank fan-out cap or a larger one is held where a fan-out threshold is set, and says which limit', () => {
+        expect(expandApproval({}, showcase).exceeded).toEqual([
+            'fan-out is unbounded, above 2,000 (four_eyes_fan_out_above)',
+        ]);
+        expect(expandApproval({ maxFanOut: 2000 }, showcase).exceeded).toEqual([]);
+        expect(expandApproval({ maxFanOut: 2001 }, showcase).exceeded[0]).toContain('four_eyes_fan_out_above');
+        const b = expandApproval({ budget: 5000, maxFanOut: 10 }, { budgetAbove: 1000, fanOutAbove: 2000 });
+        expect(b.exceeded).toEqual(['row budget 5,000 is above 1,000 (four_eyes_budget_above)']);
+    });
+
+    it('a held expand names the threshold crossed and the Settings key', () => {
+        expect(thresholdWords(['budget 500 > 100', 'maxFanOut unbounded (threshold 2000)'])).toBe(
+            'budget 500 > 100, set by four_eyes_budget_above; maxFanOut unbounded (threshold 2000), set by four_eyes_fan_out_above - Settings > Link Analysis',
+        );
+    });
+
+    it('the waiting text from a held request carries its reasons', () => {
+        const r = reconcileApprovals(
+            [],
+            [{ id: 'r1', status: 'pending', params: { ids: ['s'] }, sensitivity: { exceeded: ['budget 500 > 100'] } }] as never,
+            ws(entity('s', 0)),
+        );
+        const text = degreeOutcomeMessage(r[0]);
+        expect(text).toContain('budget 500 > 100, set by four_eyes_budget_above');
+        expect(text).toContain('Settings > Link Analysis');
     });
 });

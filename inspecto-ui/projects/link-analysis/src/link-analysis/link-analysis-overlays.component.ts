@@ -130,6 +130,28 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                         <span>Dotted outline: not expanded yet</span>
                         <span class="text-secondary ml-auto tabular-nums">{{ unexpanded() }}</span>
                     </div>
+                    <div class="mt-1 flex flex-wrap gap-1" data-testid="legend-unexpanded-aid">
+                        <button
+                            type="button"
+                            class="rounded-full border px-2 py-0.5 text-[11px]"
+                            style="border-color: var(--gamma-border)"
+                            data-testid="next-unexpanded"
+                            (click)="nextUnexpanded.emit()"
+                        >
+                            Next unexpanded
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-full border px-2 py-0.5 text-[11px]"
+                            style="border-color: var(--gamma-border)"
+                            data-testid="only-unexpanded"
+                            [attr.aria-pressed]="onlyUnexpanded()"
+                            [style.background]="onlyUnexpanded() ? 'var(--gamma-border)' : null"
+                            (click)="onlyUnexpandedChange.emit(!onlyUnexpanded())"
+                        >
+                            Only unexpanded
+                        </button>
+                    </div>
                 }
                 @if (edgeKinds().length) {
                     <!-- one toggle per link kind: pressed = drawn; unpressing hides that kind's links on the canvas -->
@@ -199,6 +221,11 @@ export class LinkAnalysisLegendComponent {
     readonly highConnectivity = input(0);
     /** How many drawn Working Set entities no expand has followed yet; 0 hides the legend row. */
     readonly unexpanded = input(0);
+    /** The "Only unexpanded" switch is on: the canvas draws just the unexpanded frontier. */
+    readonly onlyUnexpanded = input(false);
+    readonly onlyUnexpandedChange = output<boolean>();
+    /** "Next unexpanded": the host picks the next unexpanded node, so Expand one hop acts on it. */
+    readonly nextUnexpanded = output<void>();
     readonly open = input(true);
     readonly openChange = output<boolean>();
 }
