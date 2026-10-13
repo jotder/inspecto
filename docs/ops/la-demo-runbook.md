@@ -305,7 +305,7 @@ Bundle: `package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` WITH the built-in
 |---|---|---|---|
 | 1 | Bake path | PASS | Bake booted, seeded, rebased 357 files; the old spurious 409 now logs "investigation: 409, now readable (head step 0)" and carries on |
 | 2 | Sign in as `fm.analyst` (full reload returns to the deep link) | PASS | picker lists 5 Demo Users; Link Analysis menu present |
-| 3 | Start an Investigation from *Explore a Dataset* | FAIL then PASS | first press refused (422, DATE time column prefilled); typing `BOOKED_AT` works. Filed P2 `LA-EXPLORE-TIMECOL-DATE-1` |
+| 3 | Start an Investigation from *Explore a Dataset* | FAIL then PASS | first press refused (422, DATE time column prefilled); typing `BOOKED_AT` works. Fixed: Time column now defaults blank (`LA-EXPLORE-TIMECOL-DATE-1`) |
 | 4 | Seed ONE entity, **Expand one hop** | PASS | Working Set 1 -> 7 entities, 6 links |
 | 5 | Unexpanded marker | PASS | 6 dotted nodes, legend "Dotted outline: not expanded yet", count in the legend |
 | 6 | **Choose neighbours** | PASS | 2 neighbours listed; *Add the 10 strongest* -> step "restricted to 2 chosen neighbours", 7 -> 8 entities |
@@ -318,7 +318,7 @@ Bundle: `package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` WITH the built-in
 | 13 | Detection / Alert path | PASS | Alert `mule-pass-through` (13 breaching, aggregate only, no ids); *Open Investigation* lands on `mule-hub-case`. The Alerts page IS in the la-app now (S12's claim is out of date) |
 | 14 | Masked persona view | PASS | `fm.analyst` sees `masked:<hex>` everywhere; `ra.analyst` read-only 403 and non-member 404 are smoke probes. Admin Reveal not re-driven this pass |
 | 15 | Four-eyes (S8) | PASS | the bake leaves a pending request `p1`; `fm.analyst` approve is 403, `fm.manager` approve is 200 and runs the expand |
-| 16 | *Investigate a number* `99979100001` | PASS with a note | two degrees in seconds, but 895 nodes / 2,901 links (hairball); filed P3 `LA-INVESTIGATE-NUMBER-HAIRBALL-1` |
+| 16 | *Investigate a number* `99979100001` | PASS with a note | two degrees in seconds, but 895 nodes / 2,901 links (hairball); fixed: the card expands one degree, *Choose neighbours* goes further (`LA-INVESTIGATE-NUMBER-HAIRBALL-1`) |
 
 Not rehearsed this pass: Drafts cycle, Compare and seal, Settings editing, embed curl transcript (S14), Postgres/Personal variants.
 

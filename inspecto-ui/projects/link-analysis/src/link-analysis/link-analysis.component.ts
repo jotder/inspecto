@@ -754,9 +754,13 @@ export class LinkAnalysisComponent implements OnInit {
         const cols = this.attrColumns();
         return workingSetOptionsFor(this.profile(), cols).timeColumn ?? cols.find((c) => isTemporalColumn(g, c)) ?? '';
     });
-    /** {@link investigationTimeColumn}, else the picked Dataset's first date-typed column (the graph may carry no attrs). */
+    /**
+     * {@link investigationTimeColumn}. Never the picked Dataset's `date` column: the client type is coarse (DATE and
+     * TIMESTAMP both read 'date') and the server refuses a DATE as event time (LA-EXPLORE-TIMECOL-DATE-1), so a
+     * Dataset-declared guess made the first Start Investigation press fail. Blank = no event time; the analyst picks one.
+     */
     investigationTimeDefault(): string {
-        return this.investigationTimeColumn() || this.queryPanel?.datasetTimeColumn() || '';
+        return this.investigationTimeColumn();
     }
     /** Cutoff (epoch millis) — edges dated after this are hidden; `null` until the slider is touched. */
     readonly timeCutoff = signal<number | null>(null);

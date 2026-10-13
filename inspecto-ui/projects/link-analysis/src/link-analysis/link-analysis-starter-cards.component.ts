@@ -42,7 +42,7 @@ function msisdnValidator(c: AbstractControl<string>): ValidationErrors | null {
                     <mat-icon class="icon-size-6" svgIcon="heroicons_outline:phone"></mat-icon>
                     <span id="starter-investigate-title" class="block text-sm font-semibold">Investigate a number</span>
                     <span class="text-secondary block text-xs">
-                        Seeds the number and expands two degrees of who it is linked to.
+                        Seeds the number and expands one degree of who it is linked to; Choose neighbours goes further.
                     </span>
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>MSISDN</mat-label>

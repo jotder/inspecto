@@ -226,7 +226,7 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         expect(c.datasetColumns()).toEqual(['caller_id']);
     });
 
-    it('remembers the picked Dataset‘s first date-typed column as the default event time (DR-D7)', async () => {
+    it('does not offer a Dataset date column as the default event time (server refuses DATE; LA-EXPLORE-TIMECOL-DATE-1)', async () => {
         const columns = vi.fn(() =>
             Promise.resolve([
                 { name: 'payer', type: 'string' },
@@ -239,7 +239,8 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         ]);
         c.queryForm.patchValue({ datasetId: 'cdr' });
         await fixture.whenStable();
-        expect(c.datasetTimeColumn()).toBe('booked_at');
+        expect(c.datasetColumns()).toContain('booked_at');
+        expect('datasetTimeColumn' in c).toBe(false);
     });
 
     it('renders with no a11y violations', async () => {

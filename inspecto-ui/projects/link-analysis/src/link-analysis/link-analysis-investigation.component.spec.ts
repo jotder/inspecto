@@ -700,7 +700,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         expect(store.showWorkingSet()).toBe(true);
     });
 
-    it('a pending "Investigate a number" asks the purpose, then creates, seeds and expands two degrees', async () => {
+    it('a pending "Investigate a number" asks the purpose, then creates, seeds and expands one degree', async () => {
         const { fixture, el, inv, store } = create();
         const host = fixture.componentInstance as unknown as Host;
         host.pending.set({
@@ -747,7 +747,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
                 title: 'Suspect number',
                 profileId: 'telecom',
                 purpose: 'fraud alert 12',
-                degrees: 2,
+                degrees: 1,
             }),
         );
         fixture.detectChanges();

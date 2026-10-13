@@ -203,7 +203,7 @@ export class LinkAnalysisInvestigationComponent {
     readonly pendingTried = signal(false);
     private readonly pendingPurpose = viewChild<ElementRef<HTMLInputElement>>('pendingPurpose');
 
-    /** "Investigate <id>": create, seed, then expand two degrees. Asks for the purpose like every Investigation. */
+    /** "Investigate <id>": create, seed, then expand ONE degree (LA-INVESTIGATE-NUMBER-HAIRBALL-1: two drew 895 nodes on a hub-adjacent number; Choose neighbours goes further). Asks for the purpose like every Investigation. */
     async investigatePending(): Promise<void> {
         if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         const p = this.pending();
@@ -228,7 +228,7 @@ export class LinkAnalysisInvestigationComponent {
             seed: p.seed,
             presets: p.presets,
             maxDegree: p.maxDegree,
-            degrees: 2,
+            degrees: 1,
             windowEnd: p.windowEnd,
             advanced,
             profileId: p.profileId,
