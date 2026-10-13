@@ -264,7 +264,7 @@ Analysis specifically, the Postgres Investigation store is built, but embed link
 store answers 503 for them).
 Evidence: [`ha-dr-drill-runbook.md`](ha-dr-drill-runbook.md) "What has actually been proven" and the laptop-scale
 drill; [`enterprise-scale-out-plan.md`](../superpower/enterprise-scale-out-plan.md) status header;
-`docs/BACKLOG.md` `SCALEOUT-PLAN-AUDIT-1`, `LA-EMBED-PG-STORE-1`; backend §6.2.
+`docs/BACKLOG.md` `SCALEOUT-PLAN-AUDIT-1`; backend §6.2.
 Confidence: NOT YET for multi-pod; PROVEN only for the single-database lease at laptop scale.
 
 **Q27. How do we back up, restore and upgrade? Can it run air-gapped?**
@@ -308,9 +308,9 @@ Say these before anyone asks.
 
 * **Real-IAM sign-in is not verified.** The standalone app has only run over Demo User auth. (`LA-APP-REAL-SIGNIN-1`,
   security spec section 3.4.) Confidence: NOT YET.
-* **No embed viewer page.** The embed API works, and the page that renders it, and host-wide frame headers, are
-  deferred (`LA-EMBED-SPA-1`, `LA-EMBED-FRAME-HEADERS-1`). Embed links are filesystem-store only
-  (`LA-EMBED-PG-STORE-1`). Confidence: NOT YET.
+* **Embed links (read-only Investigation view)** are built and driven live on both the file and the Postgres store (viewer
+  page, frame headers, revoke); a few edge paths are unit-tested only (`LA-EMBED-VIEW-1` remainder). Confidence: PROVEN
+  on a demo bundle; OFF unless the host runs with `-Dla.embed.enabled=true`.
 * **No Hive or Kerberos connector;** feeds go in as files or database queries. Confidence: NOT YET.
 * **Slowly changing dimensions (SCD2) are deferred.** The setting is accepted but never honoured (decision D-ING4).
   Confidence: NOT YET.
