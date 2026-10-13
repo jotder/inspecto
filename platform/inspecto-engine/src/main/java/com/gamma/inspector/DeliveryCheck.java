@@ -53,6 +53,40 @@ final class DeliveryCheck {
         return markers == null || markers.isBlank() ? null : Paths.get(markers).toAbsolutePath().resolve(FILE);
     }
 
+    /** Files already signalled as skipped (path + mtime), so a poll that sees the same stranded file every cycle says it once. */
+    private static final java.util.Set<String> SKIPPED_SIGNALLED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * A file the marker dedup skipped although it was modified AFTER its {@code .processed} marker was written: a corrected
+     * delivery under the same name. The skip itself stays (no data change); this makes it visible as
+     * {@code collector.delivery.anomaly} kind {@code DUPLICATE_SKIPPED} (WARN, once per file version). Returns whether it signalled.
+     */
+    static boolean duplicateSkipped(PipelineConfig cfg, java.io.File file) {
+        try {
+            java.nio.file.Path marker = com.gamma.etl.MarkerManager.getMarkerPath(file, cfg);
+            if (!java.nio.file.Files.exists(marker)) return false;   // skipped via the logical alias marker: not this case
+            long fileTime = file.lastModified();
+            if (fileTime <= java.nio.file.Files.getLastModifiedTime(marker).toMillis()) return false;
+            if (!SKIPPED_SIGNALLED.add(file.getAbsolutePath() + "|" + fileTime)) return false;
+            String name = file.getName();
+            String template = cfg.collector().gapDetection().fileTemplate();
+            String day = "-";
+            if (template != null && !template.isBlank()) {
+                var key = FileSequenceGaps.match(template, name);
+                if (key.isPresent()) day = key.get().bucket();
+            }
+            String pipeline = cfg.identity().pipelineName();
+            String detail = "a file changed after it was processed and was skipped by duplicate_check; rename the corrected file to land it (the platform does not replace a day)";
+            log.warn("Delivery anomaly for {}: DUPLICATE_SKIPPED day {} - {}: {}", pipeline, day, name, detail);
+            DeliveryAnomalySignal.emit(pipeline, "poll", "DUPLICATE_SKIPPED", day, com.gamma.etl.FileNames.safe(cfg, name), null, detail);
+            MetricRegistry.global().inc("inspecto_delivery_anomalies_total", "Re-delivered, renamed or changed parts of a daily feed",
+                    Map.of("pipeline", pipeline), 1);
+            return true;
+        } catch (Exception e) {
+            return false;   // observability only
+        }
+    }
+
     static boolean applies(PipelineConfig cfg) {
         return cfg.collector().gapDetection().hasFileTemplate() && manifestFile(cfg) != null;
     }

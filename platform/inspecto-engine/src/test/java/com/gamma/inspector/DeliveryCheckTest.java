@@ -85,6 +85,26 @@ class DeliveryCheckTest {
                 "the anomaly is signalled: " + seen);
     }
 
+    /** LA-DAILY-INGEST-1 live finding 2026-10-13: a same-name corrected file under duplicate_check was skipped in silence. */
+    @Test
+    void aSameNameFileChangedAfterItsMarkerIsSkippedLoudlyOnceAndAnUnchangedOneIsNot(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir, true);
+        File f = dir.resolve("XDR_20260901_part0001.csv").toFile();
+        Files.writeString(f.toPath(), "x");
+        Path marker = com.gamma.etl.MarkerManager.getMarkerPath(f, cfg);
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, "");
+        Files.setLastModifiedTime(f.toPath(), java.nio.file.attribute.FileTime.fromMillis(NOW - 10_000));
+        Files.setLastModifiedTime(marker, java.nio.file.attribute.FileTime.fromMillis(NOW));
+        assertTrue(!DeliveryCheck.duplicateSkipped(cfg, f), "unchanged since the marker: the ordinary silent dedup");
+
+        Files.setLastModifiedTime(f.toPath(), java.nio.file.attribute.FileTime.fromMillis(NOW + 10_000));
+        assertTrue(DeliveryCheck.duplicateSkipped(cfg, f), "changed after the marker: signalled");
+        assertTrue(seen.stream().anyMatch(e -> String.valueOf(e.message()).startsWith(DeliveryAnomalySignal.TYPE + " DUPLICATE_SKIPPED 20260901")),
+                "signalled with its day: " + seen);
+        assertTrue(!DeliveryCheck.duplicateSkipped(cfg, f), "the same stranded file version is said once, not every poll");
+    }
+
     @Test
     void aMissingLastDayAndAMissingPartAreReportedOverTheExplicitWindowFromInboxPlusManifest(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = config(dir, true);

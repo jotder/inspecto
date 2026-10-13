@@ -669,12 +669,18 @@ public class CollectorProcessor {
         List<File> matched = toFiles(ready);
         if (matched.size() > 1 && cfg.processing().threads() > 1) {
             return matched.parallelStream()
-                    .filter(f -> !MarkerManager.isAlreadyProcessed(f, cfg))
+                    .filter(f -> {
+                        if (!MarkerManager.isAlreadyProcessed(f, cfg)) return true;
+                        if (emitSignals) DeliveryCheck.duplicateSkipped(cfg, f);
+                        return false;
+                    })
                     .collect(Collectors.toCollection(ArrayList::new));
         }
         List<File> candidates = new ArrayList<>(matched.size());
-        for (File f : matched)
+        for (File f : matched) {
             if (!MarkerManager.isAlreadyProcessed(f, cfg)) candidates.add(f);
+            else if (emitSignals) DeliveryCheck.duplicateSkipped(cfg, f);
+        }
         return candidates;
     }
 
