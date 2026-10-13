@@ -23,7 +23,7 @@ import java.util.TreeSet;
  *
  * <p><b>Hub rule.</b> An entity the read flags as a hub (above the rung's hub threshold) is reached and recorded but never
  * walked THROUGH - supernode suppression, as an expand's frontier - and a pair that came out disconnected names the hubs
- * its searches stopped at ({@code notWalked}), so "not connected" is never silently a hub the search refused to cross.
+ * that could have joined it, reached from both ends within the hop limit ({@code notWalked}), so "not connected" is never silently a hub the search refused to cross.
  * Pure: no HTTP, no store, no masking - the caller seals the result and the response masks it.
  */
 final class ConnectSeeds {
@@ -112,8 +112,10 @@ final class ConnectSeeds {
                 Integer hops = s.dist.get(b);
                 if (hops == null) {
                     pair.put("connected", false);
-                    TreeSet<String> held = new TreeSet<>(s.hubs.keySet());
-                    held.addAll(searches.get(j).hubs.keySet());
+                    Search t = searches.get(j);
+                    TreeSet<String> held = new TreeSet<>();   // only a hub BOTH searches reached close enough that walking it could have joined the pair
+                    for (String h : s.hubs.keySet())
+                        if (t.dist.containsKey(h) && s.dist.get(h) + t.dist.get(h) <= maxHops) held.add(h);
                     held.remove(a);
                     held.remove(b);
                     if (!held.isEmpty()) pair.put("notWalked", new ArrayList<>(held).subList(0, Math.min(held.size(), MAX_NOT_WALKED)));

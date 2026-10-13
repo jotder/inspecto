@@ -88,6 +88,16 @@ class ConnectSeedsTest {
     }
 
     @Test
+    void aHubIsNamedOnlyForAPairItCouldHaveJoined() {
+        // H is a hub (degree 3) reached from A; B is 5 hops from A by another route and Z has no links at all
+        ConnectSeeds.Result r = ConnectSeeds.compute(List.of("A", "B", "Z"), 3, Set.of(),
+                graph(2, new int[1], "A-H", "H-x", "H-y", "B-p", "p-q", "q-r", "r-A2", "A2-A"));
+        assertEquals(false, pair(r, "A", "B").get("connected"));
+        assertEquals(null, pair(r, "A", "B").get("notWalked"), "B never reaches H: no hub could have joined A and B");
+        assertEquals(null, pair(r, "A", "Z").get("notWalked"), "a seed with no links is joined by nothing, hub or not");
+    }
+
+    @Test
     void aHubThatIsASeedItselfIsStillConnected() {
         ConnectSeeds.Result r = ConnectSeeds.compute(List.of("A", "H"), 3, Set.of(), graph(2, new int[1], "A-H", "H-x", "H-y"));
         assertEquals(true, pair(r, "A", "H").get("connected"), "a hub is the END of a route, never a step through one");
