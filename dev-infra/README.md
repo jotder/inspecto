@@ -134,6 +134,33 @@ Console: <https://localhost:9443/console> (`admin` / `admin`).
 
 ---
 
+## Keycloak — `OidcKeycloakAgainstRealProviderTest` (2 tests)
+
+The other supported OIDC provider (`-Dauth.oidc.provider=keycloak`; the client chooses WSO2 or Keycloak by
+configuration, `docs/api/deployment/README.md`). `docker compose -f dev-infra/docker-compose.yml up -d keycloak`
+starts `quay.io/keycloak/keycloak:26.8.1` in `start-dev` mode on **<http://localhost:8180>** and imports
+[`keycloak/inspecto-realm.json`](keycloak/inspecto-realm.json): realm `inspecto`, public PKCE client
+`inspecto_spa` (redirect URIs and web origins for the SPA dev/demo ports 4200, 4204, 8080, 8090, 8095-8098,
+18080; an audience mapper; the `basic` scope), the seeded role names, and four **test users**:
+`kc-business`, `kc-developer`, `kc-admin` (realm roles) and `kc-operator` (the `operations` **client** role, so a
+pass proves the realm + client role union).
+
+⛔ **DEV FIXTURE.** The test users' passwords (`dev-only-<role>`, e.g. `dev-only-operator`) are written in the realm
+file on purpose, the console admin is `admin` / `admin` (bootstrap variables in the compose file), the client has
+*direct access grants* enabled so the test can fetch a token without a browser, and there is no TLS. None of this
+is a deployment shape.
+
+```bash
+mvn -o test -Pedition-professional -pl providers/inspecto-oidc -am -Dsurefire.failIfNoSpecifiedTests=false \
+    -Dtest=OidcKeycloakAgainstRealProviderTest -Dkeycloak.issuer=http://localhost:8180/realms/inspecto
+```
+
+Without `-Dkeycloak.issuer` (or `KEYCLOAK_ISSUER`) both tests SKIP: a skip is not a pass. A backend run:
+`-Dauth.mode=oidc -Dauth.oidc.provider=keycloak -Dauth.oidc.discoveryUrl=http://localhost:8180/realms/inspecto/.well-known/openid-configuration -Dauth.oidc.clientId=inspecto_spa -Dauth.oidc.audience=inspecto_spa`.
+⚠ Keycloak rejects unknown JSON fields on realm import, so the realm file carries no `_comment` keys.
+
+---
+
 ## MinIO — `PartitionWriterObjectStoreTest` (4 tests)
 
 ```bash

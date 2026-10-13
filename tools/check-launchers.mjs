@@ -113,7 +113,7 @@ function runLauncher(kind, dir, env, allowFail) {
   const childEnv = { ...process.env, ...env, PATH: join(dir, 'bin') + pathSep + process.env.PATH };
   // Never inherit the operator's own OIDC/JVM settings into a scenario that must NOT see them.
   for (const k of ['AUTH_OIDC_ISSUER', 'AUTH_OIDC_JWKS_URI', 'AUTH_OIDC_AUDIENCE', 'AUTH_OIDC_CLIENT_ID',
-    'AUTH_OIDC_CLIENT_SECRET', 'INSPECTO_JAVA_OPTS', 'EXTRA_JAVA_OPTS', 'INSPECTO_DB_URL', 'PORT',
+    'AUTH_OIDC_PROVIDER', 'AUTH_OIDC_DISCOVERY_URL', 'AUTH_OIDC_CLIENT_SECRET', 'INSPECTO_JAVA_OPTS', 'EXTRA_JAVA_OPTS', 'INSPECTO_DB_URL', 'PORT',
     'SPACES_ROOT', 'CORS_ORIGIN', 'HTTPS_KEYSTORE', 'HTTPS_KEYSTORE_PASSWORD']) {
     if (!(k in env)) delete childEnv[k];
   }
@@ -152,6 +152,8 @@ const OIDC_ENV = {
   AUTH_OIDC_JWKS_URI: 'https://idp.example/realms/x/jwks',
   AUTH_OIDC_AUDIENCE: 'inspecto',
   AUTH_OIDC_CLIENT_ID: 'inspecto-ui',
+  AUTH_OIDC_PROVIDER: 'keycloak',
+  AUTH_OIDC_DISCOVERY_URL: 'https://idp.example/realms/x/.well-known/openid-configuration',
   // ⚠ Not a credential, and spelled so `check-secrets.mjs` can tell: it recognises `example` as a
   // placeholder. The launcher must never put this value on the command line at all — the `reject`
   // below asserts exactly that — so a distinctive string is what makes the assertion meaningful.
@@ -185,6 +187,8 @@ export const SCENARIOS = [
       `-Dauth.oidc.jwksUri=${OIDC_ENV.AUTH_OIDC_JWKS_URI}`,
       `-Dauth.oidc.audience=${OIDC_ENV.AUTH_OIDC_AUDIENCE}`,
       `-Dauth.oidc.clientId=${OIDC_ENV.AUTH_OIDC_CLIENT_ID}`,
+      `-Dauth.oidc.provider=${OIDC_ENV.AUTH_OIDC_PROVIDER}`,
+      `-Dauth.oidc.discoveryUrl=${OIDC_ENV.AUTH_OIDC_DISCOVERY_URL}`,
       // A REFERENCE, never the value: the backend expands ${ENV:...} at use, so the secret must not
       // reach the process command line. Asserting the literal is asserting that.
       '-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}'],

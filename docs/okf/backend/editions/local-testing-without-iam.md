@@ -196,8 +196,10 @@ runtime flag exists for this.
 ### 2. Point it at a real OIDC provider
 
 `serve.bat` reads `AUTH_OIDC_ISSUER` / `AUTH_OIDC_JWKS_URI` / `AUTH_OIDC_AUDIENCE` /
-`AUTH_OIDC_CLIENT_ID` from environment variables. Two flags it does **not** wire from env —
-`tokenEndpoint` and `rolesClaim` — must ride via `INSPECTO_JAVA_OPTS` as raw `-D` flags.
+`AUTH_OIDC_CLIENT_ID` (and, since 2026-10-13, `AUTH_OIDC_PROVIDER` / `AUTH_OIDC_DISCOVERY_URL` — with a
+discovery URL `tokenEndpoint` is derived) from environment variables. Two flags it does **not** wire from env —
+`tokenEndpoint` (unless discovery supplies it) and `rolesClaim` — must ride via `INSPECTO_JAVA_OPTS` as raw
+`-D` flags.
 
 Worked example against a **local WSO2 IS in Docker** (fully offline — everything on `localhost`, no
 internet needed once JWKS is fetched once and cached):

@@ -246,6 +246,30 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
     any gateway is accommodated via `-Dauth.oidc.gateway.header`.
   Litmus test for future work: any new auth code that cannot be pointed at a different compliant IdP by
   configuration alone is wrong.
+  * **Provider preset + discovery (2026-10-13) — the client chooses WSO2 Identity Server OR Keycloak by
+    configuration.** `-Dauth.oidc.provider=generic|wso2|keycloak` (default `generic` = every behaviour above,
+    byte-for-byte) and `-Dauth.oidc.discoveryUrl=<issuer>/.well-known/openid-configuration`. `OidcConfig`
+    (module-private) resolves `issuer`, `jwksUri`, `tokenEndpoint`, `authorizeUrl`, `endSessionUrl` with the
+    precedence **explicit `-D` > the discovery document (fetched once per URL at boot) > the `keycloak`
+    preset's fixed `<issuer>/protocol/openid-connect/*` layout**. This does not reopen the D15 ban: the
+    Keycloak layout applies only to an operator who asked for `provider=keycloak`, and `generic` still derives
+    nothing. A discovery failure (unreachable, non-200, no `issuer`), a discovery `issuer` that differs from an
+    explicit `-Dauth.oidc.issuer`, an unknown provider value, or a non-`https` discovery URL (loopback `http`
+    allowed) **refuses to boot** with a value-free message. `bootstrapAuth()` reads the same resolver, so
+    `/bootstrap` `auth` carries `authorizeUrl` / `clientId` / `endSessionUrl` with no SPA change.
+    * **Roles:** `provider=keycloak` unions `realm_access.roles` and `resource_access.<clientId>.roles`
+      (`-Dauth.oidc.clientId`, else the token's `azp`) — unless `-Dauth.oidc.rolesClaim` is set explicitly,
+      which always wins and switches the union off. `wso2` adds nothing (`groups` via `rolesClaim`, as before).
+    * **Audience:** unchanged — only the configured `-Dauth.oidc.audience` is checked and the "OFF" warning
+      still fires when unset. ⚠ Keycloak's access-token `aud` is `account` unless the client carries an audience
+      mapper, so the realm needs one (`dev-infra/keycloak/inspecto-realm.json` has it).
+    * 🔴 **Keycloak 26 access tokens carry NO `sub` unless the client has the built-in `basic` scope** — and
+      `OidcAuthenticator` requires `sub` ("JWT missing required claims: [sub]"). Found only by the live run;
+      a realm authored from older Keycloak examples omits `basic`.
+    * ⚠ Keycloak's realm import REJECTS unknown JSON fields (`Unrecognized field "_comment"`): strip the
+      `_comment` keys from `docs/api/deployment/keycloak-realm-blueprint.json` before importing it.
+    * Proven live 2026-10-13 against `quay.io/keycloak/keycloak:26.8.1` — `OidcKeycloakAgainstRealProviderTest`
+      (SKIPS without `-Dkeycloak.issuer`) plus a booted backend; evidence in `docs/api/deployment/README.md`.
 - **D14 — the R1 seed grant set is ratified with one tightening.** The five previously-unreviewed route
   capabilities were checked against `Roles.SEED` in this session. `canConfigureAccess` and `canApproveShares`
   were **already** admin/super-only, so the "bootstrap deadlock left them over-granted" concern was unfounded

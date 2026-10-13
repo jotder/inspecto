@@ -1,0 +1,179 @@
+{
+  "realm": "inspecto",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "business",
+        "description": "Roles.SEED business: triage requirements."
+      },
+      {
+        "name": "pipeline-developer",
+        "description": "Roles.SEED builder: author the workbench and alert rules."
+      },
+      {
+        "name": "operations",
+        "description": "Roles.SEED operations: operate runs, work Incidents."
+      },
+      {
+        "name": "power",
+        "description": "Roles.SEED power."
+      },
+      {
+        "name": "admin",
+        "description": "Roles.SEED admin."
+      },
+      {
+        "name": "super",
+        "description": "Roles.SEED super: every capability."
+      }
+    ],
+    "client": {
+      "inspecto_spa": [
+        {
+          "name": "operations",
+          "description": "Client role: proves the realm-role + client-role union (auth.oidc.provider=keycloak)."
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "inspecto_spa",
+      "name": "Inspecto SPA (dev)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "http://localhost:4204/*",
+        "http://localhost:8080/*",
+        "http://localhost:8090/*",
+        "http://localhost:8095/*",
+        "http://localhost:8096/*",
+        "http://localhost:8097/*",
+        "http://localhost:8098/*",
+        "http://localhost:18080/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://localhost:4204",
+        "http://localhost:8080",
+        "http://localhost:8090",
+        "http://localhost:8095",
+        "http://localhost:8096",
+        "http://localhost:8097",
+        "http://localhost:8098",
+        "http://localhost:18080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost:8080/*##http://localhost:8090/*##http://localhost:18080/*"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "inspecto-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "inspecto_spa",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "kc-business",
+      "enabled": true,
+      "email": "kc-business@example.test",
+      "emailVerified": true,
+      "firstName": "Kay",
+      "lastName": "Business",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-business",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "business"
+      ]
+    },
+    {
+      "username": "kc-developer",
+      "enabled": true,
+      "email": "kc-developer@example.test",
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Builder",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-developer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "pipeline-developer"
+      ]
+    },
+    {
+      "username": "kc-operator",
+      "enabled": true,
+      "email": "kc-operator@example.test",
+      "emailVerified": true,
+      "firstName": "Opal",
+      "lastName": "Operator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-operator",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "inspecto_spa": [
+          "operations"
+        ]
+      }
+    },
+    {
+      "username": "kc-admin",
+      "enabled": true,
+      "email": "kc-admin@example.test",
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ]
+    }
+  ]
+}

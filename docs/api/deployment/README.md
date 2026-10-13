@@ -58,6 +58,11 @@ The blueprint's realm/client names map to the `-Dauth.oidc.*` flags `OidcAuthent
 | `-Dauth.oidc.clientId` | `inspecto-spa` (default) |
 | `-Dauth.oidc.clientSecret` | *optional* (public PKCE client needs none). Pass a **`SecretResolver` reference** — `${ENV:NAME}` / `${SYS:prop}` — never the raw value |
 
+> **Choosing the provider (2026-10-13):** `-Dauth.oidc.provider=generic|wso2|keycloak` and
+> `-Dauth.oidc.discoveryUrl=…` derive the endpoints from the provider's discovery document — see
+> **[Keycloak, or WSO2: choose by configuration](#keycloak-or-wso2-choose-by-configuration)** below. With
+> `generic` and no discovery URL, the table above is exactly what applies.
+
 ### 🔴 Proven against a real provider 2026-09-13 — four corrections to the table above
 
 The blueprint is Keycloak-shaped and was never run against an IdP. Standing up **WSO2 Identity Server
@@ -102,8 +107,62 @@ resolves the project property — so TLS flags need `-DforkCount=0` plus `MAVEN_
 
 `serve.sh`/`serve.bat` (bundled by `package.ps1 -Edition Standard`) read these from
 `AUTH_OIDC_ISSUER` / `AUTH_OIDC_JWKS_URI` / `AUTH_OIDC_AUDIENCE` / `AUTH_OIDC_CLIENT_ID` /
-`AUTH_OIDC_CLIENT_SECRET` environment variables — the secret is forwarded as an `${ENV:…}` reference
+`AUTH_OIDC_PROVIDER` / `AUTH_OIDC_DISCOVERY_URL` / `AUTH_OIDC_CLIENT_SECRET` environment variables — the secret is forwarded as an `${ENV:…}` reference
 the backend resolves at use, so neither the bundle nor the process command line ever holds it.
+
+### Keycloak, or WSO2: choose by configuration
+
+The same `inspecto-oidc` module serves both; the client picks one with two properties (bundle launchers:
+`AUTH_OIDC_PROVIDER`, `AUTH_OIDC_DISCOVERY_URL`). The discovery document is fetched **once at boot** and
+supplies the issuer, JWKS, token, authorize and end-session endpoints; any explicit `-Dauth.oidc.*` always
+overrides it, and a discovery `issuer` that disagrees with an explicit one refuses to boot. `/bootstrap` `auth`
+(`authorizeUrl`, `clientId`, `endSessionUrl`) is derived from the same config, so the SPA needs no change.
+
+**Keycloak**
+
+```text
+-Dauth.mode=oidc
+-Dauth.oidc.provider=keycloak
+-Dauth.oidc.discoveryUrl=https://<keycloak-host>/realms/inspecto/.well-known/openid-configuration
+-Dauth.oidc.clientId=inspecto_spa
+-Dauth.oidc.audience=inspecto_spa
+```
+
+**WSO2 Identity Server** (client id must match `[a-zA-Z0-9_]{15,30}`; its tokens carry `groups`)
+
+```text
+-Dauth.mode=oidc
+-Dauth.oidc.provider=wso2
+-Dauth.oidc.discoveryUrl=https://<wso2-host>:9443/oauth2/token/.well-known/openid-configuration
+-Dauth.oidc.clientId=inspecto_spa_client
+-Dauth.oidc.audience=inspecto_spa_client
+-Dauth.oidc.rolesClaim=groups
+```
+
+Keycloak realm setup (the proven fixture is [`dev-infra/keycloak/inspecto-realm.json`](../../../dev-infra/keycloak/inspecto-realm.json)):
+
+1. A **public** client with Authorization Code + PKCE `S256`, **redirect URIs** `<origin>/auth/callback` (a
+   wildcard `<origin>/*` works) and **web origins** for each SPA origin.
+2. 🔴 An **audience mapper** (`oidc-audience-mapper`, included client audience = the client id, *access
+   token*). Without it Keycloak's `aud` is `account` and the audience check rejects every token.
+3. 🔴 The client must keep the built-in **`basic`** client scope: Keycloak 26 puts `sub` there, and the
+   authenticator requires `sub`.
+4. **Roles:** create realm roles named exactly as `Roles.SEED` (`business`, `pipeline-developer`,
+   `operations`, `power`, `admin`, `super`, ...). With `provider=keycloak` both **realm roles**
+   (`realm_access.roles`) and **client roles** of the configured client (`resource_access.<client>.roles`) are
+   unioned; set `-Dauth.oidc.rolesClaim` only if a protocol mapper flattens roles into another claim, which
+   turns the union off. An unrecognised role grants nothing.
+5. Import: `docker compose -f dev-infra/docker-compose.yml up -d keycloak` (dev) or, in production,
+   Keycloak's realm import, which **rejects unknown fields**, so remove the `_comment` keys from the
+   blueprint JSON first.
+
+Proven 2026-10-13 against Keycloak 26.8.1 (dev realm, container `inspecto-keycloak`, port 8180): the live
+test `OidcKeycloakAgainstRealProviderTest` (2 tests, `-Dkeycloak.issuer=http://localhost:8180/realms/inspecto`);
+a backend booted with the Keycloak property set above returned `401` with no/garbage token, and for
+`POST /api/v1/alerts/evaluate` (needs `canOperateRuns`) `200` for a user holding it only as a **client** role and
+`403` for the `business`, `pipeline-developer` and `admin` users; a real Authorization Code + PKCE sign-in
+(`/bootstrap` `auth` -> Keycloak login -> `POST /auth/exchange`, nonce checked) returned `200` with a refresh
+cookie. ⚠ The SPA itself was not driven in a browser.
 
 ### Gateway trust mode (WSO2 APIM `X-JWT-Assertion`, RBAC R0 — optional)
 

@@ -1652,6 +1652,10 @@ if [ "${EDITION}" != "Personal" ]; then
     [ -n "${AUTH_OIDC_JWKS_URI:-}" ]  && JAVA_OPTS+=("-Dauth.oidc.jwksUri=${AUTH_OIDC_JWKS_URI}")
     [ -n "${AUTH_OIDC_AUDIENCE:-}" ]  && JAVA_OPTS+=("-Dauth.oidc.audience=${AUTH_OIDC_AUDIENCE}")
     [ -n "${AUTH_OIDC_CLIENT_ID:-}" ] && JAVA_OPTS+=("-Dauth.oidc.clientId=${AUTH_OIDC_CLIENT_ID}")
+    # Provider preset (generic | wso2 | keycloak) + discovery: with a discovery URL the issuer, JWKS and the token /
+    # authorize endpoints are derived at boot, so the two variables above them become optional overrides.
+    [ -n "${AUTH_OIDC_PROVIDER:-}" ]      && JAVA_OPTS+=("-Dauth.oidc.provider=${AUTH_OIDC_PROVIDER}")
+    [ -n "${AUTH_OIDC_DISCOVERY_URL:-}" ] && JAVA_OPTS+=("-Dauth.oidc.discoveryUrl=${AUTH_OIDC_DISCOVERY_URL}")
     # Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value —
     # the backend expands ${ENV:...} at use, so the secret never appears on the process command line.
     [ -n "${AUTH_OIDC_CLIENT_SECRET:-}" ] && JAVA_OPTS+=('-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}')
@@ -1770,6 +1774,8 @@ if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% 
 if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
 if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"
 if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
+if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_PROVIDER%"=="" set "OPTS=%OPTS% -Dauth.oidc.provider=%AUTH_OIDC_PROVIDER%"
+if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_DISCOVERY_URL%"=="" set "OPTS=%OPTS% -Dauth.oidc.discoveryUrl=%AUTH_OIDC_DISCOVERY_URL%"
 rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
 if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
 rem Enterprise (Professional + ABAC) needs no flag: inspecto-policy.jar is on the classpath list, and the module is found via
@@ -1974,6 +1980,8 @@ if [ ! -f inspecto.env ]; then
 # AUTH_OIDC_JWKS_URI=
 # AUTH_OIDC_AUDIENCE=
 # AUTH_OIDC_CLIENT_ID=
+# AUTH_OIDC_PROVIDER=keycloak            # generic (default) | wso2 | keycloak
+# AUTH_OIDC_DISCOVERY_URL=               # e.g. https://<keycloak-host>/realms/inspecto/.well-known/openid-configuration
 # INSPECTO_JAVA_OPTS=-Xmx4g
 ENV
     chmod 600 inspecto.env

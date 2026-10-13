@@ -42,6 +42,23 @@ services:
       retries: 20
       start_period: 60s
 
+  # The OTHER supported OIDC provider (auth.oidc.provider=keycloak): same inspecto-oidc module, config-only choice.
+  # Realm `inspecto` + client `inspecto_spa` + four TEST users are imported from keycloak/inspecto-realm.json.
+  # DEV ONLY: start-dev (plain HTTP, in-memory-ish H2), admin bootstrap credentials and test-user passwords
+  # below/in the realm file are test values, never reuse them. Host port 8180 (8080 is the backend).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    container_name: inspecto-keycloak
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin      # dev-only
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin      # dev-only, deliberately not a secret worth protecting
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./keycloak/inspecto-realm.json:/opt/keycloak/data/import/inspecto-realm.json:ro
+
   # S3-compatible object store for the scale-out phase C work (plan §5.4). Every object-store
   # measurement recorded on 2026-09-14 — the `COPY … TO 's3://…'` write, the read-back, `glob()`
   # enumeration and `parquet_metadata()` sizes — was taken against a MinIO container that had been

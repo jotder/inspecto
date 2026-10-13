@@ -57,28 +57,40 @@ public final class OidcAuthenticator implements Authenticator {
     private final ConfigurableJWTProcessor<SecurityContext> gatewayProcessor;   // null = gateway mode off
     private final String gatewayHeader;
     private final String rolesClaim;
+    private final RoleMapper.Keycloak keycloak;   // null = not the keycloak preset (or rolesClaim set explicitly)
 
     /** No-arg constructor required by {@code ServiceLoader}; reads {@code -Dauth.oidc.*}. */
     public OidcAuthenticator() {
-        this(jwksSource("auth.oidc.jwksUri"), requireProperty("auth.oidc.issuer"),
+        this(jwksSource("auth.oidc.jwksUri", OidcConfig.get("jwksUri")),
+                requireValue(OidcConfig.get("issuer"), "auth.oidc.issuer"),
                 warnIfNoAudience(System.getProperty("auth.oidc.audience"), "auth.oidc.audience"),
                 System.getProperty("auth.oidc.rolesClaim", "roles"),
                 gatewayJwksSourceFromSystemProperties(),
                 System.getProperty("auth.oidc.gateway.issuer"),
                 System.getProperty("auth.oidc.gateway.audience"),
-                System.getProperty("auth.oidc.gateway.header", "X-JWT-Assertion"));
+                System.getProperty("auth.oidc.gateway.header", "X-JWT-Assertion"),
+                keycloakRoles());
     }
 
     /** Explicit-config seam (tests use an in-memory {@code ImmutableJWKSet} — no network dependency). */
     OidcAuthenticator(JWKSource<SecurityContext> jwkSource, String issuer, String audience, String rolesClaim) {
-        this(jwkSource, issuer, audience, rolesClaim, null, null, null, "X-JWT-Assertion");
+        this(jwkSource, issuer, audience, rolesClaim, null, null, null, "X-JWT-Assertion", null);
     }
 
     /** Full seam including the optional gateway trust mode (RBAC R0). */
     OidcAuthenticator(JWKSource<SecurityContext> jwkSource, String issuer, String audience, String rolesClaim,
                       JWKSource<SecurityContext> gatewayJwkSource, String gatewayIssuer, String gatewayAudience,
                       String gatewayHeader) {
+        this(jwkSource, issuer, audience, rolesClaim, gatewayJwkSource, gatewayIssuer, gatewayAudience,
+                gatewayHeader, null);
+    }
+
+    /** Full seam plus the Keycloak role source ({@code null} = read {@code rolesClaim} only, as before). */
+    OidcAuthenticator(JWKSource<SecurityContext> jwkSource, String issuer, String audience, String rolesClaim,
+                      JWKSource<SecurityContext> gatewayJwkSource, String gatewayIssuer, String gatewayAudience,
+                      String gatewayHeader, RoleMapper.Keycloak keycloak) {
         this.rolesClaim = rolesClaim;
+        this.keycloak = keycloak;
         this.processor = processor(jwkSource, issuer, audience);
         this.gatewayProcessor = gatewayJwkSource == null ? null
                 : processor(gatewayJwkSource, requireValue(gatewayIssuer, "auth.oidc.gateway.issuer"),
@@ -149,10 +161,10 @@ public final class OidcAuthenticator implements Authenticator {
             // RBAC R1: the role → grant table is per-request — the bound space's authored roles.toon
             // overlaid on the seed (ControlApi stamps the config root on the exchange pre-auth).
             var defs = Roles.effective(ex);
-            var capabilities = new java.util.LinkedHashSet<>(RoleMapper.capabilitiesFor(claims, rolesClaim, defs));
+            var capabilities = new java.util.LinkedHashSet<>(RoleMapper.capabilitiesFor(claims, rolesClaim, defs, keycloak));
             // RBAC R2: role-subject Access Profiles enforce server-side by shaping the Subject's
             // capabilities here — only recognised (table-backed) roles count toward the union.
-            var held = RoleMapper.roles(claims, rolesClaim).stream()
+            var held = RoleMapper.roles(claims, rolesClaim, keycloak).stream()
                     .map(r -> r.toLowerCase(java.util.Locale.ROOT)).filter(defs::containsKey).toList();
             capabilities.removeAll(AccessGrants.deniedCapabilities(ex, held));
             // RBAC R3: expose the recognised role names server-internally so component sharing can
@@ -160,7 +172,7 @@ public final class OidcAuthenticator implements Authenticator {
             ComponentAccess.heldRoles(ex, Set.copyOf(held));
             Subject.stampIssuer(ex, claims.getIssuer());   // bearer vs gateway issuer: separate idempotency namespaces
             return Optional.of(new Subject(subjectId, Set.copyOf(capabilities),
-                    RoleMapper.dataScopesFor(claims, rolesClaim, defs),
+                    RoleMapper.dataScopesFor(claims, rolesClaim, defs, keycloak),
                     attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims), displayName(claims)));
         } catch (Exception e) {
             return Optional.empty();   // bad signature, wrong issuer/audience, expired, malformed — all 401
@@ -205,8 +217,16 @@ public final class OidcAuthenticator implements Authenticator {
         return out;
     }
 
-    private static JWKSource<SecurityContext> jwksSource(String propertyKey) {
-        String uri = requireProperty(propertyKey);
+    /** {@code auth.oidc.provider=keycloak} unions realm + client roles, unless {@code rolesClaim} is set explicitly. */
+    private static RoleMapper.Keycloak keycloakRoles() {
+        String explicit = System.getProperty("auth.oidc.rolesClaim");
+        if (OidcConfig.provider() != OidcConfig.Provider.KEYCLOAK || (explicit != null && !explicit.isBlank()))
+            return null;
+        return new RoleMapper.Keycloak(System.getProperty("auth.oidc.clientId"));
+    }
+
+    private static JWKSource<SecurityContext> jwksSource(String propertyKey, String configured) {
+        String uri = requireValue(configured, propertyKey);
         try {
             return new RemoteJWKSet<>(new URL(uri));
         } catch (MalformedURLException e) {
@@ -218,7 +238,7 @@ public final class OidcAuthenticator implements Authenticator {
     private static JWKSource<SecurityContext> gatewayJwksSourceFromSystemProperties() {
         String issuer = System.getProperty("auth.oidc.gateway.issuer");
         if (issuer == null || issuer.isBlank()) return null;
-        return jwksSource("auth.oidc.gateway.jwksUri");
+        return jwksSource("auth.oidc.gateway.jwksUri", System.getProperty("auth.oidc.gateway.jwksUri"));
     }
 
     private static String requireValue(String value, String key) {
@@ -226,9 +246,5 @@ public final class OidcAuthenticator implements Authenticator {
             throw new IllegalStateException("inspecto-oidc requires -D" + key
                     + " (Professional edition, docs/EDITIONS.md \"Security direction\")");
         return value;
-    }
-
-    private static String requireProperty(String key) {
-        return requireValue(System.getProperty(key), key);
     }
 }

@@ -29,9 +29,18 @@ import java.util.Set;
 final class RoleMapper {
     private RoleMapper() {}
 
+    /** The Keycloak preset's role source: realm roles union client roles of {@code clientId} (null: the token's
+     *  {@code azp}). Passed only when {@code auth.oidc.provider=keycloak} and no explicit {@code rolesClaim}. */
+    record Keycloak(String clientId) {}
+
     static Set<String> capabilitiesFor(JWTClaimsSet claims, String rolesClaim, Map<String, Roles.Def> defs) {
+        return capabilitiesFor(claims, rolesClaim, defs, null);
+    }
+
+    static Set<String> capabilitiesFor(JWTClaimsSet claims, String rolesClaim, Map<String, Roles.Def> defs,
+                                       Keycloak keycloak) {
         Set<String> caps = new LinkedHashSet<>();
-        for (String role : roles(claims, rolesClaim)) {
+        for (String role : roles(claims, rolesClaim, keycloak)) {
             Roles.Def def = defs.get(role.toLowerCase(Locale.ROOT));
             if (def != null) caps.addAll(def.capabilities());
         }
@@ -46,6 +55,11 @@ final class RoleMapper {
      * objects, fail-closed).
      */
     static Set<String> dataScopesFor(JWTClaimsSet claims, String rolesClaim, Map<String, Roles.Def> defs) {
+        return dataScopesFor(claims, rolesClaim, defs, null);
+    }
+
+    static Set<String> dataScopesFor(JWTClaimsSet claims, String rolesClaim, Map<String, Roles.Def> defs,
+                                     Keycloak keycloak) {
         Set<String> scopes = new LinkedHashSet<>();
         boolean scoped = false;
         try {
@@ -57,7 +71,7 @@ final class RoleMapper {
         } catch (ParseException ignored) {
             // not a string list — treated as absent
         }
-        for (String role : roles(claims, rolesClaim)) {
+        for (String role : roles(claims, rolesClaim, keycloak)) {
             String r = role.toLowerCase(Locale.ROOT);
             if (r.startsWith("case:")) {
                 scoped = true;
@@ -78,6 +92,13 @@ final class RoleMapper {
      *  {@code realm_access.roles}. Empty when neither shape is present. Package-visible so
      *  {@code OidcAuthenticator} can hand the held roles to {@code AccessGrants} (R2). */
     static List<String> roles(JWTClaimsSet claims, String rolesClaim) {
+        return roles(claims, rolesClaim, null);
+    }
+
+    /** With a {@link Keycloak} source: {@code realm_access.roles} union {@code resource_access.<client>.roles}
+     *  (client = configured id, else the token's {@code azp}); otherwise exactly {@link #roles(JWTClaimsSet, String)}. */
+    static List<String> roles(JWTClaimsSet claims, String rolesClaim, Keycloak keycloak) {
+        if (keycloak != null) return keycloakRoles(claims, keycloak.clientId());
         try {
             List<String> direct = claims.getStringListClaim(rolesClaim);
             if (direct != null) return direct;
@@ -91,5 +112,17 @@ final class RoleMapper {
             return out;
         }
         return List.of();
+    }
+
+    private static List<String> keycloakRoles(JWTClaimsSet claims, String configuredClient) {
+        Set<String> out = new LinkedHashSet<>();
+        if (claims.getClaim("realm_access") instanceof Map<?, ?> realm && realm.get("roles") instanceof List<?> l)
+            for (Object o : l) out.add(String.valueOf(o));
+        String client = configuredClient != null && !configuredClient.isBlank() ? configuredClient
+                : claims.getClaim("azp") instanceof String azp ? azp : null;
+        if (client != null && claims.getClaim("resource_access") instanceof Map<?, ?> res
+                && res.get(client) instanceof Map<?, ?> c && c.get("roles") instanceof List<?> l)
+            for (Object o : l) out.add(String.valueOf(o));
+        return new ArrayList<>(out);
     }
 }

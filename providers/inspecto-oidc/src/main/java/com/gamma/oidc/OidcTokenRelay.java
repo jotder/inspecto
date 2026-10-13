@@ -101,14 +101,14 @@ public final class OidcTokenRelay implements TokenRelay {
      */
     @Override
     public Map<String, Object> bootstrapAuth() {
-        String authorize = System.getProperty("auth.oidc.authorizeUrl");
+        String authorize = OidcConfig.get("authorizeUrl");
         if (authorize == null || authorize.isBlank()) return Map.of();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("authorizeUrl", authorize.trim());
         out.put("clientId", clientId);
         String scopes = System.getProperty("auth.oidc.scopes");
         if (scopes != null && !scopes.isBlank()) out.put("scopes", scopes.trim());
-        String endSession = System.getProperty("auth.oidc.endSessionUrl");
+        String endSession = OidcConfig.get("endSessionUrl");
         if (endSession != null && !endSession.isBlank()) out.put("endSessionUrl", endSession.trim());
         return out;
     }
@@ -190,7 +190,7 @@ public final class OidcTokenRelay implements TokenRelay {
      * {@code /.well-known/openid-configuration} ({@code token_endpoint}) and pass it explicitly.
      */
     private static String requireTokenEndpoint() {
-        String endpoint = System.getProperty("auth.oidc.tokenEndpoint");
+        String endpoint = OidcConfig.get("tokenEndpoint");
         if (endpoint == null || endpoint.isBlank())
             throw new IllegalStateException("inspecto-oidc requires -Dauth.oidc.tokenEndpoint"
                     + " (the OIDC provider's token_endpoint, from its /.well-known/openid-configuration;"
