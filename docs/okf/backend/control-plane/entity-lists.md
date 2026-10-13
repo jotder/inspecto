@@ -22,7 +22,7 @@ one shared, hash-chained fact log (`EntityFactLog`, `EntityRegistry`, package `c
 (`AbsentModuleRoutes` answers the seven routes 503; `/bootstrap` `features.entityList` is `false`). Link Analysis
 (`inspecto-geo-link`) depends on it — its `/inv/entity-identities*` routes, `EntityMasking` and the Investigation list-ops
 append to and read the SAME log through it; the reverse dependency does not exist. The on-disk format and paths are
-unchanged (`audit/entity-facts/`, `mask.key`), so a Space created before the move still verifies its chain. The masking
+unchanged (`audit/entity-facts/`; the masking key itself moved to `<root>.secrets/.risk-score-mask.key` on 2026-10-13, D-M7), so a Space created before the move still verifies its chain. The masking
 token algorithm moved with it as `MaskTokens`.
 
 ## Range entries (`EntityListEntries`)

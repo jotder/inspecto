@@ -68,9 +68,10 @@ in Link Analysis. That is the rule the operator named; decision D-M1 offers mask
 `mask.key`, `<write root>/audit/entity-facts/`), the key Link Analysis exploration reads and Entity Lists use. So a BI
 alias equals the Link Analysis exploration alias and the Entity List alias of the same raw id in the same Space, and an
 analyst can paste an alias from a Widget into an Entity List. The key derivation is now ONE function
-(`MaskTokens.spaceKey`), which `ExplorationMasking` delegates to. ⚠ Risk / Anomaly Score reads use a DIFFERENT key
-(`.risk-score-mask.key`, `EvidenceMasker`), so a score row's alias differs from the BI alias of the same id. Pre-existing;
-unifying them is decision D-M7 and is out of scope.
+(`MaskTokens.spaceKey`), which `ExplorationMasking` delegates to. **D-M7 BUILT 2026-10-13 (operator, option 2):** the Space identity key now lives in `<write root>.secrets/.risk-score-mask.key`
+(owner-only, outside every exported tree) and is read by `MaskTokens.spaceKey` AND `EvidenceMasker`, so a Risk / Anomaly Score row, an audit
+read, an Entity List member, Screening, Link Analysis exploration and a BI cell show one alias for one id. Investigation keys stay per Investigation.
+Tokens minted before the move differ (free). Pinned by `ControlApiBiQueryMaskingTest` (BI alias equals `EvidenceMasker` token).
 
 ### 4.2 Aggregation
 The mask is applied AFTER execution, to the output cells. Grouping, `countDistinct` and ordering run over raw values, so a
