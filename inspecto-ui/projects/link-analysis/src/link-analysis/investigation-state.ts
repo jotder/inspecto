@@ -172,6 +172,8 @@ export function investigationErrorMessage(err: unknown, fallback: string): strin
                 server
             );
         case 403:
+            // a four-eyes refusal (the neighbours read of a node above the fan-out limit) is not a missing capability
+            if (/four-eyes/i.test(server)) return 'Refused — ' + server;
             return (
                 'You are not allowed to change Investigations (it needs the Incident-management capability). Server: ' +
                 server

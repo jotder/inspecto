@@ -205,6 +205,9 @@ describe('LA-10 investigation-state', () => {
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).toContain('not yours');
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).toContain("no investigation 'x'");
         expect(investigationErrorMessage(err(403, 'missing canManageIncidents'), 'f')).toContain('not allowed');
+        const heldRead = investigationErrorMessage(err(403, 'a neighbours read of one entity (degree 60) is a sensitive read [fan-out 60 > 1] - four-eyes applies'), 'f');
+        expect(heldRead).toContain('four-eyes applies');
+        expect(heldRead).not.toContain('capability');
         expect(investigationErrorMessage(err(409, 'nothing to undo'), 'f')).toBe('Refused — nothing to undo');
         expect(investigationErrorMessage(err(422, "'exclude' requires a 'reason'"), 'f')).toContain(
             "'exclude' requires a 'reason'",
