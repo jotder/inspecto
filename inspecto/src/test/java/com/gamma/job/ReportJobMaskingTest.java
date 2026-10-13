@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.audit.Event;
+import com.gamma.event.EventLog;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -9,7 +11,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -91,5 +96,20 @@ class ReportJobMaskingTest {
         try (Stream<Path> files = Files.list(out)) { assertEquals(0, files.count(), "nothing written"); }
         assertEquals("SUCCESS", run(Map.of("scope", "dataset", "dataset", "plain_ds", "measures", "max(msisdn)",
                 "out_dir", out.toString())).status(), "the same measure over an unclassified Dataset runs");
+    }
+
+    @Test
+    void theReadyEventNamesTheAliasedColumnsAndIsEmptyWhenNothingWas(@TempDir Path root, @TempDir Path out) throws Exception {
+        seed(root);
+        List<Object> aliased = new CopyOnWriteArrayList<>();
+        BiConsumer<EventLog, Event> tap = (log, e) -> {
+            if ("REPORT_READY".equals(e.type())) aliased.add(e.attributes().get("aliasedColumns"));
+        };
+        EventLog.addTap(tap);
+        try {
+            run(Map.of("scope", "dataset", "dataset", "calls_ds", "out_dir", out.toString()));
+            run(Map.of("scope", "dataset", "dataset", "plain_ds", "out_dir", out.toString()));
+        } finally { EventLog.removeTap(tap); }
+        assertEquals(List.of("[msisdn]", "[]"), new ArrayList<>(aliased), "classified: msisdn; the negative control: none");
     }
 }

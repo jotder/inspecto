@@ -237,7 +237,6 @@ applies: `inspecto-exchange` cannot see the entity store, so (b) and (c) need a 
 No code was changed for this item.
 
 ### 11.7 Still open (not built, no decision needed beyond filing)
-* The Intelligence tools' `query_author` rows, and any Job type other than the Report Job that writes rows to a file, are not
-  masked; each needs the 11.2 seam wired in.
-* A Report file whose rows were aliased carries no marker, and the REPORT_READY event does not say a column was aliased. Cheap
-  to add once D-M5 settles whether a reveal option exists.
+* `query_author` was checked 2026-10-13: it returns a validated SQL draft and never executes it, so it returns no rows (not a hole).
+  Any Job type other than the Report Job that writes rows to a file still needs the 11.2 seam wired in.
+* Built 2026-10-13: `REPORT_READY` carries `aliasedColumns` (the output columns holding an alias), via `ReportRowMasking.Masked`.

@@ -4,6 +4,7 @@ import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
@@ -23,8 +24,11 @@ public interface ReportRowMasking {
      * @param spec the structured spec the export compiled from, or {@code null} for a raw {@code SELECT *} export
      * @throws IllegalArgumentException when the spec would return a raw key through {@code min/max/sum/avg} (fails the Run)
      */
-    QueryExecutor.Result mask(Path writeRoot, String datasetId, Map<String, Object> dataset, MeasureCompiler.Spec spec,
-                              QueryExecutor.Result rows);
+    Masked mask(Path writeRoot, String datasetId, Map<String, Object> dataset, MeasureCompiler.Spec spec,
+                QueryExecutor.Result rows);
+
+    /** The masked rows plus the output columns whose values were replaced by an alias (empty when nothing was aliased). */
+    record Masked(QueryExecutor.Result result, List<String> aliasedColumns) { }
 
     static Optional<ReportRowMasking> provider() {
         return ServiceLoader.load(ReportRowMasking.class).findFirst();

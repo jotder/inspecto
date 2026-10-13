@@ -72,6 +72,8 @@ final class ReportJob implements Job {
     private final ReportRunner reports;
     /** The space's data dir (for a dataset export's {@code physicalRef}); {@code null} degrades to view-backed only. */
     private final String dataDir;
+    /** Output columns of the last dataset export that hold an alias, not a key (BI-QUERY-MASKING-1); set by {@code datasetRows}. */
+    private volatile List<String> aliasedColumns = List.of();
 
     ReportJob(JobConfig cfg, ReportRunner reports) {
         this(cfg, reports, null);
@@ -106,6 +108,7 @@ final class ReportJob implements Job {
         String scope = cfg.opt("scope", "status").toLowerCase();
         long t0 = System.nanoTime();
 
+        aliasedColumns = List.of();
         Object report;
         List<Map<String, Object>> rows = null;   // dataset scope: tabular result for CSV rendering
         int cut = -1;                            // dataset scope: the row cap the result hit, else -1
@@ -224,7 +227,8 @@ final class ReportJob implements Job {
                 .attr("job", cfg.name())
                 .attr("scope", scope)
                 .attr("path", artifact.toString())
-                .attr("truncated", cut >= 0));
+                .attr("truncated", cut >= 0)
+                .attr("aliasedColumns", aliasedColumns));   // BI-QUERY-MASKING-1: which columns hold aliases, not keys
         return artifact.toString();
     }
 
@@ -292,7 +296,11 @@ final class ReportJob implements Job {
         QueryExecutor.Result raw = QueryExecutor.run(new QueryExecutor.Request(
                 cfg.require("dataset"), relationSql, sql.sql(), cap, 0, List.of(), List.of(), sql.params()));
         // BI-QUERY-MASKING-1: the file leaves the platform, so classified entity keys are always aliased (no viewer to ask).
-        return ReportRowMasking.provider().map(m -> m.mask(writeRoot, cfg.require("dataset"), dataset, spec, raw)).orElse(raw);
+        ReportRowMasking.Masked masked = ReportRowMasking.provider()
+                .map(m -> m.mask(writeRoot, cfg.require("dataset"), dataset, spec, raw))
+                .orElse(new ReportRowMasking.Masked(raw, List.of()));
+        aliasedColumns = masked.aliasedColumns();
+        return masked.result();
     }
 
     /** The configured row cap (default 10,000), as the request carries it. */

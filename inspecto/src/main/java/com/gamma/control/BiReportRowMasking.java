@@ -16,7 +16,7 @@ import java.util.Map;
 public final class BiReportRowMasking implements ReportRowMasking {
 
     @Override
-    public QueryExecutor.Result mask(Path writeRoot, String datasetId, Map<String, Object> dataset, MeasureCompiler.Spec spec,
+    public Masked mask(Path writeRoot, String datasetId, Map<String, Object> dataset, MeasureCompiler.Spec spec,
                                      QueryExecutor.Result rows) {
         BiResultMasking masking = BiResultMasking.of(writeRoot, new ComponentStore(writeRoot.resolve("registry")),
                 new ViewStore(writeRoot.resolve("views")), datasetId, dataset, false);
@@ -27,6 +27,10 @@ public final class BiReportRowMasking implements ReportRowMasking {
         }
         List<String> dimensions = spec != null ? spec.groupBy()
                 : rows.columns().stream().map(ResultSetDescriptor.Column::name).toList();
-        return masking.apply(rows, dimensions, null);
+        QueryExecutor.Result masked = masking.apply(rows, dimensions, null);
+        Map<String, Object> described = masking.describe();
+        @SuppressWarnings("unchecked")
+        List<String> aliased = described == null ? List.of() : (List<String>) described.get("columns");
+        return new Masked(masked, aliased);
     }
 }
