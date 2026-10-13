@@ -343,10 +343,16 @@ export function publicViewVerdict(res) {
   return null;
 }
 
-/** A mangled and a revoked token answer 404 with the same body (no oracle). */
+/** Per-request fields that legitimately differ between two otherwise identical answers. */
+const PER_REQUEST_KEYS = new Set(['correlationId', 'requestId', 'timestamp']);
+const withoutPerRequest = (v) => Array.isArray(v) ? v.map(withoutPerRequest)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => !PER_REQUEST_KEYS.has(k)).map(([k, x]) => [k, withoutPerRequest(x)]))
+  : v;
+
+/** A mangled and a revoked token answer 404 with the same body (no oracle) - per-request ids (correlationId) aside. */
 export function uniform404Verdict(a, b) {
   if (a.status !== 404 || b.status !== 404) return `expected two 404s, got ${a.status} and ${b.status}`;
-  return JSON.stringify(a.body) === JSON.stringify(b.body) ? null : `404 bodies differ: ${excerpt(a)} vs ${excerpt(b)}`;
+  return JSON.stringify(withoutPerRequest(a.body)) === JSON.stringify(withoutPerRequest(b.body)) ? null : `404 bodies differ: ${excerpt(a)} vs ${excerpt(b)}`;
 }
 
 /** The sign-in picker: a Demo Auth build publishes `auth.mock`, and `auth.spacesAttached` >= 1 when it publishes that. */

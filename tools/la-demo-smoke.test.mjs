@@ -448,6 +448,9 @@ test('--embed: mint, headers, mangled == revoked 404, revoke pass; each defect F
   assert.match(publicViewVerdict({ status: 200, headers: { 'content-security-policy': "frame-ancestors 'none'", 'x-frame-options': 'SAMEORIGIN', 'cache-control': 'no-store' } }), /DENY/);
   assert.notEqual(mangleToken('abcA'), 'abcA');
   assert.match(uniform404Verdict({ status: 404, body: 1 }, { status: 200, body: 1 }), /two 404s/);
+  const nf = (id, message = 'not found') => ({ status: 404, body: { error: { code: 'NOT_FOUND', message, correlationId: id } } });
+  assert.equal(uniform404Verdict(nf('aaa'), nf('bbb')), null);   // only the per-request correlationId differs
+  assert.match(uniform404Verdict(nf('aaa'), nf('bbb', 'token revoked')), /404 bodies differ/);   // a real oracle still fails
 });
 
 test('signin-picker FAILs a non-demo build or spacesAttached 0', async () => {

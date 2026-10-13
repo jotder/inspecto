@@ -145,6 +145,9 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
   (exactly two at 0.985); `MULE-HUB-01` is in the list (manual: 0.979; `SHELL-A` above 1). Velocity lists at least 3 fast forwarders. Cash-out
   concentration: `TILL-06` holds **97 %** (test tolerance 0.97 +/- 0.005) of cash-out value from **8 payers**. Benefit-transfer isolates `SKIMMER-01`
   with **6 recipients**.
+  **Names depend on masking:** under typed masking (the demo's default for `fm.analyst`) the measure returns `masked:<hex>` ids, so `MULE-HUB-01` / `TILL-06` /
+  `RELAY-*` read as tokens; the counts, the two 0.985 scores, the 97 % and the 8 payers hold unchanged. `node tools/la-demo-figures.mjs` checks them that way,
+  and checks the names too when run `--user <a persona that holds reveal>`.
 * **Contradiction to be aware of:** the readiness plan's DR-T6 row says `TILL-06` "at 82 %". The test and the manual say **97 %**. Quote 97 %.
 * **Proves:** whole-Dataset behaviour detectors are server-computed and read the whole Dataset, not the filtered view (manual §4.3, §9.8).
 * **If it goes wrong:** **Run Measure** stays disabled until the form is valid; the window is capped at 31 days, evaluated in UTC; 413/429 have plain
