@@ -176,7 +176,7 @@ a backend booted with the Keycloak property set above returned `401` with no/gar
 `POST /api/v1/alerts/evaluate` (needs `canOperateRuns`) `200` for a user holding it only as a **client** role and
 `403` for the `business`, `pipeline-developer` and `admin` users; a real Authorization Code + PKCE sign-in
 (`/bootstrap` `auth` -> Keycloak login -> `POST /auth/exchange`, nonce checked) returned `200` with a refresh
-cookie. ⚠ The SPA itself was not driven in a browser.
+cookie. ✅ The SPA was then driven in a browser (2026-10-13, built SPA served by the backend on :18090): `kc-admin`, `kc-operator`, `kc-business` each signed in through the Keycloak login page and landed in the SPA with their own identity and capabilities (`canOperateRuns` only for the operator, via the CLIENT role), and sign-out reached Keycloak's end-session. ⚠ `post.logout.redirect.uris` on the client must list the SPA origin or the end-session page says "Invalid redirect uri"; the SPA sends no `id_token_hint`, so Keycloak shows a "Do you want to log out?" confirmation first.
 
 ### Gateway trust mode (WSO2 APIM `X-JWT-Assertion`, RBAC R0 — optional)
 

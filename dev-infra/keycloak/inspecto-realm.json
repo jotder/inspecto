@@ -60,7 +60,8 @@
         "http://localhost:8096/*",
         "http://localhost:8097/*",
         "http://localhost:8098/*",
-        "http://localhost:18080/*"
+        "http://localhost:18080/*",
+        "http://localhost:18090/*"
       ],
       "webOrigins": [
         "http://localhost:4200",
@@ -71,11 +72,12 @@
         "http://localhost:8096",
         "http://localhost:8097",
         "http://localhost:8098",
-        "http://localhost:18080"
+        "http://localhost:18080",
+        "http://localhost:18090"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost:8080/*##http://localhost:8090/*##http://localhost:18080/*"
+        "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost:8080/*##http://localhost:8090/*##http://localhost:18080/*##http://localhost:18090/*"
       },
       "defaultClientScopes": [
         "basic",
