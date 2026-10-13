@@ -409,6 +409,25 @@ class ControlApiInvIndexedExpansionTest {
         }
     }
 
+    /** LA-INDEXED-RESTRICTED-EXPAND-1: an `only` rung is cut before the per-anchor rank on the index exactly as in the flat CTE. */
+    @Test
+    void aRestrictedExpandSealsTheSameRowsFromTheIndexAndFromTheFlatDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, ENABLED)) {
+            build(c, FULL);
+            assertTrue(sameExpand(c, "[\"A\"]", List.of(), "\"only\":[\"B\"]").at("/read/rowCount").asInt() > 0, "not vacuous");
+            sameExpand(c, "[\"A\"]", List.of(), "\"only\":[\"B\",\"C\"]");
+            sameExpand(c, "[\"A\",\"B\"]", List.of(), "\"only\":[\"C\"]");
+            sameExpand(c, "[\"A\",\"B\"]", List.of(), "\"only\":[\"A\",\"C\"],\"direction\":\"reciprocal\"");
+            sameExpand(c, "[\"A\",\"B\"]", List.of(), "\"only\":[\"B\",\"C\",\"X\"],\"direction\":\"in\",\"minEvents\":2");
+            sameExpand(c, "[\"A\"]", List.of(), "\"only\":[\"nobody\"]");                                   // nothing chosen exists: an empty read
+            sameExpand(c, "[\"H\"]", List.of(), "\"only\":[\"h01\",\"h05\",\"h20\"],\"maxFanOut\":2");   // the cap counts only the chosen
+            JsonNode capped = sameExpand(c, "[\"H\"]", List.of(), "\"only\":[\"h01\",\"h05\",\"h20\"],\"maxFanOut\":2");
+            assertTrue(capped.at("/read/fanOutCapped").asLong() > 0, "the fan-out cap fired on the chosen neighbours");
+            sameExpand(c, "[\"H\"]", List.of(), "\"only\":[\"h01\",\"h05\",\"h20\"],\"budget\":2");
+        }
+    }
+
     @Test
     void aRungTheIndexCannotAnswerExactlyKeepsTheFlatCteAndATwinIsServed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();

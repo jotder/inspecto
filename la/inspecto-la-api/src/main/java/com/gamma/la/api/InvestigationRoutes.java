@@ -1179,7 +1179,7 @@ public final class InvestigationRoutes implements RouteModule {
         // D-3 step 6: a SIMPLE rung is answered from the edge index when - and only when - it can answer exactly
         // (IndexedExpand); anything else, and every index failure, falls through to the CTE below untouched. The R3 gate above has run.
         IndexedRead.Outcome<IndexedExpand.Result> indexed = null;
-        if (!frontier.isEmpty() && only.isEmpty()) {   // a rung restricted to chosen neighbours is answered by the flat read below, exactly
+        if (!frontier.isEmpty()) {   // a restricted rung (`only`) is cut before the per-anchor rank on either path
             Map<String, Object> hdr = inv.header();
             indexed = IndexedExpand.attempt(inv.writeRoot(), api.dataRoot(), relationSql, new IndexedExpand.Request(dataset,
                     String.valueOf(hdr.get("sourceCol")), String.valueOf(hdr.get("targetCol")),
@@ -1187,7 +1187,7 @@ public final class InvestigationRoutes implements RouteModule {
                     direction, ((Number) query.get("minEvents")).longValue(), fanOut, budget, window != null, minDays != null,
                     degMin != null || degMax != null, query.get("merged") != null,
                     hdr.get("eventsCol") == null ? null : String.valueOf(hdr.get("eventsCol")), admitted,
-                    query.get("hubThreshold") instanceof Number t ? t.intValue() : null), InvRoutes.traversalPolicy(), pins);
+                    query.get("hubThreshold") instanceof Number t ? t.intValue() : null, only), InvRoutes.traversalPolicy(), pins);
             if (indexed.served()) {
                 rows = new ArrayList<>(indexed.result().rows());
                 truncated = indexed.result().truncated();

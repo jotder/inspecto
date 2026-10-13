@@ -45,13 +45,13 @@ final class IndexedExpand {
     record Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> frontier,
                    List<String> excluded, List<String> kinds, String direction, long minEvents, Integer fanOut, int budget,
                    boolean windowed, boolean minDays, boolean degreeBounded, boolean merged, String eventsCol,
-                   Set<String> admitted, Integer hubThreshold) {
+                   Set<String> admitted, Integer hubThreshold, List<String> only) {
         /** The rung without supernode suppression (no hub degree asked of the index). */
         Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> frontier, List<String> excluded,
                 List<String> kinds, String direction, long minEvents, Integer fanOut, int budget, boolean windowed, boolean minDays,
                 boolean degreeBounded, boolean merged, String eventsCol) {
             this(datasetId, sourceCol, targetCol, kindCol, frontier, excluded, kinds, direction, minEvents, fanOut, budget, windowed,
-                    minDays, degreeBounded, merged, eventsCol, Set.of(), null);
+                    minDays, degreeBounded, merged, eventsCol, Set.of(), null, List.of());
         }
     }
 
@@ -127,6 +127,7 @@ final class IndexedExpand {
         }
         Set<List<String>> have = new HashSet<>();
         for (Pair p : pairs.keySet()) have.add(List.of(p.s(), p.t()));
+        Set<String> only = new HashSet<>(rq.only());
         Map<String, List<Map.Entry<Pair, Long>>> byAnchor = new LinkedHashMap<>();
         for (Map.Entry<Pair, Long> e : pairs.entrySet()) {
             Pair p = e.getKey();
@@ -137,6 +138,8 @@ final class IndexedExpand {
                 case "reciprocal" -> (s || t) && have.contains(List.of(p.t(), p.s()));
                 default -> s || t;
             };
+            // LA-INDEXED-RESTRICTED-EXPAND-1: the chosen neighbours cut BEFORE the per-anchor rank, as the flat statement's `other IN only`
+            if (!only.isEmpty() && !only.contains(s ? p.t() : p.s())) continue;
             if (cand && e.getValue() >= rq.minEvents()) byAnchor.computeIfAbsent(s ? p.s() : p.t(), x -> new ArrayList<>()).add(e);
         }
         Comparator<Map.Entry<Pair, Long>> strongest = (a, b) -> {
