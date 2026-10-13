@@ -15,12 +15,12 @@ import { LinkAnalysisIdentityComponent } from '@inspecto/link-analysis/link-anal
     imports: [LinkAnalysisEntityListsComponent, LinkAnalysisIdentityComponent],
     providers: [InvestigationSessionStore],
     template: `
-        <section class="mx-auto flex w-full max-w-4xl flex-col gap-4 p-6" aria-labelledby="la-entity-lists-title">
+        <div class="mx-auto flex w-full max-w-4xl flex-col gap-4 p-6">
             <h1 id="la-entity-lists-title" class="text-title m-0 font-semibold">Entity Lists</h1>
             <h2 class="sr-only">Lists and identity</h2>
             <inspecto-link-analysis-entity-lists></inspecto-link-analysis-entity-lists>
             <inspecto-link-analysis-identity></inspecto-link-analysis-identity>
-        </section>
+        </div>
     `,
 })
 export class EntityListsPageComponent {}

@@ -20,7 +20,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, InspectoAlertComponent],
     template: `
-        <div class="flex min-h-screen w-full flex-col md:flex-row">
+        <main class="flex min-h-screen w-full flex-col md:flex-row">
             <!-- Left: whose deployment this is. Branding comes from the bootstrap payload, because
                  /settings/branding is auth-gated and would 401 on exactly this screen. -->
             <div class="bg-default flex flex-col justify-between gap-10 p-8 md:w-1/2 md:p-12 lg:p-16">
@@ -171,7 +171,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     <p class="text-secondary mt-6 border-t pt-4 text-sm">Need access? Ask your space administrator.</p>
                 </div>
             </div>
-        </div>
+        </main>
     `,
 })
 export class SignInComponent implements OnInit {

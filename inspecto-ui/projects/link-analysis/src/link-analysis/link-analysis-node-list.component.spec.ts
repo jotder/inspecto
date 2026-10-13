@@ -74,6 +74,24 @@ describe('LinkAnalysisNodeListComponent (LA-A11Y-AUDIT-1: the canvas text altern
         expect(el.querySelector('[data-testid="node-list-status"]')?.textContent).toContain('Showing 1–5 of 5 nodes');
     });
 
+    it('says in words what the canvas draws as a dotted outline or a halo (the non-colour cue has a text twin)', async () => {
+        const { f, el, rows, host } = create();
+        host.graph.set({
+            nodes: [
+                { id: 'a', data: { label: 'A', kind: 'msisdn', unexpanded: true } },
+                { id: 'b', data: { label: 'B', kind: 'msisdn', highConnectivity: true, unexpanded: true } },
+                { id: 'c', data: { label: 'C', kind: 'msisdn' } },
+            ],
+            edges: [],
+        });
+        f.detectChanges();
+        expect(rows()[0].textContent).toContain('not expanded yet');
+        expect(rows()[1].textContent).toContain('high connectivity, not expanded');
+        expect(rows()[1].textContent).not.toContain('not expanded yet');
+        expect(rows()[2].textContent).not.toContain('expanded');
+        await expectNoA11yViolations(el);
+    });
+
     it('roving tabindex: one tab stop; arrows, Home and End move it and focus', () => {
         const { f, rows, key } = create();
         const tabbable = (): number[] => rows().flatMap((r, i) => (r.tabIndex === 0 ? [i] : []));

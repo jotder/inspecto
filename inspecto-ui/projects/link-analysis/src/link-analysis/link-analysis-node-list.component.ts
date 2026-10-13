@@ -83,7 +83,18 @@ export const NODE_LIST_PAGE = 500;
                                 (click)="select(n.id, i)"
                                 (keydown)="onKeydown($event)"
                             >
-                                <td class="py-1 pr-2">{{ n.data.label }}</td>
+                                <td class="py-1 pr-2">
+                                    {{ n.data.label }}
+                                    @if (n.data.highConnectivity) {
+                                        <span class="text-secondary text-xs" data-testid="node-flag-hub">
+                                            (high connectivity, not expanded)</span
+                                        >
+                                    } @else if (n.data.unexpanded) {
+                                        <span class="text-secondary text-xs" data-testid="node-flag-unexpanded">
+                                            (not expanded yet)</span
+                                        >
+                                    }
+                                </td>
                                 <td class="py-1 pr-2">{{ n.data.kind }}</td>
                                 <td class="py-1 tabular-nums">{{ degree().get(n.id) ?? 0 }}</td>
                             </tr>

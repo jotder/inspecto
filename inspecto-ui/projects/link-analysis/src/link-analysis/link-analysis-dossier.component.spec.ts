@@ -137,6 +137,10 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         expect(el.textContent).toContain('(read truncated)');
         expect(el.textContent).toContain('sha256:root');
         expect(el.textContent).toContain('no score vectors');
+        // LA-A11Y-AUDIT-1: a label on a role-less div is ignored by assistive tech, so each button row is a named group
+        for (const name of ['Dossier scope', 'Verify a manifest', 'Export bundle']) {
+            expect(el.querySelector(`div[role="group"][aria-label="${name}"]`), name).not.toBeNull();
+        }
         await expectNoA11yViolations(el);
     });
 

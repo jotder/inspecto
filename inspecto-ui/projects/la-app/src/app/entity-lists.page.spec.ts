@@ -29,7 +29,11 @@ describe('EntityListsPageComponent', () => {
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelectorAll('h1')).toHaveLength(1);
-        expect(el.querySelector('section')?.getAttribute('aria-labelledby')).toBe('la-entity-lists-title');
+        // landmark-unique (real axe, 2026-10-13): the page wrapper was a second region also named "Entity Lists"
+        const names = Array.from(el.querySelectorAll('section[aria-label], section[aria-labelledby], form[aria-label]')).map(
+            (r) => r.getAttribute('aria-label') ?? el.querySelector(`#${r.getAttribute('aria-labelledby')}`)?.textContent?.trim(),
+        );
+        expect(new Set(names).size).toBe(names.length);
         await expectNoA11yViolations(el);
     }, 30_000);
 });

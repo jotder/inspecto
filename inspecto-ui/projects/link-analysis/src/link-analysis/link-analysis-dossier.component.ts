@@ -65,7 +65,7 @@ function saveBlob(blob: Blob, name: string): void {
                     {{ dossier() ? 'Rebuild' : 'Build dossier' }}
                 </button>
             </div>
-            <div class="flex flex-wrap items-start gap-2" aria-label="Dossier scope">
+            <div class="flex flex-wrap items-start gap-2" role="group" aria-label="Dossier scope">
                 <mat-form-field class="w-40" subscriptSizing="dynamic">
                     <mat-label>At step</mat-label>
                     <input matInput type="number" min="0" [attr.max]="steps()" [formControl]="atControl" />
@@ -176,7 +176,7 @@ function saveBlob(blob: Blob, name: string): void {
                 </div>
             }
 
-            <div class="flex flex-wrap items-center gap-1" aria-label="Verify a manifest">
+            <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Verify a manifest">
                 <button mat-stroked-button [disabled]="busy() || !dossier()" (click)="verifyIssued()">
                     Verify this manifest
                 </button>
@@ -190,7 +190,7 @@ function saveBlob(blob: Blob, name: string): void {
                     (change)="upload($event)"
                 />
             </div>
-            <div class="flex flex-wrap items-center gap-1" aria-label="Export bundle">
+            <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Export bundle">
                 <button mat-stroked-button [disabled]="busy()" (click)="downloadBundle()">Download sealed bundle</button>
                 <button mat-button [disabled]="busy()" (click)="bundleFile.click()">Verify a bundle…</button>
                 <input

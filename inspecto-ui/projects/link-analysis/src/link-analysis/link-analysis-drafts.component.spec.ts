@@ -111,6 +111,22 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('LA-A11Y-AUDIT-1: every per-Draft action names its Draft, and the Draft row is a named group', async () => {
+        const { el } = await create({}, [DRAFT, { ...DRAFT, draftId: 'd-2' }]);
+        const groups = Array.from(el.querySelectorAll('[role="group"][aria-label^="Draft "]'));
+        expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Draft d-1', 'Draft d-2']);
+        for (const g of groups) {
+            const id = g.getAttribute('aria-label')!.slice('Draft '.length);
+            for (const b of Array.from(g.querySelectorAll('button'))) {
+                const visible = b.textContent!.trim();
+                const name = b.getAttribute('aria-label')!;
+                expect(name, visible).toContain(id);
+                expect(name.toLowerCase(), visible).toContain(visible.toLowerCase().split(' ')[0]); // label in name (2.5.3)
+            }
+        }
+        await expectNoA11yViolations(el);
+    });
+
     it('LA-UI-DRAFT-OPS-1: makes a Draft the working scope and goes back to the main log', async () => {
         const { f, el } = await create();
         await click(f, button(el, 'Work on this Draft'));

@@ -119,6 +119,7 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                 <div
                     class="flex flex-col gap-1 border-t pt-1"
                     style="border-color: var(--gamma-border)"
+                    role="group"
                     [attr.aria-label]="'Draft ' + d.draftId"
                 >
                     <div class="flex flex-wrap items-center gap-2">
@@ -148,21 +149,62 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                         <div class="flex flex-wrap items-center gap-1">
                             @if (activeDraftId() === d.draftId) {
                                 <inspecto-status-badge value="info" label="working scope"></inspecto-status-badge>
-                                <button mat-button [disabled]="busy()" (click)="scope.emit(null)">
+                                <button
+                                    mat-button
+                                    [disabled]="busy()"
+                                    [attr.aria-label]="'Back to the Investigation from Draft ' + d.draftId"
+                                    (click)="scope.emit(null)"
+                                >
                                     Back to the Investigation
                                 </button>
                             } @else {
-                                <button mat-stroked-button [disabled]="busy()" (click)="scope.emit(d.draftId)">
+                                <button
+                                    mat-stroked-button
+                                    [disabled]="busy()"
+                                    [attr.aria-label]="'Work on this Draft ' + d.draftId"
+                                    (click)="scope.emit(d.draftId)"
+                                >
                                     Work on this Draft
                                 </button>
                             }
-                            <button mat-button [disabled]="busy()" (click)="showWorkingSet(d)">Working Set</button>
-                            <button mat-button [disabled]="busy()" (click)="showConflicts(d)">Conflicts</button>
-                            <button mat-button [disabled]="busy() || !canRebase(d)" (click)="rebase(d)">Rebase</button>
-                            <button mat-stroked-button [disabled]="busy() || !canFinish(d)" (click)="promote(d)">
+                            <button
+                                mat-button
+                                [disabled]="busy()"
+                                [attr.aria-label]="'Working Set of Draft ' + d.draftId"
+                                (click)="showWorkingSet(d)"
+                            >
+                                Working Set
+                            </button>
+                            <button
+                                mat-button
+                                [disabled]="busy()"
+                                [attr.aria-label]="'Conflicts of Draft ' + d.draftId"
+                                (click)="showConflicts(d)"
+                            >
+                                Conflicts
+                            </button>
+                            <button
+                                mat-button
+                                [disabled]="busy() || !canRebase(d)"
+                                [attr.aria-label]="'Rebase of Draft ' + d.draftId"
+                                (click)="rebase(d)"
+                            >
+                                Rebase
+                            </button>
+                            <button
+                                mat-stroked-button
+                                [disabled]="busy() || !canFinish(d)"
+                                [attr.aria-label]="'Promote Draft ' + d.draftId"
+                                (click)="promote(d)"
+                            >
                                 Promote
                             </button>
-                            <button mat-button [disabled]="busy() || !canFinish(d)" (click)="discard(d)">
+                            <button
+                                mat-button
+                                [disabled]="busy() || !canFinish(d)"
+                                [attr.aria-label]="'Discard Draft ' + d.draftId"
+                                (click)="discard(d)"
+                            >
                                 Discard
                             </button>
                         </div>

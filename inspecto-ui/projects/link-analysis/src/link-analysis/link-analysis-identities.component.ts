@@ -139,7 +139,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                             <button mat-stroked-button type="submit" [disabled]="busy()">Find group</button>
                         </form>
                         @if (found(); as g) {
-                            <div aria-label="Group found">
+                            <div role="group" aria-label="Group found">
                                 <ng-container *ngTemplateOutlet="groupTpl; context: { $implicit: g }"></ng-container>
                             </div>
                         }

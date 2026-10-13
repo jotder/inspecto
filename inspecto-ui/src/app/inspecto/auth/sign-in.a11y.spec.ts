@@ -51,6 +51,9 @@ describe('SignInComponent (W6d)', () => {
         // is the violation this asserts against, and the restyle (2026-09-15) is what introduced the risk.
         expect(el.querySelectorAll('h1')).toHaveLength(1);
         expect(el.querySelector('h2')?.textContent).toContain('Sign in');
+        // LA-A11Y-AUDIT-1 (real axe, 2026-10-13): landmark-one-main + region were red on this page — one <main> holds all of it
+        expect(el.querySelectorAll('main')).toHaveLength(1);
+        expect(el.querySelector('main')?.contains(el.querySelector('h2'))).toBe(true);
         await expectNoA11yViolations(el);
     });
 
