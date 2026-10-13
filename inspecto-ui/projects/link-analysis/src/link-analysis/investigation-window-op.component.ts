@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
+import { LensService } from '@inspecto/core/api';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -40,7 +41,7 @@ import { windowForm, windowOf } from './investigation-rung-form';
                 @if (!form.controls.full.value) {
                     <inspecto-la-window-fields [form]="form"></inspecto-la-window-fields>
                 }
-                <button mat-stroked-button type="submit" class="self-start" [disabled]="store.busy()">
+                <button mat-stroked-button type="submit" class="self-start" [disabled]="!canWrite() || store.busy()">
                     Apply window
                 </button>
             </form>
@@ -52,10 +53,14 @@ import { windowForm, windowOf } from './investigation-rung-form';
 })
 export class InvestigationWindowOpComponent {
     readonly store = inject(InvestigationSessionStore);
+    private readonly lens = inject(LensService);
+    /** Read-only for a subject without Incident management (the server refuses the op with a 403 anyway). */
+    readonly canWrite = computed(() => this.lens.canManageIncidents());
     readonly form = windowForm();
     readonly error = signal('');
 
     async submit(): Promise<void> {
+        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         this.error.set('');
         if (this.form.invalid) {
             this.form.markAllAsTouched();

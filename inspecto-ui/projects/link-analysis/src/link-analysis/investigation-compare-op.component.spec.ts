@@ -2,11 +2,12 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
+import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InvestigationCompareOpComponent } from './investigation-compare-op.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
-function setup(applyOk = true, serverError = '') {
+function setup(applyOk = true, serverError = '', canWrite = true) {
     const store = {
         busy: signal(false),
         error: signal(serverError),
@@ -14,7 +15,11 @@ function setup(applyOk = true, serverError = '') {
     };
     TestBed.configureTestingModule({
         imports: [InvestigationCompareOpComponent],
-        providers: [provideNoopAnimations(), { provide: InvestigationSessionStore, useValue: store }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InvestigationSessionStore, useValue: store },
+            { provide: LensService, useValue: { canManageIncidents: signal(canWrite) } },
+        ],
     });
     const fixture = TestBed.createComponent(InvestigationCompareOpComponent);
     fixture.detectChanges();
@@ -125,5 +130,15 @@ describe('InvestigationCompareOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', ()
         fixture.detectChanges();
         expect(el.textContent).toContain('this Investigation has no time column');
         await expectNoA11yViolations(el);
+    });
+    it('is read-only without Incident management: the button is disabled and submit sends nothing', async () => {
+        const { fixture, cmp, store, el } = setup(true, '', false);
+        const button = Array.from(el.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('Compare and seal'),
+        ) as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        await cmp.submit();
+        await fixture.whenStable();
+        expect(store.apply).not.toHaveBeenCalled();
     });
 });

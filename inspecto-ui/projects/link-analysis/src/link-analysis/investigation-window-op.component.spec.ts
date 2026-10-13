@@ -2,11 +2,12 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
+import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InvestigationWindowOpComponent } from './investigation-window-op.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
-function setup(applyOk = true, serverError = '') {
+function setup(applyOk = true, serverError = '', canWrite = true) {
     const store = {
         busy: signal(false),
         error: signal(serverError),
@@ -14,7 +15,11 @@ function setup(applyOk = true, serverError = '') {
     };
     TestBed.configureTestingModule({
         imports: [InvestigationWindowOpComponent],
-        providers: [provideNoopAnimations(), { provide: InvestigationSessionStore, useValue: store }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InvestigationSessionStore, useValue: store },
+            { provide: LensService, useValue: { canManageIncidents: signal(canWrite) } },
+        ],
     });
     const fixture = TestBed.createComponent(InvestigationWindowOpComponent);
     fixture.detectChanges();
@@ -172,5 +177,15 @@ describe('InvestigationWindowOpComponent (LA-SPA-OWED-SURFACES-1)', () => {
         expect(store.apply).toHaveBeenCalledWith({ op: 'window', window: 'full' });
         expect(el.textContent).toContain("window.timezone: unknown zone 'Mars/Base'");
         await expectNoA11yViolations(el);
+    });
+    it('is read-only without Incident management: the button is disabled and submit sends nothing', async () => {
+        const { fixture, cmp, store, el } = setup(true, '', false);
+        const button = Array.from(el.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('Apply window'),
+        ) as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        await cmp.submit();
+        await fixture.whenStable();
+        expect(store.apply).not.toHaveBeenCalled();
     });
 });
