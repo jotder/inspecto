@@ -79,4 +79,4 @@ If you need the demo, use an Enterprise or Professional bundle (filesystem store
   `InvestigationStoresTest`, not from a live boot.
 - `serve-demo.*` honouring `INSPECTO_JAVA_OPTS` is proved by the static launcher guard
   (`tools/check-launchers.mjs`), not by a live demo-bundle launch.
-- The Personal 503 for `/inv/*` was not re-probed on a built Personal bundle in this pass.
+- The Personal 503 for `/inv/*`: proved over real HTTP on the Personal build by `NoGeoLinkShipsInThePersonalBuildTest` (every `la-api`/`geo-link` stub path, 503 naming the module; 3/3, 2026-10-13) plus `AbsentModuleRoutesTest` 3/3. Not re-probed on a built Personal *bundle* (same classpath, so no new information expected).
