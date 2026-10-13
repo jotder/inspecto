@@ -157,6 +157,9 @@ mvn -o test -Pedition-professional -pl providers/inspecto-oidc -am -Dsurefire.fa
 
 Without `-Dkeycloak.issuer` (or `KEYCLOAK_ISSUER`) both tests SKIP: a skip is not a pass. A backend run:
 `-Dauth.mode=oidc -Dauth.oidc.provider=keycloak -Dauth.oidc.discoveryUrl=http://localhost:8180/realms/inspecto/.well-known/openid-configuration -Dauth.oidc.clientId=inspecto_spa -Dauth.oidc.audience=inspecto_spa`.
+`pwsh -File tools/run-backend.ps1 -AuthMode oidc -OidcProvider keycloak -OidcDiscoveryUrl <url> -OidcClientId inspecto_spa -OidcAudience inspecto_spa`
+boots the same thing from the working tree (it adds `providers/inspecto-oidc` to the classpath). Logout ends the
+Keycloak session with no confirmation page: the backend returns an end-session URL carrying `id_token_hint`.
 ⚠ Keycloak rejects unknown JSON fields on realm import, so the realm file carries no `_comment` keys.
 
 ---

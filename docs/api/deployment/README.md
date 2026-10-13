@@ -178,6 +178,21 @@ a backend booted with the Keycloak property set above returned `401` with no/gar
 (`/bootstrap` `auth` -> Keycloak login -> `POST /auth/exchange`, nonce checked) returned `200` with a refresh
 cookie. ✅ The SPA was then driven in a browser (2026-10-13, built SPA served by the backend on :18090): `kc-admin`, `kc-operator`, `kc-business` each signed in through the Keycloak login page and landed in the SPA with their own identity and capabilities (`canOperateRuns` only for the operator, via the CLIENT role), and sign-out reached Keycloak's end-session. ⚠ `post.logout.redirect.uris` on the client must list the SPA origin or the end-session page says "Invalid redirect uri"; the SPA sends no `id_token_hint`, so Keycloak shows a "Do you want to log out?" confirmation first.
 
+**Logout without a confirmation page (2026-10-13).** Keycloak asks "Do you want to log out?" unless the
+end-session request carries `id_token_hint`. The SPA never holds the ID token (access token in memory, refresh
+token in the HttpOnly `inspecto_rt` cookie), so the backend keeps the ID token in a second HttpOnly cookie,
+`inspecto_idt` (same lifetime and flags, never in any response body), and `POST /auth/logout` returns
+`endSessionUrl` = the provider's end-session URL with `id_token_hint`, `client_id` and `post_logout_redirect_uri`
+(sent by the SPA as `postLogoutRedirectUri`). The one tradeoff: the ID token appears once in that redirect URL,
+as RP-Initiated Logout 1.0 requires. With no ID token cookie the response omits `endSessionUrl` and the SPA
+falls back to the hint-less redirect (so the confirmation page may show). Proven against Keycloak 26.8.1: a
+code exchange, then logout, redirected straight to `post_logout_redirect_uri`.
+
+**Booting a real OIDC session from the working tree:** `pwsh -File tools/run-backend.ps1 -AuthMode oidc
+-OidcProvider keycloak -OidcDiscoveryUrl <discovery-url> -OidcClientId inspecto_spa -OidcAudience inspecto_spa`
+(also `-OidcRolesClaim`). `-AuthMode oidc` now puts `providers/inspecto-oidc` on the classpath (build it first, or
+add `-Rebuild`); each `-Oidc*` parameter is passed as `-Dauth.oidc.<key>` only when given.
+
 ### Gateway trust mode (WSO2 APIM `X-JWT-Assertion`, RBAC R0 — optional)
 
 When the gateway terminates end-user auth and forwards its own **gateway-signed** backend JWT

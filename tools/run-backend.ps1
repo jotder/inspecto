@@ -33,9 +33,18 @@ param(
     # SIGNIN-PREVIEW-1 (2026-09-15): -AuthMode oidc makes the CORE report authMode:'oidc' on /bootstrap, so
     # the SPA renders its Professional-edition guest routes (/sign-in, /session/callback) against an auth-free
     # backend. It is a PREVIEW switch: nothing authenticates — the core has no Authenticator, and the
-    # sign-in button's redirect will not complete. For a real OIDC session run the Professional bundle.
+    # sign-in button's redirect will not complete. For a real OIDC session run the Professional bundle,
+    # OR (2026-10-13) give the -Oidc* parameters below: with -AuthMode oidc they also put providers/inspecto-oidc
+    # on the classpath, so the working tree boots a real session against the provider you name.
     [string]$AuthMode,
-    [switch]$Rebuild   # compile the reactor first (-pl inspecto -am) before launching
+    # Each is passed as -Dauth.oidc.<key>=<value> ONLY when given (default behaviour is unchanged). They are
+    # read by inspecto-oidc, so they only matter with -AuthMode oidc. See docs/api/deployment/README.md.
+    [string]$OidcProvider,       # generic | wso2 | keycloak
+    [string]$OidcDiscoveryUrl,   # the provider's /.well-known/openid-configuration
+    [string]$OidcClientId,
+    [string]$OidcAudience,
+    [string]$OidcRolesClaim,     # e.g. groups for WSO2
+    [switch]$Rebuild   # compile the reactor first (-pl inspecto -am, plus providers/inspecto-oidc with -AuthMode oidc)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,7 +58,10 @@ if (-not $UiDir)      { $UiDir      = Join-Path $repo 'inspecto-ui/dist/gamma/br
 
 if ($Rebuild) {
     Write-Host "Compiling reactor (-pl inspecto -am)..." -ForegroundColor Cyan
-    & $mvn -o -q -f (Join-Path $repo 'pom.xml') -pl inspecto -am -DskipTests compile
+    # providers/inspecto-oidc is a module of the Professional+ editions only, so its profile must be named.
+    $rebuildPl = if ($AuthMode -eq 'oidc') { 'inspecto,providers/inspecto-oidc' } else { 'inspecto' }
+    $rebuildProfile = if ($AuthMode -eq 'oidc') { @('-Pedition-professional') } else { @() }
+    & $mvn -o -q -f (Join-Path $repo 'pom.xml') @rebuildProfile -pl $rebuildPl -am -DskipTests compile
     if ($LASTEXITCODE -ne 0) { throw "reactor compile failed" }
 }
 
@@ -67,6 +79,19 @@ if ($LASTEXITCODE -ne 0) { throw "dependency:build-classpath failed — is the .
 
 $entries = (Get-Content $cpFile -Raw).Trim() -split ';' | Where-Object { $_ }
 
+# -AuthMode oidc: inspecto-oidc (the Authenticator + TokenRelay) is a ServiceLoader module, NOT a dependency of
+# inspecto, so it is added here on purpose - its own runtime jars are merged in, de-duplicated.
+$extraModules = @()
+if ($AuthMode -eq 'oidc') {
+    $oidcCpFile = Join-Path $repo 'target/backend-oidc-cp.txt'
+    Write-Host "Deriving inspecto-oidc classpath..." -ForegroundColor Cyan
+    & $mvn -o -q -f (Join-Path $repo 'pom.xml') "-Pedition-professional" -pl providers/inspecto-oidc dependency:build-classpath `
+           "-Dmdep.outputFile=$oidcCpFile" "-Dmdep.includeScope=runtime"
+    if ($LASTEXITCODE -ne 0) { throw "dependency:build-classpath for providers/inspecto-oidc failed" }
+    $entries = @($entries) + @((Get-Content $oidcCpFile -Raw).Trim() -split ';' | Where-Object { $_ -and ($entries -notcontains $_) })
+    $extraModules = @('providers/inspecto-oidc')
+}
+
 # ── step 2: map each reactor artifact back to its working-tree classes dir ────
 # .m2 layout: .../com/gamma/inspector/<artifactId>/<version>/<artifactId>-<version>.jar
 # Dir == artifactId for every module except inspecto/ -> inspecto-processor.
@@ -81,6 +106,7 @@ $addModule = {
 }
 
 & $addModule 'inspecto'
+foreach ($m in $extraModules) { & $addModule $m }
 foreach ($e in $entries) {
     if ($e -match '[\\/]com[\\/]gamma[\\/]inspector[\\/]([^\\/]+)[\\/]') {
         $artifact = $Matches[1]
@@ -102,6 +128,11 @@ Write-Host "Classpath: $($moduleDirs.Count) module classes dirs + $($entries.Cou
 # the first attempt at this comment did exactly that, and `Parser::ParseFile` caught it.
 $authArgs = @()
 if ($AuthMode) { $authArgs += "-Dauth.mode=$AuthMode" }
+if ($OidcProvider)     { $authArgs += "-Dauth.oidc.provider=$OidcProvider" }
+if ($OidcDiscoveryUrl) { $authArgs += "-Dauth.oidc.discoveryUrl=$OidcDiscoveryUrl" }
+if ($OidcClientId)     { $authArgs += "-Dauth.oidc.clientId=$OidcClientId" }
+if ($OidcAudience)     { $authArgs += "-Dauth.oidc.audience=$OidcAudience" }
+if ($OidcRolesClaim)   { $authArgs += "-Dauth.oidc.rolesClaim=$OidcRolesClaim" }
 & java --enable-native-access=ALL-UNNAMED `
     @authArgs `
     "-Dcontrol.port=$Port" `
