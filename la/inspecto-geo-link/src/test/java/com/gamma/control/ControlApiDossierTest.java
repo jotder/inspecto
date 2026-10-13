@@ -348,7 +348,7 @@ class ControlApiDossierTest {
             HttpResponse<String> r = get(c, "/inv/investigations/case-a/dossier?format=html");
             assertEquals(200, r.statusCode(), r.body());
             assertEquals("text/html; charset=utf-8", r.headers().firstValue("Content-Type").orElse(""));
-            assertEquals("default-src 'none'; style-src 'unsafe-inline'",
+            assertEquals("default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
                     r.headers().firstValue("Content-Security-Policy").orElse(""));
             String h = r.body();
             assertTrue(h.startsWith("<!DOCTYPE html>"), h);
