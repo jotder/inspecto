@@ -84,7 +84,7 @@ function create(
         queryParams?: Record<string, string>;
         /** LA-11: a stand-in for the traversal route (the real service is used when absent). */
         inv?: Partial<InvService>;
-        /** Swap the G6 host for an inert stand-in, so the template can render with a graph in jsdom. */
+        /** Swap the G6 host for an inert stand-in, so the template can render with a graph in jsdom. Default ON: the real G6 host throws an unhandled clearRect under jsdom. */
         stubGraph?: boolean;
         /** "Investigate a number": a stand-in for the Dataset reads (latest event time, column probe). */
         rows?: Partial<DatasetRowsService>;
@@ -135,7 +135,7 @@ function create(
             },
         ],
     });
-    if (opts.stubGraph) {
+    if (opts.stubGraph ?? true) {
         TestBed.overrideComponent(LinkAnalysisComponent, {
             remove: { imports: [GraphViewComponent] },
             add: { imports: [StubGraphView] },
