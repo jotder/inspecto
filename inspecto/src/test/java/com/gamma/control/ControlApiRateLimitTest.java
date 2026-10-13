@@ -113,13 +113,13 @@ class ControlApiRateLimitTest {
                 BodyHandlers.ofString());
     }
 
-    /** Roadmap item 7: an expensive Link Analysis route has its own bucket (429 after the burst of 20); a
+    /** Roadmap item 7: an expensive Link Analysis route has its own bucket (429 after the burst of 30); a
      *  cheap Investigation read, the standard bucket and an unrelated route are untouched. The module is
      *  absent here, so the handler answers the 503 stub - proof each request below 429 reached dispatch. */
     @Test
     void expensiveLinkAnalysisRoutesAreThrottledAndCheapOnesAreNot(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 30; i++)
                 assertNotEquals(429, invRequest(c.port, "POST", "/inv/projection").statusCode(), "call " + i);
             HttpResponse<String> r = invRequest(c.port, "POST", "/inv/graph/runs");
             assertEquals(429, r.statusCode(), "the bucket is shared by the expensive LA class");
