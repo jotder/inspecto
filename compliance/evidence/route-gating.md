@@ -113,9 +113,9 @@ system: the evidence cannot say something the code does not.
 | POST | `/assist/settings/test` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:55` |
 | POST | `/audit/anchors` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java:59` |
 | POST | `/audit/anchors/rebaseline` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java:61` |
-| POST | `/auth/exchange` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:47` |
-| POST | `/auth/logout` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:49` |
-| POST | `/auth/refresh` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:48` |
+| POST | `/auth/exchange` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:49` |
+| POST | `/auth/logout` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:51` |
+| POST | `/auth/refresh` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:50` |
 | POST | `/bi/query` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:51` |
 | POST | `/bi/templates/([^/]+)/apply` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:55` |
 | POST | `/bundle/export` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:146` |
