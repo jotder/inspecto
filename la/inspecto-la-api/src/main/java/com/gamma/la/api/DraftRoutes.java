@@ -415,8 +415,8 @@ public final class DraftRoutes implements RouteModule {
         requireIntact(o);
         if (expiredPin(o.view(), o.header()))   // D7-Q3: a pin past its 30 days forces a rebase, which re-pins CURRENT
             throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the index version draft '" + draftId + "' pinned expired - rebase it (POST .../rebase) to re-pin");
-        if ("expand".equals(body.get("op")))   // D7-6: an expand reads the index / Dataset - a heavy job, 429 when the cap is full
-            return withDraftId(DraftAdmission.heavy("expand on draft " + draftId, () -> investigations.appendOpOn(api, ex, o.view(), body)), draftId);
+        if ("expand".equals(body.get("op")) || "connect".equals(body.get("op")))   // D7-6: an expand (and LA-SEED-CONNECT-1's connect) reads the index / Dataset - a heavy job, 429 when the cap is full
+            return withDraftId(DraftAdmission.heavy(body.get("op") + " on draft " + draftId, () -> investigations.appendOpOn(api, ex, o.view(), body)), draftId);
         return withDraftId(investigations.appendOpOn(api, ex, o.view(), body), draftId);
     }
 

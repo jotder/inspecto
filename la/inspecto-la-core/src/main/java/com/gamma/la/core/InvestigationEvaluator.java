@@ -27,7 +27,7 @@ import java.util.TreeSet;
  * carries its SEALED read (the materialised rows, decision D-E3), so evaluating a log is a function of the log
  * alone and replays identically on any day, against any data.
  *
- * <p>The op semantics (plan §2.3), for the fourteen ops shipped (the closed vocabulary is complete):
+ * <p>The op semantics (plan §2.3), for the fifteen ops shipped (the closed vocabulary is complete):
  * <ul>
  *   <li>{@code seed {ids, entityType?}} — admits each id at hop 0 as its own seed. An already-admitted id keeps
  *       its original provenance; an EXCLUDED id is re-admitted, because a later explicit analyst op wins.</li>
@@ -37,6 +37,8 @@ import java.util.TreeSet;
  *       order, so provenance is deterministic. Every admitted entity named in the SEALED {@code read.hubs} (endpoints
  *       above the rung's hub threshold, supernode suppression) is flagged {@code highConnectivity}; an older read has
  *       no {@code hubs} and flags nothing.</li>
+ *   <li>{@code connect {ids, maxHops}} (LA-SEED-CONNECT-1) - seeds the ids and adds the connecting routes the route SEALED
+ *       ({@code read.rows}, with the per-pair verdicts in {@code read.pairs}); see {@link #connect}. It reads no Dataset here.</li>
  *   <li>{@code exclude {ids, reason}} — gone from display, traversal and counts: the entity and every link
  *       touching it leave the Working Set, and the id is remembered (with its reason and step) so later
  *       expands never re-admit it. ⚠ A KEPT entity is not removed — {@code keep} protects it — and the step
@@ -604,6 +606,8 @@ public final class InvestigationEvaluator {
                             if (h.get("degree") instanceof Number d) s.hubDegree.put(id, d.longValue());
                         }
             }
+            case "connect" -> connect(s, ids, p.get("entityType") == null ? null : String.valueOf(p.get("entityType")),
+                    (Map<String, Object>) entry.get("read"), step);
             case "exclude" -> {
                 String reason = String.valueOf(p.get("reason"));
                 if (Boolean.TRUE.equals(p.get("merged"))) mergedExclude(s, entry, ids, reason, step);
@@ -653,6 +657,56 @@ public final class InvestigationEvaluator {
             }
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }
+    }
+
+    /**
+     * LA-SEED-CONNECT-1: a {@code connect} seeds its ids (as {@code seed} does) and adds the SEALED rows of the connecting
+     * routes. An endpoint no seed owns is admitted one hop past an endpoint already admitted (to a fixpoint over the sealed rows,
+     * so the order the rows were written in never matters), inheriting that entity's seed. A row touching an excluded entity is dropped.
+     */
+    @SuppressWarnings("unchecked")
+    private static void connect(State s, List<String> ids, String entityType, Map<String, Object> read, int step) {
+        seed(s, ids, entityType, step);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Object o : (List<Object>) read.get("rows")) {
+            Map<String, Object> r = (Map<String, Object>) o;
+            String src = String.valueOf(r.get("source")), tgt = String.valueOf(r.get("target"));
+            if (s.excluded.containsKey(src) || s.excluded.containsKey(tgt)) continue;
+            rows.add(r);
+        }
+        // a multi-source breadth-first walk over the sealed rows: a route node's hop is its distance to the NEAREST seed (a tie goes to
+        // the seed named first), so it never depends on the order the rows were written in
+        Map<String, List<String>> adjacent = new TreeMap<>();
+        for (Map<String, Object> r : rows) {
+            String src = String.valueOf(r.get("source")), tgt = String.valueOf(r.get("target"));
+            adjacent.computeIfAbsent(src, k -> new ArrayList<>()).add(tgt);
+            adjacent.computeIfAbsent(tgt, k -> new ArrayList<>()).add(src);
+        }
+        List<String> level = new ArrayList<>(ids);
+        level.removeIf(id -> !s.entities.containsKey(id));
+        while (!level.isEmpty()) {
+            List<String> next = new ArrayList<>();
+            for (String from : level)
+                for (String other : new TreeSet<>(adjacent.getOrDefault(from, List.of())))
+                    if (!s.entities.containsKey(other)) {
+                        Entity f = s.entities.get(from);
+                        s.entities.put(other, new Entity(other, f.type(), f.hop() + 1, f.seed(), step));
+                        next.add(other);
+                    }
+            level = next;
+        }
+        for (Map<String, Object> r : rows) {
+            String src = String.valueOf(r.get("source")), tgt = String.valueOf(r.get("target"));
+            if (!s.entities.containsKey(src) || !s.entities.containsKey(tgt)) continue;
+            String kind = r.get("kind") == null ? null : String.valueOf(r.get("kind"));
+            s.links.putIfAbsent(LinkIds.key(src, tgt, kind), new Link(src, tgt, kind, ((Number) r.get("count")).longValue(), step));
+        }
+        if (read.get("hubs") instanceof List<?> hubs)   // a hub the search reached (and did not walk through) is flagged, as an expand's
+            for (Object o : hubs)
+                if (o instanceof Map<?, ?> h && s.entities.containsKey(String.valueOf(h.get("id")))) {
+                    s.highConnectivity.add(String.valueOf(h.get("id")));
+                    if (h.get("degree") instanceof Number d) s.hubDegree.put(String.valueOf(h.get("id")), d.longValue());
+                }
     }
 
     /** An entity's degree: its distinct counterparties among the links of {@code s} (a self-loop is not a counterparty). */

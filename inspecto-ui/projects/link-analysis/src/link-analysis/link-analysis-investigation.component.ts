@@ -65,6 +65,7 @@ import {
     InvestigationThresholdOpComponent,
 } from './investigation-band-ops.component';
 import { InvestigationCompareOpComponent } from './investigation-compare-op.component';
+import { InvestigationConnectOpComponent } from './investigation-connect-op.component';
 import { InvestigationWindowOpComponent } from './investigation-window-op.component';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 import { LinkAnalysisReferencesComponent } from './link-analysis-references.component';
@@ -111,6 +112,7 @@ export const APPROVAL_POLL_MS = 15_000;
         InvestigationThresholdOpComponent,
         InvestigationSnapshotOpComponent,
         InvestigationCompareOpComponent,
+        InvestigationConnectOpComponent,
         LinkAnalysisDossierComponent,
         LinkAnalysisDraftsComponent,
         LinkAnalysisReferencesComponent,

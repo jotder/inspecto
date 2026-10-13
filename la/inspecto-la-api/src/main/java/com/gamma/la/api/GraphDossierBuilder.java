@@ -657,6 +657,7 @@ final class GraphDossierBuilder {
             case "snapshot" -> InvestigationRoutes.snapshotLine(e, p);
             case "compare" -> InvestigationRoutes.compareLine(e, p);
             case "temporal" -> TemporalFindings.line(e, p);
+            case "connect" -> InvestigationRoutes.connectLine(e, p);
             case "seedBy" -> {
                 Map<String, Object> r = castMap((Map<?, ?>) e.get("read"));
                 List<String> seeded = strings(r.get("ids"));

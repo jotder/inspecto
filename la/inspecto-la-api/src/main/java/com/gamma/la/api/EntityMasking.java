@@ -178,7 +178,7 @@ final class EntityMasking {
         if (e.get("params") instanceof Map<?, ?> p) {
             List<String> ids = strings(p.get("ids"));
             universe.addAll(ids);
-            if ("seed".equals(e.get("op")) && p.get("entityType") != null) {
+            if (("seed".equals(e.get("op")) || "connect".equals(e.get("op"))) && p.get("entityType") != null) {
                 String named = String.valueOf(p.get("entityType"));
                 // An entityType naming no in-force Entity Type is masked (fail closed).
                 if (types.stream().filter(t -> t.id().equalsIgnoreCase(named)).findFirst()
@@ -196,6 +196,18 @@ final class EntityMasking {
             Map<?, ?> q = r.get("query") instanceof Map<?, ?> m ? m : Map.of();
             boolean maskSrc = q.get("sourceType") != null && maskedType(types, String.valueOf(q.get("sourceType")));
             boolean maskTgt = q.get("targetType") != null && maskedType(types, String.valueOf(q.get("targetType")));
+            if ("connect".equals(e.get("op"))) {   // LA-SEED-CONNECT-1: the pair table names ids the rows may not (a not-walked hub, a seed with no links)
+                if (r.get("pairs") instanceof List<?> pairs)
+                    for (Object o : pairs)
+                        if (o instanceof Map<?, ?> pair) {
+                            for (String end : List.of("a", "b")) if (pair.get(end) != null) universe.add(String.valueOf(pair.get(end)));
+                            universe.addAll(strings(pair.get("route")));
+                            universe.addAll(strings(pair.get("notWalked")));
+                        }
+                if (r.get("hubs") instanceof List<?> hubs)
+                    for (Object o : hubs) if (o instanceof Map<?, ?> h && h.get("id") != null) universe.add(String.valueOf(h.get("id")));
+                universe.addAll(strings(r.get("noLinks")));
+            }
             if (r.get("rows") instanceof List<?> rows)
                 for (Object o : rows)
                     if (o instanceof Map<?, ?> row) {

@@ -122,9 +122,9 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The fourteen ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold}, {@code snapshot}, {@code compare} and {@code temporal}). */
+    /** The fifteen ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold}, {@code snapshot}, {@code compare}, {@code temporal} and LA-SEED-CONNECT-1's {@code connect}). */
     private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",
-            "excludeBy", "seedBy", "resolve", "threshold", "snapshot", "compare", "temporal");
+            "excludeBy", "seedBy", "resolve", "threshold", "snapshot", "compare", "temporal", "connect");
     /** The ops over a named Entity List (LA-17, design §4.4.1): they carry {@code listId}, never ids. */
     static final Set<String> LIST_OPS = Set.of("excludeBy", "seedBy");
     /** A list op seals at most this many members (design §4.4.1: bounded like every other op payload). */
@@ -409,6 +409,7 @@ public final class InvestigationRoutes implements RouteModule {
                             + "group under the resolution in force; none of " + ids + " does - exclude them without 'merged'");
                 entry.put("groups", groups);
             }
+            if (op.equals("connect")) entry.put("read", sealConnect(api, ex, inv, params, before, null, ""));
             if (op.equals("expand")) {
                 for (String i : strings(params.get("expandHubs")))
                     if (!before.entities.containsKey(i))
@@ -467,6 +468,7 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a merged exclude's identity group no longer resolves");
             e.put("groups", groups);
         }
+        if (op.equals("connect")) e.put("read", sealConnect(api, ex, inv, params, state, pins == null ? Map.of() : pins, ""));   // re-sealed over the NEW base, as an expand is
         if (op.equals("expand")) {
             for (String i : strings(params.get("expandHubs")))   // the same check an append runs
                 if (!state.entities.containsKey(i))
@@ -597,6 +599,8 @@ public final class InvestigationRoutes implements RouteModule {
                 requireResolution(state, "fork step " + step + ": ");   // operator 2026-09-30: refused, as a merged expand
                 e.put("groups", new ArrayList<Object>(state.groupsHit(strings(((Map<?, ?>) orig.get("params")).get("ids"))).values()));
             }
+            if ("connect".equals(orig.get("op")))   // a different order is a different base: the routes are re-searched
+                e.put("read", sealConnect(api, ex, parent, castParams(orig.get("params")), state, null, "fork step " + step + ": "));
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
                 Frontier fr = frontier(strings(p.get("ids")), p, state, false);
@@ -943,6 +947,12 @@ public final class InvestigationRoutes implements RouteModule {
                 r.put("hubsFlagged", flagged);
                 r.put("hubs", hubs);   // the sealed [{id, degree}]: the degree each candidate was flagged at
                 if (read.get("hubDegreeSource") != null) r.put("hubDegreeSource", read.get("hubDegreeSource"));
+            }
+            if ("connect".equals(op)) {   // LA-SEED-CONNECT-1: the pair table is the answer; the routes' rows are already in the Working Set delta
+                r.put("pairs", read.get("pairs"));
+                r.put("noLinks", read.get("noLinks"));
+                r.put("searches", read.get("searches"));
+                r.put("truncated", read.get("truncated"));
             }
             if (read.get("index") != null) r.put("index", read.get("index"));   // D-3 step 6: only when the index answered
             if (read.get("fallback") != null) r.put("fallback", read.get("fallback"));   // only when it fell back, and why
@@ -1714,6 +1724,7 @@ public final class InvestigationRoutes implements RouteModule {
                 expandParams(body, p);
                 merged(body, p);
             }
+            case "connect" -> connectParams(body, p);
             case "exclude" -> {
                 p.put("reason", exclusionReason(body, op));
                 merged(body, p);
@@ -1735,6 +1746,83 @@ public final class InvestigationRoutes implements RouteModule {
             default -> { }
         }
         return p;
+    }
+
+    /**
+     * LA-SEED-CONNECT-1: a {@code connect}'s params - the seeds ({@code ids}, 2 to {@link ConnectSeeds#MAX_SEEDS}), {@code maxHops}
+     * (default and ceiling {@link ConnectSeeds#MAX_HOPS}) and the read knobs an expand shares: {@code budget} (rows per level read),
+     * {@code linkKinds}, {@code window}, {@code minEvents}, {@code hubThreshold}. Direction is always {@code either}; fan-out caps,
+     * degree bounds and the four-eyes thresholds are expand's and do not apply (a path search must not drop candidates).
+     */
+    private static void connectParams(Map<String, Object> body, Map<String, Object> p) {
+        List<String> ids = strings(p.get("ids"));
+        if (ids.size() < 2 || ids.size() > ConnectSeeds.MAX_SEEDS)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'connect' takes 2 to " + ConnectSeeds.MAX_SEEDS + " seeds, got " + ids.size());
+        int maxHops = body.get("maxHops") == null ? ConnectSeeds.MAX_HOPS : positive(body, "maxHops", 1);
+        if (maxHops > ConnectSeeds.MAX_HOPS)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxHops' is at most " + ConnectSeeds.MAX_HOPS
+                    + " - a pair with no route within it is disconnected, never searched deeper");
+        Map<String, Object> knobs = new LinkedHashMap<>();
+        for (String k : List.of("budget", "linkKinds", "window", "minEvents", "hubThreshold"))
+            if (body.get(k) != null) knobs.put(k, body.get(k));
+        expandParams(knobs, p);
+        if (knobs.get("hubThreshold") != null) p.put("hubThreshold", positive(knobs, "hubThreshold", 1));
+        p.put("maxHops", maxHops);
+        String type = ApiContext.str(body, "entityType");   // as a seed's: it decides masking, so it is sealed with the seeds
+        if (type != null && type.length() > 64) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'entityType' is at most 64 chars");
+        if (type != null) p.put("entityType", type);
+    }
+
+    /**
+     * LA-SEED-CONNECT-1: run the per-seed searches ({@link ConnectSeeds}) over the Investigation's own one-hop read and SEAL the
+     * answer: {@code rows} (the links of every pair's example route - all the evaluator needs), {@code pairs} (the verdict per
+     * pair), the hubs reached, the seeds with no links and whether any level read hit its budget. The rows' fingerprint is the
+     * integrity check, as an expand's. A seed this step names is admitted by it, so an exclusion on a seed does not prune its search.
+     */
+    private Map<String, Object> sealConnect(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> params,
+                                            InvestigationEvaluator.State state, Map<String, Long> pins, String where) {
+        List<String> seeds = strings(params.get("ids"));
+        int maxHops = ((Number) params.get("maxHops")).intValue();
+        Set<String> excluded = new HashSet<>(state.excluded.keySet());
+        excluded.removeAll(seeds);
+        Map<String, Object> query = expandRung(api, ex, inv, params, new Frontier(sorted(seeds), List.of()), state, where);
+        query.put("excluded", new ArrayList<>(new TreeSet<>(excluded)));
+        query.put("maxHops", maxHops);
+        ConnectSeeds.Result r = ConnectSeeds.compute(seeds, maxHops, excluded, frontier -> {
+            Map<String, Object> q = new LinkedHashMap<>(query);
+            q.put("frontier", frontier);
+            return read(api, ex, inv, q, pins, Set.of());
+        });
+        Map<String, Object> read = new LinkedHashMap<>();
+        read.put("dataset", inv.dataset());
+        read.put("readAt", Instant.now().toString());
+        read.put("query", query);
+        read.put("rows", r.rows());
+        read.put("rowCount", r.rows().size());
+        read.put("truncated", r.truncated());
+        read.put("fingerprint", InvestigationEvaluator.sha256(canonical(r.rows())));
+        read.put("pairs", r.pairs());
+        read.put("hubs", r.hubs());
+        read.put("noLinks", r.noLinks());
+        read.put("searches", r.reads());
+        return read;
+    }
+
+    /** The plain-language line for a {@code connect}: seeds, hop limit, how many pairs were joined, and what could not be said. */
+    @SuppressWarnings("unchecked")
+    static String connectLine(Map<String, Object> e, Map<String, Object> p) {
+        Map<String, Object> r = e.get("read") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        List<Object> pairs = r.get("pairs") instanceof List<?> l ? (List<Object>) l : List.of();
+        long joined = pairs.stream().filter(x -> x instanceof Map<?, ?> m && Boolean.TRUE.equals(m.get("connected"))).count();
+        StringBuilder out = new StringBuilder("Connected ").append(strings(p.get("ids")).size()).append(" seeds within ")
+                .append(p.get("maxHops")).append(" hops over ").append(r.get("dataset")).append(": ").append(joined).append(" of ")
+                .append(pairs.size()).append(" pairs connected, ").append(pairs.size() - joined)
+                .append(" not connected within the limit (never searched deeper)");
+        if (Boolean.TRUE.equals(r.get("truncated"))) out.append("; a search read hit its budget, so a route may be missing");
+        if (r.get("hubs") instanceof List<?> hubs && !hubs.isEmpty())
+            out.append("; ").append(hubs.size()).append(" high-connectivity entit").append(hubs.size() == 1 ? "y was" : "ies were")
+               .append(" reached and not walked through");
+        return out.append(".").toString();
     }
 
     /** An annotate's {@code links}: a non-empty list of {@link LinkIds} wire ids, each decoded (duplicates dropped). */
@@ -1947,6 +2035,7 @@ public final class InvestigationRoutes implements RouteModule {
                         + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at its budget of " + q.get("budget") : "")
                         + "." + hubClause(r, q, p) + approvalClause(e);
             }
+            case "connect" -> connectLine(e, p);
             case "window" -> p.get("window") == null
                     ? "Cleared the time window: later expansions read the full time range."
                     : "Set the time window to " + InvestigationTime.describe((Map<String, Object>) p.get("window"))

@@ -258,7 +258,8 @@ export type InvestigationOpName =
     | 'threshold'
     | 'snapshot'
     | 'compare'
-    | 'temporal';
+    | 'temporal'
+    | 'connect';
 
 /** A rung's traversal direction (plan §2.4; `InvestigationRoutes.DIRECTIONS`). */
 export type ExpandDirection = 'either' | 'out' | 'in' | 'reciprocal';
@@ -391,6 +392,9 @@ export type InvestigationOpRequest =
      *  Refused at append: unknown list 404 · retired list / its Entity Type not in force 409 · over 5 000 members 422. */
     | { op: 'excludeBy'; listId: string; reason: string }
     | { op: 'seedBy'; listId: string }
+    /** LA-SEED-CONNECT-1: seeds `ids` (2 to 20) and adds the shortest connecting route for EVERY pair within `maxHops`
+     *  (default and ceiling 3; a pair with none is disconnected, never searched deeper) as ONE sealed step. */
+    | { op: 'connect'; ids: string[]; maxHops?: number; entityType?: string; hubThreshold?: number }
     /** A degree band over the whole Working Set: `min` inclusive, `max` exclusive, at least one, `min < max`, no `ids`.
      *  Entities outside it are excluded (as `exclude`; `keep` protects). */
     | { op: 'threshold'; min?: number; max?: number; measure?: 'degree' | 'weightedDegree' | 'eventCount' }
@@ -470,6 +474,10 @@ export interface InvestigationStepResult {
         index?: { version: number; stale: boolean; fingerprint?: string };
         /** Only when an expand was answered by the flat Dataset: the closed reason (never part of the fingerprint). */
         fallback?: { reason: string; details?: string };
+        /** `connect`: the pair table, the seeds whose first read found no link at all, and whether a search read hit its budget. */
+        pairs?: ConnectPair[];
+        noLinks?: string[];
+        searches?: number;
     };
     workingSet: WorkingSetSummary;
     /** `temporal`: the sealed finding set (the findings themselves are in the entry; `outsideWorkingSet` were dropped). */
@@ -482,6 +490,18 @@ export interface InvestigationStepResult {
     };
     /** LA-17 `excludeBy` / `seedBy`: what the step resolved and did (§4.4.1). */
     list?: EntityListStepReport;
+}
+
+/** LA-SEED-CONNECT-1: one unordered pair of a `connect` step. `route` is one shortest route (seed to seed, aliases when masked);
+ *  `notWalked` the hubs a disconnected pair's searches stopped at. */
+export interface ConnectPair {
+    a: string;
+    b: string;
+    connected: boolean;
+    hops?: number;
+    routes?: number;
+    route?: string[];
+    notWalked?: string[];
 }
 
 /**
