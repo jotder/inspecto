@@ -11,6 +11,7 @@ import {
     effect,
     inject,
     signal,
+    untracked,
 } from '@angular/core';
 import {
     FormBuilder,
@@ -840,7 +841,19 @@ export class LinkAnalysisComponent implements OnInit {
     /** Link kinds the legend's chips hide on the canvas — client-side, on the query graph and the Working Set alike. */
     readonly hiddenLinkKinds = signal<string[]>([]);
     /** An open Investigation's Working Set, else the query graph — before the legend's link-kind hiding. */
-    private readonly canvasSource = computed<G6GraphData | null>(() => this.investigation.canvas() ?? this.displayed());
+    private readonly canvasSource = computed<G6GraphData | null>(() => {
+        const inv = this.investigation.canvas();
+        if (inv) return inv;
+        const g = this.displayed();
+        const done = this.expandedNodeIds();
+        // LA-UNEXPANDED-MARKER-1 (4): without an Investigation, the merged expand history is the browser's own record. Marked
+        // only once a node has been expanded, so a fresh query result is not dotted all over.
+        if (!g || !done.length) return g;
+        const seen = new Set(done);
+        return { ...g, nodes: g.nodes.map((n) => (seen.has(n.id) ? n : { ...n, data: { ...n.data, unexpanded: true } })) };
+    });
+    /** Ids of the exploration canvas nodes an expand has followed since the last run (no Investigation: nothing is sealed). */
+    readonly expandedNodeIds = signal<string[]>([]);
     /** The link kinds the legend offers as chips: those of what the canvas draws, hidden ones included. */
     readonly legendLinkKinds = computed(() => legendEdgeKindsFor(this.canvasSource()));
     /** Nodes the node detail dialog's "Hide on canvas" took off the exploration canvas (presentation only, never a query). */
@@ -850,7 +863,7 @@ export class LinkAnalysisComponent implements OnInit {
         const g = hideLinkKinds(this.canvasSource(), this.hiddenLinkKinds());
         const hidden = new Set(this.hiddenNodeIds());
         // LA-UNEXPANDED-MARKER-1 (b): "Only unexpanded" keeps just the frontier (and the picked node, so a pick never vanishes)
-        if (g && this.onlyUnexpanded() && this.investigation.canvas()) {
+        if (g && this.onlyUnexpanded()) {
             const keep = g.nodes.filter((n) => n.data.unexpanded || n.id === this.investigation.selected()?.id);
             if (keep.some((n) => n.data.unexpanded))
                 for (const n of g.nodes) if (!keep.includes(n)) hidden.add(n.id);
@@ -867,13 +880,13 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** "Next unexpanded": pick the next unexpanded Working Set node (by id, wrapping) so Expand one hop acts on it. */
     selectNextUnexpanded(): void {
-        const frontier = (this.investigation.canvas()?.nodes ?? [])
+        const frontier = (this.canvasSource()?.nodes ?? [])
             .filter((n) => n.data.unexpanded)
             .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
         if (!frontier.length) return;
         const at = frontier.findIndex((n) => n.id === this.investigation.selected()?.id);
         const next = frontier[(at + 1) % frontier.length];
-        this.investigation.selected.set(next);
+        if (this.investigation.canvas()) this.investigation.selected.set(next);
         this.focusNode(next.id);
     }
 
@@ -1051,7 +1064,7 @@ export class LinkAnalysisComponent implements OnInit {
     );
     /** Drawn Working Set entities no expand has followed yet (LA-UNEXPANDED-MARKER-1) — the legend's dotted-outline row. */
     readonly unexpandedDrawn = computed(
-        () => this.investigation.canvas()?.nodes.filter((n) => n.data.unexpanded).length ?? 0,
+        () => this.canvasSource()?.nodes.filter((n) => n.data.unexpanded).length ?? 0,
     );
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
     readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
@@ -1059,6 +1072,19 @@ export class LinkAnalysisComponent implements OnInit {
     readonly profileId = toSignal(this.profileControl.valueChanges, { initialValue: this.profileControl.value });
     readonly profile = computed(() => domainProfile(this.profileId()));
     /** A reloaded / adopted Investigation brings back the domain profile it was opened under. */
+    /** LA-SEED-CONNECT-1 (b): a clicked Connect pair row emphasises its route's nodes and the links between consecutive ones. */
+    private readonly showConnectRoute = effect(() => {
+        const route = this.investigation.highlightRoute();
+        const g = untracked(() => this.canvasSource());
+        if (!route || !g) return;
+        const idOf = (raw: string) => g.nodes.find((n) => rawIdsOf(n).includes(raw) || n.id === raw)?.id;
+        const ids = route.map(idOf).filter((x): x is string => !!x);
+        const pair = new Set(ids.slice(1).map((b, i) => [ids[i], b].sort().join('|')));
+        this.emphasis.set({
+            nodeIds: ids,
+            edgeIds: g.edges.filter((e) => pair.has([e.source, e.target].sort().join('|'))).map((e) => e.id),
+        });
+    });
     private readonly restoreBoundProfile = effect(() => {
         const p = this.investigation.boundProfileId();
         if (p && p !== this.profileControl.value) this.profileControl.setValue(p);
@@ -1405,6 +1431,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         this.serverPaths.set(null);
         this.expandSource.set(null);
+        this.expandedNodeIds.set([]);
         this.serverPattern.set(null);
         this.temporalFindings.set(null);
         this.temporalError.set('');
@@ -2205,6 +2232,7 @@ export class LinkAnalysisComponent implements OnInit {
             const extra = await source.expand(id, nodeLabel, run.query, spellings);
             this.expandSource.set((extra as ProjectedGraph).source ?? null);
             this.graph.update((g) => (g ? mergeGraphs([g, extra]) : extra));
+            this.expandedNodeIds.update((ids) => (ids.includes(id) ? ids : [...ids, id]));
             // LA-02: an expand that hit the server's row limit, or the browser's node cap, leaves the
             // working set INCOMPLETE. `mergeGraphs` returns a bare `G6GraphData` and structurally drops
             // `truncated`, so the flag has to be carried onto the signal here or the overlay keeps

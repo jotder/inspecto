@@ -129,6 +129,8 @@ export class InvestigationSessionStore {
     readonly error = signal('');
     /** The canvas entity an op acts on; set by a node click while an Investigation is open. */
     readonly selected = signal<G6Node | null>(null);
+    /** LA-SEED-CONNECT-1 (b): the ids of one connected pair's example route, set by a click on its row; the canvas emphasises it. */
+    readonly highlightRoute = signal<string[] | null>(null);
     /** Draw the Working Set (true) or the query graph — seeds are picked from the latter. */
     readonly showWorkingSet = signal(true);
 

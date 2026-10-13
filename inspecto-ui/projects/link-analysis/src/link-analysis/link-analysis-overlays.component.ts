@@ -188,6 +188,10 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                             </li>
                         }
                     </ul>
+                    <!-- LA-UNEXPANDED-MARKER-1 decision: a hide here is the drawing only, never what an expand reads or the log records -->
+                    <div class="text-secondary mt-1 text-[11px]" data-testid="legend-kinds-note">
+                        Hiding a kind only changes the drawing. Expand still follows it; set Link kinds in the expand settings to leave one out.
+                    </div>
                 }
                 @if (hint()) {
                     <div class="text-secondary mt-1">{{ hint() }}</div>

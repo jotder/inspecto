@@ -25,6 +25,7 @@ function setup(applyOk = true, step: InvestigationStepResult | null = null) {
         busy: signal(false),
         error: signal('boom'),
         lastStep: signal<InvestigationStepResult | null>(step),
+        highlightRoute: signal<string[] | null>(null),
         apply: vi.fn(async () => applyOk),
         withPresets: vi.fn((_p: unknown, r: object) => ({ maxFanOut: 50, ...r })),
     };
@@ -48,6 +49,16 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         await cmp.connect();
         expect(store.apply).toHaveBeenCalledTimes(1);
         expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 3 });
+    });
+
+    it('a click on a connected pair row hands its example route to the canvas, and records nothing', () => {
+        const { fixture, cmp, store, el } = setup(true, STEP);
+        const row = Array.from(el.querySelectorAll('tbody tr')).find((r) => r.getAttribute('tabindex') === '0') as HTMLElement;
+        expect(row).toBeTruthy();
+        row.click();
+        fixture.detectChanges();
+        expect(store.highlightRoute()).toEqual(cmp.result()!.pairs.find((p) => p.route)!.route);
+        expect(store.apply).not.toHaveBeenCalled();
     });
 
     it('needs two numbers: Connect seeds is disabled for one and nothing is sent', async () => {

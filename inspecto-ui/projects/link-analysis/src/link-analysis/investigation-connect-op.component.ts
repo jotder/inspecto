@@ -97,7 +97,13 @@ import { MAX_CONNECT_HOPS, MAX_CONNECT_SEEDS, parseSeedList } from './seed-list'
                         </thead>
                         <tbody>
                             @for (p of r.pairs; track p.a + '|' + p.b) {
-                                <tr>
+                                <tr
+                                    [class.cursor-pointer]="!!p.route"
+                                    [attr.tabindex]="p.route ? 0 : null"
+                                    [attr.aria-label]="p.route ? 'Show this route on the canvas' : null"
+                                    (click)="showRoute(p)"
+                                    (keydown.enter)="showRoute(p)"
+                                >
                                     <td>{{ p.a }}</td>
                                     <td>{{ p.b }}</td>
                                     <td>{{ verdict(p) }}</td>
@@ -152,6 +158,11 @@ export class InvestigationConnectOpComponent {
             return `Not connected within ${this.maxHops} hops${held}`;
         }
         return `${p.hops} hop${p.hops === 1 ? '' : 's'} · ${p.routes} route${p.routes === 1 ? '' : 's'}`;
+    }
+
+    /** A click on a connected pair's row emphasises its example route on the canvas (display only; nothing is recorded). */
+    showRoute(p: ConnectPair): void {
+        if (p.route?.length) this.store.highlightRoute.set([...p.route]);
     }
 
     async connect(): Promise<void> {

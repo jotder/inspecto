@@ -483,6 +483,26 @@ describe('LinkAnalysisComponent', () => {
         expect(c.emphasis()?.nodeIds).toEqual(['a']); // untouched by the merge
     });
 
+    it('LA-UNEXPANDED-MARKER-1 (4): the exploration canvas dots every node an expand has not followed, only after the first expand', async () => {
+        const expand = vi.fn(async () => ({
+            nodes: [{ id: 'f', data: { label: 'F', kind: 'entity' } }],
+            edges: [{ id: 'c->f', source: 'c', target: 'f', data: { kind: 'link' } }],
+        }));
+        const { fixture } = create({ expand });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.unexpandedDrawn()).toBe(0);
+        await c.expandNode('c', 'C', ['C']);
+        const dotted = c.canvasData()!.nodes.filter((n) => n.data.unexpanded).map((n) => n.id).sort();
+        expect(dotted).toEqual(['a', 'b', 'd', 'e', 'f']);
+        expect(c.unexpandedDrawn()).toBe(5);
+        c.selectNextUnexpanded();
+        expect(c.emphasis()?.nodeIds).toEqual(['a']);
+        await c.run(); // a fresh run forgets the expand history
+        expect(c.unexpandedDrawn()).toBe(0);
+    });
+
     // LA-02: an unsurfaced truncation is a false negative presented as a finding. `mergeGraphs` returns
     // a bare `G6GraphData` and structurally drops `truncated`, so the flag has to be carried onto the
     // signal by `expandNode` itself.
@@ -1118,6 +1138,30 @@ describe('LinkAnalysisComponent', () => {
         ).toEqual(['ws-b', 'ws-c']);
         c.onlyUnexpanded.set(false);
         expect(c.canvasData()!.nodes).toHaveLength(3);
+    });
+    it('LA-SEED-CONNECT-1 (b): a clicked pair route emphasises its nodes and the links between consecutive ones', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        const ent = (id: string) => ({ id, type: 'x', hop: 0, seed: 's', admittedBy: 1, expanded: true });
+        c.investigation.workingSet.set({
+            entities: [ent('ws-a'), ent('ws-b'), ent('ws-c')],
+            links: [
+                { source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 },
+                { source: 'ws-b', target: 'ws-c', kind: 'k', count: 1 },
+                { source: 'ws-a', target: 'ws-c', kind: 'k', count: 1 },
+            ],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        c.investigation.highlightRoute.set(['ws-a', 'ws-b', 'ws-c']);
+        fixture.detectChanges();
+        const em = c.emphasis()!;
+        expect(em.nodeIds).toHaveLength(3);
+        expect(em.edgeIds).toHaveLength(2); // a-b and b-c, not the a-c shortcut
     });
     it('evidence: Attach to Case is on the rail with only an Investigation canvas open (no query graph) and seals the Working Set', async () => {
         const { fixture } = create();

@@ -363,6 +363,8 @@ marks its entity expanded. An entity a step added is itself unexpanded until you
 and a *high connectivity* hub keeps its ring instead (it is already "shown, not expanded"). Use it to pick the next
 node to expand when you go one node at a time.
 Two buttons under that legend row help: *Next unexpanded* selects the next unexpanded entity (so *Expand one hop* acts on it) and *Only unexpanded* draws just the unexpanded frontier until you press it again.
+On the exploration canvas (no Investigation) the same dotted outline appears once you have expanded a node with *Expand neighbours*: every node that expansion has not followed since the last query is dotted; a new query forgets the history. Nothing is recorded there.
+The legend's link-kind chips change the DRAWING only: a hidden kind is still followed by the next *Expand one hop*, and the hide is not in the log or the Dossier. To leave a kind out of an expand, set *Link kinds* in the expand settings (that is recorded). In the Connect panel, clicking a connected pair's row emphasises that example route on the canvas.
 
 **Choosing neighbours.** With one entity selected, **Choose neighbours…** in the Investigation tab lists its
 neighbours, strongest first, with their event counts and link kinds. Tick some and press **Add selected**, or press
