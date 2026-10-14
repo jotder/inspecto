@@ -82,6 +82,7 @@ describe('LinkAnalysisCorrectedDaysComponent', () => {
         expect(rows[0].textContent).toContain('Day 2026-10-05 was corrected after you last looked');
         expect(rows[1].textContent).toContain('corrected File arrived under a new name'); // the newest of the 06th wins
         expect(el.querySelector('inspecto-alert')).toBeTruthy();
+        expect(el.querySelector('[data-test="corrected-clears"]')?.textContent).toContain('until you run a step');
         (el.querySelector('[data-test="corrected-refresh"]') as HTMLButtonElement).click();
         expect(fixture.componentInstance.refreshed).toBe(1);
         await expectNoA11yViolations(el);

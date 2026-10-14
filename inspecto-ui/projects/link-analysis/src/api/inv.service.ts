@@ -883,7 +883,6 @@ export interface DatasetFile {
     collector: string;
     pipeline: string;
     consignmentId: string | null;
-    outputFiles: string[];
     /** null = the File wrote no partition file, so there is nothing to index. */
     indexState: DatasetFileIndexState | null;
     indexVersion: number | null;

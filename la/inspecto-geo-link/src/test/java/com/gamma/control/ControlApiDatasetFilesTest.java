@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -142,6 +143,7 @@ class ControlApiDatasetFilesTest {
             JsonNode items = d.get("items");
             assertEquals("c.csv", items.get(0).get("name").asText(), "newest ingested-at first");
             assertEquals("WAITING", items.get(0).get("indexState").asText());
+            assertFalse(items.get(0).has("outputFiles"), "server paths are not served to a view-only caller");
             assertTrue(items.get(0).get("indexVersion").isNull());
             assertEquals("INDEXED", items.get(2).get("indexState").asText());
             assertEquals(1, items.get(2).get("indexVersion").asInt());

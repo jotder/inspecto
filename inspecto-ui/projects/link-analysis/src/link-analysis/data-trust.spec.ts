@@ -94,6 +94,9 @@ describe('dayCells', () => {
 describe('helpers', () => {
     it('formats a day in UTC and tolerates junk', () => {
         expect(formatDay('2026-09-05T23:59:59Z')).toBe('5 Sep 2026');
+        // a DATE column is "covered through its end": the instant is the NEXT midnight, the day shown is the last one with data
+        expect(formatDay('2026-09-05T00:00:00Z')).toBe('4 Sep 2026');
+        expect(formatDay('2026-10-01T00:00:00.000Z')).toBe('30 Sep 2026');
         expect(formatDay(null)).toBe('');
         expect(formatDay('nope')).toBe('');
     });

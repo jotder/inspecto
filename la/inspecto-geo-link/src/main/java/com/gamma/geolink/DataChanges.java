@@ -28,6 +28,16 @@ final class DataChanges {
     private DataChanges() {
     }
 
+    /**
+     * The day a Signal names. The delivery manifest signals its bucket key as the file template spells it ({@code 20260902},
+     * or {@code 2026090214} for an hourly feed), the tests and the SPA use ISO; both place a day, nothing else does.
+     */
+    static LocalDate parseDay(String text) {
+        if (text.length() >= 8 && text.chars().allMatch(Character::isDigit))
+            return LocalDate.parse(text.substring(0, 8), java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        return LocalDate.parse(text);
+    }
+
     /** One qualifying anomaly. */
     record Change(String day, String kind, String file, String previousFile, Instant at, String pipeline) {
         Map<String, Object> toMap() {
@@ -62,12 +72,12 @@ final class DataChanges {
             if (pipeline == null || !pipelines.contains(pipeline) || dayText == null) continue;
             LocalDate day;
             try {
-                day = LocalDate.parse(dayText);
+                day = parseDay(dayText);
             } catch (RuntimeException e) {
                 continue;   // an unparseable day can be placed in no window — never guessed into one
             }
             if ((first != null && day.isBefore(first)) || (last != null && day.isAfter(last))) continue;
-            out.add(new Change(dayText, str(p.get("kind")), str(p.get("file")), str(p.get("previousFile")), s.at(), pipeline));
+            out.add(new Change(day.toString(), str(p.get("kind")), str(p.get("file")), str(p.get("previousFile")), s.at(), pipeline));
         }
         out.sort(Comparator.comparing(Change::at).thenComparing(Change::day));
         return out;

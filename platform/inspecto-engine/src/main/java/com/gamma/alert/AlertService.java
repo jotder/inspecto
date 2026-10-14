@@ -205,14 +205,25 @@ public final class AlertService {
         this.pollIntervalProbe = probe;
     }
 
-    private volatile java.util.function.Function<String, java.util.OptionalLong> indexLagProbe;
+    private volatile java.util.function.BiFunction<String, String, java.util.OptionalLong> indexLagProbe;
 
     /**
      * Wire the index-lag clock (LA-DATA-TRUST-1 S4): {@code dataset id} → epoch millis since which Files have waited for the
      * Link Analysis index, empty when none are waiting. Unwired = an index-lag rule reads {@code unknown} (silent).
      */
-    public void indexLagProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
+    public void indexLagProbe(java.util.function.BiFunction<String, String, java.util.OptionalLong> probe) {
         this.indexLagProbe = probe;
+    }
+
+    private volatile java.util.function.Function<String, java.util.OptionalLong> pipelineCommitProbe;
+
+    /**
+     * Wire the Collector commit clock: {@code Pipeline name} → epoch millis of its last successful commit, empty when
+     * unknown. A polled Collector emits {@code pipeline.commit} but never {@code dataset.write}, so a freshness rule that
+     * names {@code onPipeline} ages the newer of the two.
+     */
+    public void pipelineCommitProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
+        this.pipelineCommitProbe = probe;
     }
 
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalLong> eventDateProbe;
@@ -726,7 +737,7 @@ public final class AlertService {
         if (rule.indexLag()) {                           // the "age" is how long Files have waited for the index; none waiting = 0
             var lag = indexLagProbe;
             if (lag == null) return java.util.OptionalLong.empty();
-            java.util.OptionalLong since = lag.apply(rule.dataset());
+            java.util.OptionalLong since = lag.apply(rule.dataset(), rule.onPipeline());
             return since.isPresent() ? since : java.util.OptionalLong.of(nowMs);
         }
         if (rule.eventDateColumn() != null) {            // event-date mode: age of the newest event, not the last write
@@ -734,7 +745,13 @@ public final class AlertService {
             return byDate == null ? java.util.OptionalLong.empty() : byDate.apply(rule.dataset(), rule.eventDateColumn());
         }
         var probe = freshnessProbe;                      // no clock wired (lean / unit paths) = unknown
-        return probe == null ? java.util.OptionalLong.empty() : probe.apply(rule.dataset());
+        java.util.OptionalLong published = probe == null ? java.util.OptionalLong.empty() : probe.apply(rule.dataset());
+        var commit = pipelineCommitProbe;                // a polled Collector commits and never emits dataset.write
+        java.util.OptionalLong committed = commit == null || rule.onPipeline() == null
+                ? java.util.OptionalLong.empty() : commit.apply(rule.onPipeline());
+        if (committed.isEmpty()) return published;
+        return published.isEmpty() ? committed
+                : java.util.OptionalLong.of(Math.max(published.getAsLong(), committed.getAsLong()));
     }
 
     /**

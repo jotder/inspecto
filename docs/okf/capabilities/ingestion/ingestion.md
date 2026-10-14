@@ -458,8 +458,10 @@ audited), so the daily trigger need not be paused (operator, 2026-10-06). That d
 `gap_detection.file_template: "XDR_{yyyyMMdd}_part{seq}*"` + `seq_scope: PER_BUCKET` (`seq_scope` is required when the
 template holds `{seq}` and refused when it does not; the same keys the completeness KPI uses). A one-file-per-day feed
 declares a date-only template, `file_template: "XDR_{yyyyMMdd}.csv"` with no `seq_scope` (operator, 2026-10-06): one
-expected file per day, its part number recorded as 0, a missing day = one missing file. The shipped `la-daily-feed`
-template declares exactly that. Then (a) every committed part is recorded in `<markers>/day-manifest.tsv` (day, part,
+expected file per day, its part number recorded as 0, a missing day = one missing file. ⚠ A literal suffix means a
+RENAMED correction (`XDR_20260902_fix.csv`) does not match the series: it lands, the day's rows double, and nothing is
+signalled (found live 2026-10-14). The shipped `la-daily-feed` template therefore ends in `*` (`"XDR_{yyyyMMdd}*"`), so a
+second file of a day is recorded as part 0 again and signalled `RENAMED_CORRECTION`. Then (a) every committed part is recorded in `<markers>/day-manifest.tsv` (day, part,
 rows, bytes); a part re-sent under the same name, the same part under a NEW name (the day's rows are now doubled) or a
 new part for a day after a later day landed is signalled as `collector.delivery.anomaly` (WARN; payload `kind`, `day`,
 `file`, `previousFile`); (b) each poll cycle checks the window from the first known day to the last COMPLETE UTC day, so a

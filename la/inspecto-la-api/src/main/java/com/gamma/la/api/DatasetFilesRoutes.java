@@ -172,7 +172,6 @@ public final class DatasetFilesRoutes implements RouteModule {
         m.put("collector", f.collector());
         m.put("pipeline", f.pipeline());
         m.put("consignmentId", f.consignmentId());
-        m.put("outputFiles", f.outputFiles());
         m.put("indexState", state);
         m.put("indexVersion", "INDEXED".equals(state) && manifest != null ? manifest.version() : null);
         return m;

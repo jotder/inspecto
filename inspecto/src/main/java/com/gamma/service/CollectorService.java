@@ -615,6 +615,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.freshnessSubscriber = freshness.subscriber();
         this.eventLog.addSubscriber(freshnessSubscriber);
         alerting.freshnessProbe(freshness);
+        com.gamma.query.PipelineCommitProbe commits = new com.gamma.query.PipelineCommitProbe(events);
+        this.commitSubscriber = commits.subscriber();
+        this.eventLog.addSubscriber(commitSubscriber);   // a polled Collector commits and never emits dataset.write
+        alerting.pipelineCommitProbe(commits);
         alerting.pollIntervalProbe(this::deliveryIntervalMs);   // LA-DATA-TRUST-1 S3: maximumAge auto | Nxpoll
         // LA-DATA-TRUST-1 S4: index-lag rules read how long Files have waited for the Link Analysis index.
         com.gamma.query.IndexLagProbe indexLag = new com.gamma.query.IndexLagProbe();
@@ -878,6 +882,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private java.util.function.Consumer<com.gamma.audit.Event> freshnessSubscriber;
     /** The S4 index-lag probe's EventLog subscriber - held so {@link #close()} can de-register it. */
     private java.util.function.Consumer<com.gamma.audit.Event> indexLagSubscriber;
+    private java.util.function.Consumer<com.gamma.audit.Event> commitSubscriber;
     private volatile java.util.function.Consumer<com.gamma.audit.Event> datasetWriteSubscriber;
 
     /**
@@ -2248,6 +2253,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.removeSubscriber(pendingAlertRuleSubscriber);   // de-register the deferred Alert Rule seed
         this.eventLog.removeSubscriber(securityTriggers);   // de-register the security trigger evaluator
         this.eventLog.removeSubscriber(indexLagSubscriber);
+        this.eventLog.removeSubscriber(commitSubscriber);
         this.eventLog.removeSubscriber(freshnessSubscriber);   // de-register the DUCKLE-C1 freshness probe
         this.eventLog.removeSubscriber(datasetWriteSubscriber);   // de-register the S3b dataset-write trigger
         securityTriggers.detach();   // …and release the log, so a later service's evaluator takes over
