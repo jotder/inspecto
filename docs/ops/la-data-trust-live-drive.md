@@ -40,15 +40,17 @@ A second session drove the same plan the same day and landed `f3a90e6a3` on mast
 | D5 (below) | A renamed correction doubles its day silently | Fixed by `f3a90e6a3` (not re-driven here) |
 | R10 | `outputFiles` exposed absolute server paths | Fixed by `f3a90e6a3` |
 
-## Defects found and NOT fixed (on the board)
+## Defects found and NOT fixed on the first pass, fixed afterwards
 
-| ID | Pri | One-line cause |
+| ID | Pri | Fix |
 |---|---|---|
-| R2 / `LA-EXPECTATION-CLOCK-1` | P1 | No Job type evaluates Expectations; the volume band only runs on `POST /expectations/evaluate` (needs `canOperateRuns`) |
-| R1, R3 / `LA-DAILY-FEED-JOBS-1` | P2 | `la-daily-feed` ships no `la.index.build` Job and no persona roster; the Dossier footer reports `days` as not assessed for a window-less Investigation |
-| R6 / `LA-PARTITION-NULL-ROWS-1` | P2 | Garbage rows (unparseable date) are accepted into a NULL `EVENT_DATE` group: the File reads SUCCESS with 0 error rows |
-| R4, R5, R7, R8, R9 | P3 | Cramped Files table; a quarantined File has no event day; the 3-row sample days breach the volume band; one `sequence_gap` Alert per missing day up to today; Alert age printed as `5850.848s` (these overlap `LA-DATA-TRUST-POLISH-1`) |
-| T1 | trap | An incremental Maven package left `CollectorService` calling the old `indexLagProbe(Function)`: boot died with `NoSuchMethodError`. Delete the stale class (or `clean`) after changing a signature across modules |
+| R2 (`LA-EXPECTATION-CLOCK-1`) | P1 | The `expectation.evaluate` Job type already existed on master (the drive's bundle predated it); `la-daily-feed` now ships `la_rows_band_evaluate` (on every commit of `daily_xdr`) |
+| R1, R3 (`LA-DAILY-FEED-JOBS-1`) | P2 | The template ships `la_index_build`; the Dossier footer judges days over the span of the Files when the Investigation has no window (`windowBasis: files`). No persona roster in the template: personas belong to the Demo Auth build |
+| R6 (`LA-PARTITION-NULL-ROWS-1`) | P2 | Rows in the NULL partition count as error rows and the File reads PARTIAL in the Files route. They are still loaded (a deliberate Pipeline behaviour), only no longer reported as a clean SUCCESS |
+
+Still open, small: R4, R5, R7, R8, R9 (P3, overlap `LA-DATA-TRUST-POLISH-1`).
+
+T1 (trap): an incremental Maven package left `CollectorService` calling the old `indexLagProbe(Function)`: boot died with `NoSuchMethodError`. Delete the stale class (or `clean`) after changing a signature across modules.
 
 ## Not driven
 
