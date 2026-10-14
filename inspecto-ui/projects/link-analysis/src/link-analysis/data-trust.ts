@@ -18,6 +18,8 @@ export interface DataTrustFacts {
     index: { version: number; stale: boolean } | null;
     /** The first Files page (its `summary` spans every File). */
     files: DatasetFilesPage | null;
+    /** Days corrected after the analyst last looked (S5); omitted/empty = nothing to say. */
+    correctedDays?: string[];
 }
 
 export interface DataTrustStrip {
@@ -59,6 +61,12 @@ export function buildStrip(f: DataTrustFacts): DataTrustStrip {
     const s = f.files?.assessed ? f.files.summary : undefined;
     if (s && s.problem > 0) {
         parts.push(`${plural(s.problem, 'File')} quarantined, partial or failed`);
+        worse('warning');
+    }
+
+    const corrected = new Set(f.correctedDays ?? []).size;
+    if (corrected > 0) {
+        parts.push(`${plural(corrected, 'day')} corrected since you last looked`);
         worse('warning');
     }
 

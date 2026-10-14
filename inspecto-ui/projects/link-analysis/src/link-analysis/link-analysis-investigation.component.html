@@ -16,7 +16,11 @@
     <!-- ── LA-DATA-TRUST-1: what data this graph stands on (fresh · complete · Files · index); alerts project into it ── -->
     @if (store.activeId(); as openId) {
         @if (store.header()?.dataset; as dataset) {
-            <la-data-strip [investigationId]="openId" [dataset]="dataset"></la-data-strip>
+            <la-data-strip
+                [investigationId]="openId"
+                [dataset]="dataset"
+                (refreshed)="store.reload()"
+            ></la-data-strip>
         }
     }
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { ColDef } from 'ag-grid-community';
 import { firstValueFrom } from 'rxjs';
@@ -11,11 +11,13 @@ import { StatusBadgeComponent, statusBadgeHtml } from '@inspecto/core/components
 import { DataTableComponent } from '@inspecto/core/data-table';
 import {
     DatasetFile,
+    DataChange,
     DatasetFilesPage,
     InvService,
     InvestigationCoverage,
 } from '@inspecto/link-analysis/api/inv.service';
 import { GraphRunsService, LinkIndexSummary } from '@inspecto/link-analysis/api/graph-runs.service';
+import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-corrected-days.component';
 import { buildStrip, dayCells, DataTrustFacts, formatDay, outcomeTone } from './data-trust';
 
 const PAGE = 25;
@@ -30,6 +32,10 @@ const PAGE = 25;
  * <p><b>Mount point for banners:</b> project any element carrying the attribute {@code la-data-alerts} into this component
  * and it renders directly under the strip line, above the drawer (the corrected-day warning, S5, and later Alert states go
  * there). The strip owns no Alert logic itself.
+ *
+ * <p>The corrected-day warning (S5) is mounted inside that area directly: its read feeds the badge (any correction turns
+ * it at least WARNING) and the Corrections section of the drawer. Its refresh prompt re-runs every read this strip makes
+ * and emits {@code refreshed}, so the host re-reads the Investigation's own data (log + Working Set).
  */
 @Component({
     selector: 'la-data-strip',
@@ -41,6 +47,7 @@ const PAGE = 25;
         InspectoEmptyStateComponent,
         StatusBadgeComponent,
         DataTableComponent,
+        LinkAnalysisCorrectedDaysComponent,
     ],
     template: `
         <section class="flex flex-col gap-2 text-sm" aria-label="Data this graph stands on" data-test="data-strip">
@@ -61,11 +68,45 @@ const PAGE = 25;
 
             <!-- Banner / alerts mount point: project an element with the la-data-alerts attribute. -->
             <div class="flex flex-col gap-2 empty:hidden" data-test="strip-alerts">
+                <inspecto-link-analysis-corrected-days
+                    [investigationId]="investigationId()"
+                    [reloadToken]="reloadToken()"
+                    (changesRead)="corrections.set($event)"
+                    (refresh)="refresh()"
+                ></inspecto-link-analysis-corrected-days>
                 <ng-content select="[la-data-alerts]"></ng-content>
             </div>
 
             @if (open()) {
                 <div id="la-data-drawer" class="flex flex-col gap-4 rounded border p-3" data-test="drawer">
+                    @if (corrections().length) {
+                        <section class="flex flex-col gap-1" aria-label="Corrections">
+                            <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+                                Corrections since you last looked
+                            </h3>
+                            <table class="m-0 w-full text-xs" aria-label="Corrected days" data-test="corrections">
+                                <thead>
+                                    <tr class="text-secondary text-left">
+                                        <th scope="col">Day</th>
+                                        <th scope="col">Kind</th>
+                                        <th scope="col">File</th>
+                                        <th scope="col">When</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (c of corrections(); track c.day + c.at + c.file) {
+                                        <tr data-test="correction-row">
+                                            <th scope="row" class="text-left font-medium tabular-nums">{{ c.day }}</th>
+                                            <td>{{ kindText(c) }}</td>
+                                            <td>{{ c.file ?? 'not named' }}</td>
+                                            <td class="tabular-nums">{{ c.at }}</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </section>
+                    }
+
                     <section class="flex flex-col gap-1" aria-label="Fresh">
                         <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Fresh</h3>
                         <p class="m-0" data-test="fresh-asof">
@@ -237,7 +278,13 @@ export class LinkAnalysisDataStripComponent {
     /** The Investigation's Dataset. */
     readonly dataset = input.required<string>();
 
+    /** The host re-reads the Investigation's own data (log + Working Set) when the analyst refreshes. */
+    readonly refreshed = output<void>();
+
     readonly open = signal(false);
+    readonly corrections = signal<DataChange[]>([]);
+    /** Bumped by a refresh so the corrected-day banner re-reads too. */
+    readonly reloadToken = signal(0);
     readonly dataAsOf = signal<string | null>(null);
     readonly files = signal<DatasetFilesPage | null>(null);
     readonly filesError = signal('');
@@ -265,6 +312,7 @@ export class LinkAnalysisDataStripComponent {
             days: c ? { expected: c.expectedDays, covered: c.coveredDays, missing: c.missingDays } : null,
             index: ix ? { version: ix.version, stale: ix.stale } : null,
             files: this.files(),
+            correctedDays: this.corrections().map((c) => c.day),
         };
         return buildStrip(facts);
     });
@@ -307,6 +355,17 @@ export class LinkAnalysisDataStripComponent {
             const ds = this.dataset();
             untracked(() => void this.load(id, ds));
         });
+    }
+
+    kindText(c: DataChange): string {
+        return KIND_TEXT[c.kind] ?? 'its data moved';
+    }
+
+    /** "Refresh this Investigation's data": every read the strip makes, the banner's own read, and the host's reads. */
+    refresh(): void {
+        this.reloadToken.update((n) => n + 1);
+        void this.load(this.investigationId(), this.dataset());
+        this.refreshed.emit();
     }
 
     private async load(id: string, ds: string): Promise<void> {
