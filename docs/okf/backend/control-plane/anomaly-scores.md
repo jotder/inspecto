@@ -251,6 +251,10 @@ shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classi
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
 collision-free key.)
 
+Rough edges found driving the UI live on 2026-10-13 (the Schema 422 that names no Feature, raw timestamps in the panel,
+one sparkline point per run, the cramped Feature row layout, `anomaly.score` taking no `as_of`, and the untested
+503 hide path) are tracked in `ANOMALY-UI-FINDINGS-1`.
+
 ## Decisions (operator, 2026-10-10)
 
 D-AD1 names (Anomaly Model / Anomaly Score / Feature / Peer Group) · D-AD2 robust z + seasonality + peers,
