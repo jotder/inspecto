@@ -1098,6 +1098,25 @@ export interface DossierLedgerRow {
     readFingerprint?: string;
 }
 
+/**
+ * LA-DATA-TRUST-1 S9: the Dataset's state when the Dossier was exported. NEVER sealed — it sits beside the manifest, outside the
+ * custody hash and the bundle seal, and `sealed` is always `false`. A `null` reading is named in `notAssessed`, never "no gaps".
+ */
+export interface DossierDataFooter {
+    sealed: false;
+    generatedAt: string;
+    note: string;
+    dataset: string | null;
+    asOf: string | null;
+    indexVersion: number | null;
+    indexStale: boolean | null;
+    filesWaiting: number | null;
+    window: { from: string; to: string; zone: string } | null;
+    expectedDays: number | null;
+    missingDays: string[] | null;
+    notAssessed: string[];
+}
+
 /** `GET …/dossier` (format json) — the whole dossier, built from the sealed log only (`GraphDossierBuilder`). */
 export interface Dossier {
     id: string;
@@ -1123,6 +1142,8 @@ export interface Dossier {
     integrity: { intact: boolean; stepsChecked: number; failures: unknown[] };
     manifest: DossierManifest;
     renderings: { json: unknown; steps: string[]; method: string };
+    /** Outside the manifest and the seal; absent from an older server. */
+    dataFooter?: DossierDataFooter;
 }
 
 /** `GET /inv/snapshots` — sealed snapshot ids, newest first; `total` is the TRUE count, so a bounded page says so. */

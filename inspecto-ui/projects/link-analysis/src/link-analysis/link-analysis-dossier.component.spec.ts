@@ -144,6 +144,55 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('shows the data-state footer labelled as not part of the custody hash,', async () => {
+        const footer = {
+            sealed: false as const,
+            generatedAt: '2026-10-14T00:00:00Z',
+            note: 'state at export time, not sealed.',
+            dataset: 'calls',
+            asOf: '2026-09-04T00:00:00Z',
+            indexVersion: 3,
+            indexStale: true,
+            filesWaiting: 2,
+            window: null,
+            expectedDays: 3,
+            missingDays: ['2026-09-02'],
+            notAssessed: [],
+        };
+        const { f, c, el } = create({ dossier: vi.fn(() => of({ ...DOSSIER, dataFooter: footer })) });
+        await c.build();
+        f.detectChanges();
+        const block = el.querySelector('dl[aria-label="Data state at export time"]')?.textContent ?? '';
+        expect(block).toContain('Not part of the custody hash');
+        expect(block).toContain('2026-09-04T00:00:00Z');
+        expect(block).toContain('version 3 — stale');
+        expect(block).toContain('2026-09-02 (of 3 expected)');
+        expect(el.textContent).toContain('Manifest root');
+    });
+
+    it('says "not assessed" for a footer reading the server could not take, never "none"', async () => {
+        const none = {
+            sealed: false as const,
+            generatedAt: '',
+            note: 'n',
+            dataset: 'calls',
+            asOf: null,
+            indexVersion: null,
+            indexStale: null,
+            filesWaiting: null,
+            window: null,
+            expectedDays: null,
+            missingDays: null,
+            notAssessed: ['asOf', 'index', 'files', 'days'],
+        };
+        const { f, c, el } = create({ dossier: vi.fn(() => of({ ...DOSSIER, dataFooter: none })) });
+        await c.build();
+        f.detectChanges();
+        const block = el.querySelector('dl[aria-label="Data state at export time"]')?.textContent ?? '';
+        expect(block.match(/not assessed/g)?.length).toBe(4);
+        expect(block).not.toContain('none');
+    });
+
     it('downloads a rendering at the SAME step as the dossier on screen, as a Blob', async () => {
         const { c, inv } = create();
         const createUrl = vi.fn(() => 'blob:x');
