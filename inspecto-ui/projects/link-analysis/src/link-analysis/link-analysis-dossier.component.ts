@@ -168,6 +168,32 @@ function saveBlob(blob: Blob, name: string): void {
                 <p class="text-secondary m-0 break-all">
                     Manifest root: <code>{{ d.manifest.root }}</code>
                 </p>
+                @if (d.dataFooter; as f) {
+                    <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2" aria-label="Data state at export time">
+                        <dt class="text-secondary">Data state at export time</dt>
+                        <dd class="m-0"><strong>Not part of the custody hash</strong> — {{ f.note }}</dd>
+                        <dt class="text-secondary">Data as of</dt>
+                        <dd class="m-0">{{ f.asOf ?? 'not assessed' }}</dd>
+                        <dt class="text-secondary">Index</dt>
+                        <dd class="m-0">
+                            @if (f.indexVersion != null) {
+                                version {{ f.indexVersion }}{{ f.indexStale ? ' — stale' : '' }}
+                            } @else {
+                                not assessed
+                            }
+                        </dd>
+                        <dt class="text-secondary">Files waiting for the index</dt>
+                        <dd class="m-0">{{ f.filesWaiting ?? 'not assessed' }}</dd>
+                        <dt class="text-secondary">Days with no rows</dt>
+                        <dd class="m-0 break-all">
+                            @if (f.missingDays) {
+                                {{ f.missingDays.join(', ') || 'none' }} (of {{ f.expectedDays }} expected)
+                            } @else {
+                                not assessed
+                            }
+                        </dd>
+                    </dl>
+                }
                 <div class="flex flex-wrap gap-1">
                     <button mat-stroked-button [disabled]="busy()" (click)="download('steps')">Download steps</button>
                     <button mat-stroked-button [disabled]="busy()" (click)="download('method')">Download method</button>

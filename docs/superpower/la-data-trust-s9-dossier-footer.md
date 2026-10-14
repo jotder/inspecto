@@ -1,6 +1,6 @@
 # S9 design check: a data-trust footer on the Dossier (`LA-DATA-TRUST-1`)
 
-**Status: DESIGN CHECK ONLY, 2026-10-14. Nothing built. Recommendation: BUILD, after S1/S2, and only in the shape below.**
+**Status: BUILT 2026-10-14 (S9), exactly in the shape below; the as-built facts live in `docs/okf/frontend/features/link-analysis.md` (Dossier, data-state footer). Deviation: `format=steps|method` do NOT carry the footer (the method text cites the custody hash).**
 Part of [la-data-trust-plan.md](la-data-trust-plan.md) (slice S9).
 
 ## Question

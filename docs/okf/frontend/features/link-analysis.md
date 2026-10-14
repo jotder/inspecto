@@ -884,6 +884,18 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   `crypto.subtle` exists only in a secure context (https or localhost): elsewhere the Snapshot dialog refuses
   to seal and says why, never falling back to a weaker digest. The server stores `manifestHash` verbatim and
   never recomputes it — the Dossier manifest remains the custody root.
+  **Data-state footer (LA-DATA-TRUST-1 S9, 2026-10-14):** the json Dossier, the html page and the bundle carry a
+  `dataFooter` - data-as-of (the `eventDate` column's maximum, the `GET /datasets/{id}/freshness` reading through
+  `DatasetProvider.dataAsOf`), the newest index version and its stale flag (`IndexRoutes.indexesOf`), Files waiting for the
+  index (`DatasetFilesRoutes.read`), and the days with no rows over the window in force at the Dossier's step
+  (`InvestigationCoverageRoutes.gaps`). 🔴 **It is NOT sealed**: `DossierDataFooter` assembles it in the route AFTER
+  `GraphDossierBuilder.build`, as a sibling of `manifest` (never inside `dossier`), so the manifest `root`, `/dossier/verify`
+  and replay cannot see it; on the bundle it is a top-level key that `DossierBundleRoutes.seal` drops next to `generatedAt`.
+  It says `sealed:false` itself and an EDITED footer does NOT fail verification (the documented price of the seal staying
+  deterministic). A reading it cannot take is `null` and named in `notAssessed` - never "no gaps"; it holds counts, days and
+  versions only (no entity key, File name or Collector), so nothing needs masking. `format=steps|method` are unchanged: the
+  method text cites the custody hash and must not carry unsealed state. The html page renders it as its own block AFTER the
+  Manifest. Proof: `ControlApiDossierDataFooterTest` (root, seal and verify identical across two data states; mutation-checked).
   **SPA half (2026-09-23):** the Investigation panel's *Dossier* section (`link-analysis-dossier.component`)
   renders the json dossier, downloads `steps`/`method` (and, since 2026-10-03, *Download HTML* → `<id>-html.html`) as Blobs through HttpClient at the dossier's own `at`
   (never a bare href — it would skip the bearer), and verifies either the manifest just issued or an uploaded

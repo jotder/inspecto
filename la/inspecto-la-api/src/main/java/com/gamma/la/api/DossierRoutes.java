@@ -144,6 +144,8 @@ public final class DossierRoutes implements RouteModule {
         out.put("generatedAt", java.time.Instant.now().toString());   // NOT part of the manifest root
         out.putAll(dossier);
         out.put("masking", mask.describe());
+        // LA-DATA-TRUST-1 S9: the data state at export time - a sibling of the manifest, never inside it, so root/verify/replay cannot see it.
+        out.put("dataFooter", DossierDataFooter.build(api, ex, inv, log, at));
         // Comparison mode: an OPTIONAL, explicitly UNSEALED section - a live Dataset read, so outside the manifest and the
         // integrity check (the rest of the Dossier reads no Dataset). Only when windows are asked for (aFrom..bTo).
         Map<String, Map<String, Object>> compareWindows = WindowComparison.windows(ex);

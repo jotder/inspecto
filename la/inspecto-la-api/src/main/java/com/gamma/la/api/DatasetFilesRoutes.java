@@ -66,8 +66,11 @@ public final class DatasetFilesRoutes implements RouteModule {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'");
         int limit = intParam(ex, "limit", DEFAULT_LIMIT, 1, MAX_LIMIT);
         int offset = intParam(ex, "offset", 0, 0, Integer.MAX_VALUE);
-        String name = ApiContext.query(ex, "name");
+        return read(api, writeRoot, dataset, id, limit, offset, ApiContext.query(ex, "name"));
+    }
 
+    /** The per-File read of an already-gated Dataset: the one reading behind this route and the Dossier footer (LA-DATA-TRUST-1 S9). */
+    static Map<String, Object> read(ApiContext api, Path writeRoot, Map<String, Object> dataset, String id, int limit, int offset, String name) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dataset", id);
         out.put("readAt", Instant.now().toString());

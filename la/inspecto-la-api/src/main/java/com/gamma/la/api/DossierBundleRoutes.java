@@ -34,7 +34,8 @@ import static com.gamma.la.core.InvestigationEvaluator.sha256;
  * {@code masking} · {@code dossier} (exactly what {@code GET …/dossier} answers, masked) · {@code references} ·
  * {@code custody} {@code {manifestRoot, referencesCount, referencesHash}} · {@code seal}
  * {@code {algorithm, value}} — SHA-256 over the canonical JSON (map keys sorted) of every field above except
- * {@code seal}; {@code generatedAt} sits outside the seal, like the Dossier's own.
+ * {@code seal}; {@code generatedAt} and {@code dataFooter} (the Dataset's state at export time, {@code sealed:false},
+ * LA-DATA-TRUST-1 S9) sit outside the seal, like the Dossier's own.
  *
  * <p><b>Masking applies on export, and the root stays verifiable (D-U6).</b> The Dossier and the references are masked
  * per the Space's {@code maskingMode} as the bundle is built, so a bundle never carries a raw id the caller could not
@@ -97,6 +98,8 @@ public final class DossierBundleRoutes implements RouteModule {
         custody.put("referencesCount", rawRefs.size());
         custody.put("referencesHash", sha256(canonical(refs)));
         bundle.put("custody", custody);
+        // LA-DATA-TRUST-1 S9: unsealed (seal() drops it) - the Dataset's state at export time changes between two exports of the same evidence.
+        bundle.put("dataFooter", DossierDataFooter.build(api, ex, inv, log, at));
         bundle.put("seal", seal(bundle));
         bundle.put("generatedAt", Instant.now().toString());   // NOT part of the seal
 
@@ -162,11 +165,12 @@ public final class DossierBundleRoutes implements RouteModule {
         return out;
     }
 
-    /** The seal over every bundle field except {@code seal} and {@code generatedAt}: SHA-256 of the canonical JSON. */
+    /** The seal over every bundle field except {@code seal}, {@code generatedAt} and {@code dataFooter}: SHA-256 of the canonical JSON. */
     static Map<String, Object> seal(Map<String, Object> bundle) {
         Map<String, Object> body = new LinkedHashMap<>(bundle);
         body.remove("seal");
         body.remove("generatedAt");
+        body.remove("dataFooter");   // LA-DATA-TRUST-1 S9: time-varying data state, labelled sealed:false in itself
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("algorithm", "SHA-256");
         s.put("value", sha256(canonical(body)));

@@ -57,6 +57,8 @@ final class DossierHtml {
         if (d.get("temporalFindings") != null) section(b, "Temporal findings", value(d.get("temporalFindings")));
         section(b, "Integrity", value(d.get("integrity")));
         section(b, "Manifest", value(manifest));
+        // After - and apart from - the manifest: the footer is not part of the custody hash (LA-DATA-TRUST-1 S9).
+        if (d.get("dataFooter") != null) section(b, "Data state at export time, not part of the custody hash", value(d.get("dataFooter")));
         return b.append("</body></html>\n").toString();
     }
 
