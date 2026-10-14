@@ -34,6 +34,8 @@ class ControlApiFrameHeadersTest {
             + "<link href=\"https://fonts.gstatic.com\" rel=\"preconnect\">"
             + "<link href=\"https://fonts.googleapis.com/css2?family=IBM+Plex+Mono\" rel=\"stylesheet\">"
             + "<link rel=\"stylesheet\" href=\"styles-ABC.css\" media=\"print\" onload=\"this.media='all'\">"
+            + "<style>@font-face{font-family:'IBM Plex Mono';src:url(https://fonts.gstatic.com/s/ibmplexmono/v20/x.woff2) format('woff2');}"
+            + "@font-face{font-family:'Local';src:url(assets/local.woff2);}body{margin:0}</style>"
             + "</head><body><app-root></app-root></body></html>";
 
     private final HttpClient client = HttpClient.newHttpClient();
@@ -143,6 +145,8 @@ class ControlApiFrameHeadersTest {
             assertEquals("no-referrer", r.headers().firstValue("Referrer-Policy").orElse(null));
             assertEquals("no-store", r.headers().firstValue("Cache-Control").orElse(null));
             assertFalse(r.body().contains("http"), "no third-party link, not even a preconnect: " + r.body());
+            assertFalse(r.body().contains("IBM Plex Mono"), "the inlined external @font-face is dropped: " + r.body());
+            assertTrue(r.body().contains("assets/local.woff2") && r.body().contains("body{margin:0}"), "a same-origin font and other CSS stay: " + r.body());
             assertFalse(r.body().contains("onload"), "no inline handler the policy would refuse: " + r.body());
             assertTrue(r.body().contains("styles-ABC.css") && !r.body().contains("media=\"print\""), r.body());
         }
