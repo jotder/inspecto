@@ -148,6 +148,13 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         own.flush({});
     });
 
+    it('reads the corrected-day warning with a bare GET', () => {
+        svc.investigationDataChanges('inv-1').subscribe();
+        const req = httpMock.expectOne(`${base}/inv/investigations/inv-1/data-changes`);
+        expect(req.request.method).toBe('GET');
+        req.flush({});
+    });
+
     it('reads the log with GET and an optional limit', () => {
         svc.investigationLog('inv-1', 50).subscribe();
         const req = httpMock.expectOne((r) => r.url === `${base}/inv/investigations/inv-1/log`);

@@ -904,6 +904,32 @@ export interface DatasetFilesPage {
     index?: { present: boolean; version: number | null; builtAt: string | null; inputsRecorded: number | null };
     readAt: string;
     note?: string;
+
+/** LA-DATA-TRUST-1 S5: one anomaly that moved a day of the Investigation's window after the analyst last looked. */
+export interface DataChange {
+    /** `YYYY-MM-DD` — the Pipeline's partition day. */
+    day: string;
+    kind: 'REDELIVERED' | 'RENAMED_CORRECTION' | 'PART_COUNT_CHANGED' | 'DUPLICATE_SKIPPED';
+    file: string | null;
+    previousFile?: string;
+    at: string;
+    pipeline: string;
+}
+
+/** `GET /inv/investigations/{id}/data-changes` — `assessed:false` when no lineage ties the Dataset to a Pipeline. */
+export interface InvestigationDataChanges {
+    id: string;
+    dataset: string;
+    window: InvestigationWindow | null;
+    /** The newest of creation, every step and every sealed read: only anomalies after it are listed. */
+    lastLookAt: string;
+    assessed: boolean;
+    note?: string;
+    pipelines?: string[];
+    changes: DataChange[];
+    changedDays: string[];
+    capped: boolean;
+    readAt: string;
 }
 
 // ── LA-24: the optional Case link (`InvestigationCaseRoutes`) ─────────────────────────────────────────
@@ -1679,6 +1705,11 @@ export class InvService {
         return this.http.get<WorkingSetRelation>(invPath(id, 'working-set'), {
             params: toParams({ of: q.of, at: q.at, limit: q.limit, offset: q.offset }),
         });
+    }
+
+    /** LA-DATA-TRUST-1 S5: the days of this Investigation's window that were corrected after the analyst last looked. */
+    investigationDataChanges(id: string): Observable<InvestigationDataChanges> {
+        return this.http.get<InvestigationDataChanges>(invPath(id, 'data-changes'));
     }
 
     /** LA-19: coverage over `from`/`to` (+ `timezone`), or — with none — over the Investigation's own window. */
