@@ -148,7 +148,22 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
             if ("SUCCESS".equals(outcome)) outcome = "PARTIAL";
         }
         return new FileEntry(name, day, count(s.get("parsed_rows")), errorRows,
-                blankToNull(s.get("end_time")), outcome, collector, pipeline, cid, new ArrayList<>(outputs));
+                utcInstant(blankToNull(s.get("end_time"))), outcome, collector, pipeline, cid, new ArrayList<>(outputs));
+    }
+
+    /**
+     * The ledger stamps {@code end_time} with {@code LocalDateTime.now()} into a zone-NAIVE string (the host's clock, see
+     * {@code AlertService}); every other instant on the route is UTC, so read it in the host zone it was written in and state it
+     * as a UTC ISO instant. A value that already carries a zone ({@code ...Z}) or cannot be read passes through unchanged.
+     */
+    static String utcInstant(String ledgerTime) {
+        if (ledgerTime == null || ledgerTime.length() < 19 || ledgerTime.endsWith("Z") || ledgerTime.contains("+")) return ledgerTime;
+        try {
+            return java.time.LocalDateTime.parse(ledgerTime.substring(0, 19).replace(' ', 'T'))
+                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toString();
+        } catch (RuntimeException unreadable) {
+            return ledgerTime;
+        }
     }
 
     /** The status ledger's word as one of SUCCESS / PARTIAL / QUARANTINED / FAILED; a word it does not know (PARKED) passes through. */

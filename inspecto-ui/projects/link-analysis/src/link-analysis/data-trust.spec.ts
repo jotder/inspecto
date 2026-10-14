@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
-import { buildStrip, dayCells, daysWindow, formatDay, outcomeTone } from './data-trust';
+import { buildStrip, dayCells, daysWindow, formatDay, formatInstant, outcomeTone, splitMissing } from './data-trust';
 
 const files = (over: Partial<NonNullable<DatasetFilesPage['summary']>> = {}): DatasetFilesPage =>
     ({
@@ -77,6 +77,69 @@ describe('buildStrip', () => {
     });
 });
 
+describe('not delivered yet vs a real gap', () => {
+    const fileDays = [
+        { day: '2026-09-02', files: 1 },
+        { day: '2026-09-04', files: 1 },
+    ];
+
+    it('splits missing days: inside the delivered span is a hole, outside is not delivered yet', () => {
+        expect(splitMissing(['2026-09-01', '2026-09-03', '2026-09-05', '2026-09-06'], fileDays)).toEqual({
+            holes: ['2026-09-03'],
+            notDelivered: ['2026-09-01', '2026-09-05', '2026-09-06'],
+        });
+    });
+
+    it('judges nothing without a delivered day: every missing day stays a hole', () => {
+        expect(splitMissing(['2026-09-01'], [])).toEqual({ holes: ['2026-09-01'], notDelivered: [] });
+        expect(splitMissing(['2026-09-01'], null)).toEqual({ holes: ['2026-09-01'], notDelivered: [] });
+    });
+
+    it('the strip counts only the hole as a gap and names the rest', () => {
+        const s = buildStrip({
+            dataAsOf: '2026-09-05T00:00:00Z',
+            days: { expected: 6, covered: 2, missing: ['2026-09-01', '2026-09-03', '2026-09-05', '2026-09-06'] },
+            index: null,
+            files: { ...files(), days: [...fileDays.map((d) => ({ ...d, rows: 5 }))] },
+        });
+        expect(s.text).toContain('2 of 6 days · 1 gap · 3 not delivered yet');
+        expect(s.tone).toBe('warning');
+    });
+
+    it('only days after the newest File: no gap, no warning', () => {
+        const s = buildStrip({
+            dataAsOf: '2026-09-05T00:00:00Z',
+            days: { expected: 7, covered: 5, missing: ['2026-09-05', '2026-09-06'] },
+            index: { version: 1, stale: false },
+            files: { ...files(), days: [{ day: '2026-09-01', files: 1, rows: 5 }, { day: '2026-09-04', files: 1, rows: 5 }] },
+        });
+        expect(s.text).toContain('5 of 7 days · 2 not delivered yet');
+        expect(s.text).not.toContain('gap');
+        expect(s.tone).toBe('success');
+    });
+
+    it('a zero-row day outside the span reads pending, one inside reads missing', () => {
+        const cells = dayCells(
+            [
+                { date: '2026-09-01', rows: 0 },
+                { date: '2026-09-02', rows: 5 },
+                { date: '2026-09-03', rows: 0 },
+                { date: '2026-09-04', rows: 5 },
+                { date: '2026-09-05', rows: 0 },
+            ],
+            fileDays,
+        );
+        expect(cells.map((c) => c.state)).toEqual(['pending', 'ok', 'missing', 'ok', 'pending']);
+    });
+
+    it('states an instant in UTC and refuses a zone-less one', () => {
+        expect(formatInstant('2026-09-05T10:03:20Z')).toBe('5 Sep 2026 10:03 UTC');
+        expect(formatInstant('2026-09-05T15:33:20+05:30')).toBe('5 Sep 2026 10:03 UTC');
+        expect(formatInstant('2026-09-05 10:03:20')).toBe('');
+        expect(formatInstant(null)).toBe('');
+    });
+});
+
 describe('dayCells', () => {
     it('tells a gap (no File) from a zero-row day (a File arrived)', () => {
         const cells = dayCells(
@@ -85,7 +148,10 @@ describe('dayCells', () => {
                 { date: '2026-09-02', rows: 0 },
                 { date: '2026-09-03', rows: 0 },
             ],
-            [{ day: '2026-09-03', files: 1 }],
+            [
+                { day: '2026-09-01', files: 1 },
+                { day: '2026-09-03', files: 1 },
+            ],
         );
         expect(cells.map((c) => c.state)).toEqual(['ok', 'missing', 'empty']);
     });

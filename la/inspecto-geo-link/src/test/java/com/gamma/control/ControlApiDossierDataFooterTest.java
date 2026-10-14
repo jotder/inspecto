@@ -154,6 +154,7 @@ class ControlApiDossierDataFooterTest {
             assertFalse(f1.get("sealed").asBoolean());
             assertTrue(f1.get("note").asText().contains("NOT part of the custody hash"));
             assertEquals("2026-09-04T00:00:00Z", f1.get("asOf").asText(), "a DATE counts through its end");
+            assertEquals("2026-09-03", f1.get("asOfDay").asText(), "the last covered day is the one BEFORE that midnight, as the strip reads it");
             assertEquals(1, f1.get("indexVersion").asInt());
             assertTrue(f1.has("indexStale") && !f1.get("indexStale").isNull());
             assertEquals(1, f1.get("filesWaiting").asInt());
@@ -169,6 +170,7 @@ class ControlApiDossierDataFooterTest {
             JsonNode second = ok(c, "GET", INV + "/dossier", null);
             JsonNode f2 = second.get("dataFooter");
             assertEquals("2026-09-10T00:00:00Z", f2.get("asOf").asText());
+            assertEquals("2026-09-09", f2.get("asOfDay").asText());
             assertEquals(2, f2.get("indexVersion").asInt());
             assertNotEquals(f1.toString(), f2.toString(), "the footer moved with the data");
             assertEquals(first.get("manifest").toString(), second.get("manifest").toString(), "root and every artefact hash identical");
@@ -245,7 +247,7 @@ class ControlApiDossierDataFooterTest {
             ok(c, "POST", "/inv/investigations", CREATE);
             ok(c, "POST", INV + "/ops", "{\"op\":\"seed\",\"ids\":[\"alice\"]}");
             JsonNode f = ok(c, "GET", INV + "/dossier", null).get("dataFooter");
-            assertTrue(f.get("asOf").isNull() && f.get("missingDays").isNull() && f.get("indexVersion").isNull());
+            assertTrue(f.get("asOf").isNull() && f.get("asOfDay").isNull() && f.get("missingDays").isNull() && f.get("indexVersion").isNull());
             String na = f.get("notAssessed").toString();
             assertTrue(na.contains("asOf") && na.contains("days") && na.contains("index") && na.contains("files"), na);
         }

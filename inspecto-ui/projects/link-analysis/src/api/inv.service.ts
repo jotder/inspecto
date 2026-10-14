@@ -1107,6 +1107,8 @@ export interface DossierDataFooter {
     note: string;
     dataset: string | null;
     asOf: string | null;
+    /** The last UTC day covered, ISO (the day before a midnight `asOf`); the SPA shows `formatDay(asOf)`. */
+    asOfDay: string | null;
     indexVersion: number | null;
     indexStale: boolean | null;
     filesWaiting: number | null;

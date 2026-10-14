@@ -47,7 +47,10 @@ const FILES = {
             indexVersion: null,
         },
     ],
-    days: [{ day: '2026-09-03', files: 1, rows: 0 }],
+    days: [
+        { day: '2026-09-01', files: 1, rows: 10 },
+        { day: '2026-09-03', files: 1, rows: 0 },
+    ],
     summary: {
         files: 2,
         rows: 10,
@@ -212,6 +215,7 @@ describe('LinkAnalysisDataStripComponent', () => {
         expect(cells[0]).toContain('10 rows');
         expect(cells[1]).toContain('no File');
         expect(cells[2]).toContain('0 rows');
+        expect(q(f, '[data-test="day-strip"]')!.textContent).not.toContain('not delivered yet');
         expect(q(f, '[data-test="complete-basis"]')!.textContent).toContain(
             'not against a list of expected Collectors',
         );
@@ -249,7 +253,7 @@ describe('LinkAnalysisDataStripComponent', () => {
         expect(spies.coverage).toHaveBeenCalledTimes(2);
         expect(spies.coverage.mock.calls[0][1]).toBeUndefined();
         expect(spies.coverage.mock.calls[1][0]).toBe('inv1');
-        expect(spies.coverage.mock.calls[1][1]).toEqual({ from: '2026-09-03T00:00:00Z', to: '2026-09-04T00:00:00Z' });
+        expect(spies.coverage.mock.calls[1][1]).toEqual({ from: '2026-09-01T00:00:00Z', to: '2026-09-04T00:00:00Z' });
         expect(q(f, '[data-test="strip-text"]')!.textContent).not.toContain('days not assessed');
         q(f, '[data-test="strip-toggle"]')!.click();
         await settle(f);
