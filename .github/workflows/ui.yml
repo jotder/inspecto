@@ -45,6 +45,10 @@ jobs:
       - name: Design-system guard
         run: npm run lint:tokens
 
+      # Supply-chain denylist: fails if package-lock.json resolves a ruled-out package version (see the guard's header).
+      - name: Supply-chain denylist
+        run: npm run lint:denylist
+
       # Formatting guard. .prettierrc.json has been pinned since 2026-08-13, but nothing ran
       # `prettier --check`, so 68 files under src/ had drifted out of it unnoticed by 2026-08-31.
       # ⚠ Deliberately --check and never --write in CI: a reflow can change what a template

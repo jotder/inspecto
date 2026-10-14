@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p projects/la-app/tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json && tsc -p tsconfig.json --noEmit",
     "lint": "ng lint",
     "lint:tokens": "node tools/check-design-tokens.mjs",
+    "lint:denylist": "node tools/check-npm-denylist.mjs",
     "check:bundle-shape": "node tools/check-bundle-shape.mjs",
     "format:check": "prettier --check \"{src,projects}/**/*.{ts,html,scss,json}\"",
     "format": "prettier --write \"{src,projects}/**/*.{ts,html,scss,json}\""
@@ -31,7 +32,7 @@
     "@angular/material-luxon-adapter": "22.1.2",
     "@angular/platform-browser": "22.1.1",
     "@angular/router": "22.1.1",
-    "@antv/g6": "^5.1.1",
+    "@antv/g6": "5.1.1",
     "@codemirror/commands": "^6.11.0",
     "@codemirror/lang-sql": "^6.10.0",
     "@codemirror/language": "^6.12.4",
