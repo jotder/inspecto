@@ -129,6 +129,37 @@ required and max length derived from its fields (`requiredInputs`, `inputMaxLeng
 and the server's render refusal shown in the dialog, which stays open. Picker errors appear only after a submit attempt.
 **Report Templates** section (same pane): the templates with origin, and - with `canApproveChanges` - **New template** / Edit / Delete (a built-in is editable, saved as the Space override, but not deletable). `report-template.dialog.ts` edits the template as JSON beside its id (create only); client-side JSON check, then the server's 422 / 403 / 409 text shown verbatim.
 
+## Demo rehearsal 2026-10-14 (`REGULATORY-REPORTING-1`, no code row)
+A fresh `package.ps1 -Edition Enterprise -DemoAuth -Ui gamma -NoBakeDemo` bundle (the module jar is in `modules.list`;
+`/bootstrap` reports `features.regulatoryReporting: true`), the `telco-fraud` Space (`node tools/seed-telco-fraud-demo.mjs`, 15 Jobs
+triggered, `POST /alerts/evaluate` -> 30 CRITICAL Incidents), one synthetic Case (`POST /objects {type: CASE, links: [{to, relationship: CONTAINS}]}`
+over three staff-fraud Incidents, two `ATTACHMENT` notes, an `impact` set with `PUT /objects/{id}/impact {impact: {...}}`), driven as `fm.analyst`
+(maker, `operations`), `admin` (approver: seed `admin;super` holds `canApproveChanges`; **`fm.manager` (`power`) does NOT**) and `ra.viewer`.
+The Space switcher resets to the first Space on every sign-in: pick the Space again, then open `/regulatory-reports`.
+**GO for the presenter who follows this list; no schema validation, sealing, schedule or masking exists, so do not claim them.**
+
+| # | Beat | Result | Evidence |
+|---|---|---|---|
+| 1 | Module present, pane in the nav for makers | **PASS** | `modules.list` has `inspecto-regulatory-reporting.jar`; pane lists the built-in `sample-sar` |
+| 2 | Author a Report Template (CSV / JSON / XML) | **PASS** | `PUT /regulatory-reports/templates/{id}` as `admin` -> 200, `origin: space`; a viewer gets 403 `canApproveChanges` |
+| 3 | Draft from a Case with its Incidents and evidence | **PASS** | UI dialog (Template + Case pickers, one textarea per `input.*`; client message *The template requires Narrative*) and API; 3 Incidents + 2 attachments rendered |
+| 4 | XML output | **PASS** well-formed (parsed); **N/A** schema: no XSD ships, `sample-sar` claims no regulator schema | text escaped (`&lt;b&gt;&amp;`) |
+| 5 | CSV output | **PASS** 2 rows x 8 columns (RFC 4180); lists joined `"; "`; a leading `=` cell is written `'=HYPERLINK(...)` | |
+| 6 | JSON output | **PASS** parses; repeating groups become arrays | |
+| 7 | Four-eyes approve -> submit | **PASS** | analyst Send for approval; `fm.analyst` approve 403; `admin` Approve and submit -> SUBMITTED; file on disk SHA-256 equals the pane's `contentSha256` |
+| 8 | Sealed / signed output | **NOT BUILT** (listed under *Deliberately not built*); the record is MAC-signed, the delivered file is not | `contentSha256` is the only seal; the audit `submitted` row carries it |
+| 9 | Regenerate idempotent | **PARTIAL, by design**: a second draft of the same Case + inputs has the same `sourceFingerprint` but a different SHA (`report.id` and `createdAt` are in the document); `retry` re-sends the SAME bytes to the SAME file name | say "pinned", not "reproducible" |
+| 10 | Amended report after the Case changes | **PASS as a procedure**: an attachment added while PENDING sets `sourceChanged: true`; `admin` Decline, the maker drafts again and the new report carries the late evidence. There is no in-place *amend* | |
+| 11 | Field-level masking for a non-privileged persona | **NOT BUILT / consistent**: `ra.viewer` cannot read reports at all (list and detail 403 `canWorkIncidents or canApproveChanges`, no nav item, in-pane refusal text); but the Case / Incident view itself is unmasked for the viewer (`GET /objects/{id}` returns the MSISDN key), so a report adds no exposure | open decision, backlog |
+| 12 | Schedule | **NOT BUILT** (a report is always drafted by a person) | |
+| 13 | Audit trail | **PASS** | hash-chained AUDIT rows `drafted`, `approval-requested`, `approved`, `submitted`, `declined`, template `updated`; `GET /audit/verify` -> `ok: true, checked: 74`; content and inputs are never in the rows |
+| 14 | Unhappy paths | **PASS** (each a clear 4xx) | required `narrative` empty 422; unknown input key 422 naming what the template reads; both `caseId` and `incidentId` 422; unknown Case 404; unknown template 422; input over 20000 chars 422; control character in XML 422; required source that resolves empty (`subject.nope`) 422 at draft; source root not in `[incidents, input, report, subject, evidence]` 422 at template save; `delivery.dir` outside the jail 403; DELETE of a template used by a report 409, of a built-in with no override 409; viewer draft 403; approve of a draft 409 |
+| 15 | Huge Case | **NOT DRIVEN**: the 1 MiB document cap (`ReportRenderer.MAX_BYTES`) has no test of its own | backlog |
+
+Small defects found, all cosmetic, filed on the row: the route-level AUDIT row labels a decline / send-for-approval `regulatory-report.created` (the verb of the HTTP method) beside the precise
+module row; the pane and `GET /regulatory-reports/{id}` show the server's absolute drop path; a viewer sees *No Report Templates.* above the refusal; a required template field that names a
+Case attribute that does not exist saves (it cannot be known statically) and only fails at draft.
+
 ## Deliberately not built (see `docs/BACKLOG.md` `REGULATORY-REPORTING-1`)
 Regulator acknowledgement ingest (`rejected`, receipts); live regulator
 delivery (SFTP / HTTPS through a Connection); nested repeating groups; sealing / signing the delivered file; a
