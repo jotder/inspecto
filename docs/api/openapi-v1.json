@@ -3562,8 +3562,8 @@
                       "properties" : {
                         "field" : { "type" : "string" },
                         "dir" : { "type" : "string", "enum" : [ "asc", "desc" ] },
-                        "agg" : { "type" : "string", "enum" : [ "min", "max" ] },
-                        "cosmetic" : { "type" : "boolean", "description" : "Set by a chart for its category order only: honoured on a groupBy Dimension with no agg. For a caller who may not see raw entity keys the server drops a cosmetic term over a masked column and orders by the first Measure descending instead; any other order over a masked column is still refused (422)." }
+                        "agg" : { "type" : "string", "enum" : [ "min", "max" ],
+                        "cosmetic" : { "type" : "boolean", "description" : "Set by a chart for its category order only: honoured on a groupBy Dimension with no agg. For a caller who may not see raw entity keys the server drops a cosmetic term over a masked column and orders by the first Measure descending instead; any other order over a masked column is still refused (422)." } }
                       }
                     }
                   }
@@ -13743,6 +13743,11 @@
           "timezone" : {
             "type" : [ "string", "null" ],
             "description" : "An IANA region zone (e.g. Asia/Kolkata); offset forms are refused. Absent: UTC."
+          },
+          "asOf" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "latest", null ],
+            "description" : "Opt in to a period that follows the data: `latest` evaluates as of the newest day present in `timeField` (never past today) when the request carries no `asOf`. Absent: today. Anything else is a 422."
           },
           "owner" : {
             "type" : [ "string", "null" ]

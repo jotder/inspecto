@@ -70,7 +70,8 @@ final class KpiRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "kpi '" + id + "' is invalid: " + bad.getMessage());
         }
-        LocalDate asOf = asOf(ApiContext.query(ex, "asOf"), kpi.zone());
+        String asOfParam = ApiContext.query(ex, "asOf");
+        LocalDate asOf = asOf(asOfParam, kpi.zone());
         Map<String, Object> dataset = readableDataset(ex, store, kpi.dataset());
         if (dataset == null)
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "kpi '" + id + "': no dataset '" + kpi.dataset() + "'");
@@ -81,6 +82,10 @@ final class KpiRoutes implements RouteModule {
         KpiEvaluator.Result r;
         try {
             String relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
+            if (kpi.asOfLatest() && (asOfParam == null || asOfParam.isBlank())) {   // opt-in: follow the data, never past today
+                LocalDate latest = KpiEvaluator.latestDay(kpi, relationSql);
+                if (latest != null && latest.isBefore(asOf)) asOf = latest;
+            }
             r = KpiEvaluator.evaluate(kpi, relationSql, asOf);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());

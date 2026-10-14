@@ -154,6 +154,33 @@ class ControlApiKpiTest {
     }
 
     @Test
+    void asOfLatestFollowsTheNewestDayInTheDataAndNothingElseChanges(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOrders(c, "orders", Map.of());
+            String latest = KPI.replace("\"id\":\"revenue\"", "\"id\":\"revenue_latest\"").replace("\"direction\":\"up\"", "\"direction\":\"up\",\"asOf\":\"latest\"");
+            data(send(c, "POST", "/components/kpi", latest, ALICE), 200);
+            data(send(c, "POST", "/components/kpi", KPI, ALICE), 200);
+            // the newest row is 2026-08-10, long before today: the opted-in KPI follows it; the plain one still reads today
+            JsonNode v = data(send(c, "GET", "/kpis/revenue_latest/value", null, ALICE), 200);
+            assertEquals("2026-08-10", v.get("asOf").asText());
+            assertEquals(50.0, v.get("value").asDouble(), 1e-9);
+            assertTrue(data(send(c, "GET", "/kpis/revenue/value", null, ALICE), 200).get("value").isNull(), "no opt-in: today's period is empty");
+            // an explicit asOf still wins
+            assertEquals("2026-07-31", data(send(c, "GET", "/kpis/revenue_latest/value?asOf=2026-07-31", null, ALICE), 200).get("asOf").asText());
+            // rows dated today: the period is today
+            String today = java.time.LocalDate.now(java.time.ZoneId.of("UTC")).toString();
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("orders_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES (DATE '2026-08-10', 30.0), (DATE '" + today + "', 7.0)) AS t(order_date, amount)", "2026-08-01T00:00:00Z"));
+            JsonNode t = data(send(c, "GET", "/kpis/revenue_latest/value", null, ALICE), 200);
+            assertEquals(today, t.get("asOf").asText());
+            assertEquals(7.0, t.get("value").asDouble(), 1e-9);
+            // a bad value is refused at save
+            assertTrue(error(send(c, "POST", "/components/kpi", KPI.replace("\"id\":\"revenue\"", "\"id\":\"bad\"").replace("\"direction\":\"up\"", "\"direction\":\"up\",\"asOf\":\"yesterday\""), ALICE), 422)
+                    .contains("'asOf' must be 'latest'"));
+        }
+    }
+
+    @Test
     void aMissingMeasureIsRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seedOrders(c, "orders", Map.of());

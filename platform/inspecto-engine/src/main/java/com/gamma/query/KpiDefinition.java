@@ -22,7 +22,8 @@ import static com.gamma.util.Values.trimToNull;
  * {@link MeasureCompiler#splitShorthand} reads), {@code timeField} (the column a period is cut on), {@code grain},
  * {@code comparison}, {@code direction}, optional {@code target}, optional {@code bands}, optional {@code unit} /
  * {@code format} / {@code title} / {@code description}, the R3 envelope ({@code owner}, {@code shares}) and the
- * provenance {@code requirement} a delivered Requirement stamps.
+ * provenance {@code requirement} a delivered Requirement stamps, and optional {@code asOf: latest} — opt in to a period
+ * that follows the newest day present in {@code timeField} instead of today (a day-keyed Dataset loaded a day late).
  *
  * <p><b>Bands.</b> For {@code up} / {@code down}, {@code bands: {green: G, amber: A}} are thresholds: {@code up} is
  * GREEN at {@code >= G}, AMBER at {@code >= A}, else RED, so {@code A <= G}; {@code down} mirrors it
@@ -32,7 +33,7 @@ import static com.gamma.util.Values.trimToNull;
  */
 public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure measure, String measureText,
                             String timeField, Grain grain, Comparison comparison, Direction direction,
-                            Double target, Bands bands, java.time.ZoneId zone) {
+                            Double target, Bands bands, java.time.ZoneId zone, boolean asOfLatest) {
 
     /** The period a KPI is cut on. Wider than {@link MeasureCompiler#GRAINS} (a grouping grain) on purpose. */
     public enum Grain {
@@ -92,7 +93,7 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
 
     /** The keys a {@code kpi} component may carry; anything else is refused, never silently dropped. */
     static final Set<String> KEYS = Set.of("name", "title", "description", "dataset", "measure", "timeField",
-            "grain", "comparison", "direction", "target", "bands", "unit", "format", "owner", "shares", "requirement", "timezone");
+            "grain", "comparison", "direction", "target", "bands", "unit", "format", "owner", "shares", "requirement", "timezone", "asOf");
 
     /**
      * Validate a stored or proposed {@code kpi} content. {@code name} is the component id.
@@ -135,8 +136,11 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
             throw new IllegalArgumentException("kpi 'format' must be an object");
         if (m.get("unit") != null && !(m.get("unit") instanceof String))
             throw new IllegalArgumentException("kpi 'unit' must be text");
+        String asOf = trimToNull(m.get("asOf"));
+        if (m.get("asOf") != null && !"latest".equals(asOf))
+            throw new IllegalArgumentException("kpi 'asOf' must be 'latest' (the period follows the newest day in 'timeField') or absent (today), got '" + m.get("asOf") + "'");
         return new KpiDefinition(name, dataset, measure, measureText, timeField, grain, comparison, direction, target, bands,
-                zone(trimToNull(m.get("timezone")), defaultZone == null ? UTC : defaultZone));
+                zone(trimToNull(m.get("timezone")), defaultZone == null ? UTC : defaultZone), asOf != null);
     }
 
     /** A region zone name (never an offset form), default UTC — the zone a KPI's periods are cut in. */

@@ -9326,6 +9326,11 @@
             "type" : [ "string", "null" ],
             "description" : "An IANA region zone (e.g. Asia/Kolkata); offset forms are refused. Absent: UTC."
           },
+          "asOf" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "latest", null ],
+            "description" : "Opt in to a period that follows the data: `latest` evaluates as of the newest day present in `timeField` (never past today) when the request carries no `asOf`. Absent: today. Anything else is a 422."
+          },
           "owner" : {
             "type" : [ "string", "null" ]
           },

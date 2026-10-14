@@ -67,6 +67,22 @@ public final class KpiEvaluator {
                 KpiDefinition.tone(rag));
     }
 
+    /**
+     * The newest day present in the KPI's {@code timeField}, in its zone (for {@code asOf: latest}); {@code null} when
+     * the Dataset holds no dated row. The caller caps it at today.
+     */
+    public static LocalDate latestDay(KpiDefinition kpi, String relationSql) throws SQLException, IOException {
+        String sql = "SELECT CAST(CAST(CAST(max(" + com.gamma.util.SqlIdent.q(kpi.timeField()) + ") AS TIMESTAMPTZ) AS DATE) AS VARCHAR) AS d FROM "
+                + com.gamma.util.SqlIdent.q(kpi.dataset());
+        List<Finding> findings = SqlGuard.check(sql);
+        if (!findings.isEmpty())
+            throw new IllegalArgumentException("compiled KPI query failed the SQL safety check: " + findings.get(0).message());
+        QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(kpi.dataset(), relationSql, sql, 1, 0,
+                List.of(), List.of(), List.of()), com.gamma.sql.SqlSandboxPolicy.defaultPolicy(), kpi.zone());
+        if (r.rows().isEmpty() || r.rows().get(0).get("d") == null) return null;
+        return LocalDate.parse(String.valueOf(r.rows().get(0).get("d")));
+    }
+
     private static Double run(KpiDefinition kpi, String relationSql, KpiDefinition.Window w) throws SQLException, IOException {
         MeasureCompiler.Compiled sql = sql(kpi, w);
         List<Finding> findings = SqlGuard.check(sql.sql());

@@ -6,3 +6,4 @@ timeField: window_date
 grain: day
 comparison: previous
 direction: down
+asOf: latest
