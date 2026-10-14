@@ -103,4 +103,14 @@ class DataChangesTest {
         assertEquals(Instant.parse("2026-10-09T08:00:00Z"), DataChanges.lastLook(header, log), "a sealed read newer than every step wins");
         assertEquals(Instant.parse("2026-10-01T00:00:00Z"), DataChanges.lastLook(header, List.of()), "an empty log falls back to creation");
     }
+
+    @Test
+    void aCompactYyyyMMddDayFromALiveFeedIsPlacedInTheWindowAndReportedAsIso() {
+        Instant later = LOOK.plusSeconds(60);
+        var hit = pick(WINDOW, anomaly("calls", "20261006", later));
+        assertEquals(1, hit.size(), "the day manifest's compact bucket is a day, not noise");
+        assertEquals("2026-10-06", hit.get(0).day());
+        assertTrue(pick(WINDOW, anomaly("calls", "20261009", later)).isEmpty(), "a compact day outside the window is still outside");
+        assertTrue(pick(WINDOW, anomaly("calls", "202610", later)).isEmpty(), "a month bucket is placed in no window");
+    }
 }
