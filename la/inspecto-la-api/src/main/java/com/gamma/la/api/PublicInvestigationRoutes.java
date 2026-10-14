@@ -118,7 +118,7 @@ public final class PublicInvestigationRoutes implements RouteModule {
             if (r != null) throw denied(ex, null, token, r.denied().name());
             throw denied(ex, null, token, broken ? "STORE_UNAVAILABLE" : "UNKNOWN");
         }
-        if (!r.ok()) throw denied(ex, null, token, r.denied().name());
+        if (!r.ok()) throw denied(ex, r.record(), token, r.denied().name());   // a known grant: the row names it (id, Investigation), never the token
         Map<String, Object> rec = r.record();
         String grantId = String.valueOf(rec.get("grantId"));
         String invId = String.valueOf(rec.get("investigationId"));
@@ -278,7 +278,7 @@ public final class PublicInvestigationRoutes implements RouteModule {
     private static ApiException denied(HttpExchange ex, Map<String, Object> rec, String token, String reason) {
         Object grantId = rec == null ? null : rec.get("grantId");
         emit(LinkEventTypes.LINK_EMBED_DENIED, "embed:" + (grantId == null ? "unknown" : grantId), "link.embed.denied", "link.embed.denied", ex,
-                b -> b.attr("reason", reason).attr("tokenHash", EmbedGrants.hashPrefix(token)).attr("grantId", grantId)
+                b -> b.attr("reason", reason).attr("presentedHash", EmbedGrants.hashPrefix(token)).attr("grantId", grantId)
                         .attr("investigationId", rec == null ? null : rec.get("investigationId")));
         return notFound();
     }

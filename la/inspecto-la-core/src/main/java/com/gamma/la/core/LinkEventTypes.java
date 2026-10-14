@@ -293,7 +293,7 @@ public final class LinkEventTypes {
     public static final String LINK_EMBED_VIEWED = "LINK_EMBED_VIEWED";
 
     /** A presented embed token was refused. {@code reason} (an internal code: MALFORMED, UNKNOWN, MISMATCH, REVOKED, EXPIRED, PURGED, DISABLED,
-     *  INVESTIGATION_GONE, MINTER_NOT_LEAD, CASE_CLOSED, MASKING_LOOSENED) and {@code tokenHash} (8 hex digits of its SHA-256) - the HTTP client
+     *  INVESTIGATION_GONE, MINTER_NOT_LEAD, CASE_CLOSED, MASKING_LOOSENED) and {@code presentedHash} (8 hex digits of its SHA-256) - the HTTP client
      *  only ever sees the same 404. Never the token itself. */
     public static final String LINK_EMBED_DENIED = "LINK_EMBED_DENIED";
 
