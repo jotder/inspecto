@@ -83,12 +83,23 @@ final class DataChanges {
         return out;
     }
 
-    /** The newest of the Investigation's creation, every sealed step's {@code at} and every sealed read's {@code readAt}. */
+    /**
+     * The newest of the Investigation's creation and every step that READ data. Only a logged {@code op} that carries a sealed
+     * read ({@code read} — seedBy, connect, expand; {@code comparison}; {@code temporalFindings}) moves it, at that step's {@code at}
+     * or its sealed {@code readAt}, whichever is newer. An undo, annotate, rename, exclude, hide, keep, threshold, window, resolve
+     * or snapshot step reads nothing, so it never silences a corrected-day warning (an undo of a read step does not either).
+     */
     static Instant lastLook(Map<String, Object> header, List<Map<String, Object>> log) {
         Instant newest = instant(header.get("createdAt"));
         for (Map<String, Object> entry : log) {
-            newest = max(newest, instant(entry.get("at")));
-            if (entry.get("read") instanceof Map<?, ?> r) newest = max(newest, instant(r.get("readAt")));
+            if (!"op".equals(entry.get("kind")) && entry.get("kind") != null) continue;   // undo (and any non-op line) is no look
+            boolean read = false;
+            for (String key : List.of("read", "comparison", "temporalFindings")) {
+                if (!(entry.get(key) instanceof Map<?, ?> r)) continue;
+                read = true;
+                newest = max(newest, instant(r.get("readAt")));
+            }
+            if (read) newest = max(newest, instant(entry.get("at")));
         }
         return newest == null ? Instant.EPOCH : newest;
     }
