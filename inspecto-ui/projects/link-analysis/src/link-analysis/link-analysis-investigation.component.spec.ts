@@ -551,6 +551,10 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         expect(section.textContent).toContain('Shared');
         expect(section.textContent).toContain('shared through Case case-1 (read-only)');
 
+        // every row's button names its Investigation: three bare "Open" buttons cannot be told apart by a screen reader
+        expect((section.querySelector('ul button') as HTMLButtonElement).getAttribute('aria-label')).toMatch(
+            /^Open Investigation \S/,
+        );
         (section.querySelector('ul button') as HTMLButtonElement).click();
         await fixture.whenStable();
         expect(store.activeId()).toBe('inv-9');
