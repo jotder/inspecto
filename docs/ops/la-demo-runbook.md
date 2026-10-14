@@ -322,3 +322,38 @@ Bundle: `package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` WITH the built-in
 
 Not rehearsed this pass: Drafts cycle, Compare and seal, Settings editing, embed curl transcript (S14), Postgres/Personal variants.
 
+
+## 7. Final go/no-go rehearsal: fresh full bake, 2026-10-14
+
+Bundle: `package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` with the built-in bake, from `origin/master` `66f63ef73`, unzipped to a fresh folder and served with `serve-demo.bat` (`PORT=8119`, `-Dla.embed.enabled=true`); driven in the built-in browser as the five Demo Users. Scripted smoke `la-demo-smoke.mjs --embed --telecom`: **29/30**, the single FAIL is the expected `la-showcase-off` probe (a baked bundle ships no such Space).
+
+> **Build trap (new):** the bake's graceful stop sends Ctrl+C by attaching to the server's console, so `package.ps1` run from a console-less host (an agent shell, a CI step without a console) fails with "the server did not stop gracefully ... within 45 s" **every time**. Run the build from a real interactive terminal.
+
+| # | Beat | Result | Evidence |
+|---|---|---|---|
+| 1 | Sign in as `fm.analyst` | PASS | picker lists 5 Demo Users; menu has Link Analysis, Geo, Entity Lists, Alerts |
+| 2 | *Investigate a number* `99979100001` (purpose required) | PASS | one degree: 403 nodes, 403 links, a star, not a hairball (that number has 402 contacts) |
+| 3 | Legend hide/show a link kind | PASS | `forwarding` hidden 403 -> 402 links, shown 403 |
+| 4 | Unexpanded marker and *Only unexpanded* | PASS | legend count 402; only-unexpanded draws 402 nodes, 0 links; off restores |
+| 5 | Expand one node with direction and link kind | PASS | step text "direction out; link kinds voice", 2 link rows |
+| 6 | *Choose neighbours* (small node, then the hub) | PASS | 6 neighbours; *Add the 10 strongest* step "restricted to 6 chosen neighbours"; hub list "402 neighbours", *Show more* pages 50 per press to 402 |
+| 7 | *Connect seeds* (5 numbers) | PASS | "8 of 10 pairs connected within 3 hops; 2 not connected", routes tabulated, budget banner shown |
+| 8 | *Expand from these nodes (8)* | PASS | one sealed step, 407 -> 782 nodes, "161 more left out by the fan-out cap" stated |
+| 9 | *All algorithms (server)* | PASS | 29 algorithms; PageRank 782 nodes in 28 ms; Louvain 8 communities |
+| 10 | Undo, then reload | PASS | "Undid step 6", 782 -> 407; after reload the same 7-step log and Working Set |
+| 11 | Members | PASS | grant `demo.manager`, revoke it, last-lead revoke refused with the server wording |
+| 12 | Drafts | PASS | fork, step, Conflicts ("No conflicts"), Rebase, Promote -> step 8 on the Investigation |
+| 13 | Dossier build and verify | PASS | "Log intact", "Verified", sealed bundle download 200 |
+| 14 | References | PASS | `jira/ticket FM-1042` added, "1 of at most 200" |
+| 15 | Compare and seal | PASS | needs From/To on both windows (inline hint says so); sealed step 9 with fingerprint |
+| 16 | Embed: mint, open without a session, revoke (admin) | PASS | mint dialog shows the link once; the viewer opens masked, read-only, token scrubbed from the address bar; after confirming *Revoke* the public GET is 404 |
+| 17 | Admin Reveal | PASS | `MULE-HUB-01 (reveal audited)` |
+| 18 | Four-eyes (S8) | PASS | the baked request `p1` waits; `fm.manager` *Approve* -> step 9 "requested by fm.analyst, approved by fm.manager", 9 -> 15 entities |
+| 19 | Detection and an Alert | PASS | Alerts page lists `mule-pass-through` (13 breaching); `fm.analyst` *Open Investigation* lands on `mule-hub-case` |
+| 20 | Masked persona view | PASS | `ra.analyst`: 30 `masked:<hex>` ids, `MULE-HUB-01` absent; mutating buttons disabled with reasons |
+| 21 | Coverage display | PASS | "Every day has data", `mule_transfers` 3 of 3 |
+| 22 | Settings as non-admin | PASS | `fm.analyst` and `ra.analyst`: no rail link, `/settings` has no editable field and no Save; `admin`: 26 editable fields |
+
+Noted, not filed (cosmetic, no functional effect): the console logs "Unable to preventDefault inside passive event listener" on canvas wheel/zoom; the Add-reference form keeps System and Type after a successful add; the *Open Investigation* action was not seen in the `fm.manager` Alerts view (not investigated: `fm.analyst` has it).
+
+**GO.** 22/22 beats pass on the customer-zip path; no FAIL to fix or file.
