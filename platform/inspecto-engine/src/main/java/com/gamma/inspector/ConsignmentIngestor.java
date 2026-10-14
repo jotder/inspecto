@@ -826,6 +826,35 @@ public final class ConsignmentIngestor {
      * {@code status}/{@code error} args are the <em>final</em> values (a post-write
      * commit failure demotes a SUCCESS outcome to FAILED).
      */
+    /**
+     * LA-DATA-TRUST-1 S6: one {@code collector.file.problem} Signal per File that was quarantined, rode a failed
+     * consignment, or landed losing rows - from the same member audits that become the {@code _status_*.csv} rows,
+     * so the Signal and the ledger cannot disagree. Best effort: never fails the audit write.
+     */
+    static void signalFileProblems(PipelineConfig cfg, String batchId, String finalStatus,
+                                           List<MemberAudit> audits) {
+        try {
+            String template = cfg.collector().gapDetection().fileTemplate();
+            boolean batchFailed = "FAILED".equals(finalStatus);
+            for (MemberAudit ma : audits) {
+                String kind;
+                if (ma.status() != com.gamma.etl.MemberStatus.SUCCESS) kind = com.gamma.signal.FileProblemSignal.QUARANTINED;
+                else if (batchFailed) kind = com.gamma.signal.FileProblemSignal.FAILED;
+                else if (ma.errorRows() > 0) kind = com.gamma.signal.FileProblemSignal.PARTIAL;
+                else continue;
+                String day = "-";
+                if (template != null && !template.isBlank()) {
+                    var key = com.gamma.acquire.FileSequenceGaps.match(template, ma.filename());
+                    if (key.isPresent()) day = key.get().bucket();
+                }
+                com.gamma.signal.FileProblemSignal.emit(cfg.identity().pipelineName(), batchId, kind, day,
+                        FileNames.safe(cfg, ma.filename()), ma.status().name(), ma.parsedRows(), ma.errorRows());
+            }
+        } catch (RuntimeException e) {
+            log.warn("could not signal file problems for consignment {}: {}", batchId, e.getMessage());
+        }
+    }
+
     private static void writeAudit(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit,
                                    IngestOutcome outcome, String status, String error) {
         if (audit == null) return;
@@ -871,6 +900,8 @@ public final class ConsignmentIngestor {
                     batch.batchId(),
                     FileNames.safe(cfg, ma.origin()), FileNames.safe(cfg, logicalNameOf(ma, memberFiles, cfg))));
         }
+
+        signalFileProblems(cfg, batch.batchId(), status, outcome.memberAudits());
 
         long totalOutputRows  = lineage.stream().mapToLong(LineageRow::rowCount).sum();
         long totalOutputBytes = outputs.stream().mapToLong(PartitionOutput::bytes).sum();

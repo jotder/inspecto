@@ -2,6 +2,8 @@ package com.gamma.alert;
 
 import com.gamma.audit.Event;
 import com.gamma.audit.EventType;
+import com.gamma.signal.FileProblemSignal;
+import com.gamma.signal.Signal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +29,8 @@ public final class EventAlertBridge {
 
     /** The {@code rule} tag of a gap-raised Alert. */
     public static final String GAP_RULE = "sequence_gap";
+    /** The {@code rule} tag of a {@code collector.file.problem}-raised Alert (LA-DATA-TRUST-1 S6). */
+    public static final String FILE_PROBLEM_RULE = "file_problem";
     /** The {@code rule} tag of a conservation-imbalance-raised Alert (T22, §11.4). */
     public static final String IMBALANCE_RULE = "conservation_imbalance";
 
@@ -47,11 +51,44 @@ public final class EventAlertBridge {
         if (e == null) return;
         try {
             if (EventType.SEQUENCE_GAP.equals(e.type())) raiseGap(e);
+            else if (EventType.SIGNAL.equals(e.type())) raiseFromSignal(e);
             else if (EventType.PIPELINE_CONSERVATION_IMBALANCE.equals(e.type())
                     || EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY.equals(e.type())) raiseImbalance(e);   // vocab-allow: the Tier-2 legacy read-alias, matches events persisted under the pre-rename type
         } catch (RuntimeException ex) {
             log.warn("could not raise an Alert for {}: {}", e.type(), ex.getMessage());
         }
+    }
+
+    /**
+     * LA-DATA-TRUST-1 S6: a {@code collector.file.problem} Signal becomes ONE Alert per (pipeline, File, day) - the
+     * de-duplication key carries no row value and no entity key, and neither does the title. A quarantined or failed
+     * File is {@code high}; a partial one (rows lost, File landed) is {@code medium}.
+     */
+    private void raiseFromSignal(Event e) {
+        Signal s = Signal.fromEvent(e);
+        if (!FileProblemSignal.TYPE.equals(s.type()) || s.payload() == null) return;
+        Map<String, Object> p = s.payload();
+        String file = String.valueOf(p.get("file"));
+        String day = String.valueOf(p.get("day"));
+        String pipeline = String.valueOf(p.get("pipeline"));
+        String kind = String.valueOf(p.get("kind"));
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("rule", FILE_PROBLEM_RULE);
+        attrs.put("kind", kind);
+        attrs.put("file", file);
+        attrs.put("day", day);
+        attrs.put("errorRows", String.valueOf(p.get("errorRows")));
+        stamp(attrs, e);
+        String what = switch (kind) {
+            case FileProblemSignal.QUARANTINED -> "File quarantined";
+            case FileProblemSignal.FAILED -> "File not loaded (consignment failed)";
+            default -> "File loaded with rejected rows";
+        };
+        String title = what + ": " + file + " (day " + day + ") on " + pipeline;
+        String severity = FileProblemSignal.PARTIAL.equals(kind) ? "medium" : "high";
+        long at = e.ts() > 0 ? e.ts() : System.currentTimeMillis();
+        Alert alert = new Alert(FILE_PROBLEM_RULE, severity, pipeline, FILE_PROBLEM_RULE, 1, "gt", 0, null, at, title);
+        alerts.raiseFromEvent(alert, title, pipeline, FILE_PROBLEM_RULE + "|" + pipeline + "|" + file + "|" + day, attrs);
     }
 
     private void raiseImbalance(Event e) {
