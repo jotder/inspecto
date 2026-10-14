@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, buildPlan, scaffold, INV } from './seed-la-showcase.mjs';
 
-const OFF = { pending: false, alert: false, draft: false };
+const OFF = { pending: false, alert: false, draft: false, coverage: false };
 function mock(listItems = []) {
   const calls = []; let created = false;
   const fetchFn = async (url, init = {}) => {
@@ -148,11 +148,15 @@ function staged(opts = {}) {
     if (u === `${dr}/d1/ops`) { st.drafts[0].steps = opts.badStep ? 2 : 1; return reply(200, {}); }
     if (u === `${dr}/d1/discard`) { st.drafts.length = 0; st.discarded = true; return reply(200, {}); }
     if (u === `${dr}/d1`) return reply(200, st.drafts[0]);
+    if (u === '/inv/investigations/delivery-gap-case/coverage') return reply(200, opts.coverage || { collectors: { assessed: true, collectors: [{ collector: 'mule_transfers', coveredDays: 4, missingDays: ['2026-09-05'] }] } });
+    if (u === '/inv/investigations?limit=200' && st.gapMade) { const r = await m.fetchFn(url, init); const d = await r.json(); return reply(200, { items: [...d.data.items, { id: 'delivery-gap-case' }] }); }
+    if (u === '/inv/investigations' && body && body.id === 'delivery-gap-case') { st.gapMade = true; m.calls.push({ method, u, as, body }); return reply(201, {}); }
+    if (u === '/inv/investigations/delivery-gap-case/ops') { m.calls.push({ method, u, as, body }); return reply(200, {}); }
     return m.fetchFn(url, init);
   };
   return { fetchFn, st, calls: m.calls };
 }
-const go = (s, extra = {}) => run({ fetchFn: s.fetchFn, base: 'http://h', space: 's', apply: true, sleep: async () => {}, ...extra });
+const go = (s, extra = {}) => run({ fetchFn: s.fetchFn, base: 'http://h', space: 's', apply: true, sleep: async () => {}, ...extra, stages: { coverage: false, ...extra.stages } });
 
 test('stage 1 creates ONE pending unbounded expand as fm.analyst and confirms it in fm.manager\'s inbox', async () => {
   const s = staged();
@@ -339,4 +343,23 @@ test('rerun: two full applies against one server open exactly one Case', async (
   await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
   await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, ...noWait });
   assert.equal(m.calls.filter((c) => c.u === '/spaces/s/cases/from-entities').length, 1);
+});
+
+test('coverage stage: a second Investigation with a window past the landed files, then a read-back that names the missing day', async () => {
+  const s = staged();
+  const r = await go(s, { stages: { pending: false, alert: false, draft: false, coverage: true } });
+  assert.deepEqual(r.warnings, []);
+  assert.ok(r.done.includes('coverage-investigation'));
+  assert.match(r.summary.coverage, /mule_transfers: 4 covered, missing 2026-09-05/);
+  const win = s.calls.find((c) => c.u === '/inv/investigations/delivery-gap-case/ops');
+  assert.equal(win.body.window.to, '2026-09-06T00:00:00Z');
+  const again = await go(s, { stages: { pending: false, alert: false, draft: false, coverage: true } });
+  assert.ok(again.skipped.includes('coverage-investigation'));
+});
+
+test('coverage stage soft-fails when the Collector is not assessed or no day is missing', async () => {
+  const a = await go(staged({ coverage: { collectors: { assessed: false } } }), { stages: { pending: false, alert: false, draft: false, coverage: true } });
+  assert.match(a.warnings[0], /assessed=false/);
+  const b = await go(staged({ coverage: { collectors: { assessed: true, collectors: [{ collector: 'c', coveredDays: 4, missingDays: [] }] } } }), { stages: { pending: false, alert: false, draft: false, coverage: true } });
+  assert.match(b.warnings[0], /no missing day/);
 });
