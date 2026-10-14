@@ -103,4 +103,49 @@ class ControlApiDatasetFreshnessTest {
             assertEquals(503, get(c.port, "/datasets/xdr/freshness").statusCode());
         }
     }
+
+    /** LA-DATA-TRUST-1 S3: the route carries each freshness Alert Rule's verdict - the very reading the sweep fires on. */
+    @Test
+    void theVerdictOfAPollRelativeFreshnessRuleRidesTheRoute(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, "xdr", "EVENT_DATE");
+            assertTrue(V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").isEmpty(), "no rule, no verdict");
+            com.gamma.alert.AlertService alerts = c.svc.alertService().orElseThrow();
+            String pipeline = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            alerts.upsert(new com.gamma.alert.AlertRule("feed-stale", null, null, 0, null, "WARNING", pipeline,
+                    "xdr", null, null, "auto"));
+            long hour = 3_600_000L;                                  // the fixture polls every 3600 s: auto = 2 h
+            alerts.freshnessProbe(d -> java.util.OptionalLong.of(System.currentTimeMillis() - hour));
+            JsonNode fresh = V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0);
+            assertEquals("feed-stale", fresh.get("rule").asText());
+            assertEquals("fresh", fresh.get("state").asText());
+            assertEquals(7200, fresh.get("limitSeconds").asInt());
+            assertEquals(3600, fresh.get("pollSeconds").asInt());
+            assertEquals("auto", fresh.get("maximumAge").asText());
+            alerts.freshnessProbe(d -> java.util.OptionalLong.of(System.currentTimeMillis() - 3 * hour));
+            assertEquals("stale", V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0).get("state").asText());
+        }
+    }
+
+    /** LA-DATA-TRUST-1 S4: the host wires the index-lag clock to the real Signal stream - a write waits, a build covers it. */
+    @Test
+    void anIndexLagRuleReadsTheLiveSignalStream(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, "xdr", "EVENT_DATE");
+            c.svc.alertService().orElseThrow().upsert(com.gamma.alert.AlertRule.fromMap(Map.of(
+                    "name", "xdr-index-lag", "dataset", "xdr", "maximumAge", "1h", "indexLag", true)));
+            long now = System.currentTimeMillis();
+            java.util.function.BiFunction<String, Long, com.gamma.audit.Event> signal = (type, ts) -> new com.gamma.signal.Signal(
+                    null, type, java.time.Instant.ofEpochMilli(ts), com.gamma.signal.Severity.INFO,
+                    com.gamma.signal.Ref.of("dataset", "xdr"), com.gamma.signal.Ref.of("dataset", "xdr"),
+                    null, null, null, null, type,
+                    Map.of("dataset", "xdr", "job", "xdr-index", "result", "BUILT"), 1).toEvent();
+            com.gamma.event.EventLog.current().emit(signal.apply(com.gamma.signal.DatasetWriteSignal.TYPE, now - 2 * 3_600_000L));
+            JsonNode lag = V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0);
+            assertEquals("index-lag", lag.get("kind").asText());
+            assertEquals("stale", lag.get("state").asText(), lag.toString());
+            com.gamma.event.EventLog.current().emit(signal.apply(com.gamma.signal.SignalType.LA_INDEX_BUILD_COMPLETED, now));
+            assertEquals("fresh", V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0).get("state").asText());
+        }
+    }
 }

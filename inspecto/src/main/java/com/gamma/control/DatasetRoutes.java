@@ -100,6 +100,10 @@ final class DatasetRoutes implements RouteModule {
         out.put("dataset", id);
         out.put("eventDateColumn", column);
         out.put("dataAsOf", asOf.isPresent() ? java.time.Instant.ofEpochMilli(asOf.getAsLong()).toString() : null);
+        // LA-DATA-TRUST-1 S3: the verdict of each freshness Alert Rule on this Dataset - the very reading the sweep fires on.
+        long now = System.currentTimeMillis();
+        out.put("verdicts", HostContext.of(api).service().alertService()
+                .map(a -> a.freshnessVerdicts(id, now)).orElse(List.of()));
         return out;
     }
 
