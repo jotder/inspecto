@@ -119,7 +119,9 @@ function setup(
 ): ComponentFixture<Host> {
     spies = {
         changes: vi.fn(() => of({ ...CHANGES, changes: over.corrections ?? [] })),
-        coverage: vi.fn(() => over.coverage ?? of(COVERAGE)),
+        coverage: vi.fn((...a: unknown[]) =>
+            typeof over.coverage === 'function' ? (over.coverage as (...x: unknown[]) => unknown)(...a) : (over.coverage ?? of(COVERAGE)),
+        ),
         files: vi.fn(() => over.files ?? of(FILES)),
         freshness: vi.fn(() =>
             of({
@@ -236,6 +238,22 @@ describe('LinkAnalysisDataStripComponent', () => {
         q(f, '[data-test="strip-toggle"]')!.click();
         await settle(f);
         expect(q(f, '[data-test="complete-unassessed"]')).not.toBeNull();
+    });
+
+    it('an Investigation with no window is judged over the span of the Files, and the drawer says so', async () => {
+        const f = setup({
+            coverage: (_id: string, w?: unknown) =>
+                w ? of(COVERAGE) : throwError(() => new Error('coverage needs a bounded window')),
+        });
+        await settle(f);
+        expect(spies.coverage).toHaveBeenCalledTimes(2);
+        expect(spies.coverage.mock.calls[0][1]).toBeUndefined();
+        expect(spies.coverage.mock.calls[1][0]).toBe('inv1');
+        expect(spies.coverage.mock.calls[1][1]).toEqual({ from: '2026-09-03T00:00:00Z', to: '2026-09-04T00:00:00Z' });
+        expect(q(f, '[data-test="strip-text"]')!.textContent).not.toContain('days not assessed');
+        q(f, '[data-test="strip-toggle"]')!.click();
+        await settle(f);
+        expect(q(f, '[data-test="coverage-over-files"]')).not.toBeNull();
     });
 
     it('an unknown data-as-of date says so', async () => {

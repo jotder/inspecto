@@ -18,7 +18,7 @@ import {
 } from '@inspecto/link-analysis/api/inv.service';
 import { GraphRunsService, LinkIndexSummary } from '@inspecto/link-analysis/api/graph-runs.service';
 import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-corrected-days.component';
-import { buildStrip, dayCells, DataTrustFacts, formatDay, outcomeTone } from './data-trust';
+import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, outcomeTone } from './data-trust';
 
 const PAGE = 25;
 
@@ -162,6 +162,12 @@ const PAGE = 25;
                                     </li>
                                 }
                             </ul>
+                            @if (coverageOverFiles()) {
+                                <p class="text-secondary m-0 text-xs" data-test="coverage-over-files">
+                                    This Investigation has no time window, so days are judged over the span the Files
+                                    cover; a day before the first File or after the last is not counted.
+                                </p>
+                            }
                             <p class="text-secondary m-0 text-xs">
                                 "no File" = no rows and no File names that day (a gap); "0 rows" = a File arrived and
                                 held nothing.
@@ -292,6 +298,8 @@ export class LinkAnalysisDataStripComponent {
     readonly moreBusy = signal(false);
     readonly coverage = signal<InvestigationCoverage | null>(null);
     readonly coverageError = signal('');
+    /** True when the days were judged over the Files' own span because the Investigation holds no window. */
+    readonly coverageOverFiles = signal(false);
     readonly inbox = signal<number | null>(null);
 
     readonly indexesRead = computed(() => this.graphRuns.indexes() !== null);
@@ -375,6 +383,7 @@ export class LinkAnalysisDataStripComponent {
         this.filesError.set('');
         this.coverage.set(null);
         this.coverageError.set('');
+        this.coverageOverFiles.set(false);
         this.inbox.set(null);
         this.graphRuns.loadIndexes();
         const current = () => this.investigationId() === id && this.dataset() === ds;
@@ -397,6 +406,22 @@ export class LinkAnalysisDataStripComponent {
             (err) => current() && this.filesError.set(apiErrorMessage(err, 'Could not read the Files.')),
         );
         await Promise.all([freshness, coverage, files]);
+        await this.coverageOverFilesSpan(id, current);
+    }
+
+    /** The coverage read refuses an Investigation with no window; retry over the span of the Files so the days are judged. */
+    private async coverageOverFilesSpan(id: string, current: () => boolean): Promise<void> {
+        const w = this.coverageError() ? daysWindow(this.files()?.days) : null;
+        if (!w) return;
+        try {
+            const c = await firstValueFrom(this.inv.investigationCoverage(id, w));
+            if (!current()) return;
+            this.coverage.set(c);
+            this.coverageError.set('');
+            this.coverageOverFiles.set(true);
+        } catch {
+            // the first error stays: days are "not assessed", never a clean bill
+        }
     }
 
     /** The inbox count of every Pipeline the listed Files came through; null when none could be read. */

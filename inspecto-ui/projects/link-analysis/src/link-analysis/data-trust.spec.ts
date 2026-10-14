@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
-import { buildStrip, dayCells, formatDay, outcomeTone } from './data-trust';
+import { buildStrip, dayCells, daysWindow, formatDay, outcomeTone } from './data-trust';
 
 const files = (over: Partial<NonNullable<DatasetFilesPage['summary']>> = {}): DatasetFilesPage =>
     ({
@@ -106,5 +106,15 @@ describe('helpers', () => {
         expect(outcomeTone('PARTIAL')).toBe('WARNING');
         expect(outcomeTone('QUARANTINED')).toBe('WARNING');
         expect(outcomeTone('FAILED')).toBe('ERROR');
+    });
+
+    it('spans the Files days as a half-open window, or none when no day is known', () => {
+        expect(daysWindow([{ day: '2026-09-03' }, { day: '2026-09-01' }, { day: '2026-09-30' }])).toEqual({
+            from: '2026-09-01T00:00:00Z',
+            to: '2026-10-01T00:00:00Z',
+        });
+        expect(daysWindow([])).toBeNull();
+        expect(daysWindow(undefined)).toBeNull();
+        expect(daysWindow([{ day: 'junk' }])).toBeNull();
     });
 });

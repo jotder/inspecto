@@ -44,6 +44,18 @@ export function formatDay(iso: string | null | undefined): string {
     return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/**
+ * The window the Files themselves span: [first day 00:00Z, day after the last 00:00Z). Lets the strip judge days for an
+ * Investigation that has no window of its own (the coverage read refuses an unbounded one). Null when no day is known.
+ */
+export function daysWindow(days: { day: string }[] | null | undefined): { from: string; to: string } | null {
+    const ds = (days ?? []).map((d) => d.day).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    if (!ds.length) return null;
+    const last = new Date(`${ds[ds.length - 1]}T00:00:00Z`);
+    last.setUTCDate(last.getUTCDate() + 1);
+    return { from: `${ds[0]}T00:00:00Z`, to: last.toISOString().replace('.000Z', 'Z') };
+}
+
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
 export function buildStrip(f: DataTrustFacts): DataTrustStrip {
