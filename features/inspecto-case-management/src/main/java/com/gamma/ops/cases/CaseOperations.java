@@ -134,7 +134,7 @@ public final class CaseOperations {
         return new CaseRuleEvaluation(matches.size(), grouped, lastCase, anyOpened);
     }
 
-    /** Case attribute holding the entity key value a per-entity Case Rule grouped on (the raw key lives in an attribute, never the title). */
+    /** Case attribute holding the digest of the entity key value a per-entity Case Rule grouped on (never the raw key). */
     public static final String ATTR_CASE_GROUP = "caseGroup";
 
     /** The entity key value an Incident carries for the rule's {@code groupBy} column, or null. */
@@ -146,17 +146,18 @@ public final class CaseOperations {
     /** Attach {@code matches} (the whole set when {@code group} is null) to the rule's open Case for that group, or open one at the threshold. */
     private CaseRuleEvaluation groupInto(CaseRule rule, String group, List<OperationalObject> matches) {
         String name = rule.name();
-        String caseId = openCaseRaisedBy(name, group);
+        String groupId = group == null ? null : digest(group);   // the Case never stores the raw key
+        String caseId = openCaseRaisedBy(name, groupId);
         boolean opened = false;
         if (caseId == null) {
             if (matches.size() < rule.threshold())
                 return new CaseRuleEvaluation(matches.size(), 0, null, false);  // below threshold, no case yet
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put(ObjectService.ATTR_RAISED_BY_RULE, name);
-            if (group != null) attrs.put(ATTR_CASE_GROUP, group);
+            if (groupId != null) attrs.put(ATTR_CASE_GROUP, groupId);
             if (rule.category() != null) attrs.put("category", rule.category());
             if (rule.tags() != null) attrs.put(ObjectService.ATTR_TAGS, rule.tags());
-            String title = group == null ? rule.title() : rule.title() + " (" + rule.groupBy() + " #" + digest(group) + ")";
+            String title = group == null ? rule.title() : rule.title() + " (" + rule.groupBy() + " #" + groupId.substring(0, 6) + ")";
             caseId = svc.open(ObjectType.CASE, title, "Auto-raised by case rule '" + name + "'",
                     null, null, null, null, matches.get(0).correlationId(), attrs).id();
             opened = true;
@@ -165,11 +166,11 @@ public final class CaseOperations {
         return new CaseRuleEvaluation(matches.size(), matches.size(), caseId, opened);
     }
 
-    /** Six hex chars of the value's hash: stable per entity, tells Cases apart, reveals nothing. */
+    /** Twelve hex chars of the value's hash: stable per entity, tells Cases apart, reveals nothing. */
     private static String digest(String value) {
         try {
             byte[] h = java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(h, 0, 3);
+            return java.util.HexFormat.of().formatHex(h, 0, 6);
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

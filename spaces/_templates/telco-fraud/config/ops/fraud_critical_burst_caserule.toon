@@ -1,11 +1,11 @@
 case_rule:
   name: fraud_critical_burst
   title: "Critical fraud Incidents on one offender"
-  threshold: 2
+  threshold: 1
   windowMinutes: 1440
   category: fraud
   tags: fraud-desk
   groupBy: msisdn
   filter:
     type: INCIDENT
-    priority: CRITICAL
+    severity: CRITICAL

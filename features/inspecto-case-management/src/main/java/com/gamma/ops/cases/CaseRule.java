@@ -20,8 +20,8 @@ import java.util.Set;
  *
  * <p>With {@link #groupBy} (a key column such as {@code msisdn}) the rule groups per entity: Incidents sharing
  * the same {@code key.<column>} value form one group, each group reaching {@link #threshold} on its own and
- * opening its own Case; Incidents without that attribute never match. The Case title carries a short digest
- * of the value, never the raw key (a Case title is read by non-revealing viewers).
+ * opening its own Case; Incidents without that attribute never match. The Case carries only a short digest
+ * of the value (title and {@code caseGroup} attribute), never the raw key: a Case is read by non-revealing viewers.
  *
  * <p>Authored as a {@code *_caserule.toon} (a {@code case_rule { … }} block) loaded at bootstrap, or
  * saved at runtime via {@code POST /cases/rules} (persisted under the write root, rescanned at boot).

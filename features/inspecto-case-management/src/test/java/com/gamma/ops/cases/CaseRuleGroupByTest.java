@@ -42,9 +42,10 @@ class CaseRuleGroupByTest {
         assertEquals(2, allCases().size(), "one Case per offender");
         for (OperationalObject c : allCases()) {
             String group = c.attributes().get(CaseOperations.ATTR_CASE_GROUP);
-            assertTrue(group.equals("A") || group.equals("B"));
-            assertFalse(c.title().contains("A ") && c.title().contains(group + ")"), "title carries no raw key");
-            assertFalse(c.title().contains("msisdn " + group), "title carries no raw key");
+            assertEquals(12, group.length(), "a digest, not the key");
+            assertTrue(c.title().endsWith("(msisdn #" + group.substring(0, 6) + ")"), c.title());
+            assertFalse(c.attributes().containsValue("A") || c.attributes().containsValue("B"), "no raw key on the Case");
+            assertFalse(c.title().contains(" A") || c.title().contains(" B"), "no raw key in the title");
         }
         assertEquals(0, cases.evaluateCaseRule("per-offender").grouped(), "idempotent");
     }
