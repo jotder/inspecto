@@ -54,7 +54,14 @@
                                         : ''
                                 }}
                             </span>
-                            <button mat-button [disabled]="store.busy()" (click)="openListed(i)">Open</button>
+                            <button
+                                mat-button
+                                [disabled]="store.busy()"
+                                [attr.aria-label]="'Open Investigation ' + (i.title || i.id)"
+                                (click)="openListed(i)"
+                            >
+                                Open
+                            </button>
                         </li>
                     }
                 </ul>

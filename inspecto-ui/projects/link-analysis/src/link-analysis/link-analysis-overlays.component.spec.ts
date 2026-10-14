@@ -98,6 +98,17 @@ describe('Link Analysis legend - link-kind chips', () => {
         expect(chip('wire').getAttribute('aria-pressed')).toBe('true');
     });
 
+    it('every link-kind toggle is at least 24 px high (WCAG 2.5.8), though the chip inside is 20 px', () => {
+        TestBed.configureTestingModule({ imports: [Host], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(Host);
+        fixture.detectChanges();
+        const buttons = Array.from(
+            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[aria-label="Link kinds"] button'),
+        );
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const b of buttons) expect(getComputedStyle(b).minHeight).toBe('24px');
+    });
+
     it('toggleHiddenKind adds and removes a kind, the set kept sorted', () => {
         expect(toggleHiddenKind([], 'wire')).toEqual(['wire']);
         expect(toggleHiddenKind(['wire'], 'call')).toEqual(['call', 'wire']);

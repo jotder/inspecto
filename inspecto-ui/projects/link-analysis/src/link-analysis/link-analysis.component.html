@@ -224,6 +224,7 @@
                 [component]="aiExplain"
                 [inputs]="{
                     screen: 'Link Analysis',
+                    label: 'About Link Analysis tools',
                     terms: ['Entity', 'Link', 'Entity Projection', 'Link-Analysis View', 'Dataset', 'Widget'],
                 }"
             />
@@ -613,7 +614,7 @@
                     (click)="bottomOpen.set(!bottomOpen())"
                     [color]="bottomOpen() ? 'primary' : undefined"
                     [attr.aria-pressed]="bottomOpen()"
-                    aria-controls="bottom-panel-body"
+                    [attr.aria-controls]="bottomOpen() ? 'bottom-panel-body' : null"
                     [matTooltip]="bottomOpen() ? 'Hide the data table' : 'Show the data table'"
                     [attr.aria-label]="bottomOpen() ? 'Hide the rows' : 'Show the rows'"
                 >
