@@ -193,6 +193,36 @@ public final class BaselineEvaluator {
         return new Comparison(violations, List.copyOf(findings), window.size());
     }
 
+    /**
+     * Trailing-days mode (LA-DATA-TRUST-1 S7, {@code trailingDays > 0}): each group - one event day, in key order -
+     * is judged against the median row count of the up-to-{@code trailingDays} groups BEFORE it in the SAME profile,
+     * so a half-delivered day is caught without any stored history. A group with fewer than {@code minPriorDays}
+     * prior groups is not judged. Prior groups are the days that exist, not calendar-adjacent days: a missing day
+     * is the Coverage view's finding, not a zero in the median. Pure.
+     */
+    public static Comparison compareTrailing(Expectation.Baseline b, Map<String, Map<String, Double>> current) {
+        List<Map.Entry<String, Map<String, Double>>> days = new ArrayList<>(current.entrySet());
+        days.sort(Map.Entry.comparingByKey());
+        List<Finding> findings = new ArrayList<>();
+        long violations = 0;
+        for (int i = 0; i < days.size(); i++) {
+            List<Double> prior = new ArrayList<>();
+            for (int j = Math.max(0, i - b.trailingDays()); j < i; j++) {
+                Double rows = days.get(j).getValue().get("row_count");
+                if (rows != null) prior.add(rows);
+            }
+            Double now = days.get(i).getValue().get("row_count");
+            if (now == null || prior.size() < b.minPriorDays()) continue;
+            double median = median(prior);
+            String dir = breach(median, now, b.maxIncrease(), b.maxDecrease(), b.limitUnit());
+            if (dir == null) continue;
+            violations++;
+            if (findings.size() < MAX_FINDINGS)
+                findings.add(new Finding(days.get(i).getKey(), "row_count", null, median, now, dir));
+        }
+        return new Comparison(violations, List.copyOf(findings), days.size());
+    }
+
     /** The median; an even count averages the two middle values. {@code values} is non-empty. */
     static double median(List<Double> values) {
         List<Double> s = new ArrayList<>(values);

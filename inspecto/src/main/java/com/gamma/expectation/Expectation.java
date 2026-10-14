@@ -158,19 +158,30 @@ public record Expectation(String name, String description, String targetType, St
      * @param groupBy               profile per group of these columns instead of over the whole input
      * @param requireExistingGroups a group the baseline has but the current input lacks is a violation —
      *                              the missing partition that normal-looking totals hide
+     * @param trailingDays          {@code 0} = off. {@code > 0} (LA-DATA-TRUST-1 S7): the baseline of each group is
+     *                              the median of the {@code trailingDays} groups BEFORE it in the same profile -
+     *                              the trailing days of one Dataset (group by its event day), not past runs
+     * @param minPriorDays          a group with fewer prior groups than this is not judged (trailing mode only)
      */
     public record Baseline(int window, List<String> measures, List<String> columns, Double maxIncrease,
                            Double maxDecrease, String limitUnit, List<String> groupBy,
-                           boolean requireExistingGroups) {
+                           boolean requireExistingGroups, int trailingDays, int minPriorDays) {
 
         public static final int DEFAULT_WINDOW = 7;
         public static final int MAX_WINDOW = 100;
+        public static final int DEFAULT_MIN_PRIOR_DAYS = 3;
         /** Cap on {@code columns} / {@code groupBy} — every profiled column costs five aggregates per group. */
         public static final int MAX_COLUMNS = 50;
         public static final List<String> MEASURES = List.of("row_count", "null_count", "null_rate",
                 "distinct_count", "min", "max", "mean");
         public static final Set<String> LIMIT_UNITS = Set.of("percent", "absolute");
         private static final java.util.regex.Pattern IDENT = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+        public Baseline(int window, List<String> measures, List<String> columns, Double maxIncrease,
+                        Double maxDecrease, String limitUnit, List<String> groupBy, boolean requireExistingGroups) {
+            this(window, measures, columns, maxIncrease, maxDecrease, limitUnit, groupBy, requireExistingGroups,
+                    0, DEFAULT_MIN_PRIOR_DAYS);
+        }
 
         public Baseline {
             require(window >= 1 && window <= MAX_WINDOW,
@@ -195,6 +206,16 @@ public record Expectation(String name, String description, String targetType, St
             require(LIMIT_UNITS.contains(limitUnit), "expectation.limitUnit must be one of " + LIMIT_UNITS);
             require(!requireExistingGroups || !groupBy.isEmpty(),
                     "expectation.requireExistingGroups needs groupBy");
+            require(trailingDays >= 0 && trailingDays <= MAX_WINDOW,
+                    "expectation.trailingDays must be between 0 and " + MAX_WINDOW);
+            require(minPriorDays >= 1 && minPriorDays <= MAX_WINDOW,
+                    "expectation.minPriorDays must be between 1 and " + MAX_WINDOW);
+            if (trailingDays > 0) {
+                require(groupBy.size() == 1, "expectation.trailingDays needs exactly one groupBy column (the event day)");
+                require(measures.equals(List.of("row_count")), "expectation.trailingDays judges row_count only");
+                require(!requireExistingGroups, "expectation.trailingDays cannot be combined with requireExistingGroups");
+                require(minPriorDays <= trailingDays, "expectation.minPriorDays cannot exceed trailingDays");
+            }
         }
 
         private static List<String> idents(List<String> raw, String key) {
@@ -213,11 +234,17 @@ public record Expectation(String name, String description, String targetType, St
             Double window = number(m.get("baselineWindow"));
             require(window == null || window == Math.rint(window),
                     "expectation.baselineWindow must be a whole number");
+            Double trailing = number(m.get("trailingDays"));
+            Double minPrior = number(m.get("minPriorDays"));
+            require(trailing == null || trailing == Math.rint(trailing), "expectation.trailingDays must be a whole number");
+            require(minPrior == null || minPrior == Math.rint(minPrior), "expectation.minPriorDays must be a whole number");
             return new Baseline(window == null ? DEFAULT_WINDOW : window.intValue(),
                     strings(m.get("measures"), "measures"), strings(m.get("columns"), "columns"),
                     number(m.get("maxIncrease")), number(m.get("maxDecrease")),
                     trimToNull(m.get("limitUnit")), strings(m.get("groupBy"), "groupBy"),
-                    "true".equalsIgnoreCase(String.valueOf(m.get("requireExistingGroups"))));
+                    "true".equalsIgnoreCase(String.valueOf(m.get("requireExistingGroups"))),
+                    trailing == null ? 0 : trailing.intValue(),
+                    minPrior == null ? DEFAULT_MIN_PRIOR_DAYS : minPrior.intValue());
         }
 
         void putInto(Map<String, Object> m) {
@@ -229,6 +256,8 @@ public record Expectation(String name, String description, String targetType, St
             m.put("limitUnit", limitUnit);
             m.put("groupBy", groupBy);
             m.put("requireExistingGroups", requireExistingGroups);
+            m.put("trailingDays", trailingDays);
+            m.put("minPriorDays", minPriorDays);
         }
 
         private static List<String> strings(Object v, String key) {

@@ -997,6 +997,11 @@ public final class ConfigSpecs {
                         "Baseline kind: profile each group of these columns separately."),
                 FieldSpec.withDefault("requireExistingGroups", "Require existing groups", FieldType.BOOL, false,
                         "Baseline kind: a group the baseline has but the input lacks is a violation."),
+                FieldSpec.withDefault("trailingDays", "Trailing days", FieldType.INT, 0,
+                        "Baseline kind: 0 = off. Above 0 each group (one event day, via groupBy) is judged against "
+                                + "the median of this many groups before it in the same data."),
+                FieldSpec.withDefault("minPriorDays", "Minimum prior days", FieldType.INT, 3,
+                        "Baseline kind, trailingDays only: a day with fewer prior days than this is not judged."),
                 FieldSpec.enumField("severity", "Severity", List.of("MINOR", "MAJOR", "CRITICAL"), "MAJOR",
                         "Severity of the Incident raised on failure."),
                 FieldSpec.withDefault("enabled", "Enabled", FieldType.BOOL, true,
