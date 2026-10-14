@@ -377,6 +377,7 @@ journalctl -u inspecto -f
 # Windows — from an ELEVATED PowerShell, inside the bundle
 .\install-service.ps1                     # -Name Inspecto   -Uninstall
 Get-ScheduledTask -TaskName Inspecto | Get-ScheduledTaskInfo
+Get-Content .\logs\service.log -Tail 50    # a task has no console: serve.bat output lands here
 ```
 
 Configuration stays where it already was: the systemd unit reads `inspecto.env` beside the launcher

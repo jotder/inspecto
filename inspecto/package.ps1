@@ -2031,6 +2031,11 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     throw "install-service.ps1 must run from an elevated PowerShell (it registers a boot task as SYSTEM)."
 }
 
+# Stop first: unregistering a task does not stop an instance that is already running, so without
+# this an uninstall leaves the server up and a re-install's Start-ScheduledTask is ignored (the
+# old instance still holds the port and runs the old definition).
+Stop-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
+
 if ($Uninstall) {
     Unregister-ScheduledTask -TaskName $Name -Confirm:$false -ErrorAction SilentlyContinue
     Write-Host "[install-service] removed scheduled task $Name"
@@ -2043,8 +2048,13 @@ if (-not (Test-Path $serveBat)) {
 }
 
 # cmd /c so the task hosts serve.bat itself; WorkingDirectory is the bundle root, matching the
-# systemd unit, because every path the launcher resolves is relative to it.
-$action  = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c ""$serveBat""" -WorkingDirectory $bundleRoot
+# systemd unit, because every path the launcher resolves is relative to it. A task has no console,
+# so serve.bat's output is appended to logs\service.log (the journalctl equivalent); the outer
+# quotes make cmd /c keep the inner quoted paths intact when the bundle path contains spaces.
+$logDir = Join-Path $bundleRoot "logs"
+New-Item -ItemType Directory -Force $logDir | Out-Null
+$logFile = Join-Path $logDir "service.log"
+$action  = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c """"$serveBat"" >> ""$logFile"" 2>&1""" -WorkingDirectory $bundleRoot
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $taskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 # RestartInterval/RestartCount are the kill -9 half of SCR-3's acceptance. ExecutionTimeLimit is
@@ -2058,6 +2068,7 @@ Register-ScheduledTask -TaskName $Name -Action $action -Trigger $trigger `
 Start-ScheduledTask -TaskName $Name
 Write-Host "[install-service] $Name registered (at boot, as SYSTEM) and started"
 Write-Host "[install-service]   root=$bundleRoot"
+Write-Host "[install-service]   log=$logFile"
 Write-Host "[install-service] status: Get-ScheduledTask -TaskName $Name | Get-ScheduledTaskInfo"
 Write-Host "[install-service] verify recovery (SCR-3 acceptance):"
 Write-Host "[install-service]   Stop-Process -Name java -Force; Start-Sleep 70"
