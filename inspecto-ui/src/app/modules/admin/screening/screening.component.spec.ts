@@ -31,12 +31,17 @@ const HIT: ScreeningHit = {
     history: [{ state: 'open', by: 'job:screening.run:nightly', at: '2026-10-09T12:00:00Z' }],
 };
 
-async function create(overrides: Partial<Record<keyof ScreeningService, unknown>> = {}, canWork = true) {
+async function create(
+    overrides: Partial<Record<keyof ScreeningService, unknown>> = {},
+    canWork = true,
+    canReveal = false,
+) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
         hits: vi.fn(() => of({ hits: [HIT] })),
         hit: vi.fn(() => of(HIT)),
         decide: vi.fn(() => of({ ...HIT, state: 'dismissed', version: 2, decidedBy: 'ops-1' })),
+        reveal: vi.fn(() => of({ id: HIT.id, subjectName: 'Vladimir Putin', subjectIdentifier: 'NID-1', entry: 'vladimir putin' })),
         ...overrides,
     } as unknown as ScreeningService;
     TestBed.configureTestingModule({
@@ -46,7 +51,7 @@ async function create(overrides: Partial<Record<keyof ScreeningService, unknown>
             provideRouter([]),
             { provide: ScreeningService, useValue: api },
             { provide: ToastrService, useValue: toastr },
-            { provide: LensService, useValue: { canWorkIncidents: () => canWork } },
+            { provide: LensService, useValue: { canWorkIncidents: () => canWork, canRevealLinkEntities: () => canReveal } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
@@ -110,6 +115,24 @@ describe('ScreeningComponent', () => {
         fixture.detectChanges();
         expect(c.decideError()).toBeTruthy();
         expect(fixture.nativeElement.textContent).toContain('Not decided');
+    });
+
+    it('reveals the raw subject only for a holder of canRevealLinkEntities', async () => {
+        const none = await create();
+        none.fixture.componentInstance.open({ id: HIT.id });
+        none.fixture.detectChanges();
+        expect(buttons(none.fixture.nativeElement)).not.toContain('Reveal subject (audited)');
+        TestBed.resetTestingModule();
+        const { fixture, api } = await create({}, true, true);
+        fixture.componentInstance.open({ id: HIT.id });
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Reveal subject')) as HTMLElement).click();
+        fixture.detectChanges();
+        expect(api.reveal).toHaveBeenCalledWith(HIT.id);
+        expect(el.textContent).toContain('Vladimir Putin');
+        expect(el.textContent).toContain('NID-1');
+        await expectNoA11yViolations(el);
     });
 
     it('offers no decision without canWorkIncidents, on a forged record, or on a final state', async () => {

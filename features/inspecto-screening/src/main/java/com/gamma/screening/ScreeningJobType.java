@@ -195,6 +195,34 @@ public final class ScreeningJobType implements JobTypeProvider {
             }
         }
 
+        /**
+         * The raw name / identifier of one subject, read again from the Dataset the hit came from (the hit stores them
+         * masked when classified, so the raw value is not in it). Null entries when the row is gone or the column unset.
+         */
+        static Map<String, String> subjectValues(Path writeRoot, Path data, Params p, String subjectKey) {
+            ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+            Map<String, Object> ds = store.get("dataset", p.dataset()).map(ComponentRegistry.Component::content)
+                    .orElseThrow(() -> new IllegalArgumentException("dataset '" + p.dataset() + "' no longer exists"));
+            String relation = DatasetRelation.relationSql(ds, data, new ViewStore(writeRoot.resolve("views")));
+            List<String> columns = p.columns();
+            MeasureCompiler.Compiled compiled = MeasureCompiler.compile(new MeasureCompiler.Spec(p.dataset(), List.of(),
+                    columns, Map.of(), List.of(new MeasureCompiler.Filter(p.keyField(), "=", subjectKey)), List.of(), 1));
+            QueryExecutor.Result rows;
+            try {
+                rows = QueryExecutor.run(new QueryExecutor.Request(p.dataset(), relation, compiled.sql(), 1, 0, List.of(),
+                        List.of(), compiled.params()), SqlSandboxPolicy.defaultPolicy());
+            } catch (Exception e) {
+                throw new IllegalStateException("reading dataset '" + p.dataset() + "' failed (" + e.getClass().getSimpleName() + ")");
+            }
+            Map<String, String> out = new LinkedHashMap<>();
+            out.put("subjectName", null);
+            out.put("subjectIdentifier", null);
+            if (rows.rows().isEmpty()) return out;
+            out.put("subjectName", str(rows.rows().get(0), p.nameField()));
+            out.put("subjectIdentifier", str(rows.rows().get(0), p.idField()));
+            return out;
+        }
+
         private static String str(Map<String, Object> row, String col) {
             if (col == null) return null;
             Object v = row.get(col);

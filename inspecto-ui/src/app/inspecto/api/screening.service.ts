@@ -17,6 +17,15 @@ export interface ScreeningHitStep {
 }
 
 /** One match at or above the threshold, raised by a `screening.run` Job. */
+/** What a reveal returns; a null field could not be located, and `note` says why. */
+export interface ScreeningReveal {
+    id: string;
+    subjectName: string | null;
+    subjectIdentifier: string | null;
+    entry: string | null;
+    note?: string;
+}
+
 export interface ScreeningHit {
     id: string;
     state: ScreeningHitState;
@@ -100,6 +109,11 @@ export class ScreeningService {
 
     hit(id: string): Observable<ScreeningHit> {
         return this.http.get<ScreeningHit>(apiUrl(`/screening/hits/${encodeURIComponent(id)}`));
+    }
+
+    /** The raw subject name / identifier and the matched entry (`canRevealLinkEntities`; audited per call). */
+    reveal(id: string): Observable<ScreeningReveal> {
+        return this.http.get<ScreeningReveal>(apiUrl(`/screening/hits/${encodeURIComponent(id)}/reveal`));
     }
 
     decide(id: string, decision: ScreeningDecision, reason: string, version: number): Observable<ScreeningHit> {

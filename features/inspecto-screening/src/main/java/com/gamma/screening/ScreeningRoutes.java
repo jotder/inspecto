@@ -54,6 +54,8 @@ public final class ScreeningRoutes implements RouteModule {
         api.post("/screening/check", (e, m) -> check(api, api.body(e)));
         api.get("/screening/hits", (e, m) -> hits(api, e));
         api.get("/screening/hits/([^/]+)", (e, m) -> one(api, m.group(1)));
+        api.get("/screening/hits/([^/]+)/reveal", ApiContext.withCapability("canRevealLinkEntities",
+                (e, m) -> reveal(api, e, m.group(1))));
         api.post("/screening/hits/([^/]+)/decide", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> decide(api, e, m.group(1), api.body(e))));
     }
@@ -103,6 +105,56 @@ public final class ScreeningRoutes implements RouteModule {
         Map<String, Object> rec = ScreeningHits.read(root, id);
         if (rec == null) throw notFound(id);
         return ScreeningHits.render(rec);
+    }
+
+    /**
+     * {@code GET /screening/hits/{id}/reveal} (SCREENING-1-D3, operator 2026-10-14): the subject's raw name and
+     * identifier and the matched Entity List entry, for a holder of {@code canRevealLinkEntities} - the one grant that
+     * already means "may see raw keys". The hit keeps its masks; the subject values are read again from the Dataset
+     * the Job screened, the entry from the list. Every call is audited ({@code screening.hit.revealed}: ids only).
+     */
+    private Object reveal(ApiContext api, HttpExchange ex, String id) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "screening hit reveal");
+        Map<String, Object> rec = ScreeningHits.read(root, id);
+        if (rec == null) throw notFound(id);
+        if (ScreeningHits.invalid(rec))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "screening hit '" + id + "' failed its integrity check "
+                    + "(a record no server wrote) and cannot be revealed");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        String job = rec.get("source") instanceof Map<?, ?> s && s.get("job") != null ? String.valueOf(s.get("job")) : null;
+        var cfg = job == null ? java.util.Optional.<com.gamma.job.JobConfig>empty()
+                : com.gamma.control.HostContext.of(api).service().jobServiceOrCreate().jobConfig(job);
+        Map<String, String> subject = new LinkedHashMap<>();
+        String why = null;
+        if (cfg.isEmpty()) why = "the Job that raised this hit ('" + job + "') no longer exists, so the raw subject cannot be located";
+        else {
+            try {
+                Path data = com.gamma.pipeline.SpaceConfigRoot.currentDataRoot();
+                subject = ScreeningJobType.ScreeningJob.subjectValues(root, data, ScreeningJobType.Params.of(cfg.get().params()),
+                        String.valueOf(rec.get("subjectKey")));
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                why = e.getMessage();
+            }
+        }
+        out.put("subjectName", subject.get("subjectName"));
+        out.put("subjectIdentifier", subject.get("subjectIdentifier"));
+        String entry = null;
+        try {
+            Instant now = Instant.now();
+            List<Screener.Prepared> lists = Screener.load(root, List.of(String.valueOf(rec.get("listId"))), now);
+            entry = Screener.unmaskEntry(lists.get(0), String.valueOf(rec.get("entry")), now);
+        } catch (IllegalArgumentException ignored) {
+            // the list is gone: no entry to show
+        }
+        out.put("entry", entry);
+        if (why != null) out.put("note", why);
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("screeningHit", id);
+        attrs.put("listId", rec.get("listId"));
+        ScreeningHits.audit(ApiContext.actor(ex), ApiContext.actorType(ex), "screening.hit.revealed",
+                "screening hit " + id + " revealed", attrs);
+        return out;
     }
 
     private Object decide(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {

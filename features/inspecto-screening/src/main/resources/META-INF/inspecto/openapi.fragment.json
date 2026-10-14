@@ -89,6 +89,41 @@
         "x-optional-module" : true
       }
     },
+    "/screening/hits/{hitId}/reveal" : {
+      "get" : {
+        "tags" : [ "screening" ],
+        "summary" : "Reveal a Screening Hit's raw subject and matched entry",
+        "operationId" : "getScreeningHitReveal",
+        "description" : "SCREENING-1-D3. Gated on canRevealLinkEntities, the one grant that already means 'may see raw keys'. A hit stores a classified name or identifier masked, so the raw subject name and identifier are read again from the Dataset the raising Job screened (by the subject key), and a masked Entity List entry is resolved to its member. Returns {id, subjectName, subjectIdentifier, entry, note?}; a field is null when it cannot be located (the row, Dataset, Job or entry is gone) and note says why. Every call is audited as screening.hit.revealed (ids only, never a value). 409 on a record that failed its integrity check.",
+        "parameters" : [ {
+          "name" : "hitId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^sh-[0-9]{14}-[0-9a-f]{6}$"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {id, subjectName, subjectIdentifier, entry, note?}."
+          },
+          "403" : {
+            "description" : "The caller lacks canRevealLinkEntities."
+          },
+          "404" : {
+            "description" : "No such hit."
+          },
+          "409" : {
+            "description" : "The record failed its integrity check."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/screening/hits/{hitId}/decide" : {
       "post" : {
         "tags" : [ "screening" ],

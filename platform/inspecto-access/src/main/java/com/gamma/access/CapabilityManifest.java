@@ -203,6 +203,7 @@ public final class CapabilityManifest {
             new Entry("POST", "/anomaly-scores/preview", Roles.CAN_WORK_INCIDENTS),
             // ScreeningRoutes (SCREENING-1) — deciding a Screening Hit is working a triage item (SCR-D13).
             new Entry("POST", "/screening/hits/([^/]+)/decide", Roles.CAN_WORK_INCIDENTS),
+            new Entry("GET", "/screening/hits/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.

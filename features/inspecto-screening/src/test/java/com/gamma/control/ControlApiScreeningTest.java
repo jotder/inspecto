@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiScreeningTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String OPS = "Bearer ops", OPS2 = "Bearer ops2", DEV = "Bearer dev", NONE = "Bearer none";
+    private static final String OPS = "Bearer ops", OPS2 = "Bearer ops2", ADM = "Bearer adm", DEV = "Bearer dev", NONE = "Bearer none";
     private final HttpClient client = HttpClient.newHttpClient();
     private String inheritedWriteRoot;
 
@@ -53,6 +53,7 @@ class ControlApiScreeningTest {
             if (NONE.equals(h)) return Optional.of(new Subject("nobody", Set.of()));
             String[] who = switch (h) {
                 case OPS -> new String[] {"ops-1", "operations"};
+                case ADM -> new String[] {"adm-1", "admin"};
                 case OPS2 -> new String[] {"ops-2", "operations"};
                 case DEV -> new String[] {"dev-1", "pipeline-developer"};
                 default -> null;
@@ -254,6 +255,24 @@ class ControlApiScreeningTest {
             JsonNode dismissed = data(send(port, "POST", "/spaces/acme/screening/hits/" + ScreeningLists.seedHit(cfg, "c8",
                     "X Y", "sanctions", "x y", 0.9) + "/decide", decide("dismiss", 1), OPS), 200);
             assertFalse(dismissed.has("caseId"), "only a confirm opens a Case");
+        });
+    }
+
+    /** SCREENING-1-D3: reveal is gated on canRevealLinkEntities and audited; a hit whose Job is gone says why. */
+    @Test
+    void revealIsGatedOnCanRevealLinkEntities(@TempDir Path spaces) throws Exception {
+        Path cfg = space(spaces, "acme");
+        String id = ScreeningLists.seedHit(cfg, "c1", "masked:0123456789abcdef", "sanctions", "vladimir putin", 0.98);
+        withSpaces(spaces, port -> {
+            String path = "/spaces/acme/screening/hits/" + id + "/reveal";
+            assertEquals(401, send(port, "GET", path, null, null).statusCode());
+            assertEquals(403, send(port, "GET", path, null, OPS).statusCode(), "an analyst cannot reveal");
+            assertEquals(403, send(port, "GET", path, null, DEV).statusCode());
+            JsonNode r = data(send(port, "GET", path, null, ADM), 200);
+            assertEquals("vladimir putin", r.get("entry").asText(), "an unmasked list entry is its own reveal");
+            assertTrue(r.get("subjectName").isNull());
+            assertTrue(r.get("note").asText().contains("no longer exists") || r.get("note").asText().contains("Job"), r.toString());
+            assertEquals(404, send(port, "GET", "/spaces/acme/screening/hits/sh-20260101000000-abcdef/reveal", null, ADM).statusCode());
         });
     }
 

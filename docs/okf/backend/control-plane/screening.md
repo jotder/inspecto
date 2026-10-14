@@ -102,6 +102,13 @@ is latched into an explained notice, not a toast.
 never the (possibly masked) name. `caseId` / `incidentId` are stamped on the hit before it is saved; a save failure discards both objects. The module's manifest `requires` `ops`
 (the pom depends on `inspecto-ops`, as regulatory reporting does), not case-management: the Case is a plain `ObjectService` object. Opening them is the decider's act under `canWorkIncidents` (the confirm), not a second capability check.
 
+## Reveal (SCREENING-1-D3, 2026-10-14)
+`GET /screening/hits/{id}/reveal`, `canRevealLinkEntities` (the grant that already means "may see raw keys"; admin and super). A hit stores a classified name or id masked, so
+the route reads them again: the raising Job's config (`source.job`) names the Dataset and columns, `ScreeningJob.subjectValues` queries that Dataset for the subject key
+(one row, default SQL sandbox), and `Screener.unmaskEntry` resolves a masked list entry to the live member that renders to it. A gone Job, Dataset, row or entry gives a null
+field plus `note`. Audit `screening.hit.revealed` (hit id, list; never a value); the file keeps its masks; a forged record is 409. The pane's *Reveal subject (audited)*
+button shows only with `LensService.canRevealLinkEntities()`. Tests: `ControlApiScreeningTest#revealIsGatedOnCanRevealLinkEntities`, `ScreeningRevealTest`, the spec.
+
 ## Decisions (SCR-D1 … SCR-D14, lane 2026-10-09, operator away)
 Matching in Java, not DuckDB SQL (folding, token-set scoring and golden tests are plain there; DuckDB only reads rows) ·
 threshold per request / per Job, no Space settings file (a new fixed config name needs reserved-path and import-inventory
@@ -143,7 +150,7 @@ Then enable and trigger the Job `aml_screening` (the template ships it disabled)
 | 6 | Four-eyes on `confirmed` | BUILT 2026-10-14 (`ControlApiScreeningTest`) | the escalator confirming their own escalation is 409 `four-eyes`; a second person confirms; an `open` hit may be confirmed by one |
 | 7 | Hits to Incident / Case | BUILT 2026-10-14 | a confirm opens an Incident + a Case that CONTAINS it; `caseId` / `incidentId` on the hit and in the pane |
 | 8 | Audit trail | PASS | `screening.run.hits` and `screening.hit.decided` rows in `/audit/search?type=AUDIT`; `/audit/verify` chain ok |
-| 9 | Masking | PASS with a gap | PII-classified name and id are stored as `masked:` tokens and matching still works; the masked PEP list shows its entry masked to everyone; no persona can unmask (`SCREENING-1` 8) |
+| 9 | Masking | PASS with a gap | PII-classified name and id are stored as `masked:` tokens and matching still works; the masked PEP list shows its entry masked to everyone; no persona could unmask; `/reveal` now serves admin (`SCREENING-1` 8, D3) |
 | 10 | Non-privileged persona (business) | PASS | sees hits (masked), no decision buttons in the UI, decide 403 `canWorkIncidents` |
 | 11 | Unhappy paths | PASS | empty list = no matches; 1001 subjects 422; 513-char name 422; 1000 subjects in 94 ms; threshold 0.4 / 1.5 / "abc" 422; unknown list 422; 21 lists 422; no auth 401; Job with `maxRows` below the row count fails the Run ("refusing to screen a subset"); a bad Job threshold, column or an unknown list/Dataset on an enabled Job is refused at save (422, nothing written; item 9 shipped 2026-10-14) |
 

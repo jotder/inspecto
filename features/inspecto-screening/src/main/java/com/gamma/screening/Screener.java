@@ -123,6 +123,16 @@ public final class Screener {
         return out.size() > maxMatches ? List.copyOf(out.subList(0, maxMatches)) : out;
     }
 
+    /**
+     * The entry a masked list shows as {@code shownEntry}, in the clear; {@code shownEntry} itself when the list is not
+     * masked; null when no live member renders to it (a changed or expired entry).
+     */
+    static String unmaskEntry(Prepared p, String shownEntry, Instant now) {
+        for (String key : p.list.liveMembers(now))
+            if (p.shown.apply(key).equals(shownEntry)) return key;
+        return null;
+    }
+
     /** The wire shape of one match. */
     static Map<String, Object> toMap(Match m) {
         Map<String, Object> out = new LinkedHashMap<>();

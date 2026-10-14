@@ -15,6 +15,7 @@ import {
     ScreeningDecision,
     ScreeningHit,
     ScreeningHitState,
+    ScreeningReveal,
     ScreeningService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
@@ -97,6 +98,15 @@ export class ScreeningComponent implements OnInit {
         validators: [Validators.required, Validators.maxLength(500)],
     });
 
+    readonly revealed = signal<ScreeningReveal | null>(null);
+    readonly revealing = signal(false);
+    readonly revealError = signal<string | null>(null);
+
+    readonly canReveal = computed(() => {
+        const h = this.selected();
+        return !!h && !h.integrity && this.lens.canRevealLinkEntities();
+    });
+
     readonly decisions = computed<ScreeningDecision[]>(() => {
         const h = this.selected();
         return h && !h.integrity && this.lens.canWorkIncidents() ? allowedDecisions(h.state) : [];
@@ -173,6 +183,8 @@ export class ScreeningComponent implements OnInit {
 
     open(row: Record<string, unknown>): void {
         this.decideError.set(null);
+        this.revealed.set(null);
+        this.revealError.set(null);
         this.reason.reset('');
         this.api.hit(String(row['id'])).subscribe({
             next: (h) => this.selected.set(h),
@@ -182,6 +194,26 @@ export class ScreeningComponent implements OnInit {
 
     close(): void {
         this.selected.set(null);
+        this.revealed.set(null);
+        this.revealError.set(null);
+    }
+
+    /** Show the raw name, identifier and matched entry. Every call is audited server-side. */
+    reveal(): void {
+        const h = this.selected();
+        if (!h) return;
+        this.revealing.set(true);
+        this.revealError.set(null);
+        this.api.reveal(h.id).subscribe({
+            next: (r) => {
+                this.revealing.set(false);
+                this.revealed.set(r);
+            },
+            error: (err) => {
+                this.revealing.set(false);
+                this.revealError.set(apiErrorMessage(err, 'The Screening Hit could not be revealed'));
+            },
+        });
     }
 
     label(d: ScreeningDecision): string {

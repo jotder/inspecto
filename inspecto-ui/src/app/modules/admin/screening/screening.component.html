@@ -98,6 +98,30 @@
                 }
             </dl>
 
+            @if (canReveal()) {
+                <div class="mt-4">
+                    <button mat-stroked-button type="button" (click)="reveal()" [disabled]="revealing()">
+                        Reveal subject (audited)
+                    </button>
+                    @if (revealError()) {
+                        <inspecto-alert class="mt-2" variant="error" title="Not revealed">{{ revealError() }}</inspecto-alert>
+                    }
+                    @if (revealed(); as r) {
+                        <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                            <dt class="text-secondary">Name (raw)</dt>
+                            <dd class="m-0 break-all">{{ r.subjectName ?? 'not found' }}</dd>
+                            <dt class="text-secondary">Identifier (raw)</dt>
+                            <dd class="m-0 font-mono break-all">{{ r.subjectIdentifier ?? 'not found' }}</dd>
+                            <dt class="text-secondary">Matched entry (raw)</dt>
+                            <dd class="m-0 font-mono break-all">{{ r.entry ?? 'not found' }}</dd>
+                        </dl>
+                        @if (r.note) {
+                            <p class="text-secondary mt-1 text-xs">{{ r.note }}</p>
+                        }
+                    }
+                </div>
+            }
+
             <h3 class="mt-4 text-sm font-semibold">History</h3>
             <ul class="m-0 list-none p-0 text-sm">
                 @for (step of h.history; track step.at + step.state) {
