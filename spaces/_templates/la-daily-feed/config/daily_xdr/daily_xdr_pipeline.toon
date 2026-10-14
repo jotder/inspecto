@@ -40,3 +40,7 @@ collector:
     enabled: true
     sequence: "XDR_{yyyyMMdd}"
     file_template: "XDR_{yyyyMMdd}*"
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

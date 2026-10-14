@@ -59,4 +59,16 @@ class LaDailyFeedTemplateRulesTest {
         assertEquals(100.0, b.maxIncrease());
         assertEquals("percent", b.limitUnit());
     }
+
+    /** LA-DAILY-INGEST-1 owner call: the shipped Files-from-an-inbox feeds make a corrected same-name day take effect. */
+    @Test
+    void theShippedInboxFeedsReprocessAChangedSameNameFile() throws Exception {
+        for (String rel : List.of("la-daily-feed/config/daily_xdr/daily_xdr_pipeline.toon",
+                "la-showcase/config/mule/mule_transfers_pipeline.toon")) {
+            Path toon = Path.of("..", "spaces", "_templates").resolve(rel).toAbsolutePath().normalize();
+            var d = com.gamma.etl.PipelineConfig.load(toon.toString()).collector().duplicate();
+            assertEquals("checksum", d.mode(), rel);
+            assertEquals("reprocess", d.onChange(), rel);
+        }
+    }
 }

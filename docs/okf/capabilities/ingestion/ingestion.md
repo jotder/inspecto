@@ -470,6 +470,20 @@ missing day (including the last one) or a missing part is one `SEQUENCE_GAP` ale
 the instant the data is covered through (a DATE through its end), and an Alert Rule with `maximumAge: 2d` +
 `measure: max(EVENT_DATE)` fires when the newest event is older than that, even while files keep arriving.
 
+**Corrected same-name day (owner call closed 2026-10-14).** Under the default `duplicate_check` (path markers) a file
+re-delivered under the SAME name with changed bytes is skipped (the `.processed` marker wins; only a WARN +
+`DUPLICATE_SKIPPED` signal, once per file version). A feed that wants the correction to land states
+`collector.duplicate: {mode: checksum, algorithm: SHA256, on_change: reprocess}` (a Phase C key that already existed;
+no new key, no spec change): the fingerprint ledger replaces the marker, an UNCHANGED re-delivery (same hash, new
+mtime) is still skipped silently (a counter, no batch, no signal), and a CHANGED one is re-ingested, its partition is
+replaced (one file, no stale rows) and the day manifest signals one `REDELIVERED`, which the Data strip's corrected-day
+banner reads. The shipped `la-daily-feed` template and the `la-showcase` / demo `mule_transfers` feed carry it.
+Pinned by `LaDailyIngestAcceptanceTest#aCorrectedSameNameDayReplacesItsPartitionAndAnUnchangedOneIsSkipped` (drives
+`CollectorProcessor.run`; the same test goes red on `mode: path`) and `LaDailyFeedTemplateRulesTest`. ⚠ Limits: a
+date DROPPED by the correction still leaves the old file for that date (roadmap T4 b2); a `#` comment line above a block
+in a pipeline TOON silently truncates the file (the `la-showcase` mule feed lost its `collector:` block that way until
+this change).
+
 ## 4. Decisions
 
 Dated, one line each, with the reason. Only decisions that still bind are listed; where one reversed an

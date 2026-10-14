@@ -37,3 +37,7 @@ collector:
   gap_detection:
     enabled: true
     sequence: "TRANSFERS_{yyyyMMdd}"
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

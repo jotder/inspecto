@@ -31,7 +31,6 @@ processing:
     date_formats[1]: "%Y-%m-%d"
     timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
 
-# Demo Space - the seeded daily files have deliberate date holes; gap alerts would only add noise to the Alerts page.
 collector:
   discovery: poll
   connector: local
@@ -39,3 +38,7 @@ collector:
     enabled: false
     sequence: "TRANSFERS_{yyyyMMdd}"
     file_template: "TRANSFERS_{yyyyMMdd}.csv"
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

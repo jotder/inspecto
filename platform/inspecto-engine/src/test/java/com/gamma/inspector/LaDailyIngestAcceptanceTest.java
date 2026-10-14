@@ -157,6 +157,50 @@ class LaDailyIngestAcceptanceTest {
         assertEquals(10L, ((Number) partial.payload().get("errorRows")).longValue());
     }
 
+    /**
+     * LA-DAILY-INGEST-1 owner call (2026-10-14): with {@code duplicate_check} on, the feed's {@code collector.duplicate}
+     * checksum + reprocess makes a corrected SAME-NAME day take effect (partition replaced, one REDELIVERED signal) while
+     * an UNCHANGED re-delivery stays skipped - the polled path, not the direct ingest.
+     */
+    @Test
+    void aCorrectedSameNameDayReplacesItsPartitionAndAnUnchangedOneIsSkipped(@TempDir Path dir) throws Exception {
+        com.gamma.acquire.AcquisitionLedgers.use(new com.gamma.acquire.InMemoryAcquisitionLedger());
+        PipelineConfig feed = checksumFeed(dir);
+        EventLog.current().addSubscriber(sub);
+        Path inbox = Path.of(feed.dirs().poll());
+        Files.createDirectories(inbox);
+
+        Files.writeString(inbox.resolve(name(1, 1)), day(1, 3));
+        CollectorProcessor.run(feed);
+        assertEquals(3, rows(feed, "day=01"));
+        assertEquals(List.of(), kinds(), "a first delivery is no anomaly");
+
+        // UNCHANGED same-name re-delivery: same bytes, new mtime -> skipped, no new batch, no signal, partition untouched
+        long batches = Files.readAllLines(Path.of(feed.dirs().batchesFilePath())).size();
+        Files.writeString(inbox.resolve(name(1, 1)), day(1, 3));
+        CollectorProcessor.run(feed);
+        assertEquals(batches, Files.readAllLines(Path.of(feed.dirs().batchesFilePath())).size(), "an unchanged duplicate is not re-ingested");
+        assertEquals(List.of(), kinds());
+        assertEquals(3, rows(feed, "day=01"));
+
+        // CORRECTED same-name day: new content -> re-ingested, the partition is REPLACED (no stale file), one REDELIVERED
+        Files.writeString(inbox.resolve(name(1, 1)), day(1, 5));
+        CollectorProcessor.run(feed);
+        assertEquals(1, outFiles(feed, "day=01").size(), "no stale file");
+        assertEquals(5, rows(feed, "day=01"), "the corrected day took effect");
+        assertEquals(List.of("REDELIVERED"), kinds());
+    }
+
+    private static PipelineConfig checksumFeed(Path dir) throws Exception {
+        cfg(dir);   // writes ev_pipeline.toon; the checksum block is appended below
+        Path pipe = dir.resolve("ev_pipeline.toon");
+        String toon = Files.readString(pipe).replace("  threads: 1\n",
+                "  threads: 1\n  duplicate_check:\n    enabled: true\n    marker_extension: .processed\n")
+                + "  duplicate:\n    mode: checksum\n    algorithm: SHA256\n    on_change: reprocess\n";
+        Files.writeString(pipe, toon, StandardCharsets.UTF_8);
+        return PipelineConfig.load(pipe.toString());
+    }
+
     // ---- helpers ----
 
     private static String name(int d, int part) {
