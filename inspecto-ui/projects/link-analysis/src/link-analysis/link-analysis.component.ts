@@ -419,6 +419,7 @@ export class LinkAnalysisComponent implements OnInit {
     @ViewChild(LinkAnalysisQueryPanelComponent) private queryPanel?: LinkAnalysisQueryPanelComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
+    @ViewChild('graphRegion') private graphRegion?: ElementRef<HTMLElement>;
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
     @ViewChild('viewsTrigger') private viewsTrigger?: MatMenuTrigger;
 
@@ -1416,6 +1417,8 @@ export class LinkAnalysisComponent implements OnInit {
     private async execute(sourceId: GraphSourceId, q: GraphSourceQuery): Promise<void> {
         const source = this.graphSources.byId(sourceId);
         if (!source) return;
+        const firstDraw = !this.graph();
+        const focusBefore = this.focusHolder();
         this.loading.set(true);
         this.loadError.set('');
         // A fresh graph clears the canvas emphasis + presentation filters and the analysis toolbox's results.
@@ -1447,6 +1450,7 @@ export class LinkAnalysisComponent implements OnInit {
             this.kindFilter.set([]);
             this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
             this.queryOpen.set(false); // smart form: collapse to the selected-values summary
+            if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
         } catch (err) {
             this.graph.set(null);
             this.lastRun.set(null);
@@ -1464,6 +1468,28 @@ export class LinkAnalysisComponent implements OnInit {
         } finally {
             this.loading.set(false);
         }
+    }
+
+    /** What holds keyboard focus now: a starter card the draw is about to remove is a different holder after it. */
+    private focusHolder(): Element | null {
+        const a = document.activeElement;
+        return a && a !== document.body ? a : null;
+    }
+
+    /** Announced in the sr-only live region after the first draw; the text is the only place the count is spoken. */
+    readonly drawAnnouncement = signal('');
+
+    /**
+     * WCAG 2.4.3: the control that started the first draw (a landing card) is removed with the landing state, so
+     * focus would fall to the page body. Once per first draw, move it to the graph region - but only when focus is
+     * still where the draw began (the removed trigger, or nowhere); a user who moved on is never pulled back.
+     */
+    private focusDrawnGraph(before: Element | null, nodes: number, links: number): void {
+        this.drawAnnouncement.set(`Graph drawn, ${nodes} nodes, ${links} links`);
+        this.cdr.detectChanges(); // the card is removed and the region mounted in this pass
+        const now = document.activeElement;
+        const stillAtTrigger = !now || now === document.body || (before !== null && now === before && !before.isConnected);
+        if (stillAtTrigger) this.graphRegion?.nativeElement.focus({ preventScroll: false });
     }
 
     // ── the two-stage query loop ──

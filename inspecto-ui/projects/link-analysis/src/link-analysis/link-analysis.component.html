@@ -789,7 +789,15 @@
                         ></inspecto-link-analysis-timeline-playback>
                     }
 
-                    <div class="relative flex min-h-0 flex-auto flex-col max-md:min-h-[480px]">
+                    <div
+                        #graphRegion
+                        class="relative flex min-h-0 flex-auto flex-col max-md:min-h-[480px]"
+                        role="region"
+                        aria-label="Link graph"
+                        tabindex="-1"
+                        data-testid="la-graph-region"
+                    >
+                        <p class="sr-only" role="status" data-testid="la-draw-announcement">{{ drawAnnouncement() }}</p>
                         <inspecto-graph-view
                             [fill]="true"
                             [data]="canvasData()"
