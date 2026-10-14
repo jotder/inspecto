@@ -45,6 +45,12 @@ export function scorePercent(score: number | null | undefined): string {
     return typeof score === 'number' ? `${Math.round(score * 100)} %` : '';
 }
 
+/** What a reviewer reads as the subject: the name or identifier, or the subject key when those were stored masked (a `masked:` token tells nobody who it is). */
+export function subjectLabel(h: Pick<ScreeningHit, 'subjectName' | 'subjectIdentifier' | 'subjectKey'>): string {
+    const shown = [h.subjectName, h.subjectIdentifier].find((v) => v && !v.startsWith('masked:'));
+    return shown ?? h.subjectKey ?? h.subjectName ?? h.subjectIdentifier ?? '';
+}
+
 /**
  * **Screening Hits** (SCREENING-1): the matches a `screening.run` Job raised against Entity Lists, for a person to
  * decide — dismiss a false positive, confirm a true match, or escalate to a senior reviewer.
@@ -98,6 +104,7 @@ export class ScreeningComponent implements OnInit {
 
     protected readonly hitTone = hitTone;
     protected readonly scorePercent = scorePercent;
+    protected readonly subjectLabel = subjectLabel;
 
     readonly columnDefs: ColDef<ScreeningHit>[] = [
         {
@@ -110,7 +117,7 @@ export class ScreeningComponent implements OnInit {
         {
             headerName: 'Subject',
             flex: 1,
-            valueGetter: (p) => p.data?.subjectName ?? p.data?.subjectIdentifier ?? p.data?.subjectKey ?? '',
+            valueGetter: (p) => (p.data ? subjectLabel(p.data) : ''),
         },
         { field: 'entry', headerName: 'Matched entry', flex: 1 },
         { field: 'listId', headerName: 'Entity List', minWidth: 140 },

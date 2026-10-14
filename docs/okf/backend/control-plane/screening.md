@@ -4,7 +4,7 @@ title: Screening — Match Scores against Entity Lists and the review of Screeni
 description: What SCREENING-1 built — the optional inspecto-screening module (add-on screening), the name and identifier methods, the on-demand check route, the screening.run Job Type, the signed Screening Hit records and their review states, gates, audit and the recorded limits.
 resource: features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java
 tags: [control-plane, screening, entity-list, compliance, add-on, job-type]
-timestamp: 2026-10-09T00:00:00Z
+timestamp: 2026-10-14T00:00:00Z
 ---
 
 # Screening
@@ -55,7 +55,7 @@ AML function pack (`PACK-AML-1`) builds on it. Vocabulary: `docs/GLOSSARY.md` §
 | `POST /screening/check` | read-shaped exemption | `{subjects[1..1000]:[{key?, name?, identifier?}], lists[1..20], threshold? (0.5..1, default 0.85), maxMatches? (1..20, default 5)}` → `{threshold, results:[{key, name, identifier, matches:[{listId, purpose, entry, method, score}]}]}`, best first. Persists nothing; a POST so names never ride in a URL. Unknown list 422. |
 | `GET /screening/hits?state=` | Space access | every hit, newest first; `state` = `open · escalated · confirmed · dismissed` (else 422). |
 | `GET /screening/hits/{id}` | Space access | one hit; an id that is not `sh-<14 digits>-<6 hex>` is a 404 and never names a file. |
-| `POST /screening/hits/{id}/decide` | `canWorkIncidents` | `{decision: confirm · dismiss · escalate, reason (1..500), version}` → the hit. |
+| `POST /screening/hits/{id}/decide` | `canWorkIncidents` | `{decision: confirm · dismiss · escalate, reason (1..1000), version}` → the hit. |
 
 Decide gates in order: capability → no write root 503 → body 422 → unknown hit 404 → a record that fails its integrity
 check 409 → stale `version` 409 → transition not allowed 409 → save under the store lock. Test: `ControlApiScreeningTest`
@@ -109,3 +109,27 @@ Run refuses a subset. Provenance: `docs/archived-documents/plans-archive/screeni
   token); Muhammad / Mohamed (0.83) stays below the threshold — no vowel-u/o fold yet.
 - A Run lists every hit document to dedupe (no index); fine for thousands of hits, not for millions.
 - No four-eyes on `confirmed`; `check` cannot raise hits; no Space-level threshold default.
+
+## Demo script and rehearsal (2026-10-14, Enterprise Demo Auth bundle, Space `screening-demo` from the `aml` template)
+Boot: `node tools/seed-screening-demo.mjs --spaces inspecto-demo/spaces` (roster), serve the bundle, sign in as Demo Admin, run it
+again with `--base http://127.0.0.1:<port>` (creates the Space from the `aml` template, a 134-row party register with eight planted
+synthetic rows, an unmasked `party` Entity Type, and the lists `aml_sanctions` (party, block) and `aml_pep` (subscriber, watch, masked
+on purpose)). Personas: `compliance.officer` (operations), `compliance.manager` (power), `ra.viewer` (business), `admin` (admin;super).
+Then enable and trigger the Job `aml_screening` (the template ships it disabled).
+
+| # | Beat | Result | Evidence |
+|---|---|---|---|
+| 1 | Check names: exact / fuzzy / transliterated / clean / identifier | PASS | Dmitrenko Sorokin 1.0; Dmitrenco 0.98; Kadir Almansuri vs Qadhir Almansouri 0.95; Husain Alrashidi 0.95; Tobias Lindqvist clean; NID-9000001 identifier 1.0; word order and case folded (0.92 / 1.0) |
+| 2 | Check a name dialog, any persona, nothing raised | PASS | six names, two lists, 5 rows (clean name has no row, item 10) |
+| 3 | `screening.run` over the party Dataset | PASS | 134 screened, 7 matches, 7 hits; re-run 0 new (dedupe); cron `0 5 * * *` shown with next fire |
+| 4 | Hits signed; a tampered file is refused | PASS | edited a hit file: GET `integrity: invalid`, decide 409 "a record no server wrote" |
+| 5 | Review pane: dismiss with a reason (UI), escalate then confirm by a second person (API) | PASS | history carries both deciders; a final state refuses a move (409); a stale version 409 |
+| 6 | Four-eyes on `confirmed` | NOT BUILT | one `canWorkIncidents` holder can confirm a hit alone (open operator call, `SCREENING-1` 1) |
+| 7 | Hits to Incident / Case | NOT BUILT | no link exists (`SCREENING-1` 7) |
+| 8 | Audit trail | PASS | `screening.run.hits` and `screening.hit.decided` rows in `/audit/search?type=AUDIT`; `/audit/verify` chain ok |
+| 9 | Masking | PASS with a gap | PII-classified name and id are stored as `masked:` tokens and matching still works; the masked PEP list shows its entry masked to everyone; no persona can unmask (`SCREENING-1` 8) |
+| 10 | Non-privileged persona (business) | PASS | sees hits (masked), no decision buttons in the UI, decide 403 `canWorkIncidents` |
+| 11 | Unhappy paths | PASS | empty list = no matches; 1001 subjects 422; 513-char name 422; 1000 subjects in 94 ms; threshold 0.4 / 1.5 / "abc" 422; unknown list 422; 21 lists 422; no auth 401; Job with `maxRows` below the row count fails the Run ("refusing to screen a subset"); a bad Job threshold or unknown list fails the Run, not the save (item 9) |
+
+Gotcha found: the template's `full_name` / `national_id` were classified `CONFIDENTIAL`, which is not in `ColumnClassification.SENSITIVE`
+(`MSISDN IMSI ACCOUNT PII`), so a hit stored the raw name; they are `PII` now.
