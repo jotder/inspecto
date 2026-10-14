@@ -18,7 +18,7 @@ import {
 } from '@inspecto/link-analysis/api/inv.service';
 import { GraphRunsService, LinkIndexSummary } from '@inspecto/link-analysis/api/graph-runs.service';
 import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-corrected-days.component';
-import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, outcomeTone } from './data-trust';
+import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, formatInstant, outcomeTone } from './data-trust';
 
 const PAGE = 25;
 
@@ -149,14 +149,20 @@ const PAGE = 25;
                                         <inspecto-status-badge
                                             variant="dot"
                                             [value]="
-                                                d.state === 'ok' ? 'success' : d.state === 'empty' ? 'info' : 'warning'
+                                                d.state === 'ok'
+                                                    ? 'success'
+                                                    : d.state === 'empty' || d.state === 'pending'
+                                                      ? 'info'
+                                                      : 'warning'
                                             "
                                             [label]="
                                                 d.state === 'ok'
                                                     ? d.rows + ' rows'
                                                     : d.state === 'empty'
                                                       ? '0 rows'
-                                                      : 'no File'
+                                                      : d.state === 'pending'
+                                                        ? 'not delivered yet'
+                                                        : 'no File'
                                             "
                                         ></inspecto-status-badge>
                                     </li>
@@ -169,8 +175,9 @@ const PAGE = 25;
                                 </p>
                             }
                             <p class="text-secondary m-0 text-xs">
-                                "no File" = no rows and no File names that day (a gap); "0 rows" = a File arrived and
-                                held nothing.
+                                "no File" = no rows and no File names a day between delivered days (a gap); "not
+                                delivered yet" = a day before the first File or after the newest; "0 rows" = a File
+                                arrived and held nothing.
                             </p>
                             @if (c.collectors.assessed) {
                                 <table class="m-0 w-full text-xs" aria-label="Per-Collector coverage">
@@ -336,7 +343,12 @@ export class LinkAnalysisDataStripComponent {
             type: 'rightAligned',
             valueFormatter: (p) => (p.value == null ? '' : String(p.value)),
         },
-        { field: 'ingestedAt', headerName: 'Ingested at', minWidth: 180 },
+        {
+            field: 'ingestedAt',
+            headerName: 'Ingested at',
+            minWidth: 180,
+            valueFormatter: (p) => formatInstant(p.value) || (p.value ?? ''),
+        },
         {
             field: 'outcome',
             headerName: 'Outcome',

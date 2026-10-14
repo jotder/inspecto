@@ -141,9 +141,17 @@ class ControlApiInvestigationDataChangesTest {
                 // Same gate as coverage: a non-owner answers 404.
                 assertEquals(404, send(api, "GET", INV + "/data-changes", null, STRANGER).statusCode());
 
-                // The analyst acts again after the correction: it is no longer "after you last looked".
+                // A step that reads nothing (seed) and an undo of it do not count as looking again: the warning stays.
                 Thread.sleep(25);
                 ok(api, "POST", INV + "/ops", "{\"op\":\"seed\",\"ids\":[\"b\"]}", LEAD);
+                assertEquals(2, ok(api, "GET", INV + "/data-changes", null, LEAD).get("changes").size(), "a seed reads no data");
+                Thread.sleep(25);
+                ok(api, "POST", INV + "/undo", "{}", LEAD);
+                assertEquals(2, ok(api, "GET", INV + "/data-changes", null, LEAD).get("changes").size(), "an undo reads no data");
+
+                // An expand re-reads the Dataset: now it is no longer "after you last looked".
+                Thread.sleep(25);
+                ok(api, "POST", INV + "/ops", "{\"op\":\"expand\",\"ids\":[\"a\"]}", LEAD);
                 assertEquals(0, ok(api, "GET", INV + "/data-changes", null, LEAD).get("changes").size());
             } finally {
                 api.close();

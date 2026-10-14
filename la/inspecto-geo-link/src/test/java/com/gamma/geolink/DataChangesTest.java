@@ -95,13 +95,26 @@ class DataChangesTest {
     }
 
     @Test
-    void lastLookIsTheNewestOfCreationStepsAndSealedReads() {
+    void lastLookIsTheNewestOfCreationAndStepsThatReadData() {
         Map<String, Object> header = Map.of("createdAt", "2026-10-01T00:00:00Z");
         List<Map<String, Object>> log = List.of(
-                Map.of("step", 1, "at", "2026-10-02T00:00:00Z", "read", Map.of("readAt", "2026-10-09T08:00:00Z")),
-                Map.of("step", 2, "at", "2026-10-03T00:00:00Z"));
-        assertEquals(Instant.parse("2026-10-09T08:00:00Z"), DataChanges.lastLook(header, log), "a sealed read newer than every step wins");
+                Map.of("step", 1, "kind", "op", "op", "expand", "at", "2026-10-02T00:00:00Z", "read", Map.of("readAt", "2026-10-09T08:00:00Z")),
+                Map.of("step", 2, "kind", "op", "op", "connect", "at", "2026-10-10T00:00:00Z", "read", Map.of()));
+        assertEquals(Instant.parse("2026-10-10T00:00:00Z"), DataChanges.lastLook(header, log), "a read step counts at its step time or its sealed readAt, the newer");
+        assertEquals(Instant.parse("2026-10-09T08:00:00Z"), DataChanges.lastLook(header, log.subList(0, 1)), "a sealed read newer than its step wins");
         assertEquals(Instant.parse("2026-10-01T00:00:00Z"), DataChanges.lastLook(header, List.of()), "an empty log falls back to creation");
+    }
+
+    @Test
+    void aStepThatReadsNothingNeverMovesTheLastLook() {
+        Map<String, Object> header = Map.of("createdAt", "2026-10-01T00:00:00Z");
+        List<Map<String, Object>> log = List.of(
+                Map.of("step", 1, "kind", "op", "op", "expand", "at", "2026-10-02T00:00:00Z", "read", Map.of("readAt", "2026-10-02T00:00:00Z")),
+                Map.of("step", 2, "kind", "op", "op", "annotate", "at", "2026-10-05T00:00:00Z"),
+                Map.of("step", 3, "kind", "op", "op", "exclude", "at", "2026-10-06T00:00:00Z"),
+                Map.of("step", 4, "kind", "undo", "undoes", 1, "at", "2026-10-07T00:00:00Z"));
+        assertEquals(Instant.parse("2026-10-02T00:00:00Z"), DataChanges.lastLook(header, log),
+                "annotate, exclude and an undo (even of the read step) do not re-silence the warning");
     }
 
     @Test

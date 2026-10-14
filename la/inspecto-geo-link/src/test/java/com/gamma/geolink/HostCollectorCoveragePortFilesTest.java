@@ -108,4 +108,19 @@ class HostCollectorCoveragePortFilesTest {
         assertEquals(20, a.errorRows(), "the undated rows");
         assertEquals("PARTIAL", a.outcome());
     }
+
+    @Test
+    void aZoneNaiveLedgerTimeIsStatedAsAUtcInstantInTheHostZoneItWasWrittenIn() {
+        java.util.TimeZone before = java.util.TimeZone.getDefault();
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Kolkata"));   // UTC+05:30
+            assertEquals("2026-10-14T06:24:40Z", HostCollectorCoveragePort.utcInstant("2026-10-14 11:54:40"));
+            assertEquals("2026-10-14T06:24:40Z", HostCollectorCoveragePort.utcInstant("2026-10-14T11:54:40.123"));
+            assertEquals("2026-09-05T10:00:00Z", HostCollectorCoveragePort.utcInstant("2026-09-05T10:00:00Z"), "a zoned instant passes through");
+            assertEquals(null, HostCollectorCoveragePort.utcInstant(null));
+            assertEquals("garbage-time-value!", HostCollectorCoveragePort.utcInstant("garbage-time-value!"));
+        } finally {
+            java.util.TimeZone.setDefault(before);
+        }
+    }
 }

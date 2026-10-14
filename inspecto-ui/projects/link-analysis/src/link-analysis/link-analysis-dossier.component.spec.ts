@@ -151,6 +151,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
             note: 'state at export time, not sealed.',
             dataset: 'calls',
             asOf: '2026-09-04T00:00:00Z',
+            asOfDay: '2026-09-03',
             indexVersion: 3,
             indexStale: true,
             filesWaiting: 2,
@@ -164,7 +165,8 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         f.detectChanges();
         const block = el.querySelector('dl[aria-label="Data state at export time"]')?.textContent ?? '';
         expect(block).toContain('Not part of the custody hash');
-        expect(block).toContain('2026-09-04T00:00:00Z');
+        expect(block).toContain('3 Sep 2026');   // a midnight asOf covers the day BEFORE, read once, by the shared formatter
+        expect(block).not.toContain('2026-09-04T00:00:00Z');
         expect(block).toContain('version 3 — stale');
         expect(block).toContain('2026-09-02 (of 3 expected)');
         expect(el.textContent).toContain('Manifest root');
@@ -177,6 +179,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
             note: 'n',
             dataset: 'calls',
             asOf: null,
+            asOfDay: null,
             indexVersion: null,
             indexStale: null,
             filesWaiting: null,

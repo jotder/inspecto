@@ -50,6 +50,7 @@ final class DossierDataFooter {
         f.put("dataset", id);
         List<String> notAssessed = new ArrayList<>();
         f.put("asOf", null);
+        f.put("asOfDay", null);
         f.put("indexVersion", null);
         f.put("indexStale", null);
         f.put("filesWaiting", null);
@@ -65,8 +66,10 @@ final class DossierDataFooter {
         }
         try {
             OptionalLong asOf = DatasetProviders.require().dataAsOf(dataset, id, api.dataRoot(), o.writeRoot());
-            if (asOf.isPresent()) f.put("asOf", Instant.ofEpochMilli(asOf.getAsLong()).toString());
-            else notAssessed.add("asOf");
+            if (asOf.isPresent()) {
+                f.put("asOf", Instant.ofEpochMilli(asOf.getAsLong()).toString());
+                f.put("asOfDay", coveredDay(asOf.getAsLong()));
+            } else notAssessed.add("asOf");
         } catch (RuntimeException unreadable) {
             notAssessed.add("asOf");
         }
@@ -91,6 +94,17 @@ final class DossierDataFooter {
         }
         days(api, ex, o, log, at, f, notAssessed, fileDays);
         return f;
+    }
+
+    /**
+     * The last UTC day the Dataset covers, ISO. An instant at exactly UTC midnight is how {@code dataAsOf} states "covered through
+     * the end of a DATE" (newest event day 2026-09-04 reads {@code 2026-09-05T00:00:00Z}), so it names the day BEFORE - the same
+     * reading the SPA's {@code formatDay} gives the strip; any other instant names its own day.
+     */
+    static String coveredDay(long asOfMillis) {
+        Instant at = Instant.ofEpochMilli(asOfMillis);
+        java.time.LocalDate d = at.atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        return (asOfMillis % 86_400_000L == 0 ? d.minusDays(1) : d).toString();
     }
 
     /** The missing days over the window in force at the Dossier's step; not assessed without a time column or a bounded window. */

@@ -14,6 +14,7 @@ import {
     SealedSnapshotIds,
 } from '@inspecto/link-analysis/api/inv.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { formatDay } from './data-trust';
 import { investigationErrorMessage } from './investigation-state';
 
 /** `DossierRoutes.MAX_SNAPSHOTS` — the server refuses more with a 422. */
@@ -173,7 +174,7 @@ function saveBlob(blob: Blob, name: string): void {
                         <dt class="text-secondary">Data state at export time</dt>
                         <dd class="m-0"><strong>Not part of the custody hash</strong> — {{ f.note }}</dd>
                         <dt class="text-secondary">Data as of</dt>
-                        <dd class="m-0">{{ f.asOf ?? 'not assessed' }}</dd>
+                        <dd class="m-0">{{ asOfText(f.asOf) }}</dd>
                         <dt class="text-secondary">Index</dt>
                         <dd class="m-0">
                             @if (f.indexVersion != null) {
@@ -306,6 +307,7 @@ export class LinkAnalysisDossierComponent {
     readonly busy = signal(false);
     readonly error = signal('');
     readonly maxSnapshots = DOSSIER_MAX_SNAPSHOTS;
+    readonly asOfText = (iso: string | null): string => formatDay(iso) || 'not assessed';
     /** The log length, known once a dossier has been built (its `summary.steps`). */
     readonly steps = signal<number | null>(null);
     readonly snapshotList = signal<SealedSnapshotIds | null>(null);

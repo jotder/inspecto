@@ -44,6 +44,15 @@ export function formatDay(iso: string | null | undefined): string {
     return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/** `2026-09-05T10:03:20Z` -> `5 Sep 2026 10:03 UTC`: the one reading of an instant in the strip (UTC for every analyst). Blank when unreadable. */
+export function formatInstant(iso: string | null | undefined): string {
+    const d = new Date(iso ?? '');
+    if (!iso || Number.isNaN(d.getTime()) || !/(Z|[+-]\d{2}:?\d{2})$/.test(iso)) return '';
+    const hh = String(d.getUTCHours()).padStart(2, '0');
+    const mm = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${hh}:${mm} UTC`;
+}
+
 /**
  * The window the Files themselves span: [first day 00:00Z, day after the last 00:00Z). Lets the strip judge days for an
  * Investigation that has no window of its own (the coverage read refuses an unbounded one). Null when no day is known.
@@ -58,6 +67,22 @@ export function daysWindow(days: { day: string }[] | null | undefined): { from: 
 
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
+/**
+ * Splits the coverage read's missing days into real HOLES (a missing day inside the span of the delivered Files: the feed skipped it or sent nothing) and days NOT
+ * DELIVERED YET (before the first File or after the newest one: nothing is late, the window just reaches past the data).
+ * With no delivered day known nothing can be judged, so every missing day stays a hole - never "not delivered yet" by default.
+ */
+export function splitMissing(
+    missing: string[],
+    fileDays: { day: string; files: number }[] | null | undefined,
+): { holes: string[]; notDelivered: string[] } {
+    const ds = (fileDays ?? []).filter((d) => d.files > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.day)).map((d) => d.day).sort();
+    if (!ds.length) return { holes: [...missing], notDelivered: [] };
+    const [first, last] = [ds[0], ds[ds.length - 1]];
+    const holes = missing.filter((d) => d >= first && d <= last);
+    return { holes, notDelivered: missing.filter((d) => d < first || d > last) };
+}
+
 export function buildStrip(f: DataTrustFacts): DataTrustStrip {
     const parts: string[] = [];
     let tone: DataTrustTone = 'success';
@@ -71,10 +96,12 @@ export function buildStrip(f: DataTrustFacts): DataTrustStrip {
 
     if (f.days) {
         parts.push(`${f.days.covered} of ${f.days.expected} days`);
-        if (f.days.missing.length) {
-            parts.push(plural(f.days.missing.length, 'gap'));
+        const { holes, notDelivered } = splitMissing(f.days.missing, f.files?.assessed ? f.files.days : null);
+        if (holes.length) {
+            parts.push(plural(holes.length, 'gap'));
             worse('warning');
         }
+        if (notDelivered.length) parts.push(`${notDelivered.length} not delivered yet`);
     } else parts.push('days not assessed');
 
     const s = f.files?.assessed ? f.files.summary : undefined;
@@ -112,11 +139,11 @@ export function buildStrip(f: DataTrustFacts): DataTrustStrip {
     };
 }
 
-/** One cell of the per-day strip. `missing` = no rows and no File; `empty` = Files arrived but held no rows. */
+/** One cell of the per-day strip. `missing` = no rows and no File between delivered days; `pending` = no File yet, outside the delivered span; `empty` = Files arrived but held no rows. */
 export interface DayCell {
     date: string;
     rows: number;
-    state: 'ok' | 'missing' | 'empty';
+    state: 'ok' | 'missing' | 'empty' | 'pending';
 }
 
 /**
@@ -129,10 +156,16 @@ export function dayCells(
     fileDays: { day: string; files: number }[],
 ): DayCell[] {
     const delivered = new Set(fileDays.filter((d) => d.files > 0).map((d) => d.day));
+    const pending = new Set(
+        splitMissing(
+            perDay.filter((d) => d.rows === 0 && !delivered.has(d.date)).map((d) => d.date),
+            fileDays,
+        ).notDelivered,
+    );
     return perDay.map((d) => ({
         date: d.date,
         rows: d.rows,
-        state: d.rows > 0 ? 'ok' : delivered.has(d.date) ? 'empty' : 'missing',
+        state: d.rows > 0 ? 'ok' : delivered.has(d.date) ? 'empty' : pending.has(d.date) ? 'pending' : 'missing',
     }));
 }
 
