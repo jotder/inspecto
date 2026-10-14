@@ -182,8 +182,11 @@ class ControlApiRegulatoryReportsTest {
             JsonNode done = data(send(c, "POST", "/regulatory-reports/" + id + "/approve", "{\"reason\":\"checked\"}", CHECKER), 200);
             assertEquals("submitted", done.get("status").asText(), done.toString());
             assertEquals("checker-1", done.get("approver").asText());
-            Path file = Path.of(done.get("submission").get("file").asText());
-            assertEquals(c.root.resolve("regulatory-submissions/sample-sar").resolve(id + ".xml").toAbsolutePath().normalize(), file);
+            Path file = c.root.resolve("regulatory-submissions/sample-sar").resolve(id + ".xml").toAbsolutePath().normalize();
+            // a response never carries the server's absolute path: the folder as the template wrote it, the file by name
+            assertEquals("regulatory-submissions/sample-sar", done.get("delivery").get("dir").asText());
+            assertEquals(id + ".xml", done.get("submission").get("file").asText());
+            assertFalse(done.toString().contains(c.root.toAbsolutePath().normalize().toString().replace("\\", "\\\\")), done.toString());
             assertEquals(content, Files.readString(file), "the approver approved exactly what was submitted");
 
             JsonNode log = data(send(c, "GET", "/regulatory-reports?status=submitted", null, CHECKER), 200);
@@ -312,7 +315,8 @@ class ControlApiRegulatoryReportsTest {
             JsonNode ok = data(send(c, "POST", "/regulatory-reports/" + id + "/retry", "{}", CHECKER), 200);
             assertEquals("submitted", ok.get("status").asText(), ok.toString());
             assertEquals(failed.get("contentSha256").asText(),
-                    ApprovalFingerprint.sha256(Files.readAllBytes(Path.of(ok.get("submission").get("file").asText()))));
+                    ApprovalFingerprint.sha256(Files.readAllBytes(
+                            c.root.resolve("regulatory-submissions/sample-sar").resolve(id + ".xml"))));
             status(send(c, "POST", "/regulatory-reports/" + id + "/retry", "{}", CHECKER), 409, "not failed");
         }
     }

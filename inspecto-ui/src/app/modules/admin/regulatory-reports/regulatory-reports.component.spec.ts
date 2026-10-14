@@ -46,7 +46,7 @@ const REPORT: RegulatoryReport = {
     contentSha256: 'ab'.repeat(32),
     delivery: {
         kind: 'file-drop',
-        dir: 'C:/space/regulatory-submissions/sample-sar',
+        dir: 'regulatory-submissions/sample-sar',
         fileName: 'rr-20261009120000-abcdef.xml',
     },
     requestedBy: 'author-1',
@@ -81,7 +81,7 @@ async function create(
                 approver: 'checker-1',
                 submission: {
                     kind: 'file-drop',
-                    file: 'C:/drop/x.xml',
+                    file: 'x.xml',
                     at: '2026-10-09T13:00:00Z',
                     alreadyPresent: false,
                 },
@@ -146,7 +146,7 @@ describe('RegulatoryReportsComponent', () => {
         expect(api.approve).toHaveBeenCalledWith(REPORT.id, undefined);
         fixture.detectChanges();
         expect(c.selected()?.status).toBe('submitted');
-        expect(el.textContent).toContain('C:/drop/x.xml');
+        expect(el.textContent).toContain('to x.xml');
         await expectNoA11yViolations(el);
     });
 
@@ -215,6 +215,19 @@ describe('RegulatoryReportsComponent', () => {
         fixture.componentInstance.newReport();
         expect(dialog.open).toHaveBeenCalled();
         expect(fixture.componentInstance.selected()?.status).toBe('draft');
+    });
+
+    it('a reader the server refuses sees the refusal, not "No Report Templates."', async () => {
+        const refusal = new HttpErrorResponse({ status: 403, error: { message: 'requires canWorkIncidents' } });
+        const { fixture } = await create({
+            templates: vi.fn(() => throwError(() => refusal)),
+            list: vi.fn(() => throwError(() => refusal)),
+        });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Could not load the regulatory reports');
+        expect(text).not.toContain('No Report Templates.');
     });
 
     it('hides New report from a reader without canWorkIncidents', async () => {

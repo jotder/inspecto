@@ -61,7 +61,9 @@
                     }
                 </li>
             } @empty {
-                <li class="text-secondary text-sm">No Report Templates.</li>
+                @if (!error()) {
+                    <li class="text-secondary text-sm">No Report Templates.</li>
+                }
             }
         </ul>
     </section>

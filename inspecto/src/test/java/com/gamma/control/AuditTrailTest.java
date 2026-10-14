@@ -32,6 +32,17 @@ class AuditTrailTest {
                 AuditTrail.classify("PATCH", "/objects/INC-1"));
     }
 
+    /** A four-eyes decline / retry / send-for-approval must not read as "regulatory-report.created". */
+    @Test
+    void classifiesTheFourEyesVerbs() {
+        assertEquals(new AuditTrail.Action("regulatory-report.declined", "data_mutation"),
+                AuditTrail.classify("POST", "/regulatory-reports/rr-1/decline"));
+        assertEquals(new AuditTrail.Action("regulatory-report.retried", "data_mutation"),
+                AuditTrail.classify("POST", "/regulatory-reports/rr-1/retry"));
+        assertEquals(new AuditTrail.Action("regulatory-report.approval_requested", "data_mutation"),
+                AuditTrail.classify("POST", "/regulatory-reports/rr-1/request-approval"));
+    }
+
     @Test
     void classifiesBaselineAcceptAndClear() {
         assertEquals(new AuditTrail.Action("expectation.accepted", "data_mutation"),

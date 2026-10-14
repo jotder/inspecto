@@ -278,6 +278,9 @@ public final class AuditTrail {
                 case "evaluate" -> "evaluated";
                 case "accept" -> "accepted";      // POST /expectations/{name}/baseline/accept (DUCKLE-C8)
                 case "clear" -> "cleared";        // POST /expectations/{name}/baseline/clear
+                case "decline" -> "declined";     // POST /regulatory-reports/{id}/decline (and the other four-eyes inboxes)
+                case "retry" -> "retried";
+                case "request-approval" -> "approval_requested";   // POST /regulatory-reports/{id}/request-approval
                 case "delete" -> "deleted";       // e.g. /events/views/{name}/delete
                 default -> "created";
             };

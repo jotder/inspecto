@@ -99,6 +99,27 @@ public final class RegulatoryReports {
         s.remove("content");
         s.remove("inputs");
         s.remove(MAC);
+        return withoutServerPaths(s);
+    }
+
+    /**
+     * A caller sees the drop folder as the template wrote it ({@code dirLabel}) and the delivered file by name: the
+     * server's absolute path stays in the stored record (it is what is delivered to, and the MAC covers it), never
+     * in a response.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> withoutServerPaths(Map<String, Object> s) {
+        if (s.get("delivery") instanceof Map<?, ?> d) {
+            Map<String, Object> shown = new LinkedHashMap<>((Map<String, Object>) d);
+            Object label = shown.remove("dirLabel");
+            if (label != null) shown.put("dir", label);
+            s.put("delivery", shown);
+            if (s.get("submission") instanceof Map<?, ?> sub && shown.get("fileName") != null) {
+                Map<String, Object> sShown = new LinkedHashMap<>((Map<String, Object>) sub);
+                sShown.put("file", shown.get("fileName"));
+                s.put("submission", sShown);
+            }
+        }
         return s;
     }
 
@@ -106,7 +127,7 @@ public final class RegulatoryReports {
     static Map<String, Object> detail(Map<String, Object> rec) {
         Map<String, Object> s = new LinkedHashMap<>(rec);
         s.remove(MAC);
-        return s;
+        return withoutServerPaths(s);
     }
 
     static boolean invalid(Map<String, Object> rec) {

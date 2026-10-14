@@ -55,6 +55,28 @@ class ReportRendererTest {
         return ReportTemplate.parse(toon, "tt", "space");
     }
 
+    /** The 1 MiB document cap refuses (never truncates): a field with no maxLength can still not blow the document. */
+    @Test
+    void aDocumentOverTheCapIsRefusedNotTruncated() throws Exception {
+        ReportTemplate t = ReportTemplate.parse("""
+                id: big
+                title: B
+                format: json
+                delivery:
+                  kind: file-drop
+                  dir: d
+                fields[1]{name,source,required,maxLength}:
+                  narrative,input.narrative,true,0
+                """, "big", "space");
+        Map<String, Object> ctx = context();
+        ctx.put("input", new HashMap<>(Map.of("narrative", "x".repeat(ReportRenderer.MAX_BYTES))));
+        ReportRenderer.Refused e = assertThrows(ReportRenderer.Refused.class, () -> ReportRenderer.render(t, ctx));
+        assertTrue(e.problems().get(0).contains("the cap is " + ReportRenderer.MAX_BYTES), e.problems().toString());
+
+        ctx.put("input", new HashMap<>(Map.of("narrative", "x".repeat(ReportRenderer.MAX_BYTES / 2))));
+        assertTrue(ReportRenderer.render(t, ctx).content().length() < ReportRenderer.MAX_BYTES, "half the cap renders whole");
+    }
+
     @Test
     void theSampleRendersAsEscapedXmlWithRepeatingGroups() throws Exception {
         ReportRenderer.Rendered r = ReportRenderer.render(sample(), context());

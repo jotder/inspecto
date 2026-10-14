@@ -435,6 +435,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
         Map<String, Object> delivery = new LinkedHashMap<>();
         delivery.put("kind", t.deliveryKind());
         delivery.put("dir", dropDir.toString());
+        delivery.put("dirLabel", t.deliveryDir());
         delivery.put("fileName", rec.get("id") + "." + t.extension());
         rec.put("delivery", delivery);
         rec.put("requestedBy", null);
