@@ -41,10 +41,22 @@ final class AlertRoutes implements RouteModule {
 
     static final String TYPE = "alert-rule";
 
+    /** {@code GET /alerts} rows with the key named in each message masked for a caller who cannot reveal. */
+    private static java.util.List<java.util.Map<String, Object>> maskedRecent(ApiContext api, com.sun.net.httpserver.HttpExchange e,
+                                                                              java.util.List<java.util.Map<String, Object>> rows) {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, e);
+        if (masking == null) return rows;
+        return rows.stream().map(r -> {
+            java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(r);
+            out.put("message", masking.alertMessage((String) r.get("message"), (String) r.get("pipeline")));
+            return (java.util.Map<String, Object>) out;
+        }).toList();
+    }
+
     @Override
     public void register(ApiContext api) {
         api.get("/alerts", (e, m) -> HostContext.of(api).service().alertService()
-                .map(a -> (Object) a.recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50)))
+                .map(a -> (Object) maskedRecent(api, e, a.recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))))
                 .orElse(java.util.List.of()));
         api.get("/alerts/rules", (e, m) -> HostContext.of(api).service().alertService()
                 .map(a -> (Object) a.rules())

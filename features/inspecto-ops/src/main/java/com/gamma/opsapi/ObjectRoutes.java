@@ -1,6 +1,7 @@
 package com.gamma.opsapi;
 
 import com.gamma.control.HostContext;
+import com.gamma.control.ObjectReadMasking;
 import com.gamma.control.RouteErrors;
 import com.gamma.access.RowScope;
 import com.gamma.spi.auth.Subject;
@@ -108,7 +109,7 @@ public final class ObjectRoutes implements RouteModule {
         // the canAdminister PATCH, for the same reason those two are.
         api.put("/objects/([^/]+)/impact", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveImpact(api, e, ApiContext.name(m), exactBody(api, e)))));
         api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
-        api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, ApiContext.name(m))));
+        api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, e, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
         // The effective (possibly *_workflow.toon-overridden) lifecycle for a type — lets the UI derive
         // folders + action verbs instead of hardcoding state lists (case-management-design.md C6).
@@ -261,8 +262,10 @@ public final class ObjectRoutes implements RouteModule {
         return o.correlationId() == null ? "" : o.correlationId();
     }
 
-    private static List<Map<String, Object>> toObjectMaps(List<OperationalObject> objs) {
-        return objs.stream().map(OperationalObject::toMap).toList();
+    /** Each object as its JSON row, masked on read for a caller who cannot reveal ({@link ObjectReadMasking}). */
+    private static List<Map<String, Object>> toObjectMaps(ApiContext api, HttpExchange ex, List<OperationalObject> objs) {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        return objs.stream().map(o -> ObjectReadMasking.object(masking, o.toMap())).toList();
     }
 
     /** The keyset order for {@code /objects} pagination: {@code createdAt DESC, id DESC} (a total order, so a
@@ -278,7 +281,7 @@ public final class ObjectRoutes implements RouteModule {
      */
     private Object objectsList(ApiContext api, HttpExchange e) {
         if (!ApiContext.v1(e))
-            return toObjectMaps(visibleOnly(OpsEngine.of(api).query(objectQuery(e)), e));
+            return toObjectMaps(api, e, visibleOnly(OpsEngine.of(api).query(objectQuery(e)), e));
         return objectsPage(api, e);
     }
 
@@ -313,7 +316,7 @@ public final class ObjectRoutes implements RouteModule {
             nextCursor = Cursor.encode(List.of(String.valueOf(last.createdAt()), last.id()));
         }
         ApiContext.pagination(e, cursor, nextCursor, limit, total);
-        return toObjectMaps(page);
+        return toObjectMaps(api, e, page);
     }
 
     /** Build an {@link ObjectQuery} from {@code ?type=&status=&severity=&assignee=&owner=&correlationId=&q=&limit=&offset=}. */
@@ -341,8 +344,9 @@ public final class ObjectRoutes implements RouteModule {
     }
 
     /** {@code GET /objects/{id}} — the object, or 404. */
-    private Object objectById(ApiContext api, String id) {
-        return OpsEngine.of(api).get(id).map(OperationalObject::toMap)
+    private Object objectById(ApiContext api, HttpExchange ex, String id) {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        return OpsEngine.of(api).get(id).map(o -> ObjectReadMasking.object(masking, o.toMap()))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'"));
     }
 

@@ -1,0 +1,114 @@
+package com.gamma.control;
+
+import com.gamma.mask.EvidenceMasker;
+import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewStore;
+import com.gamma.spi.http.ApiContext;
+import com.sun.net.httpserver.HttpExchange;
+
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Read-time masking of per-entity ALERT / INCIDENT objects (TELCO-FRAUD-MASKED-DASHBOARD-1 (c)). A {@code by} Alert Rule
+ * stores the breached key as {@code key.<column>} attributes (and as {@code key} / {@code alertKey} / the title). For a
+ * caller WITHOUT {@link AuditReadMasking#UNMASK_CAPABILITY}, every {@code key.<column>} value whose column the rule's
+ * Dataset classifies sensitive ({@link EvidenceMasker#sensitiveColumns}) becomes the Space's {@code masked:<16 hex>} token,
+ * and the raw value is replaced by that token wherever it stands in the title, description, correlation id and the other
+ * attributes. Stored rows stay RAW (the dedupe key is raw); only the read view is masked. Fail closed: untraceable lineage
+ * masks every {@code key.*} value. A request with no Subject (Personal) is unrestricted.
+ */
+public final class ObjectReadMasking {
+
+    private static final int MIN_INLINE = AuditReadMasking.MIN_INLINE;
+
+    private final EvidenceMasker masker;
+    private final ComponentStore registry;
+    private final ViewStore views;
+    private final Map<String, Set<String>> sensitive = new HashMap<>();
+
+    private ObjectReadMasking(Path root) {
+        this.masker = EvidenceMasker.forSpace(root);
+        this.registry = new ComponentStore(root.resolve("registry"));
+        this.views = new ViewStore(root.resolve("views"));
+    }
+
+    /** The masker for this request, or {@code null} when the caller may see raw keys (or there is no Space root). */
+    public static ObjectReadMasking forRequest(ApiContext api, HttpExchange ex) {
+        boolean privileged = ApiContext.subject(ex)
+                .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
+        Path root = api.writeRoot();
+        return privileged || root == null ? null : new ObjectReadMasking(root);
+    }
+
+    static ObjectReadMasking of(Path root) {
+        return new ObjectReadMasking(root);
+    }
+
+    /** {@code masking} applied to one {@code /objects} row; the row itself when {@code masking} is {@code null}. */
+    public static Map<String, Object> object(ObjectReadMasking masking, Map<String, Object> row) {
+        return masking == null ? row : masking.maskObject(row);
+    }
+
+    private Set<String> sensitiveOf(String dataset) {
+        return dataset == null ? Set.of()
+                : sensitive.computeIfAbsent(dataset, d -> EvidenceMasker.sensitiveColumns(registry, views, d));
+    }
+
+    private static boolean hit(Set<String> sens, String column) {
+        return sens.contains(EvidenceMasker.UNKNOWN_LINEAGE) || sens.contains(column.toLowerCase(Locale.ROOT));
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> maskObject(Map<String, Object> row) {
+        if (!(row.get("attributes") instanceof Map<?, ?> a)) return row;
+        Map<String, String> attrs = (Map<String, String>) a;
+        Set<String> sens = sensitiveOf(attrs.get("dataset"));
+        if (sens.isEmpty()) return row;
+        Map<String, String> replaced = new LinkedHashMap<>();
+        attrs.forEach((k, v) -> {
+            if (k.startsWith("key.") && v != null && hit(sens, k.substring(4))) replaced.put(v, masker.tokenFor(v));
+        });
+        if (replaced.isEmpty()) return row;
+        Map<String, String> maskedAttrs = new LinkedHashMap<>();
+        attrs.forEach((k, v) -> maskedAttrs.put(k, v == null ? null
+                : k.startsWith("key.") && replaced.containsKey(v) ? replaced.get(v) : inline(v, replaced)));
+        Map<String, Object> out = new LinkedHashMap<>(row);
+        for (String f : List.of("title", "description", "correlationId"))
+            if (out.get(f) instanceof String s) out.put(f, inline(s, replaced));
+        out.put("attributes", maskedAttrs);
+        out.put("keyMasked", true);
+        return out;
+    }
+
+    private static String inline(String text, Map<String, String> replaced) {
+        String t = text;
+        for (Map.Entry<String, String> r : replaced.entrySet())
+            if (r.getKey().length() >= MIN_INLINE) t = t.replace(r.getKey(), r.getValue());
+        return t;
+    }
+
+    /**
+     * An Alert's message names its key as {@code for <column>=<value>[, <column>=<value>]}: mask each sensitive column's
+     * value (it ends at {@code ", <next>="}, {@code " is "} or the end). {@code dataset} is the Alert's scope.
+     */
+    public String alertMessage(String message, String dataset) {
+        if (message == null) return null;
+        Set<String> sens = sensitiveOf(dataset);
+        if (sens.isEmpty()) return message;
+        Matcher m = Pattern.compile("(?<=[ ,])([A-Za-z_][A-Za-z0-9_.]*)=(.+?)(?=, [A-Za-z_][A-Za-z0-9_.]*=| is |$)")
+                .matcher(message);
+        StringBuilder sb = new StringBuilder();
+        while (m.find())
+            m.appendReplacement(sb, Matcher.quoteReplacement(hit(sens, m.group(1))
+                    ? m.group(1) + "=" + masker.tokenFor(m.group(2)) : m.group()));
+        return m.appendTail(sb).toString();
+    }
+}
