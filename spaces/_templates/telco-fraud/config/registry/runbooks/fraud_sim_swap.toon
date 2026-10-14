@@ -1,6 +1,5 @@
 name: fraud_sim_swap
 title: "SIM-swap runbook"
-summary: "Detects: payments out of a line within `window_hours` after its latest SIM swap, each payment counted once, above `threshold` (default 200)."
 steps[5]:
   - text: "Detects: payments out of a line within `window_hours` after its latest SIM swap, each payment counted once, above `threshold` (default 200)."
     link:

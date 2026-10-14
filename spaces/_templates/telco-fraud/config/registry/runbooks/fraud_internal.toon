@@ -1,6 +1,5 @@
 name: fraud_internal
 title: "Internal fraud runbook"
-summary: "Detects: SIM swaps performed per staff user in the window (`dealer_id` of a SIM_SWAP event is the staff user), above `threshold` (default 5), outside the registered swap desks in `exempt_staff`."
 steps[4]:
   - text: "Detects: SIM swaps performed per staff user in the window (`dealer_id` of a SIM_SWAP event is the staff user), above `threshold` (default 5), outside the registered swap desks in `exempt_staff`."
     link:

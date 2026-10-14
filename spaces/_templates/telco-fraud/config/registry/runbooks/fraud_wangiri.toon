@@ -1,6 +1,5 @@
 name: fraud_wangiri
 title: "Wangiri runbook"
-summary: "Detects: subscribers rung for at most `max_ring_seconds` who then call the ringing number back within `callback_hours`, per ringing number, above `threshold` (default 3)."
 steps[4]:
   - text: "Detects: subscribers rung for at most `max_ring_seconds` who then call the ringing number back within `callback_hours`, per ringing number, above `threshold` (default 3)."
     link:

@@ -46,7 +46,7 @@ function create(inputs?: { name: string; embedded: boolean }) {
             provideNoopAnimations(),
             provideRouter([]),
             { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'cdr_ingest_daily' } } } },
-            { provide: JobsService, useValue: { get: () => of(JOB), runs: () => of(RUNS), runLogs: () => of(LOGS) } },
+            { provide: JobsService, useValue: { get: () => of(JOB), list: () => of([{ name: 'cdr_ingest_daily', type: 'ingest', enabled: true, nextFire: '2026-10-15 02:00:00' }]), runs: () => of(RUNS), runLogs: () => of(LOGS) } },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             {
                 provide: InspectoConfirmService,
@@ -74,6 +74,7 @@ describe('JobDetailComponent', () => {
         expect(c.selectedRunId()).toBe('run-1');
         expect(c.logs()?.logs.length).toBe(1);
         expect(c.whatScheduled()).toBe('Ingest · cdr_sftp');
+        expect(c.job()?.nextFire).toBe('2026-10-15 02:00:00'); // borrowed from the list row
     });
 
     it('embedded mode hides the page chrome, reloads on a name change, and emits closed on X (R5)', async () => {

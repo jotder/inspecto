@@ -1,6 +1,5 @@
 name: fraud_recharge
 title: "Recharge fraud runbook"
-summary: "Detects: card-testing / top-up velocity: PAYMENT top-ups under `small_amount` (default 5) per line in the window, above `threshold` (default 8). Only lines with at least `min_candidate_topups` (default 3) small top-ups are kept."
 steps[4]:
   - text: "Detects: card-testing / top-up velocity: PAYMENT top-ups under `small_amount` (default 5) per line in the window, above `threshold` (default 8). Only lines with at least `min_candidate_topups` (default 3) small top-ups are kept."
     link:

@@ -1,6 +1,5 @@
 name: fraud_simbox
 title: "SIM-box runbook"
-summary: "Detects: distinct voice targets of a line that receives no calls, sends no SMS and uses at most `max_cells` cells, above `threshold` (default 50)."
 steps[5]:
   - text: "Detects: distinct voice targets of a line that receives no calls, sends no SMS and uses at most `max_cells` cells, above `threshold` (default 50)."
     link:

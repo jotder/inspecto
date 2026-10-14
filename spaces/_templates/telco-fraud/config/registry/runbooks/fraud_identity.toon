@@ -1,6 +1,5 @@
 name: fraud_identity
 title: "Subscription / identity runbook"
-summary: "Detects: lines activated on one identity document in the window, above `threshold` (default 5)."
 steps[4]:
   - text: "Detects: lines activated on one identity document in the window, above `threshold` (default 5)."
     link:

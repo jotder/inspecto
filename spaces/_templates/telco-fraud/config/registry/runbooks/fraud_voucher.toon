@@ -1,6 +1,5 @@
 name: fraud_voucher
 title: "Voucher / EVD runbook"
-summary: "Detects: redemptions of one voucher serial, above `threshold` (default 1: a serial redeems once)."
 steps[4]:
   - text: "Detects: redemptions of one voucher serial, above `threshold` (default 1: a serial redeems once)."
     link:

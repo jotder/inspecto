@@ -1,6 +1,5 @@
 name: fraud_dealer
 title: "Dealer activations runbook"
-summary: "Detects: activations by one dealer with no originated traffic up to `traffic_grace_hours` (default 48) after the window, above `threshold` (default 20)."
 steps[5]:
   - text: "Detects: activations by one dealer with no originated traffic up to `traffic_grace_hours` (default 48) after the window, above `threshold` (default 20)."
     link:

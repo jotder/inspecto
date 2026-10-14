@@ -165,6 +165,7 @@ export class JobDetailComponent implements OnInit, OnDestroy {
             next: (j) => {
                 this.job.set(j);
                 this.loading.set(false);
+                this.loadNextFire(j);
             },
             error: () => {
                 this.job.set(null);
@@ -172,6 +173,18 @@ export class JobDetailComponent implements OnInit, OnDestroy {
             },
         });
         this.loadRuns();
+    }
+
+    /** `GET /jobs/{name}` carries no `nextFire` (list-only, computed from the live cron) — borrow it from the list row. */
+    private loadNextFire(j: JobDetail): void {
+        if (j.nextFire) return;
+        this.api.list().subscribe({
+            next: (rows) => {
+                const nextFire = rows.find((r) => r.name === j.name)?.nextFire;
+                if (nextFire && this.job()?.name === j.name) this.job.update((cur) => (cur ? { ...cur, nextFire } : cur));
+            },
+            error: () => undefined,
+        });
     }
 
     loadRuns(): void {

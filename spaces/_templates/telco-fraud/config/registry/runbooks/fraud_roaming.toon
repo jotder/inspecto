@@ -1,6 +1,5 @@
 name: fraud_roaming
 title: "Roaming high usage runbook"
-summary: "Detects: roaming charge per subscriber in the window, above `threshold` (default 500)."
 steps[4]:
   - text: "Detects: roaming charge per subscriber in the window, above `threshold` (default 500)."
     link:

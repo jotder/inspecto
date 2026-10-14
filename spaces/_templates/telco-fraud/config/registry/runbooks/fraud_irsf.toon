@@ -1,6 +1,5 @@
 name: fraud_irsf
 title: "IRSF (International Revenue Share Fraud) runbook"
-summary: "Detects: originated voice seconds to the ranges in `irsf_prefixes`, per caller, above `threshold` (default 3600 s)."
 steps[5]:
   - text: "Detects: originated voice seconds to the ranges in `irsf_prefixes`, per caller, above `threshold` (default 3600 s)."
     link:

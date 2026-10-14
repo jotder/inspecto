@@ -1,6 +1,5 @@
 name: fraud_reversal
 title: "Payment reversal runbook"
-summary: "Detects: reversals per subscriber in the window, above `threshold` (default 3)."
 steps[4]:
   - text: "Detects: reversals per subscriber in the window, above `threshold` (default 3)."
     link:

@@ -1,6 +1,5 @@
 name: fraud_data_bypass
 title: "Data-charging bypass runbook"
-summary: "Detects: seconds of originated DATA sessions rated at zero (`charge = 0`) per line in the window, above `threshold` (default 7200), outside the APNs in `zero_rated_apns`. In the CDR feed a DATA record carries the session seconds in `duration_s` and the APN in `b_number`. Only lines with at least `min_candidate_seconds` (default 600) unrated seconds are kept."
 steps[4]:
   - text: "Detects: seconds of originated DATA sessions rated at zero (`charge = 0`) per line in the window, above `threshold` (default 7200), outside the APNs in `zero_rated_apns`. In the CDR feed a DATA record carries the session seconds in `duration_s` and the APN in `b_number`. Only lines with at least `min_candidate_seconds` (default 600) unrated seconds are kept."
     link:

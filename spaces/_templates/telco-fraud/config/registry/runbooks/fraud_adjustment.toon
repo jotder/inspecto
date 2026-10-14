@@ -1,6 +1,5 @@
 name: fraud_adjustment
 title: "Manual adjustment fraud runbook"
-summary: "Detects: manual ADJUSTMENT credits summed per staff `agent_id` in the window, above `threshold` (default 500), outside the billing-correction desks in `exempt_agents`."
 steps[4]:
   - text: "Detects: manual ADJUSTMENT credits summed per staff `agent_id` in the window, above `threshold` (default 500), outside the billing-correction desks in `exempt_agents`."
     link:

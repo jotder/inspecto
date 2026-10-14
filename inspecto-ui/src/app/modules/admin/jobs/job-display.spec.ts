@@ -23,6 +23,11 @@ describe('job-display', () => {
         expect(whatScheduled({ type: 'ingest' })).toBe('Ingest');
     });
 
+    it('whatScheduled ignores a non-scalar param (no [object Object])', () => {
+        expect(whatScheduled({ type: 'pipeline', params: { source: { incremental: true }, pipeline: 'p1' } })).toBe('Pipeline · p1');
+        expect(whatScheduled({ type: 'pipeline', params: { source: { incremental: true } } })).toBe('Pipeline');
+    });
+
     // The engine dual-reads this param and prefers `pipeline`; a job persisted with the pre-Tier-3
     // `flow` spelling must still show its hint, so the fallback is coverage, not dead code.
     it('whatScheduled still reads the legacy `flow` param', () => {

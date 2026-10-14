@@ -29,7 +29,10 @@ export function whatScheduled(job: { type: string; params?: Record<string, unkno
     const p = job.params ?? {};
     // `pipeline` first, `flow` second: the engine dual-reads the same param and prefers the canonical
     // spelling (PipelineJobRunner, JobService, ParameterResolver), so a job authored either way shows a hint.
-    const hint = p['report'] ?? p['pipeline'] ?? p['flow'] ?? p['task'] ?? p['scope'] ?? p['source'];
+    // Only a scalar makes a hint: `source` can be an object (e.g. an `incremental` config) which printed `[object Object]`.
+    const hint = [p['report'], p['pipeline'], p['flow'], p['task'], p['scope'], p['source']].find(
+        (v) => (typeof v === 'string' && v !== '') || typeof v === 'number',
+    );
     return hint ? `${label} · ${hint}` : label;
 }
 
