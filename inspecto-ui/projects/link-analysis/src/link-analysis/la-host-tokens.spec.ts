@@ -75,6 +75,7 @@ class FakeBannerComponent {
 class FakeAiComponent {
     readonly screen = input('');
     readonly terms = input<string[]>([]);
+    readonly label = input('');
 }
 
 @Component({ selector: 'fake-assist', standalone: true, changeDetection: ChangeDetectionStrategy.Eager, template: '' })
@@ -193,6 +194,8 @@ describe('Link Analysis host-service tokens', () => {
             .queryAll(By.directive(FakeAiComponent))
             .map((d) => d.componentInstance as FakeAiComponent);
         expect(explain.map((e) => e.screen())).toContain('Link Analysis');
+        // the tool rail's button is named apart from the page header's (two buttons, two names)
+        expect(explain.map((e) => e.label())).toContain('About Link Analysis tools');
         // Tags go through the token, not a host dialog
         fixture.componentInstance.openTags({ id: 'v1', name: 'View one' } as never);
         expect(fakeTags.open).toHaveBeenCalledWith({
