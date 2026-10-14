@@ -25,7 +25,10 @@ export interface BiQueryBody {
      *  Every key must also appear in `groupBy` — the server 422s on one that does not. */
     grains?: Record<string, string>;
     filters?: BiFilter[];
-    orderBy?: { field: string; dir: 'asc' | 'desc' }[];
+    /** `cosmetic: true` marks a category-order term (a chart's own tie-break over its group key): for a caller who cannot
+     *  reveal, the server drops it over a MASKED column and orders by the first Measure instead of answering 422
+     *  (`BiResultMasking.stripCosmeticOrder`). Leave it unset for an order the caller actually asked for. */
+    orderBy?: { field: string; dir: 'asc' | 'desc'; cosmetic?: boolean }[];
     limit?: number;
     /** A saved Query id: aggregate over its result instead of the whole Dataset. The query must read `dataset`;
      *  a missing or hidden one is a 404, never an empty result. */
