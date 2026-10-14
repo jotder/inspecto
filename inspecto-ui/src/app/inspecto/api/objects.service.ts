@@ -150,6 +150,8 @@ export interface CaseRule {
     filter: TagRuleFilter;
     threshold: number;
     windowMinutes: number;
+    /** Key column (e.g. `msisdn`): one Case per value of the Incidents' `key.<column>`, instead of one per burst. */
+    groupBy?: string;
     category?: string;
     tags?: string;
     createdAt?: number;

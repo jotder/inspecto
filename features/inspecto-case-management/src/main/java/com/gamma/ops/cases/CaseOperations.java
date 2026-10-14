@@ -113,27 +113,66 @@ public final class CaseOperations {
         long cutoff = rule.windowMinutes() <= 0 ? 0 : now - rule.windowMinutes() * 60_000L;
         List<OperationalObject> matches = new ArrayList<>();   // every page; only the matches are held
         for (OperationalObject o : svc.allMatching(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()))
-            if (o.createdAt() >= cutoff && rule.matches(o) && !isCaseMember(o.id()))   // not already grouped
+            if (o.createdAt() >= cutoff && rule.matches(o) && !isCaseMember(o.id())   // not already grouped
+                    && (rule.groupBy() == null || groupValue(rule, o) != null))
                 matches.add(o);
         matches = matches.reversed();   // newest-first, as before: matches.get(0) seeds a new Case's correlationId
         if (matches.isEmpty()) return new CaseRuleEvaluation(0, 0, null, false);
 
-        String existing = openCaseRaisedBy(name);
+        if (rule.groupBy() == null) return groupInto(rule, null, matches);
+        Map<String, List<OperationalObject>> groups = new LinkedHashMap<>();   // one group per entity key value
+        for (OperationalObject o : matches) groups.computeIfAbsent(groupValue(rule, o), k -> new ArrayList<>()).add(o);
+        int grouped = 0;
+        String lastCase = null;
+        boolean anyOpened = false;
+        for (Map.Entry<String, List<OperationalObject>> g : groups.entrySet()) {
+            CaseRuleEvaluation e = groupInto(rule, g.getKey(), g.getValue());
+            grouped += e.grouped();
+            if (e.caseId() != null) lastCase = e.caseId();
+            anyOpened |= e.opened();
+        }
+        return new CaseRuleEvaluation(matches.size(), grouped, lastCase, anyOpened);
+    }
+
+    /** Case attribute holding the entity key value a per-entity Case Rule grouped on (the raw key lives in an attribute, never the title). */
+    public static final String ATTR_CASE_GROUP = "caseGroup";
+
+    /** The entity key value an Incident carries for the rule's {@code groupBy} column, or null. */
+    private static String groupValue(CaseRule rule, OperationalObject o) {
+        String v = o.attributes().get(rule.groupAttribute());
+        return v == null || v.isBlank() ? null : v;
+    }
+
+    /** Attach {@code matches} (the whole set when {@code group} is null) to the rule's open Case for that group, or open one at the threshold. */
+    private CaseRuleEvaluation groupInto(CaseRule rule, String group, List<OperationalObject> matches) {
+        String name = rule.name();
+        String caseId = openCaseRaisedBy(name, group);
         boolean opened = false;
-        String caseId = existing;
         if (caseId == null) {
             if (matches.size() < rule.threshold())
                 return new CaseRuleEvaluation(matches.size(), 0, null, false);  // below threshold, no case yet
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put(ObjectService.ATTR_RAISED_BY_RULE, name);
+            if (group != null) attrs.put(ATTR_CASE_GROUP, group);
             if (rule.category() != null) attrs.put("category", rule.category());
             if (rule.tags() != null) attrs.put(ObjectService.ATTR_TAGS, rule.tags());
-            caseId = svc.open(ObjectType.CASE, rule.title(), "Auto-raised by case rule '" + name + "'",
+            String title = group == null ? rule.title() : rule.title() + " (" + rule.groupBy() + " #" + digest(group) + ")";
+            caseId = svc.open(ObjectType.CASE, title, "Auto-raised by case rule '" + name + "'",
                     null, null, null, null, matches.get(0).correlationId(), attrs).id();
             opened = true;
         }
         for (OperationalObject inc : matches) svc.link(caseId, inc.id(), LinkRelationship.CONTAINS, "case-rule:" + name);
         return new CaseRuleEvaluation(matches.size(), matches.size(), caseId, opened);
+    }
+
+    /** Six hex chars of the value's hash: stable per entity, tells Cases apart, reveals nothing. */
+    private static String digest(String value) {
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(h, 0, 3);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** Whether {@code incidentId} is already a {@code CONTAINS} member of some case. */
@@ -143,11 +182,12 @@ public final class CaseOperations {
     }
 
     /** The id of a still-open case previously raised by {@code ruleName}, or null. */
-    private String openCaseRaisedBy(String ruleName) {
+    private String openCaseRaisedBy(String ruleName, String group) {
         Workflow wf = svc.workflow(ObjectType.CASE);
         String newest = null;   // oldest-first walk over every page, so the LAST hit is the newest, as before
         for (OperationalObject c : svc.allMatching(ObjectQuery.builder().objectType(ObjectType.CASE).openOnly(true).build()))
-            if (ruleName.equals(c.attributes().get(ObjectService.ATTR_RAISED_BY_RULE)) && !wf.isTerminal(c.status())) newest = c.id();
+            if (ruleName.equals(c.attributes().get(ObjectService.ATTR_RAISED_BY_RULE)) && !wf.isTerminal(c.status())
+                    && java.util.Objects.equals(group, c.attributes().get(ATTR_CASE_GROUP))) newest = c.id();
         return newest;
     }
 

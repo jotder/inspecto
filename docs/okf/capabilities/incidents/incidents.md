@@ -646,6 +646,8 @@ per-category counts into tall Parquet under `<dataDir>/ops_analytics/` as a `dat
 (2026-07-25); binding it as a Studio Dataset is unbuilt (§5). ⚠ **No committed `*_case_rule.toon` or
 `*_tag_rule.toon` exists.**
 
+**`groupBy` - one Case per offender (2026-10-14, `TELCO-FRAUD-STORY-GAPS-1`).** A Case Rule may name a key column (`groupBy: msisdn`); the rule then groups Incidents by the value of their `key.<column>` attribute (the per-entity key an Alert Rule stamps), so ONE offender's Incidents form one Case and two offenders never merge. `threshold` and `windowMinutes` apply per offender, an Incident without that attribute never matches, a late Incident joins only its own offender's open Case (`caseGroup` attribute on the Case). The Case title is the rule title plus a 6-hex digest of the value - never the raw key, since a Case title is read by non-revealing viewers (the raw key lives in the `caseGroup` attribute). Absent `groupBy` nothing changes (one Case per rule). SPA: *Group by key* in the Case rules dialog. Pinned by `CaseRuleGroupByTest`.
+
 **Impact (WS-10, `ASSURE-IMPACT-LEDGER-1`, 2026-09-26).** An Incident and a Case carry one typed financial
 impact, `com.gamma.ops.Impact`: four non-negative decimals — **suspected · confirmed · recovered · prevented** —
 in one ISO 4217 **currency** (required once any amount is set), plus free-text **period** (≤ 64) and **basis**

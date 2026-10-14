@@ -18,6 +18,11 @@ import java.util.Set;
  * {@link #windowMinutes}, they are grouped under one Case — the mechanical tail of the
  * Alert → Incident → Case chain. Reuses {@link TagRule.Filter} for the incident-matching predicate.
  *
+ * <p>With {@link #groupBy} (a key column such as {@code msisdn}) the rule groups per entity: Incidents sharing
+ * the same {@code key.<column>} value form one group, each group reaching {@link #threshold} on its own and
+ * opening its own Case; Incidents without that attribute never match. The Case title carries a short digest
+ * of the value, never the raw key (a Case title is read by non-revealing viewers).
+ *
  * <p>Authored as a {@code *_caserule.toon} (a {@code case_rule { … }} block) loaded at bootstrap, or
  * saved at runtime via {@code POST /cases/rules} (persisted under the write root, rescanned at boot).
  * On evaluation the raised Case is titled {@link #title} and inherits the rule's {@link #category} /
@@ -28,15 +33,20 @@ import java.util.Set;
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record CaseRule(String name, String title, TagRule.Filter filter, int threshold,
-                       long windowMinutes, String category, String tags, long createdAt, Map<String, Object> extra) {
+                       long windowMinutes, String category, String tags, long createdAt, String groupBy, Map<String, Object> extra) {
 
     /** The keys a {@code case_rule { … }} block models (the filter fields may be nested or flattened); any other key rides in {@link #extra}. */
     public static final Set<String> MODELLED = Set.of("name", "title", "filter", "threshold", "windowMinutes", "category",
-            "tags", "createdAt", "type", "q", "status", "priority", "severity");
+            "tags", "createdAt", "groupBy", "type", "q", "status", "priority", "severity");
 
     public CaseRule(String name, String title, TagRule.Filter filter, int threshold,
                     long windowMinutes, String category, String tags, long createdAt) {
-        this(name, title, filter, threshold, windowMinutes, category, tags, createdAt, Map.of());
+        this(name, title, filter, threshold, windowMinutes, category, tags, createdAt, null, Map.of());
+    }
+
+    public CaseRule(String name, String title, TagRule.Filter filter, int threshold,
+                    long windowMinutes, String category, String tags, long createdAt, Map<String, Object> extra) {
+        this(name, title, filter, threshold, windowMinutes, category, tags, createdAt, null, extra);
     }
 
     public CaseRule {
@@ -51,6 +61,14 @@ public record CaseRule(String name, String title, TagRule.Filter filter, int thr
         if (windowMinutes < 0) throw new IllegalArgumentException("case rule windowMinutes must be >= 0");
         category = category == null || category.isBlank() ? null : category.trim();
         tags = tags == null || tags.isBlank() ? null : tags.trim();
+        groupBy = groupBy == null || groupBy.isBlank() ? null : groupBy.trim();
+        if (groupBy != null && !groupBy.matches("[A-Za-z_][A-Za-z0-9_]*"))
+            throw new IllegalArgumentException("case rule groupBy must be a plain key column name, got '" + groupBy + "'");
+    }
+
+    /** The Incident attribute {@link #groupBy} reads: the per-entity key column an Alert Rule stamps ({@code key.<column>}), or null. */
+    public String groupAttribute() {
+        return groupBy == null ? null : "key." + groupBy;
     }
 
     /** Whether {@code o} satisfies this rule's incident-matching filter. */
@@ -68,6 +86,7 @@ public record CaseRule(String name, String title, TagRule.Filter filter, int thr
         m.put("windowMinutes", windowMinutes);
         if (category != null) m.put("category", category);
         if (tags != null) m.put("tags", tags);
+        if (groupBy != null) m.put("groupBy", groupBy);
         m.put("createdAt", createdAt);
         extra.forEach(m::putIfAbsent);   // MODULE-REORG-P4-2: author-owned x- annotations ride through
         return m;
@@ -91,7 +110,7 @@ public record CaseRule(String name, String title, TagRule.Filter filter, int thr
                 Values.trimToNull(f.get("priority")), Values.trimToNull(f.get("severity")), Values.trimToNull(f.get("category")));
         return new CaseRule(Values.trimToNull(m.get("name")), Values.trimToNull(m.get("title")), filter,
                 (int) longOr(m.get("threshold"), 2), longOr(m.get("windowMinutes"), 1440),
-                Values.trimToNull(m.get("category")), Values.trimToNull(m.get("tags")), longOr(m.get("createdAt"), System.currentTimeMillis()), Extras.of(m, MODELLED));
+                Values.trimToNull(m.get("category")), Values.trimToNull(m.get("tags")), longOr(m.get("createdAt"), System.currentTimeMillis()), Values.trimToNull(m.get("groupBy")), Extras.of(m, MODELLED));
     }
 
     private static long longOr(Object v, long def) {

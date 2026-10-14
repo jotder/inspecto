@@ -15,6 +15,8 @@ import com.gamma.inspector.CollectorProcessor;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
+import com.gamma.job.PlatformServiceRegistry;
+import com.gamma.objects.ObjectAccess;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -175,10 +177,78 @@ class TelcoFraudTemplateGoldenTest {
         Map<String, Object> caseRule = ToonHelper.requireSection(
                 ToonHelper.load(config.resolve("ops").resolve("fraud_critical_burst_caserule.toon").toString()), "case_rule");
         assertEquals("fraud_critical_burst", caseRule.get("name"));
+        assertEquals("msisdn", caseRule.get("groupBy"), "one Case per offender, not one per burst");
         JobConfig export = JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(
                 ToonHelper.load(config.resolve("jobs").resolve("fraud_offender_export_job.toon").toString()), "job")));
         assertEquals("report", export.type());
         assertEquals("0 3 * * *", export.cron());
+        JobConfig quality = JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(
+                ToonHelper.load(config.resolve("jobs").resolve("fraud_expectation_evaluate_job.toon").toString()), "job")));
+        assertEquals("expectation.evaluate", quality.type());
+        assertEquals("45 1 * * *", quality.cron(), "after the feeds land, before the 02:00 detection Jobs");
+    }
+
+    /** The nightly {@code expectation.evaluate} Job on the sample feeds: a seeded out-of-range CDR duration makes
+     *  exactly that Expectation FAIL and open an ingest-quality Incident; the other six pass and raise nothing. */
+    @Test
+    void theNightlyExpectationJobRaisesAnIngestQualityIncidentForASeededBadRow(@TempDir Path root) throws Exception {
+        Path space = createSpace(root);
+        Path cdrCsv;
+        try (Stream<Path> samples = Files.list(space.resolve("data").resolve("samples").resolve("cdr"))) {
+            cdrCsv = samples.sorted().findFirst().orElseThrow();
+        }
+        Files.writeString(cdrCsv, "R9999999,2026-07-01 10:00:00,MO,VOICE,99970000001,071031508,999999,0.10,N,C101\n",
+                java.nio.file.StandardOpenOption.APPEND);
+        ingest(space);
+
+        List<Map<String, String>> opened = new ArrayList<>();
+        ObjectAccess objects = (ObjectAccess) java.lang.reflect.Proxy.newProxyInstance(
+                ObjectAccess.class.getClassLoader(), new Class<?>[]{ObjectAccess.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("open")) {
+                        @SuppressWarnings("unchecked") Map<String, String> attrs = (Map<String, String>) args[5];
+                        opened.add(attrs);
+                        return "INC-1";
+                    }
+                    Class<?> r = method.getReturnType();
+                    return r == boolean.class ? Boolean.FALSE : r == long.class ? 0L : r == int.class ? 0
+                            : r == Optional.class ? Optional.empty() : r == List.class ? List.of() : r == Map.class ? Map.of() : null;
+                });
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("objects", ObjectAccess.class, objects);
+        // the built-in Job Types validate their own grants at registration; the Job under test only uses `objects`
+        registerInert(platform, "notifications", com.gamma.notify.NotificationAccess.class);
+        registerInert(platform, "mail", com.gamma.notify.MailAccess.class);
+        registerInert(platform, "incidents", com.gamma.objects.IncidentAccess.class);
+        registerInert(platform, "schema", com.gamma.pipeline.SchemaAccess.class);
+        registerInert(platform, "consignment-status", com.gamma.consignment.ConsignmentStatusAccess.class);
+        registerInert(platform, "datasets", com.gamma.query.DatasetAccess.class);
+        registerInert(platform, "alerts", com.gamma.alert.AlertAccess.class);
+        registerInert(platform, "link-index", com.gamma.linkindex.LinkIndexAccess.class);
+        JobConfig job = JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(ToonHelper.load(space.resolve("config")
+                .resolve("jobs").resolve("fraud_expectation_evaluate_job.toon").toString()), "job")));
+
+        String priorWriteRoot = System.getProperty("assist.write.root"), priorData = System.getProperty("data.dir");
+        System.setProperty("assist.write.root", space.resolve("config").toString());
+        System.setProperty("data.dir", space.resolve("data").toString());
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
+                     root.resolve("audit").toString(), null, null, space.resolve("data").toString(), null, platform)) {
+            js.start();
+            JobRun run = runJob(js, "fraud_expectation_evaluate", Map.of());
+            assertEquals("SUCCESS", run.status(), run.toString());
+        } finally {
+            if (priorWriteRoot == null) System.clearProperty("assist.write.root"); else System.setProperty("assist.write.root", priorWriteRoot);
+            if (priorData == null) System.clearProperty("data.dir"); else System.setProperty("data.dir", priorData);
+        }
+
+        assertEquals(1, opened.size(), "exactly the seeded breach raises an Incident: " + opened);
+        assertEquals("tf_cdr_duration_in_range", opened.get(0).get("expectation"));
+        assertEquals("1", opened.get(0).get("violations"));
+        ComponentStore store = new ComponentStore(space.resolve("config").resolve("registry"));
+        for (ComponentRegistry.Component e : store.list("expectation")) {
+            Map<?, ?> last = (Map<?, ?>) e.content().get("lastResult");
+            assertEquals("tf_cdr_duration_in_range".equals(e.name()) ? "FAILED" : "PASSED", last.get("status"), e.name());
+        }
     }
 
     /** TELCO-FRAUD-DEMO-REHEARSAL-1: a viewer without {@code canRevealLinkEntities} sees {@code masked:} aliases only where a
@@ -587,6 +657,11 @@ class TelcoFraudTemplateGoldenTest {
     }
 
     /** {@code POST /spaces} with the template (every seed gate); the Space is closed again before the test drives it. */
+    private static <T> void registerInert(PlatformServiceRegistry platform, String id, Class<T> type) {
+        platform.register(id, type, type.cast(java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(),
+                new Class<?>[]{type}, (p, m, a) -> { throw new UnsupportedOperationException(id); })));
+    }
+
     private static Path createSpace(Path root) throws Exception {
         copyTree(template(), root.resolve("_templates").resolve("telco-fraud"));
         SpaceManager spaces = SpaceManager.discover(root);

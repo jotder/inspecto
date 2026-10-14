@@ -213,6 +213,7 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   expired day; it is retry-safe and never returns wrong data. Pinned by
   `SqlTemplateIncrementalTest` (prune, seed / non-matching folders kept, failure tolerated, validation) and
   `ControlApiIncrementalJobTest` (422).
+* **`expectation.evaluate`** (2026-10-14) - puts the data-quality Expectations on a clock: the same evaluation as `POST /expectations/evaluate` (`ExpectationRunner`, shared with the route): every enabled Expectation is checked against its target's at-rest data, `lastResult` is persisted, a failure opens a correlated Incident (deduped while one is open) and emits `expectation.violated`; then `expectation.evaluate.completed`. Optional param `expectation` narrows to one. Lives in the `inspecto` module (ServiceLoader, `ExpectationEvaluateJobType`), resolves the Space's config and data roots at run time, reaches Incidents through the optional `objects` grant (absent: the breach is evented, not promoted). A dry run evaluates nothing and says so. The telco-fraud template ships it as `fraud_expectation_evaluate` (01:45).
 * **`caserule.evaluate`** — schedules the auto-grouping tail of the Alert → Incident → Case chain (C5):
   evaluates a saved Case Rule, grouping matching in-window Incidents under a Case via
   `ObjectService.evaluateCaseRule` — the same step `POST /cases/rules/{name}/evaluate` drives — and emits

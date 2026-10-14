@@ -1,0 +1,6 @@
+job:
+  name: fraud_expectation_evaluate
+  type: expectation.evaluate
+  description: "Evaluates the data-quality Expectations on the three feeds each night, after the feeds have landed, so a bad row raises an ingest-quality Incident without anyone pressing Evaluate."
+  cron: "45 1 * * *"
+  enabled: true

@@ -49,7 +49,7 @@ import {
                         <div class="min-w-0 flex-auto">
                             <div class="truncate text-sm font-semibold">{{ r.name }}</div>
                             <div class="text-secondary truncate text-xs">
-                                ≥{{ r.threshold }} incidents in {{ r.windowMinutes }}m where {{ describe(r) }} → "{{
+                                ≥{{ r.threshold }} incidents{{ r.groupBy ? ' per ' + r.groupBy : '' }} in {{ r.windowMinutes }}m where {{ describe(r) }} → "{{
                                     r.title
                                 }}"
                             </div>
@@ -115,6 +115,10 @@ import {
                         <mat-form-field class="w-36" subscriptSizing="dynamic">
                             <mat-label>Window (min)</mat-label>
                             <input matInput type="number" formControlName="windowMinutes" min="0" />
+                        </mat-form-field>
+                        <mat-form-field class="w-36" subscriptSizing="dynamic">
+                            <mat-label>Group by key</mat-label>
+                            <input matInput formControlName="groupBy" placeholder="e.g. msisdn" />
                         </mat-form-field>
                         <inspecto-option-picker
                             class="flex-1"
@@ -187,6 +191,7 @@ export class CaseRulesDialog {
         title: ['', Validators.required],
         threshold: [2],
         windowMinutes: [1440],
+        groupBy: [''],
         priority: [''],
         status: [''],
         q: [''],
@@ -227,6 +232,7 @@ export class CaseRulesDialog {
             title: v.title!.trim(),
             threshold: Number(v.threshold) || 2,
             windowMinutes: Number(v.windowMinutes) || 0,
+            ...(v.groupBy?.trim() ? { groupBy: v.groupBy.trim() } : {}),
             filter: {
                 type: 'INCIDENT',
                 ...(v.priority ? { priority: v.priority } : {}),
@@ -246,6 +252,7 @@ export class CaseRulesDialog {
                     title: '',
                     threshold: 2,
                     windowMinutes: 1440,
+                    groupBy: '',
                     priority: '',
                     status: '',
                     q: '',
