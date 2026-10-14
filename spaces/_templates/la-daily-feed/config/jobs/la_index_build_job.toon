@@ -1,0 +1,16 @@
+job:
+  name: la_index_build
+  type: la.index.build
+  description: "Appends each newly landed day of the daily XDR feed to the Link Analysis Index after every committed File. The first build is a full build (allow_full), every later one is the append the server itself advises. The owner is re-decided on every run: it must still be able to view the Dataset."
+  on_signal: pipeline.commit
+  when: "$signal.pipeline == daily_xdr && $signal.status == SUCCESS"
+  dataset: daily_xdr_dataset
+  source_col: MSISDN
+  target_col: OTHER_PARTY
+  kind_col: REC_TYPE
+  time_col: START_AT
+  attr_cols: "IMSI,IMEI,DIRECTION"
+  owner: admin
+  allow_full: "true"
+  timeout_seconds: "600"
+  wait_seconds: "300"

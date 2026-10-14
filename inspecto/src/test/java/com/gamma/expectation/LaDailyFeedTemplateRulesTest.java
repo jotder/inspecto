@@ -71,4 +71,19 @@ class LaDailyFeedTemplateRulesTest {
             assertEquals("reprocess", d.onChange(), rel);
         }
     }
+
+    /** S10 live drive: a fresh Space must index itself and run its volume band on the arrival of a File, with no Job authored by hand. */
+    @Test
+    void theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit() throws Exception {
+        Path jobs = Path.of("..", "spaces", "_templates", "la-daily-feed", "config", "jobs").toAbsolutePath().normalize();
+        com.gamma.job.JobConfig index = com.gamma.job.JobConfig.load(jobs.resolve("la_index_build_job.toon").toString());
+        assertEquals("la.index.build", index.type());
+        assertEquals("pipeline.commit", index.onSignal());
+        assertEquals("daily_xdr_dataset", index.params().get("dataset"));
+        assertEquals("true", index.params().get("allow_full"), "the first build is a full one");
+        com.gamma.job.JobConfig band = com.gamma.job.JobConfig.load(jobs.resolve("la_rows_band_evaluate_job.toon").toString());
+        assertEquals("expectation.evaluate", band.type());
+        assertEquals("pipeline.commit", band.onSignal());
+        assertTrue(band.when().contains("daily_xdr"), "only this feed's commits");
+    }
 }

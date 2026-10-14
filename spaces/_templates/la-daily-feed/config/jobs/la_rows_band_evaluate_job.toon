@@ -1,0 +1,7 @@
+job:
+  name: la_rows_band_evaluate
+  type: expectation.evaluate
+  description: "Evaluates the daily row-count band after every committed File, so a half-delivered or doubled day opens an Incident without anyone pressing Evaluate."
+  on_signal: pipeline.commit
+  when: "$signal.pipeline == daily_xdr && $signal.status == SUCCESS"
+  enabled: true
