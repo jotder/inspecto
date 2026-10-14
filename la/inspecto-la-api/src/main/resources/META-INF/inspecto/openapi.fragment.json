@@ -1190,6 +1190,35 @@
         "x-optional-module" : true
       }
     },
+    "/inv/datasets/{datasetId}/files" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "List the Files recorded towards a Dataset, with each File's index state",
+        "operationId" : "getInvDatasetFiles",
+        "description" : "LA-DATA-TRUST-1 S1. Query: limit (default 100, max 1000), offset, name (case-insensitive substring). One row per File from the Consignment audit trail (status ledger joined to lineage and batches of every Pipeline whose batches wrote the Dataset's stores; the problem Files of such a Pipeline are included): {name, day (event day of its output partition, null when it wrote none), rows (0 for a File read with no rows, distinct from no File), errorRows (null = not measured), ingestedAt (the Consignment commit time, NOT arrival time), outcome (SUCCESS | PARTIAL | QUARANTINED | FAILED, or the ledger's own word such as PARKED), collector, pipeline, consignmentId, outputFiles, indexState (INDEXED | WAITING | UNKNOWN | NO_INDEX | null when the File wrote no partition file), indexVersion (the live version, when INDEXED)}, newest ingested-at first. Also {assessed, total (after the name filter), offset, limit, days [{day, files, rows}], summary {files, rows, latestIngestedAt, indexed, waiting, unknown, problem} over ALL Files, index {present, version, builtAt, inputsRecorded}, readAt, note}. Index state is matched from the live IndexManifest input files (never guessed from timestamps): UNKNOWN when the manifest recorded no list (past 5000 files or an older build) or its list shares nothing with any File. assessed:false (items empty) when no audit trail attributes the Dataset - never read it as no Files. Gated by the geoLink feature, a write root, and R3 view access to the Dataset (unknown and not-viewable are the same 404). No capability.",
+        "parameters" : [ {
+          "name" : "datasetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "{dataset, assessed, total, offset, limit, items, days, summary, index, readAt, note}."
+          },
+          "404" : {
+            "description" : "No such Dataset, or not viewable by the caller (the same answer)."
+          },
+          "422" : {
+            "description" : "A limit or offset out of range."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/index/builds" : {
       "post" : {
         "tags" : [ "inv" ],

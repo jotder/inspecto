@@ -429,7 +429,7 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
 
 ## 6. HTTP surface (la-api, geo-link)
 
-20 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **82**<!--count:la-routes--> routes (**76**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
+21 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **83**<!--count:la-routes--> routes (**77**<!--count:la-api-routes--> in la-api + **6**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |

@@ -23,4 +23,30 @@ public interface CollectorCoveragePort {
 
     /** Every recorded delivery into the stores behind {@code dataset}, or empty when none can be attributed. */
     Optional<List<Delivery>> deliveries(ApiContext api, Map<String, Object> dataset);
+
+    /**
+     * One File a Pipeline ingested towards a Dataset (LA-DATA-TRUST-1 S1), from the Consignment audit trail.
+     *
+     * @param name          the File's name as the status ledger recorded it
+     * @param day           the event day ({@code yyyy-MM-dd}) of its output partition, or null when it wrote none (a quarantined or empty File)
+     * @param rows          rows the File contributed (0 for a File that was read and held no rows - distinct from no File at all)
+     * @param errorRows     rows it lost; {@code -1} when the ledger did not say
+     * @param ingestedAt    when its Consignment finished (the commit time, NOT the arrival time), or null
+     * @param outcome       {@code SUCCESS}, {@code PARTIAL} (committed with error rows), {@code QUARANTINED}, {@code FAILED}, or the ledger's own word
+     * @param collector     the Pipeline's Collector id
+     * @param pipeline      the Pipeline that ingested it
+     * @param consignmentId its Consignment, or null
+     * @param outputFiles   the partition files it wrote, as the lineage ledger names them (path separators and any data-root prefix NOT normalised)
+     */
+    record FileEntry(String name, String day, long rows, long errorRows, String ingestedAt, String outcome,
+                     String collector, String pipeline, String consignmentId, List<String> outputFiles) {
+        public FileEntry {
+            outputFiles = outputFiles == null ? List.of() : List.copyOf(outputFiles);
+        }
+    }
+
+    /** Every File recorded towards {@code dataset}, or empty when none can be attributed. Default: not supported. */
+    default Optional<List<FileEntry>> files(ApiContext api, Map<String, Object> dataset) {
+        return Optional.empty();
+    }
 }

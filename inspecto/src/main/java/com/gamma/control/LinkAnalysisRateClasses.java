@@ -110,6 +110,7 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/graph/runs/([^/]+)"},
             {"POST", "/inv/graph/runs/([^/]+)/cancel"},
             {"GET", "/inv/index"},
+            {"GET", "/inv/datasets/([^/]+)/files"},
             {"GET", "/inv/index/builds/([^/]+)"},
             {"POST", "/inv/index/builds/([^/]+)/cancel"},
             {"GET", "/entity-lists"},
