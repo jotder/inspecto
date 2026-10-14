@@ -1,0 +1,8 @@
+name: tf_payments_amount_in_range
+targetType: pipeline
+target: payments
+column: amount
+kind: range
+min: 0
+max: 100000
+severity: MAJOR

@@ -1,0 +1,15 @@
+name: tf_long_roaming_call_escalate
+description: "A roaming voice call of over two hours opens a CRITICAL Incident for the fraud desk (roaming high-usage / IRSF indicator)"
+targetType: pipeline
+target: cdr
+priority: 10
+enabled: true
+when:
+  kind: group
+  op: AND
+  items[3]{kind,field,operator,value}:
+    condition,roaming,"=","Y"
+    condition,service,"=","VOICE"
+    condition,duration_s,">","7200"
+consequences[1]{action}:
+  create-incident

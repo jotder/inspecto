@@ -157,6 +157,30 @@ class TelcoFraudTemplateGoldenTest {
         assertEquals("30 2 * * *", evaluators.get(0).cron());
     }
 
+    /** TELCO-FRAUD-STORY-GAPS-1 (a): the story beats beyond Alerts ship - Expectations on all three feeds, Decision Rules
+     *  (stamped by the seed gate), a Case Rule and a scheduled Dataset export - so those pages are not empty. */
+    @Test
+    void theTemplateShipsExpectationsDecisionRulesACaseRuleAndAScheduledExport(@TempDir Path root) throws Exception {
+        Path config = createSpace(root).resolve("config");
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        Set<String> feeds = new TreeSet<>();
+        List<ComponentRegistry.Component> expectations = store.list("expectation");
+        assertEquals(7, expectations.size());
+        for (ComponentRegistry.Component e : expectations) feeds.add(String.valueOf(e.content().get("target")));
+        assertEquals(Set.of("cdr", "payments", "subscriber_events"), feeds);
+        List<ComponentRegistry.Component> rules = store.list("decision-rule");
+        assertEquals(2, rules.size());
+        for (ComponentRegistry.Component r : rules)
+            assertEquals("admin-1", r.content().get("createdBy"), r.name() + " is stamped by the seed gate");
+        Map<String, Object> caseRule = ToonHelper.requireSection(
+                ToonHelper.load(config.resolve("ops").resolve("fraud_critical_burst_caserule.toon").toString()), "case_rule");
+        assertEquals("fraud_critical_burst", caseRule.get("name"));
+        JobConfig export = JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(
+                ToonHelper.load(config.resolve("jobs").resolve("fraud_offender_export_job.toon").toString()), "job")));
+        assertEquals("report", export.type());
+        assertEquals("0 3 * * *", export.cron());
+    }
+
     /** TELCO-FRAUD-DEMO-REHEARSAL-1: a viewer without {@code canRevealLinkEntities} sees {@code masked:} aliases only where a
      *  column is CLASSIFIED {@code MSISDN}; the feeds said {@code CONFIDENTIAL}, which no masked Entity Type claims, so a
      *  viewer read raw subscriber numbers in the feed Datasets. Pin the classification on the three feed schemas. (The sink

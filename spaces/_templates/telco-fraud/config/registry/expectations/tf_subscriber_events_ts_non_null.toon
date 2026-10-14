@@ -1,0 +1,6 @@
+name: tf_subscriber_events_ts_non_null
+targetType: pipeline
+target: subscriber_events
+column: event_ts
+kind: non_null
+severity: MAJOR

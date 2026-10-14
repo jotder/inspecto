@@ -1,0 +1,8 @@
+name: tf_cdr_duration_in_range
+targetType: pipeline
+target: cdr
+column: duration_s
+kind: range
+min: 0
+max: 86400
+severity: MAJOR

@@ -1,0 +1,13 @@
+name: tf_reversal_route_by_typology
+description: "Payment reversals are tagged with their typology so the fraud desk routes them to the payment-reversal runbook"
+targetType: pipeline
+target: payments
+priority: 20
+enabled: true
+when:
+  kind: group
+  op: AND
+  items[1]{kind,field,operator,value}:
+    condition,txn_type,"=","REVERSAL"
+consequences[1]{action,destination}:
+  tag,fraud_reversal

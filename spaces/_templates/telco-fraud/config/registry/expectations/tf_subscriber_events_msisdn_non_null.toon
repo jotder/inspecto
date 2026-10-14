@@ -1,0 +1,6 @@
+name: tf_subscriber_events_msisdn_non_null
+targetType: pipeline
+target: subscriber_events
+column: msisdn
+kind: non_null
+severity: CRITICAL

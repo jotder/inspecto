@@ -1,0 +1,10 @@
+case_rule:
+  name: fraud_critical_burst
+  title: "Correlated critical fraud Incidents"
+  threshold: 2
+  windowMinutes: 1440
+  category: fraud
+  tags: fraud-desk
+  filter:
+    type: INCIDENT
+    priority: CRITICAL

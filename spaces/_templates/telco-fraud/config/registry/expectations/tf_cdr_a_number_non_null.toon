@@ -1,0 +1,6 @@
+name: tf_cdr_a_number_non_null
+targetType: pipeline
+target: cdr
+column: a_number
+kind: non_null
+severity: CRITICAL
