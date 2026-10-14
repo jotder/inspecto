@@ -239,6 +239,14 @@ final class ExpectationRoutes implements RouteModule {
             BaselineProfileStore baselines = baselines(api);
             long now = System.currentTimeMillis();
             var profile = BaselineEvaluator.profile(exp, api.dataRoot());
+            if (exp.baseline().trailingDays() > 0) {
+                // trailing-days mode: the baseline is the profile's own earlier days - no history to record or accept
+                var trailing = BaselineEvaluator.compareTrailing(exp.baseline(), profile);
+                detail.put("baselineSize", trailing.baselineSize());
+                detail.put("findings", trailing.findings().stream().map(BaselineEvaluator.Finding::toMap).toList());
+                return new ExpectationEvaluator.Result(trailing.violations() > 0 ? "FAILED" : "PASSED",
+                        trailing.violations(), now);
+            }
             var cmp = BaselineEvaluator.compare(exp.baseline(), profile,
                     baselines.acceptedWindow(exp.name(), exp.baseline().window()));
             String status = cmp.violations() > 0 ? "FAILED" : "PASSED";

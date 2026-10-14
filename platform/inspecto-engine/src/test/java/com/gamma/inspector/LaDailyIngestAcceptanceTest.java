@@ -131,6 +131,32 @@ class LaDailyIngestAcceptanceTest {
         assertEquals(mtime, Files.getLastModifiedTime(anyFact).toMillis(), "no fact file was rewritten");
     }
 
+    /** LA-DATA-TRUST-1 S6: a quarantined, a partial and a failed-consignment File each signal once, naming File and day. */
+    @Test
+    void quarantinedPartialAndFailedFilesEachSignalOnceNamingFileAndDay(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = cfg(dir);
+        EventLog.current().addSubscriber(sub);
+        ingest(cfg, name(1, 1), day(1, 3), 1);                                   // healthy: no problem
+        ingest(cfg, name(2, 1), "this is not json at all" + (char) 10, 2);       // refused: QUARANTINED_EMPTY in the ledger
+        // a File that landed losing rows, and a File of a consignment that failed (synthetic audits in the ledger's shapes)
+        var t = java.time.LocalDateTime.now();
+        ConsignmentIngestor.signalFileProblems(cfg, "b3", "SUCCESS", List.of(
+                new MemberAudit(1, name(3, 1), MemberStatus.SUCCESS, 90, 10, "", t, "", null),
+                new MemberAudit(2, name(4, 1), MemberStatus.SUCCESS, 50, 0, "", t, "", null)));
+        ConsignmentIngestor.signalFileProblems(cfg, "b4", "FAILED", List.of(
+                new MemberAudit(3, name(5, 1), MemberStatus.SUCCESS, 50, 0, "", t, "", null)));
+        List<String> problems = new ArrayList<>();
+        for (Event e : seen) {
+            String msg = String.valueOf(e.message());
+            if (msg.startsWith(com.gamma.signal.FileProblemSignal.TYPE + " ")) problems.add(msg);
+        }
+        assertEquals(List.of("collector.file.problem QUARANTINED 20200402", "collector.file.problem PARTIAL 20200403",
+                "collector.file.problem FAILED 20200405"), problems, "healthy Files signal nothing");
+        Event partial = seen.stream().filter(e -> String.valueOf(e.message()).contains("PARTIAL")).findFirst().orElseThrow();
+        assertEquals("xdr_20200403_part0001.jsonl", partial.payload().get("file"));
+        assertEquals(10L, ((Number) partial.payload().get("errorRows")).longValue());
+    }
+
     // ---- helpers ----
 
     private static String name(int d, int part) {

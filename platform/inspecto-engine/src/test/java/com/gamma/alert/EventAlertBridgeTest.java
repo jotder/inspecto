@@ -211,4 +211,58 @@ class EventAlertBridgeTest {
         assertEquals(1, svc.openAlerts().size(), "an acknowledged Alert is no longer OPEN");
         assertNotEquals(first, svc.openAlerts().get(0).id());
     }
+
+    // ── LA-DATA-TRUST-1 S6: collector.file.problem ─────────────────────────────────
+
+    private static Event fileProblem(String pipeline, String kind, String day, String file, long parsed, long errors) {
+        return capture(() -> com.gamma.signal.FileProblemSignal.emit(pipeline, "b1", kind, day, file, "STATUS", parsed, errors));
+    }
+
+    /** Runs {@code emit} against a scratch EventLog and returns the one Event it wrote. */
+    private static Event capture(Runnable emit) {
+        java.util.List<Event> seen = new java.util.ArrayList<>();
+        com.gamma.event.EventLog log = com.gamma.event.EventLog.current();
+        java.util.function.Consumer<Event> sub = seen::add;
+        log.addSubscriber(sub);
+        try {
+            emit.run();
+        } finally {
+            log.removeSubscriber(sub);
+        }
+        assertEquals(1, seen.size());
+        return seen.get(0);
+    }
+
+    @Test
+    void aQuarantinedFileIsOneAlertNamingTheFileAndItsDay() {
+        AlertService svc = service(store);
+        EventAlertBridge bridge = new EventAlertBridge(svc);
+        Event e = fileProblem("daily_xdr", "QUARANTINED", "2026-09-03", "XDR_20260903.csv", 0, 0);
+        bridge.onEvent(e);
+        bridge.onEvent(e);   // re-reported: one Alert per File and day
+
+        List<AlertStore.Row> alerts = store.active("daily_xdr");
+        assertEquals(1, alerts.size());
+        AlertStore.Row a = alerts.get(0);
+        assertEquals(EventAlertBridge.FILE_PROBLEM_RULE, a.attributes().get("rule"));
+        assertEquals("high", a.severity());
+        assertTrue(a.title().contains("XDR_20260903.csv") && a.title().contains("2026-09-03"), a.title());
+        assertEquals("XDR_20260903.csv", a.attributes().get("file"));
+
+        bridge.onEvent(fileProblem("daily_xdr", "QUARANTINED", "2026-09-04", "XDR_20260904.csv", 0, 0));
+        assertEquals(2, store.active("daily_xdr").size(), "another File and day is its own Alert");
+    }
+
+    @Test
+    void aPartialFileIsMediumAndAnotherSignalTypeIsIgnored() {
+        AlertService svc = service(store);
+        EventAlertBridge bridge = new EventAlertBridge(svc);
+        bridge.onEvent(fileProblem("daily_xdr", "PARTIAL", "2026-09-03", "XDR_20260903.csv", 90, 10));
+        assertEquals("medium", store.active("daily_xdr").get(0).severity());
+        assertEquals("10", store.active("daily_xdr").get(0).attributes().get("errorRows"));
+
+        bridge.onEvent(capture(() -> com.gamma.signal.DeliveryAnomalySignal.emit("daily_xdr", "b", "REDELIVERED",
+                "2026-09-05", "XDR_20260905.csv", null, "x")));
+        assertEquals(1, store.active("daily_xdr").size(), "a different Signal type raises nothing here");
+    }
 }

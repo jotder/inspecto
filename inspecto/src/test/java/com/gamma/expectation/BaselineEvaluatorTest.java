@@ -232,4 +232,72 @@ class BaselineEvaluatorTest {
                 () -> ExpectationEvaluator.countSql(e, data));
         assertTrue(x.getMessage().contains("BaselineEvaluator"), x.getMessage());
     }
+
+    // ── trailing-days mode (LA-DATA-TRUST-1 S7) ────────────────────────────────────
+
+    private static Expectation.Baseline band() {
+        // below 50% (maxDecrease 50) or above 200% (maxIncrease 100) of the trailing 7-day median
+        return new Expectation.Baseline(7, List.of("row_count"), List.of(), 100.0, 50.0, "percent",
+                List.of("day"), false, 7, 3);
+    }
+
+    private static Map<String, Map<String, Double>> days(Object... dayRows) {
+        Map<String, Map<String, Double>> m = new java.util.TreeMap<>();
+        for (int i = 0; i < dayRows.length; i += 2)
+            m.put("[\"" + dayRows[i] + "\"]", Map.of("row_count", ((Number) dayRows[i + 1]).doubleValue()));
+        return m;
+    }
+
+    @Test
+    void aHalfDeliveredDayIsCaughtAndANormalDayIsNot() {
+        var cmp = BaselineEvaluator.compareTrailing(band(), days(
+                "2026-09-01", 1000, "2026-09-02", 1100, "2026-09-03", 900, "2026-09-04", 1000,
+                "2026-09-05", 400, "2026-09-06", 1050));
+        assertEquals(1, cmp.violations());
+        var f = cmp.findings().get(0);
+        assertEquals("[\"2026-09-05\"]", f.group());
+        assertEquals("below", f.direction());
+        assertEquals(1000, f.baseline());
+        assertEquals(400, f.current());
+    }
+
+    @Test
+    void aDoubledDayIsAboveTheBand() {
+        var cmp = BaselineEvaluator.compareTrailing(band(), days(
+                "2026-09-01", 1000, "2026-09-02", 1000, "2026-09-03", 1000, "2026-09-04", 2100));
+        assertEquals("above", cmp.findings().get(0).direction());
+        var edge = BaselineEvaluator.compareTrailing(band(), days(
+                "2026-09-01", 1000, "2026-09-02", 1000, "2026-09-03", 1000, "2026-09-04", 2000, "2026-09-05", 500));
+        assertEquals(0, edge.violations(), "exactly 200% and exactly 50% are in band");
+    }
+
+    @Test
+    void aDayWithFewerThanThreePriorDaysIsNotJudged() {
+        var cmp = BaselineEvaluator.compareTrailing(band(), days("2026-09-01", 1000, "2026-09-02", 10, "2026-09-03", 10));
+        assertEquals(0, cmp.violations(), "days 2 and 3 have only 1 and 2 prior days");
+    }
+
+    @Test
+    void theWindowIsTheTrailingDaysOnlyNotEveryEarlierDay() {
+        // 8 old high days, then 7 low days: with a 7-day window the last low day is judged against low days
+        Object[] d = new Object[30];
+        for (int i = 0; i < 15; i++) {
+            d[2 * i] = String.format("2026-09-%02d", i + 1);
+            d[2 * i + 1] = i < 8 ? 1000 : 100;
+        }
+        var cmp = BaselineEvaluator.compareTrailing(band(), days(d));
+        assertTrue(cmp.findings().stream().noneMatch(f -> f.group().equals("[\"2026-09-15\"]")));
+    }
+
+    @Test
+    void trailingModeValidationAndRoundTrip() {
+        Expectation e = fromBody("groupBy=[day];trailingDays=7;maxDecrease=50");
+        assertEquals(7, e.baseline().trailingDays());
+        assertEquals(3, e.baseline().minPriorDays());
+        assertEquals(e, Expectation.fromMap(e.toMap()));
+        for (String bad : List.of("trailingDays=7", "groupBy=[a,b];trailingDays=7", "groupBy=[day];trailingDays=7;minPriorDays=9",
+                "groupBy=[day];trailingDays=7;requireExistingGroups=true", "groupBy=[day];trailingDays=101",
+                "groupBy=[day];trailingDays=7;measures=[mean];columns=[x]"))
+            assertThrows(IllegalArgumentException.class, () -> fromBody(bad), bad);
+    }
 }

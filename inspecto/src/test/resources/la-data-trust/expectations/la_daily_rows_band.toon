@@ -1,0 +1,12 @@
+name: la_daily_rows_band
+description: "A day whose row count is below 50% or above 200% of the median of the 7 days before it is odd (a half-delivered or doubled File). A day with fewer than 3 prior days is not judged."
+targetType: pipeline
+target: daily_xdr/database
+kind: baseline
+groupBy[1]: EVENT_DATE
+trailingDays: 7
+minPriorDays: 3
+maxDecrease: 50
+maxIncrease: 100
+limitUnit: percent
+severity: MAJOR
