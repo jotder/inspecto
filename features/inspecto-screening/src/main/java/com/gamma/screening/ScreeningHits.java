@@ -136,6 +136,15 @@ public final class ScreeningHits {
         return m;
     }
 
+    /** Who moved the hit to {@code escalated} (the latest such step), or null. */
+    static String escalatedBy(Map<String, Object> rec) {
+        String by = null;
+        if (rec.get("history") instanceof List<?> h)
+            for (Object o : h)
+                if (o instanceof Map<?, ?> m && ESCALATED.equals(m.get("state"))) by = m.get("by") == null ? null : String.valueOf(m.get("by"));
+        return by;
+    }
+
     static boolean invalid(Map<String, Object> rec) {
         return INVALID.equals(rec.get("integrity"));
     }

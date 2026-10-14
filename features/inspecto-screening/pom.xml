@@ -36,6 +36,14 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- ObjectService / OpsEngine: a confirmed hit opens an Incident and a Case (SCREENING-1-D2); the manifest's
+             requires.modules: ops carries the run-time edge, as inspecto-regulatory-reporting does. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-ops</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- The Entity List fact log, registry fold and mask tokens. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>

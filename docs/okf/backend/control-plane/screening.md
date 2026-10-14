@@ -96,6 +96,12 @@ is latched into an explained notice, not a toast.
 **Check a name** (header button, `check-name.dialog.ts`, shown to every viewer: `POST /screening/check` is a read-shaped exemption with no capability gate): one name per line (1..1000, 512 chars each), Entity List checkboxes from `GET /entity-lists` (active lists only; 1..20), optional threshold (0.5..1, blank = 0.85) and most-matches (1..20, blank = 5), results as a read-only table (name, Entity List, matched entry, method, Match Score) under a persistent *nothing is raised — this check does not create Hits* notice; server 422 text is shown verbatim, and an absent `inspecto-entity-list` module explains itself in the list area. Raising a hit from a check stays open (`SCREENING-1` item 5). Specs: `screening.component.spec.ts` (axe included) and the
 `navigation.service.spec.ts` case for the feature flag; proved end to end in the preview over a seeded Space.
 
+## Four-eyes and the Case (SCREENING-1-D1 / D2, 2026-10-14)
+`decide` refuses `confirm` from the person who moved the hit to `escalated` (409 `four-eyes`; `ScreeningHits#escalatedBy` reads the history; an `open` hit has no escalator). A confirm then opens, through `ScreeningCases` and the ops `ObjectService`
+(`OpsEngine.of(api)`: 503 when absent, before anything changes), an INCIDENT carrying the subject key and the run's Dataset as its entity identity and a CASE that CONTAINS it, owner = the confirmer; both descriptions cite the hit id, list, method and score and
+never the (possibly masked) name. `caseId` / `incidentId` are stamped on the hit before it is saved; a save failure discards both objects. The module's manifest `requires` `ops`
+(the pom depends on `inspecto-ops`, as regulatory reporting does), not case-management: the Case is a plain `ObjectService` object. Opening them is the decider's act under `canWorkIncidents` (the confirm), not a second capability check.
+
 ## Decisions (SCR-D1 … SCR-D14, lane 2026-10-09, operator away)
 Matching in Java, not DuckDB SQL (folding, token-set scoring and golden tests are plain there; DuckDB only reads rows) ·
 threshold per request / per Job, no Space settings file (a new fixed config name needs reserved-path and import-inventory
@@ -118,7 +124,7 @@ The Check a name result has one row per name: a name with no match shows *Checke
   letter with no Latin look-alike (Виктор, Сергей) is transliterated by sound (viktor, sergei) and so reaches its Latin
   entry, while a look-alike-only or Latin-mixed token (`Pаvel`) keeps the look-alike fold.
 - A Run lists every hit document to dedupe (no index); fine for thousands of hits, not for millions.
-- No four-eyes on `confirmed`; `check` cannot raise hits; no Space-level threshold default. Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO with beats 6 and 7 shown as roadmap.
+- `check` cannot raise hits; no Space-level threshold default. Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO beats 6 and 7 built the same day.
 
 ## Demo script and rehearsal (2026-10-14, Enterprise Demo Auth bundle, Space `screening-demo` from the `aml` template)
 Boot: `node tools/seed-screening-demo.mjs --spaces inspecto-demo/spaces` (roster), serve the bundle, sign in as Demo Admin, run it
@@ -134,8 +140,8 @@ Then enable and trigger the Job `aml_screening` (the template ships it disabled)
 | 3 | `screening.run` over the party Dataset | PASS | 134 screened, 7 matches, 7 hits; re-run 0 new (dedupe); cron `0 5 * * *` shown with next fire |
 | 4 | Hits signed; a tampered file is refused | PASS | edited a hit file: GET `integrity: invalid`, decide 409 "a record no server wrote" |
 | 5 | Review pane: dismiss with a reason (UI), escalate then confirm by a second person (API) | PASS | history carries both deciders; a final state refuses a move (409); a stale version 409 |
-| 6 | Four-eyes on `confirmed` | NOT BUILT | one `canWorkIncidents` holder can confirm a hit alone (open operator call, `SCREENING-1` 1) |
-| 7 | Hits to Incident / Case | NOT BUILT | no link exists (`SCREENING-1` 7) |
+| 6 | Four-eyes on `confirmed` | BUILT 2026-10-14 (`ControlApiScreeningTest`) | the escalator confirming their own escalation is 409 `four-eyes`; a second person confirms; an `open` hit may be confirmed by one |
+| 7 | Hits to Incident / Case | BUILT 2026-10-14 | a confirm opens an Incident + a Case that CONTAINS it; `caseId` / `incidentId` on the hit and in the pane |
 | 8 | Audit trail | PASS | `screening.run.hits` and `screening.hit.decided` rows in `/audit/search?type=AUDIT`; `/audit/verify` chain ok |
 | 9 | Masking | PASS with a gap | PII-classified name and id are stored as `masked:` tokens and matching still works; the masked PEP list shows its entry masked to everyone; no persona can unmask (`SCREENING-1` 8) |
 | 10 | Non-privileged persona (business) | PASS | sees hits (masked), no decision buttons in the UI, decide 403 `canWorkIncidents` |

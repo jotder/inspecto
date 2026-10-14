@@ -12543,7 +12543,7 @@
             "description" : "Malformed body, or an unknown Entity List."
           },
           "503" : {
-            "description" : "No write root."
+            "description" : "No write root, or (a confirm) the ops engine that opens the Case is absent."
           }
         },
         "x-optional-module" : true
@@ -12612,7 +12612,7 @@
         "tags" : [ "screening" ],
         "summary" : "Decide a Screening Hit (confirm, dismiss or escalate)",
         "operationId" : "postScreeningHitDecide",
-        "description" : "SCREENING-1. Gated on canWorkIncidents. open -> confirmed|dismissed|escalated; escalated -> confirmed|dismissed; confirmed and dismissed are final. The body names the hit's current version (optimistic concurrency) and a reason; the transition is appended to the hit's history and audited (never the screened name).",
+        "description" : "SCREENING-1. Gated on canWorkIncidents. open -> confirmed|dismissed|escalated; escalated -> confirmed|dismissed; confirmed and dismissed are final. The body names the hit's current version (optimistic concurrency) and a reason; the transition is appended to the hit's history and audited (never the screened name). Four-eyes: the person who escalated a hit cannot confirm it (409). A confirm opens an Incident for the subject and a Case that contains it (the Case module is not required: the ops module is) and stamps caseId and incidentId on the hit; if they cannot be opened the hit stays as it was (503 when the ops engine is absent).",
         "parameters" : [ {
           "name" : "hitId",
           "in" : "path",
@@ -12644,7 +12644,7 @@
             "description" : "No such hit."
           },
           "409" : {
-            "description" : "Stale version, a final state, a transition not allowed, or a record that failed its integrity check."
+            "description" : "Stale version, a final state, a transition not allowed, a record that failed its integrity check, or the escalator confirming their own escalation (four-eyes)."
           },
           "422" : {
             "description" : "Malformed body."
