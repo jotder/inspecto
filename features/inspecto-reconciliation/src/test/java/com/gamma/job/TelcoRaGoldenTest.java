@@ -360,19 +360,17 @@ class TelcoRaGoldenTest {
             assertEquals(Map.of("leakage_found", 161.16, "leakage_items", 17.0, "data_quality_items", 17.0), kpiValues,
                     "the KPI definitions read the pinned leakage / data-quality Datasets");
 
-            // ── Alert Rules: one Alert per control (by CONTROL), never per entity (G-42) ──
+            // ── Alert Rules: ONE Alert per rule counting its firing controls (by CONTROL), never per entity (G-42; ALERT-PER-RULE-1) ──
             List<com.gamma.alert.Alert> alerts = svc.alertService().orElseThrow().evaluateRules();
-            Map<String, Double> perControl = new java.util.TreeMap<>();
+            Map<String, Double> perRule = new java.util.TreeMap<>();
             for (com.gamma.alert.Alert a : alerts) {
-                var m = java.util.regex.Pattern.compile("CONTROL=(\\w+)").matcher(a.message());
-                assertTrue(m.find(), a.message());
-                assertNull(perControl.put(a.rule() + "|" + a.severity() + "|" + m.group(1), a.value()), "one Alert per control: " + alerts);
+                assertTrue(a.message().contains("3 keys (by CONTROL) breach"), a.message());
+                assertFalse(a.message().contains("ra_rerating") || a.message().contains("ra_settlement"),
+                        "no control is named in the Alert: " + a.message());
+                assertNull(perRule.put(a.rule() + "|" + a.severity(), a.value()), "one Alert per rule: " + alerts);
             }
-            assertEquals(Map.of(
-                    "ra_leakage_found|CRITICAL|ra_rerating", 5.0, "ra_leakage_found|CRITICAL|ra_rollforward", 5.0,
-                    "ra_leakage_found|CRITICAL|ra_settlement", 7.0,
-                    "ra_data_quality|WARNING|ra_rerating", 13.0, "ra_data_quality|WARNING|ra_rollforward", 1.0,
-                    "ra_data_quality|WARNING|ra_settlement", 3.0), perControl, "exactly one Alert per firing control and rule");
+            assertEquals(Map.of("ra_leakage_found|CRITICAL", 3.0, "ra_data_quality|WARNING", 3.0), perRule,
+                    "exactly one Alert per rule, counting the three firing controls");
 
             // ── Expectations: the shipped two pass the clean corpus; a probe that would otherwise fail proves they can ──
             for (String name : List.of("ra_switch_xdr_id_non_null", "ra_rated_charge_non_negative")) {
