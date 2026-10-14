@@ -1,4 +1,4 @@
-import { Component, Input, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -68,6 +68,12 @@ class StubGraphView {
     @Input() textHint = '';
     @Input() layout: unknown;
     @Input() plugins: unknown;
+    @Input() interaction: unknown;
+    @Input() selection: unknown;
+    @Output() nodeClick = new EventEmitter<string>();
+    @Output() edgeClick = new EventEmitter<string>();
+    @Output() nodeDblClick = new EventEmitter<string>();
+    @Output() selectionChange = new EventEmitter<string[]>();
 }
 
 // The Toolbox dock remembers an explicit open/close in sessionStorage; no test may inherit another's.
@@ -1568,7 +1574,7 @@ describe('LinkAnalysisComponent', () => {
         it('is a labelled nav in the page header, so the canvas starts right under the title row', async () => {
             const { el, rail } = await ready();
             expect(rail.getAttribute('aria-label')).toBe('Link Analysis tools');
-            expect(rail.closest('inspecto-page-header header')).toBeTruthy();
+            expect(rail.closest('header[data-testid="la-header"]')).toBeTruthy(); // the header IS the toolbar
             const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
             expect(rail.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             expect(rail.classList).toContain('flex-row');
@@ -1991,7 +1997,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         const el = fixture.nativeElement as HTMLElement;
         const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
         expect(status).toBeTruthy();
-        expect(status.closest('inspecto-page-header header')).toBeNull();
+        expect(status.closest('header[data-testid="la-header"]')).toBeNull();
         expect(status.textContent).toContain('nodes');
         expect(status.querySelector('button[aria-label="Change the query"]')).toBeTruthy();
         expect(el.querySelectorAll('[aria-label="Active query"]').length).toBe(1); // no second, separate panel
@@ -2247,5 +2253,157 @@ describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a,
         expect(document.activeElement).toBe(elsewhere);
         elsewhere.remove();
         fixture.nativeElement.remove();
+    });
+});
+
+describe('LinkAnalysisComponent - header is the toolbar, the footer carries the title (operator 2026-10-15)', () => {
+    it('moves the title, the explain button and the page info to the footer status bar; the page keeps exactly one h1', async () => {
+        const { fixture } = create();
+        fixture.detectChanges(); // the landing state: no graph yet
+        const el = fixture.nativeElement as HTMLElement;
+        const header = el.querySelector('header[data-testid="la-header"]') as HTMLElement;
+        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
+        expect(el.querySelector('inspecto-page-header')).toBeNull();
+        expect(header.querySelector('h1')).toBeNull(); // nothing of the title is left up there
+        expect(header.querySelector('nav[data-testid="la-tool-rail"]')).toBeTruthy(); // only the toolbar
+        expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
+        expect(status.querySelector('inspecto-ai-explain')).toBeTruthy();
+        expect(status.textContent).toContain('Project a Dataset'); // the page info shows until a graph is drawn
+        expect(el.querySelectorAll('h1')).toHaveLength(1);
+        expect(header.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('keeps the title in the footer after a query, next to the counts', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const status = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status"]') as HTMLElement;
+        expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
+        expect(status.textContent).toContain('5 nodes');
+        expect(status.textContent).not.toContain('Project a Dataset');
+    });
+});
+
+describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', () => {
+    const drawn = async (opts: Parameters<typeof create>[0] = {}) => {
+        const made = create(opts);
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        made.fixture.detectChanges();
+        const el = made.fixture.nativeElement as HTMLElement;
+        const stub = made.fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+        return { ...made, c: made.fixture.componentInstance, el, stub };
+    };
+    const key = (el: HTMLElement, init: KeyboardEventInit) =>
+        (el.querySelector('[data-testid="la-graph-region"]') as HTMLElement).dispatchEvent(
+            new KeyboardEvent('keydown', { bubbles: true, ...init }),
+        );
+
+    it('hands the host the pointer model: no pan by drag, a drag draws a box, double click, re-fit on data change', async () => {
+        const { stub } = await drawn();
+        expect(stub.interaction).toEqual({ panByDrag: false, boxSelect: true, doubleClick: true, fitOnDataChange: true });
+    });
+
+    it('a box selection is highlighted on the canvas, counted in the toolbar and the footer, and ignores nodes that are not drawn', async () => {
+        const { fixture, c, el, stub } = await drawn();
+        expect(el.querySelector('[data-testid="la-selection-bar"]')).toBeNull();
+        c.onSelectionChange(['a', 'b', 'not-drawn']);
+        fixture.detectChanges();
+        expect(c.selectedOnCanvas()).toEqual(['a', 'b']);
+        expect(stub.selection).toEqual(['a', 'b']);
+        expect(el.querySelector('[data-testid="la-selection-count"]')?.textContent).toContain('2 selected');
+        expect(el.querySelector('[data-testid="la-status-selected"]')?.textContent).toContain('2 selected');
+        expect(el.querySelector('[data-testid="la-selection-announcement"]')?.textContent).toContain('3 nodes selected');
+    });
+
+    it('every selection action is a named button; Exclude appears only inside an Investigation', async () => {
+        const { fixture, c, el } = await drawn();
+        c.onSelectionChange(['a', 'b']);
+        fixture.detectChanges();
+        const bar = el.querySelector('[data-testid="la-selection-bar"]') as HTMLElement;
+        const names = Array.from(bar.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'));
+        expect(names).toEqual([
+            'Expand from the 2 selected nodes',
+            'Hide the 2 selected nodes',
+            'Attach the 2 selected nodes to a Case',
+            'Clear the selection',
+        ]);
+        expect(bar.querySelector('[aria-label^="Exclude"]')).toBeNull();
+    });
+
+    it('Escape clears the selection and Ctrl+A selects every drawn node (the keyboard path to a box select)', async () => {
+        const { fixture, c, el } = await drawn();
+        key(el, { key: 'a', ctrlKey: true });
+        fixture.detectChanges();
+        expect(c.selectedOnCanvas()).toEqual(['a', 'b', 'c', 'd', 'e']);
+        key(el, { key: 'Escape' });
+        fixture.detectChanges();
+        expect(c.selectedOnCanvas()).toEqual([]);
+        expect(el.querySelector('[data-testid="la-selection-bar"]')).toBeNull();
+        expect(el.querySelector('[data-testid="la-selection-announcement"]')?.textContent).toContain('Selection cleared');
+    });
+
+    it('a selection a hide takes off the canvas is dropped with it', async () => {
+        const { fixture, c } = await drawn();
+        c.onSelectionChange(['a', 'b', 'c']);
+        c.hiddenNodeIds.set(['b']);
+        fixture.detectChanges();
+        expect(c.selectedOnCanvas()).toEqual(['a', 'c']);
+    });
+
+    it('Hide selected (exploration) takes the nodes off the canvas, clears the selection, and is undoable', async () => {
+        const { fixture, c } = await drawn();
+        c.onSelectionChange(['a', 'b']);
+        await c.hideSelected();
+        fixture.detectChanges();
+        expect(c.hiddenNodeIds()).toEqual(['a', 'b']);
+        expect(c.selectedOnCanvas()).toEqual([]);
+        c.undoPresentation();
+        expect(c.hiddenNodeIds()).toEqual([]);
+    });
+
+    it('Expand from the selected nodes fetches one hop for each node not yet expanded, once', async () => {
+        const expand = vi.fn(async () => ({
+            nodes: [{ id: 'x', data: { label: 'X', kind: 'entity' } }],
+            edges: [{ id: 'a->x', source: 'a', target: 'x', data: { kind: 'link' } }],
+        }));
+        const { c } = await drawn({ expand });
+        c.onSelectionChange(['a', 'b']);
+        await c.expandFromSelected();
+        expect(expand).toHaveBeenCalledTimes(2);
+        expect(c.expandedNodeIds()).toEqual(['a', 'b']);
+        await c.expandFromSelected(); // already expanded: nothing more is fetched
+        expect(expand).toHaveBeenCalledTimes(2);
+    });
+
+    it('double click toggles: expand the neighbours, then fold the branch it brought in, then unfold it', async () => {
+        const expand = vi.fn(async () => ({
+            nodes: [{ id: 'x', data: { label: 'X', kind: 'entity' } }],
+            edges: [{ id: 'a->x', source: 'a', target: 'x', data: { kind: 'link' } }],
+        }));
+        const { c } = await drawn({ expand });
+        await c.onNodeDblClick('a');
+        expect(expand).toHaveBeenCalledTimes(1);
+        expect(c.expandedNodeIds()).toContain('a');
+        expect(c.collapsedRoots()).not.toContain('a');
+
+        await c.onNodeDblClick('a'); // expanded: fold the branch
+        expect(expand).toHaveBeenCalledTimes(1); // no second fetch
+        expect(c.collapsedRoots()).toContain('a');
+
+        await c.onNodeDblClick('a'); // folded: unfold it
+        expect(c.collapsedRoots()).not.toContain('a');
+        expect(expand).toHaveBeenCalledTimes(1);
+    });
+
+    it('double click on a node with no branch to fold says so instead of doing nothing silently', async () => {
+        const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
+        const { c } = await drawn({ expand });
+        await c.onNodeDblClick('e'); // e has no outgoing link: expand first
+        expect(c.expandedNodeIds()).toContain('e');
+        await c.onNodeDblClick('e'); // expanded and nothing downstream
+        expect(c.collapsedRoots()).not.toContain('e');
+        expect(c.drawAnnouncement()).toContain('no branch to fold');
     });
 });
