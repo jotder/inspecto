@@ -1539,10 +1539,13 @@ describe('LinkAnalysisComponent', () => {
         it('has a table icon that shows and hides the data table below the canvas completely', async () => {
             const { fixture, el, rail } = await ready();
             expect(el.querySelector('#bottom-panel-body')).toBeNull();
-            const toggle = rail.querySelector('button[aria-controls="bottom-panel-body"]') as HTMLButtonElement;
+            const toggle = rail.querySelector('button[aria-label="Show the rows"]') as HTMLButtonElement;
+            // aria-controls must name an element that exists (axe aria-valid-attr-value): only while it is open
+            expect(toggle.hasAttribute('aria-controls')).toBe(false);
             toggle.click();
             fixture.detectChanges();
             expect(el.querySelector('#bottom-panel-body')).toBeTruthy();
+            expect(toggle.getAttribute('aria-controls')).toBe('bottom-panel-body');
             toggle.click();
             fixture.detectChanges();
             expect(el.querySelector('#bottom-panel-body')).toBeNull();
