@@ -10,7 +10,7 @@ import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
 import { CheckNameDialog } from './check-name.dialog';
-import { allowedDecisions, hitTone, ScreeningComponent, scorePercent } from './screening.component';
+import { allowedDecisions, hitTone, ScreeningComponent, scorePercent, subjectLabel } from './screening.component';
 
 const HIT: ScreeningHit = {
     id: 'sh-20261009120000-abcdef',
@@ -140,6 +140,13 @@ describe('ScreeningComponent', () => {
         expect(hitTone('open')).toBe('info');
         expect(scorePercent(0.85)).toBe('85 %');
         expect(scorePercent(undefined)).toBe('');
+    });
+
+    it('names a hit by its subject key when the name and identifier were stored masked', () => {
+        expect(subjectLabel(HIT)).toBe('Putin, Vladimir');
+        expect(subjectLabel({ ...HIT, subjectName: 'masked:aa', subjectIdentifier: 'NID-1' })).toBe('NID-1');
+        expect(subjectLabel({ ...HIT, subjectName: 'masked:aa', subjectIdentifier: 'masked:bb' })).toBe('c1');
+        expect(subjectLabel({ ...HIT, subjectName: null, subjectIdentifier: null })).toBe('c1');
     });
 
     it('opens the read-only Check a name dialog from the header, for any lens', async () => {

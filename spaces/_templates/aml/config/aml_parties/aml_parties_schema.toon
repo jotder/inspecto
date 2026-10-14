@@ -4,8 +4,8 @@ raw:
   fields[5]{name,selector,type,description,unit,classification}:
     snapshot_date,"0",DATE,"Party-register snapshot day","","INTERNAL"
     party_id,"1",VARCHAR,"Customer or counterparty identifier","","CONFIDENTIAL"
-    full_name,"2",VARCHAR,"Registered name","","CONFIDENTIAL"
-    national_id,"3",VARCHAR,"National or registration identifier","","CONFIDENTIAL"
+    full_name,"2",VARCHAR,"Registered name","","PII"
+    national_id,"3",VARCHAR,"National or registration identifier","","PII"
     country,"4",VARCHAR,"Country of residence or registration","","INTERNAL"
 mapping:
   canonicalName: aml_parties
