@@ -65,6 +65,14 @@ public final class EngineDatasetProvider implements DatasetProvider {
     }
 
     @Override
+    public java.util.OptionalLong dataAsOf(Map<String, Object> dataset, String datasetId, Path dataRoot, Path writeRoot) {
+        // The same key and probe as GET /datasets/{id}/freshness (DatasetRoutes.EVENT_DATE_KEY): one reading, two surfaces.
+        Object col = dataset.get("eventDate");
+        if (!(col instanceof String c) || c.isBlank()) return java.util.OptionalLong.empty();
+        return new com.gamma.query.DatasetMeasureProbe(() -> writeRoot, () -> dataRoot).dataAsOf(datasetId, c.trim());
+    }
+
+    @Override
     public InputFingerprint inputFingerprint(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
         return inputFingerprint(dataset, dataRoot, writeRoot, FingerprintBudget.forListing());
     }

@@ -94,6 +94,34 @@ public final class InvestigationCoverageRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "coverage needs a bounded window — pass 'from' and 'to', or set a window "
                     + "with both on the Investigation");
 
+        Gaps g = gaps(api, ex, inv, window);
+        String zone = g.zone();
+        String dataset = inv.dataset();
+        List<LocalDate> expected = g.expected();
+        List<String> missing = g.missing();
+        List<Map<String, Object>> perDay = g.perDay();
+        emit(ex, id, dataset, expected.size(), missing.size());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("dataset", dataset);
+        out.put("window", window);
+        out.put("zone", zone);
+        out.put("expectedDays", expected.size());
+        out.put("coveredDays", expected.size() - missing.size());
+        out.put("missingDays", missing);
+        out.put("complete", missing.isEmpty());
+        out.put("perDay", perDay);
+        out.put("readAt", Instant.now().toString());
+        out.put("collectors", collectors(api, inv, expected));
+        return out;
+    }
+
+    /** The expected local days of a bounded window and which of them have no rows: the one reading behind the coverage route and the Dossier footer. */
+    record Gaps(String zone, List<LocalDate> expected, List<String> missing, List<Map<String, Object>> perDay) {}
+
+    /** Requires {@code inv.header().timeCol} and a window with both bounds (the callers check); throws 422 on a cap or a failed read. */
+    static Gaps gaps(ApiContext api, HttpExchange ex, InvestigationRoutes.Inv inv, Map<String, Object> window) throws IOException {
+        Map<String, Object> h = inv.header();
         String zone = InvestigationTime.localZone(window);
         ZoneId zid = ZoneId.of(zone);
         Instant from = Instant.parse(String.valueOf(window.get("from")));
@@ -140,20 +168,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
             m.put("rows", n);
             perDay.add(m);
         }
-        emit(ex, id, dataset, expected.size(), missing.size());
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("id", id);
-        out.put("dataset", dataset);
-        out.put("window", window);
-        out.put("zone", zone);
-        out.put("expectedDays", expected.size());
-        out.put("coveredDays", expected.size() - missing.size());
-        out.put("missingDays", missing);
-        out.put("complete", missing.isEmpty());
-        out.put("perDay", perDay);
-        out.put("readAt", Instant.now().toString());
-        out.put("collectors", collectors(api, inv, expected));
-        return out;
+        return new Gaps(zone, expected, missing, perDay);
     }
 
     /**

@@ -281,31 +281,38 @@ public final class IndexRoutes implements RouteModule {
 
     private Object list(ApiContext api, HttpExchange ex) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link index");
-        Path root = indexRoot(writeRoot);
         List<Object> items = new ArrayList<>();
         Supplier<FingerprintBudget> override = requestBudgetOverride;
         FingerprintBudget budget = override == null ? FingerprintBudget.forRequest() : override.get();   // ONE budget for every Dataset listed
         for (DatasetProvider.Entry c : DatasetProviders.require().datasets(writeRoot)) {
             if (!ComponentAccess.canView(ex, c.content())) continue;           // R3: a Dataset the caller may not view has no index, as far as they can tell
-            List<String> hashes;
-            try {
-                hashes = IndexStore.mappingHashes(root, c.name());
-            } catch (IllegalArgumentException cannotNameADirectory) {
-                continue;                                                      // such a Dataset can have no index
-            }
-            if (hashes.isEmpty()) continue;
-            String currentSqlHash = currentRelationHash(api, c, writeRoot);
-            InputFingerprint input = currentInput(api, writeRoot, c.content(), budget);
-            for (String hash : hashes) {
-                Map<String, Object> item = item(root, c.name(), hash, currentSqlHash, input);
-                if (item != null) items.add(item);
-            }
+            items.addAll(indexesOf(api, writeRoot, c, budget));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("enabled", LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex().enabledInForce());
         out.put("indexes", items);
         out.put("total", items.size());
         return out;
+    }
+
+    /** The published index summaries of one viewable Dataset, one per mapping: the reading behind {@code GET /inv/index} and the Dossier footer. */
+    static List<Map<String, Object>> indexesOf(ApiContext api, Path writeRoot, DatasetProvider.Entry c, FingerprintBudget budget) {
+        Path root = indexRoot(writeRoot);
+        List<String> hashes;
+        try {
+            hashes = IndexStore.mappingHashes(root, c.name());
+        } catch (IllegalArgumentException cannotNameADirectory) {
+            return List.of();                                                  // such a Dataset can have no index
+        }
+        if (hashes.isEmpty()) return List.of();
+        String currentSqlHash = currentRelationHash(api, c, writeRoot);
+        InputFingerprint input = currentInput(api, writeRoot, c.content(), budget);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (String hash : hashes) {
+            Map<String, Object> item = item(root, c.name(), hash, currentSqlHash, input);
+            if (item != null) items.add(item);
+        }
+        return items;
     }
 
     /** The hash of the Dataset's relation SQL now, or null when it cannot be resolved. */

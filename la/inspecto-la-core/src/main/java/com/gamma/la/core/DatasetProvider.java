@@ -85,6 +85,15 @@ public interface DatasetProvider {
     List<Path> readRoots(Map<String, Object> dataset, Path dataRoot);
 
     /**
+     * The instant the Dataset's data is covered THROUGH (LA-DATA-TRUST-1 S9: the Dossier footer; the same reading as
+     * {@code GET /datasets/{id}/freshness}), in epoch milliseconds, or empty when the provider cannot say (no event-date column named,
+     * not a date/time, empty Dataset - and the default, so a test double keeps compiling). Never "now".
+     */
+    default java.util.OptionalLong dataAsOf(Map<String, Object> dataset, String datasetId, Path dataRoot, Path writeRoot) {
+        return java.util.OptionalLong.empty();
+    }
+
+    /**
      * The {@link InputFingerprint} of the INPUT FILES the Dataset's relation reads now (after superseded-file
      * subtraction), or {@code null} when this provider cannot say ('unknown' - the default, so an existing implementer or
      * test double keeps compiling and Link Analysis claims no currency it cannot know). An implementation returns
