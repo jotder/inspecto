@@ -10,6 +10,7 @@ import {
     GraphDisplayOptions,
     GraphViewComponent,
     NODE_DBLCLICK_DELAY_MS,
+    SELECTED_STATE,
     buildBehaviors,
     buildPluginList,
     demotePositiveTabindex,
@@ -373,6 +374,8 @@ describe('opt-in pointer model (Link Analysis, 2026-10-15)', () => {
         const brush = b.find((x) => x['type'] === 'brush-select') as Record<string, unknown>;
         expect(brush['trigger']).toEqual(['drag']); // a plain drag, no shift
         expect(brush['enableElements']).toEqual(['node']);
+        expect(brush['state']).toBe(SELECTED_STATE); // drag-element moves every node in this state together
+        expect(SELECTED_STATE).toBe('selected'); // drag-element's default group state
         const enable = brush['enable'] as (e: { targetType?: string }) => boolean;
         expect(enable({ targetType: 'canvas' })).toBe(true); // starts on the empty canvas
         expect(enable({ targetType: 'node' })).toBe(false); // never on a node: that drags the node

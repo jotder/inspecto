@@ -2336,6 +2336,10 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
             'Clear the selection',
         ]);
         expect(bar.querySelector('[aria-label^="Exclude"]')).toBeNull();
+        // an OVERLAY on the canvas, not part of the toolbar: a selection must never change the layout, or the canvas
+        // would resize and the view re-fit under the analyst's zoom
+        expect(bar.closest('[data-testid="la-graph-region"]')).toBeTruthy();
+        expect(el.querySelector('header[data-testid="la-header"] [data-testid="la-selection-bar"]')).toBeNull();
     });
 
     it('Escape clears the selection and Ctrl+A selects every drawn node (the keyboard path to a box select)', async () => {

@@ -95,6 +95,12 @@ export interface GraphViewInteraction {
 /** How long a single click waits for a possible second one when {@link GraphViewInteraction.doubleClick} is on. */
 export const NODE_DBLCLICK_DELAY_MS = 230;
 
+/** A canvas resize smaller than this (either side, in px) does not re-fit the view. */
+export const RESIZE_REFIT_MIN_PX = 8;
+
+/** G6's selection state: the box select sets it, the `selection` input is mirrored into it, and `drag-element` groups by it. */
+export const SELECTED_STATE = 'selected';
+
 /**
  * The G6 behaviour list for a pointer model - pure, so the wiring is unit-testable without a canvas. `drag-canvas`
  * is dropped for `panByDrag: false`; `boxSelect` adds a plain-drag `brush-select` (G6 documents that it replaces
@@ -119,9 +125,9 @@ export function buildBehaviors(
                       type: 'brush-select',
                       trigger: ['drag'],
                       enableElements: ['node'],
-                      // A private state name: G6 paints its own `selected` look through the theme, but the selection the
-                      // analyst sees is the host's halo (selection input), so this state is bookkeeping only.
-                      state: 'brushed',
+                      // G6's own `selected` state: `drag-element` moves EVERY node in this state together when one of them
+                      // is dragged, which is what an analyst expects after boxing a group.
+                      state: SELECTED_STATE,
                       mode: 'default',
                       enable: (e: { targetType?: string }) => e.targetType === 'canvas',
                       style: brushStyle,
@@ -493,11 +499,16 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.create();
         // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
         if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => {
+            this.resizeObserver = new ResizeObserver((entries) => {
                 this.graph?.resize();
                 // G6's resize keeps the old zoom and offset, so a canvas that grew or shrank leaves the graph off to a side:
                 // re-fit once the size settles (a drag of a panel edge fires many events), when the pointer model asks for it.
-                if (this.interaction?.fitOnResize) this.scheduleFit();
+                // A change of a few pixels (a scrollbar, a rounding) is not worth throwing the analyst's zoom away for.
+                const box = entries[entries.length - 1]?.contentRect;
+                const moved =
+                    !box || Math.abs(box.width - this.lastSize[0]) > RESIZE_REFIT_MIN_PX || Math.abs(box.height - this.lastSize[1]) > RESIZE_REFIT_MIN_PX;
+                if (box) this.lastSize = [box.width, box.height];
+                if (moved && this.interaction?.fitOnResize) this.scheduleFit();
             });
             this.resizeObserver.observe(this.hostEl.nativeElement);
         }
@@ -687,6 +698,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /** Tear the live instance down, sweeping any tooltip card its own cleanup left orphaned. */
     private fitTimer: ReturnType<typeof setTimeout> | null = null;
+    /** The canvas size the last resize event reported (width, height), to tell a real resize from a few-pixel wobble. */
+    private lastSize: [number, number] = [0, 0];
 
     /** One re-fit after a burst of resize events has gone quiet. */
     private scheduleFit(): void {
@@ -775,7 +788,27 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         // preview: toggling node labels off left every label showing. Re-setting the SAME data object
         // re-runs the mappers and does NOT re-run layout, so positions are untouched.
         graph.setData(this.data as unknown as GraphData);
-        void graph.draw();
+        void graph.draw().then(() => this.syncSelectionState());
+    }
+
+    /** The node ids this host last put in {@link SELECTED_STATE}, so the next sync only touches what changed. */
+    private selectedStateIds = new Set<string>();
+
+    /**
+     * Mirror the page's selection into G6's `selected` element state. The box select sets it itself, but Select all, a
+     * clear, a selection that lost nodes to a hide, and a node-list pick all arrive through the `selection` input; without
+     * this, dragging one selected node would move only that node (`drag-element` groups by the state, not by our input).
+     */
+    private syncSelectionState(): void {
+        const graph = this.graph;
+        if (!graph || !this.interaction?.boxSelect) return;
+        const want = this.selSet;
+        const touched = new Set([...this.selectedStateIds, ...want]);
+        this.selectedStateIds = new Set(want);
+        if (!touched.size) return;
+        const states: Record<string, string[]> = {};
+        for (const id of touched) states[id] = want.has(id) ? [SELECTED_STATE] : [];
+        void graph.setElementState(states, false).catch(() => undefined); // an id the graph no longer holds is not an error
     }
 
     /**
@@ -808,8 +841,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const painted = added ? graph.render() : graph.draw();
         // The pointer model asked for a graph that stays fully in view: re-fit once the new data is on the canvas.
         // Only HERE (a data change), never in `redraw`, so a hover, a selection or a restyle never yanks the view.
-        if (this.interaction?.fitOnDataChange) void painted.then(() => graph.fitView());
-        else void painted;
+        void painted.then(() => {
+            this.syncSelectionState();
+            if (this.interaction?.fitOnDataChange) void graph.fitView();
+        });
     }
 
     /**
@@ -984,7 +1019,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         graph.on(NodeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'node', false));
         graph.on(EdgeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'edge', false));
         const host = this.hostEl.nativeElement;
-        void graph.render().then(() => demotePositiveTabindex(host));
+        void graph.render().then(() => {
+            demotePositiveTabindex(host);
+            this.selectedStateIds = new Set(); // a fresh instance carries no states
+            this.syncSelectionState();
+        });
         this.graph = graph;
         this.snapshotKeys();
     }

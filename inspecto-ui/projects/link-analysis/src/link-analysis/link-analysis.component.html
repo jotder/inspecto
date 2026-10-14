@@ -616,57 +616,6 @@
                     <mat-icon svgIcon="heroicons_outline:table-cells"></mat-icon>
                 </button>
             }
-            <!-- the box selection: what it does (expand from it, hide it, exclude it, attach it to a Case) -->
-            @if (selectedOnCanvas().length) {
-                <div class="flex items-center gap-1 border-l pl-1" role="group" aria-label="Selection" data-testid="la-selection-bar">
-                    <span class="px-1 text-xs font-medium" data-testid="la-selection-count">
-                        {{ selectedOnCanvas().length }} selected
-                    </span>
-                    <button
-                        mat-icon-button
-                        (click)="expandFromSelected()"
-                        matTooltip="Expand from the selected nodes"
-                        [attr.aria-label]="'Expand from the ' + selectedOnCanvas().length + ' selected nodes'"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:plus-circle"></mat-icon>
-                    </button>
-                    <button
-                        mat-icon-button
-                        (click)="hideSelected()"
-                        matTooltip="Hide the selected nodes"
-                        [attr.aria-label]="'Hide the ' + selectedOnCanvas().length + ' selected nodes'"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:eye-slash"></mat-icon>
-                    </button>
-                    @if (investigation.canvas()) {
-                        <button
-                            mat-icon-button
-                            (click)="excludeSelected()"
-                            matTooltip="Exclude the selected nodes from the Working Set (asks for a reason)"
-                            [attr.aria-label]="'Exclude the ' + selectedOnCanvas().length + ' selected nodes'"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:no-symbol"></mat-icon>
-                        </button>
-                    }
-                    <button
-                        mat-icon-button
-                        (click)="openAttachToCase()"
-                        [disabled]="!!attachUnavailable()"
-                        [matTooltip]="attachUnavailable() || 'Attach the selected nodes to a Case'"
-                        [attr.aria-label]="'Attach the ' + selectedOnCanvas().length + ' selected nodes to a Case'"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
-                    </button>
-                    <button
-                        mat-icon-button
-                        (click)="clearSelection()"
-                        matTooltip="Clear the selection (Esc)"
-                        aria-label="Clear the selection"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                    </button>
-                </div>
-            }
         </nav>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -863,6 +812,63 @@
                             (selectionChange)="onSelectionChange($event)"
                             (edgeClick)="onEdgeClick($event)"
                         ></inspecto-graph-view>
+                        <!-- the box selection: what it does. An OVERLAY, so selecting never changes the layout or resizes the canvas -->
+                        @if (selectedOnCanvas().length) {
+                            <div
+                                class="absolute left-1/2 top-2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border px-1 shadow"
+                                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                                role="group"
+                                aria-label="Selection"
+                                data-testid="la-selection-bar"
+                            >
+                                <span class="px-1 text-xs font-medium" data-testid="la-selection-count">
+                                    {{ selectedOnCanvas().length }} selected
+                                </span>
+                                <button
+                                    mat-icon-button
+                                    (click)="expandFromSelected()"
+                                    matTooltip="Expand from the selected nodes"
+                                    [attr.aria-label]="'Expand from the ' + selectedOnCanvas().length + ' selected nodes'"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:plus-circle"></mat-icon>
+                                </button>
+                                <button
+                                    mat-icon-button
+                                    (click)="hideSelected()"
+                                    matTooltip="Hide the selected nodes"
+                                    [attr.aria-label]="'Hide the ' + selectedOnCanvas().length + ' selected nodes'"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:eye-slash"></mat-icon>
+                                </button>
+                                @if (investigation.canvas()) {
+                                    <button
+                                        mat-icon-button
+                                        (click)="excludeSelected()"
+                                        matTooltip="Exclude the selected nodes from the Working Set (asks for a reason)"
+                                        [attr.aria-label]="'Exclude the ' + selectedOnCanvas().length + ' selected nodes'"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:no-symbol"></mat-icon>
+                                    </button>
+                                }
+                                <button
+                                    mat-icon-button
+                                    (click)="openAttachToCase()"
+                                    [disabled]="!!attachUnavailable()"
+                                    [matTooltip]="attachUnavailable() || 'Attach the selected nodes to a Case'"
+                                    [attr.aria-label]="'Attach the ' + selectedOnCanvas().length + ' selected nodes to a Case'"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
+                                </button>
+                                <button
+                                    mat-icon-button
+                                    (click)="clearSelection()"
+                                    matTooltip="Clear the selection (Esc)"
+                                    aria-label="Clear the selection"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                </button>
+                            </div>
+                        }
                         <!-- overlays: legend (top-left) and working set (top-right), each minimisable -->
                         <inspecto-link-analysis-legend
                             class="absolute left-2 top-2 z-10"
