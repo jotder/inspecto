@@ -66,13 +66,18 @@ public final class NameMatcher {
         // lower-case FIRST: "İ".toLowerCase() is "i" + a combining dot, which the mark strip then removes
         String s = MARKS.matcher(Normalizer.normalize(name.toLowerCase(Locale.ROOT), Normalizer.Form.NFKD)).replaceAll("");
         StringBuilder b = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            Character conf = CONFUSABLES.get(c);
-            if (conf != null) { b.append(conf.charValue()); continue; }
-            String exp = EXPANSIONS.get(c);
-            if (exp != null) { b.append(exp); continue; }
-            b.append(Character.isLetterOrDigit(c) ? c : ' ');
+        for (String run : s.split("[^\\p{L}\\p{N}]+")) {
+            if (run.isEmpty()) continue;
+            b.append(' ');
+            if (isGenuineCyrillic(run)) { b.append(transliterate(run)); continue; }
+            for (int i = 0; i < run.length(); i++) {
+                char c = run.charAt(i);
+                Character conf = CONFUSABLES.get(c);
+                if (conf != null) { b.append(conf.charValue()); continue; }
+                String exp = EXPANSIONS.get(c);
+                if (exp != null) { b.append(exp); continue; }
+                b.append(c);
+            }
         }
         List<String> out = new ArrayList<>();
         for (String t : b.toString().trim().split(" +")) {
@@ -86,6 +91,40 @@ public final class NameMatcher {
     /** The folded name: its tokens joined by one space. */
     public static String fold(String name) {
         return String.join(" ", tokens(name));
+    }
+
+    /** Cyrillic → Latin, a plain reading of the sound (Виктор → viktor). Letters the map lacks pass through. */
+    private static final Map<Character, String> CYRILLIC = Map.ofEntries(
+            Map.entry('а', "a"), Map.entry('б', "b"), Map.entry('в', "v"), Map.entry('г', "g"), Map.entry('д', "d"),
+            Map.entry('е', "e"), Map.entry('ж', "zh"), Map.entry('з', "z"), Map.entry('и', "i"), Map.entry('к', "k"),
+            Map.entry('л', "l"), Map.entry('м', "m"), Map.entry('н', "n"), Map.entry('о', "o"), Map.entry('п', "p"),
+            Map.entry('р', "r"), Map.entry('с', "s"), Map.entry('т', "t"), Map.entry('у', "u"), Map.entry('ф', "f"),
+            Map.entry('х', "kh"), Map.entry('ц', "ts"), Map.entry('ч', "ch"), Map.entry('ш', "sh"), Map.entry('щ', "sh"),
+            Map.entry('ъ', ""), Map.entry('ы', "y"), Map.entry('ь', ""), Map.entry('э', "e"), Map.entry('ю', "yu"),
+            Map.entry('я', "ya"), Map.entry('і', "i"), Map.entry('ї', "i"), Map.entry('є', "ye"), Map.entry('ґ', "g"));
+
+    /**
+     * A token of Cyrillic letters only, at least one of them with no Latin look-alike (и д л п б г ж з ц ч ш ф ...): a
+     * real Cyrillic name, read by sound. A token that is all look-alikes, or mixes in a Latin letter, keeps the
+     * look-alike fold, so "Pаvel" (Cyrillic а) still reads as Pavel.
+     */
+    private static boolean isGenuineCyrillic(String run) {
+        boolean unique = false;
+        for (int i = 0; i < run.length(); i++) {
+            char c = run.charAt(i);
+            if (c < 'Ѐ' || c > 'ӿ') return false;
+            if (!CONFUSABLES.containsKey(c)) unique = true;
+        }
+        return unique;
+    }
+
+    private static String transliterate(String run) {
+        StringBuilder b = new StringBuilder(run.length() + 4);
+        for (int i = 0; i < run.length(); i++) {
+            String t = CYRILLIC.get(run.charAt(i));
+            b.append(t != null ? t : String.valueOf(run.charAt(i)));
+        }
+        return b.toString();
     }
 
     /** A token mixing letters and digits reads each look-alike digit as its letter; an all-digit token is kept. */
@@ -112,7 +151,7 @@ public final class NameMatcher {
 
     /**
      * The transliteration skeleton of one folded token (Arabic-name variants): {@code dh gh kh} read as their first
-     * letter, {@code ou oo} as u, {@code ei ai ay ey} as i, doubled letters collapsed, and a long token's leading
+     * letter, {@code ou oo o} as u (Muhammad / Mohamed), {@code ei ai ay ey} as i, doubled letters collapsed, and a long token's leading
      * q / g as k — so Gaddafi, Qadhafi, Kadhafi, Gadhafi, Khadafi all give "kadafi" and Hussein, Husain, Hussain
      * "husin". A token holding a digit is returned as is. Used only by {@link #score(List, List)}'s second reading
      * and by {@link #blockKeys(List)}.
@@ -120,7 +159,7 @@ public final class NameMatcher {
     static String phonetic(String t) {
         for (int i = 0; i < t.length(); i++) if (Character.isDigit(t.charAt(i))) return t;
         String s = t.replace("dh", "d").replace("gh", "g").replace("kh", "k").replace("ou", "u").replace("oo", "u")
-                .replace("ei", "i").replace("ai", "i").replace("ay", "i").replace("ey", "i");
+                .replace("ei", "i").replace("ai", "i").replace("ay", "i").replace("ey", "i").replace('o', 'u');
         StringBuilder b = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) if (i == 0 || s.charAt(i) != s.charAt(i - 1)) b.append(s.charAt(i));
         if (b.length() >= KAF_MIN_LENGTH && (b.charAt(0) == 'q' || b.charAt(0) == 'g')) b.setCharAt(0, 'k');

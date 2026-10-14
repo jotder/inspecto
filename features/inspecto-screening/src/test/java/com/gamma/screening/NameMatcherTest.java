@@ -134,6 +134,7 @@ class NameMatcherTest {
             {"Muhammad", "Mohammed"}, {"Muhammed", "Mohammed"},
             {"Hussein", "Husain"}, {"Hussein", "Hussain"}, {"Husain", "Hussain"},
             {"Yusuf", "Yousef"},
+            {"Muhammad", "Mohamed"}, {"Muhammad", "Mohamad"}, {"Mohamed Salah", "Muhammad Salah"},
     };
 
     /** Not the same person: the phonetic reading must not pull these over the threshold. */
@@ -152,6 +153,19 @@ class NameMatcherTest {
         assertEquals("kadafi", NameMatcher.phonetic("gaddafi"));
         assertEquals("kadafi", NameMatcher.phonetic("qadhafi"));
         assertEquals("husin", NameMatcher.phonetic("hussein"));
+    }
+
+    /** SCREENING-1 (11): a real Cyrillic name is read by sound; a look-alike-only or mixed token keeps the look-alike fold. */
+    @Test
+    void cyrillicNamesAreTransliteratedByTheirSound() {
+        assertEquals("viktor", NameMatcher.fold("Виктор"));
+        assertEquals("sergei", NameMatcher.fold("Сергей"));
+        assertEquals("viktor sorokin", NameMatcher.fold("Виктор Сорокин"));
+        assertTrue(NameMatcher.score("Виктор Сорокин", "Viktor Sorokin") >= T);
+        assertTrue(NameMatcher.score("Сергей Лавров", "Sergey Lavrov") >= T, "" + NameMatcher.score("Сергей Лавров", "Sergey Lavrov"));
+        assertEquals("pavel", NameMatcher.fold("Pаvel"), "a Latin letter next to a look-alike keeps the look-alike fold");
+        assertEquals("putin", NameMatcher.fold("Рutin"));
+        assertTrue(NameMatcher.score("Виктор Сорокин", "Viktor Sorenson") < T);
     }
 
     @Test

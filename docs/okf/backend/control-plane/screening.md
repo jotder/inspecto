@@ -104,11 +104,21 @@ four-eyes on `confirmed` is required) · the Action Requests record pattern rath
 `SpaceRoot` accessor, count tripwires and backup lockstep) · a dismissed hit is never re-raised for the same entry · a
 Run refuses a subset. Provenance: `docs/archived-documents/plans-archive/screening-addon-plan.md`.
 
+## Save-time check of a `screening.run` Job (2026-10-14)
+`JobTypeProvider#saveRefusal(JobConfig)` (default null) is asked by `JobRoutes#persistJob` after the type check: a Job Type that
+can judge its params without running refuses them at save with a 422 (`job '<name>' refused at save: ... - nothing was written`).
+`screening.run` answers with `Params.of` (threshold, maxRows, column names, `lists` ids: always) and, for an ENABLED Job in a
+Space with a write root, an unknown Dataset or Entity List; a draft (`enabled: false`) may name ones that do not exist yet. An
+unreadable store never blocks a save (the Run reports it). Test: `ControlApiScreeningTest#aScreeningJobWithBadParamsIsRefusedAtSave`.
+The Check a name result has one row per name: a name with no match shows *Checked: no match at or above T*.
+
 ## Limits and what is open (`SCREENING-1` residuals in `docs/BACKLOG.md`)
 - Blocking still misses a first-letter difference that is not a known transliteration (a typo in the initial of every
-  token); Muhammad / Mohamed (0.83) stays below the threshold — no vowel-u/o fold yet.
+  token). Muhammad / Mohamed now match (the phonetic skeleton folds `o` to `u`, 2026-10-14); a Cyrillic token that holds a
+  letter with no Latin look-alike (Виктор, Сергей) is transliterated by sound (viktor, sergei) and so reaches its Latin
+  entry, while a look-alike-only or Latin-mixed token (`Pаvel`) keeps the look-alike fold.
 - A Run lists every hit document to dedupe (no index); fine for thousands of hits, not for millions.
-- No four-eyes on `confirmed`; `check` cannot raise hits; no Space-level threshold default.
+- No four-eyes on `confirmed`; `check` cannot raise hits; no Space-level threshold default. Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO with beats 6 and 7 shown as roadmap.
 
 ## Demo script and rehearsal (2026-10-14, Enterprise Demo Auth bundle, Space `screening-demo` from the `aml` template)
 Boot: `node tools/seed-screening-demo.mjs --spaces inspecto-demo/spaces` (roster), serve the bundle, sign in as Demo Admin, run it
@@ -120,7 +130,7 @@ Then enable and trigger the Job `aml_screening` (the template ships it disabled)
 | # | Beat | Result | Evidence |
 |---|---|---|---|
 | 1 | Check names: exact / fuzzy / transliterated / clean / identifier | PASS | Dmitrenko Sorokin 1.0; Dmitrenco 0.98; Kadir Almansuri vs Qadhir Almansouri 0.95; Husain Alrashidi 0.95; Tobias Lindqvist clean; NID-9000001 identifier 1.0; word order and case folded (0.92 / 1.0) |
-| 2 | Check a name dialog, any persona, nothing raised | PASS | six names, two lists, 5 rows (clean name has no row, item 10) |
+| 2 | Check a name dialog, any persona, nothing raised | PASS | six names, two lists, 5 rows plus a *Checked: no match* row for the clean name (item 10 shipped 2026-10-14) |
 | 3 | `screening.run` over the party Dataset | PASS | 134 screened, 7 matches, 7 hits; re-run 0 new (dedupe); cron `0 5 * * *` shown with next fire |
 | 4 | Hits signed; a tampered file is refused | PASS | edited a hit file: GET `integrity: invalid`, decide 409 "a record no server wrote" |
 | 5 | Review pane: dismiss with a reason (UI), escalate then confirm by a second person (API) | PASS | history carries both deciders; a final state refuses a move (409); a stale version 409 |
@@ -129,7 +139,7 @@ Then enable and trigger the Job `aml_screening` (the template ships it disabled)
 | 8 | Audit trail | PASS | `screening.run.hits` and `screening.hit.decided` rows in `/audit/search?type=AUDIT`; `/audit/verify` chain ok |
 | 9 | Masking | PASS with a gap | PII-classified name and id are stored as `masked:` tokens and matching still works; the masked PEP list shows its entry masked to everyone; no persona can unmask (`SCREENING-1` 8) |
 | 10 | Non-privileged persona (business) | PASS | sees hits (masked), no decision buttons in the UI, decide 403 `canWorkIncidents` |
-| 11 | Unhappy paths | PASS | empty list = no matches; 1001 subjects 422; 513-char name 422; 1000 subjects in 94 ms; threshold 0.4 / 1.5 / "abc" 422; unknown list 422; 21 lists 422; no auth 401; Job with `maxRows` below the row count fails the Run ("refusing to screen a subset"); a bad Job threshold or unknown list fails the Run, not the save (item 9) |
+| 11 | Unhappy paths | PASS | empty list = no matches; 1001 subjects 422; 513-char name 422; 1000 subjects in 94 ms; threshold 0.4 / 1.5 / "abc" 422; unknown list 422; 21 lists 422; no auth 401; Job with `maxRows` below the row count fails the Run ("refusing to screen a subset"); a bad Job threshold, column or an unknown list/Dataset on an enabled Job is refused at save (422, nothing written; item 9 shipped 2026-10-14) |
 
 Gotcha found: the template's `full_name` / `national_id` were classified `CONFIDENTIAL`, which is not in `ColumnClassification.SENSITIVE`
 (`MSISDN IMSI ACCOUNT PII`), so a hit stored the raw name; they are `PII` now.

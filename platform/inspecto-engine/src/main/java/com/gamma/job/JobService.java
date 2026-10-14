@@ -829,6 +829,9 @@ public final class JobService implements AutoCloseable {
         return IncrementalSink.layoutRefusal(dir, inc.column(), c.name());
     }
 
+    /** The Job Type's own save-time refusal of {@code c} (bad params it can judge without running), or null. */
+    public String typeSaveRefusal(JobConfig c) { return registry.saveRefusal(c.type(), c); }
+
     public synchronized void upsertJob(JobConfig c) {
         removeJobInternal(c.name());
         configs.add(c);

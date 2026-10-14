@@ -512,6 +512,10 @@ final class JobRoutes implements RouteModule {
         if (sinkRefusal != null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: incremental "
                     + sinkRefusal + " - nothing was written");
+        String typeRefusal = jobs(api).typeSaveRefusal(c);
+        if (typeRefusal != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: "
+                    + typeRefusal + " - nothing was written");
         Path target = jobFile(api, c.name());
         byte[] bytes = ConfigCodec.toToon(Map.of("job", c.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".job-");

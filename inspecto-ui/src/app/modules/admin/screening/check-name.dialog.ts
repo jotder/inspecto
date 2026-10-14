@@ -25,6 +25,8 @@ export interface CheckRow {
     entry: string;
     method: string;
     score: string;
+    /** True for the row of a name with no match: the check ran and found nothing (a reviewer can tell it was checked). */
+    clean: boolean;
 }
 
 /** The subjects typed one per line: blank lines dropped, each trimmed. */
@@ -88,16 +90,20 @@ export class CheckNameDialog implements OnInit {
     readonly names = computed(() => parseSubjects(this.namesText()));
 
     readonly rows = computed<CheckRow[]>(() =>
-        (this.response()?.results ?? []).flatMap((r) =>
-            r.matches.map((m) => ({
-                subject: r.name ?? r.identifier ?? r.key,
+        (this.response()?.results ?? []).flatMap((r): CheckRow[] => {
+            const subject = r.name ?? r.identifier ?? r.key;
+            if (r.matches.length === 0)
+                return [{ subject, listId: '', purpose: '', entry: '', method: '', score: '', clean: true }];
+            return r.matches.map((m) => ({
+                subject,
                 listId: m.listId,
                 purpose: m.purpose,
                 entry: m.entry,
                 method: m.method,
                 score: `${Math.round(m.score * 100)} %`,
-            })),
-        ),
+                clean: false,
+            }));
+        }),
     );
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty && !this.response(), this.confirm);

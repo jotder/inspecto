@@ -24,6 +24,13 @@ public interface JobTypeProvider {
      */
     default List<ParameterDecl> parameters(JobConfig config) { return descriptor().parameters(); }
 
+    /**
+     * A refusal reason for one authored config at save time, or {@code null} when it may be saved. A type whose
+     * params can be judged without running (a bad number, an unknown reference) overrides this so the author learns
+     * at save, not at the 05:00 Run. {@code enabled} is false for a draft: judge shape only, references may follow.
+     */
+    default String saveRefusal(JobConfig config) { return null; }
+
     /** The Run deadline for this type (platform-services R1, operator 2026-10-06): {@link JobDeadline#DEFAULT}
      *  (30 min), or the 24 h ceiling for the built-in long-running types. A pack overrides it; a definition's
      *  {@code deadline_seconds:} overrides both, and {@code -Djob.deadlineCeilingSeconds} caps all of them. */

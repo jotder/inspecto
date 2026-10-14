@@ -65,6 +65,33 @@ public final class ScreeningJobType implements JobTypeProvider {
 
     @Override public Job create(JobConfig config) { return new ScreeningJob(config, dataDir); }
 
+    /**
+     * The Run's own param checks, at save: a bad {@code threshold} / {@code maxRows} / column name always; an unknown
+     * Dataset or Entity List only for an enabled Job (a draft may be saved before its lists exist), and only when
+     * the Space's write root is known.
+     */
+    @Override public String saveRefusal(JobConfig config) {
+        Params p;
+        try {
+            p = Params.of(config.params());
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
+        }
+        if (!config.enabled()) return null;
+        Path writeRoot = SpaceConfigRoot.current();
+        if (writeRoot == null) return null;
+        try {
+            if (new ComponentStore(writeRoot.resolve("registry")).get("dataset", p.dataset()).isEmpty())
+                return ID + ": unknown dataset '" + p.dataset() + "'";
+            Screener.load(writeRoot, p.lists(), Instant.now());
+        } catch (IllegalArgumentException e) {
+            return ID + ": " + e.getMessage();
+        } catch (java.io.IOException | RuntimeException e) {
+            return null;   // an unreadable store is the Run's to report; never block a save on it
+        }
+        return null;
+    }
+
     static final class ScreeningJob implements Job {
         private final JobConfig cfg;
         private final String dataDir;

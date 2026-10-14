@@ -142,6 +142,36 @@ class ControlApiScreeningTest {
         });
     }
 
+    /** SCREENING-1 (9): a screening.run Job with params it can never run is refused at save, not at 05:00. */
+    @Test
+    void aScreeningJobWithBadParamsIsRefusedAtSave(@TempDir Path spaces) throws Exception {
+        Path cfg = space(spaces, "acme");
+        withSpaces(spaces, port -> {
+            String base = "\"name\":\"s1\",\"type\":\"screening.run\",\"dataset\":\"ghost\",\"keyField\":\"id\","
+                    + "\"nameField\":\"n\",";
+            HttpResponse<String> bad = send(port, "POST", "/spaces/acme/jobs", "{" + base
+                    + "\"lists\":\"sanctions\",\"threshold\":\"abc\",\"enabled\":false}", DEV);
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("threshold"), bad.body());
+            assertFalse(Files.exists(cfg.resolve("jobs").resolve("s1_job.toon")), "nothing was written");
+
+            HttpResponse<String> noDataset = send(port, "POST", "/spaces/acme/jobs", "{" + base
+                    + "\"lists\":\"sanctions\",\"enabled\":true}", DEV);
+            assertEquals(422, noDataset.statusCode(), noDataset.body());
+            assertTrue(noDataset.body().contains("unknown dataset 'ghost'"), noDataset.body());
+
+            HttpResponse<String> noList = send(port, "POST", "/spaces/acme/jobs", "{" + base.replace("ghost", "x")
+                    + "\"lists\":\"nope\",\"enabled\":true}", DEV);
+            assertEquals(422, noList.statusCode(), noList.body());
+
+            // a DRAFT may name a Dataset / list that does not exist yet: only its params' shape is judged
+            HttpResponse<String> draft = send(port, "POST", "/spaces/acme/jobs", "{" + base
+                    + "\"lists\":\"later\",\"enabled\":false}", DEV);
+            assertTrue(draft.statusCode() < 300, draft.body());
+            assertTrue(Files.exists(cfg.resolve("jobs").resolve("s1_job.toon")));
+        });
+    }
+
     @Test
     void decideIsGatedOnCanWorkIncidents(@TempDir Path spaces) throws Exception {
         Path cfg = space(spaces, "acme");

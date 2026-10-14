@@ -147,6 +147,12 @@ final class JobTypeRegistry {
         return p == null ? JobDeadline.DEFAULT : p.deadline();
     }
 
+    /** {@link JobTypeProvider#saveRefusal}; {@code null} for an unknown id (the type check is the caller's). */
+    String saveRefusal(String id, JobConfig config) {
+        JobTypeProvider p = providers.get(id == null ? "" : id.toLowerCase(Locale.ROOT));
+        return p == null ? null : p.saveRefusal(config);
+    }
+
     /** The parameters a type requires for one authored config (R3) — config-aware where the provider
      *  overrides {@link JobTypeProvider#parameters(JobConfig)}; empty for an unknown id. */
     List<ParameterDecl> parameters(String id, JobConfig config) {

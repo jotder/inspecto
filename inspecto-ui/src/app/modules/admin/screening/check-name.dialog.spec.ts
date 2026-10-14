@@ -91,7 +91,15 @@ describe('CheckNameDialog', () => {
             maxMatches: 3,
         });
         const cells = Array.from(el.querySelectorAll('tbody td')).map((t) => t.textContent?.trim());
-        expect(cells).toEqual(['Vladimir Putin', 'sanctions (block)', 'vladimir putin', 'name', '99 %']);
+        expect(cells).toEqual([
+            'Vladimir Putin',
+            'sanctions (block)',
+            'vladimir putin',
+            'name',
+            '99 %',
+            'Jane Doe',
+            'Checked: no match at or above 0.85',
+        ]);
         expect(el.textContent).toContain('this check does not create Hits');
         await expectNoA11yViolations(el);
     });
@@ -116,7 +124,7 @@ describe('CheckNameDialog', () => {
         );
     });
 
-    it('shows the empty state when nothing matches', async () => {
+    it('shows a Checked row for a clean name, beside the names that matched', async () => {
         const { c, fixture, el } = await create({
             check: vi.fn(() =>
                 of({ threshold: 0.85, results: [{ key: '1', name: 'X', identifier: null, matches: [] }] }),
@@ -126,8 +134,8 @@ describe('CheckNameDialog', () => {
         c.toggle('sanctions', true);
         c.run();
         fixture.detectChanges();
-        expect(el.querySelector('table')).toBeNull();
-        expect(el.textContent).toContain('No matches at or above 0.85 for 1 name.');
+        expect(el.querySelector('table')).not.toBeNull();
+        expect(el.textContent).toContain('Checked: no match at or above 0.85');
         await expectNoA11yViolations(el);
     });
 
