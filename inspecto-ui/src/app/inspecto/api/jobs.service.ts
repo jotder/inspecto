@@ -353,8 +353,12 @@ export class JobsService {
         return this.http.get<JobRun[]>(apiUrl(`/jobs/${encodeURIComponent(name)}/runs`));
     }
     /** v1 async contract (W5): 202 + the submitted run's id; poll `/jobs/runs/{runId}` for status. */
-    trigger(name: string): Observable<{ runId: string }> {
-        return this.http.post<{ runId: string }>(apiUrl(`/jobs/${encodeURIComponent(name)}/trigger`), {});
+    trigger(name: string, params?: Record<string, unknown>): Observable<{ runId: string }> {
+        // `params` = explicit trigger args for this one fire (override the job's configured params); omitted ⇒ {}.
+        return this.http.post<{ runId: string }>(
+            apiUrl(`/jobs/${encodeURIComponent(name)}/trigger`),
+            params && Object.keys(params).length ? { params } : {},
+        );
     }
     /** One run's status by the id {@link trigger} (or an ad-hoc run's 202) returned; 404 once evicted or unknown. */
     run(runId: string): Observable<JobRunById> {

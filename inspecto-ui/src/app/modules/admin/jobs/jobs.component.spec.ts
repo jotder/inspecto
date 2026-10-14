@@ -115,10 +115,10 @@ describe('JobsComponent', () => {
         const hints = c.scheduleActions.map((a) =>
             typeof a.hint === 'function' ? a.hint({ enabled: true } as JobView) : a.hint,
         );
-        expect(hints).toEqual(['Run now', 'Disable']);
+        expect(hints).toEqual(['Run now', 'Run with parameters…', 'Disable']);
     });
 
-    it('badges a system job "System" in the name cell and offers it only Run now (backend 409s the rest)', () => {
+    it('badges a system job "System" in the name cell and offers it only the Run verbs (backend 409s the rest)', () => {
         const c = create('ok').componentInstance;
         const nameCol = c.columnDefs.find((d) => d.field === 'name')!;
         const render = (data: JobView) =>
@@ -134,8 +134,8 @@ describe('JobsComponent', () => {
             c.scheduleActions
                 .filter((a) => !a.visible || a.visible(j))
                 .map((a) => (typeof a.hint === 'function' ? a.hint(j) : a.hint));
-        expect(shown(sys)).toEqual(['Run now']);
-        expect(shown(authored)).toEqual(['Run now', 'Disable', 'Reschedule', 'Edit', 'Delete']);
+        expect(shown(sys)).toEqual(['Run now', 'Run with parameters…']);
+        expect(shown(authored)).toEqual(['Run now', 'Run with parameters…', 'Disable', 'Reschedule', 'Edit', 'Delete']);
     });
 
     it('badges a job whose type no installed module provides "Not installed", with the reason as text (P4-1)', () => {

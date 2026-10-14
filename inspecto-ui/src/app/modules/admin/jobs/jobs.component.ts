@@ -46,6 +46,7 @@ import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
 import { fmtDuration, scheduleSummary, whatScheduled } from './job-display';
 import { JobDetailComponent } from './job-detail/job-detail.component';
 import { JobFormDialog } from './job-form.dialog';
+import { JobRunParamsDialog } from './job-run-params.dialog';
 import { JobRunDetailDialog } from './job-run-detail.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -229,6 +230,11 @@ export class JobsComponent implements OnInit, OnDestroy {
                 onClick: (j) => this.trigger(j),
             },
             {
+                icon: 'heroicons_outline:adjustments-horizontal',
+                hint: 'Run with parameters…',
+                onClick: (j) => this.triggerWithParams(j),
+            },
+            {
                 icon: (j) => (j.enabled ? 'heroicons_outline:pause-circle' : 'heroicons_outline:play-circle'),
                 hint: (j) => (j.enabled ? 'Disable' : 'Enable'),
                 visible: (j) => !j.system,
@@ -356,6 +362,18 @@ export class JobsComponent implements OnInit, OnDestroy {
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Run failed for ${job.name}`)),
         });
+    }
+
+    /** Run once with explicit trigger parameters (dialog lists the type's declared ones); same feedback as Run now. */
+    triggerWithParams(job: JobView): void {
+        this.dialog
+            .open(JobRunParamsDialog, { width: '560px', data: { name: job.name, type: job.type } })
+            .afterClosed()
+            .subscribe((r) => {
+                if (!r) return;
+                this.toastr.success(`Job "${job.name}" run started.`);
+                this.load();
+            });
     }
 
     /** Row-click target → the job detail side panel (the `/jobs/:name` URL stays shareable). */

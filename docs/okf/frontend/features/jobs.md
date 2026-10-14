@@ -21,11 +21,22 @@ fills `derivedFrom` (the one field only the by-id read carries) when it returns;
 `GET /jobs` carries `system: true` on a platform-armed job (today only `system.freshness-sweep`, derived
 from the Alert Rules that declare `maximumAge`). `JobView.system` mirrors it; the list's Job cell shows a
 neutral **System** pill (`statusBadgeHtml('system', 'System')`, the name itself set as text, never HTML), and
-the row offers **Run now only**. That reflects the backend, not a UI policy: `JobRoutes.refuseSystemJob` 409s
+the row offers the **Run verbs only** (Run now, Run with parameters…). That reflects the backend, not a UI policy: `JobRoutes.refuseSystemJob` 409s
 `PUT`/`DELETE /jobs/{name}` and `POST …/enable|disable|reschedule` on a system job, while `…/trigger` stays
 open. ⚠ **`GET /jobs/{name}` does not carry the flag**, so the detail panel cannot tell on its own; it is
 safe today only because the panel is always mounted `embedded`, and its write buttons render only in the
 full-page header, which no route reaches. A future full-page detail needs the flag served there first.
+
+## Run with parameters (TELCO-FRAUD-DEMO-DATE-1, 2026-10-14)
+
+Row action and detail-pane button **Run with parameters…** open `JobRunParamsDialog`
+(`job-run-params.dialog.ts`). It reads the type's declarations (`GET /jobs/types/{id}`) plus the Job's configured
+values (`GET /jobs/{name}`), renders them through the same `paramDeclsToSpecs` → `<inspecto-schema-form>` path as
+the authoring form, and posts `POST /jobs/{name}/trigger {"params":{…}}` with **only the dirty fields** (a `multi`
+value is joined to CSV, the resolver's wire form). A refusal (422) shows inline and the dialog stays open; success
+reuses the Run-now toast + reload. Same gate as Run now (the route's `canOperateRuns`; the UI adds none).
+Deliberately **no free-form key=value rows**: a Job's contract is its declaration, and a type with none shows
+"declares no runtime parameters". Needed no backend change — the declarations were already exposed.
 
 ## The authoring form is descriptor-driven (job-parameter-contract steps 10–16, 2026-08-10)
 

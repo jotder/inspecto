@@ -46,7 +46,23 @@ function create(inputs?: { name: string; embedded: boolean }) {
             provideNoopAnimations(),
             provideRouter([]),
             { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'cdr_ingest_daily' } } } },
-            { provide: JobsService, useValue: { get: () => of(JOB), list: () => of([{ name: 'cdr_ingest_daily', type: 'ingest', enabled: true, nextFire: '2026-10-15 02:00:00' }]), runs: () => of(RUNS), runLogs: () => of(LOGS) } },
+            {
+                provide: JobsService,
+                useValue: {
+                    get: () => of(JOB),
+                    list: () =>
+                        of([
+                            {
+                                name: 'cdr_ingest_daily',
+                                type: 'ingest',
+                                enabled: true,
+                                nextFire: '2026-10-15 02:00:00',
+                            },
+                        ]),
+                    runs: () => of(RUNS),
+                    runLogs: () => of(LOGS),
+                },
+            },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             {
                 provide: InspectoConfirmService,

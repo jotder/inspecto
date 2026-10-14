@@ -36,6 +36,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { fmtDuration, scheduleSummary, whatScheduled } from '../job-display';
 import { JobFormDialog } from '../job-form.dialog';
+import { JobRunParamsDialog } from '../job-run-params.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 const LIVE_TAIL_MS = 5000;
@@ -181,7 +182,8 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         this.api.list().subscribe({
             next: (rows) => {
                 const nextFire = rows.find((r) => r.name === j.name)?.nextFire;
-                if (nextFire && this.job()?.name === j.name) this.job.update((cur) => (cur ? { ...cur, nextFire } : cur));
+                if (nextFire && this.job()?.name === j.name)
+                    this.job.update((cur) => (cur ? { ...cur, nextFire } : cur));
             },
             error: () => undefined,
         });
@@ -251,6 +253,21 @@ export class JobDetailComponent implements OnInit, OnDestroy {
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Run failed for ${j.name}`)),
         });
+    }
+
+    /** Run once with explicit trigger parameters; same feedback as {@link runNow}. */
+    runWithParams(): void {
+        const j = this.job();
+        if (!j) return;
+        this.dialog
+            .open(JobRunParamsDialog, { width: '560px', data: { name: j.name, type: j.type } })
+            .afterClosed()
+            .subscribe((r) => {
+                if (!r) return;
+                this.toastr.success(`Job "${j.name}" run started.`);
+                this.selectedRunId.set(null);
+                this.load();
+            });
     }
 
     toggleEnabled(): void {
