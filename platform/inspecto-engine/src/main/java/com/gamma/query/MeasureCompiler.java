@@ -51,9 +51,13 @@ public final class MeasureCompiler {
      * One ORDER BY term. {@code agg} non-null marks a <b>hidden aggregate</b> term (CATEGORY-SORT-ORDER-1): the
      * {@code field} is a Dataset column that is NOT in the result, ordered as {@code agg(field)} while the
      * grouping stays unchanged. {@code null} = an ordinary term over a result column (a grouped Dimension or a Measure id).
+     * {@code cosmetic} marks the chart's own category ordering over a grouped dimension (the SPA sets it): when that column is
+     * a masked key the route DROPS the term for a caller who cannot reveal instead of refusing (BiResultMasking.stripCosmeticOrder).
      */
-    public record Sort(String field, boolean descending, String agg) {
-        public Sort(String field, boolean descending) { this(field, descending, null); }
+    public record Sort(String field, boolean descending, String agg, boolean cosmetic) {
+        public Sort(String field, boolean descending, String agg) { this(field, descending, agg, false); }
+
+        public Sort(String field, boolean descending) { this(field, descending, null, false); }
 
         public boolean hidden() { return agg != null; }
     }
@@ -89,6 +93,11 @@ public final class MeasureCompiler {
         /** The same spec with another row cap — how a route asks for ONE row past its cap to detect truncation. */
         public Spec withLimit(int newLimit) {
             return new Spec(dataset, measures, groupBy, grains, filters, orderBy, newLimit, when);
+        }
+
+        /** The same spec with another ORDER BY. */
+        public Spec withOrderBy(List<Sort> newOrderBy) {
+            return new Spec(dataset, measures, groupBy, grains, filters, newOrderBy, limit, when);
         }
     }
 
@@ -197,7 +206,8 @@ public final class MeasureCompiler {
                     if (agg != null && (measures.isEmpty() || groupBy.isEmpty()))
                         throw new IllegalArgumentException("orderBy '" + field + "' (hidden " + agg
                                 + ") needs at least one measure and one groupBy column");
-                    orderBy.add(new Sort(field, desc, agg));
+                    boolean cosmetic = Boolean.TRUE.equals(s.get("cosmetic")) && agg == null && groupBy.contains(field);
+                    orderBy.add(new Sort(field, desc, agg, cosmetic));
                 }
 
         Map<String, Object> when = null;

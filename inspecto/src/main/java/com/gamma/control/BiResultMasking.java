@@ -200,6 +200,24 @@ final class BiResultMasking {
                 refuseIfMasked(m.field(), m.agg() + " over", viaText);
     }
 
+    /**
+     * The spec with the chart's COSMETIC category ordering ({@link MeasureCompiler.Sort#cosmetic}) over a masked grouped
+     * dimension replaced by a descending order on the first Measure, for a caller who cannot reveal: a refusal would blank every
+     * chart over a masked key. A spec with no Measure is left for {@link #vet} to refuse. Any other ordering on a masked column is untouched, so {@link #vet} still refuses it.
+     */
+    MeasureCompiler.Spec stripCosmeticOrder(MeasureCompiler.Spec spec, String boundText) {
+        if (!engaged() || spec.measures().isEmpty()) return spec;   // no measure: the compiler's key-order fallback would leak, so vet refuses
+        boolean viaText = boundText != null && mentions(boundText, masked);
+        List<MeasureCompiler.Sort> kept = new ArrayList<>();
+        for (MeasureCompiler.Sort s : spec.orderBy())
+            if (!(s.cosmetic() && isMasked(s.field(), viaText))) kept.add(s);
+        if (kept.size() == spec.orderBy().size()) return spec;
+        // The compiler orders an unordered GROUP BY by its keys (a stable LIMIT), which would be the raw rank again: order by
+        // the first Measure (descending, no raw value involved) so the cut stays deterministic and leaks nothing.
+        if (kept.isEmpty()) kept.add(new MeasureCompiler.Sort(spec.measures().get(0).id(), true));
+        return spec.withOrderBy(kept);
+    }
+
     /** {@code POST /queries/{id}/run}: a caller-supplied {@code sort} on a masked column is refused. */
     void vetSort(List<QueryExecutor.Sort> sort) {
         if (!engaged()) return;

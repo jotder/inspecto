@@ -237,6 +237,35 @@ class ControlApiBiQueryMaskingTest {
     }
 
     @Test
+    void theChartsCosmeticCategoryOrderOverAMaskedKeyIsDroppedNotRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            String cosmetic = "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"msisdn\"],"
+                    + "\"orderBy\":[{\"field\":\"msisdn\",\"dir\":\"asc\",\"cosmetic\":true}]";
+            HttpResponse<String> viewer = bi(c, "viewer", "calls_ds", cosmetic);
+            assertEquals(200, viewer.statusCode(), viewer.body());
+            assertNoRaw(viewer.body());
+            JsonNode v = V1Body.of(viewer.body());
+            assertEquals(3, v.get("rows").size());
+            assertTrue(column(v.get("rows"), "msisdn").stream().allMatch(s -> s.startsWith("masked:")));
+            assertFalse(v.get("sql").asText().contains("\"msisdn\" ASC"), "no ordering by the raw key: " + v.get("sql"));
+            assertTrue(v.get("sql").asText().contains("ORDER BY \"count\" DESC"), v.get("sql").asText());
+            assertEquals(422, bi(c, "viewer", "calls_ds", "\"groupBy\":[\"msisdn\"],\"orderBy\":[{\"field\":\"msisdn\",\"dir\":\"asc\",\"cosmetic\":true}]").statusCode(),
+                    "no Measure to order by: the key-order fallback would leak, so it is refused");
+            // An ordering that is NOT cosmetic is still refused, and so is a cosmetic flag on a hidden aggregate.
+            assertEquals(422, bi(c, "viewer", "calls_ds", cosmetic.replace(",\"cosmetic\":true", "")).statusCode());
+            assertEquals(422, bi(c, "viewer", "calls_ds", "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"region\"],"
+                    + "\"orderBy\":[{\"field\":\"msisdn\",\"dir\":\"asc\",\"agg\":\"min\",\"cosmetic\":true}]").statusCode());
+            // A cosmetic order over an unmasked dimension is kept; a revealer keeps the order on the masked one too.
+            JsonNode region = V1Body.of(bi(c, "viewer", "calls_ds", "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"region\"],"
+                    + "\"orderBy\":[{\"field\":\"region\",\"dir\":\"desc\",\"cosmetic\":true}]").body());
+            assertEquals(List.of("US", "EU"), column(region.get("rows"), "region"));
+            JsonNode r = V1Body.of(bi(c, "revealer", "calls_ds", cosmetic).body());
+            assertEquals(List.of(A, B, C), column(r.get("rows"), "msisdn"), "an admin with reveal is unaffected");
+        }
+    }
+
+    @Test
     void aCalculatedColumnThatNamesAMaskedColumnIsMaskedToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seed(c, Map.of("calculated", List.of(Map.of("name", "msisdn_up", "expr", "upper(msisdn)"))));

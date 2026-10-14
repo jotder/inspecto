@@ -914,7 +914,10 @@ public final class AlertService {
                          List<Alert> out, ObjectIndex index) {
         String scope = rule.dataset();
         boolean storm = STORM_KEY.equals(key);
-        String label = storm ? textScope(rule, scope) : textScope(rule, scope) + " for " + keyLabel(keyValues);
+        // Operator decision 2026-10-14: an Alert is per RULE and carries no entity. The key is NOT in the title, message,
+        // event or log (a raw MSISDN there reaches every reader, masked or not); it rides in the structured `key` /
+        // `key.<column>` attributes, which the object read masking covers.
+        String label = textScope(rule, scope);
         Alert alert = storm ? Alert.storm(rule, scope, label, (long) value, nowMs)
                 : Alert.of(rule, scope, label, value, nowMs);
         fired.addFirst(alert);
@@ -1004,8 +1007,8 @@ public final class AlertService {
         String message = STORM_KEY.equals(key)
                 ? String.format(Locale.ROOT, "CLEARED: the storm on %s is over — at most %d keys breach alert rule %s",
                         textScope(rule, scope), rule.stormCap(), rule.name())
-                : String.format(Locale.ROOT, "CLEARED: %s for %s no longer breaches alert rule %s",
-                        textScope(rule, scope), key, rule.name());
+                : String.format(Locale.ROOT, "CLEARED: %s no longer breaches alert rule %s for one of its keys",
+                        textScope(rule, scope), rule.name());
         log.info("[ALERT-CLEARED] {}", message);
         EventLog.current().emit(Event.builder(EventType.ALERT_CLEARED)
                 .level(EventLevel.INFO)

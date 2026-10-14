@@ -61,13 +61,14 @@ export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
     };
 }
 
-/** The ORDER BY of an XY query: alphabetical by the dimensions, or — when the widget set `options.categoryOrder` —
+/** The ORDER BY of an XY query (terms over a grouped dimension carry `cosmetic`: the server drops them rather than 422s when
+ *  that dimension is a masked key for a caller who cannot reveal): alphabetical by the dimensions, or — when the widget set `options.categoryOrder` —
  *  that term first (a hidden `agg` only for a column the result does not carry), the dimensions still breaking ties. */
 function categoryOrderBy(groupBy: string[], co: VizRenderOptions['categoryOrder']): NonNullable<QuerySpec['orderBy']> {
-    const alphabetical = groupBy.map((f) => ({ field: f, dir: 'asc' as const }));
+    const alphabetical = groupBy.map((f) => ({ field: f, dir: 'asc' as const, cosmetic: true }));
     if (!co?.field) return alphabetical;
     const hidden = !groupBy.includes(co.field);
-    const term = { field: co.field, dir: co.dir, ...(hidden ? { agg: co.agg ?? ('min' as const) } : {}) };
+    const term = { field: co.field, dir: co.dir, ...(hidden ? { agg: co.agg ?? ('min' as const) } : { cosmetic: true }) };
     return [term, ...alphabetical.filter((t) => t.field !== co.field)];
 }
 

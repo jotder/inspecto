@@ -84,11 +84,12 @@ final class BiRoutes implements RouteModule {
                     "error", "compiled BI query failed the SQL safety check", "findings", findings));
 
         // 3. Resolve the dataset to its trusted relation and execute in the sandbox.
-        Map<String, Object> dataset = store.get("dataset", spec.dataset())
+        final String datasetId = spec.dataset();
+        Map<String, Object> dataset = store.get("dataset", datasetId)
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + spec.dataset() + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
         if (!ComponentAccess.canView(ex, dataset))   // R3: shared-away ⇒ indistinguishable from absence
-            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + spec.dataset() + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'");
         String relationSql;
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
@@ -100,15 +101,22 @@ final class BiRoutes implements RouteModule {
         // BI-QUERY-MASKING-1: classified entity keys are masked in the rows unless the caller may reveal them.
         BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")),
                 spec.dataset(), dataset, BiResultMasking.mayReveal(ex));
-        String boundText = null;
+        String queryId = ApiContext.str(body, "query");
+        String boundText = queryId == null ? null : boundQueryWith(ex, store, queryId, spec);
+        // The chart's cosmetic category order over a masked key is dropped (not refused) for a caller who cannot reveal.
+        MeasureCompiler.Spec stripped = masking.stripCosmeticOrder(spec, boundText);
+        if (stripped != spec) {
+            spec = stripped;
+            probe = spec.withLimit(spec.limit() + 1);
+            sql = MeasureCompiler.compile(probe);
+            echoSql = MeasureCompiler.render(spec);
+        }
 
         // 4. QUERY-BOUND-WIDGET-1: a Widget bound to a saved Query aggregates over THAT query's result, so the
         //    query's own filtering reaches the Widget. Its text is read and rendered NOW (parameter defaults
         //    + session context), never baked at save time, and the whole statement is re-guarded.
-        String queryId = ApiContext.str(body, "query");
         if (queryId != null) {
-            String with = boundQueryWith(ex, store, queryId, spec);
-            boundText = with;
+            String with = boundText;
             MeasureCompiler.Compiled over = MeasureCompiler.compile(overBound(probe));
             // The WITH carries no placeholders (the query text is rendered), so the Measure's parameters stay in order.
             sql = new MeasureCompiler.Compiled(with + over.sql(), over.params());

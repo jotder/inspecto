@@ -8,7 +8,7 @@ describe('buildXyQuery — options.categoryOrder', () => {
     const values: ControlValues = { x: [{ field: 'stage' }], y: [{ field: 'goals', agg: 'sum' }] };
 
     it('stays alphabetical without the option (older saved Widgets unaffected)', () => {
-        expect(buildXyQuery(values, CTX).orderBy).toEqual([{ field: 'stage', dir: 'asc' }]);
+        expect(buildXyQuery(values, CTX).orderBy).toEqual([{ field: 'stage', dir: 'asc', cosmetic: true }]);
     });
 
     it('orders by a hidden aggregate of a Dataset column outside the result, the dimension breaking ties', () => {
@@ -18,7 +18,7 @@ describe('buildXyQuery — options.categoryOrder', () => {
         });
         expect(spec.orderBy).toEqual([
             { field: 'stage_order', dir: 'desc', agg: 'min' },
-            { field: 'stage', dir: 'asc' },
+            { field: 'stage', dir: 'asc', cosmetic: true },
         ]);
         const max = buildXyQuery(values, {
             ...CTX,
@@ -29,7 +29,7 @@ describe('buildXyQuery — options.categoryOrder', () => {
 
     it('sends no agg for the grouped dimension itself', () => {
         const spec = buildXyQuery(values, { ...CTX, options: { categoryOrder: { field: 'stage', dir: 'desc' } } });
-        expect(spec.orderBy).toEqual([{ field: 'stage', dir: 'desc' }]);
+        expect(spec.orderBy).toEqual([{ field: 'stage', dir: 'desc', cosmetic: true }]);
     });
 });
 
@@ -52,8 +52,8 @@ describe('buildXyQuery', () => {
         expect(spec.grains).toBeUndefined();
         // Categories follow row order, so the query orders by its dimensions (hash order scrambled months).
         expect(spec.orderBy).toEqual([
-            { field: 'tariff', dir: 'asc' },
-            { field: 'cell_id', dir: 'asc' },
+            { field: 'tariff', dir: 'asc', cosmetic: true },
+            { field: 'cell_id', dir: 'asc', cosmetic: true },
         ]);
     });
 

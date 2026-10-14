@@ -59,7 +59,9 @@ export interface QuerySpec {
     filters?: ConditionGroup | null;
     /** `agg` marks a hidden-aggregate term (CATEGORY-SORT-ORDER-1): `field` is a Dataset column NOT in the result,
      *  ordered as `agg(field)` server-side while the grouping is unchanged. Absent = a result column. */
-    orderBy?: { field: string; dir: SortDir; agg?: 'min' | 'max' }[];
+    /** `cosmetic` = the chart's own category ordering over a grouped dimension: the server DROPS it (never 422s) when
+     *  that column is a masked key for the caller; any non-cosmetic ordering on a masked column is still refused. */
+    orderBy?: { field: string; dir: SortDir; agg?: 'min' | 'max'; cosmetic?: boolean }[];
     limit?: number | null;
     /** A saved Query (R3) the Widget is bound to — the server aggregates over that query's result, read and
      *  rendered at run time, instead of the whole Dataset (QUERY-BOUND-WIDGET-1). Absent = the Dataset. */
