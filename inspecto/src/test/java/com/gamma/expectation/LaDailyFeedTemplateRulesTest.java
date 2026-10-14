@@ -26,6 +26,23 @@ class LaDailyFeedTemplateRulesTest {
         return AlertRule.fromMap(c.content());
     }
 
+    /**
+     * A raw {@code #} line in a .toon file TRUNCATES the file at that line (project memory, TOON traps): the la-showcase
+     * {@code mule_transfers} Pipeline had one above {@code collector:}, so its whole collector block - gap_detection
+     * and file_template included - was dropped and it never wrote a day-manifest (LA-DATA-TRUST-1 live drive, 2026-10-14).
+     */
+    @Test
+    void noShippedTemplateToonFileHasARawCommentLine() throws Exception {
+        Path templates = Path.of("..", "spaces", "_templates").toAbsolutePath().normalize();
+        List<String> bad = new java.util.ArrayList<>();
+        try (var files = java.nio.file.Files.walk(templates)) {
+            for (Path f : (Iterable<Path>) files.filter(x -> x.toString().endsWith(".toon"))::iterator)
+                for (String line : java.nio.file.Files.readAllLines(f))
+                    if (line.stripLeading().startsWith("#")) bad.add(templates.relativize(f) + ": " + line.strip());
+        }
+        assertTrue(bad.isEmpty(), "a raw # line truncates a TOON file: " + bad);
+    }
+
     @Test
     void theFreshnessRuleFollowsThePollIntervalOfTheFeedingPipeline() {
         AlertRule r = rule("daily_xdr_freshness");
