@@ -251,6 +251,34 @@ class ControlApiDossierDataFooterTest {
         }
     }
 
+    /** S10 live drive: an Investigation with no window still has days to judge - over the span of the Files delivered. */
+    @Test
+    void anInvestigationWithNoWindowJudgesDaysOverTheSpanOfTheFiles(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        CollectorCoveragePorts.forTest(new CollectorCoveragePort() {
+            @Override
+            public Optional<List<Delivery>> deliveries(com.gamma.spi.http.ApiContext api, Map<String, Object> dataset) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<List<FileEntry>> files(com.gamma.spi.http.ApiContext api, Map<String, Object> dataset) {
+                return Optional.of(List.of(
+                        new FileEntry("a.csv", "2026-09-01", 3, 0, "2026-09-02T00:00:00Z", "SUCCESS", "c1", "p1", "b1", List.of("/x/a.parquet")),
+                        new FileEntry("c.csv", "2026-09-03", 3, 0, "2026-09-04T00:00:00Z", "SUCCESS", "c1", "p1", "b2", List.of("/x/c.parquet"))));
+            }
+        });
+        try (Ctx c = open(cfg, root, true)) {
+            ok(c, "POST", "/inv/investigations", CREATE);
+            ok(c, "POST", INV + "/ops", "{\"op\":\"seed\",\"ids\":[\"alice\"]}");
+            JsonNode f = ok(c, "GET", INV + "/dossier", null).get("dataFooter");
+            assertEquals(3, f.get("expectedDays").asInt(), f.toString());
+            assertEquals("[\"2026-09-02\"]", f.get("missingDays").toString());
+            assertEquals("files", f.get("windowBasis").asText(), "the footer says the span is the Files'");
+            assertFalse(f.get("notAssessed").toString().contains("days"), f.toString());
+        }
+    }
+
     @Test
     void aNonOwnerGetsTheDossiersOwn404NotAFooter(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();

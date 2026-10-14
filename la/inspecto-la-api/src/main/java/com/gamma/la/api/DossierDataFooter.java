@@ -80,21 +80,23 @@ final class DossierDataFooter {
         } catch (RuntimeException unreadable) {
             notAssessed.add("index");
         }
+        List<?> fileDays = List.of();
         try {
             Map<String, Object> files = DatasetFilesRoutes.read(api, o.writeRoot(), dataset, id, 1, 0, null);
             if (Boolean.TRUE.equals(files.get("assessed")) && files.get("summary") instanceof Map<?, ?> s) f.put("filesWaiting", s.get("waiting"));
             else notAssessed.add("files");
+            if (files.get("days") instanceof List<?> d) fileDays = d;
         } catch (RuntimeException unreadable) {
             notAssessed.add("files");
         }
-        days(api, ex, o, log, at, f, notAssessed);
+        days(api, ex, o, log, at, f, notAssessed, fileDays);
         return f;
     }
 
     /** The missing days over the window in force at the Dossier's step; not assessed without a time column or a bounded window. */
     @SuppressWarnings("unchecked")
     private static void days(ApiContext api, HttpExchange ex, DossierRoutes.Opened o, List<String> log, int at, Map<String, Object> f,
-                             List<String> notAssessed) {
+                             List<String> notAssessed, List<?> fileDays) {
         try {
             if (o.inv().header().get("timeCol") == null) {
                 notAssessed.add("days");
@@ -104,8 +106,13 @@ final class DossierDataFooter {
             for (String line : log) entries.add(ApiContext.JSON.readValue(line, Map.class));
             Map<String, Object> window = InvestigationEvaluator.evaluate(entries, at, null).window;
             if (window == null || window.get("from") == null || window.get("to") == null) {
-                notAssessed.add("days");
-                return;
+                // An Investigation with no window still has days to judge: the span of the Files delivered (S10 live drive).
+                window = filesSpan(fileDays);
+                if (window == null) {
+                    notAssessed.add("days");
+                    return;
+                }
+                f.put("windowBasis", "files");
             }
             InvestigationCoverageRoutes.Gaps g = InvestigationCoverageRoutes.gaps(api, ex, o.inv(), window);
             f.put("window", Map.of("from", String.valueOf(window.get("from")), "to", String.valueOf(window.get("to")), "zone", g.zone()));
@@ -114,5 +121,24 @@ final class DossierDataFooter {
         } catch (java.io.IOException | RuntimeException unreadable) {
             notAssessed.add("days");
         }
+    }
+
+    /** [first Files day 00:00Z, day after the last 00:00Z), or null when no Files day is known. */
+    static Map<String, Object> filesSpan(List<?> fileDays) {
+        java.util.TreeSet<java.time.LocalDate> days = new java.util.TreeSet<>();
+        for (Object d : fileDays) {
+            if (d instanceof Map<?, ?> m && m.get("day") instanceof String day) {
+                try {
+                    days.add(java.time.LocalDate.parse(day));
+                } catch (java.time.format.DateTimeParseException ignored) {
+                    // a day that is not an ISO date takes no part in the span
+                }
+            }
+        }
+        if (days.isEmpty()) return null;
+        Map<String, Object> w = new LinkedHashMap<>();
+        w.put("from", days.first() + "T00:00:00Z");
+        w.put("to", days.last().plusDays(1) + "T00:00:00Z");
+        return w;
     }
 }
