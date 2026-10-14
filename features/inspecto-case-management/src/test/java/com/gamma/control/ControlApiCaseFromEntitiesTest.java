@@ -43,6 +43,8 @@ class ControlApiCaseFromEntitiesTest {
     private static final Authenticator FAKE = ex -> {
         String auth = ex.getRequestHeaders().getFirst("Authorization");
         if ("Bearer manager".equals(auth)) return Optional.of(new Subject("mia", Set.of("canManageIncidents")));
+        if ("Bearer viewer".equals(auth)) return Optional.of(new Subject("vic", Set.of("canManageIncidents")));
+        if ("Bearer revealer".equals(auth)) return Optional.of(new Subject("rex", Set.of("canManageIncidents", "canRevealLinkEntities")));
         if ("Bearer analyst".equals(auth)) return Optional.of(new Subject("ana", Set.of("canOperateRuns")));
         return Optional.empty();
     };
@@ -68,6 +70,68 @@ class ControlApiCaseFromEntitiesTest {
         ControlApi api = new ControlApi(svc, 0);
         api.start();
         return new Ctx(svc, api, api.port());
+    }
+
+    /** A Space with a write root and a Dataset {@code fraud_ds} whose {@code msisdn} is classified MSISDN. */
+    private Ctx openClassified(Path dir, Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
+        System.setProperty("assist.write.root", root.toString());
+        try {
+            CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
+            ControlApi api = new ControlApi(svc, 0);
+            api.start();
+            new com.gamma.pipeline.ComponentStore(root.resolve("registry")).write("dataset", "fraud_ds", Map.of("columns",
+                    List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            return new Ctx(svc, api, api.port());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    private static final String RAW_BODY = """
+            {"title":"Probe","entities":[{"id":"entity:99970001401","dataset":"fraud_ds"}]}""";
+
+    @Test
+    void aNonRevealerCannotMintOrProbeARawKeyOfAClassifiedDatasetAndARevealerIsUnchanged(
+            @TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = openClassified(dir, root)) {
+            // No Incident exists for the key: refused, nothing written.
+            HttpResponse<String> absent = post(c.port, "/cases/from-entities", RAW_BODY, "viewer");
+            assertEquals(422, absent.statusCode(), absent.body());
+            assertTrue(TestOpsEngine.of(c.svc).query(ObjectQuery.recent(10)).isEmpty());
+
+            // A revealer mints it (unchanged behaviour); then an Incident EXISTS for the key.
+            HttpResponse<String> made = post(c.port, "/cases/from-entities", RAW_BODY, "revealer");
+            assertEquals(200, made.statusCode(), made.body());
+            assertTrue(V1Body.of(made.body()).get("members").get(0).get("minted").asBoolean());
+            assertEquals(99970001401L, Long.parseLong(V1Body.of(made.body()).get("members").get(0)
+                    .get("attributes").get("entityKey").asText().substring("entity:".length())), "a revealer sees the raw key");
+            HttpResponse<String> reused = post(c.port, "/cases/from-entities", RAW_BODY, "revealer");
+            assertFalse(V1Body.of(reused.body()).get("members").get(0).get("minted").asBoolean());
+
+            // The non-revealer's answer is IDENTICAL whether or not an Incident exists: no existence oracle.
+            HttpResponse<String> present = post(c.port, "/cases/from-entities", RAW_BODY, "viewer");
+            assertEquals(absent.statusCode(), present.statusCode());
+            assertEquals(absent.body().replaceAll("\"correlationId\":\"[^\"]*\"", ""),
+                    present.body().replaceAll("\"correlationId\":\"[^\"]*\"", ""), "same shape and message either way");
+            assertFalse(present.body().contains("99970001401"), "the refusal never echoes the key");
+        }
+    }
+
+    @Test
+    void aMaskedPseudonymIsRefusedAsAnEntityKeyForEveryone(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            for (String id : List.of("masked:0123456789abcdef", "entity:masked:0123456789abcdef", "account:masked:0123456789abcdef")) {
+                for (String who : List.of("manager", "revealer")) {
+                    HttpResponse<String> r = post(c.port, "/cases/from-entities",
+                            "{\"title\":\"T\",\"entities\":[{\"id\":\"" + id + "\",\"dataset\":\"orders\"}]}", who);
+                    assertEquals(422, r.statusCode(), id + " as " + who + ": " + r.body());
+                    assertFalse(r.body().contains("0123456789abcdef"), "value-free: " + r.body());
+                }
+            }
+            assertTrue(TestOpsEngine.of(c.svc).query(ObjectQuery.recent(10)).isEmpty(), "nothing was written");
+        }
     }
 
     @Test

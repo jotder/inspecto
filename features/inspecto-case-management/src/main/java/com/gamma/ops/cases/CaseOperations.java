@@ -53,6 +53,10 @@ public final class CaseOperations {
             // LA-17 D-M6: untyped ids are 'entity:<key>', typed ones '<type>:<key>' (an Entity Type id).
             if (entityKey == null || !entityKey.matches("[a-z][a-z0-9_]{0,31}:.+"))
                 throw new IllegalArgumentException("an entity needs its node id ('entity:…' or '<type>:…'), got '" + entityKey + "'");
+            // A mask pseudonym (`masked:<hex>`, bare or after a type) is not a key: an Incident keyed on one could never be
+            // found by the real key. Refused for EVERY caller, value-free (decision 2026-10-15: reveal in Link Analysis first).
+            if (entityKey.matches("([a-z][a-z0-9_]{0,31}:)?masked:.*"))
+                throw new IllegalArgumentException("an entity cannot be keyed on a masked pseudonym - a Case is keyed on the real key");
             if (dataset == null || dataset.isBlank())
                 throw new IllegalArgumentException("entity '" + entityKey + "' needs the Dataset it was projected from");
             label = label == null || label.isBlank() ? entityKey : label.trim();

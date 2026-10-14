@@ -260,8 +260,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/jobs/packs/rescan` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:99` |
 | POST | `/jobs/runs/([^/]+)/replay` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:111` |
 | PUT | `/nav/menus` | gated | `canCurateMenus` | `inspecto/src/main/java/com/gamma/control/NavRoutes.java:39` |
-| POST | `/notes/([^/]+)/([^/]+)/attachments` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:58` |
-| POST | `/notes/([^/]+)/([^/]+)/comments` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:56` |
+| POST | `/notes/([^/]+)/([^/]+)/attachments` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:59` |
+| POST | `/notes/([^/]+)/([^/]+)/comments` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:57` |
 | DELETE | `/notifications/(?!suppressions$)([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java:94` |
 | POST | `/notifications/([^/]+)/read` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java:56` |
 | POST | `/notifications/([^/]+)/unread` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java:57` |

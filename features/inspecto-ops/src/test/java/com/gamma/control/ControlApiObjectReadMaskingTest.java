@@ -275,4 +275,31 @@ class ControlApiObjectReadMaskingTest {
             assertEquals(ids(JSON.readTree(get(c, "viewer", "/objects?correlationId=" + maskedCid).body()).get("data")).trim(), withCid.id());
         }
     }
+
+    @Test
+    void aCommentThatCarriesTheKeyIsMaskedForANonRevealerAndLinksAreStructuralOnly(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            String id = open(c, ObjectType.INCIDENT).id(), other = open(c, ObjectType.INCIDENT).id();
+            assertEquals(200, send(c, "workrev", "POST", "/objects/" + id + "/comments",
+                    "{\"body\":\"called " + RAW + " back\"}").statusCode());
+            for (String path : List.of("/objects/" + id + "/comments", "/notes/object/" + id + "/comments")) {
+                String viewer = get(c, "viewer", path).body();
+                assertFalse(viewer.contains(RAW), path + ": " + viewer);
+                assertTrue(viewer.contains("called masked:"), path + ": " + viewer);
+                assertTrue(get(c, "revealer", path).body().contains("called " + RAW + " back"), path);
+            }
+            // The comment POST echo for a non-revealer is masked too.
+            assertFalse(send(c, "worker", "POST", "/objects/" + id + "/comments", "{\"body\":\"x " + RAW + "\"}").body().contains(RAW));
+            // ObjectLink carries ids, types, a relationship word and a timestamp, no free text: pin the exact shape.
+            assertEquals(200, send(c, "worker", "POST", "/objects/" + id + "/links", "{\"to\":\"" + other + "\"}").statusCode());
+            JsonNode links = JSON.readTree(get(c, "viewer", "/objects/" + id + "/links").body()).get("data");
+            assertTrue(links.size() >= 1);
+            links.forEach(l -> {
+                List<String> names = new java.util.ArrayList<>();
+                l.fieldNames().forEachRemaining(names::add);
+                assertEquals(List.of("from", "fromType", "to", "toType", "relationship", "createdAt"), names);
+                assertFalse(l.toString().contains(RAW));
+            });
+        }
+    }
 }

@@ -91,13 +91,21 @@ public final class CaseRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_CASE_ENTITIES + " entities per Case, got " + raw.size());
         List<CaseOperations.EntityMember> entities = new java.util.ArrayList<>();
         List<String> existing = new java.util.ArrayList<>();
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
         try {
             for (Object o : raw) {
                 if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each entity must be an object");
                 Object objectId = m.get("objectId");
                 if (objectId != null && !objectId.toString().isBlank()) existing.add(objectId.toString().trim());
-                else entities.add(new CaseOperations.EntityMember(text(m.get("id")), text(m.get("dataset")),
-                        text(m.get("label"))));
+                else {
+                    CaseOperations.EntityMember member = new CaseOperations.EntityMember(text(m.get("id")),
+                            text(m.get("dataset")), text(m.get("label")));
+                    // A caller who may not reveal must not mint from (nor, through the reuse path, probe for) a raw key
+                    // of a classified Dataset: refused value-free, identically whether or not an Incident exists.
+                    if (masking != null && masking.hides(Map.of("entityDataset", member.dataset()), "entityKey"))
+                        throw new IllegalArgumentException("an entity of a classified Dataset needs canRevealLinkEntities");
+                    entities.add(member);
+                }
             }
             CaseOperations.EntityCase made = cases(api).openCaseFromEntities(title,
                     ApiContext.str(body, "description"), entities, existing, o -> ObjectRoutes.visibleTo(ex, o),

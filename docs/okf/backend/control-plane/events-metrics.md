@@ -382,7 +382,7 @@ timestamp: 2026-07-16T00:00:00Z
     **Mutation echoes (closed).** Every write route that returns an object (`/ack`, `/resolve`, `/transition`,
     `/assign`, PATCH, `/category`, `/postmortem`, `/impact`, `/findings`, `POST /objects`, and the Case open-from-entities,
     merge and split bodies) goes through the one helper `ObjectReadMasking.echo`, so a non-revealer never gets the raw key.
-    Link and comment echoes carry no object. **`/objects/by-entity` (decision for the operator, fail closed):** an object
+    Link echoes carry no object. **`/objects/by-entity` (decision for the operator, fail closed):** an object
     whose matching attribute is masked for the caller (`ObjectReadMasking.hides`) is dropped from the result, so a raw
     number a non-revealer supplies is never confirmed as under investigation (empty, indistinguishable from absence, and
     `total` does not count it); unclassified keys still match, a revealer / no-Subject is unchanged. The raw-number
@@ -390,6 +390,22 @@ timestamp: 2026-07-16T00:00:00Z
     `POST /inv/case-history`). Row titles of surviving matches are unmasked text. Real-HTTP test
     `ControlApiObjectReadMaskingTest` (list, detail, echoes, no-dataset, entityKey, by-entity); unit
     `ObjectReadMaskingTest`.
+    **Residuals (4) and (6), built 2026-10-15 (`OBJECT-READ-MASKING-RESIDUALS-1`).** (4) `ObjectLink.toMap` is structural
+    only (`from`, `fromType`, `to`, `toType`, `relationship`, `createdAt`; the graph edges, `/objects/{id}/links` and the link
+    create echo all use it), so there is nothing to mask; a real-HTTP test pins the exact key list. Free text that CAN carry the
+    key is a note: comment `body` and attachment `attributes` (name, uri) are written by users (the only system-authored
+    notes, Case merge/split, name a Case title, not an Incident key). `GET /objects/{id}/comments`, `/attachments`, the
+    comment create echo and `GET /notes/object/{id}[/comments|/attachments]` now replace the object's OWN classified keys inline
+    for a non-revealer (`ObjectReadMasking.note`); stored notes stay raw. Not covered: the RCA-apply echo (template text) and a
+    key that is not one of the object's own attributes. (6) `POST /cases/from-entities`: **decision 1 (operator to confirm):** a
+    mask pseudonym (`masked:<hex>`, bare or after a type) is refused as an entity key for EVERY caller (422, value-free), because
+    an Incident keyed on a token could never be found by the real key; the Link Analysis picker (`case-members.ts`) no longer
+    offers a masked node, and the way to a Case from a masked node is to reveal first or join an existing Incident
+    (`{objectId}`). **Decision 2 (operator to confirm):** for a non-revealer an entity of a classified Dataset (the same fail
+    closed test as `entityKey` masking, `ObjectReadMasking.hides`) is refused 422 value-free BEFORE any lookup, so the answer
+    is identical whether or not an Incident exists for the key (no `minted` / reuse oracle); the cost is that a non-revealer
+    can no longer mint from a classified Dataset at all. A revealer or no-Subject request is unchanged. Tests:
+    `ControlApiCaseFromEntitiesTest`, `ControlApiObjectReadMaskingTest`, `case-members.spec.ts`.
     **Follow-ups (closed, `OBJECT-READ-MASKING-RESIDUALS-1`).** (1) `GET /objects/{id}/graph` masks each node `title` with
     THAT node's own attributes (same `ObjectReadMasking`). (2) `OBJECT_OPENED` is emitted WITHOUT the title
     (`<type> opened [<id>]`; the title is on the object, nothing consumed it); the append-only log still holds older raw rows,

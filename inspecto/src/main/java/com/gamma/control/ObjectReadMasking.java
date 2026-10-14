@@ -87,13 +87,11 @@ public final class ObjectReadMasking {
         return sens.contains(EvidenceMasker.UNKNOWN_LINEAGE) || sens.contains(column.toLowerCase(Locale.ROOT));
     }
 
-    @SuppressWarnings("unchecked")
-    Map<String, Object> maskObject(Map<String, Object> row) {
-        if (!(row.get("attributes") instanceof Map<?, ?> a)) return row;
-        Map<String, String> attrs = (Map<String, String>) a;
+    /** raw key value to mask token, for one object's own classified keys; empty when it has none. */
+    private Map<String, String> replacements(Map<String, String> attrs) {
         Set<String> sens = sensitiveOfObject(attrs);
-        if (sens.isEmpty()) return row;
         Map<String, String> replaced = new LinkedHashMap<>();
+        if (sens.isEmpty()) return replaced;
         attrs.forEach((k, v) -> {
             if (k.startsWith("key.") && v != null && hit(sens, k.substring(4))) replaced.put(v, masker.tokenFor(v));
         });
@@ -102,6 +100,36 @@ public final class ObjectReadMasking {
         String entityKey = attrs.get("entityKey");
         String bare = entityKey == null ? null : bareEntityKey(entityKey);
         if (bare != null) replaced.put(bare, masker.tokenFor(bare));
+        return replaced;
+    }
+
+    /**
+     * A note (comment / attachment) on an object, for a caller who may not reveal: its free text ({@code body} and the
+     * attribute values, e.g. an attachment name / uri) can carry the object's raw key, so the object's own classified keys
+     * are replaced inline. {@code objectRow} is the object's {@code toMap()}; the note when {@code masking} is {@code null}.
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> note(ObjectReadMasking masking, Map<String, Object> objectRow, Map<String, Object> note) {
+        if (masking == null || !(objectRow.get("attributes") instanceof Map<?, ?> a)) return note;
+        Map<String, String> replaced = masking.replacements((Map<String, String>) a);
+        if (replaced.isEmpty()) return note;
+        Map<String, Object> out = new LinkedHashMap<>(note);
+        if (out.get("body") instanceof String s) out.put("body", inline(s, replaced));
+        if (out.get("attributes") instanceof Map<?, ?> na) {
+            Map<String, String> m = new LinkedHashMap<>();
+            na.forEach((k, v) -> m.put(String.valueOf(k), v == null ? null : inline(v.toString(), replaced)));
+            out.put("attributes", m);
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> maskObject(Map<String, Object> row) {
+        if (!(row.get("attributes") instanceof Map<?, ?> a)) return row;
+        Map<String, String> attrs = (Map<String, String>) a;
+        Map<String, String> replaced = replacements(attrs);
+        String entityKey = attrs.get("entityKey");
+        String bare = entityKey == null ? null : bareEntityKey(entityKey);
         if (replaced.isEmpty()) return row;
         Map<String, String> maskedAttrs = new LinkedHashMap<>();
         attrs.forEach((k, v) -> maskedAttrs.put(k, v == null ? null

@@ -89,9 +89,9 @@ public final class ObjectRoutes implements RouteModule {
         api.delete("/objects/([^/]+)/links", scoped(api, (e, m) -> deleteLink(api, ApiContext.name(m), e)));
         api.get("/objects/([^/]+)/graph", scoped(api, (e, m) -> objectGraph(api, ApiContext.name(m), e)));
         api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, e, ApiContext.name(m), api.body(e))));
-        api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT))));
+        api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> maskedNotes(api, e, ApiContext.name(m), toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT)))));
         api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, ApiContext.name(m), api.body(e))));
-        api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT))));
+        api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> maskedNotes(api, e, ApiContext.name(m), toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT)))));
         api.post("/objects/([^/]+)/rca", scoped(api, (e, m) -> applyRca(api, ApiContext.name(m), api.body(e))));
         // Operator decision 2026-09-25: saving a Case's FINDINGS VALUES is collaboration, like a comment — open
         // to anyone who can see the object (the scope guard still answers 404), recorded in
@@ -568,7 +568,7 @@ public final class ObjectRoutes implements RouteModule {
         if (text == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'body'");
         String author = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.str(body, "author"));
         try {
-            return OpsEngine.of(api).comment(id, author, text).toMap();
+            return maskedNotes(api, ex, id, List.of(OpsEngine.of(api).comment(id, author, text).toMap())).get(0);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -588,6 +588,14 @@ public final class ObjectRoutes implements RouteModule {
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
+    }
+
+    /** An object's notes for this caller: free text can carry the object's raw key, masked unless the caller reveals. */
+    private static List<Map<String, Object>> maskedNotes(ApiContext api, HttpExchange ex, String id, List<Map<String, Object>> notes) {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        if (masking == null) return notes;
+        Map<String, Object> row = OpsEngine.of(api).get(id).map(OperationalObject::toMap).orElse(Map.of());
+        return notes.stream().map(n -> ObjectReadMasking.note(masking, row, n)).toList();
     }
 
     private static List<Map<String, Object>> toNoteMaps(List<ObjectNote> notes) {
