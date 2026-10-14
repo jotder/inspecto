@@ -1,6 +1,6 @@
 # Link Analysis data trust — what data am I looking at? (`LA-DATA-TRUST-1`)
 
-**Status: ACTIVE plan, opened 2026-10-14 (operator).** Nothing built yet. When a slice ships, distil its as-built
+**Status: ACTIVE plan, opened 2026-10-14 (operator). S1-S9 BUILT 2026-10-14** (S1 Files route, S2 Data strip, S3/S4 freshness and index Alerts, S5 corrected-day warning + banner, S6 file-problem Alert, S7 volume Expectation, S8 template, S9 Dossier footer; as-built in `okf/frontend/features/link-analysis.md` section *Data trust*). **Open: S10 the live drive** on a fresh `la-app` bundle; archive this plan when it passes. When a slice ships, distil its as-built
 facts into `okf/frontend/features/link-analysis.md` (and `okf/capabilities/ingestion/ingestion.md` for the
 Collector side), move residuals to `docs/BACKLOG.md`, then archive this plan (CLAUDE.md, tier 2).
 
