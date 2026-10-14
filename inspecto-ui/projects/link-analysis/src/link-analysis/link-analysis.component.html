@@ -1,12 +1,7 @@
 <div #studioRoot class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-md:h-auto">
-    <!-- ── compact header (the canvas gets the space) ── -->
-    <inspecto-page-header
-        compact
-        title="Link Analysis"
-        [subtitle]="graph() ? '' : 'Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it.'"
-        [terms]="['Entity', 'Link', 'Dataset', 'Pipeline']"
-    >
-        <div badge class="flex min-w-0 flex-1 items-center">
+    <!-- ── header = the toolbar only (operator 2026-10-15); the title and the page info live in the footer status bar ── -->
+    <header class="flex min-w-0 flex-wrap items-center gap-2" data-testid="la-header">
+        <div class="flex min-w-0 flex-1 items-center">
         <nav
             class="flex min-w-0 flex-row flex-wrap items-center gap-1 rounded-lg border px-1"
             style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
@@ -623,7 +618,7 @@
             }
         </nav>
         </div>
-        <ng-container actions>
+        <div class="flex shrink-0 items-center gap-2">
             <button
                 mat-icon-button
                 (click)="toggleCanvasMaximized()"
@@ -640,8 +635,8 @@
                     "
                 ></mat-icon>
             </button>
-        </ng-container>
-    </inspecto-page-header>
+        </div>
+    </header>
 
     <div class="mt-1 flex min-h-0 flex-auto flex-col gap-2">
         @if (loadError()) {
@@ -796,8 +791,10 @@
                         aria-label="Link graph"
                         tabindex="-1"
                         data-testid="la-graph-region"
+                        (keydown)="onGraphKeydown($event)"
                     >
                         <p class="sr-only" role="status" data-testid="la-draw-announcement">{{ drawAnnouncement() }}</p>
+                        <p class="sr-only" role="status" data-testid="la-selection-announcement">{{ selectionAnnouncement() }}</p>
                         <inspecto-graph-view
                             [fill]="true"
                             [data]="canvasData()"
@@ -808,9 +805,70 @@
                             [attr.inert]="listMode() ? '' : null"
                             [layout]="layoutId()"
                             [plugins]="canvasPlugins()"
+                            [interaction]="canvasInteraction"
+                            [selection]="selectedOnCanvas()"
                             (nodeClick)="onNodeClick($event)"
+                            (nodeDblClick)="onNodeDblClick($event)"
+                            (selectionChange)="onSelectionChange($event)"
                             (edgeClick)="onEdgeClick($event)"
                         ></inspecto-graph-view>
+                        <!-- the box selection: what it does. An OVERLAY, so selecting never changes the layout or resizes the canvas -->
+                        @if (selectedOnCanvas().length) {
+                            <div
+                                class="absolute left-1/2 top-2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border px-1 shadow"
+                                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                                role="group"
+                                aria-label="Selection"
+                                data-testid="la-selection-bar"
+                            >
+                                <span class="px-1 text-xs font-medium" data-testid="la-selection-count">
+                                    {{ selectedOnCanvas().length }} selected
+                                </span>
+                                <button
+                                    mat-icon-button
+                                    (click)="expandFromSelected()"
+                                    matTooltip="Expand from the selected nodes"
+                                    [attr.aria-label]="'Expand from the ' + selectedOnCanvas().length + ' selected nodes'"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:plus-circle"></mat-icon>
+                                </button>
+                                <button
+                                    mat-icon-button
+                                    (click)="hideSelected()"
+                                    matTooltip="Hide the selected nodes"
+                                    [attr.aria-label]="'Hide the ' + selectedOnCanvas().length + ' selected nodes'"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:eye-slash"></mat-icon>
+                                </button>
+                                @if (investigation.canvas()) {
+                                    <button
+                                        mat-icon-button
+                                        (click)="excludeSelected()"
+                                        matTooltip="Exclude the selected nodes from the Working Set (asks for a reason)"
+                                        [attr.aria-label]="'Exclude the ' + selectedOnCanvas().length + ' selected nodes'"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:no-symbol"></mat-icon>
+                                    </button>
+                                }
+                                <button
+                                    mat-icon-button
+                                    (click)="openAttachToCase()"
+                                    [disabled]="!!attachUnavailable()"
+                                    [matTooltip]="attachUnavailable() || 'Attach the selected nodes to a Case'"
+                                    [attr.aria-label]="'Attach the ' + selectedOnCanvas().length + ' selected nodes to a Case'"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
+                                </button>
+                                <button
+                                    mat-icon-button
+                                    (click)="clearSelection()"
+                                    matTooltip="Clear the selection (Esc)"
+                                    aria-label="Clear the selection"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                </button>
+                            </div>
+                        }
                         <!-- overlays: legend (top-left) and working set (top-right), each minimisable -->
                         <inspecto-link-analysis-legend
                             class="absolute left-2 top-2 z-10"
@@ -1306,6 +1364,17 @@
             aria-label="Active query"
             data-testid="la-status"
         >
+            <!-- the page title and its info (moved down from the header, operator 2026-10-15): the page's one h1 -->
+            <h1 class="shrink-0 text-sm font-semibold leading-6" data-testid="la-title">Link Analysis</h1>
+            <inspecto-ai-explain screen="Link Analysis" [terms]="['Entity', 'Link', 'Dataset', 'Pipeline']" />
+            @if (!graph()) {
+                <span class="text-secondary hidden min-w-0 truncate text-xs md:inline">
+                    Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it.
+                </span>
+            }
+            @if (selectedOnCanvas().length) {
+                <span class="shrink-0 text-xs font-medium" data-testid="la-status-selected">· {{ selectedOnCanvas().length }} selected</span>
+            }
             @if (graph()) {
                 <mat-icon class="icon-size-4 shrink-0" svgIcon="heroicons_outline:circle-stack"></mat-icon>
                 <span class="shrink-0 text-sm font-medium">{{ sourceLabel() }}</span>

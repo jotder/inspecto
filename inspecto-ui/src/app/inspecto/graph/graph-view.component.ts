@@ -15,7 +15,17 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { GammaConfigService } from '@gamma/services/config';
-import { EdgeData, EdgeEvent, ElementDatum, Graph, GraphData, LayoutOptions, NodeData, NodeEvent } from '@antv/g6';
+import {
+    CanvasEvent,
+    EdgeData,
+    EdgeEvent,
+    ElementDatum,
+    Graph,
+    GraphData,
+    LayoutOptions,
+    NodeData,
+    NodeEvent,
+} from '@antv/g6';
 import { G6GraphData, nodeColor, nodeKindLabel, nodeShape } from './catalog-graph';
 import { toSvg } from './graph-export';
 import { NodeKind } from 'app/inspecto/api';
@@ -62,6 +72,71 @@ export interface GraphViewPlugins {
     /** Alignment guides while dragging a node — a pure interaction aid, no data required. */
     snapline?: boolean;
     behaviors?: ('brush-select' | 'lasso-select' | 'hover-activate')[];
+}
+
+/**
+ * The OPT-IN pointer model of one host (Link Analysis, operator 2026-10-15). The host is shared with the catalog
+ * and pipeline graphs, so `null` (the default) keeps every other screen exactly as it was: a drag on the empty
+ * canvas pans, a click is delivered at once, nothing re-fits on a data change.
+ */
+export interface GraphViewInteraction {
+    /** `false`: a drag on the empty canvas does NOT pan. The Minimap, the wheel zoom and {@link GraphViewComponent.panBy} still move the view. */
+    panByDrag?: boolean;
+    /** `true`: a plain drag on the empty canvas draws a rubber-band box that selects the nodes inside it (emitted as `selectionChange`). */
+    boxSelect?: boolean;
+    /** `true`: a double click emits `nodeDblClick`, and the single click is delivered after {@link NODE_DBLCLICK_DELAY_MS} unless a second click cancels it. */
+    doubleClick?: boolean;
+    /** `true`: the view re-fits after a DATA change (an expand, a fold, a hide), never after a hover, a selection or a restyle. */
+    fitOnDataChange?: boolean;
+    /** `true`: the view re-fits when the canvas is RESIZED (a side panel opens or closes, the window changes), once it settles. */
+    fitOnResize?: boolean;
+}
+
+/** How long a single click waits for a possible second one when {@link GraphViewInteraction.doubleClick} is on. */
+export const NODE_DBLCLICK_DELAY_MS = 230;
+
+/** A canvas resize smaller than this (either side, in px) does not re-fit the view. */
+export const RESIZE_REFIT_MIN_PX = 8;
+
+/** G6's selection state: the box select sets it, the `selection` input is mirrored into it, and `drag-element` groups by it. */
+export const SELECTED_STATE = 'selected';
+
+/**
+ * The G6 behaviour list for a pointer model - pure, so the wiring is unit-testable without a canvas. `drag-canvas`
+ * is dropped for `panByDrag: false`; `boxSelect` adds a plain-drag `brush-select` (G6 documents that it replaces
+ * `drag-canvas`, so the two never coexist) that starts only on the empty canvas, and replaces the shift+drag
+ * `brush-select` the View toolbox may also have asked for.
+ */
+export function buildBehaviors(
+    interaction: GraphViewInteraction | null,
+    plugins: GraphViewPlugins | null,
+    onBrush: (nodeIds: string[]) => void,
+    brushStyle: Record<string, unknown> = {},
+): unknown[] {
+    const box = interaction?.boxSelect === true;
+    const extra = (plugins?.behaviors ?? []).filter((b) => !(box && b === 'brush-select'));
+    return [
+        ...(interaction?.panByDrag === false ? [] : ['drag-canvas']),
+        { type: 'zoom-canvas', minZoom: 0.1, maxZoom: 4 },
+        'drag-element',
+        ...(box
+            ? [
+                  {
+                      type: 'brush-select',
+                      trigger: ['drag'],
+                      enableElements: ['node'],
+                      // G6's own `selected` state: `drag-element` moves EVERY node in this state together when one of them
+                      // is dragged, which is what an analyst expects after boxing a group.
+                      state: SELECTED_STATE,
+                      mode: 'default',
+                      enable: (e: { targetType?: string }) => e.targetType === 'canvas',
+                      style: brushStyle,
+                      onSelect: (states: Record<string, unknown>) => onBrush(Object.keys(states)),
+                  },
+              ]
+            : []),
+        ...extra,
+    ];
 }
 
 /** The host's accessible name: the graph's size, so the canvas is not an unnamed blank to a screen reader. */
@@ -351,8 +426,16 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Input() layout: GraphLayoutId | null = null;
     /** Opt-in canvas plugins/behaviors (Link Analysis View toolbox); `null` = the four existing hosts' defaults. */
     @Input() plugins: GraphViewPlugins | null = null;
+    /** Opt-in pointer model (Link Analysis); `null` = the other hosts' behaviour. Fixed at construction, like `plugins`. */
+    @Input() interaction: GraphViewInteraction | null = null;
+    /** The page's multi-selection (node ids): painted with a halo and a thicker outline. A repaint, never a rebuild. */
+    @Input() selection: string[] | null = null;
     @Output() nodeClick = new EventEmitter<string>();
     @Output() edgeClick = new EventEmitter<string>();
+    /** A double click on a node (only with `interaction.doubleClick`). */
+    @Output() nodeDblClick = new EventEmitter<string>();
+    /** The nodes a box select enclosed, or `[]` when a click on the empty canvas cleared them (only with `interaction.boxSelect`). */
+    @Output() selectionChange = new EventEmitter<string[]>();
 
     @ViewChild('host') private hostEl!: ElementRef<HTMLDivElement>;
 
@@ -384,6 +467,17 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private emEdges: Set<string> | null = null;
     private emGroups: Map<string, string> | null = null;
     private groupSwatch = new Map<string, string>();
+    /** The page's multi-selection, read LIVE by the node mappers (a halo + a thicker outline). */
+    private selSet = new Set<string>();
+    /** A single click waiting to see whether a second one makes it a double click ({@link GraphViewInteraction.doubleClick}). */
+    private clickTimer: ReturnType<typeof setTimeout> | null = null;
+    /** When a box select last finished: the click that ends a drag must not be read as 'click the empty canvas, clear'. */
+    private brushedAt = 0;
+
+    /** What is fixed at construction besides the layout: the plugins AND the pointer model. */
+    private pluginKey(): string {
+        return stableKey([this.plugins ?? null, this.interaction ?? null]);
+    }
 
     constructor() {
         inject(GammaConfigService)
@@ -405,7 +499,17 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.create();
         // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
         if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
+            this.resizeObserver = new ResizeObserver((entries) => {
+                this.graph?.resize();
+                // G6's resize keeps the old zoom and offset, so a canvas that grew or shrank leaves the graph off to a side:
+                // re-fit once the size settles (a drag of a panel edge fires many events), when the pointer model asks for it.
+                // A change of a few pixels (a scrollbar, a rounding) is not worth throwing the analyst's zoom away for.
+                const box = entries[entries.length - 1]?.contentRect;
+                const moved =
+                    !box || Math.abs(box.width - this.lastSize[0]) > RESIZE_REFIT_MIN_PX || Math.abs(box.height - this.lastSize[1]) > RESIZE_REFIT_MIN_PX;
+                if (box) this.lastSize = [box.width, box.height];
+                if (moved && this.interaction?.fitOnResize) this.scheduleFit();
+            });
             this.resizeObserver.observe(this.hostEl.nativeElement);
         }
         // G6's tooltip plugin (`[tooltips]`) is meant to hide itself on pointer-leave/pan/zoom, but
@@ -450,9 +554,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             this.create();
             return;
         }
-        if (changes['layout'] || changes['plugins']) {
+        if (changes['layout'] || changes['plugins'] || changes['interaction']) {
             const layoutKey = stableKey(this.layout ?? null);
-            const pluginKey = stableKey(this.plugins ?? null);
+            const pluginKey = this.pluginKey();
             if (layoutKey !== this.prevLayoutKey || pluginKey !== this.prevPluginKey) {
                 this.create();
                 return;
@@ -465,7 +569,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 return;
             }
         }
-        if (changes['emphasis'] || changes['display']) {
+        if (changes['emphasis'] || changes['display'] || changes['selection']) {
             const styleKey = this.styleKey();
             if (styleKey !== this.prevStyleKey) this.redraw(styleKey);
         }
@@ -473,6 +577,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     ngOnDestroy(): void {
         this.resizeObserver?.disconnect();
+        if (this.fitTimer !== null) clearTimeout(this.fitTimer);
         const host = this.hostEl?.nativeElement;
         host?.removeEventListener('pointerleave', this.hideStaleTooltipBound);
         host?.removeEventListener('pointerdown', this.hideStaleTooltipBound);
@@ -507,6 +612,19 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     /** Re-fit the whole graph into the viewport (the toolbar's fit-to-screen). */
     fitView(): void {
         void this.graph?.fitView();
+    }
+
+    /**
+     * Move the view by a screen offset - the keyboard equivalent of dragging the canvas (WCAG 2.5.7), for a host
+     * whose drag no longer pans. A no-op until a graph is drawn.
+     */
+    panBy(dx: number, dy: number): void {
+        void this.graph?.translateBy([dx, dy], false);
+    }
+
+    /** Zoom the view by a ratio around its centre (the keyboard equivalent of the wheel). A no-op until a graph is drawn. */
+    zoomBy(ratio: number): void {
+        void this.graph?.zoomBy(ratio, false);
     }
 
     /**
@@ -579,7 +697,26 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
 
     /** Tear the live instance down, sweeping any tooltip card its own cleanup left orphaned. */
+    private fitTimer: ReturnType<typeof setTimeout> | null = null;
+    /** The canvas size the last resize event reported (width, height), to tell a real resize from a few-pixel wobble. */
+    private lastSize: [number, number] = [0, 0];
+
+    /** One re-fit after a burst of resize events has gone quiet. */
+    private scheduleFit(): void {
+        if (this.fitTimer !== null) clearTimeout(this.fitTimer);
+        this.fitTimer = setTimeout(() => {
+            this.fitTimer = null;
+            void this.graph?.fitView();
+        }, 150);
+    }
+
+    private cancelPendingClick(): void {
+        if (this.clickTimer !== null) clearTimeout(this.clickTimer);
+        this.clickTimer = null;
+    }
+
     private destroyGraph(): void {
+        this.cancelPendingClick();
         this.graph?.destroy();
         this.graph = null;
         // `destroy()` is expected to remove the G6 tooltip plugin's card, but observed live it sometimes
@@ -590,13 +727,13 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /** Signature of the inputs that affect PAINT ONLY. */
     private styleKey(): string {
-        return stableKey([this.emphasis ?? null, this.display ?? null]);
+        return stableKey([this.emphasis ?? null, this.display ?? null, this.selection ?? null]);
     }
 
     /** Record what the live graph now reflects, so the next `ngOnChanges` can classify against it. */
     private snapshotKeys(): void {
         this.prevLayoutKey = stableKey(this.layout ?? null);
-        this.prevPluginKey = stableKey(this.plugins ?? null);
+        this.prevPluginKey = this.pluginKey();
         this.prevDataKey = stableKey(this.data ?? null);
         this.prevStyleKey = this.styleKey();
         this.renderedNodeIds = new Set((this.data?.nodes ?? []).map((n) => String(n.id)));
@@ -613,6 +750,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.emNodes = em ? new Set(em.nodeIds) : null;
         this.emEdges = em?.edgeIds ? new Set(em.edgeIds) : null;
         this.emGroups = em?.groups ?? null;
+        this.selSet = new Set(this.selection ?? []);
         this.groupSwatch = new Map<string, string>();
         for (const g of this.emGroups?.values() ?? []) {
             if (!this.groupSwatch.has(g))
@@ -650,7 +788,27 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         // preview: toggling node labels off left every label showing. Re-setting the SAME data object
         // re-runs the mappers and does NOT re-run layout, so positions are untouched.
         graph.setData(this.data as unknown as GraphData);
-        void graph.draw();
+        void graph.draw().then(() => this.syncSelectionState());
+    }
+
+    /** The node ids this host last put in {@link SELECTED_STATE}, so the next sync only touches what changed. */
+    private selectedStateIds = new Set<string>();
+
+    /**
+     * Mirror the page's selection into G6's `selected` element state. The box select sets it itself, but Select all, a
+     * clear, a selection that lost nodes to a hide, and a node-list pick all arrive through the `selection` input; without
+     * this, dragging one selected node would move only that node (`drag-element` groups by the state, not by our input).
+     */
+    private syncSelectionState(): void {
+        const graph = this.graph;
+        if (!graph || !this.interaction?.boxSelect) return;
+        const want = this.selSet;
+        const touched = new Set([...this.selectedStateIds, ...want]);
+        this.selectedStateIds = new Set(want);
+        if (!touched.size) return;
+        const states: Record<string, string[]> = {};
+        for (const id of touched) states[id] = want.has(id) ? [SELECTED_STATE] : [];
+        void graph.setElementState(states, false).catch(() => undefined); // an id the graph no longer holds is not an error
     }
 
     /**
@@ -680,7 +838,13 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.prevDataKey = dataKey;
         this.prevStyleKey = this.styleKey();
         this.renderedNodeIds = new Set(next);
-        void (added ? graph.render() : graph.draw());
+        const painted = added ? graph.render() : graph.draw();
+        // The pointer model asked for a graph that stays fully in view: re-fit once the new data is on the canvas.
+        // Only HERE (a data change), never in `redraw`, so a hover, a selection or a restyle never yanks the view.
+        void painted.then(() => {
+            this.syncSelectionState();
+            if (this.interaction?.fitOnDataChange) void graph.fitView();
+        });
     }
 
     /**
@@ -736,7 +900,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     radius: 8,
                     fill: () => this.styleNodeFill,
                     stroke: (d) => this.nodeColorOf(d),
-                    lineWidth: 2,
+                    // A box-selected node (the page's `selection`) wears a thicker outline and a halo.
+                    lineWidth: (d) => (this.selSet.has(d.id as string) ? 4 : 2),
                     // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
                     // sees what the narrower question removed) renders dimmed with a dashed outline.
                     lineDash: (d) => {
@@ -745,10 +910,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                         return nd.missing ? [4, 3] : nd.unexpanded ? [2, 3] : undefined;
                     },
                     // A high-connectivity entity (Link Analysis hub suppression) wears a wide halo in its own colour.
-                    halo: (d) => !!(d.data as { highConnectivity?: boolean }).highConnectivity,
+                    halo: (d) =>
+                        !!(d.data as { highConnectivity?: boolean }).highConnectivity || this.selSet.has(d.id as string),
                     haloStroke: (d) => this.nodeColorOf(d),
-                    haloLineWidth: 10,
-                    haloStrokeOpacity: 0.35,
+                    haloLineWidth: (d) => (this.selSet.has(d.id as string) ? 16 : 10),
+                    haloStrokeOpacity: (d) => (this.selSet.has(d.id as string) ? 0.6 : 0.35),
                     iconSrc: (d) => iconOf(d),
                     iconWidth: 22,
                     iconHeight: 22,
@@ -798,12 +964,16 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 state: { labelled: { label: true } },
             },
             layout: layoutConfig(this.layout) as LayoutOptions,
-            behaviors: [
-                'drag-canvas',
-                { type: 'zoom-canvas', minZoom: 0.1, maxZoom: 4 },
-                'drag-element',
-                ...(this.plugins?.behaviors ?? []),
-            ],
+            behaviors: buildBehaviors(
+                this.interaction,
+                this.plugins,
+                (ids) => {
+                    this.brushedAt = Date.now();
+                    this.selectionChange.emit(ids);
+                },
+                // The rubber band reads the theme's foreground, so it shows in both colour schemes without a literal colour.
+                { fill: this.styleFg, fillOpacity: 0.08, stroke: this.styleFg, lineWidth: 1, lineDash: [4, 3] },
+            ) as never[],
             plugins: [
                 ...(this.tooltips
                     ? [
@@ -820,8 +990,24 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const targetId = (e: unknown): string | undefined => (e as { target?: { id?: string } }).target?.id;
         graph.on(NodeEvent.CLICK, (e) => {
             const id = targetId(e);
-            if (id) this.nodeClick.emit(id);
+            if (this.interaction?.doubleClick) {
+                // A double click is two clicks and a dblclick: hold the single click back so it does not also fire.
+                this.cancelPendingClick();
+                if (id) this.clickTimer = setTimeout(() => this.nodeClick.emit(id), NODE_DBLCLICK_DELAY_MS);
+            } else if (id) this.nodeClick.emit(id);
             this.revealEdgeLabels(id, 'node', true);
+        });
+        graph.on(NodeEvent.DBLCLICK, (e) => {
+            if (!this.interaction?.doubleClick) return;
+            this.cancelPendingClick();
+            const id = targetId(e);
+            if (id) this.nodeDblClick.emit(id);
+        });
+        graph.on(CanvasEvent.CLICK, () => {
+            // The click that ends a box select must not clear what the box just selected.
+            if (this.interaction?.boxSelect && Date.now() - this.brushedAt > 250 && this.selSet.size > 0) {
+                this.selectionChange.emit([]);
+            }
         });
         graph.on(EdgeEvent.CLICK, (e) => {
             const id = targetId(e);
@@ -833,7 +1019,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         graph.on(NodeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'node', false));
         graph.on(EdgeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'edge', false));
         const host = this.hostEl.nativeElement;
-        void graph.render().then(() => demotePositiveTabindex(host));
+        void graph.render().then(() => {
+            demotePositiveTabindex(host);
+            this.selectedStateIds = new Set(); // a fresh instance carries no states
+            this.syncSelectionState();
+        });
         this.graph = graph;
         this.snapshotKeys();
     }

@@ -9,6 +9,9 @@ import {
     GRAPH_LAYOUTS,
     GraphDisplayOptions,
     GraphViewComponent,
+    NODE_DBLCLICK_DELAY_MS,
+    SELECTED_STATE,
+    buildBehaviors,
     buildPluginList,
     demotePositiveTabindex,
     graphSummaryLabel,
@@ -349,5 +352,65 @@ describe('graph text alternative and canvas tabindex (LA-A11Y-AUDIT-1)', () => {
         expect(values).toEqual(['0', '-1', '-1']); // one tab stop for the stacked layers
         await expectNoA11yViolations(root);
         root.remove();
+    });
+});
+
+
+describe('opt-in pointer model (Link Analysis, 2026-10-15)', () => {
+    const types = (b: unknown[]) => b.map((x) => (typeof x === 'string' ? x : (x as { type: string }).type));
+
+    it('no interaction keeps every other screen exactly as it was: drag pans, no box, no extras', () => {
+        expect(types(buildBehaviors(null, null, vi.fn()))).toEqual(['drag-canvas', 'zoom-canvas', 'drag-element']);
+        expect(types(buildBehaviors({}, null, vi.fn()))).toEqual(['drag-canvas', 'zoom-canvas', 'drag-element']);
+    });
+
+    it('panByDrag:false drops drag-canvas and keeps the wheel zoom and node dragging', () => {
+        expect(types(buildBehaviors({ panByDrag: false }, null, vi.fn()))).toEqual(['zoom-canvas', 'drag-element']);
+    });
+
+    it('boxSelect draws a plain-drag brush on the empty canvas only, over nodes only', () => {
+        const forwarded: string[][] = [];
+        const b = buildBehaviors({ panByDrag: false, boxSelect: true }, null, (ids) => forwarded.push(ids)) as Record<string, unknown>[];
+        const brush = b.find((x) => x['type'] === 'brush-select') as Record<string, unknown>;
+        expect(brush['trigger']).toEqual(['drag']); // a plain drag, no shift
+        expect(brush['enableElements']).toEqual(['node']);
+        expect(brush['state']).toBe(SELECTED_STATE); // drag-element moves every node in this state together
+        expect(SELECTED_STATE).toBe('selected'); // drag-element's default group state
+        const enable = brush['enable'] as (e: { targetType?: string }) => boolean;
+        expect(enable({ targetType: 'canvas' })).toBe(true); // starts on the empty canvas
+        expect(enable({ targetType: 'node' })).toBe(false); // never on a node: that drags the node
+        (brush['onSelect'] as (s: Record<string, unknown>) => void)({ a: 'brushed', b: 'brushed' });
+        expect(forwarded).toEqual([['a', 'b']]);
+        expect(types(b)).not.toContain('drag-canvas'); // G6: a drag-triggered brush and drag-canvas cannot coexist
+    });
+
+    it('boxSelect replaces the View toolbox shift+drag brush but keeps its other behaviours', () => {
+        const b = buildBehaviors(
+            { boxSelect: true, panByDrag: false },
+            { behaviors: ['hover-activate', 'brush-select', 'lasso-select'] },
+            vi.fn(),
+        );
+        expect(types(b).filter((t) => t === 'brush-select')).toHaveLength(1);
+        expect(types(b)).toContain('hover-activate');
+        expect(types(b)).toContain('lasso-select');
+    });
+
+    it('without boxSelect the toolbox shift+drag brush is untouched', () => {
+        expect(types(buildBehaviors(null, { behaviors: ['brush-select'] }, vi.fn()))).toContain('brush-select');
+    });
+
+    it('the single-click hold for a double click is short enough to feel instant', () => {
+        expect(NODE_DBLCLICK_DELAY_MS).toBeGreaterThanOrEqual(150);
+        expect(NODE_DBLCLICK_DELAY_MS).toBeLessThanOrEqual(300);
+    });
+
+    it('the new inputs and outputs default to the current behaviour', () => {
+        const fixture = create(null);
+        const c = fixture.componentInstance;
+        expect(c.interaction).toBeNull();
+        expect(c.selection).toBeNull();
+        expect(c.nodeDblClick).toBeDefined();
+        expect(c.selectionChange).toBeDefined();
+        fixture.destroy();
     });
 });
