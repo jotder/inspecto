@@ -62,6 +62,7 @@ public final class PublicInvestigationRoutes implements RouteModule {
     public void register(ApiContext api) {
         PublicPaths.registerSelfVerifying(EmbedGrants.PREFIX);   // exempt from platform auth; the token after it is redacted from every record
         api.get("/public/investigations/([^/]+)", (e, m) -> view(api, e, m.group(1)));
+        PublicPaths.registerRedacted("/embed/inv/");   // the viewer page's path carries the same token
         com.gamma.spi.auth.EmbedShellSpaces.register(token -> spaceOfLiveGrant(api, token));
     }
 

@@ -31,6 +31,18 @@ public final class PublicPaths {
         if (!PREFIXES.contains(prefix)) PREFIXES.add(prefix);
     }
 
+    private static final List<String> REDACT_ONLY = new CopyOnWriteArrayList<>();
+
+    /**
+     * Register {@code prefix} (of the form {@code /embed/<name>/}, e.g. {@code /embed/inv/}) as a page path whose remainder is a credential:
+     * it is NOT exempt from anything here (the page is a static shell), it only gets {@link #redact}ed in every record. Idempotent.
+     */
+    public static void registerRedacted(String prefix) {
+        if (prefix == null || !prefix.startsWith("/embed/") || !prefix.endsWith("/") || prefix.length() < 9)
+            throw new IllegalArgumentException("a redacted page prefix is /embed/<name>/ : " + prefix);
+        if (!REDACT_ONLY.contains(prefix)) REDACT_ONLY.add(prefix);
+    }
+
     /** Whether {@code path} (the effective path, API and Space prefixes stripped) is under a registered prefix. */
     public static boolean isSelfVerifying(String path) {
         if (path == null) return false;
@@ -41,6 +53,10 @@ public final class PublicPaths {
     /** {@code path} with everything after a registered prefix replaced by {@link #REDACTED}; any other path is returned unchanged. */
     public static String redact(String path) {
         if (path == null) return null;
+        for (String p : REDACT_ONLY) {
+            int at = path.indexOf(p);
+            if (at >= 0) return path.substring(0, at + p.length()) + REDACTED;
+        }
         for (String p : PREFIXES) {
             int at = path.indexOf(p);   // also after a /api/v1 or /spaces/{id} prefix, which a log line may still carry
             if (at >= 0) return path.substring(0, at + p.length()) + REDACTED;

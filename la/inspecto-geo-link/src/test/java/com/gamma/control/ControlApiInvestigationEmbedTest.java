@@ -622,8 +622,11 @@ class ControlApiInvestigationEmbedTest {
     }
 
     @Test
-    void theTokenIsInNoLogLineAndNoAuditEventAndTheAuditCarriesTheGrantAndTheIssuer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void theTokenIsInNoLogLineAndNoAuditEventAndTheAuditCarriesTheGrantAndTheIssuer(@TempDir Path cfg, @TempDir Path root, @TempDir Path ui)
+            throws Exception {
         subjects();
+        Files.writeString(ui.resolve("index.html"), "<!doctype html><html><head></head><body><app-root></app-root></body></html>");
+        System.setProperty("ui.dir", ui.toString());
         enable();
         ListAppender<ILoggingEvent> logs = new ListAppender<>();
         logs.start();
@@ -631,6 +634,9 @@ class ControlApiInvestigationEmbedTest {
         Level was = rootLogger.getLevel();
         rootLogger.setLevel(Level.DEBUG);
         rootLogger.addAppender(logs);
+        ch.qos.logback.classic.Logger hostLog = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ControlApi.class);   // may carry its own level
+        Level hostWas = hostLog.getLevel();
+        hostLog.setLevel(Level.DEBUG);
         List<Event> events = new CopyOnWriteArrayList<>();
         Consumer<Event> sub = events::add;
         EventLog.current().addSubscriber(sub);
@@ -640,6 +646,9 @@ class ControlApiInvestigationEmbedTest {
             String id = token.substring(0, token.indexOf('.'));
             String secret = token.substring(token.indexOf('.') + 1);
             assertEquals(200, pub(c, token).statusCode());
+            for (String page : List.of(token, "nope.nope"))   // the viewer PAGE's path carries the token too (a host DEBUG line logs every served page)
+                assertEquals(200, client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/embed/inv/" + page)).GET().build(),
+                        BodyHandlers.ofString()).statusCode());
             assertEquals(404, pub(c, token + "x").statusCode());
             assertEquals(404, pub(c, secret).statusCode());
             assertEquals(405, status(c, "POST", PUB + token, "{}", null));
@@ -654,6 +663,7 @@ class ControlApiInvestigationEmbedTest {
             String secret2 = t2.substring(t2.indexOf('.') + 1);
             for (String needle : List.of(secret, id, secret2, t2.substring(0, t2.indexOf('.'))))
                 assertFalse(allLogs.contains(needle), "no log line carries a token (" + needle + ")");
+            assertTrue(allLogs.contains("/embed/inv/[redacted]"), "the viewer page was served and its path logged, redacted: " + allLogs);
             assertTrue(allLogs.contains("/public/investigations/[redacted]"), "the server fault was logged, with the path redacted: " + allLogs);
             String allEvents = events.stream().map(e -> String.valueOf(e.toMap())).reduce("", (x, y) -> x + "\n" + y);
             assertFalse(allEvents.contains(secret), "no audit event carries the token's secret");
@@ -674,6 +684,7 @@ class ControlApiInvestigationEmbedTest {
             EventLog.current().removeSubscriber(sub);
             rootLogger.detachAppender(logs);
             rootLogger.setLevel(was);
+            hostLog.setLevel(hostWas);
         }
     }
 
