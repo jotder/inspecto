@@ -1944,6 +1944,7 @@ export class LinkAnalysisComponent implements OnInit {
         boxSelect: true,
         doubleClick: true,
         fitOnDataChange: true,
+        fitOnResize: true,
     };
 
     /** What the box (or Select all) picked. Read through {@link selectedOnCanvas}: a hide, a fold or a new run drops what is gone. */

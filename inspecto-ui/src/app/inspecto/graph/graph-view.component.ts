@@ -88,6 +88,8 @@ export interface GraphViewInteraction {
     doubleClick?: boolean;
     /** `true`: the view re-fits after a DATA change (an expand, a fold, a hide), never after a hover, a selection or a restyle. */
     fitOnDataChange?: boolean;
+    /** `true`: the view re-fits when the canvas is RESIZED (a side panel opens or closes, the window changes), once it settles. */
+    fitOnResize?: boolean;
 }
 
 /** How long a single click waits for a possible second one when {@link GraphViewInteraction.doubleClick} is on. */
@@ -491,7 +493,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.create();
         // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
         if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
+            this.resizeObserver = new ResizeObserver(() => {
+                this.graph?.resize();
+                // G6's resize keeps the old zoom and offset, so a canvas that grew or shrank leaves the graph off to a side:
+                // re-fit once the size settles (a drag of a panel edge fires many events), when the pointer model asks for it.
+                if (this.interaction?.fitOnResize) this.scheduleFit();
+            });
             this.resizeObserver.observe(this.hostEl.nativeElement);
         }
         // G6's tooltip plugin (`[tooltips]`) is meant to hide itself on pointer-leave/pan/zoom, but
@@ -559,6 +566,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     ngOnDestroy(): void {
         this.resizeObserver?.disconnect();
+        if (this.fitTimer !== null) clearTimeout(this.fitTimer);
         const host = this.hostEl?.nativeElement;
         host?.removeEventListener('pointerleave', this.hideStaleTooltipBound);
         host?.removeEventListener('pointerdown', this.hideStaleTooltipBound);
@@ -678,6 +686,17 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
 
     /** Tear the live instance down, sweeping any tooltip card its own cleanup left orphaned. */
+    private fitTimer: ReturnType<typeof setTimeout> | null = null;
+
+    /** One re-fit after a burst of resize events has gone quiet. */
+    private scheduleFit(): void {
+        if (this.fitTimer !== null) clearTimeout(this.fitTimer);
+        this.fitTimer = setTimeout(() => {
+            this.fitTimer = null;
+            void this.graph?.fitView();
+        }, 150);
+    }
+
     private cancelPendingClick(): void {
         if (this.clickTimer !== null) clearTimeout(this.clickTimer);
         this.clickTimer = null;

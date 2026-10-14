@@ -2302,7 +2302,13 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
 
     it('hands the host the pointer model: no pan by drag, a drag draws a box, double click, re-fit on data change', async () => {
         const { stub } = await drawn();
-        expect(stub.interaction).toEqual({ panByDrag: false, boxSelect: true, doubleClick: true, fitOnDataChange: true });
+        expect(stub.interaction).toEqual({
+            panByDrag: false,
+            boxSelect: true,
+            doubleClick: true,
+            fitOnDataChange: true,
+            fitOnResize: true,
+        });
     });
 
     it('a box selection is highlighted on the canvas, counted in the toolbar and the footer, and ignores nodes that are not drawn', async () => {
