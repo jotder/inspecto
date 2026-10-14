@@ -33,3 +33,4 @@ collector:
   gap_detection:
     enabled: true
     sequence: "CDR_{yyyyMMdd}"
+    file_template: "CDR_{yyyyMMdd}.csv"

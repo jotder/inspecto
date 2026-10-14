@@ -33,3 +33,4 @@ collector:
   gap_detection:
     enabled: true
     sequence: "PAYMENTS_{yyyyMMdd}"
+    file_template: "PAYMENTS_{yyyyMMdd}.csv"

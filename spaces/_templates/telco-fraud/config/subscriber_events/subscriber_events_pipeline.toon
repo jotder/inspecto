@@ -33,3 +33,4 @@ collector:
   gap_detection:
     enabled: true
     sequence: "SUBSCRIBER_EVENTS_{yyyyMMdd}"
+    file_template: "SUBSCRIBER_EVENTS_{yyyyMMdd}.csv"
