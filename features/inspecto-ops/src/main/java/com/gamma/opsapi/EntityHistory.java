@@ -1,5 +1,6 @@
 package com.gamma.opsapi;
 
+import com.gamma.control.ObjectReadMasking;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.ops.ObjectService;
@@ -54,8 +55,13 @@ public final class EntityHistory {
     private static final List<ObjectType> KINDS = List.of(ObjectType.INCIDENT, ObjectType.CASE);
 
     static Object byEntity(ApiContext api, HttpExchange ex) {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        // A caller who cannot reveal gets no match through a classified key: a raw number that hits one would confirm
+        // that the number is under investigation, so such an object is absent (D-P8, fail closed).
+        java.util.function.BiPredicate<OperationalObject, String> hidden =
+                (o, on) -> masking != null && masking.hides(o.attributes(), on);
         Result r = query(api.writeRoot(), OpsEngine.of(api), ex, ApiContext.query(ex, "type"), ApiContext.query(ex, "id"),
-                ApiContext.query(ex, "status"), ApiContext.query(ex, "limit"));
+                ApiContext.query(ex, "status"), ApiContext.query(ex, "limit"), hidden);
         ApiContext.pagination(ex, null, null, r.limit(), r.total());
         if (r.truncated()) {
             // The scan stopped at its cap: older references may exist, so `total` is a lower bound — say so.
@@ -83,6 +89,12 @@ public final class EntityHistory {
      * (Link Analysis's masked case history), so the two cannot disagree. {@code status}/{@code limit} may be null.
      */
     public static Result query(Path root, ObjectService svc, HttpExchange ex, String typeIn, String idIn, String statusIn, String limitIn) {
+        return query(root, svc, ex, typeIn, idIn, statusIn, limitIn, (o, on) -> false);
+    }
+
+    /** As above; {@code hidden} drops a match the caller may not learn of (an object, the attribute that matched it). */
+    static Result query(Path root, ObjectService svc, HttpExchange ex, String typeIn, String idIn, String statusIn,
+                        String limitIn, java.util.function.BiPredicate<OperationalObject, String> hidden) {
         String type = trim(typeIn);
         String rawId = trim(idIn);
         String status = trim(statusIn);
@@ -113,7 +125,7 @@ public final class EntityHistory {
         List<OperationalObject> matchedIncidents = new ArrayList<>();
         for (OperationalObject o : scanned) {
             String on = matchedOn(o, et, key, known);
-            if (on == null || !ObjectRoutes.visibleTo(ex, o)) continue;
+            if (on == null || !ObjectRoutes.visibleTo(ex, o) || hidden.test(o, on)) continue;
             hits.put(o.id(), row(o, on, null));
             if (o.objectType() == ObjectType.INCIDENT) matchedIncidents.add(o);
         }

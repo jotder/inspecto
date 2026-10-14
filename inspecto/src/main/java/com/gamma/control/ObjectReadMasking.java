@@ -57,6 +57,27 @@ public final class ObjectReadMasking {
         return masking == null ? row : masking.maskObject(row);
     }
 
+    /** A mutation echo / any other object body: masked for this request, one helper for every route. */
+    public static Map<String, Object> echo(ApiContext api, HttpExchange ex, Map<String, Object> row) {
+        return object(forRequest(api, ex), row);
+    }
+
+    /**
+     * The classified columns of an object's Dataset. An object WITHOUT a {@code dataset} attribute (hand-made, imported)
+     * cannot prove its {@code key.*} columns unclassified, so it fails closed exactly like untraceable lineage.
+     */
+    private Set<String> sensitiveOfObject(Map<String, String> attrs) {
+        String dataset = attrs.get("dataset");
+        if (dataset == null || dataset.isBlank()) dataset = attrs.get("entityDataset");   // LA / Screening-minted objects
+        return dataset == null || dataset.isBlank() ? Set.of(EvidenceMasker.UNKNOWN_LINEAGE) : sensitiveOf(dataset);
+    }
+
+    /** {@code true} when the attribute {@code name} ({@code key.<column>}) is a key this caller may not see raw. */
+    public boolean hides(Map<String, String> attrs, String name) {
+        Set<String> sens = sensitiveOfObject(attrs);
+        return name.equals("entityKey") ? !sens.isEmpty() : name.startsWith("key.") && hit(sens, name.substring(4));
+    }
+
     private Set<String> sensitiveOf(String dataset) {
         return dataset == null ? Set.of()
                 : sensitive.computeIfAbsent(dataset, d -> EvidenceMasker.sensitiveColumns(registry, views, d));
@@ -70,22 +91,36 @@ public final class ObjectReadMasking {
     Map<String, Object> maskObject(Map<String, Object> row) {
         if (!(row.get("attributes") instanceof Map<?, ?> a)) return row;
         Map<String, String> attrs = (Map<String, String>) a;
-        Set<String> sens = sensitiveOf(attrs.get("dataset"));
+        Set<String> sens = sensitiveOfObject(attrs);
         if (sens.isEmpty()) return row;
         Map<String, String> replaced = new LinkedHashMap<>();
         attrs.forEach((k, v) -> {
             if (k.startsWith("key.") && v != null && hit(sens, k.substring(4))) replaced.put(v, masker.tokenFor(v));
         });
+        // An LA / Screening-minted object names its Entity as `entityKey` = entity:[<type>:]<key>; its Dataset has a
+        // classified column and the column is not named, so the key is masked (fail closed), full id and bare key alike.
+        String entityKey = attrs.get("entityKey");
+        String bare = entityKey == null ? null : bareEntityKey(entityKey);
+        if (bare != null) replaced.put(bare, masker.tokenFor(bare));
         if (replaced.isEmpty()) return row;
         Map<String, String> maskedAttrs = new LinkedHashMap<>();
         attrs.forEach((k, v) -> maskedAttrs.put(k, v == null ? null
-                : k.startsWith("key.") && replaced.containsKey(v) ? replaced.get(v) : inline(v, replaced)));
+                : k.startsWith("key.") && replaced.containsKey(v) ? replaced.get(v)
+                : k.equals("entityKey") && bare != null ? entityKey.replace(bare, replaced.get(bare))
+                : inline(v, replaced)));
         Map<String, Object> out = new LinkedHashMap<>(row);
         for (String f : List.of("title", "description", "correlationId"))
             if (out.get(f) instanceof String s) out.put(f, inline(s, replaced));
         out.put("attributes", maskedAttrs);
         out.put("keyMasked", true);
         return out;
+    }
+
+    private static String bareEntityKey(String v) {
+        String rest = v.startsWith("entity:") ? v.substring("entity:".length()) : v;
+        int i = rest.indexOf(':');
+        if (i > 0 && rest.substring(0, i).matches("[A-Za-z_][A-Za-z0-9_-]*")) rest = rest.substring(i + 1);
+        return rest.isBlank() ? null : rest;
     }
 
     private static String inline(String text, Map<String, String> replaced) {

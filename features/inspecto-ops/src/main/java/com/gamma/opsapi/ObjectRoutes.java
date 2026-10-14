@@ -80,8 +80,8 @@ public final class ObjectRoutes implements RouteModule {
         // answer as `POST /recon/promote`, deliberately: both perform the one act of OPENING an Incident,
         // and a second precedent for one concept is what the call was made to avoid. ⚠ Distinct from the
         // `canWorkIncidents` gates on ack/resolve below: opening an Incident and working it are two names.
-        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, actorOf(e, api.body(e)), null))));
-        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> { Map<String, Object> b = api.body(e); return transition(api, ApiContext.name(m), "resolve", null, actorOf(e, b), ApiContext.str(b, "disposition")); })));
+        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, e, ApiContext.name(m), "ack", null, actorOf(e, api.body(e)), null))));
+        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> { Map<String, Object> b = api.body(e); return transition(api, e, ApiContext.name(m), "resolve", null, actorOf(e, b), ApiContext.str(b, "disposition")); })));
         api.post("/objects/([^/]+)/transition", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transitionFromBody(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/assign", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> assign(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
@@ -108,7 +108,7 @@ public final class ObjectRoutes implements RouteModule {
         // postmortem / category: recording what an Incident cost is part of finishing it. Its own narrow PUT, not
         // the canAdminister PATCH, for the same reason those two are.
         api.put("/objects/([^/]+)/impact", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveImpact(api, e, ApiContext.name(m), exactBody(api, e)))));
-        api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
+        api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, e, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, e, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
         // The effective (possibly *_workflow.toon-overridden) lifecycle for a type — lets the UI derive
@@ -262,6 +262,11 @@ public final class ObjectRoutes implements RouteModule {
         return o.correlationId() == null ? "" : o.correlationId();
     }
 
+    /** A write route's echo of the object it just changed: the same read masking as GET (one helper for every route). */
+    private static Map<String, Object> echo(ApiContext api, HttpExchange ex, OperationalObject o) {
+        return ObjectReadMasking.echo(api, ex, o.toMap());
+    }
+
     /** Each object as its JSON row, masked on read for a caller who cannot reveal ({@link ObjectReadMasking}). */
     private static List<Map<String, Object>> toObjectMaps(ApiContext api, HttpExchange ex, List<OperationalObject> objs) {
         ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
@@ -391,7 +396,7 @@ public final class ObjectRoutes implements RouteModule {
         String actor = ApiContext.str(body, "actor");
         for (LinkSpec l : links)
             OpsEngine.of(api).link(created.id(), l.to(), l.relationship(), actor);
-        return created.toMap();
+        return echo(api, ex, created);
     }
 
     /** One entry of the create body's mandatory {@code links} array. */
@@ -591,7 +596,7 @@ public final class ObjectRoutes implements RouteModule {
         String assignee = ApiContext.str(body, "assignee");
         if (assignee == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'assignee'");
         return RouteErrors.mapCaseErrors(
-                () -> OpsEngine.of(api).assign(id, assignee, actorOf(ex, body)).toMap());
+                () -> echo(api, ex, OpsEngine.of(api).assign(id, assignee, actorOf(ex, body))));
     }
 
     /**
@@ -614,7 +619,7 @@ public final class ObjectRoutes implements RouteModule {
      * (Postgres multi-user, 2026-10-06). No workflow involvement — status changes stay on
      * {@code /objects/{id}/transition}.
      */
-    private Object patchObject(ApiContext api, String id, Map<String, Object> body) {
+    private Object patchObject(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         Map<String, String> attrs = null;
         if (body.get("attributes") instanceof Map<?, ?> bag) {
             Map<String, String> collected = new LinkedHashMap<>();
@@ -639,7 +644,7 @@ public final class ObjectRoutes implements RouteModule {
             validateFindings(api, id, attrs);
         }
         try {
-            return OpsEngine.of(api).patch(id, expectedVersion, priority, severity, assignee, attrs).toMap();
+            return echo(api, ex, OpsEngine.of(api).patch(id, expectedVersion, priority, severity, assignee, attrs));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -685,7 +690,7 @@ public final class ObjectRoutes implements RouteModule {
         validateFindings(api, id, attrs);
         if (caseImpact) saveFindingsImpact(api, ex, target, impactValue);
         try {
-            return OpsEngine.of(api).saveFindings(id, attrs, ApiContext.actor(ex)).toMap();
+            return echo(api, ex, OpsEngine.of(api).saveFindings(id, attrs, ApiContext.actor(ex)));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -788,7 +793,7 @@ public final class ObjectRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         try {
-            return OpsEngine.of(api).saveImpact(id, impact, ApiContext.actor(ex)).toMap();
+            return echo(api, ex, OpsEngine.of(api).saveImpact(id, impact, ApiContext.actor(ex)));
         } catch (NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalArgumentException wrongType) {
@@ -835,7 +840,7 @@ public final class ObjectRoutes implements RouteModule {
 
     private static Object saveAttribute(ApiContext api, HttpExchange ex, String id, String key, String value) {
         try {
-            return OpsEngine.of(api).saveAttributes(id, Map.of(key, value), ApiContext.actor(ex), key).toMap();
+            return echo(api, ex, OpsEngine.of(api).saveAttributes(id, Map.of(key, value), ApiContext.actor(ex), key));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -881,8 +886,8 @@ public final class ObjectRoutes implements RouteModule {
 
     /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} per {@link #actorOf}.
      *  Resolve takes an optional {@code disposition} (WS-10: an Incident needs one → else 422). */
-    private Object transition(ApiContext api, String id, String action, String target, String actor, String disposition) {
-        return doTransition(api, id, action, target, actor, disposition);
+    private Object transition(ApiContext api, HttpExchange ex, String id, String action, String target, String actor, String disposition) {
+        return doTransition(api, ex, id, action, target, actor, disposition);
     }
 
     /** {@code POST /objects/{id}/transition} — body {@code {action}} or {@code {status|to}} (+ optional
@@ -893,16 +898,16 @@ public final class ObjectRoutes implements RouteModule {
         if (target == null) target = ApiContext.str(body, "to");
         if (action == null && target == null)
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'action' or 'status'");
-        return doTransition(api, id, action, target, actorOf(ex, body), ApiContext.str(body, "disposition"));
+        return doTransition(api, ex, id, action, target, actorOf(ex, body), ApiContext.str(body, "disposition"));
     }
 
     /** Apply a lifecycle transition, mapping the service's exceptions to 404 (unknown id) / 422 (illegal move). */
-    private Object doTransition(ApiContext api, String id, String action, String target, String actor, String disposition) {
+    private Object doTransition(ApiContext api, HttpExchange ex, String id, String action, String target, String actor, String disposition) {
         try {
             OperationalObject updated = (action != null)
                     ? OpsEngine.of(api).transition(id, action, actor, disposition)
                     : OpsEngine.of(api).transitionTo(id, target, actor, disposition);
-            return updated.toMap();
+            return echo(api, ex, updated);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalStateException | IllegalArgumentException illegal) {

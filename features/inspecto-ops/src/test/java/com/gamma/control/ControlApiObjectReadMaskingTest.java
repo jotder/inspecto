@@ -46,7 +46,12 @@ class ControlApiObjectReadMaskingTest {
         String a = ex.getRequestHeaders().getFirst("Authorization");
         if (a == null || !a.startsWith("Bearer ")) return Optional.empty();
         String user = a.substring(7);
-        return Optional.of(new Subject(user, "revealer".equals(user) ? Set.of("canRevealLinkEntities") : Set.of()));
+        return Optional.of(new Subject(user, switch (user) {
+            case "revealer" -> Set.of("canRevealLinkEntities");
+            case "worker" -> Set.of("canWorkIncidents", "canAdminister");
+            case "workrev" -> Set.of("canWorkIncidents", "canAdminister", "canRevealLinkEntities");
+            default -> Set.of();
+        }));
     };
 
     @AfterEach
@@ -135,6 +140,95 @@ class ControlApiObjectReadMaskingTest {
             OperationalObject incident = open(c, ObjectType.INCIDENT);
             JsonNode a = JSON.readTree(get(c, "viewer", "/objects/" + incident.id()).body()).get("data").get("attributes");
             assertEquals(RAW, a.get("key.msisdn").asText());
+        }
+    }
+
+    private HttpResponse<String> send(Ctx c, String user, String method, String path, String json) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
+                .header("Authorization", "Bearer " + user).header("Content-Type", "application/json")
+                .method(method, HttpRequest.BodyPublishers.ofString(json)).build(), BodyHandlers.ofString());
+    }
+
+    /** Every write route that echoes the object (ack, assign, transition, PATCH, category, postmortem, impact, findings). */
+    private List<HttpResponse<String>> mutate(Ctx c, String user, String id) throws Exception {
+        String p = "/objects/" + id;
+        return List.of(send(c, user, "POST", p + "/ack", "{}"),
+                send(c, user, "POST", p + "/assign", "{\"assignee\":\"ana\"}"),
+                send(c, user, "POST", p + "/transition", "{\"action\":\"ack\"}"),
+                send(c, user, "PATCH", p, "{\"priority\":\"P1\"}"),
+                send(c, user, "PUT", p + "/category", "{\"category\":\"fraud\"}"),
+                send(c, user, "PUT", p + "/postmortem", "{\"postmortem\":{\"summary\":\"s\"}}"),
+                send(c, user, "PUT", p + "/impact", "{\"impact\":{\"suspected\":\"100\",\"currency\":\"USD\"}}"),
+                send(c, user, "PUT", p + "/findings", "{\"findings\":{}}"));
+    }
+
+    @Test
+    void aMutationEchoCarriesTheTokenForANonRevealerAndTheRawKeyForARevealer(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            String id = open(c, ObjectType.INCIDENT).id();
+            int echoed = 0;
+            for (HttpResponse<String> r : mutate(c, "worker", id)) {
+                if (r.statusCode() != 200) continue;   // a refusal (e.g. findings on an Incident) echoes no object
+                echoed++;
+                assertMasked(JSON.readTree(r.body()).get("data"));
+            }
+            assertTrue(echoed >= 5, "ack/assign/PATCH/category/postmortem/impact echo the object: " + echoed);
+            for (HttpResponse<String> r : mutate(c, "workrev", id)) {
+                if (r.statusCode() != 200) continue;
+                assertEquals(RAW, JSON.readTree(r.body()).get("data").get("attributes").get("key.msisdn").asText());
+            }
+        }
+    }
+
+    @Test
+    void aMutationEchoOfAnObjectWithNoDatasetFailsClosed(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            Map<String, String> attrs = new LinkedHashMap<>();
+            attrs.put("key.msisdn", RAW);      // no `dataset`: cannot prove the column unclassified
+            String id = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "hand made " + RAW, "d", "HIGH", null, null, null, null, attrs).id();
+            JsonNode viewer = JSON.readTree(get(c, "viewer", "/objects/" + id).body()).get("data");
+            assertTrue(viewer.get("attributes").get("key.msisdn").asText().startsWith("masked:"), viewer.toString());
+            assertFalse(viewer.get("title").asText().contains(RAW));
+            HttpResponse<String> acked = send(c, "worker", "POST", "/objects/" + id + "/assign", "{\"assignee\":\"ana\"}");
+            assertEquals(200, acked.statusCode(), acked.body());
+            JsonNode echo = JSON.readTree(acked.body()).get("data");
+            assertTrue(echo.get("attributes").get("key.msisdn").asText().startsWith("masked:"), echo.toString());
+            assertEquals(RAW, JSON.readTree(get(c, "revealer", "/objects/" + id).body()).get("data")
+                    .get("attributes").get("key.msisdn").asText());
+        }
+    }
+
+    @Test
+    void byEntityDoesNotConfirmAClassifiedKeyToANonRevealer(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            open(c, ObjectType.INCIDENT);
+            String q = "/objects/by-entity?type=msisdn&id=" + RAW;
+            assertEquals(0, JSON.readTree(get(c, "viewer", q).body()).get("data").size(), "indistinguishable from absence");
+            JsonNode hit = JSON.readTree(get(c, "revealer", q).body()).get("data");
+            assertEquals(1, hit.size());
+        }
+    }
+
+    @Test
+    void byEntityStillMatchesAnUnclassifiedKeyForANonRevealer(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, false)) {
+            open(c, ObjectType.INCIDENT);
+            assertEquals(1, JSON.readTree(get(c, "viewer", "/objects/by-entity?type=msisdn&id=" + RAW).body()).get("data").size());
+        }
+    }
+
+    @Test
+    void anEntityMintedObjectMasksItsEntityKey(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            Map<String, String> attrs = new LinkedHashMap<>();
+            attrs.put("entityKey", "entity:msisdn:" + RAW);
+            attrs.put("entityDataset", "fraud_ds");
+            String id = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "Entity " + RAW, "d", "HIGH", null, null, null, null, attrs).id();
+            JsonNode v = JSON.readTree(get(c, "viewer", "/objects/" + id).body()).get("data");
+            assertFalse(v.toString().contains(RAW), v.toString());
+            assertTrue(v.get("attributes").get("entityKey").asText().startsWith("entity:msisdn:masked:"));
+            assertEquals(0, JSON.readTree(get(c, "viewer", "/objects/by-entity?type=msisdn&id=" + RAW).body()).get("data").size());
+            assertTrue(get(c, "revealer", "/objects/" + id).body().contains(RAW));
         }
     }
 }

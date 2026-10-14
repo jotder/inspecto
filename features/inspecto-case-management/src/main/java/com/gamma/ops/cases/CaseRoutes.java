@@ -9,6 +9,7 @@ import com.gamma.opsapi.TagRoutes;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.Subject;
+import com.gamma.control.ObjectReadMasking;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.control.RouteErrors;
@@ -102,11 +103,11 @@ public final class CaseRoutes implements RouteModule {
                     ApiContext.str(body, "description"), entities, existing, o -> ObjectRoutes.visibleTo(ex, o),
                     ApiContext.str(body, "actor"), ApiContext.subject(ex).map(Subject::id).orElse(null));
             List<Map<String, Object>> members = made.members().stream().map(o -> {
-                Map<String, Object> row = new LinkedHashMap<>(o.toMap());
+                Map<String, Object> row = new LinkedHashMap<>(ObjectReadMasking.echo(api, ex, o.toMap()));
                 row.put("minted", made.minted().contains(o.id()));
                 return row;
             }).toList();
-            return Map.of("case", made.caseObject().toMap(), "members", members);
+            return Map.of("case", ObjectReadMasking.echo(api, ex, made.caseObject().toMap()), "members", members);
         } catch (IllegalArgumentException refused) {
             // Only the refusals. A store that FAILS (IllegalStateException) stays a 500 — reporting it as a
             // bad body would send the analyst to fix input that was never wrong.
@@ -190,7 +191,7 @@ public final class CaseRoutes implements RouteModule {
         return RouteErrors.mapCaseErrors(() -> {
             var result = cases(api).mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("survivor", result.survivor().toMap());
+            out.put("survivor", ObjectReadMasking.echo(api, ex, result.survivor().toMap()));
             out.put("merged", result.merged());
             out.put("membersMoved", result.membersMoved());
             return out;
@@ -213,7 +214,7 @@ public final class CaseRoutes implements RouteModule {
             var result = cases(api).splitCase(caseId, title, members,
                     ApiContext.str(body, "assignee"), ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("case", result.part().toMap());
+            out.put("case", ObjectReadMasking.echo(api, ex, result.part().toMap()));
             out.put("membersMoved", result.membersMoved());
             return out;
         });

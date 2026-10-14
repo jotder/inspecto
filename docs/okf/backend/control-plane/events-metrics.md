@@ -374,12 +374,23 @@ timestamp: 2026-07-16T00:00:00Z
     unknown lineage), and that raw value wherever it stands in the title, description, correlation id and the other
     attributes (`key`, `alertKey`); `keyMasked:true` is added. Applied to `GET /objects`, its v1 page and
     `GET /objects/{id}`; `GET /alerts` masks the key in each `message`. Revealer and a no-Subject request see raw.
-    ⚠ The object must carry a `dataset` attribute: without one nothing is masked. Real-HTTP test
-    `ControlApiObjectReadMaskingTest` (list, detail, revealer raw, unclassified column untouched); unit
-    `ObjectReadMaskingTest`. **Not covered:** the objects mutation echoes (`/ack`, `/transition`, `/assign`, PATCH
-    return the full object map, raw), `/objects/by-entity` (matches the raw number the caller supplies), LA-minted
-    `entityKey`, and the object SSE / mail / search / export surfaces (not traced). Tracked in
-    `OBJECT-READ-MASKING-RESIDUALS-1`.
+    **Dataset resolution (fail closed).** The classification comes from the `dataset` attribute, else `entityDataset`
+    (LA / Screening-minted objects); an object with `key.*` and neither cannot prove a column unclassified, so every
+    `key.*` value is masked. `entityKey` (`entity:[<type>:]<key>`) is masked, full id and bare key, whenever its Dataset
+    has any classified column (the column is not named). Alert-promoted Incidents always carry `dataset`
+    (`AlertService.openKeyIncident`); `key.*` is written nowhere else.
+    **Mutation echoes (closed).** Every write route that returns an object (`/ack`, `/resolve`, `/transition`,
+    `/assign`, PATCH, `/category`, `/postmortem`, `/impact`, `/findings`, `POST /objects`, and the Case open-from-entities,
+    merge and split bodies) goes through the one helper `ObjectReadMasking.echo`, so a non-revealer never gets the raw key.
+    Link and comment echoes carry no object. **`/objects/by-entity` (decision for the operator, fail closed):** an object
+    whose matching attribute is masked for the caller (`ObjectReadMasking.hides`) is dropped from the result, so a raw
+    number a non-revealer supplies is never confirmed as under investigation (empty, indistinguishable from absence, and
+    `total` does not count it); unclassified keys still match, a revealer / no-Subject is unchanged. The raw-number
+    lookup of a masked key is therefore unavailable to a non-revealer (Link Analysis keeps its own alias route,
+    `POST /inv/case-history`). Row titles of surviving matches are unmasked text. Real-HTTP test
+    `ControlApiObjectReadMaskingTest` (list, detail, echoes, no-dataset, entityKey, by-entity); unit
+    `ObjectReadMaskingTest`. **Not covered:** the Regulatory report object view, graph / links titles, the object SSE /
+    mail / search / export surfaces (not traced). Tracked in `OBJECT-READ-MASKING-RESIDUALS-1`.
   - **Accepted limits (operator, 2026-10-06; `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (5), (7)).** (5) The lock-race fork
     window is a stated limit, not prevented: a writer with unflushed linked rows when its lock is deleted can
     collide with a second writer, and `GET /audit/verify` detects it afterwards as a `duplicate`. (7) A local
