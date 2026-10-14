@@ -217,7 +217,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/inv/investigations/([^/]+)/alert-rules/([^/]+)` | gated | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:85` |
 | DELETE | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java:66` |
 | PUT | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java:64` |
-| POST | `/inv/investigations/([^/]+)/dossier/bundle/verify` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DossierBundleRoutes.java:70` |
+| POST | `/inv/investigations/([^/]+)/dossier/bundle/verify` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DossierBundleRoutes.java:71` |
 | POST | `/inv/investigations/([^/]+)/dossier/verify` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DossierRoutes.java:72` |
 | POST | `/inv/investigations/([^/]+)/drafts` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:69` |
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/discard` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:80` |
