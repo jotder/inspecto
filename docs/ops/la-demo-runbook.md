@@ -232,6 +232,18 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Proves:** limits and bounds are Space settings (arch §9). Editing live and the Edge index first-build flow: the plan lists an editing Settings pass as open:
   **editing: UNVERIFIED (rehearse first)**; show read-only if you have not rehearsed.
 
+### Embed links behind a reverse proxy (operator requirement)
+The link's token is **in the URL path**: `/embed/inv/<grantId>.<secret>` (the viewer page) and `/api/v1/public/investigations/<grantId>.<secret>` (the data call). Inspecto
+redacts it from its own log lines, audit rows and `links.self` (`PublicPaths.redact`, pinned by `ControlApiInvestigationEmbedTest`), and the viewer rewrites the address bar to
+`/embed/inv/shared` so it leaves the browser history. **A reverse proxy, load balancer or CDN in front of the host writes its own access log, and it will record the full path
+unless you tell it not to.** Anyone who reads that log can open the link until it expires or is revoked. Before enabling `-Dla.embed.enabled=true` behind a proxy:
+* mask the segment after `/embed/inv/` and after `/public/investigations/` in the access-log format (nginx: log `$uri` through a `map` that rewrites those two prefixes to `<prefix>[redacted]`,
+  never `$request` or `$request_uri`; the same for any `X-Forwarded-*` copy of the path), and keep `$http_referer` out of it;
+* give that log the retention you would give a credential, and do not ship it to a third-party log service unmasked;
+* a leaked link is revoked at once from the Share panel (or `POST .../embeds/<grantId>/revoke`); links default to 72 h and a Space can lower `embed.max_ttl_hours`.
+Not built: token delivery by a header, a fragment or a POST exchange. A fragment would hide the token from every server log but the page could then not tell the token's Space to
+send the right `frame-ancestors` (see `okf/backend/modules/link-analysis.md` §6.2); a POST exchange is a new route and a new client flow. Both are a larger change than the redaction rule above, so this stays a documented operator duty.
+
 ### S14. Embed API aside, API only (2 min) [admin by curl]
 No SPA exists for embed links (the SPA shell is deferred). Start the server with `-Dla.embed.enabled=true` (§0 step 8). Mint needs `canShareInvestigation` AND a lead
 of the Investigation: as `admin` (a lead by the seed).
@@ -281,7 +293,7 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
   transfers plus the planted ring); it demonstrates behaviour, not scale.
 * **Real IAM:** no real-IAM sign-in is verified on this bundle. Demo Users sign in with no password on a loopback-only, `-DemoAuth` build, which refuses
   to run bound elsewhere. Do not call it a security demonstration of SSO.
-* **Embed UI:** not built. Embed links are API-only (S14); the SPA shell and host-wide frame headers are deferred.
+* **Embed UI:** built (mint dialog, grant list, `/embed/inv/<token>` viewer, `-Dcontrol.frameDeny`, Space `embed.frame_ancestors`); this S14 script drives only the API. For a real deployment read *Embed links behind a reverse proxy* below.
 * **Fences:** the "engine names no la-* class" rule is grep-true but unguarded (DR-T3); the dependency fences are shown by a named guard, not live.
 * **Postgres store, Personal 503, 429/503 bursts:** other variants (see the variants runbook) or `--burst`, not part of this script.
 * **A fired Alert names entities:** it does not, by design (aggregate only).

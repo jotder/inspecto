@@ -34,6 +34,8 @@ class ControlApiFrameHeadersTest {
             + "<link href=\"https://fonts.gstatic.com\" rel=\"preconnect\">"
             + "<link href=\"https://fonts.googleapis.com/css2?family=IBM+Plex+Mono\" rel=\"stylesheet\">"
             + "<link rel=\"stylesheet\" href=\"styles-ABC.css\" media=\"print\" onload=\"this.media='all'\">"
+            + "<style>@font-face{font-family:'IBM Plex Mono';src:url(https://fonts.gstatic.com/s/ibmplexmono/v20/x.woff2) format('woff2');}"
+            + "@font-face{font-family:'Local';src:url(assets/local.woff2);}body{margin:0}</style>"
             + "</head><body><app-root></app-root></body></html>";
 
     private final HttpClient client = HttpClient.newHttpClient();
@@ -48,6 +50,12 @@ class ControlApiFrameHeadersTest {
     @AfterEach
     void reset() {
         for (String p : List.of(FrameHeaders.FLAG, "ui.dir", "assist.write.root")) System.clearProperty(p);
+        com.gamma.spi.auth.EmbedShellSpaces.register(null);
+    }
+
+    /** The viewer token "abc.def" is a live grant of the Space at {@code dir/space}; any other token is not a live grant. */
+    private static void tokenBelongsTo(Path root) {
+        com.gamma.spi.auth.EmbedShellSpaces.register(t -> "abc.def".equals(t) ? java.util.Optional.of(root) : java.util.Optional.empty());
     }
 
     private Ctx open(Path dir, List<String> frameAncestors) throws Exception {
@@ -57,9 +65,8 @@ class ControlApiFrameHeadersTest {
         Files.writeString(ui.resolve("assets").resolve("app.js"), "console.log('x');");
         Path root = dir.resolve("space");
         Files.createDirectories(root);
-        if (frameAncestors != null)
-            new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                    new LinkAnalysisSettings.Embed(null, null, null, frameAncestors)).write(root.resolve(LinkAnalysisSettings.FILE));
+        if (frameAncestors != null) writeAllowList(root, frameAncestors);
+        tokenBelongsTo(root);
         System.setProperty("ui.dir", ui.toString());
         System.setProperty("assist.write.root", root.toString());
         try {
@@ -71,6 +78,12 @@ class ControlApiFrameHeadersTest {
             System.clearProperty("ui.dir");
             System.clearProperty("assist.write.root");
         }
+    }
+
+    private static void writeAllowList(Path root, List<String> frameAncestors) throws Exception {
+        Files.createDirectories(root);
+        new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new LinkAnalysisSettings.Embed(null, null, null, frameAncestors)).write(root.resolve(LinkAnalysisSettings.FILE));
     }
 
     private HttpResponse<String> get(Ctx c, String path) throws Exception {
@@ -132,6 +145,8 @@ class ControlApiFrameHeadersTest {
             assertEquals("no-referrer", r.headers().firstValue("Referrer-Policy").orElse(null));
             assertEquals("no-store", r.headers().firstValue("Cache-Control").orElse(null));
             assertFalse(r.body().contains("http"), "no third-party link, not even a preconnect: " + r.body());
+            assertFalse(r.body().contains("IBM Plex Mono"), "the inlined external @font-face is dropped: " + r.body());
+            assertTrue(r.body().contains("assets/local.woff2") && r.body().contains("body{margin:0}"), "a same-origin font and other CSS stay: " + r.body());
             assertFalse(r.body().contains("onload"), "no inline handler the policy would refuse: " + r.body());
             assertTrue(r.body().contains("styles-ABC.css") && !r.body().contains("media=\"print\""), r.body());
         }
@@ -158,5 +173,27 @@ class ControlApiFrameHeadersTest {
         }
         assertEquals("http://localhost:4200", LinkAnalysisSettings.Embed.normaliseOrigin("HTTP://localhost:4200"));
         assertNull(LinkAnalysisSettings.Embed.normaliseOrigin("http://evil.example"));
+    }
+
+    @Test
+    void aTokenIsFramedOnlyByItsOwnSpacesAllowListNeverTheUnionAndAnUnresolvedTokenByNobody(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, List.of("https://a.example"))) {
+            Path a = dir.resolve("space"), b = dir.resolve("space-b");
+            writeAllowList(b, List.of("https://b.example"));
+            com.gamma.spi.auth.EmbedShellSpaces.register(t -> switch (t) {
+                case "abc.def" -> java.util.Optional.of(a);
+                case "bbb.bbb" -> java.util.Optional.of(b);
+                default -> java.util.Optional.empty();
+            });
+            String ofA = get(c, "/embed/inv/abc.def").headers().firstValue("Content-Security-Policy").orElseThrow();
+            String ofB = get(c, "/embed/inv/bbb.bbb").headers().firstValue("Content-Security-Policy").orElseThrow();
+            assertTrue(ofA.endsWith("frame-ancestors https://a.example"), ofA);
+            assertTrue(ofB.endsWith("frame-ancestors https://b.example"), ofB);
+            for (String forged : List.of("zzz.zzz", "abc", "abc.def/x")) {
+                HttpResponse<String> r = get(c, "/embed/inv/" + forged);
+                assertTrue(r.headers().firstValue("Content-Security-Policy").orElseThrow().endsWith("frame-ancestors 'none'"), forged);
+                assertEquals("DENY", r.headers().firstValue("X-Frame-Options").orElse(null), forged);
+            }
+        }
     }
 }

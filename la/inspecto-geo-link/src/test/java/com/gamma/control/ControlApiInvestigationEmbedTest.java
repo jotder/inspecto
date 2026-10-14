@@ -77,7 +77,7 @@ class ControlApiInvestigationEmbedTest {
         CaseTeamObjectEngine.CASES = null;
         Authenticators.forTest(null);
         AccessDeciders.forTest(null);
-        for (String p : List.of("la.embed.enabled", "control.cors", "control.rateLimit.embed.capacity", "control.rateLimit.embed.refillPerSecond"))
+        for (String p : List.of("la.embed.enabled", "control.cors", "control.rateLimit.embed.capacity", "control.rateLimit.embed.refillPerSecond", "ui.dir"))
             System.clearProperty(p);
     }
 
@@ -209,6 +209,37 @@ class ControlApiInvestigationEmbedTest {
             }
             String stored = Files.readString(grantFiles(c).get(0));
             assertTrue(stored.contains("tokenSha256"), "only the hash is stored: " + stored);
+        }
+    }
+
+    /** LA-EMBED-VIEW-1 remainder (a): the viewer page is framed by the allow-list of the TOKEN's Space, and by nobody for a token that is not live. */
+    @Test
+    void theViewerPageIsFramedOnlyByTheOriginsOfTheTokensOwnSpaceAndNobodyOnceTheLinkIsRevokedOrForged(@TempDir Path cfg, @TempDir Path root,
+            @TempDir Path ui) throws Exception {
+        subjects();
+        enable();
+        Files.writeString(ui.resolve("index.html"), "<!doctype html><html><head></head><body><app-root></app-root></body></html>");
+        System.setProperty("ui.dir", ui.toString());
+        try (Ctx c = open(cfg, root)) {
+            investigation(c);
+            settings(root, null, new LinkAnalysisSettings.Embed(null, null, null, List.of("https://portal.example")));
+            String token = mint(c, "{}");
+            String grantId = token.substring(0, token.indexOf('.'));
+            java.util.function.Function<String, String> csp = t -> {
+                try {
+                    HttpResponse<String> r = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/embed/inv/" + t)).GET().build(),
+                            BodyHandlers.ofString());
+                    assertEquals(200, r.statusCode());
+                    return r.headers().firstValue("Content-Security-Policy").orElseThrow();
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            };
+            assertTrue(csp.apply(token).endsWith("frame-ancestors https://portal.example"), "the live token's own Space");
+            assertTrue(csp.apply(grantId + ".wrongsecret").endsWith("frame-ancestors 'none'"), "right id, wrong secret");
+            assertTrue(csp.apply("nope.nope").endsWith("frame-ancestors 'none'"), "unknown grant");
+            assertEquals(200, status(c, "POST", INV + "/embeds/" + grantId + "/revoke", "{}", L));
+            assertTrue(csp.apply(token).endsWith("frame-ancestors 'none'"), "revoked: nobody");
         }
     }
 
@@ -591,8 +622,11 @@ class ControlApiInvestigationEmbedTest {
     }
 
     @Test
-    void theTokenIsInNoLogLineAndNoAuditEventAndTheAuditCarriesTheGrantAndTheIssuer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void theTokenIsInNoLogLineAndNoAuditEventAndTheAuditCarriesTheGrantAndTheIssuer(@TempDir Path cfg, @TempDir Path root, @TempDir Path ui)
+            throws Exception {
         subjects();
+        Files.writeString(ui.resolve("index.html"), "<!doctype html><html><head></head><body><app-root></app-root></body></html>");
+        System.setProperty("ui.dir", ui.toString());
         enable();
         ListAppender<ILoggingEvent> logs = new ListAppender<>();
         logs.start();
@@ -600,6 +634,9 @@ class ControlApiInvestigationEmbedTest {
         Level was = rootLogger.getLevel();
         rootLogger.setLevel(Level.DEBUG);
         rootLogger.addAppender(logs);
+        ch.qos.logback.classic.Logger hostLog = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ControlApi.class);   // may carry its own level
+        Level hostWas = hostLog.getLevel();
+        hostLog.setLevel(Level.DEBUG);
         List<Event> events = new CopyOnWriteArrayList<>();
         Consumer<Event> sub = events::add;
         EventLog.current().addSubscriber(sub);
@@ -609,6 +646,9 @@ class ControlApiInvestigationEmbedTest {
             String id = token.substring(0, token.indexOf('.'));
             String secret = token.substring(token.indexOf('.') + 1);
             assertEquals(200, pub(c, token).statusCode());
+            for (String page : List.of(token, "nope.nope"))   // the viewer PAGE's path carries the token too (a host DEBUG line logs every served page)
+                assertEquals(200, client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/embed/inv/" + page)).GET().build(),
+                        BodyHandlers.ofString()).statusCode());
             assertEquals(404, pub(c, token + "x").statusCode());
             assertEquals(404, pub(c, secret).statusCode());
             assertEquals(405, status(c, "POST", PUB + token, "{}", null));
@@ -623,6 +663,7 @@ class ControlApiInvestigationEmbedTest {
             String secret2 = t2.substring(t2.indexOf('.') + 1);
             for (String needle : List.of(secret, id, secret2, t2.substring(0, t2.indexOf('.'))))
                 assertFalse(allLogs.contains(needle), "no log line carries a token (" + needle + ")");
+            assertTrue(allLogs.contains("/embed/inv/[redacted]"), "the viewer page was served and its path logged, redacted: " + allLogs);
             assertTrue(allLogs.contains("/public/investigations/[redacted]"), "the server fault was logged, with the path redacted: " + allLogs);
             String allEvents = events.stream().map(e -> String.valueOf(e.toMap())).reduce("", (x, y) -> x + "\n" + y);
             assertFalse(allEvents.contains(secret), "no audit event carries the token's secret");
@@ -643,6 +684,7 @@ class ControlApiInvestigationEmbedTest {
             EventLog.current().removeSubscriber(sub);
             rootLogger.detachAppender(logs);
             rootLogger.setLevel(was);
+            hostLog.setLevel(hostWas);
         }
     }
 

@@ -66,17 +66,20 @@ final class FrameHeaders {
     }
 
     private static final Pattern EXTERNAL_LINK = Pattern.compile("<link\\b[^>]*\\bhref\\s*=\\s*[\"']?https?://[^>]*>", Pattern.CASE_INSENSITIVE);
+    /** An {@code @font-face} that names another origin: Angular inlines the Google font CSS into the built index, and the policy's {@code font-src 'self'} refuses every one. */
+    private static final Pattern EXTERNAL_FONT_FACE = Pattern.compile("@font-face\\s*\\{[^}]*https?://[^}]*\\}",Pattern.CASE_INSENSITIVE);
     private static final Pattern EVENT_HANDLER = Pattern.compile("\\s+on[a-z]+\\s*=\\s*(\"[^\"]*\"|'[^']*')", Pattern.CASE_INSENSITIVE);
     private static final Pattern PRINT_MEDIA = Pattern.compile("\\s+media\\s*=\\s*[\"']print[\"']", Pattern.CASE_INSENSITIVE);
 
     /**
      * The shell page for the viewer: the SPA's {@code index.html} with every link to another origin removed (the viewer makes no
-     * third-party call: no font or icon host, not even a preconnect), and the inline event handler of Angular's deferred stylesheet
+     * third-party call: no font or icon host, not even a preconnect), and every inlined {@code @font-face} that names another origin, and the inline event handler of Angular's deferred stylesheet
      * dropped (the policy would refuse it, so the stylesheet is loaded eagerly instead).
      */
     static byte[] sanitiseShell(byte[] html) {
         String s = new String(html, StandardCharsets.UTF_8);
         s = EXTERNAL_LINK.matcher(s).replaceAll("");
+        s = EXTERNAL_FONT_FACE.matcher(s).replaceAll("");   // the viewer falls back to system fonts: no refused request, a clean console
         if (EVENT_HANDLER.matcher(s).find()) {
             s = EVENT_HANDLER.matcher(s).replaceAll("");
             s = PRINT_MEDIA.matcher(s).replaceAll("");
