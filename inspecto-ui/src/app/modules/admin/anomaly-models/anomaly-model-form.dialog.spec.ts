@@ -71,6 +71,8 @@ const flush = async () => {
     for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
 };
 
+const datasetGet = vi.fn((id: string) => of({ id, sourceName: id }));
+
 function setup(existing?: ComponentDef, write?: () => unknown, opts: { work?: boolean } = {}) {
     const close = vi.fn();
     const result = write ?? (() => of({ ...EXISTING }));
@@ -98,8 +100,12 @@ function setup(existing?: ComponentDef, write?: () => unknown, opts: { work?: bo
             {
                 provide: DatasetsService,
                 useValue: {
-                    list: () => of([{ id: 'cdr' }, { id: 'no_schema' }]),
-                    get: (id: string) => of({ id, sourceName: id }),
+                    list: () =>
+                        of([
+                            { id: 'cdr', sourceName: 'cdr' },
+                            { id: 'no_schema', sourceName: 'no_schema' },
+                        ]),
+                    get: datasetGet,
                 },
             },
             {
@@ -141,6 +147,14 @@ describe('AnomalyModelFormDialog', () => {
         expect(cmp.datasets().map((o) => o.value)).toEqual(['cdr']);
         expect(cmp.featureEditor!.timeOptions(0).map((o) => o.value)).toEqual(['event_time']);
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('probes each Dataset from the list it already holds, without a GET per Dataset', async () => {
+        datasetGet.mockClear();
+        const { fixture } = setup(undefined);
+        await flush();
+        fixture.detectChanges();
+        expect(datasetGet).not.toHaveBeenCalled();
     });
 
     it('saves an edit with If-Match, keeping the envelope keys', async () => {

@@ -88,82 +88,86 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
                             <span class="text-secondary text-xs">Scored under the unsaved draft.</span>
                         }
                     </div>
-                    <table class="mt-3 w-full text-left text-sm">
-                        <caption class="sr-only">
-                            Per-feature explanation of the previewed Anomaly Score
-                        </caption>
-                        <thead>
-                            <tr class="border-b">
-                                <th scope="col">Feature</th>
-                                <th scope="col">Observed</th>
-                                <th scope="col">Self z</th>
-                                <th scope="col">Peer z</th>
-                                <th scope="col">Cohort shift</th>
-                                <th scope="col">Baseline</th>
-                                <th scope="col">Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (f of p.features; track f.feature) {
-                                <tr class="border-b align-top">
-                                    <td>{{ f.label || f.feature }}</td>
-                                    <td class="tabular-nums">{{ fmt(f.observed) }}</td>
-                                    <td class="tabular-nums">{{ fmt(f.zSelf) }}</td>
-                                    <td class="tabular-nums">{{ f.peerBaseline ? fmt(f.zPeer) : '—' }}</td>
-                                    <td class="tabular-nums">
-                                        {{ f.cohortShift != null && f.peerBaseline ? '×' + fmt(f.cohortShift) : '—' }}
-                                    </td>
-                                    <td class="w-44">
-                                        @if (strip(f); as s) {
-                                            <svg
-                                                viewBox="0 0 160 24"
-                                                class="h-6 w-40"
-                                                role="img"
-                                                [attr.aria-label]="stripLabel(f)"
-                                            >
-                                                <line
-                                                    x1="0"
-                                                    y1="12"
-                                                    x2="160"
-                                                    y2="12"
-                                                    class="text-hint stroke-current"
-                                                    stroke-width="1"
-                                                />
-                                                <rect
-                                                    [attr.x]="s.lo * 160"
-                                                    y="6"
-                                                    [attr.width]="(s.hi - s.lo) * 160"
-                                                    height="12"
-                                                    rx="2"
-                                                    class="text-hint fill-current"
-                                                    fill-opacity="0.35"
-                                                />
-                                                <line
-                                                    [attr.x1]="s.median * 160"
-                                                    y1="4"
-                                                    [attr.x2]="s.median * 160"
-                                                    y2="20"
-                                                    class="text-secondary stroke-current"
-                                                    stroke-width="2"
-                                                />
-                                                @if (s.observed != null) {
-                                                    <circle
-                                                        [attr.cx]="s.observed * 160"
-                                                        cy="12"
-                                                        r="4"
-                                                        class="text-primary fill-current"
-                                                    />
-                                                }
-                                            </svg>
-                                        } @else {
-                                            <span class="text-secondary text-xs">No baseline</span>
-                                        }
-                                    </td>
-                                    <td class="text-xs">{{ f.reason }}</td>
+                    <div class="mt-3 overflow-x-auto">
+                        <table class="w-full text-left text-sm [&_td]:py-1 [&_td]:pr-4 [&_th]:pr-4">
+                            <caption class="sr-only">
+                                Per-feature explanation of the previewed Anomaly Score
+                            </caption>
+                            <thead>
+                                <tr class="border-b">
+                                    <th scope="col">Feature</th>
+                                    <th scope="col">Observed</th>
+                                    <th scope="col">Self z</th>
+                                    <th scope="col">Peer z</th>
+                                    <th scope="col">Cohort shift</th>
+                                    <th scope="col">Baseline</th>
+                                    <th scope="col">Reason</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @for (f of p.features; track f.feature) {
+                                    <tr class="border-b align-top">
+                                        <td>{{ f.label || f.feature }}</td>
+                                        <td class="tabular-nums">{{ fmt(f.observed) }}</td>
+                                        <td class="tabular-nums">{{ fmt(f.zSelf) }}</td>
+                                        <td class="tabular-nums">{{ f.peerBaseline ? fmt(f.zPeer) : '—' }}</td>
+                                        <td class="tabular-nums">
+                                            {{
+                                                f.cohortShift != null && f.peerBaseline ? '×' + fmt(f.cohortShift) : '—'
+                                            }}
+                                        </td>
+                                        <td class="w-44">
+                                            @if (strip(f); as s) {
+                                                <svg
+                                                    viewBox="0 0 160 24"
+                                                    class="h-6 w-40"
+                                                    role="img"
+                                                    [attr.aria-label]="stripLabel(f)"
+                                                >
+                                                    <line
+                                                        x1="0"
+                                                        y1="12"
+                                                        x2="160"
+                                                        y2="12"
+                                                        class="text-hint stroke-current"
+                                                        stroke-width="1"
+                                                    />
+                                                    <rect
+                                                        [attr.x]="s.lo * 160"
+                                                        y="6"
+                                                        [attr.width]="(s.hi - s.lo) * 160"
+                                                        height="12"
+                                                        rx="2"
+                                                        class="text-hint fill-current"
+                                                        fill-opacity="0.35"
+                                                    />
+                                                    <line
+                                                        [attr.x1]="s.median * 160"
+                                                        y1="4"
+                                                        [attr.x2]="s.median * 160"
+                                                        y2="20"
+                                                        class="text-secondary stroke-current"
+                                                        stroke-width="2"
+                                                    />
+                                                    @if (s.observed != null) {
+                                                        <circle
+                                                            [attr.cx]="s.observed * 160"
+                                                            cy="12"
+                                                            r="4"
+                                                            class="text-primary fill-current"
+                                                        />
+                                                    }
+                                                </svg>
+                                            } @else {
+                                                <span class="text-secondary text-xs">No baseline</span>
+                                            }
+                                        </td>
+                                        <td class="text-xs">{{ f.reason }}</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                     <p class="text-secondary mt-1 text-xs">
                         Baseline: the shaded band is the usual range (median ± 3 MAD of the window), the bar its median
                         and the dot the observed day.
@@ -175,7 +179,7 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
                                 class="!h-48"
                                 type="line"
                                 [data]="c.data"
-                                [options]="chartOptions"
+                                [options]="c.options"
                                 [ariaLabel]="c.label"
                             ></inspecto-chart>
                             <p class="text-secondary text-xs">
@@ -206,7 +210,6 @@ export class AnomalyModelPreviewComponent {
     readonly result = signal<AnomalyScorePreview | null>(null);
     readonly fmt = fmt;
     readonly badge = bandBadge;
-    readonly chartOptions = dayChartOptions();
     /** One chart per feature that has a series with a value; built once per result, never per change-detection pass. */
     readonly charts = computed(() => {
         const p = this.result();
@@ -215,7 +218,9 @@ export class AnomalyModelPreviewComponent {
             const s = p.series?.[f.feature];
             const data = dayChartData(s);
             const title = f.label || f.feature;
-            return s && data ? [{ feature: f.feature, title, data, label: dayChartLabel(title, s) }] : [];
+            return s && data
+                ? [{ feature: f.feature, title, data, options: dayChartOptions(s), label: dayChartLabel(title, s) }]
+                : [];
         });
     });
 

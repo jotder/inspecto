@@ -38,7 +38,7 @@
                             >
                                 <span class="block text-sm font-semibold">{{ m.id }}</span>
                                 <span class="text-secondary block text-xs">
-                                    {{ m.entityType || 'entity' }} · {{ m.features.length }} features
+                                    {{ m.entityType || 'entity' }} · {{ count(m.features.length, 'feature') }}
                                 </span>
                             </button>
                         </li>

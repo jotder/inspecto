@@ -59,7 +59,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                     @if (rowErrors()[i]; as e) {
                         <p class="text-warn mb-2 text-xs" role="alert" data-testid="feature-error">{{ e }}</p>
                     }
-                    <div class="grid grid-cols-1 gap-x-3 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Id</mat-label>
                             <input matInput formControlName="id" />
@@ -128,7 +128,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                         <p class="text-secondary text-xs">Only rows matching every filter are measured.</p>
                         @for (fg of filtersOf(g).controls; track fg; let j = $index) {
                             <div
-                                class="mt-2 grid grid-cols-1 items-start gap-x-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                                class="mt-2 grid grid-cols-1 items-start gap-x-4 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto]"
                                 role="group"
                                 [formGroupName]="j"
                                 [attr.aria-label]="'Feature ' + (i + 1) + ' filter ' + (j + 1)"

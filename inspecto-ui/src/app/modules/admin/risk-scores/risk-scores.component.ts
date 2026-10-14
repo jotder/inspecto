@@ -15,6 +15,7 @@ import { AnomalyPanelComponent } from 'app/inspecto/components/anomaly-panel.com
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { RiskModelView, riskModelView } from 'app/inspecto/risk/risk-score-view';
+import { countLabel } from 'app/inspecto/viz/number-format';
 import { RiskScoreActionsComponent } from './risk-score-actions.component';
 import { RiskScoreHeldBadgeComponent, RiskScoreHeldStore } from './risk-score-held';
 
@@ -48,6 +49,7 @@ export class RiskScoresComponent implements OnInit {
     private riskScores = inject(RiskScoresService);
     private held = inject(RiskScoreHeldStore);
 
+    readonly count = countLabel;
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
     readonly models = signal<RiskModelView[]>([]);

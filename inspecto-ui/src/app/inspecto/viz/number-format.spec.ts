@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAxisTick, formatNumber, isRawNumberColumn } from './number-format';
+import { countLabel, formatAxisTick, formatNumber, isRawNumberColumn } from './number-format';
 import { tableColDefs } from './table-columns';
 
 const plain = (n: number, d = 2) => new Intl.NumberFormat('en', { maximumFractionDigits: d }).format(n);
@@ -46,5 +46,13 @@ describe('number format (UIE-4)', () => {
         expect(fmt({ value: 13175.37 })).toMatch(/^SAR 13,?175$/);
         expect(id.valueFormatter).toBeUndefined();
         expect((text.valueFormatter as (p: { value: unknown }) => string)({ value: 'M. Otaibi' })).toBe('M. Otaibi');
+    });
+});
+
+describe('countLabel', () => {
+    it('agrees the noun with the count', () => {
+        expect(countLabel(1, 'feature')).toBe('1 feature');
+        expect(countLabel(0, 'factor')).toBe('0 factors');
+        expect(countLabel(3, 'entity', 'entities')).toBe('3 entities');
     });
 });

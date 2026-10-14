@@ -71,8 +71,21 @@ export function dayChartData(series: AnomalyDaySeries | undefined): ChartData<'l
     };
 }
 
+/**
+ * The y axis bounds for a CONSTANT series (every plotted value, band included, equal): Chart.js would pick -200..200
+ * around a single value, so pad it by max(1, 10 %). `null` when the values vary and the axis can follow the data.
+ */
+export function flatAxis(series: AnomalyDaySeries | undefined): { min: number; max: number } | null {
+    if (!series) return null;
+    const all = [...series.points.map((p) => p.value), series.median, series.low, series.high].filter(finite);
+    if (!all.length || Math.min(...all) !== Math.max(...all)) return null;
+    const pad = Math.max(1, Math.abs(all[0]) * 0.1);
+    return { min: all[0] - pad, max: all[0] + pad };
+}
+
 /** Chart options: legend on, the lower band edge left out of it (it only closes the fill), y from the data. */
-export function dayChartOptions(): ChartOptions<'line'> {
+export function dayChartOptions(series?: AnomalyDaySeries): ChartOptions<'line'> {
+    const flat = flatAxis(series);
     return {
         plugins: {
             legend: {
@@ -80,7 +93,7 @@ export function dayChartOptions(): ChartOptions<'line'> {
                 labels: { filter: (item) => item.text !== 'Lower usual range' },
             },
         },
-        scales: { y: { ticks: { callback: (v) => formatNumber(Number(v), { compact: true }) } } },
+        scales: { y: { ...(flat ?? {}), ticks: { callback: (v) => formatNumber(Number(v), { compact: true }) } } },
     } as ChartOptions<'line'>;
 }
 

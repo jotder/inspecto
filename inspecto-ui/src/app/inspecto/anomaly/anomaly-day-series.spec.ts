@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AnomalyDaySeries } from 'app/inspecto/api/anomaly-models.service';
-import { dayChartData, dayChartLabel } from './anomaly-day-series';
+import { dayChartData, dayChartLabel, dayChartOptions, flatAxis } from './anomaly-day-series';
 
 const SERIES: AnomalyDaySeries = {
     points: [
@@ -41,5 +41,31 @@ describe('anomaly day series', () => {
         expect(t).toContain('scored day 3,000');
         expect(t).toContain('usual range 40 to 160');
         expect(dayChartLabel('x', { ...SERIES, median: null })).toContain('no usual range yet');
+    });
+
+    it('pads the axis around a constant series, and leaves a varying one to the data', () => {
+        const flat: AnomalyDaySeries = {
+            points: [
+                { day: '2026-09-29', value: 5 },
+                { day: '2026-09-30', value: 5 },
+            ],
+            median: 5,
+            low: 5,
+            high: 5,
+            bandSpreads: 3,
+        };
+        expect(flatAxis(flat)).toEqual({ min: 4, max: 6 });
+        expect(
+            flatAxis({
+                ...flat,
+                median: 500,
+                low: 500,
+                high: 500,
+                points: flat.points.map((p) => ({ ...p, value: 500 })),
+            }),
+        ).toEqual({ min: 450, max: 550 });
+        expect(flatAxis(SERIES)).toBeNull();
+        expect((dayChartOptions(flat).scales as { y: { min: number } }).y.min).toBe(4);
+        expect((dayChartOptions(SERIES).scales as { y: { min?: number } }).y.min).toBeUndefined();
     });
 });

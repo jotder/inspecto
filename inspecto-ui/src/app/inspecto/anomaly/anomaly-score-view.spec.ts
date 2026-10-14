@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bandBadge, rankedFeatures, sparklinePoints } from './anomaly-score-view';
+import { bandBadge, onePerPeriod, rankedFeatures, sparklinePoints, stampLabel } from './anomaly-score-view';
 
 describe('anomaly-score-view', () => {
     it('maps each band to a tone and label', () => {
@@ -28,5 +28,25 @@ describe('anomaly-score-view', () => {
         );
         expect(pts).toBe('0.0,20.0 100.0,0.0');
         expect(sparklinePoints([{ periodStart: 'd', score: 5, band: 'normal', runId: 'r' }], 100, 20)).toBe('');
+    });
+
+    it('collapses re-runs of one period to the latest run, so a day is one point', () => {
+        const h = (periodStart: string, score: number, runId: string) => ({
+            periodStart,
+            score,
+            band: 'normal' as const,
+            runId,
+        });
+        const history = [h('d2', 90, 'r5'), h('d2', 10, 'r4'), h('d2', 10, 'r3'), h('d1', 0, 'r1')];
+        expect(onePerPeriod(history).map((x) => x.runId)).toEqual(['r5', 'r1']);
+        expect(sparklinePoints(history, 100, 20)).toBe('0.0,20.0 100.0,2.0');
+        expect(sparklinePoints([h('d', 5, 'a'), h('d', 6, 'b')], 100, 20)).toBe('');
+    });
+
+    it('words server timestamps in the app spelling, whole-day for a period', () => {
+        expect(stampLabel('2026-10-13 23:54:15.428051')).toBe('13 Oct 2026, 23:54:15');
+        expect(stampLabel('2026-10-12 00:00:00.0', true)).toBe('12 Oct 2026');
+        expect(stampLabel('not a date')).toBe('not a date');
+        expect(stampLabel(null)).toBe('');
     });
 });

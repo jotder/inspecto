@@ -23,6 +23,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { ColumnMeta } from 'app/inspecto/query/query-types';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
+import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { AnomalyModelFeaturesComponent } from './anomaly-model-features.component';
 import { AnomalyModelPreviewComponent } from './anomaly-model-preview.component';
@@ -121,6 +122,8 @@ export class AnomalyModelFormDialog implements OnInit {
     readonly refusal = signal<string | null>(null);
     readonly datasets = signal<PickerOption[]>([]);
     private readonly columnCache = new Map<string, Promise<ColumnMeta[]>>();
+    /** The Datasets the list already returned in full, so a column probe does not GET each one again. */
+    private readonly known = new Map<string, Dataset>();
 
     readonly requestClose = guardDirtyClose(
         this.ref,
@@ -131,7 +134,8 @@ export class AnomalyModelFormDialog implements OnInit {
     readonly columnMetaFor = (id: string): Promise<ColumnMeta[]> => {
         let p = this.columnCache.get(id);
         if (!p) {
-            p = firstValueFrom(this.datasetsApi.get(id))
+            const have = this.known.get(id);
+            p = (have ? Promise.resolve(have) : firstValueFrom(this.datasetsApi.get(id)))
                 .then((ds) => this.rowsApi.columns(ds))
                 .catch(() => [] as ColumnMeta[]);
             this.columnCache.set(id, p);
@@ -142,7 +146,9 @@ export class AnomalyModelFormDialog implements OnInit {
     async ngOnInit(): Promise<void> {
         let ids: string[];
         try {
-            ids = (await firstValueFrom(this.datasetsApi.list())).map((d) => d.id);
+            const all = await firstValueFrom(this.datasetsApi.list());
+            for (const d of all) this.known.set(d.id, d);
+            ids = all.map((d) => d.id);
         } catch {
             ids = [];
         }

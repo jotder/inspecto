@@ -265,6 +265,13 @@ cramped Feature row layout) are tracked in `ANOMALY-UI-FINDINGS-1`. Its backend 
   `POST /anomaly-scores/preview` as 503 `CAPABILITY_UNAVAILABLE` naming `inspecto-anomaly` (the SPA hides the panel
   on it). `anomaly-model` is a component kind, not a module route: absent the module, `GET /components/anomaly-model`
   is an ordinary empty 200, and there is no `/bootstrap` `features.anomaly` flag.
+Polished 2026-10-14 (SPA side of `ANOMALY-UI-FINDINGS-1`): the panel (and the Risk Score panel) word `period_start` / `scored_at` in the app's
+date-time spelling with the raw value in a `title`; the sparkline draws one point per `period_start` (the latest run wins);
+a constant day series gets a padded y axis (value ± max(1, 10 %)) instead of -200..200; counts read "1 feature" / "1 factor";
+the edit dialog reads each Dataset's columns once per open from the list it already holds (no per-Dataset GET; a 404 probe
+still shows in the browser console, which a page cannot suppress) and lays Feature fields out two per row.
+
+What remains of `ANOMALY-UI-FINDINGS-1` is the live visual check of the layout and the sign-in return path.
 
 ## Decisions (operator, 2026-10-10)
 

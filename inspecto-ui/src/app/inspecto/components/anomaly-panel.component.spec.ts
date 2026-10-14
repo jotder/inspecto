@@ -70,7 +70,10 @@ describe('AnomalyPanelComponent', () => {
         expect(items[0]).toContain('Data MB');
         expect(items[0]).toContain('14.5 MADs above');
         expect(items[0]).toContain('observed 4812');
-        expect(el.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toContain('last 3 runs');
+        expect(el.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toContain('last 3 periods');
+        expect(el.textContent).toContain('period 9 Oct 2026');
+        expect(el.textContent).toContain('scored 10 Oct 2026, 01:00:00');
+        expect(el.querySelector('[title="2026-10-10 01:00:00"]')).not.toBeNull();
         await expectNoA11yViolations(el);
     });
 

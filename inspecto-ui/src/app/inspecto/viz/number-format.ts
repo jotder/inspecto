@@ -68,3 +68,8 @@ export function formatNumber(value: number, format?: NumberFormat): string {
 export function formatAxisTick(value: number, format?: NumberFormat): string {
     return formatNumber(value, { ...format, compact: true, decimals: undefined });
 }
+
+/** `1 feature`, `2 features`: a count with its noun in the right number. */
+export function countLabel(n: number, singular: string, plural = `${singular}s`): string {
+    return `${n} ${n === 1 ? singular : plural}`;
+}

@@ -4,7 +4,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { AnomalyScore, AnomalyScoresService } from '../api/anomaly-scores.service';
 import { ComponentsService } from '../api/components.service';
-import { bandBadge, rankedFeatures, sparklinePoints } from '../anomaly/anomaly-score-view';
+import { bandBadge, onePerPeriod, rankedFeatures, sparklinePoints, stampLabel } from '../anomaly/anomaly-score-view';
+import { countLabel } from '../viz/number-format';
 import { displayEntityKey } from '../risk/risk-score-view';
 import { StatusBadgeComponent } from './status-badge.component';
 
@@ -49,7 +50,8 @@ const SPARK_H = 24;
                 </div>
                 <p class="text-secondary mt-1 text-xs">
                     {{ s.model }} · elevated at {{ s.elevatedThreshold }}, high at {{ s.highThreshold }} · period
-                    {{ s.periodStart }} · scored {{ s.scoredAt }}
+                    <span [attr.title]="s.periodStart">{{ stamp(s.periodStart, true) }}</span> · scored
+                    <span [attr.title]="s.scoredAt">{{ stamp(s.scoredAt) }}</span>
                 </p>
                 <p class="mt-1 text-xs">
                     <span class="text-secondary">{{ s.entityType || 'Entity' }}</span>
@@ -98,7 +100,9 @@ const SPARK_H = 24;
                         [attr.aria-expanded]="expanded()[s.model] ? 'true' : 'false'"
                         (click)="toggleAll(s.model)"
                     >
-                        {{ expanded()[s.model] ? 'Show top ' + top : 'Show all ' + s.features.length + ' features' }}
+                        {{
+                            expanded()[s.model] ? 'Show top ' + top : 'Show all ' + count(s.features.length, 'feature')
+                        }}
                     </button>
                 }
             </section>
@@ -119,6 +123,8 @@ export class AnomalyPanelComponent {
     readonly top = TOP_FEATURES;
     readonly sparkW = SPARK_W;
     readonly sparkH = SPARK_H;
+    readonly stamp = stampLabel;
+    readonly count = countLabel;
     readonly badge = (s: AnomalyScore) => bandBadge(s.band);
 
     constructor() {
@@ -153,9 +159,9 @@ export class AnomalyPanelComponent {
     }
 
     sparkLabel(s: AnomalyScore): string {
-        const h = s.history ?? [];
+        const h = onePerPeriod(s.history ?? []);
         const oldest = h[h.length - 1]?.score ?? 0;
-        return `Score over the last ${h.length} runs, from ${Math.round(oldest)} to ${Math.round(s.score)}`;
+        return `Score over the last ${countLabel(h.length, 'period')}, from ${Math.round(oldest)} to ${Math.round(s.score)}`;
     }
 
     /** A masked token shows as-is; a raw key is dotted down to its last 4 until revealed. */

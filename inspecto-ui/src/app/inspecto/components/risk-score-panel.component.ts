@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RiskScore, RiskScoresService } from '../api/risk-scores.service';
+import { stampLabel } from '../anomaly/anomaly-score-view';
 import { displayEntityKey } from '../risk/risk-score-view';
 import { apiErrorMessage } from '../api/api-base';
 import { InspectoAlertComponent } from './alert.component';
@@ -29,7 +30,8 @@ import { StatusBadgeComponent } from './status-badge.component';
                         [label]="s.high ? 'High' : 'Below threshold'"
                     />
                     <span class="text-secondary text-xs">
-                        {{ s.model }} · high at {{ s.highThreshold }} · {{ s.scoredAt }}
+                        {{ s.model }} · high at {{ s.highThreshold }} ·
+                        <span [attr.title]="s.scoredAt">{{ stamp(s.scoredAt) }}</span>
                     </span>
                 </div>
                 <ul class="mt-3 flex flex-col gap-2">
@@ -87,6 +89,7 @@ export class RiskScorePanelComponent {
     readonly absent = signal(false);
     readonly loadError = signal<string | null>(null);
     readonly shownKey = displayEntityKey;
+    readonly stamp = stampLabel;
 
     readonly rows = computed(() => {
         const s = this.score();

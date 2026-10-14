@@ -36,7 +36,7 @@
                             >
                                 <span class="block text-sm font-semibold">{{ m.id }}</span>
                                 <span class="text-secondary block text-xs">
-                                    {{ m.entityType || 'entity' }} · {{ m.factors.length }} factors
+                                    {{ m.entityType || 'entity' }} · {{ count(m.factors.length, 'factor') }}
                                 </span>
                                 @if (m.invalid) {
                                     <inspecto-status-badge value="error" label="Invalid"></inspecto-status-badge>

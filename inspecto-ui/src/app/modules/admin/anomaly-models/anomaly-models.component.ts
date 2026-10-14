@@ -20,6 +20,7 @@ import {
     AnomalyModelFormResult,
     heldAnomalyChange,
 } from './anomaly-model-form.dialog';
+import { countLabel } from 'app/inspecto/viz/number-format';
 import { AnomalyModelPreviewComponent } from './anomaly-model-preview.component';
 
 /**
@@ -50,6 +51,7 @@ export class AnomalyModelsComponent implements OnInit {
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
 
+    readonly count = countLabel;
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
     readonly models = signal<AnomalyModelView[]>([]);
