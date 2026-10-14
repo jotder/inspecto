@@ -223,8 +223,10 @@ class MobileMoneyPackGoldenTest {
 
             assertRaisesExactlyThePlanted(rules, probe, corpus);
             Map<String, Integer> fired = new TreeMap<>();
-            for (Alert a : svc.evaluateRules()) fired.merge(a.rule(), 1, Integer::sum);
-            assertEquals(EXPECTED, fired, "golden Alert count per typology");
+            List<Alert> raised = svc.evaluateRules();
+            assertEquals(EXPECTED.size(), raised.size(), "ONE Alert per typology rule, whatever its offender count");
+            for (Alert a : raised) fired.merge(a.rule(), (int) a.value(), Integer::sum);
+            assertEquals(EXPECTED, fired, "golden breached-key count per typology (an Alert's value)");
             assertEquals(TOTAL, fired.values().stream().mapToInt(Integer::intValue).sum());
             assertEquals(List.of(), svc.evaluateRules(), "a re-evaluation raises nothing new");
 

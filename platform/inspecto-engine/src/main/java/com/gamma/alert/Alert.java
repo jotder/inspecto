@@ -106,13 +106,15 @@ public record Alert(String rule, String severity, String pipeline, String metric
     }
 
     /**
-     * The ONE aggregate Alert a {@code by} rule raises when more than {@link AlertRule#stormCap} keys breach at
-     * once (ASSURE-PER-ENTITY-ALERTS-1) — its {@link #value} is the count of breached keys, not a Measure value.
+     * The ONE Alert a {@code by} rule holds open (ALERT-PER-RULE-1): its {@link #value} is the count of breached
+     * keys, not a Measure value, and no entity is named. {@code storm}: the count is above the rule's
+     * {@link AlertRule#stormCap}, so one storm Incident stands for the keys.
      */
-    static Alert storm(AlertRule r, String pipeline, String scopeLabel, long keys, long epochMillis) {
-        String msg = String.format(Locale.ROOT,
-                "%s: storm — %s keys (by %s) breach: %s; above the storm cap of %s, one storm Alert stands for them all",
-                r.severity(), number(keys), String.join(", ", r.by()), title(r, scopeLabel), number(r.stormCap()));
+    static Alert aggregate(AlertRule r, String pipeline, String scopeLabel, long keys, boolean storm, long epochMillis) {
+        String msg = String.format(Locale.ROOT, "%s: %s %s (by %s) breach: %s", r.severity(), number(keys),
+                keys == 1 ? "key" : "keys", String.join(", ", r.by()), title(r, scopeLabel))
+                + (storm ? String.format(Locale.ROOT, "; above the storm cap of %s, one storm Incident stands for them all",
+                number(r.stormCap())) : "");
         return new Alert(r.name(), r.severity(), pipeline, r.measure(), keys, r.comparator(),
                 r.threshold(), r.window(), epochMillis, msg);
     }

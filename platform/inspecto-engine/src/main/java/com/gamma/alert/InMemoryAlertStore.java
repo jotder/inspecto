@@ -37,6 +37,14 @@ public final class InMemoryAlertStore implements AlertStore {
         return rows.values().stream().filter(r -> !AlertLifecycle.isTerminal(r.state())).toList().reversed();
     }
 
+    @Override public synchronized boolean update(String alertId, String message, Map<String, String> attributes, Alert fired) {
+        Row cur = rows.get(alertId);
+        if (cur == null || AlertLifecycle.isTerminal(cur.state())) return false;
+        rows.put(alertId, new Row(cur.id(), cur.title(), message, cur.severity(), cur.scope(), attributes, cur.state(),
+                cur.openedAt(), cur.closedAt(), cur.closedBy(), cur.incidentId(), fired));
+        return true;
+    }
+
     @Override public synchronized void linkIncident(String alertId, String incidentId) {
         Row cur = rows.get(alertId);
         if (cur == null) return;

@@ -95,7 +95,9 @@ class AnomalyScoreAlertTest {
         svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
                 r.threshold(), r.stormCap()));
 
-        assertEquals(2, svc.evaluateRules().size(), "the two planted anomalies, and no look-alike");
+        List<com.gamma.alert.Alert> raised = svc.evaluateRules();
+        assertEquals(1, raised.size(), "ONE Alert for the rule (ALERT-PER-RULE-1)");
+        assertEquals(2.0, raised.get(0).value(), 1e-9, "counting the two planted anomalies, and no look-alike");
         List<FakeObjectAccess.Opened> incidents = objects.opened.stream()
                 .filter(o -> o.kind() == ObjectType.INCIDENT).toList();
         assertEquals(List.of("masked", "spike"), incidents.stream()
@@ -109,8 +111,8 @@ class AnomalyScoreAlertTest {
         score(cfg, data, LocalDate.parse("2026-09-30"), "r2");
         assertEquals(0, svc.evaluateRules().size(), "no new Alert");
         assertEquals(2, objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT).count());
-        assertTrue(alerts.allActive().isEmpty(), "each healed key resolves its Alert");
-        assertEquals(2, alerts.size(), "the Alert records are kept, resolved");
+        assertTrue(alerts.allActive().isEmpty(), "the last healed key resolves the rule's Alert");
+        assertEquals(1, alerts.size(), "the rule's Alert record is kept, resolved when its last key healed");
     }
 
     @Test

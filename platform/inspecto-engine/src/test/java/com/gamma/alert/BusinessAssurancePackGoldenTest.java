@@ -81,10 +81,17 @@ class BusinessAssurancePackGoldenTest {
     private static final List<String> RULES = List.of("ba_revenue_outside_band", "ba_revenue_regime_change",
             "ba_revenue_drift", "ba_margin_erosion", "ba_margin_data_quality");
 
-    /** Every pack Alert Rule through the production sweep. */
-    private record Sweep(List<Alert> fired, List<FakeObjectAccess.Opened> incidents) {
-        long count(String rule) { return fired.stream().filter(a -> a.rule().equals(rule)).count(); }
-        String of(String rule) { return fired.stream().filter(a -> a.rule().equals(rule)).toList().toString(); }
+    /**
+     * Every pack Alert Rule through the production sweep. An Alert is per RULE (ALERT-PER-RULE-1): its value is the
+     * count of breached keys, so a "detection" is a breached key. {@code keys} are the offenders the probe reads for
+     * each rule; {@link #sweep(Path, Path)} has already checked that each rule's one stored Alert holds exactly
+     * their digests.
+     */
+    private record Sweep(List<Alert> fired, List<FakeObjectAccess.Opened> incidents,
+                         Map<String, List<String>> keys) {
+        long count(String rule) { return fired.stream().filter(a -> a.rule().equals(rule)).mapToLong(a -> (long) a.value()).sum(); }
+        String of(String rule) { return String.valueOf(keys.getOrDefault(rule, List.of())); }
+        long detections() { return fired.stream().mapToLong(a -> (long) a.value()).sum(); }
     }
 
     /** Each Job's sink Dataset (what the pack's Alert Rules read) and the view whose SQL the Job runs. */
@@ -122,12 +129,34 @@ class BusinessAssurancePackGoldenTest {
                 .map(ComponentRegistry.Component::content).orElseThrow())).toList();
         DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> data);
         FakeObjectAccess objects = new FakeObjectAccess();
-        AlertService svc = new AlertService(rules, noPipelines(), emptyStore(), objects);
+        InMemoryAlertStore alerts = new InMemoryAlertStore();
+        java.util.Optional<com.gamma.objects.ObjectAccess> ops = java.util.Optional.of(objects);
+        AlertService svc = new AlertService(rules, noPipelines(), emptyStore(), AlertRecords.of(alerts, ops),
+                AlertRecords.incidentsOf(ops));
         svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
                 r.threshold(), r.stormCap()));
         svc.datasetLabel(probe::label);
         List<Alert> fired = svc.evaluateRules();
-        return new Sweep(fired, objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT).toList());
+        Map<String, List<String>> keys = new java.util.LinkedHashMap<>();
+        for (AlertRule r : rules) {
+            List<DatasetMeasureProbe.Breach> breached = probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
+                    r.threshold(), r.stormCap()).orElseThrow().keys();
+            keys.put(r.name(), breached.stream().map(b -> AlertService.keyLabel(b.key())).toList());
+            Set<String> expected = new java.util.TreeSet<>();
+            breached.forEach(b -> expected.add(AlertService.keyDigest(AlertService.keyId(b.key()))));
+            Set<String> held = new java.util.TreeSet<>();
+            long alertCount = 0;
+            for (AlertStore.Row row : alerts.allActive())
+                if (r.name().equals(row.attributes().get("rule"))) {
+                    alertCount++;
+                    String d = row.attributes().get(AlertService.DIGESTS);
+                    if (d != null && !d.isBlank()) held.addAll(List.of(d.split(",")));
+                    assertEquals(String.valueOf(expected.size()), row.attributes().get("breachedKeys"), r.name());
+                }
+            assertEquals(expected.isEmpty() ? 0 : 1, alertCount, r.name() + ": ONE Alert per rule, none when nothing breaches");
+            assertEquals(expected, held, r.name() + ": the Alert holds exactly the offenders' digests");
+        }
+        return new Sweep(fired, objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT).toList(), keys);
     }
 
     /**
@@ -184,7 +213,7 @@ class BusinessAssurancePackGoldenTest {
     void thePackRaisesExactlyThePlantedDetectionsAndNoFalsePositive() {
         assertTrue(Files.isDirectory(CFG), "the pack ships at " + CFG);
         Sweep s = sweep(CFG);
-        assertEquals(2, s.fired().size(), "2 detections, 0 false positives: " + s.fired());
+        assertEquals(2, s.detections(), "2 detections, 0 false positives: " + s.fired());
         assertEquals(1, s.count("ba_revenue_outside_band"));
         assertTrue(s.of("ba_margin_erosion").contains("partner=PB"), s.of("ba_margin_erosion"));
         // Only the CRITICAL forecast breach opens an Incident; the WARNING erosion stays an Alert.
@@ -209,7 +238,7 @@ class BusinessAssurancePackGoldenTest {
             Sweep s = sweep(cfg);
             assertEquals(1, s.count("ba_revenue_regime_change"), shift + ": " + s.fired());
             assertEquals(1, s.count("ba_revenue_outside_band"), shift + ": " + s.fired());
-            assertEquals(3, s.fired().size(), shift + ": shift + spike + the unchanged planted erosion: " + s.fired());
+            assertEquals(3, s.detections(), shift + ": shift + spike + the unchanged planted erosion: " + s.fired());
             assertEquals(2, s.incidents().size(), "one Incident for the shift, one for the spike: " + s.incidents());
         }
     }
@@ -297,7 +326,7 @@ class BusinessAssurancePackGoldenTest {
         assertEquals(3, s.count("ba_revenue_outside_band"), s.fired().toString());
         assertEquals(1, s.count("ba_revenue_regime_change"), s.fired().toString());
         assertEquals(1, s.count("ba_revenue_drift"), s.fired().toString());
-        assertEquals(6, s.fired().size(), "5 revenue detections + the unchanged planted erosion: " + s.fired());
+        assertEquals(6, s.detections(), "5 revenue detections + the unchanged planted erosion: " + s.fired());
         for (String m : List.of("2.5 AS z", "3.0 AS z")) {
             Path z = variant(dir.resolve("z" + m.charAt(0)), "ba_revenue_forecast", "daily_revenue", SECOND_CORPUS,
                     x -> x.replace("4.0 AS z", m));

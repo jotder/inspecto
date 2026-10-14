@@ -40,6 +40,10 @@ final class StoredAlertRecords implements AlertRecords {
         return store.open(title, message, severity, scope, attributes, fired);
     }
 
+    @Override public boolean updateAlert(String alertId, String message, Map<String, String> attributes, Alert fired) {
+        return store.update(alertId, message, attributes, fired);
+    }
+
     @Override public boolean resolveAlert(String alertId, String actor) { return store.transition(alertId, "resolve", actor); }
 
     @Override public boolean acknowledgeAlert(String alertId, String actor) { return store.transition(alertId, "ack", actor); }

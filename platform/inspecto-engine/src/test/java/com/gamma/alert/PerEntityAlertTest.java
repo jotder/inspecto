@@ -27,9 +27,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * ASSURE-PER-ENTITY-ALERTS-1 — a Dataset measure Alert Rule with {@code by} evaluates the Measure per key over
- * REAL DuckDB data (the production {@link DatasetMeasureProbe}) and raises one Alert + Incident per breaching
- * key, edge-triggered: a re-fire raises nothing, a healed key resolves its own objects, and above the storm cap
- * one storm Alert stands for them all.
+ * REAL DuckDB data (the production {@link DatasetMeasureProbe}) and raises ONE Alert per rule (a count of breached
+ * keys, no entity named) and one Incident per breaching key (ALERT-PER-RULE-1), edge-triggered: a re-fire raises
+ * nothing, a healed key leaves the Alert's count, the Alert resolves when the last key heals, and above the storm
+ * cap one storm Incident stands for the keys.
  */
 class PerEntityAlertTest {
 
@@ -103,15 +104,30 @@ class PerEntityAlertTest {
     }
 
     @Test
-    void fortyBreachingKeysRaiseFortyIncidentsEachNamingItsOffender(@TempDir Path root) throws Exception {
+    void fortyBreachingKeysRaiseOneAlertWithACountAndFortyIncidentsEachNamingItsOffender(@TempDir Path root)
+            throws Exception {
         plantUsage(root, OFFENDERS, Set.of());
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = service(root, byRule(100), objects);
 
-        assertEquals(OFFENDERS, svc.evaluateRules().size(), "one Alert per breaching key");
+        List<Alert> raised = svc.evaluateRules();
+        assertEquals(1, raised.size(), "ONE Alert for the rule, not one per breaching key");
+        assertEquals(OFFENDERS, raised.get(0).value(), 1e-9, "its value is the count of breached keys");
+        assertEquals("CRITICAL: 40 keys (by msisdn, region) breach: High spend — usage", raised.get(0).message());
+        assertFalse(raised.get(0).message().contains("m7"), "no entity is named in the Alert");
         List<FakeObjectAccess.Opened> incidents = opened(objects, ObjectType.INCIDENT);
         assertEquals(OFFENDERS, incidents.size(), "one Incident per breaching key");
-        assertEquals(OFFENDERS, alerts.opened.size());
+        assertEquals(1, alerts.opened.size(), "one stored Alert");
+        AlertStore.Row row = alerts.opened.get(0);
+        assertEquals("high-spend|*", row.attributes().get(AlertService.ALERT_KEY));
+        assertEquals("40", row.attributes().get("breachedKeys"));
+        assertEquals("High spend — usage", row.title(), "no entity in the title");
+        assertTrue(row.attributes().keySet().stream().noneMatch(k -> k.equals("key") || k.startsWith("key.")),
+                "no key attribute on the rule's Alert");
+        assertEquals(OFFENDERS, row.attributes().get(AlertService.DIGESTS).split(",").length,
+                "the breached keys are held as digests, one per key");
+        assertFalse(row.attributes().get(AlertService.DIGESTS).contains("m7"), "digests, never the entity");
+        assertTrue(row.attributes().get("firstBreachAt") != null && row.attributes().get("lastBreachAt") != null);
 
         FakeObjectAccess.Opened m7 = incidents.stream()
                 .filter(o -> "m7".equals(o.attributes().get("key.msisdn"))).findFirst().orElseThrow();
@@ -123,7 +139,9 @@ class PerEntityAlertTest {
         assertTrue(incidents.stream().allMatch(o ->
                         Integer.parseInt(o.attributes().get("key.msisdn").substring(1)) <= OFFENDERS),
                 "the quiet keys raise nothing");
-        assertEquals(OFFENDERS, objects.subjectLinked.size(), "each Incident ESCALATED_FROM its own Alert (kind + id)");
+        assertEquals(OFFENDERS, objects.subjectLinked.size(), "each Incident ESCALATED_FROM the rule's Alert (kind + id)");
+        assertTrue(objects.subjectLinked.stream().allMatch(l -> l.subjectId().equals(row.id())),
+                "all forty point at the ONE Alert");
         assertTrue(objects.linked.isEmpty(), "never an object-to-object link: the Alert is not an object");
     }
 
@@ -150,73 +168,91 @@ class PerEntityAlertTest {
         plantUsage(root, OFFENDERS, Set.of());
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = service(root, byRule(100), objects);
-        assertEquals(OFFENDERS, svc.evaluateRules().size());
+        assertEquals(1, svc.evaluateRules().size());
         int before = objects.opened.size();
         assertEquals(OFFENDERS, before, "an Incident per key");
-        assertEquals(OFFENDERS, alerts.opened.size(), "and an Alert record per key");
+        assertEquals(1, alerts.opened.size(), "and ONE Alert record");
+        int links = objects.subjectLinked.size();
 
         assertEquals(0, svc.evaluateRules().size(), "an open key re-firing raises no Alert");
         assertEquals(before, objects.opened.size(), "and no object");
-        assertEquals(OFFENDERS, alerts.opened.size(), "and no new Alert record");
+        assertEquals(1, alerts.opened.size(), "and no new Alert record");
 
-        // A restart forgets nothing: a fresh service over the same objects seeds its open keys from them.
+        // A restart forgets nothing: a fresh service seeds its open keys from the Alert's digests. A key it failed
+        // to seed would be a fresh breach and re-link its Incident, so the link count is the probe.
         assertEquals(0, service(root, byRule(100), objects).evaluateRules().size(),
-                "the still-active Alert records are the open keys after a restart");
+                "the still-active Alert's digests are the open keys after a restart");
         assertEquals(before, objects.opened.size());
-        assertEquals(OFFENDERS, alerts.opened.size());
+        assertEquals(1, alerts.opened.size());
+        assertEquals(links, objects.subjectLinked.size(), "no key was mistaken for a fresh breach");
     }
 
     @Test
-    void aHealedKeyResolvesItsOwnAlertAndNoOtherAndNeverItsIncident(@TempDir Path root) throws Exception {
+    void aHealedKeyLeavesTheCountTheAlertResolvesWithItsLastKeyAndNoIncidentIsEverResolved(@TempDir Path root)
+            throws Exception {
         plantUsage(root, OFFENDERS, Set.of());
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = service(root, byRule(100), objects);
         svc.evaluateRules();
+        String alertId = alerts.opened.get(0).id();
 
         plantUsage(root, OFFENDERS, Set.of(7));
         assertEquals(0, svc.evaluateRules().size(), "healing raises no Alert");
+        assertTrue(alerts.resolvedIds().isEmpty(), "39 keys still breach: the rule's Alert stays open");
+        AlertStore.Row row = alerts.get(alertId).orElseThrow();
+        assertEquals("39", row.attributes().get("breachedKeys"), "the healed key left the count");
+        assertEquals(39, row.attributes().get(AlertService.DIGESTS).split(",").length);
+        assertTrue(row.message().contains("39 keys"), row.message());
+        assertEquals(39.0, row.fired().value(), 1e-9, "the stored fired Alert follows the count");
 
-        String healedKey = "high-spend|msisdn=m7,region=EU";
-        List<String> resolved = alerts.resolvedIds();
-        assertEquals(1, resolved.size(), "exactly the healed key's Alert resolves");
-        String alertId = alerts.opened.stream()
-                .filter(o -> healedKey.equals(o.attributes().get(AlertService.ALERT_KEY)))
-                .findFirst().orElseThrow().id();
-        assertTrue(resolved.contains(alertId), "the healed key's Alert resolved");
         // ⛔ a machine heal never resolves an Incident — its Disposition is a human decision (WS-10)
-        String incidentId = opened(objects, ObjectType.INCIDENT).stream()
-                .filter(o -> healedKey.equals(o.attributes().get(AlertService.ALERT_KEY)))
-                .findFirst().orElseThrow().id();
-        assertFalse(objects.transitioned.stream().anyMatch(t -> incidentId.equals(t.objectId())),
-                "the heal does not even attempt the Incident");
+        assertTrue(objects.transitioned.isEmpty(), "the heal does not even attempt an Incident");
+
+        plantUsage(root, 0, Set.of());                                   // every key healed
+        assertEquals(0, svc.evaluateRules().size(), "the all-clear raises no Alert");
+        assertEquals(List.of(alertId), alerts.resolvedIds(), "the last key's heal resolves the rule's one Alert");
         assertTrue(alerts.moved.stream().allMatch(t -> "alert-rule:high-spend".equals(t.actor())));
+        assertTrue(objects.transitioned.isEmpty(), "still no Incident transition");
         assertEquals(OFFENDERS, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage",
-                AlertService.ALERT_KEY).size(), "all 40 Incidents stay open, the healed one included");
+                AlertService.ALERT_KEY).size(), "all 40 Incidents stay open, the healed ones included");
+
+        plantUsage(root, 2, Set.of());                                   // a relapse is a NEW Alert
+        assertEquals(1, svc.evaluateRules().size(), "a relapse after the all-clear opens a fresh rule Alert");
+        assertEquals(2, alerts.opened.size());
     }
 
     @Test
-    void moreBreachingKeysThanTheStormCapRaiseExactlyOneStormAlert(@TempDir Path root) throws Exception {
+    void moreBreachingKeysThanTheStormCapKeepTheOneAlertAndRaiseOneStormIncident(@TempDir Path root) throws Exception {
         plantUsage(root, OFFENDERS, Set.of());
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = service(root, byRule(10), objects);
 
         List<Alert> fired = svc.evaluateRules();
-        assertEquals(1, fired.size(), "one storm Alert, not 40");
-        assertEquals(OFFENDERS, fired.get(0).value(), 1e-9, "the storm reports how many keys breached");
-        assertTrue(fired.get(0).message().contains("storm — 40 keys (by msisdn, region)"), fired.get(0).message());
+        assertEquals(1, fired.size(), "one Alert, not 40");
+        assertEquals(OFFENDERS, fired.get(0).value(), 1e-9, "it reports how many keys breached");
+        assertTrue(fired.get(0).message().contains("40 keys (by msisdn, region) breach"), fired.get(0).message());
+        assertTrue(fired.get(0).message().contains("above the storm cap of 10"), fired.get(0).message());
         assertEquals(1, alerts.opened.size());
+        assertEquals("true", alerts.opened.get(0).attributes().get("storm"));
         FakeObjectAccess.Opened incident = opened(objects, ObjectType.INCIDENT).get(0);
-        assertEquals(1, opened(objects, ObjectType.INCIDENT).size());
+        assertEquals(1, opened(objects, ObjectType.INCIDENT).size(), "one storm Incident, no per-key Incidents");
         assertEquals("40", incident.attributes().get("breachedKeys"));
         assertTrue(incident.title().startsWith("Storm: 40 keys breach"), incident.title());
 
         assertEquals(0, svc.evaluateRules().size(), "a storm still raging raises nothing new");
 
-        // Back under the cap: the storm heals and the (now few) offenders are raised one by one.
+        // Back under the cap: the storm ends, the same Alert now counts 3 keys, and each gets its own Incident.
         plantUsage(root, 3, Set.of());
-        assertEquals(3, svc.evaluateRules().size());
-        assertEquals(1, alerts.resolvedIds().size(),
-                "the storm's Alert resolves; its Incident stays for a human (WS-10)");
+        assertEquals(0, svc.evaluateRules().size(), "the rule's Alert is updated in place, not re-raised");
+        assertEquals(4, opened(objects, ObjectType.INCIDENT).size(), "the storm Incident + three offenders");
+        AlertStore.Row row = alerts.get(alerts.opened.get(0).id()).orElseThrow();
+        assertEquals("false", row.attributes().get("storm"));
+        assertEquals("3", row.attributes().get("breachedKeys"));
+        assertTrue(alerts.resolvedIds().isEmpty(), "three keys still breach");
+
+        plantUsage(root, 0, Set.of());
+        svc.evaluateRules();
+        assertEquals(1, alerts.resolvedIds().size(), "the Alert resolves; its Incidents stay for a human (WS-10)");
     }
 
     @Test
@@ -224,7 +260,7 @@ class PerEntityAlertTest {
         plantUsage(root, OFFENDERS, Set.of());
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = service(root, byRule(100), objects);
-        assertEquals(OFFENDERS, svc.evaluateRules().size());
+        assertEquals(1, svc.evaluateRules().size());
         Files.delete(root.resolve("data").resolve("usage").resolve("usage.parquet"));
 
         assertEquals(0, svc.evaluateRules().size());
@@ -312,15 +348,19 @@ class PerEntityAlertTest {
                 key("a", null, "b", "1"), key("a", "null", "b", "1"),          // NULL vs 'null'
                 key("a", "p|q\\", "b", "="));                                  // every escaped character
         FakeObjectAccess objects = new FakeObjectAccess();
-        assertEquals(7, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(),
-                "seven keys, seven Alerts — none collapsed into another");
+        assertEquals(1, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(), "one Alert for the rule");
+        assertEquals("7", alerts.opened.get(0).attributes().get("breachedKeys"));
+        assertEquals(7, java.util.Set.of(alerts.opened.get(0).attributes().get(AlertService.DIGESTS).split(",")).size(),
+                "seven distinct key digests — none collapsed into another");
         assertEquals(7, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage", AlertService.ALERT_KEY).size(),
-                "seven distinct dedupe keys");
-        assertTrue(alerts.opened.stream().anyMatch(o -> "NULL".equals(o.attributes().get("key.a"))));
+                "seven distinct Incident dedupe keys");
+        assertTrue(opened(objects, ObjectType.INCIDENT).stream().anyMatch(o -> "NULL".equals(o.attributes().get("key.a"))));
+        int links = objects.subjectLinked.size();
 
         assertEquals(0, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(),
-                "a restart seeds every encoded key back — nothing re-fires");
-        assertTrue(alerts.moved.isEmpty(), "and nothing is healed by a mis-decoded key");
+                "a restart seeds every key back from the digests — nothing re-fires");
+        assertTrue(alerts.moved.isEmpty(), "and nothing is healed by a mis-seeded key");
+        assertEquals(links, objects.subjectLinked.size(), "no key was taken for a fresh breach");
     }
 
     @Test
@@ -328,19 +368,19 @@ class PerEntityAlertTest {
         FakeObjectAccess objects = new FakeObjectAccess();
         List<Map<String, Object>> old = List.of(key("a", "1", "b", "1"), key("a", "2", "b", "2"));
         AlertService svc = stubbed(rule("usage"), objects, r -> "usage".equals(r.dataset()) ? old : List.of());
-        assertEquals(2, svc.evaluateRules().size());
+        assertEquals(1, svc.evaluateRules().size());
 
         svc.upsert(rule("usage_v2"));
         List<String> oldAlerts = alerts.opened.stream().map(AlertStore.Row::id).toList();
         assertEquals(oldAlerts.stream().sorted().toList(),
                 alerts.moved.stream().map(RecordingAlertStore.Moved::alertId).sorted().toList(),
-                "exactly the old rule's per-key Alerts are resolved");
+                "exactly the old rule's Alert is resolved");
         assertTrue(alerts.moved.stream().allMatch(t -> "alert-rule:high-spend:rule-changed".equals(t.actor())));
         assertEquals(2, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage", AlertService.ALERT_KEY).size(),
                 "the Incidents stay with triage");
 
         assertEquals(0, svc.evaluateRules().size());
-        assertEquals(2, alerts.moved.size(), "the sweep over the new Dataset heals nothing old");
+        assertEquals(1, alerts.moved.size(), "the sweep over the new Dataset heals nothing old");
 
         // A threshold-only edit keeps the open keys: nothing retired, nothing re-raised.
         FakeObjectAccess objects2 = new FakeObjectAccess();
@@ -386,7 +426,7 @@ class PerEntityAlertTest {
         plantUsage(root, OFFENDERS, Set.of());
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = service(root, rule, objects);
-        assertEquals(OFFENDERS, svc.evaluateRules().size());
+        assertEquals(1, svc.evaluateRules().size());
 
         int alertCount = alerts.opened.size();
         for (int i = 0; i < 4; i++) {                                    // m7 flaps: healthy, breaching, healthy, ...
@@ -401,7 +441,72 @@ class PerEntityAlertTest {
         svc.evaluateRules();
         assertTrue(alerts.resolvedIds().isEmpty(), "one healthy sweep");
         svc.evaluateRules();
-        assertEquals(1, alerts.resolvedIds().size(),
-                "the second consecutive healthy sweep resolves exactly m7's Alert");
+        assertTrue(alerts.resolvedIds().isEmpty(), "39 keys still breach: the rule's Alert is not resolved by m7");
+        assertEquals("39", alerts.get(alerts.opened.get(0).id()).orElseThrow().attributes().get("breachedKeys"),
+                "the second consecutive healthy sweep removes exactly m7 from the count");
+    }
+
+    // ── ALERT-PER-RULE-1: two rules, the migration, a rule-level count ─────────────────────────────
+
+    @Test
+    void twoRulesOverTheSameKeyRaiseTwoAlerts() {
+        FakeObjectAccess objects = new FakeObjectAccess();
+        AlertRule other = AlertRule.fromMap(Map.of("name", "high-spend-b", "dataset", "usage", "measure", "sum(amount)",
+                "by", List.of("a", "b"), "comparator", "gt", "threshold", 400, "severity", "CRITICAL"));
+        Optional<com.gamma.objects.ObjectAccess> ops = Optional.of(objects);
+        AlertService svc = new AlertService(List.of(rule("usage"), other), noPipelines(), emptyStore(),
+                AlertRecords.of(alerts, ops), AlertRecords.incidentsOf(ops));
+        List<Map<String, Object>> keys = List.of(key("a", "1", "b", "1"), key("a", "2", "b", "2"));
+        svc.groupedMeasureProbe(r -> Optional.of(new DatasetMeasureProbe.Breaches(
+                keys.stream().map(k -> new DatasetMeasureProbe.Breach(k, 1000)).toList(), keys.size())));
+
+        assertEquals(2, svc.evaluateRules().size(), "one Alert per rule, whatever the key overlap");
+        assertEquals(java.util.Set.of("high-spend|*", "high-spend-b|*"), alerts.opened.stream()
+                .map(r -> r.attributes().get(AlertService.ALERT_KEY)).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(4, opened(objects, ObjectType.INCIDENT).size(), "and one Incident per (rule, key)");
+    }
+
+    /** A Space stored before the fold holds one Alert per key: the first sweep folds them into the rule's one Alert. */
+    @Test
+    void perKeyAlertsStoredBeforeTheFoldAreFoldedIntoTheRulesOneAlert() {
+        FakeObjectAccess objects = new FakeObjectAccess();
+        List<Map<String, Object>> keys = List.of(key("a", "1", "b", "1"), key("a", "2", "b", "2"), key("a", "3", "b", "3"));
+        List<String> legacyIds = new java.util.ArrayList<>();
+        for (Map<String, Object> k : keys) {
+            Map<String, String> attrs = new java.util.LinkedHashMap<>();
+            attrs.put("rule", "high-spend");
+            attrs.put(AlertService.ALERT_KEY, "high-spend|" + AlertService.keyId(k));
+            attrs.put("key", AlertService.keyLabel(k));
+            legacyIds.add(alerts.open("High spend — usage for " + AlertService.keyLabel(k), "m", "CRITICAL", "usage", attrs, null));
+        }
+        AlertService svc = stubbed(rule("usage"), objects, r -> keys);
+
+        assertEquals(0, svc.evaluateRules().size(), "the three keys were already announced: nothing is re-raised");
+        assertEquals(new java.util.TreeSet<>(legacyIds), new java.util.TreeSet<>(alerts.resolvedIds()),
+                "every legacy per-key Alert is resolved");
+        assertTrue(alerts.moved.stream().allMatch(t -> "alert-rule:high-spend:per-rule-fold".equals(t.actor())));
+        List<AlertStore.Row> active = alerts.active("usage");
+        assertEquals(1, active.size(), "exactly one active Alert is left: the rule's");
+        assertEquals("high-spend|*", active.get(0).attributes().get(AlertService.ALERT_KEY));
+        assertEquals("3", active.get(0).attributes().get("breachedKeys"));
+        assertEquals(3, active.get(0).attributes().get(AlertService.DIGESTS).split(",").length);
+        assertTrue(opened(objects, ObjectType.INCIDENT).isEmpty(), "the migration opens no Incident");
+
+        // and the folded ledger heals like a native one: all three keys healing resolves the rule's Alert
+        AlertService again = stubbed(rule("usage"), objects, r -> List.of());
+        assertEquals(0, again.evaluateRules().size());
+        assertTrue(alerts.resolvedIds().contains(active.get(0).id()), "the folded Alert resolves when its keys heal");
+    }
+
+    @Test
+    void aSixtyFourOffenderRuleKeepsOneAlertAndSixtyFourDistinctKeys() {
+        FakeObjectAccess objects = new FakeObjectAccess();
+        List<Map<String, Object>> keys = new java.util.ArrayList<>();
+        for (int i = 0; i < 64; i++) keys.add(key("a", "m" + i, "b", "EU"));
+        List<Alert> raised = stubbed(rule("usage"), objects, r -> keys).evaluateRules();
+        assertEquals(1, raised.size());
+        assertEquals(64, raised.get(0).value(), 1e-9);
+        assertEquals(64, opened(objects, ObjectType.INCIDENT).size());
+        assertEquals(64, java.util.Set.of(alerts.opened.get(0).attributes().get(AlertService.DIGESTS).split(",")).size());
     }
 }

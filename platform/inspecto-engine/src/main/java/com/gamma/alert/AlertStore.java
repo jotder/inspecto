@@ -49,6 +49,13 @@ public interface AlertStore extends AutoCloseable {
     /** Every non-terminal Alert of the Space, newest first (the one-shot migration and diagnostics). */
     List<Row> allActive();
 
+    /**
+     * ALERT-PER-RULE-1: refresh a still-active Alert in place - its message, attributes and fired {@link Alert} - so a
+     * per-rule aggregate Alert can carry a count that moves. {@code false} when unknown or already RESOLVED (a closed
+     * Alert is history, never rewritten). State, timestamps and the Incident link are untouched.
+     */
+    boolean update(String alertId, String message, Map<String, String> attributes, Alert fired);
+
     /** Link {@code alertId} to the Incident that was escalated from it. */
     void linkIncident(String alertId, String incidentId);
 

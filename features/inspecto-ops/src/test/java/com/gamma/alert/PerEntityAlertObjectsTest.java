@@ -89,24 +89,27 @@ class PerEntityAlertObjectsTest {
         AlertService svc = svc(objects);
         svc.groupedMeasureProbe(r -> Optional.of(now.get()));
 
-        assertEquals(40, svc.evaluateRules().size());
-        assertEquals(40, incidents(objects).size());
+        assertEquals(1, svc.evaluateRules().size(), "ONE Alert for the rule");
+        assertEquals(40, incidents(objects).size(), "one Incident per key");
+        assertEquals(1, alerts.allActive().size());
+        assertEquals("40", alerts.allActive().get(0).attributes().get("breachedKeys"));
 
         now.set(offenders(2, 40));                                   // m1 heals
         assertEquals(0, svc.evaluateRules().size());
-        assertEquals(39, alerts.allActive().size(), "the healed key's Alert resolved; the other 39 stay open");
+        assertEquals(1, alerts.allActive().size(), "the rule's Alert stays open while 39 keys still breach");
+        assertEquals("39", alerts.allActive().get(0).attributes().get("breachedKeys"), "the healed key left the count");
         // ⛔ A machine heal never resolves an Incident (operator standing rule, WS-10): it stays open for its operator.
         assertEquals("IDENTIFIED", incidentFor(objects, "m1").status());
 
         now.set(offenders(1, 40));                                   // m1 relapses while its Incident is open
-        assertEquals(1, svc.evaluateRules().size(), "the relapse is a new breach edge");
+        assertEquals(0, svc.evaluateRules().size(), "the relapse joins the open rule Alert: no new Alert");
+        assertEquals("40", alerts.allActive().get(0).attributes().get("breachedKeys"), "the count is back to 40");
         assertEquals(40, incidents(objects).size(), "no second Incident for the same key");
         OperationalObject stillOpen = incidentFor(objects, "m1");
-        AlertStore.Row relapseAlert = alerts.allActive().stream()
-                .filter(o -> "m1".equals(o.attributes().get("key.msisdn"))).findFirst().orElseThrow();
+        AlertStore.Row relapseAlert = alerts.allActive().get(0);
         assertTrue(objects.linksOf(stillOpen.id()).stream().anyMatch(l -> l.fromId().equals(stillOpen.id())
                         && l.toId().equals(relapseAlert.id()) && "ESCALATED_FROM".equalsIgnoreCase(l.relationship())),
-                "the relapse Alert is linked to the Incident still being worked");
+                "the rule's Alert is linked to the Incident still being worked");
         assertEquals("IDENTIFIED", stillOpen.status(), "an Incident never resolved is not 'reopened'");
 
         // Even with a complete postmortem (and an SLA), the next heal leaves the Incident open — it has no
@@ -124,7 +127,7 @@ class PerEntityAlertObjectsTest {
 
         // … and a relapse after that REOPENS it rather than hiding behind the resolved one.
         now.set(offenders(1, 40));
-        assertEquals(1, svc.evaluateRules().size());
+        assertEquals(0, svc.evaluateRules().size(), "m1 re-joins the still-open rule Alert");
         assertEquals(40, incidents(objects).size());
         assertEquals("DIAGNOSING", incidentFor(objects, "m1").status(), "its Incident is reopened");
     }

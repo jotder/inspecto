@@ -390,8 +390,10 @@ class TelcoFraudTemplateGoldenTest {
                 assertEquals("DATE", probe.columnType(sink, "window_date"), sink + ": window_date reads as a DATE");
             }
             Map<String, Integer> fired = new TreeMap<>();
-            for (Alert a : svc.evaluateRules()) fired.merge(a.rule(), 1, Integer::sum);
-            assertEquals(EXPECTED, fired, "golden Alert count per typology");
+            List<Alert> raised = svc.evaluateRules();
+            assertEquals(EXPECTED.size(), raised.size(), "ONE Alert per typology rule, whatever its offender count");
+            for (Alert a : raised) fired.merge(a.rule(), (int) a.value(), Integer::sum);
+            assertEquals(EXPECTED, fired, "golden breached-key count per typology (an Alert's value)");
             assertEquals(TOTAL, fired.values().stream().mapToInt(Integer::intValue).sum());
             assertEquals(List.of(), svc.evaluateRules(), "a re-evaluation raises nothing new");
 
@@ -423,7 +425,9 @@ class TelcoFraudTemplateGoldenTest {
             for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), day31).status(), j.name() + " day 31");
             assertRaisesExactlyThePlanted(rules, probe, corpus);
             assertEquals(List.of(), svc.evaluateRules(), "day 31 still holds day 1: nothing raised or healed");
-            assertEquals(TOTAL, svc.openAlerts().size(), "day 1's Alerts stay open on day 31");
+            assertEquals(EXPECTED.size(), svc.openAlerts().size(), "one Alert per rule stays open on day 31");
+            assertEquals(TOTAL, svc.openAlerts().stream().mapToInt(a -> (int) a.fired().value()).sum(),
+                    "...still counting every day-1 offender");
             Map<String, String> day32 = window(java.time.LocalDate.of(2026, 8, 1));
             for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), day32).status(), j.name() + " day 32");
             for (JobConfig j : jobs) {
@@ -434,9 +438,9 @@ class TelcoFraudTemplateGoldenTest {
             for (AlertRule r : rules)
                 assertEquals(List.of(), probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(), r.threshold(),
                         r.stormCap()).orElseThrow().keys(), r.name() + ": every day-1 key healed once its evidence aged out");
-            assertEquals(TOTAL, svc.openAlerts().size(), "day 1's Alerts are open before the evaluation");
+            assertEquals(EXPECTED.size(), svc.openAlerts().size(), "the rules' Alerts are open before the evaluation");
             assertEquals(List.of(), svc.evaluateRules(), "ageing out raises nothing");
-            assertEquals(List.of(), svc.openAlerts(), "the aged-out keys resolve their Alerts");
+            assertEquals(List.of(), svc.openAlerts(), "the aged-out keys resolve each rule's Alert");
         }
     }
 
@@ -553,12 +557,13 @@ class TelcoFraudTemplateGoldenTest {
 
     /**
      * Sixteen days of offenders at the corpus rate (each day a fresh copy of the corpus with every identifier
-     * suffixed {@code -<day>} and every timestamp shifted), all retained. Every distinct offender gets its own
-     * Alert on its day, and no rule collapses into a storm Alert: the retained offender count stays under
-     * {@code stormCap}.
+     * suffixed {@code -<day>} and every timestamp shifted), all retained. Each rule holds ONE
+     * Alert (ALERT-PER-RULE-1) whose breached-key count grows to every distinct retained offender, each offender
+     * counted once under its own key digest, and no rule collapses into a storm: the retained offender count stays
+     * under {@code stormCap}.
      */
     @Test
-    void sixteenRetainedDaysOfOffendersEachRaiseTheirOwnAlertAndNoStorm(@TempDir Path root) throws Exception {
+    void sixteenRetainedDaysOfOffendersAreCountedInEachRulesOneAlertAndNoStorm(@TempDir Path root) throws Exception {
         Path space = createSpace(root);
         Path data = space.resolve("data"), config = space.resolve("config");
         ingest(space);
@@ -567,14 +572,17 @@ class TelcoFraudTemplateGoldenTest {
         List<JobConfig> jobs = jobs(config);
         List<AlertRule> rules = rules(config);
         DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> config, () -> data);
-        AlertService svc = new AlertService(rules, noPipelines(), emptyStore());
+        com.gamma.alert.InMemoryAlertStore alerts = new com.gamma.alert.InMemoryAlertStore();
+        AlertService svc = new AlertService(rules, noPipelines(), emptyStore(),
+                com.gamma.alert.AlertRecords.of(alerts, Optional.empty()),
+                com.gamma.alert.AlertRecords.incidentsOf(Optional.empty()));
         svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
                 r.threshold(), r.stormCap()));
         TelcoFraudCorpus corpus = new TelcoFraudCorpus().generate();
         StringBuilder pbx = new StringBuilder("99970001119");
         for (int d = 2; d <= days; d++) pbx.append(",99970001119-").append(d);   // the register lists each day's PBX line
 
-        Map<String, Set<String>> raised = new TreeMap<>();
+        Map<String, Integer> raisedAlerts = new TreeMap<>();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
                      root.resolve("audit").toString(), null, null, data.toString())) {
@@ -588,7 +596,7 @@ class TelcoFraudTemplateGoldenTest {
                 }
                 for (Alert a : svc.evaluateRules()) {
                     assertFalse(a.message().contains("storm"), "day " + d + ": " + a.message());
-                    raised.computeIfAbsent(a.rule(), k -> new TreeSet<>()).add(a.message());
+                    raisedAlerts.merge(a.rule(), 1, Integer::sum);
                 }
             }
         }
@@ -596,12 +604,24 @@ class TelcoFraudTemplateGoldenTest {
             Set<String> expected = new TreeSet<>();
             for (int d = 1; d <= days; d++)
                 for (String k : corpus.offenders.get(e.getKey())) expected.add(d == 1 ? k : k + "-" + d);
-            assertEquals(e.getValue() * days, raised.getOrDefault(e.getKey(), Set.of()).size(), e.getKey());
+            assertEquals(1, raisedAlerts.getOrDefault(e.getKey(), 0), e.getKey() + ": ONE Alert over all sixteen days");
+            List<com.gamma.alert.AlertStore.Row> rows = alerts.allActive().stream()
+                    .filter(x -> e.getKey().equals(x.attributes().get("rule"))).toList();
+            assertEquals(1, rows.size(), e.getKey() + ": one active Alert record");
+            assertEquals("false", rows.get(0).attributes().get("storm"), e.getKey());
+            assertEquals(String.valueOf(e.getValue() * days), rows.get(0).attributes().get("breachedKeys"),
+                    e.getKey() + ": the Alert counts every distinct offender of the sixteen days");
             AlertRule r = rules.stream().filter(x -> x.name().equals(e.getKey())).findFirst().orElseThrow();
             Set<String> keys = new TreeSet<>();
+            Set<String> digests = new TreeSet<>();
             for (DatasetMeasureProbe.Breach br : probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
-                    r.threshold(), r.stormCap()).orElseThrow().keys()) keys.add(String.valueOf(br.key().get(r.by().get(0))));
+                    r.threshold(), r.stormCap()).orElseThrow().keys()) {
+                keys.add(String.valueOf(br.key().get(r.by().get(0))));
+                digests.add(AlertService.keyDigest(AlertService.keyId(br.key())));
+            }
             assertEquals(expected, keys, e.getKey() + ": every retained day's offenders, each once");
+            assertEquals(digests, new TreeSet<>(List.of(rows.get(0).attributes().get(AlertService.DIGESTS).split(","))),
+                    e.getKey() + ": the Alert holds exactly those offenders' digests");
         }
     }
 

@@ -316,18 +316,20 @@ class AlertRecordsParityTest {
             AtomicReference<DatasetMeasureProbe.Breaches> now = new AtomicReference<>(breaching("m1", "m2"));
             svc.groupedMeasureProbe(r -> Optional.of(now.get()));
 
-            assertEquals(2, svc.evaluate(null, 0).size(), label + ": one Alert per breaching key");
+            assertEquals(1, svc.evaluate(null, 0).size(), label + ": ONE Alert for the rule, not one per key");
             assertEquals(0, svc.evaluate(null, 1000).size(), label + ": an open key raises nothing new");
-            assertEquals(2, events(EventType.ALERT_FIRED, "high-spend"), label);
+            assertEquals(1, events(EventType.ALERT_FIRED, "high-spend"), label);
 
             now.set(breaching("m1"));                                     // m2 heals
             assertEquals(0, svc.evaluate(null, 2000).size());
-            assertEquals(1, events(EventType.ALERT_CLEARED, "high-spend"), label + ": m2's all-clear");
+            assertEquals(0, events(EventType.ALERT_CLEARED, "high-spend"), label + ": m1 still breaches, no all-clear yet");
+            assertEquals("1", w.alerts.allActive().get(0).attributes().get("breachedKeys"), label + ": m2 left the count");
             now.set(breaching("m1", "m2"));                               // m2 relapses
-            assertEquals(1, svc.evaluate(null, 3000).size(), label + ": the healed key fires again");
+            assertEquals(0, svc.evaluate(null, 3000).size(), label + ": the relapse joins the open Alert, raising none");
 
-            assertEquals(3, w.alerts.size(), label + ": three Alert records");
-            assertEquals(2, w.alerts.allActive().size(), label + ": m2's first one was resolved by its heal");
+            assertEquals(1, w.alerts.size(), label + ": one Alert record");
+            assertEquals(1, w.alerts.allActive().size(), label);
+            assertEquals("2", w.alerts.allActive().get(0).attributes().get("breachedKeys"), label + ": count back to 2");
             if (w.wiring == Wiring.WITH_OPS) {
                 assertEquals(2, count(w.objects, ObjectType.INCIDENT), label + ": m2's relapse meets its still-active Incident");
                 assertEquals(1, w.objects.transitioned.stream().filter(t -> "reopen".equals(t.action())).count(), label);
@@ -341,6 +343,11 @@ class AlertRecordsParityTest {
             AlertService restarted = w.service(null, store(List.of()), byRule("critical"));
             restarted.groupedMeasureProbe(r -> Optional.of(breaching("m1", "m2")));
             assertEquals(0, restarted.evaluate(null, 4000).size(), label + ": open keys survive a restart in the Alert store");
+
+            restarted.groupedMeasureProbe(r -> Optional.of(breaching()));  // every key heals
+            assertEquals(0, restarted.evaluate(null, 5000).size());
+            assertEquals(1, events(EventType.ALERT_CLEARED, "high-spend"), label + ": the all-clear, once, after the last key");
+            assertTrue(w.alerts.allActive().isEmpty(), label + ": the rule's Alert is resolved");
         });
     }
 
@@ -435,6 +442,7 @@ class AlertRecordsParityTest {
         @Override public Map<String, String> activeAlertIndex(String s, String a) { calls++; return inner.activeAlertIndex(s, a); }
         @Override public Map<String, String> activeIncidentIndex(String s, String a) { calls++; return inner.activeIncidentIndex(s, a); }
         @Override public String openAlert(Alert f, String t, String m, String sev, String s, Map<String, String> a) { calls++; return inner.openAlert(f, t, m, sev, s, a); }
+        @Override public boolean updateAlert(String id, String m, Map<String, String> a, Alert f) { calls++; return inner.updateAlert(id, m, a, f); }
         @Override public boolean resolveAlert(String id, String actor) { calls++; return inner.resolveAlert(id, actor); }
         @Override public boolean acknowledgeAlert(String id, String actor) { calls++; return inner.acknowledgeAlert(id, actor); }
         @Override public Optional<AlertStore.Row> findAlert(String id) { calls++; return inner.findAlert(id); }

@@ -99,12 +99,12 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
     },
     {
         key: 'by',
-        label: 'One Alert per',
+        label: 'Incident per',
         type: 'list',
         tier: 'optional',
         dependsOn: { key: 'kind', equals: 'measure' },
         placeholder: 'e.g. msisdn',
-        help: 'Key columns of the Dataset: the Measure is computed per key and each breaching key raises its own Alert.',
+        help: 'Key columns of the Dataset: the Measure is computed per key. The rule raises ONE Alert that counts its breaching keys, and each breaching key opens its own Incident.',
     },
     {
         key: 'stormCap',
@@ -115,7 +115,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         min: 1,
         dependsOn: { key: 'kind', equals: 'measure' },
         placeholder: '100',
-        help: 'With One Alert per: above this many breaching keys, one storm Alert replaces them (default 100).',
+        help: 'With Incident per: above this many breaching keys, the Alert says so and one storm Incident replaces the per-key ones (default 100).',
     },
     {
         key: 'healAfterSweeps',

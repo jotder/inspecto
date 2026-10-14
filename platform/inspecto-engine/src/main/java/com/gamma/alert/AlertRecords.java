@@ -52,6 +52,9 @@ public interface AlertRecords {
     String openAlert(Alert fired, String title, String message, String severity, String scope,
                      Map<String, String> attributes);
 
+    /** ALERT-PER-RULE-1: refresh a still-active Alert's message, attributes and fired {@link Alert} in place; see {@link AlertStore#update}. */
+    boolean updateAlert(String alertId, String message, Map<String, String> attributes, Alert fired);
+
     /** Resolve an Alert as {@code actor}; {@code false} when unknown or not legal from its state. */
     boolean resolveAlert(String alertId, String actor);
 

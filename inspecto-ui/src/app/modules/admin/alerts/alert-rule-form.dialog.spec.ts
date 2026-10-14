@@ -412,9 +412,9 @@ describe('AlertRuleFormDialog', () => {
         expect(err?.textContent).toContain('A rule id is required.');
         expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
-    /** The "One Alert per" draft input (the schema-form list field labelled so). */
+    /** The "Incident per" draft input (the schema-form list field labelled so). */
     function byInput(el: HTMLElement): HTMLInputElement {
-        return fieldByLabel(el, 'One Alert per')!.querySelector('input') as HTMLInputElement;
+        return fieldByLabel(el, 'Incident per')!.querySelector('input') as HTMLInputElement;
     }
 
     it('Save changes with the by suggestion panel still open keeps the typed entry (edit)', async () => {

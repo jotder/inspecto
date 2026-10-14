@@ -65,7 +65,7 @@ export interface AlertRule {
     measure?: string | null;
     /** Per-entity measure rule: the key columns the Measure is evaluated per — each breaching key raises its own Alert. */
     by?: string[] | null;
-    /** With `by`: above this many breaching keys one storm Alert replaces the per-key ones (server default 100). */
+    /** With `by`: above this many breaching keys the rule's one Alert reports a storm and one storm Incident replaces the per-key ones (server default 100). */
     stormCap?: number | null;
     /** Measure rule: consecutive healthy sweeps before its Alert is cleared (server default 1, at most 1000). */
     healAfterSweeps?: number | null;

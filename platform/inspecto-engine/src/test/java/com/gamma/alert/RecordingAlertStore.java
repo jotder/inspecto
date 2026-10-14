@@ -30,6 +30,9 @@ final class RecordingAlertStore implements AlertStore {
     }
     @Override public List<Row> active(String scope) { return inner.active(scope); }
     @Override public List<Row> allActive() { return inner.allActive(); }
+    @Override public boolean update(String alertId, String message, java.util.Map<String, String> attributes, Alert fired) {
+        return inner.update(alertId, message, attributes, fired);
+    }
     @Override public void linkIncident(String alertId, String incidentId) { inner.linkIncident(alertId, incidentId); }
     @Override public List<Alert> recentFired(int limit) { return inner.recentFired(limit); }
     @Override public java.util.Optional<Row> get(String alertId) { return inner.get(alertId); }

@@ -134,6 +134,23 @@ public final class DbAlertStore implements AlertStore {
         return query("SELECT " + COLS + " FROM inspecto_alerts WHERE state <> 'RESOLVED' ORDER BY opened_at DESC, id DESC");
     }
 
+    @Override public boolean update(String alertId, String message, Map<String, String> attributes, Alert fired) {
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE inspecto_alerts SET message = ?, attrs_json = ?, fired_json = ? WHERE id = ? AND state <> 'RESOLVED'")) {
+                    ps.setString(1, message);
+                    ps.setString(2, json(attributes));
+                    ps.setString(3, fired == null ? null : json(fired.toMap()));
+                    ps.setString(4, alertId);
+                    return ps.executeUpdate() > 0;
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not update Alert " + alertId + ": " + e.getMessage(), e);
+        }
+    }
+
     @Override public void linkIncident(String alertId, String incidentId) {
         try {
             src.run(conn -> {

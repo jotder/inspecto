@@ -176,34 +176,56 @@ neither key, and the rule takes the scalar path below. How it runs:
   key columns, every identifier `SqlIdent.q`-quoted) and wraps it in a breach filter built from the quoted
   measure id, a fixed operator and a numeric literal, plus `COUNT(*) OVER ()` for the total; at most `stormCap`
   rows come back. Wired in `CollectorService` beside the scalar probe (same per-Space roots).
-- **Edge-triggered per key, not cooldown-throttled** — a key that starts breaching raises ONE Alert and (at
-  critical/error) ONE Incident; while it stays breached nothing is raised; `AlertService.openKeys` is the edge
-  detector, seeded on a rule's first sweep from its still-active Alert records (the Alert store since 2026-10-07 — no longer ALERT objects; db-layer.md §3.14) so a restart neither re-raises
-  nor forgets. Dedupe attribute `alertKey = <rule>|<col=value,…>` — the INJECTIVE `AlertService.keyId`: in a
+- **An Alert per RULE, an Incident per ENTITY** (`ALERT-PER-RULE-1`, operator decision 2026-10-14, BOTH model).
+  The first key to breach opens ONE Alert for the rule (`alertKey = <rule>|*`): a count of breached keys
+  (`Alert.value` = `breachedKeys`), **no entity named in its title or message** (`CRITICAL: 40 keys (by msisdn,
+  region) breach: <title>`), `firstBreachAt` / `lastBreachAt` (when the breach began, and when a key last joined
+  or left), `storm` true/false, and `breachedKeyDigests`, a comma list of at most `AlertService.MAX_DIGESTS`
+  (1000) 12-hex SHA-256 digests of the breached keys' `keyId` — the persisted open-key ledger, never the entity.
+  Every key that starts breaching afterwards is counted in that Alert, **updated in place**
+  (`AlertStore.update`, no new Alert, no new event); a key that heals leaves the count; the Alert resolves — with
+  the one `ALERT_CLEARED` + `alert-rule.cleared` Signal (`CLEARED: … no longer breaches alert rule X — no key still
+  breaches`) — only when the LAST key has healed, and a relapse after that opens a fresh Alert. At critical/error
+  each key that starts breaching ALSO opens its own **Incident** (per entity: `key`, `key.<column>`, the masked
+  title below), linked `ESCALATED_FROM` to the rule's one Alert. A warning rule has the Alert only: its keys are
+  visible as a count and digests, not by name.
+- **Edge-triggered per key, not cooldown-throttled** — while a key stays breached nothing is raised;
+  `AlertService.openKeys` (rule → key digests, plus the `*` storm flag) is the edge detector, seeded on a rule's
+  first sweep from its still-active Alert's `breachedKeyDigests` (the Alert store since 2026-10-07 — no longer
+  ALERT objects; db-layer.md §3.14) so a restart neither re-raises nor forgets. **Migration**: a Space stored
+  before the fold holds one Alert per key; the first sweep of its rule folds them (their digests become the rule's
+  one Alert, each old per-key Alert resolves as actor `alert-rule:<name>:per-rule-fold`, no event, no Incident
+  touched — `PerEntityAlertTest.perKeyAlertsStoredBeforeTheFoldAreFoldedIntoTheRulesOneAlert`). An Incident's
+  dedupe attribute stays `alertKey = <rule>|<col=value,…>` — the INJECTIVE `AlertService.keyId`: in a
   value `\ , = |` are backslash-escaped and SQL NULL is `\0`, so two keys that read alike (`a="x, b=y", b="z"`
   vs `a="x", b="y, b=z"`) or NULL vs the string `null` never share an Incident; the readable `keyLabel`
-  (NULL → `NULL`) is for titles and the `key` attribute only. The objects also carry `key`,
-  `key.<column>` per key column, and the Measure `value`; the title is `<description> — <Dataset> for
-  msisdn=m7, region=EU` (or the generated title with the same suffix). Scope stays the Dataset id.
-- **Heal** — a key no longer breaching emits `ALERT_CLEARED` + an `alert-rule.cleared` Signal (correlation
-  `alert:<rule>|<dataset>|<key>`) and resolves its **ALERT** through the new
-  `ObjectAccess.transition(id, action, actor)` (answers `false`, never throws). ⛔ **A machine heal NEVER
+  (NULL → `NULL`) is for titles and the `key` attribute only. The **Incident** also carries `key`,
+  `key.<column>` per key column, and the Measure `value`; its title is `<description> — <Dataset> for
+  msisdn=m7, region=EU` (or the generated title with the same suffix) — the entity lives on the Incident and a
+  caller who cannot reveal reads it masked (`ObjectReadMasking`, `TELCO-FRAUD-MASKED-DASHBOARD-1`); the Alert
+  carries none. Scope stays the Dataset id.
+- **Heal** — a key no longer breaching leaves the Alert's count (no event; the per-key line is the Incident's).
+  When the last key is gone the rule emits `ALERT_CLEARED` + an `alert-rule.cleared` Signal (correlation
+  `alert:<rule>|<dataset>|*`) and resolves its **ALERT** through `AlertRecords.resolveAlert` (answers `false`,
+  never throws). ⛔ **A machine heal NEVER
   resolves the INCIDENT** (operator standing rule, 2026-09-26, with WS-10): an Incident resolves only with a
   Disposition, which is a human decision a heal cannot know — so the heal does not even attempt it, and the
   Incident stays open for its operator however complete its postmortem is (`PerEntityAlertObjectsTest`). A key
   that relapses while its Incident is RESOLVED (by an operator; non-terminal until archived) **re-opens** that
   Incident instead of being suppressed;
-  one whose Incident never left IDENTIFIED/DIAGNOSING is not re-opened, but either way the relapse ALERT is
+  one whose Incident never left IDENTIFIED/DIAGNOSING is not re-opened, but either way the rule's Alert is
   linked `ESCALATED_FROM` to that still-active Incident.
 - **Rule edits** — re-saving a `by` rule over different keys (another Dataset, Measure or `by`) or removing it
-  **retires** its open keys (`AlertService.retireKeys`): the edge state is dropped and each still-active per-key
+  **retires** its open keys (`AlertService.retireKeys`): the edge state is dropped and the still-active
   ALERT of the old rule resolves as actor `alert-rule:<name>:rule-changed`; no all-clear is emitted (nothing
   recovered) and the Incidents stay with triage. A threshold/severity edit keeps the open keys.
   A **scalar (no-`by`) Measure rule heals the same way** (`ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1`, 2026-09-28) —
   see *Scalar Measure heal* below.
-- **Storm** — more than `stormCap` breaching keys → ONE storm Alert/Incident (pseudo-key `*`, attributes
-  `breachedKeys`, `stormCap`; title `Storm: 40 keys breach — …`). While it rages no key fires or heals (a capped
-  read cannot see which keys healed); back under the cap it heals and the keys are raised one by one.
+- **Storm** — more than `stormCap` breaching keys: the rule's ONE Alert says so (`storm: true`, message `…; above
+  the storm cap of 100, one storm Incident stands for them all`) and ONE storm **Incident** (dedupe `<rule>|*`,
+  title `Storm: 40 keys breach — …`) replaces the per-key ones. While it rages no key opens or heals and the stored
+  digests are frozen (a capped read cannot see which keys healed); back under the cap the same Alert counts the
+  few keys again and each gets its own Incident.
 - **Unknown is not healed** — an empty probe answer (unreadable Dataset) neither fires nor resolves anything.
 - **Save-time check, fail closed** — `AlertRoutes.requireGroupingColumns` (every `/alerts/rules` write and a
   Decision Rule's `create-alert`, and `/components/alert-rule` for a body carrying `by`) reads the Dataset's
@@ -216,10 +238,15 @@ neither key, and the rule takes the scalar path below. How it runs:
   (`AlertRoutes.editionRefused`) still answers first. ⚠ A body with neither `metric` nor `dataset` used to be an
   HTTP **500** on both doors (`Set.of(..).contains(null)`, as with comparator/severity before 2026-09-24); it is
   a 422 (`ControlApiAlertRuleWriteTest`).
-- **Case grouping** — no Case Rule change is needed: an existing Case Rule whose `q` matches the rule's title
-  (e.g. its `description`) groups the per-key Incidents into one Case.
+- **Case grouping** — unchanged: Incident titles and attributes are as before, so an existing Case Rule whose `q`
+  matches the rule's title (e.g. its `description`), or a Case Rule `groupBy` the key column, groups the per-key
+  Incidents. Nothing groups on the Alert: there is one per rule.
+- **Consumers** — the notification layer sees ONE `ALERT_FIRED` per rule onset (message with the count; the
+  per-entity breach is the Incident), the `alert-rule.fired` Signal is per rule (correlation
+  `alert:<rule>|<dataset>|*`), `GET /alerts` lists the rule's Alert once (its fired record follows the count),
+  and `EventAlertBridge` is unaffected (its Alerts have their own dedupe key).
 - **UI** — the Alert Rule dialog authors Measure rules too (2026-09-27): a *Watch* kind choice, Dataset, Measure,
-  **One Alert per** (`by`, column suggestions from the Dataset) and **Storm cap**; the save-time 422 renders in
+  **Incident per** (`by`, column suggestions from the Dataset) and **Storm cap**; the save-time 422 renders in
   the dialog ([alerts feature](../../frontend/features/alerts.md)).
 
 **Scalar Measure heal** (`ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1` (2), 2026-09-28). A Dataset Measure rule without
@@ -1048,7 +1075,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 |---|---|---|
 | `AlertRuleTest` | `inspecto-engine` | both record shapes parse; `when` scoping |
 | `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules`; a `by` column outside the Dataset's Schema refused at both save doors; `/components/alert-rule` refuses every shape `/alerts/rules` refuses |
-| `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → 40 Incidents, re-fire → 0, restart seeding, a healed key resolves only its own Alert and never its Incident, storm cap → one Alert, unknown never heals, no-`by` unchanged |
+| `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → ONE Alert (count 40, digests, no entity) and 40 Incidents, re-fire → 0, restart seeding from the digests, a healed key leaves the count and the last heal resolves the Alert, never an Incident, storm cap → one Alert + one storm Incident, two rules over a key → two Alerts, the pre-fold per-key Alerts folded, unknown never heals, no-`by` unchanged |
 | `MeasureAlertTest` | `inspecto-engine` | scalar Measure rules: fire once per open breach (no re-fire while still breached), the heal edge (all-clear once, cooldown reset so a relapse fires at once), unknown never heals |
 | `ScalarMeasureAlertObjectsTest` | `inspecto-ops` | the real workflow for a no-`by` Measure rule: heal resolves the Alert never the Incident, relapse links / re-opens, restart seeding, retire on a Dataset change |
 | `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: a heal never resolves the Incident, even with a complete postmortem; a relapse after an operator's resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
