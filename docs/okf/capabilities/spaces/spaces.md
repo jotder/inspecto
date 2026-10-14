@@ -495,6 +495,8 @@ follows the checklist below, NO-GO for a cold start** (the three P2 rows). Beat 
 | 12 | Masking for a non-privileged persona | **FAIL** -> `TELCO-FRAUD-MASKED-DASHBOARD-1` | viewer read raw `msisdn`; feed schemas now `MSISDN` (fixed); sink classification blanks 10 bars |
 | 13 | Reports | **FAIL** -> `TELCO-FRAUD-STORY-GAPS-1` | no scheduled export or report in the template |
 
+**Bootstrap (2026-10-14, closes `TELCO-FRAUD-DEMO-BOOTSTRAP-1`).** `node tools/seed-telco-fraud-demo.mjs --spaces inspecto-demo/spaces` writes a `telco-demo` roster Space (`admin;super`, `fm.analyst` `operations`, `fm.manager` `power`, `ra.viewer` `business`); sign in as Demo Admin, create `telco-fraud` from the gallery, run the script again: it copies the roster in and drops the three sample feeds into `data/inbox/<feed>` with every date shifted so the sample day is yesterday (the Jobs roll to `$yesterday`). Test: `tools/seed-telco-fraud-demo.test.mjs`. Still open: the KPI tiles read today (`TELCO-FRAUD-DEMO-DATE-1`).
+
 ⚠ Method traps found: the browser pane scales screenshots (800 px) over a 1323 px viewport, so coordinate clicks land beside the control - use refs or
 `javascript_tool` `.click()`; a viewer persona reaches the dashboard *editor* route (`/studio/dashboards/<id>`), there is no read-only view route to land on.
 ⚠ A mojibake scare was the shell: the server emits correct UTF-8 (`E2 80 94`) and Python's default Windows decoding mangled it.
