@@ -1385,16 +1385,17 @@ public final class ControlApi implements AutoCloseable, HostContext {
 
     /**
      * The embed viewer page (LA-EMBED-FRAME-HEADERS-1): the SPA index with no third-party link, under a strict CSP and no-referrer. The
-     * only origins that may frame it are the ones a Space states (embed.frame_ancestors, union of the attached Spaces whose
-     * Link Analysis module is on); none stated = nobody. The token in the URL is never read or logged here.
+     * only origins that may frame it are the ones the TOKEN's Space states (embed.frame_ancestors); none stated, or a token that is not a live
+     * grant = nobody. The token in the URL is read only to find its Space and is never logged.
      */
     private void writeEmbedShell(HttpExchange ex, Path index) throws IOException {
+        // Only the token's OWN Space may frame the page (LA-EMBED-VIEW-1 remainder a); a token that is not a live grant frames for nobody.
         List<String> origins = new java.util.ArrayList<>();
-        for (var space : attachedSpaceRoots().entrySet()) {
-            if (space.getValue().contains("geoLink")) continue;
-            for (String o : com.gamma.entitystore.LinkAnalysisSettings.forRoot(space.getKey()).effectiveEmbed().frameAncestorsInForce())
-                if (!origins.contains(o)) origins.add(o);
-        }
+        String path = ex.getRequestURI().getPath();
+        int at = path.indexOf("/embed/inv/");
+        String token = at < 0 ? "" : path.substring(at + "/embed/inv/".length());
+        var space = at < 0 || token.indexOf('/') >= 0 ? java.util.Optional.<Path>empty() : com.gamma.spi.auth.EmbedShellSpaces.spaceOf(token);
+        if (space.isPresent()) origins.addAll(com.gamma.entitystore.LinkAnalysisSettings.forRoot(space.get()).effectiveEmbed().frameAncestorsInForce());
         FrameHeaders.embedShell(ex, origins);
         byte[] bytes = FrameHeaders.sanitiseShell(Files.readAllBytes(index));
         ex.getResponseHeaders().set("Content-Type", contentType("index.html"));

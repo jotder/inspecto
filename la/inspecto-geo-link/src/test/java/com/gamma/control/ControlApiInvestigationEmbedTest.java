@@ -77,7 +77,7 @@ class ControlApiInvestigationEmbedTest {
         CaseTeamObjectEngine.CASES = null;
         Authenticators.forTest(null);
         AccessDeciders.forTest(null);
-        for (String p : List.of("la.embed.enabled", "control.cors", "control.rateLimit.embed.capacity", "control.rateLimit.embed.refillPerSecond"))
+        for (String p : List.of("la.embed.enabled", "control.cors", "control.rateLimit.embed.capacity", "control.rateLimit.embed.refillPerSecond", "ui.dir"))
             System.clearProperty(p);
     }
 
@@ -209,6 +209,37 @@ class ControlApiInvestigationEmbedTest {
             }
             String stored = Files.readString(grantFiles(c).get(0));
             assertTrue(stored.contains("tokenSha256"), "only the hash is stored: " + stored);
+        }
+    }
+
+    /** LA-EMBED-VIEW-1 remainder (a): the viewer page is framed by the allow-list of the TOKEN's Space, and by nobody for a token that is not live. */
+    @Test
+    void theViewerPageIsFramedOnlyByTheOriginsOfTheTokensOwnSpaceAndNobodyOnceTheLinkIsRevokedOrForged(@TempDir Path cfg, @TempDir Path root,
+            @TempDir Path ui) throws Exception {
+        subjects();
+        enable();
+        Files.writeString(ui.resolve("index.html"), "<!doctype html><html><head></head><body><app-root></app-root></body></html>");
+        System.setProperty("ui.dir", ui.toString());
+        try (Ctx c = open(cfg, root)) {
+            investigation(c);
+            settings(root, null, new LinkAnalysisSettings.Embed(null, null, null, List.of("https://portal.example")));
+            String token = mint(c, "{}");
+            String grantId = token.substring(0, token.indexOf('.'));
+            java.util.function.Function<String, String> csp = t -> {
+                try {
+                    HttpResponse<String> r = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/embed/inv/" + t)).GET().build(),
+                            BodyHandlers.ofString());
+                    assertEquals(200, r.statusCode());
+                    return r.headers().firstValue("Content-Security-Policy").orElseThrow();
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            };
+            assertTrue(csp.apply(token).endsWith("frame-ancestors https://portal.example"), "the live token's own Space");
+            assertTrue(csp.apply(grantId + ".wrongsecret").endsWith("frame-ancestors 'none'"), "right id, wrong secret");
+            assertTrue(csp.apply("nope.nope").endsWith("frame-ancestors 'none'"), "unknown grant");
+            assertEquals(200, status(c, "POST", INV + "/embeds/" + grantId + "/revoke", "{}", L));
+            assertTrue(csp.apply(token).endsWith("frame-ancestors 'none'"), "revoked: nobody");
         }
     }
 

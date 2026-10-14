@@ -62,6 +62,26 @@ public final class PublicInvestigationRoutes implements RouteModule {
     public void register(ApiContext api) {
         PublicPaths.registerSelfVerifying(EmbedGrants.PREFIX);   // exempt from platform auth; the token after it is redacted from every record
         api.get("/public/investigations/([^/]+)", (e, m) -> view(api, e, m.group(1)));
+        com.gamma.spi.auth.EmbedShellSpaces.register(token -> spaceOfLiveGrant(api, token));
+    }
+
+    /**
+     * The Space whose LIVE grant {@code token} is, for the viewer page's frame headers: only that Space's allow-list may frame the page.
+     * Empty when the feature is off, the token is malformed, unknown, revoked or expired. Every Space is asked, like {@link #view}.
+     */
+    static java.util.Optional<Path> spaceOfLiveGrant(ApiContext api, String token) {
+        if (!EmbedGrants.enabled()) return java.util.Optional.empty();
+        Path found = null;
+        Instant now = Instant.now();
+        for (var space : api.attachedSpaceRoots().entrySet()) {
+            if (space.getValue().contains("geoLink")) continue;
+            try {
+                if (EmbedGrants.resolve(InvestigationStores.of(space.getKey()), token, now).ok() && found == null) found = space.getKey();
+            } catch (IOException | RuntimeException unavailable) {
+                // a Space that is down only hides its own grants
+            }
+        }
+        return java.util.Optional.ofNullable(found);
     }
 
     private static Object view(ApiContext api, HttpExchange ex, String token) throws IOException {
