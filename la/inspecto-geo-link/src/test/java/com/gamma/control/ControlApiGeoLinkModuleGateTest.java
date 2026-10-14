@@ -60,7 +60,8 @@ class ControlApiGeoLinkModuleGateTest {
             new String[]{"POST", "/inv/pattern/branching"},                   // PatternRoutes
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
             new String[]{"GET", "/inv/investigations/x/working-set"},         // WorkingSetRoutes
-            new String[]{"GET", "/inv/investigations/x/measures"});           // InvestigationMeasureRoutes (geo-link)
+            new String[]{"GET", "/inv/investigations/x/measures"},           // InvestigationMeasureRoutes (geo-link)
+            new String[]{"GET", "/inv/investigations/x/data-changes"});       // InvestigationDataChangesRoutes (geo-link)
 
     @BeforeEach
     void arm() {

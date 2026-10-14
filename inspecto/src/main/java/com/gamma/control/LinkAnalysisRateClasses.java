@@ -74,6 +74,7 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/investigation-templates/([^/]+)"},
             {"POST", "/inv/investigation-templates/([^/]+)/instantiate"},
             {"GET", "/inv/investigations/([^/]+)/measures"},
+            {"GET", "/inv/investigations/([^/]+)/data-changes"},
             {"GET", "/inv/investigations/([^/]+)/alert-rules"},
             {"POST", "/inv/investigations/([^/]+)/alert-rules"},
             {"POST", "/inv/investigations/([^/]+)/standing-detection"},

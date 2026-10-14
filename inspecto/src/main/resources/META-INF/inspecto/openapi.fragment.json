@@ -334,6 +334,7 @@
     "/inv/investigation-templates/{investigationtemplateId}",
     "/inv/investigation-templates/{investigationtemplateId}/instantiate",
     "/inv/investigations/{investigationId}/measures",
+    "/inv/investigations/{investigationId}/data-changes",
     "/inv/investigations/{investigationId}/alert-rules",
     "/inv/investigations/{investigationId}/case",
     "/inv/investigations/{investigationId}/dossier/bundle",
