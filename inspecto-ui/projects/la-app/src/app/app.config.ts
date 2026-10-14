@@ -2,6 +2,7 @@ import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/ht
 import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
 import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
+import { MAT_DIALOG_DEFAULT_OPTIONS, MatDialogConfig } from '@angular/material/dialog';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { provideGamma } from '@gamma';
@@ -52,6 +53,9 @@ export const appConfig: ApplicationConfig = {
                 },
             },
         },
+        // Every dialog is modal to assistive technology (axe aria-modal; the gamma host does the same). It REPLACES
+        // `new MatDialogConfig()` rather than merging, so the defaults are spread in: `{ ariaModal: true }` alone drops `role`.
+        { provide: MAT_DIALOG_DEFAULT_OPTIONS, useFactory: () => ({ ...new MatDialogConfig(), ariaModal: true }) },
         // `GET /bootstrap` once, before routing: the auth mode, the module flags (`LA_FEATURES` reads them) and, under
         // OIDC, a session resumed from the refresh cookie. Never rejects.
         // The shared-Investigation viewer (`/embed/...`) is anonymous and talks to nothing but its one public read, so it skips the
