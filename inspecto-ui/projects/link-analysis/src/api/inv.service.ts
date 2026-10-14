@@ -865,6 +865,47 @@ export type CollectorCoverage =
           collectors: { collector: string; coveredDays: number; missingDays: string[]; complete: boolean }[];
       };
 
+// ── LA-DATA-TRUST-1 S1: the per-File read (`DatasetFilesRoutes`) ───────────────────────────────────────
+
+export type DatasetFileOutcome = 'SUCCESS' | 'PARTIAL' | 'QUARANTINED' | 'FAILED' | string;
+export type DatasetFileIndexState = 'INDEXED' | 'WAITING' | 'UNKNOWN' | 'NO_INDEX';
+
+/** One File recorded towards a Dataset. `errorRows: null` = not measured (blank, never 0); `rows: 0` is a File with no rows. */
+export interface DatasetFile {
+    name: string;
+    /** Event day of its output partition, or null when it wrote none. */
+    day: string | null;
+    rows: number;
+    errorRows: number | null;
+    /** The Consignment's commit time - NOT the arrival time. */
+    ingestedAt: string | null;
+    outcome: DatasetFileOutcome;
+    collector: string;
+    pipeline: string;
+    consignmentId: string | null;
+    outputFiles: string[];
+    /** null = the File wrote no partition file, so there is nothing to index. */
+    indexState: DatasetFileIndexState | null;
+    indexVersion: number | null;
+}
+
+/** `GET /inv/datasets/{id}/files`. `assessed:false` = no audit trail attributes the Dataset (never read it as "no Files"). */
+export interface DatasetFilesPage {
+    dataset: string;
+    assessed: boolean;
+    total: number;
+    offset: number;
+    limit: number;
+    items: DatasetFile[];
+    /** Per event day, over ALL Files. */
+    days?: { day: string; files: number; rows: number }[];
+    /** Over ALL Files, not the page. */
+    summary?: { files: number; rows: number; latestIngestedAt: string | null; indexed: number; waiting: number; unknown: number; problem: number };
+    index?: { present: boolean; version: number | null; builtAt: string | null; inputsRecorded: number | null };
+    readAt: string;
+    note?: string;
+}
+
 // ── LA-24: the optional Case link (`InvestigationCaseRoutes`) ─────────────────────────────────────────
 
 /** `GET|PUT|DELETE /inv/investigations/{id}/case` — the link, and what it grants the caller. */
@@ -1647,6 +1688,13 @@ export class InvService {
     ): Observable<InvestigationCoverage> {
         return this.http.get<InvestigationCoverage>(invPath(id, 'coverage'), {
             params: toParams({ from: w.from, to: w.to, timezone: w.timezone }),
+        });
+    }
+
+    /** LA-DATA-TRUST-1 S1: one page of the Files recorded towards a Dataset, each with its index state. */
+    datasetFiles(dataset: string, q: { limit?: number; offset?: number; name?: string } = {}): Observable<DatasetFilesPage> {
+        return this.http.get<DatasetFilesPage>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/files`), {
+            params: toParams({ limit: q.limit, offset: q.offset, name: q.name }),
         });
     }
 

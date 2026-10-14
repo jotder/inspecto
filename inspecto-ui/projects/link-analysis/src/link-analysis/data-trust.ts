@@ -1,0 +1,115 @@
+import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
+
+/**
+ * LA-DATA-TRUST-1 S2 - the framework-free half of the Data strip: what the one-line summary says, the tone of its
+ * badge, and the per-day strip. 🔴 A gap in the data looks exactly like innocence, so the words here never claim
+ * more than was measured: an unassessed read says "not assessed", an unknown index state says "unknown".
+ */
+
+export type DataTrustTone = 'success' | 'warning' | 'error' | 'neutral';
+
+/** The facts the strip is built from; each is null when its read has not answered (or could not). */
+export interface DataTrustFacts {
+    /** `GET /datasets/{id}/freshness` `dataAsOf` (ISO instant) or null. */
+    dataAsOf: string | null;
+    /** From the coverage read: expected / covered / missing days; null when the read needs a window the Investigation lacks. */
+    days: { expected: number; covered: number; missing: string[] } | null;
+    /** From `GET /inv/index` for the Dataset. */
+    index: { version: number; stale: boolean } | null;
+    /** The first Files page (its `summary` spans every File). */
+    files: DatasetFilesPage | null;
+}
+
+export interface DataTrustStrip {
+    text: string;
+    tone: DataTrustTone;
+    /** The badge's word - the tone is never conveyed by colour alone. */
+    label: string;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `2026-09-05T10:00:00Z` -> `5 Sep 2026` (UTC, so the same instant reads the same for every analyst). */
+export function formatDay(iso: string | null | undefined): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+    return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '';
+}
+
+const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+
+export function buildStrip(f: DataTrustFacts): DataTrustStrip {
+    const parts: string[] = [];
+    let tone: DataTrustTone = 'success';
+    const worse = (t: DataTrustTone) => {
+        if (t === 'error' || (t === 'warning' && tone !== 'error') || (t === 'neutral' && tone === 'success')) tone = t;
+    };
+
+    const asOf = formatDay(f.dataAsOf);
+    parts.push(asOf ? `Data as of ${asOf}` : 'Data as-of date not known');
+    if (!asOf) worse('neutral');
+
+    if (f.days) {
+        parts.push(`${f.days.covered} of ${f.days.expected} days`);
+        if (f.days.missing.length) {
+            parts.push(plural(f.days.missing.length, 'gap'));
+            worse('warning');
+        }
+    } else parts.push('days not assessed');
+
+    const s = f.files?.assessed ? f.files.summary : undefined;
+    if (s && s.problem > 0) {
+        parts.push(`${plural(s.problem, 'File')} quarantined, partial or failed`);
+        worse('warning');
+    }
+
+    let index = 'no index';
+    if (f.index) {
+        index = `index v${f.index.version}`;
+        if (f.index.stale) {
+            index += ' (stale)';
+            worse('warning');
+        }
+        if (s) {
+            if (s.waiting > 0) {
+                index += `, ${plural(s.waiting, 'file')} waiting`;
+                worse('warning');
+            } else if (s.unknown > 0) index += `, ${s.unknown} unknown`;
+        }
+    }
+    parts.push(index);
+
+    return {
+        text: parts.join(' · '),
+        tone,
+        label: tone === 'success' ? 'OK' : tone === 'warning' ? 'WARNING' : tone === 'error' ? 'PROBLEM' : 'UNKNOWN',
+    };
+}
+
+/** One cell of the per-day strip. `missing` = no rows and no File; `empty` = Files arrived but held no rows. */
+export interface DayCell {
+    date: string;
+    rows: number;
+    state: 'ok' | 'missing' | 'empty';
+}
+
+/**
+ * The per-day strip from the coverage read's `perDay` (every expected day, `rows: 0` for both a gap and an empty day) and
+ * the Files' event days: a zero-row day that some File names is `empty` (the feed delivered, the day holds nothing);
+ * a zero-row day no File names is `missing`.
+ */
+export function dayCells(
+    perDay: { date: string; rows: number }[],
+    fileDays: { day: string; files: number }[],
+): DayCell[] {
+    const delivered = new Set(fileDays.filter((d) => d.files > 0).map((d) => d.day));
+    return perDay.map((d) => ({
+        date: d.date,
+        rows: d.rows,
+        state: d.rows > 0 ? 'ok' : delivered.has(d.date) ? 'empty' : 'missing',
+    }));
+}
+
+/** The badge a File's outcome reads as. */
+export function outcomeTone(outcome: string): string {
+    return outcome === 'SUCCESS' ? 'SUCCESS' : outcome === 'PARTIAL' || outcome === 'QUARANTINED' ? 'WARNING' : 'ERROR';
+}
