@@ -1,0 +1,6 @@
+job:
+  name: fraud_alert_evaluate
+  type: alert.evaluate
+  description: "Evaluates every Alert Rule half an hour after the 02:00 detection Jobs have written their sink Datasets, so each night's offenders raise their Alerts without anyone pressing Evaluate. Without a clock the rules only fire when somebody asks."
+  cron: "30 2 * * *"
+  enabled: true

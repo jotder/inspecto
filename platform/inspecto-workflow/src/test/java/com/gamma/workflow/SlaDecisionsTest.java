@@ -48,6 +48,13 @@ class SlaDecisionsTest {
     }
 
     @Test
+    void anUnsetPriorityFallsBackToTheSeverity() {
+        long created = at("2026-10-05T09:00");
+        GovernedItem promoted = new GovernedItem("o1", "INCIDENT", "IDENTIFIED", "CRITICAL", null, null, created, false, Map.of());
+        assertEquals("CRITICAL", SlaDecisions.deadlineStamp(promoted, policy()).get(SlaDecisions.ATTR_SLA_PRIORITY));
+    }
+
+    @Test
     void stampLeavesAnOperatorDueAtABreachedItemAndAnUnchangedPriorityAlone() {
         long created = at("2026-10-05T09:00");
         assertNull(SlaDecisions.deadlineStamp(item("IDENTIFIED", "CRITICAL", created, Map.of("dueAt", "123")), policy()));

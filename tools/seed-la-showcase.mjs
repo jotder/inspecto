@@ -11,6 +11,8 @@
 // idempotent, each SOFT: a refusal prints a warning and leaves the Space as it was, the exit code stays 0):
 //   --no-pending   one PENDING four-eyes expand on mule-hub-case (an unbounded expand by fm.analyst; left undecided for fm.manager)
 //   --no-alert     one run of the la_detect Job (as fm.manager, who holds canOperateRuns) until the mule-pass-through Alert exists
+//   --no-coverage  one SECOND Investigation (delivery-gap-case) whose window reaches 2026-09-06, one day past the landed files, so the
+//                  coverage read shows a missing day for the mule_transfers Collector (LA-COLLECTOR-COVERAGE-1); the stage reads it back
 //   --no-draft     one open Draft of mule-hub-case forked by fm.analyst, carrying one annotate step, left unpromoted
 // (the Draft carries the label 'Draft: widen the ring'; it is still found again as fm.analyst's one live Draft)
 //
@@ -22,6 +24,8 @@ import { fileURLToPath } from 'node:url';
 
 export const INV = 'mule-hub-case';
 export const DATASET = 'mule_transfers_dataset';
+export const GAP_INV = 'delivery-gap-case';
+export const GAP_WINDOW = { from: '2026-09-01T00:00:00Z', to: '2026-09-06T00:00:00Z' };   // days 01-04 landed (the 0903 file's last row is booked 09-04); 05 is the missing day
 const CASE_TITLE = 'Mule ring around MULE-HUB-01';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,7 +85,7 @@ const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, lines }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-showcase', apply = false, log = () => {},
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 30, alertWaitTries = 20, readyTries = 60, stages = {} } = {}) {
-  const want = { pending: true, alert: true, draft: true, ...stages };
+  const want = { pending: true, alert: true, draft: true, coverage: true, ...stages };
   const plan = buildPlan();
   const out = { done: [], skipped: [], failed: [], warnings: [], summary: {} };
   if (!apply) {
@@ -89,6 +93,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     for (const s of plan) log(`  ${s.as.padEnd(11)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
     if (want.pending) log(`  fm.analyst  POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request; skipped if fm.manager already sees one)`);
     if (want.alert) log(`  fm.manager  POST /jobs/la_detect/trigger  (skipped if an Alert for ${RULE} already exists)`);
+    if (want.coverage) log(`  fm.analyst  POST /inv/investigations ${GAP_INV} + window ${JSON.stringify(GAP_WINDOW)}, then GET .../coverage (must show the Collector's missing day)`);
     if (want.draft) log(`  fm.analyst  POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}  (skipped if fm.analyst has a live Draft)`);
     return out;
   }
@@ -178,6 +183,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (want.pending) try { await stagePending(call, out, log); } catch (e) { warn('pending', e); }
   if (want.alert) try { await stageAlert(call, out, log, sleep, alertWaitTries, items); } catch (e) { warn('alert', e); }
   if (want.draft) try { await stageDraft(call, out, log); } catch (e) { warn('draft', e); }
+  if (want.coverage) try { await stageCoverage(call, out, log, items); } catch (e) { warn('coverage', e); }
   return out;
 }
 
@@ -210,6 +216,24 @@ async function stageAlert(call, out, log, sleep, tries, items) {
   for (let i = 0; i < tries && !a; i++) { await sleep(3000); a = await read(); }
   if (!a) throw new Error(`no Alert for ${RULE} appeared after ${tries} polls of the la_detect run (is standing detection enabled on the rule?)`);
   out.done.push('alert'); out.summary.alertId = id(a); log(`  alert: ${id(a)}`);
+}
+
+/** ONE extra Investigation over the same Dataset with a window one day past the landed files, then a read-back of its coverage:
+ *  the Collector that feeds the Dataset must be assessed and report the missing day. Idempotent: an existing id is only re-read. */
+async function stageCoverage(call, out, log, items) {
+  const listed = items(must(await call('fm.analyst', 'GET', '/inv/investigations?limit=200'), 'Investigation list'));
+  if (!listed.some((i) => i.id === GAP_INV)) {
+    must(await call('fm.analyst', 'POST', '/inv/investigations', { id: GAP_INV, title: 'Delivery gap check', purpose: 'Showcase: per-Collector delivery coverage',
+      dataset: DATASET, sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT', linkKindCol: 'CHANNEL', timeCol: 'BOOKED_AT' }), 'the gap Investigation');
+    must(await call('fm.analyst', 'POST', `/inv/investigations/${GAP_INV}/ops`, { op: 'window', window: GAP_WINDOW }), 'the gap window');
+    out.done.push('coverage-investigation');
+  } else out.skipped.push('coverage-investigation');
+  const c = must(await call('fm.analyst', 'GET', `/inv/investigations/${GAP_INV}/coverage`), 'the coverage read');
+  const col = c.collectors && c.collectors.assessed ? (c.collectors.collectors || []) : [];
+  if (!col.length) throw new Error('coverage reads collectors.assessed=false: no Consignment lineage is attributed to a Collector yet (has the first ingest finished?)');
+  if (!col.some((k) => (k.missingDays || []).length)) throw new Error(`coverage lists Collector(s) ${col.map((k) => k.collector).join(', ')} but no missing day`);
+  out.summary.coverage = col.map((k) => `${k.collector}: ${k.coveredDays} covered, missing ${k.missingDays.join('/') || '-'}`).join('; ');
+  log(`  coverage: ${out.summary.coverage}`);
 }
 
 /** ONE open Draft with one step. Idempotent: fm.analyst's live Draft (open or hibernated) is reused, and only topped up when it is empty. */
@@ -273,12 +297,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const made = scaffold(root);
     console.log(made.length ? `scaffolded: ${made.join(', ')}` : 'nothing to do: the Spaces already exist');
   } else {
-    const stages = { pending: !args.includes('--no-pending'), alert: !args.includes('--no-alert'), draft: !args.includes('--no-draft') };
+    const stages = { pending: !args.includes('--no-pending'), alert: !args.includes('--no-alert'), draft: !args.includes('--no-draft'), coverage: !args.includes('--no-coverage') };
     run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), apply: args.includes('--apply'), log: console.log, stages })
       .then((r) => {
         if (args.includes('--apply')) {
           console.log(`created: ${r.done.join(', ') || '-'}\nalready there: ${r.skipped.join(', ') || '-'}\nfailed: ${r.failed.join('; ') || '-'}`);
-          console.log(`warnings: ${r.warnings.join('; ') || '-'}\nstaged: pending request ${r.summary.pendingRequestId || '-'} | Alert ${r.summary.alertId || '-'} | Draft ${r.summary.draftId || '-'}`);
+          console.log(`warnings: ${r.warnings.join('; ') || '-'}\nstaged: pending request ${r.summary.pendingRequestId || '-'} | Alert ${r.summary.alertId || '-'} | Draft ${r.summary.draftId || '-'} | coverage ${r.summary.coverage || '-'}`);
         }
         process.exit(r.failed.length ? 1 : 0);
       })

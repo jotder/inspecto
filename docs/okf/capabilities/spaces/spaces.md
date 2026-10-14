@@ -473,6 +473,35 @@ planted offenders (5/4/4/5/4/4/3/3/4/4 = 40 Alerts) and no look-alike, re-runs t
 Alert change), then runs the next window (nothing raised or dropped); a second case runs 16 retained days of
 fresh offenders at the corpus rate — 640 Alerts, every offender its own, no storm. Each defence was mutation-checked red.
 
+**Demo rehearsal 2026-10-14 (`TELCO-FRAUD-DEMO-REHEARSAL-1`, no code row).** A fresh `package.ps1 -Edition Enterprise -DemoAuth` bundle (main `gamma` UI),
+a Space made from this template through *Settings > Spaces > New from template*, the three sample files copied into `data/inbox/<feed>`, driven in the
+browser as `admin` (`admin;super`), `fm.analyst` (`operations`), `fm.manager` (`power`) and a non-privileged `business` viewer. **GO for a presenter who
+follows the checklist below, NO-GO for a cold start** (the three P2 rows). Beat list (this is the checklist):
+
+| # | Beat | Result | Evidence |
+|---|---|---|---|
+| 0 | Sign in on a fresh bundle | **FAIL** -> `TELCO-FRAUD-DEMO-BOOTSTRAP-1` | `/bootstrap` `demoUsers: []`; the template cannot carry `demo-users.toon` (import-reserved) |
+| 1 | Create the Space from the gallery | **PASS** with `admin;super` (**FAIL** as seed `admin`: refused, `canAuthorAlertRules`) | Space folder + 15 Jobs + 14 Alert Rules seeded; gallery text said *thirteen* (fixed: fourteen) |
+| 2 | Deliver the feeds (polled inbox, 60 s) | **PASS** | status CSVs: CDR 3359, payments 698, subscriber events 503 rows, 0 error rows |
+| 3 | Ingest quality: Expectations, quality Incidents | **FAIL** -> `TELCO-FRAUD-STORY-GAPS-1` | `/expectations` empty, Home *Expectations breached 0* |
+| 4 | Detection Jobs (14, by API with the golden window) | **PASS**, with `TELCO-FRAUD-DEMO-DATE-1` | 14 x SUCCESS, rows per sink 6-346 |
+| 5 | Alert Rules raise Alerts | **FAIL as shipped, fixed**: no Job evaluated the rules overnight; `fraud_alert_evaluate` (`alert.evaluate`, `30 2 * * *`) added | `POST /alerts/evaluate` -> **58 Alerts**, exactly the golden count, one per offender per rule (per entity by design; the sequence_gap decision belongs to the LA demo and does not apply here) |
+| 6 | Alert -> Incident | **PASS** | 30 CRITICAL Incidents (WARNING rules stay Alerts), runbook, tags `fraud` / `telco`, evidence attributes (`rule`, `key`, `value`, `threshold`, `measure`) |
+| 7 | Incident workflow as `fm.analyst`: Accept | **PASS** (IDENTIFIED -> DIAGNOSING, no assignee) | `TELCO-FRAUD-INCIDENT-PRIORITY-1` |
+| 8 | SLA badge | **PASS** (badge shows) but **wrong target**: 24 h `*` fallback | `TELCO-FRAUD-INCIDENT-PRIORITY-1`; the policies are applied by hand from `config/examples/` |
+| 9 | Case with assignment | **PASS** | created in *Case Manager* (assignee `fm.manager`, linked Incident); no Case Rule, so never automatic |
+| 10 | Decision Rules | **FAIL** -> `TELCO-FRAUD-STORY-GAPS-1` | `/decision-rules` empty; the template ships none |
+| 11 | Dashboard + Value Measures | **PASS** structurally (18 tiles, 14 bars render), **FAIL** for the KPI tiles on the sample (`value: null`) | `TELCO-FRAUD-DEMO-DATE-1` |
+| 12 | Masking for a non-privileged persona | **FAIL** -> `TELCO-FRAUD-MASKED-DASHBOARD-1` | viewer read raw `msisdn`; feed schemas now `MSISDN` (fixed); sink classification blanks 10 bars |
+| 13 | Reports | **FAIL** -> `TELCO-FRAUD-STORY-GAPS-1` | no scheduled export or report in the template |
+
+**Bootstrap (2026-10-14, closes `TELCO-FRAUD-DEMO-BOOTSTRAP-1`).** `node tools/seed-telco-fraud-demo.mjs --spaces inspecto-demo/spaces` writes a `telco-demo` roster Space (`admin;super`, `fm.analyst` `operations`, `fm.manager` `power`, `ra.viewer` `business`); sign in as Demo Admin, create `telco-fraud` from the gallery, run the script again: it copies the roster in and drops the three sample feeds into `data/inbox/<feed>` with every date shifted so the sample day is yesterday (the Jobs roll to `$yesterday`). Test: `tools/seed-telco-fraud-demo.test.mjs`. Still open: the KPI tiles read today (`TELCO-FRAUD-DEMO-DATE-1`).
+
+⚠ Method traps found: the browser pane scales screenshots (800 px) over a 1323 px viewport, so coordinate clicks land beside the control - use refs or
+`javascript_tool` `.click()`; a viewer persona reaches the dashboard *editor* route (`/studio/dashboards/<id>`), there is no read-only view route to land on.
+⚠ A mojibake scare was the shell: the server emits correct UTF-8 (`E2 80 94`) and Python's default Windows decoding mangled it.
+Pins: `TelcoFraudTemplateGoldenTest.theAlertRulesAreEvaluatedOnAClockAfterTheDetectionJobs`, `.everyFeedSubscriberNumberColumnIsClassifiedMsisdn`.
+
 **Every registry kind a template seeds is gated, not only `kpi`** (`ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠,
 2026-09-28). The seed gate is `TemplateSeedGate.require`, one table-driven pass over the staged tree before boot:
 (1) **capability** — `ImportCapabilityGuard.checkFiles(…, newSpace=true)` over the staged `config/`, the same

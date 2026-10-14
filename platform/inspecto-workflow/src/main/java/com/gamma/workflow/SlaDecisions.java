@@ -62,7 +62,10 @@ public final class SlaDecisions {
         Map<String, String> a = o.attributes();
         boolean operatorSet = a.get(ATTR_DUE_AT) != null && !a.get(ATTR_DUE_AT).isBlank() && a.get(ATTR_SLA_POLICY) == null;
         if (operatorSet || a.containsKey(ATTR_SLA_BREACHED_AT)) return null;
-        String priority = o.priority() == null ? "" : o.priority().trim().toUpperCase(Locale.ROOT);
+        // An Incident promoted from an Alert Rule carries a severity and no priority (TELCO-FRAUD-INCIDENT-PRIORITY-1):
+        // an unset priority falls back to the severity, so a CRITICAL fraud Incident meets the CRITICAL target.
+        String raw = o.priority() != null && !o.priority().isBlank() ? o.priority() : o.severity();
+        String priority = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
         if (a.get(ATTR_SLA_POLICY) != null && priority.equals(a.get(ATTR_SLA_PRIORITY))) return null;
         SlaPolicy.Target t = policy.targetFor(priority).orElse(null);
         if (t == null) return null;
