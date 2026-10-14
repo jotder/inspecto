@@ -141,6 +141,40 @@ class TelcoFraudTemplateGoldenTest {
         }
     }
 
+    /** TELCO-FRAUD-DEMO-REHEARSAL-1: detection Jobs only write sink Datasets; without an {@code alert.evaluate} Job
+     *  on a clock the Alert Rules never fire overnight. One ships, and it runs AFTER the 02:00 detection Jobs. */
+    @Test
+    void theAlertRulesAreEvaluatedOnAClockAfterTheDetectionJobs(@TempDir Path root) throws Exception {
+        Path space = createSpace(root);
+        List<JobConfig> evaluators = new ArrayList<>();
+        try (Stream<Path> files = Files.list(space.resolve("config").resolve("jobs"))) {
+            for (Path f : files.filter(p -> p.getFileName().toString().endsWith("_job.toon")).sorted().toList()) {
+                JobConfig j = JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(ToonHelper.load(f.toString()), "job")));
+                if ("alert.evaluate".equals(j.type())) evaluators.add(j);
+            }
+        }
+        assertEquals(1, evaluators.size());
+        assertEquals("30 2 * * *", evaluators.get(0).cron());
+    }
+
+    /** TELCO-FRAUD-DEMO-REHEARSAL-1: a viewer without {@code canRevealLinkEntities} sees {@code masked:} aliases only where a
+     *  column is CLASSIFIED {@code MSISDN}; the feeds said {@code CONFIDENTIAL}, which no masked Entity Type claims, so a
+     *  viewer read raw subscriber numbers in the feed Datasets. Pin the classification on the three feed schemas. (The sink
+     *  Datasets stay unclassified on purpose: a bar Widget orders by its key, and a masked key refuses ordering, so the
+     *  dashboard would go blank for a viewer - P2 TELCO-FRAUD-MASKED-DASHBOARD-1.) */
+    @Test
+    void everyFeedSubscriberNumberColumnIsClassifiedMsisdn(@TempDir Path root) throws Exception {
+        Path config = createSpace(root).resolve("config");
+        for (String[] f : new String[][]{{"cdr/cdr_schema.toon", "a_number", "b_number"},
+                {"subscriber_events/subscriber_events_schema.toon", "msisdn"}, {"payments/payments_schema.toon", "msisdn"}}) {
+            String text = Files.readString(config.resolve(f[0]));
+            for (int i = 1; i < f.length; i++) {
+                String col = f[i];
+                assertTrue(text.lines().anyMatch(l -> l.strip().startsWith(col + ",") && l.endsWith("\"MSISDN\"")), f[0] + " " + col);
+            }
+        }
+    }
+
     /** Runbook (operator 2026-10-10): every typology's Alert Rule links its own Runbook, and each one is valid. */
     @Test
     void everyAlertRuleLinksAValidRunbookOfItsOwnTypology(@TempDir Path root) throws Exception {
