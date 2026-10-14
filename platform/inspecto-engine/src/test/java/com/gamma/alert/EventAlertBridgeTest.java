@@ -253,6 +253,14 @@ class EventAlertBridgeTest {
     }
 
     @Test
+    void aCompactManifestDayReadsAsAnIsoDayInTheAlertTitle() {
+        EventAlertBridge bridge = new EventAlertBridge(service(store));
+        bridge.onEvent(fileProblem("daily_xdr", "QUARANTINED", "20260910", "XDR_20260910.csv", 0, 0));
+        String title = store.active("daily_xdr").get(0).title();
+        assertTrue(title.contains("(day 2026-09-10)"), title);
+    }
+
+    @Test
     void aQuarantinedFileIsOneAlertNamingTheFileAndItsDay() {
         AlertService svc = service(store);
         EventAlertBridge bridge = new EventAlertBridge(svc);

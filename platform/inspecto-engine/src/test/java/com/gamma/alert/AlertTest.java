@@ -98,8 +98,12 @@ class AlertTest {
         AlertRule fresh = new AlertRule("sales-stale", null, null, 0, null, "WARNING", null,
                 "sales_ds", null, null, "6h");
         Alert stale = Alert.of(fresh, "sales_ds", "Daily sales", 7200, 0L);
-        assertEquals("WARNING: dataset Daily sales has not published for 7200s (freshness limit 6h)", stale.message());
+        assertEquals("WARNING: dataset Daily sales has not published for 2 h (freshness limit 6h)", stale.message());
         assertEquals("sales_ds", stale.pipeline());
+        assertEquals("16 min", Alert.duration(978.514));
+        assertEquals("2 h 10 min", Alert.duration(7800));
+        assertEquals("45 s", Alert.duration(45.2));
+        assertEquals("3 d 4 h", Alert.duration(3 * 86400 + 4 * 3600 + 5));
     }
 
     @Test

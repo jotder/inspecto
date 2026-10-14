@@ -67,14 +67,14 @@ public record Alert(String rule, String severity, String pipeline, String metric
         if (r.isFreshnessRule()) {
             String freshMsg = r.indexLag()
                     ? String.format(java.util.Locale.ROOT,
-                    "%s: dataset %s has had Files waiting for the Link Analysis index for %ss (limit %s)",
-                    r.severity(), scopeLabel, trim(value), r.maximumAge())
+                    "%s: dataset %s has had Files waiting for the Link Analysis index for %s (limit %s)",
+                    r.severity(), scopeLabel, duration(value), r.maximumAge())
                     : r.eventDateColumn() != null
-                    ? String.format(java.util.Locale.ROOT, "%s: dataset %s holds no event newer than %ss ago (event-date freshness limit %s)",
-                    r.severity(), scopeLabel, trim(value), r.maximumAge())
+                    ? String.format(java.util.Locale.ROOT, "%s: dataset %s holds no event newer than %s ago (event-date freshness limit %s)",
+                    r.severity(), scopeLabel, duration(value), r.maximumAge())
                     : String.format(java.util.Locale.ROOT,
-                    "%s: dataset %s has not published for %ss (freshness limit %s)",
-                    r.severity(), scopeLabel, trim(value), r.maximumAge());
+                    "%s: dataset %s has not published for %s (freshness limit %s)",
+                    r.severity(), scopeLabel, duration(value), r.maximumAge());
             return new Alert(r.name(), r.severity(), pipeline, r.indexLag() ? "index-lag" : "freshness", value, r.comparator(),
                     r.threshold(), r.maximumAge(), epochMillis, freshMsg);
         }
@@ -239,7 +239,16 @@ public record Alert(String rule, String severity, String pipeline, String metric
         return o == null ? 0 : Double.parseDouble(String.valueOf(o));
     }
 
-    private static String trim(double d) {
-        return d == Math.rint(d) ? String.valueOf((long) d) : String.valueOf(d);
+    /**
+     * An age in seconds for reading: {@code 45 s}, {@code 16 min}, {@code 2 h 10 min}, {@code 3 d 4 h}. Whole units only, the two
+     * largest non-zero ones; never decimals ({@code 978.514}), so the same age reads the same on every machine.
+     */
+    static String duration(double seconds) {
+        long s = Math.max(0, Math.round(seconds));
+        if (s < 60) return s + " s";
+        long min = s / 60, h = min / 60, d = h / 24;
+        if (d > 0) return d + " d" + (h % 24 > 0 ? " " + (h % 24) + " h" : "");
+        if (h > 0) return h + " h" + (min % 60 > 0 ? " " + (min % 60) + " min" : "");
+        return min + " min";
     }
 }

@@ -129,11 +129,17 @@ public final class EventAlertBridge {
             case FileProblemSignal.FAILED -> "File not loaded (consignment failed)";
             default -> "File loaded with rejected rows";
         };
-        String title = what + ": " + file + " (day " + day + ") on " + pipeline;
+        String title = what + ": " + file + " (day " + isoDay(day) + ") on " + pipeline;
         String severity = FileProblemSignal.PARTIAL.equals(kind) ? "medium" : "high";
         long at = e.ts() > 0 ? e.ts() : System.currentTimeMillis();
         Alert alert = new Alert(FILE_PROBLEM_RULE, severity, pipeline, FILE_PROBLEM_RULE, 1, "gt", 0, null, at, title);
         alerts.raiseFromEvent(alert, title, pipeline, FILE_PROBLEM_RULE + "|" + pipeline + "|" + file + "|" + day, attrs);
+    }
+
+    /** {@code 20260908} (a delivery manifest's bucket key) as {@code 2026-09-08}; anything else is shown as given. */
+    private static String isoDay(String day) {
+        return day.length() == 8 && day.chars().allMatch(Character::isDigit)
+                ? day.substring(0, 4) + "-" + day.substring(4, 6) + "-" + day.substring(6) : day;
     }
 
     private void raiseImbalance(Event e) {
