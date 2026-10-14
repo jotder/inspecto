@@ -67,6 +67,97 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
         return out.isEmpty() ? Optional.empty() : Optional.of(out);
     }
 
+    // ── LA-DATA-TRUST-1 S1: one row per File ─────────────────────────────────────────────────────────────
+
+    @Override
+    public Optional<List<FileEntry>> files(ApiContext api, Map<String, Object> dataset) {
+        Set<String> stores = EvidenceMasker.datasetStores(dataset);
+        if (stores.isEmpty()) return Optional.empty();
+        Set<String> origins = origins(stores);
+        var service = HostContext.of(api).service();
+        List<FileEntry> out = new ArrayList<>();
+        for (var pv : service.pipelines()) {
+            Optional<PipelineConfig> cfg = service.configFor(pv.name());
+            if (cfg.isEmpty() || cfg.get().dirs().batchesFilePath() == null || cfg.get().dirs().lineageFilePath() == null) continue;
+            String collector = cfg.get().collector().id();
+            boolean matched = false;
+            List<FileEntry> mine = new ArrayList<>(), problems = new ArrayList<>();
+            boolean owns = ownsOrigin(cfg.get(), origins);
+            for (Path[] run : runs(Path.of(cfg.get().dirs().batchesFilePath()), Path.of(cfg.get().dirs().lineageFilePath()))) {
+                matched |= collectFiles(run, stores, owns, collector, pv.name(), mine, problems);
+            }
+            if (!matched) continue;                                  // no batch of this Pipeline wrote the Dataset: its Files are not this Dataset's
+            out.addAll(mine);
+            out.addAll(problems);
+        }
+        return out.isEmpty() ? Optional.empty() : Optional.of(out);
+    }
+
+    /**
+     * One run's (batches, lineage, status) triple: the Files of the Consignments that wrote the Dataset go to {@code mine}; a
+     * File that did not succeed goes to {@code problems} (kept only when the Pipeline matched in some run). Returns whether a
+     * Consignment of this run wrote the Dataset.
+     */
+    static boolean collectFiles(Path[] run, Set<String> stores, boolean owns, String collector, String pipeline,
+                                List<FileEntry> mine, List<FileEntry> problems) {
+        Set<String> consignments = new HashSet<>();
+        for (Map<String, String> b : read(run[0])) {
+            String table = b.get("output_table");
+            if (stores.contains(table) || (owns && (table == null || table.isBlank()) && "SUCCESS".equalsIgnoreCase(b.get("status"))))
+                consignments.add(b.get("consignment_id"));
+        }
+        Path status = run[0].resolveSibling(run[0].getFileName().toString().replaceFirst("_batches_", "_status_"));
+        if (Files.exists(status)) {
+            List<Map<String, String>> lineage = read(run[1]);
+            for (Map<String, String> s : read(status)) {
+                boolean in = consignments.contains(s.get("consignment_id"));
+                String outcome = outcome(s.get("status"), count(s.get("error_rows")));
+                if (!in && "SUCCESS".equals(outcome)) continue;
+                (in ? mine : problems).add(entry(s, outcome, lineage, in, collector, pipeline));
+            }
+        }
+        return !consignments.isEmpty();
+    }
+
+    private static FileEntry entry(Map<String, String> s, String outcome, List<Map<String, String>> lineage, boolean joinLineage,
+                                   String collector, String pipeline) {
+        String name = s.get("filename") == null ? "" : s.get("filename");
+        String cid = blankToNull(s.get("consignment_id"));
+        String day = null;
+        Set<String> outputs = new java.util.LinkedHashSet<>();
+        if (joinLineage) {
+            String base = baseName(name);
+            for (Map<String, String> r : lineage) {
+                if (!java.util.Objects.equals(cid, blankToNull(r.get("consignment_id"))) || !base.equals(baseName(r.get("input_file")))) continue;
+                String d = day(r.get("partition"));
+                if (d != null && (day == null || d.compareTo(day) < 0)) day = d;
+                String o = r.get("output_file");
+                if (o != null && !o.isBlank()) outputs.add(o);
+            }
+        }
+        String errors = s.get("error_rows");
+        return new FileEntry(name, day, count(s.get("parsed_rows")), errors == null || errors.isBlank() ? -1L : count(errors),
+                blankToNull(s.get("end_time")), outcome, collector, pipeline, cid, new ArrayList<>(outputs));
+    }
+
+    /** The status ledger's word as one of SUCCESS / PARTIAL / QUARANTINED / FAILED; a word it does not know (PARKED) passes through. */
+    static String outcome(String status, long errorRows) {
+        String st = status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
+        if (st.equals("SUCCESS")) return errorRows > 0 ? "PARTIAL" : "SUCCESS";
+        if (st.startsWith("QUARANTINED") || st.equals("SKIPPED_UNREADABLE")) return "QUARANTINED";
+        return st.isEmpty() ? "FAILED" : st;
+    }
+
+    private static String baseName(String p) {
+        if (p == null) return "";
+        String n = p.replace('\\', '/');
+        return n.substring(n.lastIndexOf('/') + 1);
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s;
+    }
+
     /** The Catalog's origin names for a Dataset: its {@code sourceName} and the head segment of its {@code physicalRef}, lower-cased. */
     static Set<String> origins(Set<String> stores) {
         Set<String> out = new HashSet<>();

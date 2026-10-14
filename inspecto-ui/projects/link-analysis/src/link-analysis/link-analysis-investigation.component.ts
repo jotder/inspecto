@@ -56,6 +56,7 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.component';
 import { stepReadSuffix } from './index-source';
 import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
@@ -108,6 +109,7 @@ export const APPROVAL_POLL_MS = 15_000;
         InspectoAlertComponent,
         ChipComponent,
         InspectoOptionPickerComponent,
+        LinkAnalysisDataStripComponent,
         InvestigationExpandRungComponent,
         InvestigationWindowOpComponent,
         InvestigationThresholdOpComponent,
