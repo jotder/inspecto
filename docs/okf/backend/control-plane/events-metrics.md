@@ -368,6 +368,18 @@ timestamp: 2026-07-16T00:00:00Z
     is unrestricted, as every `withCapability` gate is. ⛔ Stored rows stay RAW, so the chain, `/audit/verify` and
     the anchors are unchanged. ⚠ Matching is by attribute KEY: a classified value carried under an unrelated key
     (or inside `target_id`) is not detected. Tests: `ControlApiAuditReadMaskingTest`.
+  - **Incident / Alert reads (D-P8, `TELCO-FRAUD-MASKED-DASHBOARD-1` (c), 2026-10-14).** `ObjectReadMasking`
+    (`inspecto/.../control/ObjectReadMasking.java`) masks, for a caller without `canRevealLinkEntities`, every
+    `key.<column>` value the object's `dataset` classifies sensitive (token = `EvidenceMasker.tokenFor`, fail closed on
+    unknown lineage), and that raw value wherever it stands in the title, description, correlation id and the other
+    attributes (`key`, `alertKey`); `keyMasked:true` is added. Applied to `GET /objects`, its v1 page and
+    `GET /objects/{id}`; `GET /alerts` masks the key in each `message`. Revealer and a no-Subject request see raw.
+    ⚠ The object must carry a `dataset` attribute: without one nothing is masked. Real-HTTP test
+    `ControlApiObjectReadMaskingTest` (list, detail, revealer raw, unclassified column untouched); unit
+    `ObjectReadMaskingTest`. **Not covered:** the objects mutation echoes (`/ack`, `/transition`, `/assign`, PATCH
+    return the full object map, raw), `/objects/by-entity` (matches the raw number the caller supplies), LA-minted
+    `entityKey`, and the object SSE / mail / search / export surfaces (not traced). Tracked in
+    `OBJECT-READ-MASKING-RESIDUALS-1`.
   - **Accepted limits (operator, 2026-10-06; `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (5), (7)).** (5) The lock-race fork
     window is a stated limit, not prevented: a writer with unflushed linked rows when its lock is deleted can
     collide with a second writer, and `GET /audit/verify` detects it afterwards as a `duplicate`. (7) A local
