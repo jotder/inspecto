@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Router, RouterLink } from '@angular/router';
@@ -24,7 +25,9 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { DEFAULT_REFRESH_MS, visibleInterval } from 'app/inspecto/api/auto-refresh';
 import { ToastrService } from 'ngx-toastr';
+import { filter, fromEvent, merge } from 'rxjs';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One row of the "Needs attention" list — the three sources normalised onto one shape. */
@@ -198,8 +201,20 @@ export class HomeComponent implements OnInit {
             .sort((a, b) => a.label.localeCompare(b.label)),
     );
 
+    private readonly destroyRef = inject(DestroyRef);
+
     ngOnInit(): void {
         this.load();
+        // The counts loaded once at init, so a Home opened before the night's writes read 0 until a manual
+        // reload (TELCO-FRAUD-STORY-GAPS-1 d). Refresh on the console cadence while the tab is visible, and
+        // at once when the tab or window regains focus.
+        merge(
+            visibleInterval(DEFAULT_REFRESH_MS),
+            fromEvent(document, 'visibilitychange').pipe(filter(() => !document.hidden)),
+            fromEvent(window, 'focus'),
+        )
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.load());
     }
 
     load(): void {

@@ -270,6 +270,30 @@ describe('HomeComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    /** TELCO-FRAUD-STORY-GAPS-1 (d): the tiles loaded once at init, so a page opened before the writes read 0. */
+    describe('refresh', () => {
+        it('re-fetches the counts when the window regains focus and stops after destroy', () => {
+            const { fixture, jobs } = create({ runs: [RUN()] });
+            expect(jobs.recentRuns).toHaveBeenCalledTimes(1);
+            window.dispatchEvent(new Event('focus'));
+            expect(jobs.recentRuns).toHaveBeenCalledTimes(2);
+            fixture.destroy();
+            window.dispatchEvent(new Event('focus'));
+            expect(jobs.recentRuns).toHaveBeenCalledTimes(2);
+        });
+
+        it('re-fetches on the console cadence while the tab is visible', () => {
+            vi.useFakeTimers();
+            try {
+                const { jobs } = create({ runs: [RUN()] });
+                vi.advanceTimersByTime(15000);
+                expect(jobs.recentRuns).toHaveBeenCalledTimes(2);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+    });
+
     /** HOME-TILES-1: the two counted tiles (operational Home only — first-run shows the onboarding panel) show the server's numbers and hide — not dash — when the call fails. */
     describe('counted tiles', () => {
         it('shows breached Expectations and Datasets written from the server counts', () => {
