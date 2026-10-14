@@ -5,7 +5,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { DataChange, InvService } from '@inspecto/link-analysis/api/inv.service';
 
 /** What each anomaly kind means to an analyst, in the vocabulary of the Collector's delivery check. */
-const KIND_TEXT: Record<DataChange['kind'], string> = {
+export const KIND_TEXT: Record<DataChange['kind'], string> = {
     REDELIVERED: 'a File was delivered again',
     RENAMED_CORRECTION: 'a corrected File arrived under a new name',
     PART_COUNT_CHANGED: 'a further File arrived for a day that had looked complete',
@@ -60,6 +60,8 @@ export class LinkAnalysisCorrectedDaysComponent {
     readonly reloadToken = input<unknown>(null);
     /** The analyst asked to refresh: the host re-runs its read. */
     readonly refresh = output<void>();
+    /** Every correction the read listed (empty when none, not assessed, or the read failed) - the Data strip counts them. */
+    readonly changesRead = output<DataChange[]>();
 
     readonly changes = signal<DataChange[]>([]);
 
@@ -71,8 +73,15 @@ export class LinkAnalysisCorrectedDaysComponent {
                 .investigationDataChanges(id)
                 .pipe(takeUntilDestroyed(this.destroyRef))
                 .subscribe({
-                    next: (r) => this.changes.set(r.assessed ? this.oneRowPerDay(r.changes) : []),
-                    error: () => this.changes.set([]),
+                    next: (r) => {
+                        const all = r.assessed ? r.changes : [];
+                        this.changes.set(this.oneRowPerDay(all));
+                        this.changesRead.emit(all);
+                    },
+                    error: () => {
+                        this.changes.set([]);
+                        this.changesRead.emit([]);
+                    },
                 });
         });
     }

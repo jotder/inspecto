@@ -86,13 +86,52 @@ const COVERAGE = {
     standalone: true,
     imports: [LinkAnalysisDataStripComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
-    template: `<la-data-strip investigationId="inv1" dataset="calls"
+    template: `<la-data-strip investigationId="inv1" dataset="calls" (refreshed)="refreshed = refreshed + 1"
         ><p la-data-alerts data-test="banner">corrected day</p></la-data-strip
     >`,
 })
-class Host {}
+class Host {
+    refreshed = 0;
+}
 
-function setup(over: { files?: unknown; coverage?: unknown; asOf?: string | null } = {}): ComponentFixture<Host> {
+const CHANGES = {
+    id: 'inv1',
+    dataset: 'calls',
+    window: null,
+    lastLookAt: '2026-09-01T00:00:00Z',
+    assessed: true,
+    changes: [] as unknown[],
+    changedDays: [] as string[],
+    capped: false,
+    readAt: 'x',
+};
+const CORRECTION = { day: '2026-09-01', kind: 'REDELIVERED', file: 'a.csv', at: '2026-09-04T11:00:00Z', pipeline: 'p' };
+
+interface Spies {
+    changes: ReturnType<typeof vi.fn>;
+    coverage: ReturnType<typeof vi.fn>;
+    files: ReturnType<typeof vi.fn>;
+    freshness: ReturnType<typeof vi.fn>;
+    loadIndexes: ReturnType<typeof vi.fn>;
+}
+let spies: Spies;
+
+function setup(
+    over: { files?: unknown; coverage?: unknown; asOf?: string | null; corrections?: unknown[] } = {},
+): ComponentFixture<Host> {
+    spies = {
+        changes: vi.fn(() => of({ ...CHANGES, changes: over.corrections ?? [] })),
+        coverage: vi.fn(() => over.coverage ?? of(COVERAGE)),
+        files: vi.fn(() => over.files ?? of(FILES)),
+        freshness: vi.fn(() =>
+            of({
+                dataset: 'calls',
+                eventDateColumn: 'ts',
+                dataAsOf: over.asOf === undefined ? '2026-09-05T10:00:00Z' : over.asOf,
+            }),
+        ),
+        loadIndexes: vi.fn(),
+    };
     const indexes = signal({
         enabled: true,
         indexes: [{ dataset: 'calls', version: 3, stale: false, reason: null, mapping: {}, plan: { added: 1 } }],
@@ -109,26 +148,22 @@ function setup(over: { files?: unknown; coverage?: unknown; asOf?: string | null
             {
                 provide: InvService,
                 useValue: {
-                    datasetFiles: vi.fn(() => over.files ?? of(FILES)),
-                    investigationCoverage: vi.fn(() => over.coverage ?? of(COVERAGE)),
+                    datasetFiles: spies.files,
+                    investigationCoverage: spies.coverage,
+                    investigationDataChanges: spies.changes,
                 },
             },
             {
                 provide: DbBrowserService,
                 useValue: {
-                    datasetFreshness: () =>
-                        of({
-                            dataset: 'calls',
-                            eventDateColumn: 'ts',
-                            dataAsOf: over.asOf === undefined ? '2026-09-05T10:00:00Z' : over.asOf,
-                        }),
+                    datasetFreshness: spies.freshness,
                 },
             },
             {
                 provide: RunsService,
                 useValue: { pending: () => of({ pipeline: 'p', inbox: '', pending: 2, running: false }) },
             },
-            { provide: GraphRunsService, useValue: { indexes, loadIndexes: vi.fn() } },
+            { provide: GraphRunsService, useValue: { indexes, loadIndexes: spies.loadIndexes } },
         ],
     });
     const f = TestBed.createComponent(Host);
@@ -209,5 +244,54 @@ describe('LinkAnalysisDataStripComponent', () => {
         const f = setup({ asOf: null });
         await settle(f);
         expect(q(f, '[data-test="strip-text"]')!.textContent).toContain('Data as-of date not known');
+    });
+
+    it('mounts no corrected-day banner when nothing was corrected', async () => {
+        const f = setup();
+        await settle(f);
+        expect(q(f, '[data-test="corrected-days"]')).toBeNull();
+        expect(q(f, '[data-test="strip-text"]')!.textContent).not.toContain('corrected');
+        q(f, '[data-test="strip-toggle"]')!.click();
+        await settle(f);
+        expect(q(f, '[data-test="corrections"]')).toBeNull();
+    });
+
+    it('shows the banner and escalates the strip status when a day was corrected, listing it in the drawer', async () => {
+        const f = setup({ corrections: [CORRECTION] });
+        await settle(f);
+        expect(spies.changes).toHaveBeenCalledWith('inv1');
+        expect(q(f, '[data-test="strip-alerts"] [data-test="corrected-days"]')!.textContent).toContain(
+            'Day 2026-09-01 was corrected after you last looked',
+        );
+        expect(q(f, '[data-test="strip-text"]')!.textContent).toContain('1 day corrected since you last looked');
+        expect(q(f, 'inspecto-status-badge')!.textContent).toContain('WARNING');
+        q(f, '[data-test="strip-toggle"]')!.click();
+        await settle(f);
+        const row = q(f, '[data-test="correction-row"]')!.textContent!.replace(/\s+/g, ' ');
+        expect(row).toContain('2026-09-01');
+        expect(row).toContain('a File was delivered again');
+        expect(row).toContain('a.csv');
+        expect(row).toContain('2026-09-04T11:00:00Z');
+        await expectNoA11yViolations(f.nativeElement);
+    });
+
+    it('the refresh prompt re-runs the strip reads, the banner read, and asks the host to re-read the Investigation', async () => {
+        const f = setup({ corrections: [CORRECTION] });
+        await settle(f);
+        const before = {
+            changes: spies.changes.mock.calls.length,
+            coverage: spies.coverage.mock.calls.length,
+            files: spies.files.mock.calls.length,
+            freshness: spies.freshness.mock.calls.length,
+            indexes: spies.loadIndexes.mock.calls.length,
+        };
+        q(f, '[data-test="corrected-refresh"]')!.click();
+        await settle(f);
+        expect(spies.changes.mock.calls.length).toBe(before.changes + 1);
+        expect(spies.coverage.mock.calls.length).toBe(before.coverage + 1);
+        expect(spies.files.mock.calls.length).toBe(before.files + 1);
+        expect(spies.freshness.mock.calls.length).toBe(before.freshness + 1);
+        expect(spies.loadIndexes.mock.calls.length).toBe(before.indexes + 1);
+        expect(f.componentInstance.refreshed).toBe(1);
     });
 });

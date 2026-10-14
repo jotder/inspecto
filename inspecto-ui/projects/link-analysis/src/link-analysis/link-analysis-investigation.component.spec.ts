@@ -130,6 +130,7 @@ function create(opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: Wor
             of({ head: { step: 2, workingSetHash: 'sha256:h2' }, rows: [], total: 0, truncated: false, cached: false }),
         ),
         investigationCoverage: vi.fn(() => of(COVERAGE)),
+        investigationDataChanges: vi.fn(() => of({ id: 'inv-1', dataset: 'calls', window: null, lastLookAt: 'x', assessed: true, changes: [], changedDays: [], capped: false, readAt: 'x' })),
         datasetFiles: vi.fn(() => of({ dataset: 'calls', assessed: false, total: 0, offset: 0, limit: 25, items: [], readAt: 'x' })),
         listInvestigations: vi.fn(() =>
             of({

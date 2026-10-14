@@ -27,6 +27,19 @@ describe('buildStrip', () => {
         expect(s.label).toBe('OK');
     });
 
+    it('turns an otherwise-OK strip to warning when a day was corrected, counting each day once', () => {
+        const s = buildStrip({
+            dataAsOf: '2026-09-05T10:00:00Z',
+            days: { expected: 7, covered: 7, missing: [] },
+            index: { version: 3, stale: false },
+            files: files(),
+            correctedDays: ['2026-09-01', '2026-09-01', '2026-09-02'],
+        });
+        expect(s.text).toBe('Data as of 5 Sep 2026 · 7 of 7 days · 2 days corrected since you last looked · index v3');
+        expect(s.tone).toBe('warning');
+        expect(s.label).toBe('WARNING');
+    });
+
     it('names a gap, a waiting File and warns', () => {
         const s = buildStrip({
             dataAsOf: '2026-09-05T10:00:00Z',
