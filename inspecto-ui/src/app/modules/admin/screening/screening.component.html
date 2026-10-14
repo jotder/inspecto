@@ -88,6 +88,10 @@
                     <dt class="text-secondary">Raised by the run</dt>
                     <dd class="m-0">{{ s.job }} · {{ s.runId }} · Dataset {{ s.dataset }}</dd>
                 }
+                @if (h.caseId) {
+                    <dt class="text-secondary">Case opened</dt>
+                    <dd class="m-0 font-mono break-all">{{ h.caseId }} (Incident {{ h.incidentId }})</dd>
+                }
                 @if (h.decidedBy) {
                     <dt class="text-secondary">Last decided by</dt>
                     <dd class="m-0">{{ h.decidedBy }} on {{ h.decidedAt | date: 'medium' }}</dd>

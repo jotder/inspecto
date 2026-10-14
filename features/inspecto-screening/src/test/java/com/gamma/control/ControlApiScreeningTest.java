@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiScreeningTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String OPS = "Bearer ops", DEV = "Bearer dev", NONE = "Bearer none";
+    private static final String OPS = "Bearer ops", OPS2 = "Bearer ops2", DEV = "Bearer dev", NONE = "Bearer none";
     private final HttpClient client = HttpClient.newHttpClient();
     private String inheritedWriteRoot;
 
@@ -53,6 +53,7 @@ class ControlApiScreeningTest {
             if (NONE.equals(h)) return Optional.of(new Subject("nobody", Set.of()));
             String[] who = switch (h) {
                 case OPS -> new String[] {"ops-1", "operations"};
+                case OPS2 -> new String[] {"ops-2", "operations"};
                 case DEV -> new String[] {"dev-1", "pipeline-developer"};
                 default -> null;
             };
@@ -207,9 +208,23 @@ class ControlApiScreeningTest {
             HttpResponse<String> stale = send(port, "POST", path, decide("confirm", 1), OPS);
             assertEquals(409, stale.statusCode(), "a decision on a version that moved on: " + stale.body());
             assertTrue(stale.body().contains("version 2"), stale.body());
-            JsonNode confirmed = data(send(port, "POST", path, decide("confirm", 2), OPS), 200);
+            // four-eyes (SCREENING-1-D1): the escalator may not confirm; nothing changed, no Case was opened
+            HttpResponse<String> self = send(port, "POST", path, decide("confirm", 2), OPS);
+            assertEquals(409, self.statusCode(), self.body());
+            assertTrue(self.body().contains("four-eyes"), self.body());
+            JsonNode still = data(send(port, "GET", "/spaces/acme/screening/hits/" + id, null, DEV), 200);
+            assertEquals("escalated", still.get("state").asText());
+            assertFalse(still.has("caseId"));
+            JsonNode confirmed = data(send(port, "POST", path, decide("confirm", 2), OPS2), 200);
             assertEquals("confirmed", confirmed.get("state").asText());
             assertEquals(3, confirmed.get("history").size(), "open, escalated, confirmed");
+            // SCREENING-1-D2: the confirm opened a Case that CONTAINS an Incident for the subject, ids stamped on the hit
+            String caseId = confirmed.get("caseId").asText(), incidentId = confirmed.get("incidentId").asText();
+            JsonNode kase = data(send(port, "GET", "/spaces/acme/objects/" + caseId, null, OPS), 200);
+            assertEquals("CASE", kase.get("objectType").asText(), kase.toString());
+            assertTrue(kase.toString().contains(incidentId) || data(send(port, "GET", "/spaces/acme/objects/" + incidentId, null, OPS), 200)
+                    .get("attributes").get("entityKey").asText().equals("c1"));
+            assertFalse(kase.toString().contains("Putin"), "the screened name never reaches the Case");
             assertEquals(409, send(port, "POST", path, decide("dismiss", 3), OPS).statusCode(), "confirmed is final");
 
             JsonNode open = data(send(port, "GET", "/spaces/acme/screening/hits?state=open", null, DEV), 200).get("hits");
@@ -225,6 +240,20 @@ class ControlApiScreeningTest {
             assertEquals(404, send(port, "GET", "/spaces/acme/screening/hits/sh-20260101000000-abcdef", null, DEV).statusCode());
             assertEquals(404, send(port, "GET", "/spaces/acme/screening/hits/..%2Froles", null, DEV).statusCode(),
                     "an id that is not a hit id never names a file");
+        });
+    }
+
+    /** An open hit has no escalator, so one person may confirm it; the Case is still opened. */
+    @Test
+    void anOpenHitConfirmedByOnePersonOpensACase(@TempDir Path spaces) throws Exception {
+        Path cfg = space(spaces, "acme");
+        String id = ScreeningLists.seedHit(cfg, "c9", "Osama bin Laden", "sanctions", "osama bin laden", 1.0);
+        withSpaces(spaces, port -> {
+            JsonNode hit = data(send(port, "POST", "/spaces/acme/screening/hits/" + id + "/decide", decide("confirm", 1), OPS), 200);
+            assertTrue(hit.get("caseId").asText().length() > 0);
+            JsonNode dismissed = data(send(port, "POST", "/spaces/acme/screening/hits/" + ScreeningLists.seedHit(cfg, "c8",
+                    "X Y", "sanctions", "x y", 0.9) + "/decide", decide("dismiss", 1), OPS), 200);
+            assertFalse(dismissed.has("caseId"), "only a confirm opens a Case");
         });
     }
 

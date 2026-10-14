@@ -11,4 +11,4 @@ provides:
   jobTypes[1]: screening.run
   routes[4]: "POST /screening/check","GET /screening/hits","GET /screening/hits/([^/]+)","POST /screening/hits/([^/]+)/decide"
 requires:
-  modules[1]: entity-list
+  modules[2]: entity-list,ops

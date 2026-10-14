@@ -38,6 +38,9 @@ export interface ScreeningHit {
     decidedBy?: string;
     decidedAt?: string;
     reason?: string;
+    /** Set by a confirm: the Case (and its Incident) the confirmed match opened. */
+    caseId?: string;
+    incidentId?: string;
     history: ScreeningHitStep[];
     /** `invalid` when the stored record failed its integrity check: shown, never decidable. */
     integrity?: 'invalid';

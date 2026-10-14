@@ -2,6 +2,8 @@ package com.gamma.screening;
 
 import com.gamma.access.WriteGates;
 import com.gamma.entitystore.EntityListFacts;
+import com.gamma.ops.ObjectService;
+import com.gamma.opsapi.OpsEngine;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
@@ -27,7 +29,8 @@ import java.util.Set;
  *       exemption): it persists nothing, and it is a POST so names never ride in a URL.</li>
  *   <li>{@code GET /screening/hits?state=} → {@code {hits:[…]}}, newest first; {@code GET /screening/hits/{id}}.</li>
  *   <li>{@code POST /screening/hits/{id}/decide} {@code {decision: confirm|dismiss|escalate, reason, version}} → the
- *       hit. {@code canWorkIncidents} (SCR-D13).</li>
+ *       hit. {@code canWorkIncidents} (SCR-D13). Four-eyes (SCREENING-1-D1): whoever escalated a hit cannot confirm
+ *       it. A confirm opens an Incident and a Case for the subject (SCREENING-1-D2) and stamps their ids on the hit.</li>
  * </ul>
  *
  * <p><b>Gates.</b> decide: {@code canWorkIncidents} (the wrapper) → no write root 503 → body 422 → unknown hit 404 →
@@ -131,14 +134,31 @@ public final class ScreeningRoutes implements RouteModule {
             if (!ScreeningHits.allowed(from, to))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "screening hit '" + id + "' is " + from
                         + " and cannot be moved to " + to);
-            ScreeningHits.transition(rec, to, actor, reason);
-            ScreeningHits.save(root, rec);
+            if (ScreeningHits.CONFIRMED.equals(to) && ScreeningHits.ESCALATED.equals(from) && actor != null
+                    && actor.equals(ScreeningHits.escalatedBy(rec)))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "screening hit '" + id + "' was escalated by you; a second "
+                        + "person must confirm it (four-eyes)");
+            ObjectService svc = ScreeningHits.CONFIRMED.equals(to) ? OpsEngine.of(api) : null;   // 503 when absent: nothing changed
+            ScreeningCases.Opened opened = svc == null ? null : ScreeningCases.open(svc, rec, actor);
+            try {
+                ScreeningHits.transition(rec, to, actor, reason);
+                if (opened != null) {
+                    rec.put("caseId", opened.caseId());
+                    rec.put("incidentId", opened.incidentId());
+                }
+                ScreeningHits.save(root, rec);
+            } catch (IOException | RuntimeException failure) {
+                if (opened != null) ScreeningCases.discard(svc, opened, actor,
+                        failure instanceof RuntimeException r ? r : new IllegalStateException(failure));
+                throw failure;
+            }
         }
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("screeningHit", id);
         attrs.put("listId", rec.get("listId"));
         attrs.put("from", from);
         attrs.put("to", to);
+        if (rec.get("caseId") != null) attrs.put("caseId", rec.get("caseId"));
         ScreeningHits.audit(actor, ApiContext.actorType(ex), "screening.hit.decided",
                 "screening hit " + id + " " + from + " -> " + to, attrs);
         return ScreeningHits.render(rec);

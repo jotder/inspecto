@@ -82,7 +82,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `reconciliation` - Reconciliation | features | optional | — | — | ✅ | ✅ | ✅ |
 | `regulatory-reporting` - Regulatory Reporting | features | optional | `ops` | — | ✅ | ✅ | ✅ |
 | `scoring` - Scoring | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
-| `screening` - Screening | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
+| `screening` - Screening | features | optional | `entity-list`, `ops` | — | ✅ | ✅ | ✅ |
 | `geo-link` - Geo and link adapters over platform data | la | optional | `la-api`, `la-core` | — | ✅ | ✅ | ✅ |
 | `la-api` - Link analysis and geo routes | la | optional | `la-core`, `la-storage` | — | ✅ | ✅ | ✅ |
 | `la-core` - Link analysis core and ports | la | optional | `la-graph` | — | ✅ | ✅ | ✅ |
