@@ -1,0 +1,6 @@
+name: daily_xdr_freshness
+dataset: daily_xdr_dataset
+onPipeline: daily_xdr
+maximumAge: auto
+severity: WARNING
+description: "No new File has landed in the daily XDR Dataset for twice the Collector's poll interval (maximumAge: auto = 2x poll; write 3xpoll for a looser limit). Clears when a File is delivered."
