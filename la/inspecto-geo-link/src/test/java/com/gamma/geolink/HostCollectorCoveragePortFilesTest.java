@@ -91,4 +91,21 @@ class HostCollectorCoveragePortFilesTest {
         assertEquals("FAILED", HostCollectorCoveragePort.outcome(null, 0));
         assertEquals("PARKED", HostCollectorCoveragePort.outcome("PARKED", 0));
     }
+
+    /** S10 live drive: rows with no usable event day sit in the NULL partition; the File must not read as a clean SUCCESS. */
+    @Test
+    void rowsInTheNullPartitionCountAsErrorRowsAndMakeTheFilePartial(@TempDir Path dir) throws Exception {
+        String nul = "year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/day=__HIVE_DEFAULT_PARTITION__";
+        Path[] run = run(dir,
+                "t0,2026-09-05T10:00:00Z,a.csv,SUCCESS,300,0,\"x\",\"1\",5,\"\",c1,,\"\"\n",
+                "c1,p,s,calls,t0,t1,SUCCESS,1,0,0,300,300,1,1,5,,\n",
+                "c1,0,a.csv,/db/calls/year=2026/month=09/day=11/a.parquet,year=2026/month=09/day=11,280\n"
+                        + "c1,0,a.csv,/db/calls/" + nul + "/a.parquet," + nul + ",20\n");
+        List<FileEntry> mine = new ArrayList<>(), problems = new ArrayList<>();
+        assertTrue(HostCollectorCoveragePort.collectFiles(run, Set.of("calls"), false, "col-1", "p", mine, problems));
+        FileEntry a = mine.get(0);
+        assertEquals("2026-09-11", a.day());
+        assertEquals(20, a.errorRows(), "the undated rows");
+        assertEquals("PARTIAL", a.outcome());
+    }
 }

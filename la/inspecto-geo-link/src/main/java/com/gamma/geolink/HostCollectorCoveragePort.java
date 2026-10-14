@@ -125,18 +125,29 @@ public final class HostCollectorCoveragePort implements CollectorCoveragePort {
         String cid = blankToNull(s.get("consignment_id"));
         String day = null;
         Set<String> outputs = new java.util.LinkedHashSet<>();
+        long undated = 0;   // rows the Pipeline could not give an event day: they sit in the NULL partition, on no day of the strip
         if (joinLineage) {
             String base = baseName(name);
             for (Map<String, String> r : lineage) {
                 if (!java.util.Objects.equals(cid, blankToNull(r.get("consignment_id"))) || !base.equals(baseName(r.get("input_file")))) continue;
                 String d = day(r.get("partition"));
                 if (d != null && (day == null || d.compareTo(day) < 0)) day = d;
+                String part = r.get("partition");
+                if (part != null && part.contains("__HIVE_DEFAULT_PARTITION__")) undated += count(r.get("row_count"));
                 String o = r.get("output_file");
                 if (o != null && !o.isBlank()) outputs.add(o);
             }
         }
         String errors = s.get("error_rows");
-        return new FileEntry(name, day, count(s.get("parsed_rows")), errors == null || errors.isBlank() ? -1L : count(errors),
+        long errorRows = errors == null || errors.isBlank() ? -1L : count(errors);
+        // S10 live drive: 20 garbage rows (an unparseable event date) were loaded under the NULL partition and the File read
+        // SUCCESS with 0 error rows. They are not rejected, but they are not on any day: count them with the error rows and
+        // read the File as PARTIAL so the analyst sees that part of it was not usable.
+        if (undated > 0) {
+            errorRows = Math.max(errorRows, 0) + undated;
+            if ("SUCCESS".equals(outcome)) outcome = "PARTIAL";
+        }
+        return new FileEntry(name, day, count(s.get("parsed_rows")), errorRows,
                 blankToNull(s.get("end_time")), outcome, collector, pipeline, cid, new ArrayList<>(outputs));
     }
 
