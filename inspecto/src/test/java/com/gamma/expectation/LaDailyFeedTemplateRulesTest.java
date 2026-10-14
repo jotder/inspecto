@@ -37,11 +37,11 @@ class LaDailyFeedTemplateRulesTest {
     }
 
     @Test
-    void theIndexLagRuleWaitsOnTheSameClock() {
+    void theIndexLagRuleTakesALiteralLimit() {
         AlertRule r = rule("daily_xdr_index_lag");
         assertEquals("daily_xdr_dataset", r.dataset());
         assertTrue(r.indexLag());
-        assertTrue(r.followsPoll());
+        assertEquals("2h", r.maximumAge(), "an index-lag rule takes a literal limit");
     }
 
     @Test

@@ -1,7 +1,7 @@
 name: daily_xdr_index_lag
 dataset: daily_xdr_dataset
 onPipeline: daily_xdr
-maximumAge: auto
+maximumAge: 2h
 indexLag: true
 severity: WARNING
-description: "Files have landed in the daily XDR Dataset that the Link Analysis index does not cover yet (la.index.build has not caught up). A graph read now may lag the data."
+description: "Files have landed in the daily XDR Dataset that the Link Analysis index does not cover yet (la.index.build has not caught up) for more than two hours; the limit is a literal because an index-lag rule takes no poll multiple. A graph read now may lag the data."
