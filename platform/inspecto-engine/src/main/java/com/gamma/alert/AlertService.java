@@ -193,6 +193,18 @@ public final class AlertService {
         this.freshnessProbe = probe;
     }
 
+    private volatile java.util.function.Function<String, java.util.OptionalLong> pollIntervalProbe;
+
+    /**
+     * Wire the Collector poll interval (LA-DATA-TRUST-1 S3): {@code Pipeline name} → the cadence, in millis, at which that
+     * Pipeline's Collector is expected to deliver, empty when it has none a multiple can be taken of (cron, event, manual,
+     * unknown Pipeline). A rule with {@code maximumAge: auto | Nxpoll} reads it; empty or unwired reads {@code unknown}
+     * (silent), never fresh and never stale.
+     */
+    public void pollIntervalProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
+        this.pollIntervalProbe = probe;
+    }
+
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalLong> eventDateProbe;
 
     /**
@@ -637,17 +649,10 @@ public final class AlertService {
      * guarantee from the Signal it reads; it does not re-derive it, and a second implementation here
      * would be a second answer to one question.
      */
-    private void evaluateFreshness(AlertRule rule, long nowMs, List<Alert> out) {
-        java.util.OptionalLong last;
-        if (rule.eventDateColumn() != null) {            // event-date mode: age of the newest event, not the last write
-            var byDate = eventDateProbe;
-            if (byDate == null) return;                  // unknown: not wired
-            last = byDate.apply(rule.dataset(), rule.eventDateColumn());
-        } else {
-            var probe = freshnessProbe;
-            if (probe == null) return;                   // unknown: no clock wired (lean / unit paths)
-            last = probe.apply(rule.dataset());
-        }
+    private void evaluateFreshness(AlertRule declared, long nowMs, List<Alert> out) {
+        AlertRule rule = effectiveFreshnessRule(declared);
+        if (rule == null) return;                        // unknown: a poll-relative limit with no poll interval to take
+        java.util.OptionalLong last = lastPublication(rule);
         if (last.isEmpty()) return;                      // unknown: never published - never "fresh"
 
         String key = rule.name() + "|" + rule.dataset();
@@ -661,6 +666,60 @@ public final class AlertService {
             // the second operand is the restart case: this instance never saw the dataset go stale, the store did
             clear(rule, rule.dataset(), key, ageMs, nowMs);
         }
+    }
+
+    /**
+     * The rule with its limit made literal: a poll-relative limit ({@code auto | Nxpoll}, LA-DATA-TRUST-1 S3) resolved
+     * against the poll interval of the Pipeline the rule names; {@code null} when none can be taken (unknown, not fresh).
+     */
+    private AlertRule effectiveFreshnessRule(AlertRule rule) {
+        if (!rule.followsPoll()) return rule;
+        var probe = pollIntervalProbe;
+        if (probe == null) return null;
+        java.util.OptionalLong poll = probe.apply(rule.onPipeline());
+        return poll.isEmpty() || poll.getAsLong() <= 0 ? null : rule.resolvedFor(poll.getAsLong());
+    }
+
+    /** Newest publication (or event) the rule ages, empty = unknown. One reader for the sweep and {@link #freshnessVerdicts}. */
+    private java.util.OptionalLong lastPublication(AlertRule rule) {
+        if (rule.eventDateColumn() != null) {            // event-date mode: age of the newest event, not the last write
+            var byDate = eventDateProbe;
+            return byDate == null ? java.util.OptionalLong.empty() : byDate.apply(rule.dataset(), rule.eventDateColumn());
+        }
+        var probe = freshnessProbe;                      // no clock wired (lean / unit paths) = unknown
+        return probe == null ? java.util.OptionalLong.empty() : probe.apply(rule.dataset());
+    }
+
+    /**
+     * One freshness rule's verdict for a Dataset (LA-DATA-TRUST-1 S3): the SAME reading the sweep acts on, so a strip showing
+     * it can never disagree with the Alert. {@code state} is {@code fresh | stale | unknown}; the age and limit are in seconds
+     * and null while unknown; {@code pollSeconds} is the poll interval a poll-relative limit was taken from (else null).
+     */
+    public record FreshnessVerdict(String rule, String dataset, String state, Long ageSeconds, Long limitSeconds,
+                                   String maximumAge, Long pollSeconds) {}
+
+    /** The verdict of every freshness rule on {@code datasetId}, at {@code nowMs}. */
+    public synchronized List<FreshnessVerdict> freshnessVerdicts(String datasetId, long nowMs) {
+        List<FreshnessVerdict> out = new ArrayList<>();
+        for (AlertRule declared : rules) {
+            if (!declared.isFreshnessRule() || !declared.dataset().equals(datasetId)) continue;
+            AlertRule rule = effectiveFreshnessRule(declared);
+            if (rule == null) {
+                out.add(new FreshnessVerdict(declared.name(), datasetId, "unknown", null, null, declared.maximumAge(), null));
+                continue;
+            }
+            Long poll = declared.followsPoll() ? pollIntervalProbe.apply(declared.onPipeline()).getAsLong() / 1000 : null;
+            java.util.OptionalLong last = lastPublication(rule);
+            long limit = rule.maximumAgeDuration().toSeconds();
+            if (last.isEmpty()) {
+                out.add(new FreshnessVerdict(rule.name(), datasetId, "unknown", null, limit, declared.maximumAge(), poll));
+                continue;
+            }
+            long age = Math.max(0, nowMs - last.getAsLong()) / 1000;
+            out.add(new FreshnessVerdict(rule.name(), datasetId, age > limit ? "stale" : "fresh", age, limit,
+                    declared.maximumAge(), poll));
+        }
+        return out;
     }
 
     /**

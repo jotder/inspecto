@@ -316,9 +316,21 @@ public record AlertRule(String name, String metric, String comparator, double th
             require(metric == null, "a freshness alert (maximumAge:) must not also declare a ledger metric");
             require(window == null, "a freshness alert (maximumAge:) takes no window (maximumAge IS the window)");
             require(when == null, "alert.when scopes ledger rows; a freshness alert has none");
-            require(maximumAge.matches("\\d+[smhd]"), "alert.maximumAge must be Ns/Nm/Nh/Nd (e.g. 6h, 1d)");
-            require(Long.parseLong(maximumAge.substring(0, maximumAge.length() - 1)) > 0,
-                    "alert.maximumAge must be a positive duration");
+            if (POLL_RELATIVE.matcher(maximumAge).matches()) {
+                // LA-DATA-TRUST-1 S3: the limit is a multiple of the feeding Collector's poll interval, resolved at
+                // evaluation time from the Pipeline named by onPipeline - so an operator does not hand-pick a number.
+                require(onPipeline != null && !onPipeline.isBlank(),
+                        "alert.maximumAge '" + maximumAge + "' (a multiple of the poll interval) requires alert.onPipeline, "
+                                + "the Pipeline of the feeding Collector");
+                require(measure == null, "a poll-relative freshness alert (maximumAge: auto | Nxpoll) is write-time only: "
+                        + "it takes no measure (event-date freshness needs an explicit duration)");
+                require(pollMultiple(maximumAge) > 0, "alert.maximumAge must be a positive multiple (1xpoll or more)");
+            } else {
+                require(maximumAge.matches("\\d+[smhd]"),
+                        "alert.maximumAge must be Ns/Nm/Nh/Nd (e.g. 6h, 1d), or auto / Nxpoll (a multiple of the poll interval)");
+                require(Long.parseLong(maximumAge.substring(0, maximumAge.length() - 1)) > 0,
+                        "alert.maximumAge must be a positive duration");
+            }
             // A freshness breach is "age exceeded", not a comparator over a threshold: both are fixed
             // here rather than demanded of the author, so no rule can declare a comparator that would
             // silently invert the check.
@@ -416,8 +428,36 @@ public record AlertRule(String name, String metric, String comparator, double th
         return m.matches() ? m.group(1) : null;
     }
 
-    /** The elapsed-time span a freshness rule allows between publications. */
+    /** {@code auto} (the default multiple) or {@code Nxpoll}: a freshness limit relative to the Collector's poll interval. */
+    private static final java.util.regex.Pattern POLL_RELATIVE = java.util.regex.Pattern.compile("auto|\\d+xpoll");
+    /** The multiple of the poll interval {@code maximumAge: auto} stands for. */
+    public static final int DEFAULT_POLL_MULTIPLE = 2;
+
+    private static long pollMultiple(String maximumAge) {
+        return "auto".equals(maximumAge) ? DEFAULT_POLL_MULTIPLE
+                : Long.parseLong(maximumAge.substring(0, maximumAge.length() - "xpoll".length()));
+    }
+
+    /** Whether the limit is a multiple of the feeding Collector's poll interval rather than a literal duration. */
+    public boolean followsPoll() {
+        return maximumAge != null && POLL_RELATIVE.matcher(maximumAge).matches();
+    }
+
+    /**
+     * This rule with its limit resolved against {@code pollIntervalMs}: {@code maximumAge} becomes the literal seconds
+     * ({@code Ns}) so every sentence an Alert carries names the real limit. A rule with a literal limit returns itself.
+     */
+    public AlertRule resolvedFor(long pollIntervalMs) {
+        if (!followsPoll()) return this;
+        long seconds = Math.max(1, pollMultiple(maximumAge) * pollIntervalMs / 1000);
+        return new AlertRule(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when,
+                seconds + "s", investigation, relation, description, by, stormCap, owner, valueMeasure,
+                0, extra, runbook);   // 0 = the default heal count (a freshness rule declares none; the ctor refuses a stated one)
+    }
+
+    /** The elapsed-time span a freshness rule allows between publications (a literal limit; see {@link #resolvedFor}). */
     public Duration maximumAgeDuration() {
+        if (followsPoll()) throw new IllegalStateException("maximumAge '" + maximumAge + "' follows the poll interval: resolvedFor first");
         long n = Long.parseLong(maximumAge.substring(0, maximumAge.length() - 1));
         return switch (maximumAge.charAt(maximumAge.length() - 1)) {
             case 's' -> Duration.ofSeconds(n);

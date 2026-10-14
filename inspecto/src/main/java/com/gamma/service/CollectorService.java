@@ -17,6 +17,7 @@ import com.gamma.etl.StatusStore;
 import com.gamma.pipeline.DeletionFence;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineStore;
+import com.gamma.pipeline.PipelineTrigger;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
@@ -41,6 +42,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Optional;
 import java.util.Set;
 import java.util.ServiceLoader;
@@ -613,6 +615,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.freshnessSubscriber = freshness.subscriber();
         this.eventLog.addSubscriber(freshnessSubscriber);
         alerting.freshnessProbe(freshness);
+        alerting.pollIntervalProbe(this::deliveryIntervalMs);   // LA-DATA-TRUST-1 S3: maximumAge auto | Nxpoll
         bus.subscribe(this::onConsignmentEvent);
         // Notification engine (Phase B2): render operational events into the appUser's in-app feed.
         // Subscribed on the EventLog (the unified event stream, so it sees BATCH_FAILED/SEQUENCE_GAP/…);
@@ -1777,6 +1780,23 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * ({@code GET /collectors}). Pure config read (no I/O) plus, for a {@code db} source bound to a connection,
      * the current row-level DB watermark derived from the acquisition ledger.
      */
+    /**
+     * How often a Pipeline's Collector is expected to deliver, in millis (LA-DATA-TRUST-1 S3): its {@code schedule: {every}}
+     * interval, or the service poll interval for a Pipeline with no trigger. Empty for cron / event / manual / stream
+     * triggers (no interval a multiple can be taken of) and for an unknown Pipeline.
+     */
+    OptionalLong deliveryIntervalMs(String pipelineName) {
+        if (pipelineName == null) return OptionalLong.empty();
+        return configFor(pipelineName).map(cfg -> {
+            PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
+            return switch (t.kind()) {
+                case SCHEDULE_INTERVAL -> OptionalLong.of(t.everyMs());
+                case DEFAULT_POLL -> OptionalLong.of(pollSeconds * 1000);
+                default -> OptionalLong.empty();
+            };
+        }).orElse(OptionalLong.empty());
+    }
+
     /** The loaded Stage-1 pipelines — the live view by-name enrichment references resolve against (also the
      *  enrichment-preview route's reference context). */
     public List<PipelineConfig> loadedPipelines() {
