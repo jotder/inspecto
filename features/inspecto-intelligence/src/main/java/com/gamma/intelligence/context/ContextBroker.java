@@ -32,9 +32,15 @@ public final class ContextBroker {
     private static final Severity OVERLAY_FLOOR = Severity.WARN;
 
     private final ReadModel service;
+    private final com.gamma.intelligence.pack.EgressMasking egress;
 
     public ContextBroker(ReadModel service) {
+        this(service, com.gamma.intelligence.pack.EgressMasking.system());
+    }
+
+    public ContextBroker(ReadModel service, com.gamma.intelligence.pack.EgressMasking egress) {
         this.service = service;
+        this.egress = egress;
     }
 
     /**
@@ -88,9 +94,12 @@ public final class ContextBroker {
                 .thenComparing(Signal::signalId, Comparator.nullsFirst(Comparator.naturalOrder()))
                 .reversed());
         List<String> lines = new ArrayList<>(recent.size());
+        // The overlay is prompt text, so it is model-bound: a msisdn=<value> pair in a message is tokenised (EgressMasking).
+        java.util.Optional<com.gamma.intelligence.pack.EgressMasking.Masker> mask = egress.active();
         for (Signal s : recent) {
-            lines.add("- " + s.at() + " " + s.severity().name() + " " + s.type()
-                    + " [" + s.signalId() + "] " + s.message());
+            String line = "- " + s.at() + " " + s.severity().name() + " " + s.type()
+                    + " [" + s.signalId() + "] " + s.message();
+            lines.add(mask.isPresent() ? mask.get().text(line) : line);
         }
         return lines;
     }

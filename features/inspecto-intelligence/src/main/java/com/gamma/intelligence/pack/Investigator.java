@@ -53,7 +53,9 @@ public final class Investigator {
 
     public Investigator(ReadModel service, ComponentStore components,
                         Supplier<List<BrowsableStore>> browseStores, LlmGateway gateway) {
-        this.tools = InspectoTools.tools(service, components, browseStores);
+        // The evidence feeds gateway.chat() (a possibly hosted provider): masked like any model-bound tool result.
+        this.tools = InspectoTools.tools(service, components, browseStores).stream()
+                .map(EgressMasking.system()::decorate).toList();
         this.components = components;
         this.gateway = gateway;
     }
@@ -193,7 +195,7 @@ public final class Investigator {
     private Map<String, Object> invoke(String name, Map<String, Object> args) {
         Tool tool = tools.stream().filter(t -> t.spec().name().equals(name)).findFirst().orElse(null);
         if (tool == null) return null;
-        ToolResult r = tool.invoke(new ToolCall(name, args, new RunId("rca-" + UUID.randomUUID())));
+        ToolResult r = ToolCaller.modelBound(() -> tool.invoke(new ToolCall(name, args, new RunId("rca-" + UUID.randomUUID()))));
         if (!r.ok()) {
             log.debug("RCA evidence tool '{}' returned no data: {}", name, r.error());
             return null;
