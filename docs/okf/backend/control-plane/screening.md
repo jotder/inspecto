@@ -131,7 +131,7 @@ The Check a name result has one row per name: a name with no match shows *Checke
   letter with no Latin look-alike (Виктор, Сергей) is transliterated by sound (viktor, sergei) and so reaches its Latin
   entry, while a look-alike-only or Latin-mixed token (`Pаvel`) keeps the look-alike fold.
 - A Run lists every hit document to dedupe (no index); fine for thousands of hits, not for millions.
-- `check` cannot raise hits; no Space-level threshold default. Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO beats 6 and 7 built the same day.
+- `check` cannot raise hits (D4, decided 2026-10-14: stays read-only; raising belongs to the Job under `canWorkIncidents`); no Space-level threshold default (D5: not until a customer asks; SCR-D2 declined a settings file); no dedupe index (D6: measure at 100 000 hits first); an initial-letter difference that is not a known transliteration is never compared (D7: needs a full cross-join). Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO beats 6 and 7 built the same day.
 
 ## Demo script and rehearsal (2026-10-14, Enterprise Demo Auth bundle, Space `screening-demo` from the `aml` template)
 Boot: `node tools/seed-screening-demo.mjs --spaces inspecto-demo/spaces` (roster), serve the bundle, sign in as Demo Admin, run it
