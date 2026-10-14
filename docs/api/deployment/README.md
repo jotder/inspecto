@@ -99,6 +99,13 @@ token whose Subject has no capabilities.
 ⛔ On WSO2 the claim is **`groups`**, so `-Dauth.oidc.rolesClaim=groups`. The table's `roles` default and
 the documented `realm_access.roles` fallback are both Keycloak conventions and neither applies here.
 
+⚠ **No display name without the same two settings (live-observed 2026-10-13).** A WSO2 access token carries
+**no** name claim by default, so `OidcAuthenticator.displayName` (it reads `name`, then `given_name` +
+`family_name`, then `preferred_username`) yields `null` and the SPA shows no name. `sub` is an opaque id (a
+UUID on WSO2), so it is deliberately **not** used as a fallback, and there is no userinfo call at request time.
+Fix it in the application, not in code: add `name` (or `username` mapped to `preferred_username`) to
+`requestedClaims` **and** to `accessTokenAttributes`, exactly like `groups` above.
+
 🔴 **TLS: there is no skip switch, by design.** JWKS is fetched with stock Nimbus `RemoteJWKSet` over the
 JVM default truststore. A self-signed dev IdP must have its certificate imported
 (`keytool -importcert -alias wso2is -file wso2is.crt -keystore ts.jks`) and the JVM pointed at it.
