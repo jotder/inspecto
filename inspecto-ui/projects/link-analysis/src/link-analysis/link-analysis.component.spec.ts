@@ -756,7 +756,7 @@ describe('LinkAnalysisComponent', () => {
         await c.saveView();
         const saved = save.mock.calls[0][0];
         expect(saved.display).toEqual({
-            nodeLabels: true,
+            nodeLabels: false, // labels start off (operator 2026-10-15)
             edgeLabels: false,
             nodeColors: { entity: c.swatches[1] },
             edgeColors: { link: c.swatches[2] },
@@ -778,6 +778,42 @@ describe('LinkAnalysisComponent', () => {
 
         await c.loadView({ id: 'plain', name: 'Plain', sourceId: 'entity-projection', query: {} });
         expect(c.displayCustomized()).toBe(false); // a view without display resets to defaults
+    });
+
+    it('node and link labels are OFF by default; a saved view that omits them opens with them off, one that states them keeps them', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+
+        expect(c.nodeLabels()).toBe(false);
+        expect(c.edgeLabels()).toBe(false);
+        expect(c.displayOptions().nodeLabels).toBe(false);
+        expect(c.displayOptions().edgeLabels).toBe(false);
+        expect(c.displayCustomized()).toBe(false); // off IS the default: the paint-brush is not tinted
+
+        // An OLD saved view: its display block never stated the label switches (the cast is the point of the case).
+        const oldDisplay = { nodeColors: {}, edgeColors: {}, nodeShapes: {}, edgePatterns: {}, edgeSizes: {} };
+        await c.loadView({
+            id: 'old',
+            name: 'Old',
+            sourceId: 'entity-projection',
+            query: {},
+            display: oldDisplay as unknown as NonNullable<LinkAnalysisView['display']>,
+        });
+        expect(c.nodeLabels()).toBe(false); // an old view without the keys must not switch labels on
+        expect(c.edgeLabels()).toBe(false);
+
+        await c.loadView({
+            id: 'labelled',
+            name: 'Labelled',
+            sourceId: 'entity-projection',
+            query: {},
+            display: { ...oldDisplay, nodeLabels: true, edgeLabels: true },
+        });
+        expect(c.nodeLabels()).toBe(true); // a stated value is the analyst's choice and is kept
+        expect(c.edgeLabels()).toBe(true);
+        expect(c.displayCustomized()).toBe(true);
     });
 
     it('all-link-labels toggle: off by default, persisted in the saved view display, restored on load', async () => {
@@ -1346,6 +1382,8 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
+        c.nodeLabels.set(true); // labels start off now: switch them on to see the level-of-detail rule drop them
+        c.edgeLabels.set(true);
         expect(c.lodLabelsOff()).toBe(true);
         expect(c.displayOptions().nodeLabels).toBe(false);
         expect(c.displayOptions().edgeLabels).toBe(false);

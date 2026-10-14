@@ -937,8 +937,9 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     // ── display options (persisted with a saved view; applied on load) ──
-    readonly nodeLabels = signal(true);
-    readonly edgeLabels = signal(true);
+    /** Node and link labels start OFF (operator 2026-10-15): a fresh graph is the shapes; labels are one checkbox away. */
+    readonly nodeLabels = signal(false);
+    readonly edgeLabels = signal(false);
     /** Override the density rule: label every link even on a dense graph (persisted as `display.allEdgeLabels`). */
     readonly allEdgeLabels = signal(false);
     readonly denseEdgeLabelCap = DENSE_EDGE_LABEL_CAP;
@@ -1018,8 +1019,8 @@ export class LinkAnalysisComponent implements OnInit {
     /** True when any display option deviates from the defaults (tints the paint-brush button). */
     readonly displayCustomized = computed<boolean>(
         () =>
-            !this.nodeLabels() ||
-            !this.edgeLabels() ||
+            this.nodeLabels() ||
+            this.edgeLabels() ||
             this.allEdgeLabels() ||
             Object.keys(this.nodeColors()).length > 0 ||
             Object.keys(this.edgeColors()).length > 0 ||
@@ -1873,8 +1874,8 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     private applyDisplay(display: GraphDisplayOptions | undefined): void {
-        this.nodeLabels.set(display?.nodeLabels ?? true);
-        this.edgeLabels.set(display?.edgeLabels ?? true);
+        this.nodeLabels.set(display?.nodeLabels ?? false);
+        this.edgeLabels.set(display?.edgeLabels ?? false);
         this.allEdgeLabels.set(display?.allEdgeLabels ?? false);
         this.nodeColors.set(display?.nodeColors ?? {});
         this.edgeColors.set(display?.edgeColors ?? {});
