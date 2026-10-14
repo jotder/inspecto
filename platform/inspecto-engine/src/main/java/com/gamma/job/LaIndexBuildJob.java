@@ -74,6 +74,7 @@ final class LaIndexBuildJob implements Job {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("job", cfg.name());
+        payload.put("dataset", req.dataset());   // an id, never a value: the index-lag clock pairs this with dataset.write
         payload.put("result", o.result());
         payload.put("mode", o.mode());
         if (o.code() != null) payload.put("code", o.code());

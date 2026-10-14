@@ -112,7 +112,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String dataset, String measure, Object when, String maximumAge,
                         String investigation, String relation, String description,
                         List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
-                        int healAfterSweeps, Map<String, Object> extra, String runbook) {
+                        int healAfterSweeps, Map<String, Object> extra, String runbook, boolean indexLag) {
 
     /**
      * Every key {@link #fromMap} models (and the R3 {@code shares} envelope key, which the save routes carry
@@ -120,7 +120,7 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
             "onPipeline", "dataset", "measure", "when", "maximumAge", "investigation", "relation", "description",
-            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook");
+            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag");
     /** The prefix of an author-owned annotation key: kept through every save, never refused. */
     public static final String AUTHOR_PREFIX = "x-";
 
@@ -158,6 +158,17 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     public static final Set<String> VALUE_MEASURES = Set.of("passThrough", "velocity", "timeToCashOut",
             "cashOutConcentration", "structuring", "benefitTransfer");
+
+    /** Every pre-{@code indexLag} caller of the full shape: not an index-lag rule. */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description,
+                     List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
+                     int healAfterSweeps, Map<String, Object> extra, String runbook) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, by, stormCap, owner, valueMeasure, healAfterSweeps, extra, runbook, false);
+    }
 
     /** Every pre-{@code runbook} caller of the full shape (no linked Runbook). */
     public AlertRule(String name, String metric, String comparator, double threshold,
@@ -331,6 +342,12 @@ public record AlertRule(String name, String metric, String comparator, double th
                 require(Long.parseLong(maximumAge.substring(0, maximumAge.length() - 1)) > 0,
                         "alert.maximumAge must be a positive duration");
             }
+            if (indexLag) {
+                // LA-DATA-TRUST-1 S4: "Files have waited for the Link Analysis index longer than maximumAge" - the same
+                // clock, cooldown, all-clear and verdict as a freshness rule, over a different reading.
+                require(measure == null && !POLL_RELATIVE.matcher(maximumAge).matches(),
+                        "an index-lag alert (indexLag: true) takes a literal maximumAge (Ns/Nm/Nh/Nd) and no measure");
+            }
             // A freshness breach is "age exceeded", not a comparator over a threshold: both are fixed
             // here rather than demanded of the author, so no rule can declare a comparator that would
             // silently invert the check.
@@ -351,6 +368,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         require(COMPARATORS.contains(comparator), "alert.comparator must be one of " + COMPARATORS);
         require(SEVERITIES.contains(severity), "alert.severity must be one of " + SEVERITIES);
         require(relation == null || investigation != null, "alert.relation requires alert.investigation");
+        require(!indexLag || maximumAge != null, "alert.indexLag requires alert.maximumAge (the longest Files may wait) and alert.dataset");
         if (maximumAge == null) require(threshold > 0, "alert.threshold must be a positive number");
         onPipeline = (onPipeline == null || onPipeline.isBlank()) ? null : onPipeline.trim();
         by = by == null ? List.of() : by.stream().map(c -> c == null ? "" : c.trim()).filter(c -> !c.isEmpty())
@@ -452,7 +470,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         long seconds = Math.max(1, pollMultiple(maximumAge) * pollIntervalMs / 1000);
         return new AlertRule(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when,
                 seconds + "s", investigation, relation, description, by, stormCap, owner, valueMeasure,
-                0, extra, runbook);   // 0 = the default heal count (a freshness rule declares none; the ctor refuses a stated one)
+                0, extra, runbook, indexLag);   // 0 = the default heal count (a freshness rule declares none; the ctor refuses a stated one)
     }
 
     /** The elapsed-time span a freshness rule allows between publications (a literal limit; see {@link #resolvedFor}). */
@@ -494,7 +512,8 @@ public record AlertRule(String name, String metric, String comparator, double th
                 alert.get("healAfterSweeps") == null ? 0
                         : wholeNumber(alert.get("healAfterSweeps"), "alert.healAfterSweeps"),
                 unmodelled(alert),
-                str(alert.get("runbook")));
+                str(alert.get("runbook")),
+                flag(alert.get("indexLag"), "alert.indexLag"));
     }
 
     /** The keys of {@code alert} this record does not model, in authored order (MODULE-REORG-P4-2). */
@@ -565,6 +584,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         if (measure != null) m.put("measure", measure);
         if (valueMeasure != null) m.put("valueMeasure", valueMeasure);
         if (maximumAge != null) m.put("maximumAge", maximumAge);
+        if (indexLag) m.put("indexLag", true);
         m.put("comparator", comparator);
         m.put("threshold", threshold);
         if (window != null) m.put("window", window);
@@ -610,6 +630,14 @@ public record AlertRule(String name, String metric, String comparator, double th
         if (v == null) return null;
         List<?> items = v instanceof List<?> l ? l : List.of(String.valueOf(v).split(","));
         return items.stream().map(o -> o == null ? null : String.valueOf(o)).toList();
+    }
+
+    private static boolean flag(Object v, String field) {
+        if (v == null) return false;
+        if (v instanceof Boolean b) return b;
+        String t = String.valueOf(v).trim().toLowerCase(Locale.ROOT);
+        require(t.equals("true") || t.equals("false"), field + " must be true or false");
+        return t.equals("true");
     }
 
     private static int wholeNumber(Object v, String field) {

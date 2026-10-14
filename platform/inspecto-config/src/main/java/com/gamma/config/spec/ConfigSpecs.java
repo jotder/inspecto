@@ -813,7 +813,13 @@ public final class ConfigSpecs {
                 FieldSpec.of("alert.maximumAge", "Maximum age", FieldType.STRING,
                         "Dataset freshness limit: Ns/Nm/Nh/Nd since the Dataset last published "
                                 + "(e.g. 6h, 1d). Requires alert.dataset; takes no metric, window or "
-                                + "threshold. Absent = this rule does not check freshness."),
+                                + "threshold. Absent = this rule does not check freshness. Instead of a duration, "
+                                + "'auto' (2x) or 'Nxpoll' takes a multiple of the poll interval of the Pipeline named "
+                                + "by alert.onPipeline (its feeding Collector)."),
+                // LA-DATA-TRUST-1 S4: the same clock, over how long Files wait for the Link Analysis index.
+                FieldSpec.of("alert.indexLag", "Index lag", FieldType.BOOL,
+                        "true = fire when Files have waited for the Link Analysis index longer than "
+                                + "alert.maximumAge (a literal duration). Requires alert.dataset."),
                 // DUCKLE-C1 residual 2: owner routing. The HTTP authoring routes STAMP it from the calling
                 // Subject (a body value is ignored there); a hand-edited registry file may name one.
                 FieldSpec.of("alert.owner", "Owner", FieldType.STRING,

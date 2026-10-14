@@ -616,6 +616,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.addSubscriber(freshnessSubscriber);
         alerting.freshnessProbe(freshness);
         alerting.pollIntervalProbe(this::deliveryIntervalMs);   // LA-DATA-TRUST-1 S3: maximumAge auto | Nxpoll
+        // LA-DATA-TRUST-1 S4: index-lag rules read how long Files have waited for the Link Analysis index.
+        com.gamma.query.IndexLagProbe indexLag = new com.gamma.query.IndexLagProbe();
+        this.indexLagSubscriber = indexLag.subscriber();
+        this.eventLog.addSubscriber(indexLagSubscriber);
+        alerting.indexLagProbe(indexLag);
         bus.subscribe(this::onConsignmentEvent);
         // Notification engine (Phase B2): render operational events into the appUser's in-app feed.
         // Subscribed on the EventLog (the unified event stream, so it sees BATCH_FAILED/SEQUENCE_GAP/…);
@@ -871,6 +876,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /** The DUCKLE-C1 freshness probe's and the S3b dataset-write trigger's EventLog subscribers — held so
      *  {@link #close()} can de-register them (the default Space's log is the process-wide global one). */
     private java.util.function.Consumer<com.gamma.audit.Event> freshnessSubscriber;
+    /** The S4 index-lag probe's EventLog subscriber - held so {@link #close()} can de-register it. */
+    private java.util.function.Consumer<com.gamma.audit.Event> indexLagSubscriber;
     private volatile java.util.function.Consumer<com.gamma.audit.Event> datasetWriteSubscriber;
 
     /**
@@ -2240,6 +2247,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
         this.eventLog.removeSubscriber(pendingAlertRuleSubscriber);   // de-register the deferred Alert Rule seed
         this.eventLog.removeSubscriber(securityTriggers);   // de-register the security trigger evaluator
+        this.eventLog.removeSubscriber(indexLagSubscriber);
         this.eventLog.removeSubscriber(freshnessSubscriber);   // de-register the DUCKLE-C1 freshness probe
         this.eventLog.removeSubscriber(datasetWriteSubscriber);   // de-register the S3b dataset-write trigger
         securityTriggers.detach();   // …and release the log, so a later service's evaluator takes over

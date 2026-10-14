@@ -126,4 +126,26 @@ class ControlApiDatasetFreshnessTest {
             assertEquals("stale", V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0).get("state").asText());
         }
     }
+
+    /** LA-DATA-TRUST-1 S4: the host wires the index-lag clock to the real Signal stream - a write waits, a build covers it. */
+    @Test
+    void anIndexLagRuleReadsTheLiveSignalStream(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, "xdr", "EVENT_DATE");
+            c.svc.alertService().orElseThrow().upsert(com.gamma.alert.AlertRule.fromMap(Map.of(
+                    "name", "xdr-index-lag", "dataset", "xdr", "maximumAge", "1h", "indexLag", true)));
+            long now = System.currentTimeMillis();
+            java.util.function.BiFunction<String, Long, com.gamma.audit.Event> signal = (type, ts) -> new com.gamma.signal.Signal(
+                    null, type, java.time.Instant.ofEpochMilli(ts), com.gamma.signal.Severity.INFO,
+                    com.gamma.signal.Ref.of("dataset", "xdr"), com.gamma.signal.Ref.of("dataset", "xdr"),
+                    null, null, null, null, type,
+                    Map.of("dataset", "xdr", "job", "xdr-index", "result", "BUILT"), 1).toEvent();
+            com.gamma.event.EventLog.current().emit(signal.apply(com.gamma.signal.DatasetWriteSignal.TYPE, now - 2 * 3_600_000L));
+            JsonNode lag = V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0);
+            assertEquals("index-lag", lag.get("kind").asText());
+            assertEquals("stale", lag.get("state").asText(), lag.toString());
+            com.gamma.event.EventLog.current().emit(signal.apply(com.gamma.signal.SignalType.LA_INDEX_BUILD_COMPLETED, now));
+            assertEquals("fresh", V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0).get("state").asText());
+        }
+    }
 }

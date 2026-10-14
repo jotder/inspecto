@@ -205,6 +205,16 @@ public final class AlertService {
         this.pollIntervalProbe = probe;
     }
 
+    private volatile java.util.function.Function<String, java.util.OptionalLong> indexLagProbe;
+
+    /**
+     * Wire the index-lag clock (LA-DATA-TRUST-1 S4): {@code dataset id} → epoch millis since which Files have waited for the
+     * Link Analysis index, empty when none are waiting. Unwired = an index-lag rule reads {@code unknown} (silent).
+     */
+    public void indexLagProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
+        this.indexLagProbe = probe;
+    }
+
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalLong> eventDateProbe;
 
     /**
@@ -413,6 +423,22 @@ public final class AlertService {
         fired.addFirst(alert);
         while (fired.size() > capacity) fired.removeLast();
         return java.util.Optional.of(records.openAlert(alert, title, alert.message(), alert.severity(), sc, attrs));
+    }
+
+    /**
+     * Resolve the active Alert raised by {@link #raiseFromEvent} with {@code dedupeKey} in {@code scope}, when there is
+     * one - the all-clear of an event-raised Alert (a later successful index build). A no-op otherwise; never throws.
+     *
+     * @return whether an active Alert was resolved
+     */
+    public synchronized boolean resolveFromEvent(String scope, String dedupeKey, String actor) {
+        try {
+            String id = records.activeAlertIndex(scope == null ? "" : scope, EVENT_KEY).get(dedupeKey);
+            return id != null && records.resolveAlert(id, actor);
+        } catch (RuntimeException e) {
+            log.warn("could not resolve the event-raised Alert {}: {}", dedupeKey, e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -652,7 +678,7 @@ public final class AlertService {
     private void evaluateFreshness(AlertRule declared, long nowMs, List<Alert> out) {
         AlertRule rule = effectiveFreshnessRule(declared);
         if (rule == null) return;                        // unknown: a poll-relative limit with no poll interval to take
-        java.util.OptionalLong last = lastPublication(rule);
+        java.util.OptionalLong last = lastPublication(rule, nowMs);
         if (last.isEmpty()) return;                      // unknown: never published - never "fresh"
 
         String key = rule.name() + "|" + rule.dataset();
@@ -681,7 +707,13 @@ public final class AlertService {
     }
 
     /** Newest publication (or event) the rule ages, empty = unknown. One reader for the sweep and {@link #freshnessVerdicts}. */
-    private java.util.OptionalLong lastPublication(AlertRule rule) {
+    private java.util.OptionalLong lastPublication(AlertRule rule, long nowMs) {
+        if (rule.indexLag()) {                           // the "age" is how long Files have waited for the index; none waiting = 0
+            var lag = indexLagProbe;
+            if (lag == null) return java.util.OptionalLong.empty();
+            java.util.OptionalLong since = lag.apply(rule.dataset());
+            return since.isPresent() ? since : java.util.OptionalLong.of(nowMs);
+        }
         if (rule.eventDateColumn() != null) {            // event-date mode: age of the newest event, not the last write
             var byDate = eventDateProbe;
             return byDate == null ? java.util.OptionalLong.empty() : byDate.apply(rule.dataset(), rule.eventDateColumn());
@@ -695,8 +727,12 @@ public final class AlertService {
      * it can never disagree with the Alert. {@code state} is {@code fresh | stale | unknown}; the age and limit are in seconds
      * and null while unknown; {@code pollSeconds} is the poll interval a poll-relative limit was taken from (else null).
      */
-    public record FreshnessVerdict(String rule, String dataset, String state, Long ageSeconds, Long limitSeconds,
-                                   String maximumAge, Long pollSeconds) {}
+    public record FreshnessVerdict(String rule, String kind, String dataset, String state, Long ageSeconds,
+                                   Long limitSeconds, String maximumAge, Long pollSeconds) {}
+
+    private static String kindOf(AlertRule rule) {
+        return rule.indexLag() ? "index-lag" : "freshness";
+    }
 
     /** The verdict of every freshness rule on {@code datasetId}, at {@code nowMs}. */
     public synchronized List<FreshnessVerdict> freshnessVerdicts(String datasetId, long nowMs) {
@@ -705,18 +741,18 @@ public final class AlertService {
             if (!declared.isFreshnessRule() || !declared.dataset().equals(datasetId)) continue;
             AlertRule rule = effectiveFreshnessRule(declared);
             if (rule == null) {
-                out.add(new FreshnessVerdict(declared.name(), datasetId, "unknown", null, null, declared.maximumAge(), null));
+                out.add(new FreshnessVerdict(declared.name(), kindOf(declared), datasetId, "unknown", null, null, declared.maximumAge(), null));
                 continue;
             }
             Long poll = declared.followsPoll() ? pollIntervalProbe.apply(declared.onPipeline()).getAsLong() / 1000 : null;
-            java.util.OptionalLong last = lastPublication(rule);
+            java.util.OptionalLong last = lastPublication(rule, nowMs);
             long limit = rule.maximumAgeDuration().toSeconds();
             if (last.isEmpty()) {
-                out.add(new FreshnessVerdict(rule.name(), datasetId, "unknown", null, limit, declared.maximumAge(), poll));
+                out.add(new FreshnessVerdict(rule.name(), kindOf(rule), datasetId, "unknown", null, limit, declared.maximumAge(), poll));
                 continue;
             }
             long age = Math.max(0, nowMs - last.getAsLong()) / 1000;
-            out.add(new FreshnessVerdict(rule.name(), datasetId, age > limit ? "stale" : "fresh", age, limit,
+            out.add(new FreshnessVerdict(rule.name(), kindOf(rule), datasetId, age > limit ? "stale" : "fresh", age, limit,
                     declared.maximumAge(), poll));
         }
         return out;
@@ -744,6 +780,8 @@ public final class AlertService {
         String message = String.format(Locale.ROOT,
                 rule.eventDateColumn() != null
                         ? "CLEARED: dataset %s holds events as of %ds ago, within its %s event-date freshness limit"
+                        : rule.indexLag()
+                        ? "CLEARED: dataset %s has no File waiting for the Link Analysis index (last checked wait %ds, limit %s)"
                         : "CLEARED: dataset %s published %ds ago, within its %s freshness limit",
                 textScope(rule, scope), ageMs / 1000, rule.maximumAge());
         log.info("[ALERT-CLEARED] {}", message);

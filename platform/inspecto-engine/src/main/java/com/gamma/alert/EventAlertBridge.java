@@ -2,6 +2,8 @@ package com.gamma.alert;
 
 import com.gamma.audit.Event;
 import com.gamma.audit.EventType;
+import com.gamma.signal.Signal;
+import com.gamma.signal.SignalType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +32,9 @@ public final class EventAlertBridge {
     /** The {@code rule} tag of a conservation-imbalance-raised Alert (T22, §11.4). */
     public static final String IMBALANCE_RULE = "conservation_imbalance";
 
+    /** The {@code rule} tag of an Alert raised by a refused or failed Link Analysis index build (LA-DATA-TRUST-1 S4). */
+    public static final String INDEX_BUILD_RULE = "la_index_build";
+
     private final AlertService alerts;
 
     public EventAlertBridge(AlertService alerts) {
@@ -38,6 +43,9 @@ public final class EventAlertBridge {
 
     /** The de-duplication key of a gap Alert; {@link AlertMigration} stamps the same key on an adopted legacy one. */
     static String gapKey(String expected) { return GAP_RULE + "|" + expected; }
+
+    /** The de-duplication key of an index-build Alert: one per index-build Job. */
+    static String indexBuildKey(String job) { return INDEX_BUILD_RULE + "|" + job; }
 
     /** The de-duplication key of an imbalance Alert. */
     static String imbalanceKey(String node) { return IMBALANCE_RULE + "|" + node; }
@@ -49,9 +57,45 @@ public final class EventAlertBridge {
             if (EventType.SEQUENCE_GAP.equals(e.type())) raiseGap(e);
             else if (EventType.PIPELINE_CONSERVATION_IMBALANCE.equals(e.type())
                     || EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY.equals(e.type())) raiseImbalance(e);   // vocab-allow: the Tier-2 legacy read-alias, matches events persisted under the pre-rename type
+            else if (EventType.SIGNAL.equals(e.type())
+                    && SignalType.LA_INDEX_BUILD_COMPLETED.equals(e.attributes().get(Signal.ATTR_TYPE))) indexBuild(e);
         } catch (RuntimeException ex) {
             log.warn("could not raise an Alert for {}: {}", e.type(), ex.getMessage());
         }
+    }
+
+    /**
+     * {@code la.index.build.completed} (LA-DATA-TRUST-1 S4): a build that ended {@code REFUSED} or {@code FAILED} raises one
+     * Alert per index-build Job, naming the Job, the mode and the stable refusal code (BUILD_IN_PROGRESS, OVER_BUDGET,
+     * FULL_NOT_ALLOWED, BUSY, ...); a later build that leaves the index current ({@code BUILT} / {@code UP_TO_DATE}) resolves it.
+     * ⚠ The Signal payload is aggregate-only (job, result, mode, code, counts), so the text can carry no entity key or value.
+     * {@code RUNNING} / {@code DRY_RUN} neither raise nor resolve: the index state is not decided yet.
+     */
+    private void indexBuild(Event e) {
+        Map<String, Object> p = e.payload();
+        String job = String.valueOf(p.get("job"));
+        if (p.get("job") == null || job.isBlank()) return;
+        Object result = p.get("result");
+        if ("BUILT".equals(result) || "UP_TO_DATE".equals(result)) {
+            alerts.resolveFromEvent(job, indexBuildKey(job), "index-build:" + job);
+            return;
+        }
+        if (!"REFUSED".equals(result) && !"FAILED".equals(result)) return;
+        String mode = p.get("mode") == null ? null : String.valueOf(p.get("mode"));
+        String code = p.get("code") == null ? null : String.valueOf(p.get("code"));
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("rule", INDEX_BUILD_RULE);
+        attrs.put("job", job);
+        attrs.put("result", String.valueOf(result));
+        putIfPresent(attrs, "mode", mode);
+        putIfPresent(attrs, "code", code);
+        if (p.get("dataset") != null) attrs.put("dataset", String.valueOf(p.get("dataset")));
+        stamp(attrs, e);
+        String title = "Link Analysis index build " + String.valueOf(result).toLowerCase(java.util.Locale.ROOT) + ": " + job
+                + (code == null ? "" : " (" + code + ")");
+        String message = title + (mode == null ? "" : ", mode " + mode) + " - the index may be behind the data";
+        alerts.raiseFromEvent(new Alert(INDEX_BUILD_RULE, "high", job, INDEX_BUILD_RULE, 1, "gt", 0, null,
+                e.ts() > 0 ? e.ts() : System.currentTimeMillis(), message), title, job, indexBuildKey(job), attrs);
     }
 
     private void raiseImbalance(Event e) {
