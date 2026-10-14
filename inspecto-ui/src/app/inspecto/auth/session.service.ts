@@ -1,4 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { recordReturnUrl, returnKeyForState, safeReturnUrl, takePendingReturnUrl } from './return-url';
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { SpacesService } from '../api/spaces.service';
@@ -329,6 +330,8 @@ export class SessionService {
         sessionStorage.setItem(VERIFIER_KEY, verifier);
         sessionStorage.setItem(STATE_KEY, state);
         sessionStorage.setItem(NONCE_KEY, nonce);
+        const target = takePendingReturnUrl();
+        if (target) sessionStorage.setItem(returnKeyForState(state), target);
 
         if (this.oidc?.mock) {
             // Offline demo: no real IAM to redirect to — grant a fake code and jump straight to the callback.
@@ -349,6 +352,15 @@ export class SessionService {
             code_challenge_method: 'S256',
         });
         this.redirect(`${this.oidc?.authorizeUrl}?${params.toString()}`);
+    }
+
+    /** Consume-once: the page recorded for this PKCE `state` (validated), or null. Call before {@link completeLogin}. */
+    takeReturnUrl(state: string): string | null {
+        if (!state) return null;
+        const key = returnKeyForState(state);
+        const v = sessionStorage.getItem(key);
+        sessionStorage.removeItem(key);
+        return safeReturnUrl(v);
     }
 
     /**
@@ -457,6 +469,7 @@ export class SessionService {
         this.actor.set(null);
         this.subjectDisplayName.set(null);
         this.capabilities.set([]);
+        recordReturnUrl(this.router.url);
         if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
     }
 
@@ -469,6 +482,7 @@ export class SessionService {
             this.bootstrapError.set(
                 'The server requires sign-in, but this page started without a session. Reload to sign in.',
             );
+        recordReturnUrl(this.router.url);
         if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
     }
 

@@ -345,7 +345,12 @@ describe('SessionService (W6d edition switch)', () => {
     it('records the server message of a typed DEMO_ROSTER_CONFLICT 409 as the bootstrap error', async () => {
         const done = svc.init();
         httpMock.expectOne(`${base}/bootstrap`).flush(
-            { error: { errorCode: 'DEMO_ROSTER_CONFLICT', message: "Demo User 'x' is defined differently in Spaces 'a' and 'b'." } },
+            {
+                error: {
+                    errorCode: 'DEMO_ROSTER_CONFLICT',
+                    message: "Demo User 'x' is defined differently in Spaces 'a' and 'b'.",
+                },
+            },
             { status: 409, statusText: 'Conflict' },
         );
         await done;
@@ -562,5 +567,25 @@ describe('SessionService (W6d edition switch)', () => {
         httpMock.expectOne(`${base}/bootstrap`).flush({ session: { authenticated: true, capabilities: ['a'] } });
         await tick();
         expect(svc.capabilities()).toEqual(['a']);
+    });
+});
+
+describe('SessionService return path (mock sign-in)', () => {
+    it('binds the recorded page to the PKCE state, consume-once, and rejects a tampered one', async () => {
+        sessionStorage.clear();
+        TestBed.configureTestingModule({
+            providers: [SessionService, provideHttpClient(withXhr()), provideHttpClientTesting(), provideRouter([])],
+        });
+        const svc = TestBed.inject(SessionService);
+        sessionStorage.setItem('inspecto.signin.return', '/link-analysis?c=1');
+        (svc as unknown as { oidc: unknown }).oidc = { mock: true, authorizeUrl: 'x', clientId: 'c' };
+        await svc.beginLogin('demo-user').catch(() => undefined);
+        const state = sessionStorage.getItem('inspecto.pkce.state') as string;
+        expect(state).toBeTruthy();
+        expect(svc.takeReturnUrl('wrong-state')).toBeNull();
+        expect(svc.takeReturnUrl(state)).toBe('/link-analysis?c=1');
+        expect(svc.takeReturnUrl(state)).toBeNull();
+        sessionStorage.setItem('inspecto.pkce.return.s2', '//evil.example');
+        expect(svc.takeReturnUrl('s2')).toBeNull();
     });
 });
