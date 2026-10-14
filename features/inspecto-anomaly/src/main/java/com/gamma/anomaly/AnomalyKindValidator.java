@@ -100,6 +100,26 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
     }
 
     /**
+     * The {@code features[<n>].<field>} path of every Feature of {@code dataset} that names a {@code missing} column, in
+     * Feature order (the pane lands a 422 on the first one it finds); {@code peers} columns have no Feature path.
+     */
+    static List<String> offendingPaths(AnomalyModel model, String dataset, List<String> missing) {
+        List<String> out = new java.util.ArrayList<>();
+        List<AnomalyModel.Feature> fs = model.features();
+        for (int i = 0; i < fs.size(); i++) {
+            AnomalyModel.Feature f = fs.get(i);
+            if (!f.dataset().equals(dataset)) continue;
+            String p = "features[" + i + "].";
+            if (f.compiledMeasure().field() != null && missing.contains(f.compiledMeasure().field())) out.add(p + "measure");
+            if (missing.contains(f.key())) out.add(p + "key");
+            if (missing.contains(f.time())) out.add(p + "time");
+            if (f.filters().stream().anyMatch(x -> missing.contains(String.valueOf(x.get("field"))))) out.add(p + "filters");
+            if (f.evidence().stream().anyMatch(missing::contains)) out.add(p + "evidence");
+        }
+        return out;
+    }
+
+    /**
      * Every named column is in its Dataset's Schema, each feature's {@code time} is a DATE/TIMESTAMP column, and the
      * derived output names collide with nothing this model does not own. An unreadable Schema refuses the save.
      */
@@ -115,9 +135,12 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
                         + "dataset '" + e.getKey() + "': " + ex.getMessage(), ex);
             }
             List<String> missing = e.getValue().stream().filter(c -> !columns.contains(c)).toList();
-            if (!missing.isEmpty())
-                throw new IllegalArgumentException("anomaly-model column(s) " + missing
+            if (!missing.isEmpty()) {
+                List<String> paths = offendingPaths(model, e.getKey(), missing);
+                throw new IllegalArgumentException("anomaly-model"
+                        + (paths.isEmpty() ? "" : "." + String.join(", ", paths)) + " column(s) " + missing
                         + " are not in the Schema of dataset '" + e.getKey() + "' (have: " + columns + ")");
+            }
         }
         for (AnomalyModel.Feature f : model.features()) {
             String t = probe.columnType(f.dataset(), f.time());

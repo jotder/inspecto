@@ -37,7 +37,21 @@ class AnomalyKindValidatorTest {
         Map<String, Object> f = new LinkedHashMap<>(((List<Map<String, Object>>) m.get("features")).get(0));
         f.put("measure", "sum(bytes)");
         m.put("features", List.of(f));
-        refused(() -> v.validateInSpace(cfg, () -> data, "usage", m), "[bytes] are not in the Schema of dataset 'usage'");
+        refused(() -> v.validateInSpace(cfg, () -> data, "usage", m), "anomaly-model.features[0].measure column(s) [bytes] are not in the Schema of dataset 'usage'");
+    }
+
+    @Test
+    void aMissingColumnIsAttributedToTheFeaturePathsThatNameIt() {
+        Map<String, Object> m = new LinkedHashMap<>(AnomalyCorpus.model());
+        Map<String, Object> f0 = new LinkedHashMap<>(((List<Map<String, Object>>) m.get("features")).get(0));
+        Map<String, Object> f1 = new LinkedHashMap<>(f0);
+        f1.put("id", "second");
+        f1.put("measure", "sum(bytes)");
+        f1.put("key", "bogus_key");
+        m.put("features", List.of(f0, f1));
+        AnomalyModel model = AnomalyModel.fromMap("usage", m);
+        assertEquals(List.of("features[1].measure", "features[1].key"),
+                AnomalyKindValidator.offendingPaths(model, f0.get("dataset").toString(), List.of("bytes", "bogus_key")));
     }
 
     @Test

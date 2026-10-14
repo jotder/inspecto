@@ -251,9 +251,20 @@ shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classi
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
 collision-free key.)
 
-Rough edges found driving the UI live on 2026-10-13 (the Schema 422 that names no Feature, raw timestamps in the panel,
-one sparkline point per run, the cramped Feature row layout, `anomaly.score` taking no `as_of`, and the untested
-503 hide path) are tracked in `ANOMALY-UI-FINDINGS-1`.
+Rough edges found driving the UI live on 2026-10-13 (raw timestamps in the panel, one sparkline point per run, the
+cramped Feature row layout) are tracked in `ANOMALY-UI-FINDINGS-1`. Its backend items shipped 2026-10-14:
+* **Schema 422 names the Feature.** `AnomalyKindValidator.requireStorable` now leads the "not in the Schema" refusal
+  with the `anomaly-model.features[<n>].<measure|key|time|filters|evidence>` path of every Feature naming a missing
+  column (`offendingPaths`), the shape `mapAnomalyRefusal` already parses, so the pane lands it on that Feature row.
+  A `peers` column has no Feature path and stays a banner. Text stays value-free (column names only).
+* **One-off back-dated run.** `anomaly.score` read only the Job's config `params:`, so a trigger arg `as_of` was
+  silently ignored. It now reads the resolved params (`ctx.params()`: trigger `args` over config `params:`), so
+  `POST /jobs/{name}/trigger` with `{"params":{"as_of":"2026-10-01"}}` needs no config edit; a bad date still fails the
+  Run before the sink is touched.
+* **Module-absent contract.** `NoAnomalyShipsInThePersonalBuildTest` pins `GET /anomaly-scores/{model}/{entity}` and
+  `POST /anomaly-scores/preview` as 503 `CAPABILITY_UNAVAILABLE` naming `inspecto-anomaly` (the SPA hides the panel
+  on it). `anomaly-model` is a component kind, not a module route: absent the module, `GET /components/anomaly-model`
+  is an ordinary empty 200, and there is no `/bootstrap` `features.anomaly` flag.
 
 ## Decisions (operator, 2026-10-10)
 

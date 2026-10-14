@@ -48,12 +48,17 @@ class AnomalyScoreJobTest {
     }
 
     private static JobRun runOnce(Path dir, Path data, Map<String, String> params) throws Exception {
+        return runOnce(dir, data, params, Map.of());
+    }
+
+    /** {@code args} are this fire's trigger args ({@code POST /jobs/{name}/trigger} body {@code params:}). */
+    private static JobRun runOnce(Path dir, Path data, Map<String, String> params, Map<String, String> args) throws Exception {
         JobConfig job = new JobConfig("score-usage", "anomaly.score", null, null, true, false, params, null, null);
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, data.toString())) {
             js.start();
-            String id = js.triggerRun("score-usage", null).orElseThrow();
+            String id = js.triggerRun("score-usage", null, args).orElseThrow();
             long deadline = System.nanoTime() + 60_000_000_000L;
             while (System.nanoTime() < deadline) {
                 JobRun r = js.lastRunOf("score-usage").orElse(null);
@@ -159,5 +164,24 @@ class AnomalyScoreJobTest {
         JobRun run = runOnce(dir, data, Map.of("model", AnomalyCorpus.MODEL, "as_of", "yesterday"), 1);
         assertEquals("FAILED", run.status());
         assertTrue(run.message().contains("as_of must be YYYY-MM-DD"), run.message());
+    }
+
+    @Test
+    void aTriggerArgAsOfOverridesTheConfigAndNeedsNoConfigEdit(@TempDir Path dir) throws Exception {
+        Path data = plant(dir);
+        // The config's own as_of is unparseable: only a run that really reads the trigger arg can succeed.
+        JobRun run = runOnce(dir, data, Map.of("model", AnomalyCorpus.MODEL, "as_of", "yesterday"),
+                Map.of("as_of", "2026-10-01"));
+        assertEquals("SUCCESS", run.status(), run.message());
+        assertEquals(306, rows(data.resolve("anomaly_scores_usage_latest")).size());
+    }
+
+    @Test
+    void aBadTriggerArgAsOfFailsTheRunWithoutTouchingTheSink(@TempDir Path dir) throws Exception {
+        Path data = plant(dir);
+        JobRun run = runOnce(dir, data, Map.of("model", AnomalyCorpus.MODEL), Map.of("as_of", "2026-13-45"));
+        assertTrue(run.status().equals("FAILED") || run.status().equals("REJECTED"), run.status());
+        assertTrue(run.message().contains("as_of"), run.message());
+        assertFalse(Files.exists(data.resolve("anomaly_scores_usage")), "no sink written");
     }
 }

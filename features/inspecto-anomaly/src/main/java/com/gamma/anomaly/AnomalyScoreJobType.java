@@ -90,7 +90,10 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
             if (data == null) throw new IllegalStateException("anomaly.score needs a data root (space dataDir)");
             String modelId = cfg.require("model");
             Instant now = Instant.now();
-            LocalDate asOf = asOf(cfg.params() == null ? null : cfg.params().get("as_of"), now);
+            // ctx.params() is the resolved set (this fire's trigger args over the config params:), so a one-off
+            // back-dated run is POST /jobs/{name}/trigger {"params":{"as_of":"YYYY-MM-DD"}} with no config edit.
+            LocalDate asOf = asOf(ctx.params() != null && ctx.params().get("as_of") != null
+                    ? ctx.params().get("as_of") : cfg.params() == null ? null : cfg.params().get("as_of"), now);
             Path writeRoot = SpaceConfigRoot.requireCurrent("anomaly.score");
             ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
             Map<String, Object> content = store.get(AnomalyModel.KIND, modelId)
