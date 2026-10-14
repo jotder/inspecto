@@ -236,6 +236,27 @@ class ControlApiExpectationBaselineTest {
 
     // ── helpers ─────────────────────────────────────────────────────────────────
 
+    @Test
+    void trailingDaysCatchesAHalfDeliveredDayOverHttp(@TempDir Path dir) throws Exception {
+        // 6 event days, 1000 rows each, except 2026-09-05 with 400 (a half-delivered File)
+        seed("SELECT r.range AS id, CAST(DATE '2026-09-01' + CAST(d.range AS INTEGER) AS VARCHAR) AS day "
+                + "FROM range(6) d, range(1000) r WHERE NOT (d.range = 4 AND r.range >= 400)");
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String body = "{\"name\":\"daily_rows\",\"target\":\"" + target + "\",\"kind\":\"baseline\","
+                    + "\"groupBy\":[\"day\"],\"trailingDays\":7,\"minPriorDays\":3,"
+                    + "\"maxIncrease\":100,\"maxDecrease\":50,\"limitUnit\":\"percent\"}";
+            assertEquals(200, send(c.port, "POST", "/expectations", body).statusCode());
+            JsonNode r = evaluate(c, "daily_rows");
+            assertEquals("FAILED", r.get("status").asText(), r.toString());
+            assertEquals(1, r.get("violations").asLong());
+            JsonNode f = r.get("findings").get(0);
+            assertEquals("[\"2026-09-05\"]", f.get("group").asText());
+            assertEquals("below", f.get("direction").asText());
+            assertEquals(400, f.get("current").asDouble());
+            assertFalse(r.has("profileId"), "trailing mode records no history");
+        }
+    }
+
     private JsonNode evaluate(Ctx c, String name) throws Exception {
         HttpResponse<String> r = send(c.port, "POST", "/expectations/" + name + "/evaluate", null);
         assertEquals(200, r.statusCode(), r.body());
