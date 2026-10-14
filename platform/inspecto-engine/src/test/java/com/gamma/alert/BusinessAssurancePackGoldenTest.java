@@ -186,7 +186,7 @@ class BusinessAssurancePackGoldenTest {
         Sweep s = sweep(CFG);
         assertEquals(2, s.fired().size(), "2 detections, 0 false positives: " + s.fired());
         assertEquals(1, s.count("ba_revenue_outside_band"));
-        assertFalse(s.of("ba_margin_erosion").contains("partner=PB"), "an Alert carries no entity: " + s.of("ba_margin_erosion"));
+        assertTrue(s.of("ba_margin_erosion").contains("partner=PB"), s.of("ba_margin_erosion"));
         // Only the CRITICAL forecast breach opens an Incident; the WARNING erosion stays an Alert.
         assertEquals(1, s.incidents().size(), s.incidents().toString());
         assertEquals("2026-06-04", s.incidents().get(0).attributes().get("key.ds"));
@@ -346,7 +346,7 @@ class BusinessAssurancePackGoldenTest {
 
         Sweep s = sweep(cfg);
         assertEquals(1, s.count("ba_margin_erosion"), s.fired().toString());
-        assertFalse(s.of("ba_margin_erosion").contains("partner=PB"), "an Alert carries no entity: " + s.of("ba_margin_erosion"));
+        assertTrue(s.of("ba_margin_erosion").contains("partner=PB"), s.of("ba_margin_erosion"));
         assertEquals(2, s.count("ba_margin_data_quality"), s.fired().toString());
     }
 

@@ -3994,7 +3994,8 @@
                       "properties" : {
                         "field" : { "type" : "string" },
                         "dir" : { "type" : "string", "enum" : [ "asc", "desc" ] },
-                        "agg" : { "type" : "string", "enum" : [ "min", "max" ] }
+                        "agg" : { "type" : "string", "enum" : [ "min", "max" ] },
+                        "cosmetic" : { "type" : "boolean", "description" : "Set by a chart for its category order only: honoured on a groupBy Dimension with no agg. For a caller who may not see raw entity keys the server drops a cosmetic term over a masked column and orders by the first Measure descending instead; any other order over a masked column is still refused (422)." }
                       }
                     }
                   }
