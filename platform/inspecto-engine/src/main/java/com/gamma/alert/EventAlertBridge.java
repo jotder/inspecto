@@ -164,7 +164,7 @@ public final class EventAlertBridge {
         putIfPresent(attrs, "unit", e.attributes().get("unit"));
         stamp(attrs, e);
         String title = "Missing file in sequence: " + expected + (pipeline != null ? " on " + pipeline : "");
-        alerts.raiseFromEvent(alert(GAP_RULE, pipeline, e), title, pipeline, gapKey(expected), attrs);
+        alerts.raiseFromEvent(alert(GAP_RULE, pipeline, e), title, pipeline, gapKey(expected), attrs, true);
     }
 
     /** The fired {@link Alert} behind the record (so it shows in {@code GET /alerts}); severity {@code high} as before. */
