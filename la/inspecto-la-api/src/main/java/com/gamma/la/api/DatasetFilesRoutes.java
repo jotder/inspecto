@@ -70,6 +70,19 @@ public final class DatasetFilesRoutes implements RouteModule {
     }
 
     /** The per-File read of an already-gated Dataset: the one reading behind this route and the Dossier footer (LA-DATA-TRUST-1 S9). */
+    /**
+     * The Files table's order (LA-DATA-TRUST-POLISH-1 #7): event day newest first (a File with no day last), then name A-Z.
+     * A bulk delivery lands in one second, so ingested-at cannot order it; the tail (Collector, Pipeline, Consignment, ingested-at)
+     * makes the order TOTAL, so two equal-looking rows never swap places between one page and the next.
+     */
+    static final Comparator<CollectorCoveragePort.FileEntry> FILE_ORDER = Comparator
+            .comparing((CollectorCoveragePort.FileEntry f) -> f.day() == null ? "" : f.day()).reversed()
+            .thenComparing(CollectorCoveragePort.FileEntry::name)
+            .thenComparing(f -> f.collector() == null ? "" : f.collector())
+            .thenComparing(f -> f.pipeline() == null ? "" : f.pipeline())
+            .thenComparing(f -> f.consignmentId() == null ? "" : f.consignmentId())
+            .thenComparing(f -> f.ingestedAt() == null ? "" : f.ingestedAt());
+
     static Map<String, Object> read(ApiContext api, Path writeRoot, Map<String, Object> dataset, String id, int limit, int offset, String name) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dataset", id);
@@ -90,8 +103,7 @@ public final class DatasetFilesRoutes implements RouteModule {
         Set<String> indexed = manifest == null || manifest.inputFiles() == null ? null
                 : paths(manifest.inputFiles());
         List<CollectorCoveragePort.FileEntry> all = new ArrayList<>(found.get());
-        all.sort(Comparator.comparing((CollectorCoveragePort.FileEntry f) -> f.ingestedAt() == null ? "" : f.ingestedAt()).reversed()
-                .thenComparing(CollectorCoveragePort.FileEntry::name));
+        all.sort(FILE_ORDER);
 
         // One pass: the state of every File (the strip's counts are over ALL of them, not the page).
         List<String> states = new ArrayList<>();
