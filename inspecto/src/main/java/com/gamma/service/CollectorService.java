@@ -655,6 +655,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 ? durableReceipts
                 : new com.gamma.notify.InMemoryDeliveryReceiptStore();
         this.notificationService.deliveryReceipts(deliveryReceipts);
+        // Notification content is ALWAYS masked (recipients cannot be capability-checked): same root resolution as persistedRules().
+        this.notificationService.contentMasking(com.gamma.control.NotificationContentMasking.of(() -> {
+            java.nio.file.Path wr = root.config();
+            if (wr == null) {
+                String p = System.getProperty("assist.write.root");
+                wr = (p == null || p.isBlank()) ? null : java.nio.file.Path.of(p);
+            }
+            return wr;
+        }));
         if (this.jobs != null) this.jobs.deliveryReceiptStore(deliveryReceipts);   // receipt_prune maintenance task
         // soft_bounce_retry re-delivers through the service rather than reaching for a transport itself —
         // channel resolution, the suppression re-check and the template all live there, and a task that

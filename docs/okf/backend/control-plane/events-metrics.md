@@ -419,8 +419,18 @@ timestamp: 2026-07-16T00:00:00Z
     without them and the page is sliced afterwards; the v1 `total` counts the post-filtered set), so a raw number matches
     nothing; the `masked:<16 hex>` token a viewer sees does filter the rows that show it. A revealer / no-Subject request
     is unchanged. Consequence: a revealer's `q` no longer finds NEW `OBJECT_OPENED` events by title (use the object list).
-    **Not covered (record only):** the Regulatory report object view (needs an operator decision), outbound mail / webhook
-    policy, the agent SSE stream.
+    **Not covered (record only):** the Regulatory report object view (needs an operator decision), the agent SSE stream.
+    **Notification content is ALWAYS masked (2026-10-15, `NotificationContentMasking`, core `control`).** A notification is rendered once
+    and read by recipients nobody can capability-check (mail, webhook, the shared in-app feed), so `NotificationService.dispatch` passes each
+    Event through `contentMasking` BEFORE any rule or per-channel template renders from it (the `ReportRowMasking` precedent): the stored in-app
+    text, the mail subject and body and the webhook payload are all built from the masked Event. It reuses `AuditReadMasking.mask` (classified
+    AUDIT values), `maskOpened` (no object lookup, so a legacy title is dropped) and `ObjectReadMasking` for `key.<column>` / `entityKey`
+    attributes and the raw value inline in `{{message}}`; an Event with `key.*` and no `dataset` attribute fails closed (every `key.*` masked);
+    a masker that throws drops the notification. The hook is an injected `UnaryOperator<Event>` (the helpers live in core `inspecto`, the engine
+    owns the service), so `inspecto-notify-channels` gains no dependency. ⚠ **Decision for the operator:** an operator now receives
+    `masked:<16 hex>` in mail, never the number; there is NO escape hatch (a reveal is done in the UI by a holder of `canRevealLinkEntities`).
+    Not covered: `notify()` called directly by a granted Run (free text from the Run), and a Space with no write root (no registry to classify).
+    Tests: `NotificationContentMaskingTest`.
   - **Accepted limits (operator, 2026-10-06; `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (5), (7)).** (5) The lock-race fork
     window is a stated limit, not prevented: a writer with unflushed linked rows when its lock is deleted can
     collide with a second writer, and `GET /audit/verify` detects it afterwards as a `duplicate`. (7) A local

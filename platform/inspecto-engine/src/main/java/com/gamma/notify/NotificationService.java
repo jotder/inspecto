@@ -62,6 +62,10 @@ public final class NotificationService implements NotificationAccess, AutoClosea
 
     /** Per-recipient suppression (D8-SUPPRESS-1); disarmed until a DURABLE receipt store is wired. */
     private volatile SuppressionList suppression = SuppressionList.fromProperties(null);
+    /** The "notification content is always masked" policy: every Event is passed through this BEFORE a rule
+     *  renders it, so the stored in-app text, every channel body and every per-channel template are built from
+     *  the masked view. Identity until the host wires one; a throw drops the notification (fail closed). */
+    private volatile java.util.function.UnaryOperator<Event> contentMasking = java.util.function.UnaryOperator.identity();
     private final CopyOnWriteArrayList<Consumer<Notification>> listeners = new CopyOnWriteArrayList<>();
     /** Callbacks run on {@link #close()} to unblock open SSE streams (each interrupts its blocked thread). */
     private final CopyOnWriteArrayList<Runnable> streamClosers = new CopyOnWriteArrayList<>();
@@ -143,6 +147,11 @@ public final class NotificationService implements NotificationAccess, AutoClosea
         if (overrides != null) this.overrides = overrides;
     }
 
+    /** Wire the content-masking policy ({@code null} keeps the current one). */
+    public void contentMasking(java.util.function.UnaryOperator<Event> masking) {
+        if (masking != null) this.contentMasking = masking;
+    }
+
     /** The per-Subject preference overrides this service delivers against. */
     public NotificationPreferenceOverrides preferenceOverrides() {
         return overrides;
@@ -222,8 +231,10 @@ public final class NotificationService implements NotificationAccess, AutoClosea
     /** Render → dedup → store → notify, off the emitting thread. Serialized so the dedup check and the
      *  add are atomic across concurrent workers (the feed is low-volume; the executor exists to get off
      *  the emit thread, not for parallelism). */
-    private synchronized void dispatch(Event e, NotificationRule rule) {
+    private synchronized void dispatch(Event raw, NotificationRule rule) {
+        Event e = raw;
         try {
+            e = contentMasking.apply(raw);   // before ANY render: title, body, templates all see the masked view
             Notification n = rule.render(e);
             if (store.hasActiveDuplicate(n.dedupeKey())) return;   // collapse identical unread alerts
             if (!rateLimiter.allow(n.dedupeKey())) return;          // cap identical alerts per rolling hour
