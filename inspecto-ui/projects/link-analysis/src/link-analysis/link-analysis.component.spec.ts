@@ -2142,3 +2142,72 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect([c.toolboxDockOpen(), c.queryDockOpen()]).toEqual([false, false]);
     });
 });
+
+describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a, WCAG 2.4.3)', () => {
+    const MONEY: LinkAnalysisView = {
+        id: 'mule_layering_ring',
+        name: 'mule_layering_ring',
+        description: 'Money-mule layering ring.',
+        sourceId: 'entity-projection',
+        query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
+    };
+    const region = (el: HTMLElement) => el.querySelector('[data-testid="la-graph-region"]') as HTMLElement | null;
+    const follow = (el: HTMLElement) => el.querySelector('[data-testid="starter-follow"]') as HTMLButtonElement;
+
+    /** A real focus target needs the fixture in the document; jsdom ignores focus() on a detached node. */
+    function mount() {
+        const made = create({ views: [MONEY] });
+        document.body.appendChild(made.fixture.nativeElement);
+        made.fixture.detectChanges();
+        return made;
+    }
+
+    it('moves focus from the removed landing card to the named graph region, and announces the draw', async () => {
+        const { fixture } = mount();
+        const el = fixture.nativeElement as HTMLElement;
+        follow(el).focus();
+        expect(document.activeElement).toBe(follow(el));
+        follow(el).click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const r = region(el)!;
+        expect(r.getAttribute('aria-label')).toBe('Link graph');
+        expect(r.getAttribute('tabindex')).toBe('-1');
+        expect(document.activeElement).toBe(r);
+        expect(el.querySelector('[data-testid="la-draw-announcement"]')?.textContent).toContain(
+            'Graph drawn, 5 nodes, 3 links',
+        );
+        await expectNoA11yViolations(el);
+        fixture.nativeElement.remove();
+    });
+
+    it('does not move focus when the user has already put it somewhere else during the draw', async () => {
+        const { fixture } = mount();
+        const el = fixture.nativeElement as HTMLElement;
+        const elsewhere = document.createElement('button');
+        document.body.appendChild(elsewhere);
+        follow(el).click();
+        elsewhere.focus(); // the user tabbed away while the query was in flight
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(document.activeElement).toBe(elsewhere);
+        elsewhere.remove();
+        fixture.nativeElement.remove();
+    });
+
+    it('does not steal focus on a later run over a graph that is already on screen', async () => {
+        const { fixture } = mount();
+        const el = fixture.nativeElement as HTMLElement;
+        follow(el).click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const elsewhere = document.createElement('button');
+        document.body.appendChild(elsewhere);
+        elsewhere.focus();
+        await fixture.componentInstance.loadView(MONEY);
+        fixture.detectChanges();
+        expect(document.activeElement).toBe(elsewhere);
+        elsewhere.remove();
+        fixture.nativeElement.remove();
+    });
+});

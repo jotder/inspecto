@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.CollectorCoveragePort;
@@ -149,13 +150,23 @@ public final class InvestigationCoverageRoutes implements RouteModule {
                 + "GROUP BY d ORDER BY d";
         binds.add(Long.toString(from.toEpochMilli()));
         binds.add(Long.toString(to.toEpochMilli()));
-        TreeMap<String, Long> rows = new TreeMap<>();
-        try {
-            DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                    dataset, relationSql, sql, MAX_DAYS + 2, 0, List.of(), List.of(), binds));
-            for (Map<String, Object> row : r.rows()) rows.put(String.valueOf(row.get("d")), ((Number) row.get("n")).longValue());
-        } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "coverage over dataset '" + dataset + "' failed: " + e.getMessage());
+        String stamp = inputStamp(api, inv, relationSql);
+        String key = stamp == null ? null : inv.writeRoot() + "|" + api.dataRoot() + "|" + dataset + "|" + relationSql + "|" + col + "|"
+                + naive + "|" + zone + "|" + from.toEpochMilli() + "|" + to.toEpochMilli() + "|" + stamp;
+        TreeMap<String, Long> rows = key == null ? null : ROWS_CACHE.get(key);
+        if (rows == null) {
+            rows = new TreeMap<>();
+            try {
+                DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
+                        dataset, relationSql, sql, MAX_DAYS + 2, 0, List.of(), List.of(), binds));
+                for (Map<String, Object> row : r.rows()) rows.put(String.valueOf(row.get("d")), ((Number) row.get("n")).longValue());
+            } catch (SQLException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "coverage over dataset '" + dataset + "' failed: " + e.getMessage());
+            }
+            if (key != null) {                                                   // a failed read threw above: it is never cached
+                if (ROWS_CACHE.size() >= ROWS_CACHE_MAX) ROWS_CACHE.clear();
+                ROWS_CACHE.put(key, new TreeMap<>(rows));
+            }
         }
 
         List<Map<String, Object>> perDay = new ArrayList<>();
@@ -169,6 +180,29 @@ public final class InvestigationCoverageRoutes implements RouteModule {
             perDay.add(m);
         }
         return new Gaps(zone, expected, missing, perDay);
+    }
+
+    /** One cached day histogram per (Dataset, relation, time column, zone, window, input-file stamp); a bound, not a property of the data. */
+    private static final java.util.concurrent.ConcurrentHashMap<String, TreeMap<String, Long>> ROWS_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int ROWS_CACHE_MAX = 256;
+
+    /**
+     * The identity of everything the day histogram reads: the {@link InputFingerprint} of the Dataset's input files (path, size
+     * and mtime of each, Consignment subtraction included), so a new, removed or rewritten File moves it and the cached histogram
+     * is dropped - the cache can never show more or fewer days or rows than the disk. {@code null} (= read live, cache nothing)
+     * whenever the stamp cannot be trusted: no files to list (a view-backed or virtual Dataset), too many, an unknown listing,
+     * a relation that reads the clock, or any failure to stamp. Runs below the gates ({@code openForRead}, R3): never instead of them.
+     */
+    private static String inputStamp(ApiContext api, InvestigationRoutes.Inv inv, String relationSql) {
+        try {
+            if (relationSql == null || relationSql.toLowerCase(java.util.Locale.ROOT).matches("(?s).*\\b(now|current_\\w+|today|random)\\b.*")) return null;
+            Map<String, Object> ds = DatasetProviders.require().dataset(inv.writeRoot(), inv.dataset()).orElse(null);
+            if (ds == null) return null;
+            InputFingerprint fp = DatasetProviders.require().inputFingerprint(ds, api.dataRoot(), inv.writeRoot());
+            return fp != null && fp.known() ? fp.value() : null;
+        } catch (RuntimeException cannotStamp) {
+            return null;
+        }
     }
 
     /**
