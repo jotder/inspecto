@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -52,9 +53,60 @@ public final class AuditReadMasking {
         Path root = api.writeRoot();
         if (privileged || root == null) return UnaryOperator.identity();
         Set<String> classified = classifiedColumns(new ComponentStore(root.resolve("registry")), new ViewStore(root.resolve("views")));
-        if (classified.isEmpty()) return UnaryOperator.identity();
         EvidenceMasker masker = EvidenceMasker.forSpace(root);
-        return e -> mask(e, classified, masker::tokenFor);
+        ObjectReadMasking objects = ObjectReadMasking.of(root);
+        Function<String, Optional<Map<String, Object>>> lookup = id -> {
+            try {
+                return HostContext.of(api).service().objects().flatMap(a -> a.summary(id));
+            } catch (RuntimeException unavailable) {
+                return Optional.empty();   // fail closed in maskOpened
+            }
+        };
+        return e -> maskOpened(classified.isEmpty() ? e : mask(e, classified, masker::tokenFor), objects, lookup);
+    }
+
+    /** {@code true} when this request is served masked (a Subject without {@link #UNMASK_CAPABILITY} on a Space with a root):
+     *  a search filter must then match the MASKED row, never the stored raw text. */
+    public static boolean restricted(ApiContext api, HttpExchange ex) {
+        return api.writeRoot() != null
+                && !ApiContext.subject(ex).map(s -> s.capabilities().contains(UNMASK_CAPABILITY)).orElse(true);
+    }
+
+    private static final String OPENED = " opened: ";
+
+    /**
+     * An {@code OBJECT_OPENED} message is {@code <type> opened: <title> [<id>]} and the stored (append-only) row may hold
+     * the title RAW, so it is masked on read with the object's own classified keys ({@link ObjectReadMasking}); the event
+     * correlation id is the object's, so it is masked the same way. Fail closed: a title that cannot be isolated, or an
+     * object that cannot be resolved (purged, no ops module), is dropped (with the event correlation id) — {@code <type> opened [<id>]}. Newer events
+     * carry no title at all and pass through.
+     */
+    static Event maskOpened(Event e, ObjectReadMasking objects, Function<String, Optional<Map<String, Object>>> lookup) {
+        if (!EventType.OBJECT_OPENED.equals(e.type()) || e.message() == null) return e;
+        String id = e.attributes().get("objectId");
+        String msg = e.message();
+        int i = msg.indexOf(OPENED);
+        if (i < 0) return e;   // title-free message (new events): nothing to mask in it
+        String head = msg.substring(0, i);
+        String rest = msg.substring(i + OPENED.length());
+        String tail = id == null ? null : " [" + id + "]";
+        String title = tail != null && rest.endsWith(tail) ? rest.substring(0, rest.length() - tail.length()) : null;
+        Map<String, Object> obj = id == null ? null : lookup.apply(id).orElse(null);
+        String cid = e.correlationId();
+        if (title == null || obj == null || !(obj.get("attributes") instanceof Map<?, ?>))
+            return withMessageAndCorrelation(e, head + " opened" + (id == null ? "" : " [" + id + "]"), null);
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("title", title);
+        if (cid != null) row.put("correlationId", cid);
+        row.put("attributes", obj.get("attributes"));
+        Map<String, Object> masked = objects.maskObject(row);
+        return withMessageAndCorrelation(e, head + OPENED + masked.get("title") + tail,
+                cid == null ? null : (String) masked.get("correlationId"));
+    }
+
+    private static Event withMessageAndCorrelation(Event e, String message, String correlationId) {
+        return new Event(e.eventId(), e.ts(), e.level(), e.type(), e.source(), e.pipeline(),
+                correlationId, message, e.attributes(), e.payload());
     }
 
     /** Every Dataset's sensitive columns, lower-cased; {@link EvidenceMasker#UNKNOWN_LINEAGE} when any is untraceable. */

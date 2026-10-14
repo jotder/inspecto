@@ -292,7 +292,7 @@ public final class ObjectService {
                 .level(EventLevel.INFO)
                 .source(SOURCE)
                 .correlationId(correlationId)
-                .message(type + " opened: " + stored.title() + " [" + stored.id() + "]")
+                .message(type + " opened [" + stored.id() + "]")   // no title: it can embed a classified key (read-masked for older rows)
                 .attr("objectId", stored.id())
                 .attr("objectType", type.name())
                 .attr("status", stored.status())

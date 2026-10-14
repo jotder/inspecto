@@ -57,7 +57,7 @@ public final class EventRoutes implements RouteModule {
         // the list is instead cursor-paginated over the full retained history (eventsPage), sharing the route.
         api.get("/events", (e, m) -> ApiContext.v1(e) ? eventsPage(api, e)
                 : toMaps(api, e, HostContext.of(api).service().events().recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
-        api.get("/events/search", (e, m) -> toMaps(api, e, HostContext.of(api).service().events().query(eventQuery(e, EventQuery.DEFAULT_LIMIT))));
+        api.get("/events/search", (e, m) -> toMaps(api, e, matching(api, e, EventQuery.DEFAULT_LIMIT)));
         api.get("/events/export", (e, m) -> exportEvents(api, e));
         api.get("/events/views", (e, m) -> HostContext.of(api).service().savedViews().list());
         // A saved view is SERVER-WIDE, not per-user: SavedView is (name, filters, createdAt) with no subject,
@@ -73,6 +73,23 @@ public final class EventRoutes implements RouteModule {
             return Map.of("name", ApiContext.name(m), "deleted", true);
         }));
         api.get("/events/([^/]+)", (e, m) -> eventById(api, e, ApiContext.name(m)));
+    }
+
+    /**
+     * The events matching this request's filters, already masked ({@link AuditReadMasking}). For a masked caller
+     * {@code ?q=} and {@code ?correlationId=} are matched against the MASKED event, never the stored raw text, so
+     * neither can probe whether a raw key exists; the page is sliced after that filter.
+     */
+    private static List<Event> matching(ApiContext api, HttpExchange ex, int defaultLimit) {
+        java.util.function.UnaryOperator<Event> view = AuditReadMasking.forRequest(api, ex);
+        EventQuery q = eventQuery(ex, defaultLimit);
+        if (!AuditReadMasking.restricted(api, ex))
+            return HostContext.of(api).service().events().query(q).stream().map(view).toList();
+        EventQuery text = EventQuery.builder().correlationId(q.correlationId()).textContains(q.textContains()).build();
+        EventQuery wide = EventQuery.builder().minLevel(q.minLevel()).type(q.type()).pipeline(q.pipeline())
+                .from(q.fromMs()).to(q.toMs()).limit(EventQuery.MAX_LIMIT).build();
+        return HostContext.of(api).service().events().query(wide).stream().map(view).filter(text::matches)
+                .skip(q.offset()).limit(q.limit()).toList();
     }
 
     /** D-P8 (operator 2026-10-06): audit rows are masked on read for a caller without the unmask capability. */
@@ -151,8 +168,7 @@ public final class EventRoutes implements RouteModule {
      * JSON always carries {@code attributes} whole.
      */
     private Object exportEvents(ApiContext api, HttpExchange ex) throws IOException {
-        List<Event> rows = HostContext.of(api).service().events().query(eventQuery(ex, EventQuery.MAX_LIMIT))
-                .stream().map(AuditReadMasking.forRequest(api, ex)).toList();   // D-P8
+        List<Event> rows = matching(api, ex, EventQuery.MAX_LIMIT);
         if ("csv".equalsIgnoreCase(ApiContext.query(ex, "format"))) {
             String type = ApiContext.query(ex, "type");
             List<String> attributeColumns =

@@ -285,8 +285,15 @@ public final class ObjectRoutes implements RouteModule {
      * list is instead cursor-paginated ({@link #objectsPage}), so the two share this one route.
      */
     private Object objectsList(ApiContext api, HttpExchange e) {
-        if (!ApiContext.v1(e))
-            return toObjectMaps(api, e, visibleOnly(OpsEngine.of(api).query(objectQuery(e)), e));
+        if (!ApiContext.v1(e)) {
+            ObjectReadMasking masking = ObjectReadMasking.forRequest(api, e);
+            if (masking == null) return toObjectMaps(api, e, visibleOnly(OpsEngine.of(api).query(objectQuery(e, true)), e));
+            // A caller who cannot reveal keys filters on what they SEE: q / correlationId match the masked row, so
+            // neither can probe whether a raw key exists. The page is sliced after that filter.
+            ObjectQuery q = objectQuery(e, false);
+            List<OperationalObject> all = matchMasked(masking, visibleOnly(OpsEngine.of(api).query(q.unbounded()), e), e);
+            return toObjectMaps(api, e, all.stream().skip(q.offset()).limit(q.limit()).toList());
+        }
         return objectsPage(api, e);
     }
 
@@ -299,14 +306,15 @@ public final class ObjectRoutes implements RouteModule {
      * grants. The v1 envelope's {@code metadata.pagination} carries {@code cursor/nextCursor/limit/total}.
      */
     private Object objectsPage(ApiContext api, HttpExchange e) {
-        ObjectQuery q = objectQuery(e);
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, e);
+        ObjectQuery q = objectQuery(e, masking == null);
         int limit = q.limit();
         String cursor = ApiContext.query(e, "cursor");
         List<String> key = Cursor.decode(cursor);
         Long afterCreatedAt = key.size() == 2 ? parseLongOr(key.get(0), Long.MIN_VALUE) : null;
         String afterId = key.size() == 2 ? key.get(1) : null;
 
-        List<OperationalObject> visible = visibleOnly(OpsEngine.of(api).query(q.unbounded()), e)
+        List<OperationalObject> visible = matchMasked(masking, visibleOnly(OpsEngine.of(api).query(q.unbounded()), e), e)
                 .stream().sorted(KEYSET_ORDER).toList();
         long total = visible.size();
         List<OperationalObject> after = visible.stream()
@@ -324,16 +332,40 @@ public final class ObjectRoutes implements RouteModule {
         return toObjectMaps(api, e, page);
     }
 
-    /** Build an {@link ObjectQuery} from {@code ?type=&status=&severity=&assignee=&owner=&correlationId=&q=&limit=&offset=}. */
-    private static ObjectQuery objectQuery(HttpExchange ex) {
+    /**
+     * {@code objs} narrowed by {@code ?correlationId=} / {@code ?q=} evaluated against the MASKED row, for a caller
+     * under {@link ObjectReadMasking} (the store query was built without those two filters, {@code rawText} false).
+     * A {@code null} masking (revealer / no Subject) leaves {@code objs} alone: the store already applied them raw.
+     * A masked token ({@code masked:<16 hex>}) therefore matches the rows that show it; a raw key matches nothing.
+     */
+    private static List<OperationalObject> matchMasked(ObjectReadMasking masking, List<OperationalObject> objs, HttpExchange ex) {
+        if (masking == null) return objs;
+        String cid = ApiContext.query(ex, "correlationId");
+        String q = ApiContext.query(ex, "q");
+        String needle = q == null || q.isBlank() ? null : q.trim().toLowerCase(java.util.Locale.ROOT);
+        if ((cid == null || cid.isBlank()) && needle == null) return objs;
+        return objs.stream().filter(o -> {
+            Map<String, Object> row = ObjectReadMasking.object(masking, o.toMap());
+            if (cid != null && !cid.isBlank() && !cid.trim().equals(row.get("correlationId"))) return false;
+            return needle == null || containsIgnoreCase(row.get("title"), needle) || containsIgnoreCase(row.get("description"), needle);
+        }).toList();
+    }
+
+    private static boolean containsIgnoreCase(Object text, String lowerNeedle) {
+        return text instanceof String s && s.toLowerCase(java.util.Locale.ROOT).contains(lowerNeedle);
+    }
+
+    /** Build an {@link ObjectQuery} from {@code ?type=&status=&severity=&assignee=&owner=&correlationId=&q=&limit=&offset=};
+     *  {@code rawText} false leaves {@code correlationId} / {@code q} out (see {@link #matchMasked}). */
+    private static ObjectQuery objectQuery(HttpExchange ex, boolean rawText) {
         return ObjectQuery.builder()
                 .objectType(parseObjectType(ApiContext.query(ex, "type")))
                 .status(ApiContext.query(ex, "status"))
                 .severity(ApiContext.query(ex, "severity"))
                 .assignee(ApiContext.query(ex, "assignee"))
                 .owner(ApiContext.query(ex, "owner"))
-                .correlationId(ApiContext.query(ex, "correlationId"))
-                .textContains(ApiContext.query(ex, "q"))
+                .correlationId(rawText ? ApiContext.query(ex, "correlationId") : null)
+                .textContains(rawText ? ApiContext.query(ex, "q") : null)
                 .limit(ApiContext.parseIntOr(ApiContext.query(ex, "limit"), ObjectQuery.DEFAULT_LIMIT))
                 .offset(ApiContext.parseIntOr(ApiContext.query(ex, "offset"), 0))
                 .build();
@@ -504,12 +536,20 @@ public final class ObjectRoutes implements RouteModule {
         }
         List<Map<String, Object>> nodes = (List<Map<String, Object>>) g.get("nodes");
         java.util.Set<String> visible = new java.util.HashSet<>();
-        List<Map<String, Object>> keptNodes = nodes.stream().filter(n -> {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        List<Map<String, Object>> keptNodes = new java.util.ArrayList<>();
+        for (Map<String, Object> n : nodes) {
             String nid = String.valueOf(n.get("id"));
-            boolean ok = OpsEngine.of(api).get(nid).map(o -> visibleTo(ex, o)).orElse(false);
-            if (ok) visible.add(nid);
-            return ok;
-        }).toList();
+            OperationalObject o = OpsEngine.of(api).get(nid).orElse(null);
+            if (o == null || !visibleTo(ex, o)) continue;
+            visible.add(nid);
+            Map<String, Object> node = n;
+            if (masking != null && n.get("title") != null) {   // the title can embed the node's own key
+                node = new java.util.LinkedHashMap<>(n);
+                node.put("title", ObjectReadMasking.object(masking, o.toMap()).get("title"));
+            }
+            keptNodes.add(node);
+        }
         List<Map<String, Object>> keptEdges = ((List<Map<String, Object>>) g.get("edges")).stream()
                 .filter(l -> visible.contains(String.valueOf(l.get("from")))
                         && visible.contains(String.valueOf(l.get("to")))).toList();

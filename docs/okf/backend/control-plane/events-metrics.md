@@ -389,8 +389,22 @@ timestamp: 2026-07-16T00:00:00Z
     lookup of a masked key is therefore unavailable to a non-revealer (Link Analysis keeps its own alias route,
     `POST /inv/case-history`). Row titles of surviving matches are unmasked text. Real-HTTP test
     `ControlApiObjectReadMaskingTest` (list, detail, echoes, no-dataset, entityKey, by-entity); unit
-    `ObjectReadMaskingTest`. **Not covered:** the Regulatory report object view, graph / links titles, the object SSE /
-    mail / search / export surfaces (not traced). Tracked in `OBJECT-READ-MASKING-RESIDUALS-1`.
+    `ObjectReadMaskingTest`.
+    **Follow-ups (closed, `OBJECT-READ-MASKING-RESIDUALS-1`).** (1) `GET /objects/{id}/graph` masks each node `title` with
+    THAT node's own attributes (same `ObjectReadMasking`). (2) `OBJECT_OPENED` is emitted WITHOUT the title
+    (`<type> opened [<id>]`; the title is on the object, nothing consumed it); the append-only log still holds older raw rows,
+    so `AuditReadMasking.forRequest` also masks them on read for a non-revealer (`maskOpened`): the object is resolved by id
+    through the core `ObjectAccess.summary` seam and its title and the event correlation id are masked with its classified
+    keys; fail closed, an object that cannot be resolved (purged, no ops module) loses the title and the correlation id
+    (`<type> opened [<id>]`). This covers `/events`, `/events/search`, `/events/{id}` and both `/events/export` formats.
+    Real-HTTP `ControlApiEventsReadMaskingTest` (module observability: the fail-closed path), unit
+    `AuditReadMaskingOpenedEventTest` (resolved path). (3) For a non-revealer, `q` and `correlationId` on `GET /objects`
+    (legacy and v1) and on `/events/search` / `/events/export` match the MASKED row after masking (the store query runs
+    without them and the page is sliced afterwards; the v1 `total` counts the post-filtered set), so a raw number matches
+    nothing; the `masked:<16 hex>` token a viewer sees does filter the rows that show it. A revealer / no-Subject request
+    is unchanged. Consequence: a revealer's `q` no longer finds NEW `OBJECT_OPENED` events by title (use the object list).
+    **Not covered (record only):** the Regulatory report object view (needs an operator decision), outbound mail / webhook
+    policy, the agent SSE stream.
   - **Accepted limits (operator, 2026-10-06; `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (5), (7)).** (5) The lock-race fork
     window is a stated limit, not prevented: a writer with unflushed linked rows when its lock is deleted can
     collide with a second writer, and `GET /audit/verify` detects it afterwards as a `duplicate`. (7) A local

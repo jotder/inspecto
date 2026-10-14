@@ -231,4 +231,48 @@ class ControlApiObjectReadMaskingTest {
             assertTrue(get(c, "revealer", "/objects/" + id).body().contains(RAW));
         }
     }
+
+    // ── OBJECT-READ-MASKING follow-ups: graph titles, OBJECT_OPENED events, q / correlationId probes ──
+
+    private static String ids(JsonNode rows) {
+        StringBuilder b = new StringBuilder();
+        rows.forEach(r -> b.append(r.get("id").asText()).append(' '));
+        return b.toString();
+    }
+
+    @Test
+    void theGraphMasksEachNodeTitleWithThatNodesOwnKeys(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            OperationalObject a = open(c, ObjectType.INCIDENT), b = open(c, ObjectType.INCIDENT);
+            TestOpsEngine.of(c.svc).link(a.id(), b.id(), "RELATES_TO", "t");
+            JsonNode viewer = JSON.readTree(get(c, "viewer", "/objects/" + a.id() + "/graph").body()).get("data");
+            assertEquals(2, viewer.get("nodes").size());
+            assertFalse(viewer.toString().contains(RAW), viewer.toString());
+            viewer.get("nodes").forEach(n -> assertTrue(n.get("title").asText().contains("masked:"), n.toString()));
+            assertTrue(get(c, "revealer", "/objects/" + a.id() + "/graph").body().contains(RAW));
+        }
+    }
+
+    @Test
+    void qAndCorrelationIdCannotProbeARawKeyForANonRevealer(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            OperationalObject o = open(c, ObjectType.INCIDENT);
+            Map<String, String> attrs = new LinkedHashMap<>(o.attributes());
+            OperationalObject withCid = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "other " + RAW, "d", "HIGH",
+                    null, null, null, "case-" + RAW, attrs);
+            for (String base : List.of("/objects", "/objects?limit=50&offset=0")) {
+                assertEquals(0, JSON.readTree(get(c, "viewer", base + (base.contains("?") ? "&" : "?") + "q=" + RAW).body()).get("data").size(), "viewer q=raw");
+                assertEquals(0, JSON.readTree(get(c, "viewer", base + (base.contains("?") ? "&" : "?") + "correlationId=case-" + RAW).body()).get("data").size(), "viewer correlationId=raw");
+            }
+            JsonNode page = JSON.readTree(get(c, "viewer", "/objects?q=" + RAW).body());
+            assertEquals(0, page.get("metadata").get("pagination").get("total").asInt(), "the total counts the post-filtered set");
+            assertEquals(2, JSON.readTree(get(c, "revealer", "/objects?q=" + RAW).body()).get("data").size());
+            assertEquals(1, JSON.readTree(get(c, "revealer", "/objects?correlationId=case-" + RAW).body()).get("data").size());
+            // the masked token a viewer SEES is matchable (documented): it filters the rows that show it
+            String token = JSON.readTree(get(c, "viewer", "/objects/" + o.id()).body()).get("data").get("attributes").get("key.msisdn").asText();
+            assertEquals(2, JSON.readTree(get(c, "viewer", "/objects?q=" + token).body()).get("data").size());
+            String maskedCid = JSON.readTree(get(c, "viewer", "/objects/" + withCid.id()).body()).get("data").get("correlationId").asText();
+            assertEquals(ids(JSON.readTree(get(c, "viewer", "/objects?correlationId=" + maskedCid).body()).get("data")).trim(), withCid.id());
+        }
+    }
 }
