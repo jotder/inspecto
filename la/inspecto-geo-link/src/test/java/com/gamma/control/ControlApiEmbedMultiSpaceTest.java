@@ -68,6 +68,14 @@ class ControlApiEmbedMultiSpaceTest {
         new ComponentStore(cfg.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view"));
     }
 
+    /** The LINK_EMBED_VIEWED / DENIED / REVOKED event types held by one Space's own event store. */
+    private static List<String> embedRows(SpaceManager spaces, String space) {
+        return spaces.space(com.gamma.service.SpaceId.of(space)).orElseThrow().service().events()
+                .query(com.gamma.audit.EventQuery.builder().limit(5000).build()).stream()
+                .map(com.gamma.audit.Event::type)
+                .filter(t -> t.equals("LINK_EMBED_VIEWED") || t.equals("LINK_EMBED_DENIED") || t.equals("LINK_EMBED_REVOKED")).toList();
+    }
+
     @Test
     void aGrantMintedInTheSecondSpaceIsViewableAndEveryRefusalIsTheSame404(@TempDir Path root) throws Exception {
         System.setProperty("la.embed.enabled", "true");
@@ -104,6 +112,13 @@ class ControlApiEmbedMultiSpaceTest {
 
             ok(port, "POST", inv + "/inv-a/embeds/" + token.substring(0, token.indexOf('.')) + "/revoke", "{}");
             assertEquals(unknown, refusal(send(port, "GET", "/public/investigations/" + token, null, false)), "revoked");
+
+            // the public path names no Space, yet its audit rows land in the GRANT'S Space event store (not the in-memory global log, and not another Space)
+            List<String> inTwo = embedRows(spaces, "two");
+            assertEquals(2, inTwo.stream().filter("LINK_EMBED_VIEWED"::equals).count(), "a VIEWED row per successful read, in Space two: " + inTwo);
+            org.junit.jupiter.api.Assertions.assertTrue(inTwo.contains("LINK_EMBED_DENIED"), "the revoked read's DENIED row too: " + inTwo);
+            org.junit.jupiter.api.Assertions.assertTrue(inTwo.contains("LINK_EMBED_REVOKED"), "and the revoke: " + inTwo);
+            assertEquals(List.of(), embedRows(spaces, "one").stream().filter(t -> !"LINK_EMBED_DENIED".equals(t)).toList(), "nothing of Space two's grant in Space one");
         } finally {
             api.close();
             spaces.close();

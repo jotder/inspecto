@@ -678,7 +678,7 @@ class ControlApiInvestigationEmbedTest {
             List<Event> denied = events.stream().filter(e -> "LINK_EMBED_DENIED".equals(e.type())).toList();
             assertTrue(denied.size() >= 3, "every refusal is audited: " + denied.size());
             assertTrue(denied.stream().anyMatch(e -> e.toMap().toString().contains("REVOKED")), "the internal reason goes to the audit row only");
-            assertTrue(denied.stream().allMatch(e -> e.toMap().toString().contains("tokenHash")), "with a hash prefix of the token");
+            assertTrue(denied.stream().allMatch(e -> e.toMap().toString().contains("presentedHash")), "with a hash prefix of the token");
             assertTrue(events.stream().anyMatch(e -> "LINK_EMBED_REVOKED".equals(e.type())));
         } finally {
             EventLog.current().removeSubscriber(sub);
@@ -705,5 +705,123 @@ class ControlApiInvestigationEmbedTest {
             assertEquals(200, pub(c, two).statusCode(), "another link has its own budget");
             assertNotEquals(429, pub(c, "unknown-token-1.AAAA").statusCode());
         }
+    }
+
+    // ── audit rows, field by field (LA-EMBED-VIEW-1 verification) ───────────────────────────────────────
+
+    /** Run {@code body} with every audit event collected; the subscriber is always removed. */
+    private static List<Event> collect(java.util.concurrent.Callable<?> body) throws Exception {
+        List<Event> events = new CopyOnWriteArrayList<>();
+        Consumer<Event> sub = events::add;
+        EventLog.current().addSubscriber(sub);
+        try {
+            body.call();
+        } finally {
+            EventLog.current().removeSubscriber(sub);
+        }
+        return events;
+    }
+
+    private static Event only(List<Event> events, String type) {
+        List<Event> hit = events.stream().filter(e -> type.equals(e.type())).toList();
+        assertEquals(1, hit.size(), type + " in " + events.stream().map(Event::type).toList());
+        return hit.get(0);
+    }
+
+    @Test
+    void everyViewWritesOneViewedRowAndEveryRefusalOneDeniedRowWithExactFieldsAndNeitherCarriesATokenOrAnEntityValue(
+            @TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        enable();
+        try (Ctx c = open(cfg, root)) {
+            investigation(c);
+            settings(root, "none", null);   // raw ids on the wire: if an audit row leaked an entity value it would be readable
+            String token = mint(c, "{\"label\":\"secret label\"}");
+            String id = token.substring(0, token.indexOf('.'));
+            String secret = token.substring(token.indexOf('.') + 1);
+
+            List<Event> viewedRows = collect(() -> pub(c, token));
+            Event v = only(viewedRows, "LINK_EMBED_VIEWED");
+            assertEquals("embed:" + id, v.attributes().get("actor"));
+            assertEquals("embed", v.attributes().get("actor_type"));
+            assertEquals("link.embed.viewed", v.attributes().get("action"));
+            assertEquals("inv-a", v.attributes().get("investigationId"));
+            assertEquals(id, v.attributes().get("grantId"));
+            assertEquals("lead-1", v.attributes().get("issuedBy"));
+            assertEquals("3", v.attributes().get("step"), "the head step the holder was shown: seed, expand, annotate");
+            assertTrue(v.attributes().get("uaHash").matches("[0-9a-f]{8,}"), "the User-Agent is only a hash prefix: " + v.attributes());
+
+            List<Event> deniedRows = collect(() -> {
+                pub(c, token + "x");   // tampered: no stored hash matches, so it is unknown
+                pub(c, "nope");   // not even the shape of a token
+                ok(c, "POST", INV + "/embeds/" + id + "/revoke", "{}", L);
+                return pub(c, token);  // revoked
+            });
+            List<Event> denied = deniedRows.stream().filter(e -> "LINK_EMBED_DENIED".equals(e.type())).toList();
+            assertEquals(3, denied.size(), deniedRows.stream().map(Event::type).toList().toString());
+            assertEquals(List.of("UNKNOWN", "MALFORMED", "REVOKED"), denied.stream().map(e -> e.attributes().get("reason")).toList());
+            for (Event d : denied) {
+                assertEquals("embed", d.attributes().get("actor_type"));
+                assertEquals("link.embed.denied", d.attributes().get("action"));
+                assertTrue(d.attributes().get("presentedHash").matches("[0-9a-f]{8,}"), "a hash prefix, never the token: " + d.attributes());
+            }
+            assertEquals("embed:unknown", denied.get(0).attributes().get("actor"), "a token no grant matches names no grant");
+            assertEquals("embed:unknown", denied.get(1).attributes().get("actor"));
+            assertEquals("embed:" + id, denied.get(2).attributes().get("actor"));
+            assertEquals("inv-a", denied.get(2).attributes().get("investigationId"));
+
+            String all = Stream.concat(viewedRows.stream(), deniedRows.stream()).map(e -> String.valueOf(e.toMap())).reduce("", (x, y) -> x + "\n" + y);
+            for (String needle : List.of(secret, token, "secret label", "suspect a", "Ring around", "Fraud referral", "calls_ds", "calls_view"))
+                assertFalse(all.contains(needle), "no audit row carries " + needle);
+            for (Event e : Stream.concat(viewedRows.stream(), deniedRows.stream()).toList())
+                for (String k : e.attributes().keySet())
+                    assertFalse(k.toLowerCase().contains("entity"), "attribute " + k);
+        }
+    }
+
+    @Test
+    void anAutoRevokedLinkEndsRevokedBySystemWithItsReasonAndOneRevokedAndOneDeniedRow(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        enable();
+        try (Ctx c = open(cfg, root)) {
+            investigation(c);
+            ok(c, "POST", INV + "/members", "{\"subject\":\"analyst-2\",\"role\":\"lead\"}", L);
+            // minter-not-lead, found at the next READ (a demotion keeps the membership, so no eager revoke runs)
+            String byA = ok(c, "POST", INV + "/embeds", "{}", A).get("token").asText();
+            String idA = byA.substring(0, byA.indexOf('.'));
+            assertEquals(200, pub(c, byA).statusCode());
+            ok(c, "POST", INV + "/members", "{\"subject\":\"analyst-2\",\"role\":\"analyst\"}", L);
+            List<Event> lead = collect(() -> pub(c, byA));
+            assertRevokedBySystem(c, lead, idA, "MINTER_NOT_LEAD");
+
+            // masking loosened after a stricter mint
+            settings(root, "all", null);
+            String strict = mint(c, "{}");
+            String idS = strict.substring(0, strict.indexOf('.'));
+            settings(root, null, null);
+            List<Event> loose = collect(() -> pub(c, strict));
+            assertRevokedBySystem(c, loose, idS, "MASKING_LOOSENED");
+            settings(root, "all", null);
+            assertEquals(404, pub(c, strict).statusCode(), "it stays dead after the Space tightens again");
+        }
+    }
+
+    private void assertRevokedBySystem(Ctx c, List<Event> events, String grantId, String reason) throws Exception {
+        Event r = only(events, "LINK_EMBED_REVOKED");
+        assertEquals("system", r.attributes().get("actor"));
+        assertEquals(grantId, r.attributes().get("grantId"));
+        assertEquals(reason, r.attributes().get("reason"));
+        assertEquals("system", r.attributes().get("revokedBy"));
+        assertEquals("inv-a", r.attributes().get("investigationId"));
+        Event d = only(events, "LINK_EMBED_DENIED");
+        assertEquals(reason, d.attributes().get("reason"), "the refusal row names the same reason");
+        assertEquals("embed:" + grantId, d.attributes().get("actor"));
+        assertTrue(events.stream().noneMatch(e -> "LINK_EMBED_VIEWED".equals(e.type())), "a refused read is never a view");
+        JsonNode row = null;
+        for (JsonNode g : ok(c, "GET", INV + "/embeds", null, L).get("grants")) if (grantId.equals(g.get("grantId").asText())) row = g;
+        assertNotNull(row, "the grant stays listed");
+        assertEquals("revoked", row.get("status").asText(), row.toString());
+        assertEquals(reason, row.get("revokedReason").asText());
+        assertEquals("system", row.get("revokedBy").asText());
     }
 }
