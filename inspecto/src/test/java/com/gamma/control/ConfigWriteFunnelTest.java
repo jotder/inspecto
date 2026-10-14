@@ -122,8 +122,6 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /requirements/([^/]+)/decision", "requirement: " + NOT_GOVERNABLE),
             Map.entry("POST /requirements/([^/]+)/deliver", "requirement: " + NOT_GOVERNABLE),
             Map.entry("POST /decision-rules/([^/]+)/simulate", RESULT_STAMP),
-            Map.entry("POST /expectations/evaluate", RESULT_STAMP),
-            Map.entry("POST /expectations/([^/]+)/evaluate", RESULT_STAMP),
             Map.entry("PUT /regulatory-reports/templates/([^/]+)", REPORT_TEMPLATE),
             Map.entry("PUT /settings/egress", EGRESS),
             Map.entry("PUT /settings/approvers", APPROVERS),
@@ -245,7 +243,7 @@ class ConfigWriteFunnelTest {
             Map.entry("BundleRoutes#write", HELPER + "; /bundle/import refuses (holdRefusing) before any item"),
             Map.entry("DecisionRoutes#write", HELPER), Map.entry("ExpectationRoutes#write", HELPER),
             Map.entry("DecisionRoutes#simulate", "a lastSimulation RESULT stamp (archive=false) — operating, not authoring"),
-            Map.entry("ExpectationRoutes#runAndPersist", "a lastResult RESULT stamp (archive=false) — operating, not authoring"),
+            Map.entry("ExpectationRunner#runAndPersist", "a lastResult RESULT stamp (archive=false) — operating, not authoring"),
             Map.entry("NotificationRoutes#write", HELPER), Map.entry("NotificationRoutes#writeRule", HELPER),
             Map.entry("RequirementRoutes#write", "requirement: " + NOT_GOVERNED),
             Map.entry("PipelineListRoutes#deletePipeline", "a grandfathered PipelineStore graph (authored-pipeline) — "

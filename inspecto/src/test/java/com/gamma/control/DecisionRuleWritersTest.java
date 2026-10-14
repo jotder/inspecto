@@ -40,7 +40,7 @@ class DecisionRuleWritersTest {
             Map.entry("AccessRoutes#write", FIXED_KIND + " (access catalog / profiles)"),
             Map.entry("AlertRoutes#write", FIXED_KIND + " (alert-rule)"),
             Map.entry("ExpectationRoutes#write", FIXED_KIND + " (expectation)"),
-            Map.entry("ExpectationRoutes#runAndPersist", FIXED_KIND + " (an expectation's lastResult stamp)"),
+            Map.entry("ExpectationRunner#runAndPersist", FIXED_KIND + " (an expectation's lastResult stamp)"),
             Map.entry("DecisionRoutes#simulate", "re-writes the STORED rule with a lastSimulation stamp only "
                     + "(archive=false) — no body content, the stamps and invoke-api consequences are the stored ones"),
             Map.entry("DecisionRoutes#delete", "deletes; a deleted rule's history is purged with it"),
