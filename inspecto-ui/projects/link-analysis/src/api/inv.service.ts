@@ -904,6 +904,7 @@ export interface DatasetFilesPage {
     index?: { present: boolean; version: number | null; builtAt: string | null; inputsRecorded: number | null };
     readAt: string;
     note?: string;
+}
 
 /** LA-DATA-TRUST-1 S5: one anomaly that moved a day of the Investigation's window after the analyst last looked. */
 export interface DataChange {
