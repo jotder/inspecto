@@ -102,7 +102,7 @@ function create(s: Stubs = {}) {
     });
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, jobs, objects, approvals };
+    return { fixture, el: fixture.nativeElement as HTMLElement, jobs, objects, approvals, events };
 }
 
 const RUN = (over: Record<string, unknown> = {}) => ({
@@ -309,6 +309,24 @@ describe('HomeComponent', () => {
         it('says "at least" when the ledger count is capped', () => {
             const { el } = create({ runs: [RUN()], writes: { count: 10000, datasets: 12, capped: true } });
             expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('at least');
+        });
+
+        it('re-reads the counts on a tick, so a page opened before the writes stops showing 0', () => {
+            vi.useFakeTimers();
+            try {
+                const { fixture, el, events } = create({ runs: [RUN()], writes: { count: 2, datasets: 1, capped: false } });
+                expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('2 writes');
+                events.signalCount.mockReturnValue(of({ count: 17, datasets: 9, capped: false }));
+                vi.advanceTimersByTime(30_000);
+                fixture.detectChanges();
+                expect(events.signalCount).toHaveBeenCalledTimes(2);
+                expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('17 writes');
+                fixture.destroy();
+                vi.advanceTimersByTime(60_000);
+                expect(events.signalCount).toHaveBeenCalledTimes(2);   // the tick dies with the page
+            } finally {
+                vi.useRealTimers();
+            }
         });
 
         it('hides a tile whose count call failed instead of showing a dash', () => {

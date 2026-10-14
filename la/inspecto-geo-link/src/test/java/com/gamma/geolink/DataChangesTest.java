@@ -40,6 +40,18 @@ class DataChangesTest {
         return DataChanges.select(List.of(s), PIPES, window, LOOK);
     }
 
+    /** The real emitter (DayManifest) signals the template's bucket key, not an ISO date: found in the 2026-10-14 live drive. */
+    @Test
+    void theManifestsCompactAndHourlyBucketKeysPlaceADayAndComeBackAsIso() {
+        Instant later = LOOK.plusSeconds(60);
+        List<DataChanges.Change> daily = pick(WINDOW, anomaly("calls", "20261006", later));
+        assertEquals(1, daily.size(), "yyyyMMdd inside the window");
+        assertEquals("2026-10-06", daily.get(0).day(), "shown as an ISO day");
+        assertEquals(1, pick(WINDOW, anomaly("calls", "2026100714", later)).size(), "yyyyMMddHH takes its day");
+        assertTrue(pick(WINDOW, anomaly("calls", "20261004", later)).isEmpty(), "compact day before the window");
+        assertTrue(pick(WINDOW, anomaly("calls", "20261008", later)).isEmpty(), "compact day after the window");
+    }
+
     @Test
     void firstAndLastDayOfTheWindowAreInsideTheDayBeforeAndAfterAreNot() {
         Instant later = LOOK.plusSeconds(60);

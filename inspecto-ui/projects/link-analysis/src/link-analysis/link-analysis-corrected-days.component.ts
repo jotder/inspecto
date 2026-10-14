@@ -38,6 +38,10 @@ export const KIND_TEXT: Record<DataChange['kind'], string> = {
                         </li>
                     }
                 </ul>
+                <p class="mb-0 mt-1 text-xs" data-test="corrected-clears">
+                    This stays until you run a step that reads the data again (for example Resolve); Refresh only re-reads the
+                    Data strip.
+                </p>
                 <button
                     mat-stroked-button
                     type="button"

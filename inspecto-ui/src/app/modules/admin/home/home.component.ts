@@ -25,9 +25,8 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
-import { DEFAULT_REFRESH_MS, visibleInterval } from 'app/inspecto/api/auto-refresh';
 import { ToastrService } from 'ngx-toastr';
-import { filter, fromEvent, merge } from 'rxjs';
+import { interval } from 'rxjs';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One row of the "Needs attention" list — the three sources normalised onto one shape. */
@@ -65,6 +64,9 @@ const CLOSED_INCIDENT = new Set(['RESOLVED', 'ARCHIVED']);
  * landing page that fetched every Expectation to count failures was the wrong trade, and neither tile is
  * computed client-side. Both hide, rather than show a dash, when their call fails.
  */
+/** How often the Home counted tiles re-read their server counts. */
+const COUNT_REFRESH_MS = 30_000;
+
 @Component({
     selector: 'inspecto-home',
     standalone: true,
@@ -205,16 +207,6 @@ export class HomeComponent implements OnInit {
 
     ngOnInit(): void {
         this.load();
-        // The counts loaded once at init, so a Home opened before the night's writes read 0 until a manual
-        // reload (TELCO-FRAUD-STORY-GAPS-1 d). Refresh on the console cadence while the tab is visible, and
-        // at once when the tab or window regains focus.
-        merge(
-            visibleInterval(DEFAULT_REFRESH_MS),
-            fromEvent(document, 'visibilitychange').pipe(filter(() => !document.hidden)),
-            fromEvent(window, 'focus'),
-        )
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe(() => this.load());
     }
 
     load(): void {
@@ -262,6 +254,13 @@ export class HomeComponent implements OnInit {
 
         // HOME-TILES-1: two more cheap counts. Silent on error — a missing write root or an older backend
         // hides the tile; the numbers that ARE shown are always the server's, never a client-side sweep.
+        this.loadCounts();
+        // The page stays open while work lands: a count read once at init showed 0 beside 17 fresh Dataset writes
+        // (TELCO-FRAUD-STORY-GAPS-1 d). Re-read both on a slow tick — two cheap counts, never a client-side sweep.
+        interval(COUNT_REFRESH_MS).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.loadCounts());
+    }
+
+    private loadCounts(): void {
         this.expectations.breachedCount().subscribe({
             next: (r) => this.breached.set(r.count),
             error: () => this.breached.set(null),

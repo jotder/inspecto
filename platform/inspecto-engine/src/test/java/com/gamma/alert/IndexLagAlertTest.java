@@ -109,6 +109,46 @@ class IndexLagAlertTest {
         assertEquals("fresh", svc.freshnessVerdicts("xdr", 142 * MIN).get(0).state(), "cleared by the build");
     }
 
+    /** A polled Collector commits Files and emits pipeline.commit, never dataset.write (found in the 2026-10-14 live drive). */
+    @Test
+    void aPolledCollectorCommitStartsTheWaitAndABuildAfterItEndsIt() {
+        IndexLagProbe probe = new IndexLagProbe();
+        Consumer<Event> bus = probe.subscriber();
+        AlertRule rule = AlertRule.fromMap(Map.of("name", "xdr-index-lag", "dataset", "xdr", "onPipeline", "xdr_feed",
+                "maximumAge", "30m", "indexLag", true, "severity", "warning"));
+        AlertService svc = service(new InMemoryAlertStore(), rule);
+        svc.indexLagProbe(probe);
+
+        bus.accept(signal(SignalType.PIPELINE_COMMIT, Map.of("pipeline", "other_feed", "status", "SUCCESS"), 100 * MIN));
+        bus.accept(signal(SignalType.PIPELINE_COMMIT, Map.of("pipeline", "xdr_feed", "status", "FAILED"), 100 * MIN));
+        bus.accept(signal(SignalType.PIPELINE_COMMIT,
+                Map.of("pipeline", "xdr_feed", "status", "SUCCESS", "dryRun", true), 100 * MIN));
+        assertTrue(svc.evaluate(null, 200 * MIN).isEmpty(), "another Pipeline, a failure and a dry run start no wait");
+
+        bus.accept(signal(SignalType.PIPELINE_COMMIT, Map.of("pipeline", "xdr_feed", "status", "SUCCESS"), 100 * MIN));
+        assertEquals(1, svc.evaluate(null, 140 * MIN).size(), "waited 40 min > 30 min limit");
+        bus.accept(built("BUILT", 141 * MIN));
+        assertEquals("fresh", svc.freshnessVerdicts("xdr", 142 * MIN).get(0).state(), "a build after the commit covers it");
+        bus.accept(signal(SignalType.PIPELINE_COMMIT, Map.of("pipeline", "xdr_feed", "status", "SUCCESS"), 150 * MIN));
+        assertEquals(150 * MIN, probe.apply("xdr", "xdr_feed").getAsLong(), "a later commit starts a new wait");
+    }
+
+    @Test
+    void aFreshnessRuleAgesTheNewerOfDatasetWriteAndPolledCommit() {
+        AlertRule rule = AlertRule.fromMap(Map.of("name", "xdr-fresh", "dataset", "xdr", "onPipeline", "xdr_feed",
+                "maximumAge", "30m", "severity", "warning"));
+        AlertService svc = service(new InMemoryAlertStore(), rule);
+        com.gamma.query.PipelineCommitProbe commits = new com.gamma.query.PipelineCommitProbe(null);
+        svc.pipelineCommitProbe(commits);
+        svc.freshnessProbe(d -> java.util.OptionalLong.empty());
+        assertEquals("unknown", svc.freshnessVerdicts("xdr", 100 * MIN).get(0).state(), "no commit seen: never fresh");
+
+        commits.subscriber().accept(signal(SignalType.PIPELINE_COMMIT, Map.of("pipeline", "xdr_feed", "status", "SUCCESS"), 100 * MIN));
+        assertEquals("fresh", svc.freshnessVerdicts("xdr", 110 * MIN).get(0).state());
+        assertEquals("stale", svc.freshnessVerdicts("xdr", 140 * MIN).get(0).state());
+        assertEquals(1, svc.evaluate(null, 140 * MIN).size(), "a stopped feed fires");
+    }
+
     @Test
     void aRefusedBuildCoversNothingAndTheWaitIsMeasuredFromTheOldestFile() {
         IndexLagProbe probe = new IndexLagProbe();

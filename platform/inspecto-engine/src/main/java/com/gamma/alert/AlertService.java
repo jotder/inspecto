@@ -205,14 +205,25 @@ public final class AlertService {
         this.pollIntervalProbe = probe;
     }
 
-    private volatile java.util.function.Function<String, java.util.OptionalLong> indexLagProbe;
+    private volatile java.util.function.BiFunction<String, String, java.util.OptionalLong> indexLagProbe;
 
     /**
      * Wire the index-lag clock (LA-DATA-TRUST-1 S4): {@code dataset id} → epoch millis since which Files have waited for the
      * Link Analysis index, empty when none are waiting. Unwired = an index-lag rule reads {@code unknown} (silent).
      */
-    public void indexLagProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
+    public void indexLagProbe(java.util.function.BiFunction<String, String, java.util.OptionalLong> probe) {
         this.indexLagProbe = probe;
+    }
+
+    private volatile java.util.function.Function<String, java.util.OptionalLong> pipelineCommitProbe;
+
+    /**
+     * Wire the Collector commit clock: {@code Pipeline name} → epoch millis of its last successful commit, empty when
+     * unknown. A polled Collector emits {@code pipeline.commit} but never {@code dataset.write}, so a freshness rule that
+     * names {@code onPipeline} ages the newer of the two.
+     */
+    public void pipelineCommitProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
+        this.pipelineCommitProbe = probe;
     }
 
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalLong> eventDateProbe;
@@ -409,20 +420,35 @@ public final class AlertService {
     /**
      * Record an Alert that is NOT an Alert Rule firing but the consequence of a domain Event (a sequence gap, a
      * conservation imbalance: {@link EventAlertBridge}). It joins the {@code GET /alerts} ring and the Alert store,
-     * de-duplicated while a non-terminal Alert with the same {@code dedupeKey} exists in {@code scope}. No Incident,
+     * de-duplicated while a non-terminal Alert with the same {@code dedupeKey} exists in {@code scope}. No Incident unless {@code escalate},
      * no {@code ALERT_FIRED} event (the source Event is the record) and no cooldown.
      *
      * @return the new Alert record's id, or empty when an active one already carries {@code dedupeKey}
      */
     public synchronized java.util.Optional<String> raiseFromEvent(Alert alert, String title, String scope,
                                                                   String dedupeKey, Map<String, String> attributes) {
+        return raiseFromEvent(alert, title, scope, dedupeKey, attributes, false);
+    }
+
+    /** As above; {@code escalate} also opens an Incident for it (a missing file in a sequence, {@link EventAlertBridge}). */
+    public synchronized java.util.Optional<String> raiseFromEvent(Alert alert, String title, String scope,
+                                                                  String dedupeKey, Map<String, String> attributes,
+                                                                  boolean escalate) {
         String sc = scope == null ? "" : scope;
         if (records.activeAlertIndex(sc, EVENT_KEY).containsKey(dedupeKey)) return java.util.Optional.empty();
         Map<String, String> attrs = new LinkedHashMap<>(attributes);
         attrs.put(EVENT_KEY, dedupeKey);
         fired.addFirst(alert);
         while (fired.size() > capacity) fired.removeLast();
-        return java.util.Optional.of(records.openAlert(alert, title, alert.message(), alert.severity(), sc, attrs));
+        String id = records.openAlert(alert, title, alert.message(), alert.severity(), sc, attrs);
+        if (escalate) {
+            // A missing delivery is a data-quality fault someone must own: open ONE Incident per (scope, event key)
+            // through the same incidents service a high-severity rule uses and link it ESCALATED_FROM the Alert. A
+            // deployment without the operational-object module opens none (NO_INCIDENTS) and keeps the Alert.
+            incidents.openIncident(title, alert.message(), "error", sc, new LinkedHashMap<>(attrs), EVENT_KEY)
+                    .ifPresent(inc -> records.linkEscalation(inc, id, "event-bridge"));
+        }
+        return java.util.Optional.of(id);
     }
 
     /**
@@ -711,7 +737,7 @@ public final class AlertService {
         if (rule.indexLag()) {                           // the "age" is how long Files have waited for the index; none waiting = 0
             var lag = indexLagProbe;
             if (lag == null) return java.util.OptionalLong.empty();
-            java.util.OptionalLong since = lag.apply(rule.dataset());
+            java.util.OptionalLong since = lag.apply(rule.dataset(), rule.onPipeline());
             return since.isPresent() ? since : java.util.OptionalLong.of(nowMs);
         }
         if (rule.eventDateColumn() != null) {            // event-date mode: age of the newest event, not the last write
@@ -719,7 +745,13 @@ public final class AlertService {
             return byDate == null ? java.util.OptionalLong.empty() : byDate.apply(rule.dataset(), rule.eventDateColumn());
         }
         var probe = freshnessProbe;                      // no clock wired (lean / unit paths) = unknown
-        return probe == null ? java.util.OptionalLong.empty() : probe.apply(rule.dataset());
+        java.util.OptionalLong published = probe == null ? java.util.OptionalLong.empty() : probe.apply(rule.dataset());
+        var commit = pipelineCommitProbe;                // a polled Collector commits and never emits dataset.write
+        java.util.OptionalLong committed = commit == null || rule.onPipeline() == null
+                ? java.util.OptionalLong.empty() : commit.apply(rule.onPipeline());
+        if (committed.isEmpty()) return published;
+        return published.isEmpty() ? committed
+                : java.util.OptionalLong.of(Math.max(published.getAsLong(), committed.getAsLong()));
     }
 
     /**

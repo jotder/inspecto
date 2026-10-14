@@ -48,6 +48,25 @@ class EventAlertBridgeTest {
     }
 
     @Test
+    void aGapAlsoOpensOneLinkedIncidentWhenTheIncidentsServiceIsPresent() {
+        java.util.List<String> opened = new java.util.ArrayList<>();
+        AlertService svc = new AlertService(List.of(), null, null, AlertRecords.of(store, Optional.empty()),
+                (title, message, severity, scope, attributes, dedupe) -> {
+                    opened.add(title + "|" + scope + "|" + dedupe + "=" + attributes.get(dedupe));
+                    return Optional.of("inc-" + opened.size());
+                });
+        EventAlertBridge bridge = new EventAlertBridge(svc);
+        bridge.onEvent(gap("cdr", "CDR_20260702.csv"));
+        bridge.onEvent(gap("cdr", "CDR_20260702.csv"));   // a re-report: no second Alert, no second Incident
+        bridge.onEvent(imbalance("cdr", "dedup", "LOSS", 10, 2));   // an imbalance stays an Alert only
+
+        assertEquals(1, opened.size(), "one Incident for the gap: " + opened);
+        assertTrue(opened.get(0).startsWith("Missing file in sequence: CDR_20260702.csv on cdr|cdr|eventKey="), opened.get(0));
+        AlertStore.Row gapAlert = store.active("cdr").stream().filter(a -> "sequence_gap".equals(a.attributes().get("rule"))).findFirst().orElseThrow();
+        assertEquals("inc-1", gapAlert.incidentId(), "the Alert links to its Incident");
+    }
+
+    @Test
     void raisesAGapAsAStoredAlertCarryingTheExpectedKey() {
         AlertService svc = service(store);
         new EventAlertBridge(svc).onEvent(gap("gap_src", "cdr_2026061402.csv"));

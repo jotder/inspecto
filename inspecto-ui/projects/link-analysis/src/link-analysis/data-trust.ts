@@ -31,10 +31,17 @@ export interface DataTrustStrip {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** `2026-09-05T10:00:00Z` -> `5 Sep 2026` (UTC, so the same instant reads the same for every analyst). */
+/**
+ * `2026-09-05T10:00:00Z` -> `5 Sep 2026` (UTC, so the same instant reads the same for every analyst). An instant at exactly
+ * UTC midnight is how the server states "covered through the end of a DATE" (the newest event day 2026-09-04 reads
+ * `2026-09-05T00:00:00Z`), so it names the day BEFORE: showing 5 Sep would claim a day with no data (live drive 2026-10-14).
+ */
 export function formatDay(iso: string | null | undefined): string {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
-    return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '';
+    if (!m) return '';
+    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    if (/T00:00:00(\.0+)?Z$/.test(iso as string)) d.setUTCDate(d.getUTCDate() - 1);
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
