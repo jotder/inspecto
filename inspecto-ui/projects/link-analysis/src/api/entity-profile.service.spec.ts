@@ -27,6 +27,12 @@ describe('EntityProfileService (la-entity-profile-plan section 4.5)', () => {
         http.expectOne(
             (r) => r.method === 'GET' && r.url.endsWith('/inv/entities/msisdn/masked%3Af01a%2F9b/profile'),
         ).flush({});
+        // The raw value travels in the body of the resolve POST only, never in its URL.
+        svc.resolveEntity('msisdn', '+249 911').subscribe();
+        const res = http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/inv/entities/msisdn/resolve'));
+        expect(res.request.body).toEqual({ key: '+249 911' });
+        expect(res.request.urlWithParams).not.toContain('249');
+        res.flush({ type: 'msisdn', key: 'masked:ab', masked: true });
         http.verify();
     });
 });
