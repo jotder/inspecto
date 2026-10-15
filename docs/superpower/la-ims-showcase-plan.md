@@ -1,6 +1,6 @@
 # Link Analysis showcase on real IMS records (analysis and plan)
 
-**Status: PLAN 2026-10-15, nothing built.** Input: 20 Huawei IMS CDR extracts (`fct_huawei_ims`) at `C:\sandbox\data\IMS` (outside the repo, **never committed**:
+**Status: BUILT and rehearsed on screen 2026-10-15 (steps B1-B5 and the dry run below); the Space and data stay outside the repo.** Input: 20 Huawei IMS CDR extracts (`fct_huawei_ims`) at `C:\sandbox\data\IMS` (outside the repo, **never committed**:
 no data or client files in commits). This page records what the data holds, what graph a Link Analysis user can draw from it, and the build steps.
 Numbers in this page were measured on 2026-10-15 over the 19 distinct files; subscriber numbers are masked here on purpose.
 Existing showcase assets this reuses: [demo runbook](../ops/la-demo-runbook.md), the `la-showcase` Space Template, `tools/gen-la-telecom-data.py` (the synthetic telecom feeds).
@@ -126,6 +126,32 @@ Findings to handle before the demo:
 | Masking | no raw MSISDN anywhere in the op log or Alert text | |
 
 Findings from the dry run: (1) the burst saved view hits the 500-node cap because `failed_ratio >= 0.9` also keeps failed service SMS: add a `link_kind` condition to the view or the demo opens on "Truncated"; (2) the **service-hub beat is the four-eyes gate, not a hub restriction** (`hubsFlagged` 0 for a 6,638-receiver sender name): say "bounded to 500, 6,138 more not shown", not "flagged as a hub"; (3) the rejected row of B1 finding 2 was a schema defect and is fixed (all 29,650 rows stored; the dry run above ran on the 29,649-row ingest, counts unchanged at 3 / 1 / 1 after the re-ingest, links 19,638); (4) the plan's "consecutive IMSIs" and "one IMEI batch" wording is corrected above. **Not done in this pass:** the full 20 minutes on screen (only Load, the loaded view and the Alerts data were driven in the browser), the Alerts page, the Dossier panel and the embed beat in the UI; a spoken run with a second person.
+
+**On-screen rehearsal, 2026-10-15 (current `master` `1ad331c50`, Enterprise demo bundle, `la-app` UI; the Space served by it on port 8101).**
+
+*Which bundle.* A bundle built with the default (full SPA) UI has **no Link Analysis page** (`/link-analysis` is "Page not found"; the SPA offers Home, Business, Operations); it does show Home "Needs attention", Incidents and Cases. For this demo build **`package.ps1 -Edition Enterprise -DemoAuth -Ui la-app -NoBakeDemo`** (about 10 minutes; the Angular font inlining fetches Google Fonts and failed once on a transient network error: retry). The `la-app` UI has Link Analysis, Geo, Entity Lists and Alerts, but no Incidents or Cases page: show the Incident and Case through the full SPA or by API.
+
+| Beat | On screen | Result |
+|---|---|---|
+| Alerts page | `la-app` /alerts | 4 fired rows (3 Space Alerts and the stale `file_problem`), 3 Alert Rules |
+| Burst view (saved-view Load) | picker, hover the row, "Load view" | **228 nodes, 261 links, no "Truncated" banner** (the projection cap is now 1,000 under LA-CONFIG-LIMITS-1); legend `co_target` and `sms` only; stars of 8, 14 and 36 senders; ids masked |
+| Shared-device view | same path | **22 nodes, 110 links**: the 15-MSISDN clique, a 3-clique and a pair, as community hulls |
+| Start Investigation, seed by list | Investigation tab, Entity Lists "Seed by list" | "Seeded 9 entities from IMS SMS burst" (the lists only offer Seed by list once an Investigation is open); works under masking |
+| Expand one degree | "Expand next degree" | **runs at once, no approval wait**: 0 new entities, 36 links (28 clique + 8 SMS), "answered from the link index v25" |
+| Replay | Replay button | "Replay is equivalent: the same Working Set at every step" |
+| Dossier | Build, then "Verify this manifest" | topology 9 entities, 36 links; "Log intact"; ledger names the Entity List; **"Verified, self-consistent: yes"** with the manifest root hash |
+| Alert, Incident, Case | full SPA (Home, Incidents, Cases) | burst Incident on Home "Needs attention" with aggregate-only text; Incidents: 1 Identified; Cases: 1 Open, tag `fraud-desk` |
+| All 16 API checks | re-run on the new bundle | 16 of 16 PASS (same as the earlier run; unbounded expand with no ids still waits for approval) |
+
+Findings from this pass (the open ones first):
+
+1. **The Entity List "member of" marker is a real defect under `typed` masking.** `POST /entity-lists/{id}/match` with the raw number matches (`match: key`); with the node's masked alias it does not, and the alias the list returns for the same number (`masked:6d98...`) differs from the exploration alias (`masked:f01a...`), so a masked node id can never match a list. Root cause is two aliasings: fix by matching on the same keyed alias the exploration uses, or by resolving the node to its raw key server-side. Not fixed here.
+2. **Four-eyes no longer fires on a plain degree expand** (LA-CONFIG-LIMITS-1 gave the UI a bounded default): the T7 beat must use "Expand the whole Working Set" or a high-degree sender name (the API call with no ids still returns `pending`). The earlier "first click waits for approval" note is superseded.
+3. **`Σ via` in the Working Set panel is a nonsense figure** (an IMEI string summed as a number: 38,468T). Cosmetic; drop `via` from the numeric attribute columns of the telecom views or label it as text.
+4. **The data-trust strip still reads "Data as-of date not known, days not assessed"**, and the Dossier "Data state at export time" says "not assessed" for as-of, files waiting and days with no rows: the strip reads input-file stamps and `ims_links` is built by a Job, not landed by a Collector. Drop T12 for this Space, or point a view at `ims_cdr` itself.
+5. The stale `file_problem` Alert (from the rejected row, fixed) is still OPEN in the Space: acknowledge it before the demo or it shows as a fourth Alert.
+
+**Not done in this pass:** the tamper check by file upload on screen (the API tamper check passes), the embed beat (API only by design), a spoken run with a second person, and the Alerts-page drill into the Investigation.
 
 ### 4.2 Demo run (20 minutes, technical audience; full runbook scenes in brackets)
 
