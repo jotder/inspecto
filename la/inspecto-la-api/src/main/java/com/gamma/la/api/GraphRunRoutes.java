@@ -63,7 +63,9 @@ import java.util.TreeSet;
  *
  * <p><b>Decision 7 - inline or job.</b> A run whose Working Set has at most {@link Algorithm#inlineNodeCeiling()} nodes is
  * waited for briefly ({@value #INLINE_WAIT_MS} ms) and answered {@code 200}; a larger one is a {@code 202} the caller polls.
- * Both are the same run in the same service - the ceiling only decides whether the request waits.
+ * Both are the same run in the same service - the ceiling only decides whether the request waits. ⚠ {@code suspicionScore}'s
+ * ceiling is the Space's {@code suspicion_node_cap} ({@code LA-CONFIG-LIMITS-1} CL-2), the SAME value the browser refuses
+ * above, so the two never disagree about what is too big to answer at once ({@link #inlineNodeCeiling}).
  *
  * <p><b>Never a silent cap.</b> A run past its budget is a {@code 200} whose body says {@code BUDGET_EXCEEDED}, the budget,
  * the measured size and the reason - and carries NO {@code result} key, ever. The budget in force and what was consumed
@@ -160,6 +162,15 @@ public final class GraphRunRoutes implements RouteModule {
         return Math.min(stated != null ? stated : GraphResultJson.DEFAULT_MAX_RESULT_ITEMS, GraphResultJson.MAX_RESULT_ITEMS);
     }
 
+    /**
+     * The inline ceiling in force for {@code a} in the Space at {@code writeRoot}: the catalogue's measured one, except
+     * {@code suspicionScore}, whose ceiling is the Space's {@code suspicion_node_cap} (CL-2: one value, browser and server).
+     */
+    static int inlineNodeCeiling(Algorithm a, Path writeRoot) {
+        if (a != Algorithm.SUSPICION_SCORE) return a.inlineNodeCeiling();
+        return SpaceLimits.get(writeRoot, LaLimit.SUSPICION_NODE_CAP);
+    }
+
     private static long inlineWaitMs() {
         return inlineWaitOverrideMs >= 0 ? inlineWaitOverrideMs : INLINE_WAIT_MS;
     }
@@ -178,7 +189,7 @@ public final class GraphRunRoutes implements RouteModule {
             o.put("id", a.id());
             o.put("label", a.label());
             o.put("cost", a.cost().name());
-            o.put("inlineNodeCeiling", a.inlineNodeCeiling());
+            o.put("inlineNodeCeiling", inlineNodeCeiling(a, api.writeRoot()));
             List<Object> params = new ArrayList<>();
             for (Algorithm.Param p : a.params()) {
                 Map<String, Object> pm = new LinkedHashMap<>();
@@ -310,7 +321,7 @@ public final class GraphRunRoutes implements RouteModule {
         int dropped = input instanceof GraphInput.Materialised m ? m.droppedDangling() : 0;      // an index edge has both endpoints by construction
         emit(LinkEventTypes.LINK_GRAPH_RUN_STARTED, ex, v, nodes, edges);
 
-        if (!v.status().terminal() && nodes <= algorithm.inlineNodeCeiling()) {
+        if (!v.status().terminal() && nodes <= inlineNodeCeiling(algorithm, writeRoot)) {
             try {
                 v = svc.await(v.id(), inlineWaitMs());
             } catch (InterruptedException e) {

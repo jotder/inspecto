@@ -58,7 +58,8 @@ import { combineSources } from './index-source';
  * ⚠ Its shipped default is a **default, not a truth** — measured on one host and one graph shape (plan §1.7). It is
  * the real governor of what an analyst sees, and it is set by LAYOUT cost, not by the algorithms: the default layered
  * layout renders 500 nodes in ~0.9 s but 750 in ~10.7 s. A different host, layout or data shape moves that cliff.
- * Read it — never cache it.
+ * The operator raised the default from 500 to 1 000 (CL-1, 2026-10-15); an analyst whose machine struggles lowers it
+ * for their own browser (My browser). Read it — never cache it.
  */
 export function projectionNodeCapValue(): number {
     return laLimit('projection_node_cap');

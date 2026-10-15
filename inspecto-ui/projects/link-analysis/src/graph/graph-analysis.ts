@@ -1,16 +1,18 @@
 import type { GraphDirection } from '@inspecto/core/api';
 import type { G6Edge, G6GraphData, G6Node } from '@inspecto/core/graph/graph-types';
-import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
+import { LaLimitKey, laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * Pure, source-agnostic graph analysis over the shared {@link G6GraphData} shape — the Link Analysis
  * Studio's algorithm library (plan §3 P1). Framework-free; every function returns new data and never
- * mutates its input. Guarded by {@link analysisNodeCapValue} where the algorithm is super-linear.
+ * mutates its input. Each super-linear algorithm is guarded by its OWN cap, {@link browserAlgorithmCapValue}.
  */
 
 /**
- * The ceiling for the browser-side algorithms, in nodes: `analysis_node_cap` (LA-CONFIG-LIMITS-1), the Space's value
- * or the analyst's lower one for this browser, published by `GET /settings/link-analysis/limits`.
+ * The GENERAL browser cap, in nodes: `analysis_node_cap` (LA-CONFIG-LIMITS-1), the Space's value or the analyst's lower
+ * one for this browser, published by `GET /settings/link-analysis/limits`. Since P2 (CL-3) it guards what has no cap of
+ * its own - the branching pattern matcher - and is the selection algorithms' hand-over threshold
+ * ({@link selectionNodeCapValue}); every guarded catalogue algorithm reads {@link browserAlgorithmCapValue} instead.
  *
  * ⚠ Its shipped default is a **default, not a truth**. It was measured on one host, one browser and one synthetic
  * graph shape (2026-09-22, plan §1.7): 25 of the 27 algorithms stay under 60 ms even at ~2 000 nodes, while
@@ -21,22 +23,38 @@ export function analysisNodeCapValue(): number {
     return laLimit('analysis_node_cap');
 }
 
+/** A catalogue algorithm the browser caps on its own item, `browser_algorithms.<id>` (CL-3). */
+type AlgorithmOf<K> = K extends `browser_algorithms.${infer Id}` ? Id : never; // distributes over the union
+export type BrowserCappedAlgorithm = AlgorithmOf<LaLimitKey>;
+
+/**
+ * The browser cap of ONE algorithm, in nodes: `browser_algorithms.<id>` (LA-CONFIG-LIMITS-1 CL-3), the Space's value or
+ * the analyst's lower one. Shipped at 2 500, or at the algorithm's measured ceiling where that is lower (betweenness 500;
+ * closeness, cliques, max flow, link prediction, eigenvector, Katz, HITS 1 000). Read it - never cache it.
+ * ⚠ Suspicion score has no such item: {@link suspicionNodeCapValue} is its one key, shared with the server.
+ */
+export function browserAlgorithmCapValue(algorithm: BrowserCappedAlgorithm): number {
+    return laLimit(`browser_algorithms.${algorithm}`);
+}
+
 /**
  * The Working Set size above which the SELECTION algorithms (shortest and all paths, cycles, cut points, spanning
  * forest) are handed to the server instead of run in the browser (LA-GRAPH-RUN-SELECTION-LOCAL-ONLY-1).
  *
- * ⚠ These algorithms have NO browser cap of their own - they never refuse - so there is nothing configured to
- * reuse. This is the ONE place their threshold is defined: it is the analysis cap (the largest graph the
- * deployment says the browser analyses comfortably), so one setting moves every browser-or-server decision. The
- * server's own per-algorithm `inlineNodeCeiling` can only LOWER it (see the toolbox), never raise it.
+ * ⚠ These algorithms never refuse in the browser. Their hand-over threshold is the analysis cap (the largest graph the
+ * deployment says the browser analyses comfortably), so one setting moves every browser-or-server decision. Their own
+ * `browser_algorithms.<id>` item and the server's per-algorithm `inlineNodeCeiling` can only LOWER it (see the
+ * toolbox), never raise it.
  */
 export function selectionNodeCapValue(): number {
     return laLimit('analysis_node_cap');
 }
 
 /**
- * The ceiling for the **betweenness-bearing** algorithms — `betweennessCentrality` and `suspicionScore`,
- * which is slow only because it calls it (decision D-S3, operator 2026-09-22): `suspicion_node_cap`.
+ * The ceiling for `suspicionScore`: `suspicion_node_cap`, ONE value for the browser and the server (LA-CONFIG-LIMITS-1
+ * CL-2, default 1 000): the browser refuses above it, and a server run above it is a job rather than an inline answer.
+ * Betweenness alone has its own item since P2 ({@link browserAlgorithmCapValue}, default 500); the history below is
+ * why that cap is low.
  *
  * 🔴 **Corrected 2026-09-23.** This was applied to suspicion score alone, on the plan's §1.7 claim that
  * "25 of 27 algorithms stay under 60 ms at 1 999 nodes" (the count then; the server catalogue now lists 29) with suspicion score the sole outlier. That claim
@@ -46,9 +64,6 @@ export function selectionNodeCapValue(): number {
  * while the CAUSE stayed on the shared 2 000 ceiling, and an analyst selecting "Betweenness" from the
  * centrality list froze the main thread for about ten seconds.
  *
- * ⚠ The setting is still keyed `suspicion_node_cap`. That name is now narrower than what it governs; renaming a
- * setting shipped the day before is an operator call and is deliberately NOT taken here.
- *
  * Measured on the dev host, median of 3, ~3 edges per node — suspicion score end to end:
  * 250 → 103 ms · 500 → 402 ms · **750 → 972 ms** · 1 000 → 1 608 ms · 1 500 → 3 774 ms · 2 000 → 7 277 ms.
  * And betweenness alone, which accounts for essentially all of it: 500 → 425 ms · 1 000 → 2 930 ms ·
@@ -56,8 +71,8 @@ export function selectionNodeCapValue(): number {
  *
  * 🔴 **The curve is quadratic** — betweenness dominates, and doubling the nodes costs ~4.5× the time,
  * so this cap is far more sensitive than a linear one: halving it from 2 000 to 1 000 cuts the work to
- * about a quarter, not a half. The shipped default 750 is the last MEASURED point under one second; the
- * interpolated crossing is ~760, and a default should be a number someone actually observed.
+ * about a quarter, not a half. Until P2 the default was 750, the last MEASURED point under one second; the
+ * operator chose 1 000 for browser and server alike (CL-2, 2026-10-15) - about 1.6 s here - and it is configurable.
  *
  * ⚠ Like the others this is a DEFAULT, not a truth — one host, one browser, one synthetic shape. Read it — never cache it.
  */
@@ -296,19 +311,20 @@ export function degreeCentrality(g: G6GraphData): NodeScore[] {
 
 /**
  * Betweenness centrality (Brandes, unweighted, treating the graph as undirected), descending.
- * Throws above {@link analysisNodeCapValue} — callers surface that as a typed message.
+ * Throws above its own cap, `browser_algorithms.betweennessCentrality` — callers surface that as a typed message.
  */
 export function betweennessCentrality(g: G6GraphData): NodeScore[] {
     // 🔴 The LOW cap, not the shared one. Measured 2026-09-23: betweenness is 425 ms at 500 nodes,
     // 2.9 s at 1 000 and 9.8 s at 2 000 — it is THE slow algorithm in this library, and every other
     // component of suspicion score together costs under 130 ms at 2 000. Guarding it with the shared
-    // 2 000 cap meant an analyst choosing "Betweenness" from the centrality list froze the main thread
-    // for about ten seconds. D-S3 capped suspicion score at 750 believing IT was the outlier; suspicion
-    // score is only slow because it calls this, so the cap belonged here all along.
-    const cap = suspicionNodeCapValue();
-    if (g.nodes.length > cap) {
-        throw new Error(`Betweenness is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
-    }
+    // cap meant an analyst choosing "Betweenness" from the centrality list froze the main thread
+    // for about ten seconds. Its own item defaults to 500, the measured server ceiling (CL-3).
+    requireUnderCap(g, 'Betweenness', browserAlgorithmCapValue('betweennessCentrality'));
+    return brandes(g);
+}
+
+/** Brandes betweenness, unguarded: {@link betweennessCentrality} and {@link suspicionScore} each apply their own cap. */
+function brandes(g: G6GraphData): NodeScore[] {
     const adj = adjacency(g);
     const bc = new Map<string, number>(g.nodes.map((n) => [n.id, 0]));
     for (const s of g.nodes) {
@@ -423,13 +439,10 @@ export function detectCommunities(g: G6GraphData, maxIterations = 20): Map<strin
  * level nodes visited in id order, moves only on a strict modularity gain). Local-moving +
  * community aggregation to convergence. Returns nodeId → communityId (id = the community's smallest
  * member), matching the {@link detectCommunities} contract so the UI shares the list + emphasis code.
- * Throws above {@link analysisNodeCapValue} — callers surface that as a typed message.
+ * Throws above its own cap, `browser_algorithms.louvainCommunities` — callers surface that as a typed message.
  */
 export function louvainCommunities(g: G6GraphData): Map<string, string> {
-    const cap = analysisNodeCapValue();
-    if (g.nodes.length > cap) {
-        throw new Error(`Community detection is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
-    }
+    requireUnderCap(g, 'Community detection', browserAlgorithmCapValue('louvainCommunities'));
     const ids = g.nodes.map((n) => n.id).sort();
     const n = ids.length;
     if (!n) return new Map();
@@ -1197,7 +1210,8 @@ export function egoNetwork(g: G6GraphData, nodeId: string, direction: GraphDirec
 // V2 — Algorithm library (centrality family, cohesive subgroups, flow, similarity, link prediction)
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 
-function requireUnderCap(g: G6GraphData, what: string, cap = analysisNodeCapValue()): void {
+/** Refuse above `cap`, naming the algorithm and the cap in force (the analyst can lower it, an admin raise it). */
+function requireUnderCap(g: G6GraphData, what: string, cap: number): void {
     if (g.nodes.length > cap) {
         throw new Error(`${what} is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
@@ -1246,10 +1260,10 @@ export function pageRank(g: G6GraphData, opts: { damping?: number; iterations?: 
 
 /**
  * Closeness centrality (undirected, Wasserman–Faust normalization for disconnected graphs),
- * descending — high for nodes with short paths to many others. Throws above {@link analysisNodeCapValue}.
+ * descending — high for nodes with short paths to many others. Throws above its own cap.
  */
 export function closenessCentrality(g: G6GraphData): NodeScore[] {
-    requireUnderCap(g, 'Closeness');
+    requireUnderCap(g, 'Closeness', browserAlgorithmCapValue('closenessCentrality'));
     const adj = adjacency(g);
     const ids = g.nodes.map((n) => n.id);
     const N = ids.length;
@@ -1294,9 +1308,9 @@ function powerIterate(
     return x;
 }
 
-/** Eigenvector centrality (undirected, power iteration), descending. Throws above {@link analysisNodeCapValue}. */
+/** Eigenvector centrality (undirected, power iteration), descending. Throws above its own cap. */
 export function eigenvectorCentrality(g: G6GraphData, iterations = 100): NodeScore[] {
-    requireUnderCap(g, 'Eigenvector centrality');
+    requireUnderCap(g, 'Eigenvector centrality', browserAlgorithmCapValue('eigenvectorCentrality'));
     const adj = adjacency(g);
     const x = powerIterate(
         g,
@@ -1320,7 +1334,7 @@ export function katzCentrality(
     g: G6GraphData,
     opts: { alpha?: number; beta?: number; iterations?: number } = {},
 ): NodeScore[] {
-    requireUnderCap(g, 'Katz centrality');
+    requireUnderCap(g, 'Katz centrality', browserAlgorithmCapValue('katzCentrality'));
     const { alpha = 0.1, beta = 1, iterations = 100 } = opts;
     const adj = adjacency(g);
     const ids = g.nodes.map((n) => n.id);
@@ -1337,14 +1351,14 @@ export function katzCentrality(
     return scored(g, x);
 }
 
-/** Hub and authority scores (HITS, directed, power iteration). Throws above {@link analysisNodeCapValue}. */
+/** Hub and authority scores (HITS, directed, power iteration). Throws above its own cap. */
 export interface HitsResult {
     hubs: NodeScore[];
     authorities: NodeScore[];
 }
 
 export function hits(g: G6GraphData, iterations = 100): HitsResult {
-    requireUnderCap(g, 'HITS');
+    requireUnderCap(g, 'HITS', browserAlgorithmCapValue('hits'));
     const adj = adjacency(g);
     const ids = g.nodes.map((n) => n.id);
     let hub = new Map(ids.map((id) => [id, 1]));
@@ -1462,10 +1476,10 @@ export function triangleCount(g: G6GraphData): NodeScore[] {
 
 /**
  * Maximal cliques (undirected, Bron–Kerbosch with pivoting) of size ≥ `minSize` (default 3), largest
- * first — fully-interconnected groups, the tightest form of a ring. Throws above {@link analysisNodeCapValue}.
+ * first — fully-interconnected groups, the tightest form of a ring. Throws above its own cap.
  */
 export function cliques(g: G6GraphData, opts: { minSize?: number } = {}): string[][] {
-    requireUnderCap(g, 'Clique detection');
+    requireUnderCap(g, 'Clique detection', browserAlgorithmCapValue('cliques'));
     const { minSize = 3 } = opts;
     const nb = undirectedNeighbors(g);
     const found: string[][] = [];
@@ -1507,10 +1521,10 @@ export interface MaxFlowResult {
 /**
  * Maximum flow from `sourceId` to `sinkId` (Edmonds–Karp) with edge capacity = {@link edgeWeight},
  * and the resulting min-cut. Directed. Returns `{ value: 0, minCut: empty }` when either endpoint is
- * absent. Throws above {@link analysisNodeCapValue}.
+ * absent. Throws above its own cap.
  */
 export function maxFlow(g: G6GraphData, sourceId: string, sinkId: string): MaxFlowResult {
-    requireUnderCap(g, 'Max-flow');
+    requireUnderCap(g, 'Max-flow', browserAlgorithmCapValue('maxFlow'));
     const empty: MaxFlowResult = { value: 0, minCut: { nodeIds: [], edgeIds: [] } };
     if (sourceId === sinkId) return empty;
     const nodeIds = new Set(g.nodes.map((n) => n.id));
@@ -1647,13 +1661,13 @@ export interface PredictedLink {
  * Link prediction over non-adjacent node pairs (undirected), top `limit` (default 20) by score.
  * `method`: `common-neighbors` (raw shared-neighbor count) or `adamic-adar` (shared neighbors
  * weighted by `1/log(degree)`, the default — rarer common associates count for more). Throws above
- * {@link analysisNodeCapValue}.
+ * its own cap.
  */
 export function linkPrediction(
     g: G6GraphData,
     opts: { method?: 'common-neighbors' | 'adamic-adar'; limit?: number } = {},
 ): PredictedLink[] {
-    requireUnderCap(g, 'Link prediction');
+    requireUnderCap(g, 'Link prediction', browserAlgorithmCapValue('linkPrediction'));
     const { method = 'adamic-adar', limit = 20 } = opts;
     const nb = undirectedNeighbors(g);
     const label = new Map(g.nodes.map((n) => [n.id, n.data.label]));
@@ -1721,16 +1735,15 @@ function normalize(scores: NodeScore[]): Map<string, number> {
  * tunable (default 1 each); the per-node `factors` breakdown drives risk sizing/colouring on the
  * canvas and an explainable ranking.
  *
- * ⚠ Refuses above {@link suspicionNodeCapValue}, its OWN lower ceiling — not the shared
- * {@link analysisNodeCapValue} — because betweenness dominates the cost and the growth is quadratic
- * (D-S3). The refusal names this cap, so an analyst who can run every other tool at 2 000 nodes is told
- * why this one stopped at 750 instead of being left to guess.
+ * ⚠ Refuses above {@link suspicionNodeCapValue} — `suspicion_node_cap`, the one value the browser and the server
+ * share (CL-2) — and above NOTHING else: it computes betweenness itself, unguarded, so betweenness's own (lower) cap
+ * cannot refuse a suspicion score the Space allows. The refusal names the cap in force.
  */
 export function suspicionScore(g: G6GraphData, weights: SuspicionWeights = {}): SuspicionScore[] {
     requireUnderCap(g, 'Suspicion scoring', suspicionNodeCapValue());
     const w = { degree: 1, betweenness: 1, pageRank: 1, core: 1, triangles: 1, ...weights };
     const deg = normalize(degreeCentrality(g));
-    const btw = normalize(betweennessCentrality(g));
+    const btw = normalize(brandes(g));
     const pr = normalize(pageRank(g));
     const core = normalize(kCore(g));
     const tri = normalize(triangleCount(g));

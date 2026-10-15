@@ -123,11 +123,11 @@ class ControlApiLinkAnalysisLimitsTest {
             assertTrue(p.get("browser").asBoolean());
             assertEquals("canvas", p.get("group").asText());
             assertEquals("nodes", p.get("unit").asText());
-            assertEquals(500, p.get("default").asInt());
+            assertEquals(1_000, p.get("default").asInt());
             assertEquals(1, p.get("min").asInt());
             assertEquals(100_000, p.get("max").asInt());
             assertTrue(p.get("value").isNull(), "nothing stated = inherit");
-            assertEquals(500, p.get("inForce").asInt());
+            assertEquals(1_000, p.get("inForce").asInt());
             assertTrue(p.get("editable").asBoolean(), "an author may change a Space item");
             assertTrue(item(v, "four_eyes_budget_above").get("default").isNull(), "no threshold");
             assertEquals(0.5, item(v, "rate.link_analysis_per_s").get("inForce").asDouble());
@@ -206,7 +206,7 @@ class ControlApiLinkAnalysisLimitsTest {
             assertEquals(600_000, item(v, "graph_run.ceiling_nodes").get("inForce").asInt());
             assertEquals(0.25, item(v, "rate.link_analysis_per_s").get("value").asDouble());
             assertTrue(Files.exists(doc));
-            assertEquals(500, item(v, "projection_node_cap").get("inForce").asInt(), "the Space document is untouched");
+            assertEquals(1_000, item(v, "projection_node_cap").get("inForce").asInt(), "the Space document is untouched");
         }
     }
 

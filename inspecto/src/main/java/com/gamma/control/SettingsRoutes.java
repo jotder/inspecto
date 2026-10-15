@@ -28,7 +28,9 @@ import com.gamma.access.WriteGates;
  *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue,maxAgeHours},
  *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}, plus read-only *InForce echoes incl.
  *                                 graphRunInForce{threads,queue,maxResultItems}} (nulls = shipped defaults)
- *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
+ *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding); a LIMIT key
+ *                                 the body leaves out keeps its stored value (limits are edited at
+ *                                 /settings/link-analysis/limits), a stated null clears it
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
  *   PUT /settings/pipeline-history   replace it (same gates as branding)
@@ -168,6 +170,7 @@ final class SettingsRoutes implements RouteModule {
 
     private Object writeLinkAnalysis(ApiContext api, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "link-analysis settings write");
+        body = keepUnsentLimits(body, linkAnalysisShape(LinkAnalysisSettings.read(root.resolve(LinkAnalysisSettings.FILE))));
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body, root),
@@ -175,6 +178,43 @@ final class SettingsRoutes implements RouteModule {
                 setBytes(body), investigationBytes(body), nodeCap(body, "hubThreshold"), embed(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
+    }
+
+    /**
+     * The numeric LIMIT keys of this document's wire shape (top level, then per block) — each a {@code LaLimit} catalogue
+     * item, edited in ONE place, {@code PUT /settings/link-analysis/limits} (LA-CONFIG-LIMITS-1 CL-17). The settings pane
+     * no longer sends them, so this route must not read their absence as "clear".
+     */
+    private static final List<String> LIMIT_KEYS = List.of("projectionNodeCap", "analysisNodeCap", "suspicionNodeCap",
+            "fourEyesBudgetAbove", "fourEyesFanOutAbove", "mergedDistinctCap", "seedByDistinctCap", "maxSetBytes",
+            "maxInvestigationBytes", "hubThreshold");
+    private static final Map<String, List<String>> LIMIT_BLOCK_KEYS = Map.of(
+            "graphRun", List.of("maxNodes", "maxEdges", "timeoutMs", "maxResultItems"),
+            "index", List.of("maxDiskBytes", "keepVersions", "maxAgeHours"),
+            "drafts", List.of("maxOpen", "hibernateAfterMinutes", "expireAfterDays"),
+            "embed", List.of("defaultTtlHours", "maxTtlHours"));
+
+    /**
+     * {@code body} with every limit key it leaves out taken from {@code stored} (the current document's wire shape), so a
+     * save of the non-limit settings never clears a limit; a key the body STATES, null included, is the body's. Only a
+     * stored non-null value is carried, and only under a key the stored shape still has.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> keepUnsentLimits(Map<String, Object> body, Map<String, Object> stored) {
+        Map<String, Object> out = new LinkedHashMap<>(body);
+        for (String k : LIMIT_KEYS)
+            if (!out.containsKey(k) && stored.get(k) != null) out.put(k, stored.get(k));
+        for (Map.Entry<String, List<String>> b : LIMIT_BLOCK_KEYS.entrySet()) {
+            if (!(stored.get(b.getKey()) instanceof Map<?, ?> was)) continue;
+            if (out.containsKey(b.getKey()) && out.get(b.getKey()) == null) continue;    // a stated null clears the whole block
+            Object sent = out.get(b.getKey());
+            if (sent != null && !(sent instanceof Map<?, ?>)) continue;               // malformed: the block's own parser refuses it
+            Map<String, Object> block = sent == null ? new LinkedHashMap<>() : new LinkedHashMap<>((Map<String, Object>) sent);
+            for (String k : b.getValue())
+                if (!block.containsKey(k) && was.get(k) != null) block.put(k, was.get(k));
+            if (!block.isEmpty()) out.put(b.getKey(), block);
+        }
+        return out;
     }
 
     /** The wire shape the UI's Link Analysis settings expect — null means "inherit the shipped default". */

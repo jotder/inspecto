@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.spi.http.ApiContext;
@@ -55,8 +56,7 @@ import java.util.regex.Pattern;
 public final class GeoRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** Mirrors the client's GEO_POINT_CAP; the server can scale far higher on request. */
-    private static final int DEFAULT_LIMIT = 5_000;
+    /** The most points one request may ask for; a request that states none gets the Space's {@code display.geo_point_cap}. */
     private static final int MAX_LIMIT = 100_000;
 
     @Override
@@ -83,7 +83,7 @@ public final class GeoRoutes implements RouteModule {
         String kind = ident(body, "kindCol", false);
         String time = ident(body, "timeCol", false);
         List<String> attrCols = attrCols(body);
-        int limit = limit(body);
+        int limit = limit(api, body);
 
         String valid = "TRY_CAST(" + q(lat) + " AS DOUBLE) BETWEEN -90 AND 90"
                 + " AND TRY_CAST(" + q(lon) + " AS DOUBLE) BETWEEN -180 AND 180";
@@ -142,7 +142,7 @@ public final class GeoRoutes implements RouteModule {
         String toLat = ident(body, "toLatCol", true), toLon = ident(body, "toLonCol", true);
         String fromCol = ident(body, "fromCol", false), toCol = ident(body, "toCol", false);
         String kindCol = ident(body, "kindCol", false);
-        int limit = limit(body);
+        int limit = limit(api, body);
 
         String aName = fromCol != null ? "TRIM(CAST(" + q(fromCol) + " AS VARCHAR))" : "''";
         String bName = toCol != null ? "TRIM(CAST(" + q(toCol) + " AS VARCHAR))" : "''";
@@ -274,9 +274,10 @@ public final class GeoRoutes implements RouteModule {
         return s.isEmpty() ? fallback : s;
     }
 
-    private static int limit(Map<String, Object> body) {
+    /** The stated limit, within 1..{@value #MAX_LIMIT}; none stated = the Space's {@code display.geo_point_cap} (LA-CONFIG-LIMITS-1), the cap the SPA reads too. */
+    private static int limit(ApiContext api, Map<String, Object> body) {
         return body.get("limit") instanceof Number n
-                ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
+                ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : SpaceLimits.get(api.writeRoot(), LaLimit.DISPLAY_GEO_POINT_CAP);
     }
 
     private static List<String> attrCols(Map<String, Object> body) {

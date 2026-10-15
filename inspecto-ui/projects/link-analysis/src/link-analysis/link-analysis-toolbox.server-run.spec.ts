@@ -18,7 +18,13 @@ import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import { buildServerIdMap } from './graph-run-apply';
 import { workingSetToGraph } from './investigation-state';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
-import { configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
+import { LA_LIMIT_FALLBACKS, configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
+
+/** Every browser cap at `n`: the general one, suspicion score's and each algorithm's own (CL-3). */
+function capAll(n: number): void {
+    const own = Object.keys(LA_LIMIT_FALLBACKS).filter((k) => k.startsWith('browser_algorithms.'));
+    configureLaLimits({ analysis_node_cap: n, suspicion_node_cap: n, ...Object.fromEntries(own.map((k) => [k, n])) });
+}
 
 /**
  * D-4 step 7 - "browser first under the cap, server above": the toolbox runs locally at or under an algorithm's cap
@@ -156,7 +162,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('above the cap the browser control becomes Run on server - and no "capped at" refusal is shown', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const { fixture, c, el, button } = make();
         c.tab.set('centrality');
         c.centralityMetric.set('betweenness');
@@ -169,7 +175,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('an algorithm without a browser cap (degree) stays local even on a big graph', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const { fixture, c, button } = make();
         c.tab.set('centrality');
         c.centralityMetric.set('degree');
@@ -179,7 +185,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a completed server ranking lands on the canvas ids through the same ranking code a local run uses', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const result: GraphRunResult = {
             algorithm: 'betweennessCentrality',
             kind: 'SCORES',
@@ -205,7 +211,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a returned min-cut edge highlights the intended canvas edge (flow, params carry the server node ids)', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const result: GraphRunResult = {
             algorithm: 'maxFlow',
             kind: 'FLOW',
@@ -237,7 +243,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a server BUDGET_EXCEEDED leaves the canvas and every result untouched', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const probe: GraphRunResult = {
             algorithm: 'betweennessCentrality',
             kind: 'SCORES',
@@ -259,7 +265,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('without the capability the control is disabled with a stated reason and no run is sent', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const { fixture, c, button, run, el } = make({ allowed: false });
         c.tab.set('scoring');
         fixture.detectChanges();
@@ -270,14 +276,14 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('with no Investigation open it says so instead of running', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const { fixture, c, el } = make({ investigationId: null });
         c.tab.set('communities');
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="blocked-reason"]')!.textContent).toMatch(/Investigation/);
     });
     it('with a Working Set open the decision is made on ITS size, not the query graph under it', () => {
-        configureLaLimits({ analysis_node_cap: 750, suspicion_node_cap: 750 });
+        capAll(750);
         // no query graph loaded at all, but an Investigation whose Working Set has 1 225 nodes
         const big = make({ graph: null, workingSetNodes: 1225 });
         big.c.tab.set('scoring');
@@ -289,7 +295,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a Working Set under the cap stays local even when the query graph beside it is over', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const { c } = make({ workingSetNodes: 2 }); // CANVAS has 5 nodes, over the 3-node cap
         expect(c.serverSpecs().scoring).toBeNull();
     });
@@ -302,7 +308,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
  */
 describe('LinkAnalysisToolboxComponent - selection algorithms on the server', () => {
     afterEach(() => resetLaLimits());
-    const over = () => configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+    const over = () => capAll(3);
     const sel = (nodes: string[], edges: [string, string][]) => ({
         nodeIds: nodes,
         edgeIds: edges.map(([s, t]) => linkId(s, t, 'calls')),
@@ -484,7 +490,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
     });
 
     it('the threshold is ONE shared cap, lowered (never raised) by the server ceiling', () => {
-        configureLaLimits({ analysis_node_cap: 100, suspicion_node_cap: 100 });
+        capAll(100);
         // 5 nodes: under the 100 cap, so the browser runs it...
         expect(make().c.serverSpecs().cycles).toBeNull();
         TestBed.resetTestingModule();
@@ -492,7 +498,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
         expect(make({ serverCeilings: { findCycles: 3 } }).c.serverSpecs().cycles?.algorithm).toBe('findCycles');
         TestBed.resetTestingModule();
         // a HIGHER server ceiling never raises the browser threshold
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         expect(make({ serverCeilings: { findCycles: 100_000 } }).c.serverSpecs().cycles?.algorithm).toBe('findCycles');
     });
 
@@ -538,7 +544,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
 
 describe('LinkAnalysisToolboxComponent - the server result cap is never silent (D1)', () => {
     afterEach(() => resetLaLimits());
-    const over = () => configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+    const over = () => capAll(3);
     const ranking = (more: Partial<GraphRunResult>): GraphRunResult => ({
         algorithm: 'betweennessCentrality',
         kind: 'SCORES',
@@ -625,7 +631,7 @@ describe('LinkAnalysisToolboxComponent - a server cut-points answer never combin
     });
 
     it('articulation on one Working Set, then bridges on another: the bridges answer carries no old cut nodes', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const answers: Record<string, GraphRunResult> = {
             articulationPoints: result({ algorithm: 'articulationPoints', ids: ['b', 'c'] }),
             bridges: result({ algorithm: 'bridges', ids: [linkId('a', 'b', 'calls')] }),
@@ -651,7 +657,7 @@ describe('LinkAnalysisToolboxComponent - a server cut-points answer never combin
     });
 
     it('"No cut points" is claimed only when both halves were checked on this Working Set', () => {
-        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
+        capAll(3);
         const answers: Record<string, GraphRunResult> = {
             articulationPoints: result({ algorithm: 'articulationPoints', ids: [] }),
             bridges: result({ algorithm: 'bridges', ids: [] }),
@@ -722,5 +728,42 @@ describe('LinkAnalysisToolboxComponent - All algorithms (server) results feed th
         c.applyCatalogueResult({ ...base, algorithm: 'cliques', kind: 'GROUPS', groups: [['a', 'b']] });
         expect(c.ranking()).toEqual([]);
         expect(c.communities()).toEqual([]);
+    });
+});
+
+/** LA-CONFIG-LIMITS-1 CL-3: each guarded algorithm hands over above ITS OWN cap, not a shared one. */
+describe('LinkAnalysisToolboxComponent - per-algorithm browser caps decide the hand-over (CL-3)', () => {
+    afterEach(() => resetLaLimits());
+
+    it('an algorithm hands over above its own cap while a sibling under its own stays local', () => {
+        configureLaLimits({ 'browser_algorithms.closenessCentrality': 3 }); // the five-node graph is over closeness only
+        const { fixture, c, el, button } = make();
+        c.tab.set('centrality');
+        c.centralityMetric.set('closeness');
+        fixture.detectChanges();
+        expect(c.serverSpecs().centrality?.algorithm).toBe('closenessCentrality');
+        expect(el.textContent).toContain('above the 3-node limit');
+        c.centralityMetric.set('hub');
+        fixture.detectChanges();
+        expect(c.serverSpecs().centrality).toBeNull();
+        expect(button(/Rank nodes/)).toBeDefined();
+    });
+
+    it('the general cap alone no longer hands a guarded algorithm over', () => {
+        configureLaLimits({ analysis_node_cap: 3 });
+        const { c } = make();
+        c.tab.set('centrality');
+        c.centralityMetric.set('closeness');
+        expect(c.serverSpecs().centrality).toBeNull();
+        expect(c.serverSpecs().prediction).toBeNull();
+        expect(c.serverSpecs().communities).toBeNull();
+    });
+
+    it("a selection algorithm's own item lowers its hand-over threshold below the general cap", () => {
+        configureLaLimits({ 'browser_algorithms.findCycles': 3 });
+        const { c } = make();
+        expect(c.serverSpecs().cycles?.algorithm).toBe('findCycles');
+        expect(c.serverSpecs().cycles?.note).toContain('above the 3-node limit');
+        expect(c.serverSpecs().forest).toBeNull(); // its sibling keeps the general 2 500
     });
 });

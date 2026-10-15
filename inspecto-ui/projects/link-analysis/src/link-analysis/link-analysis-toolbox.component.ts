@@ -42,8 +42,9 @@ import {
     PatternStep,
     PredictedLink,
     SuspicionScore,
+    BrowserCappedAlgorithm,
     allPaths,
-    analysisNodeCapValue,
+    browserAlgorithmCapValue,
     selectionNodeCapValue,
     articulationPoints,
     betweennessCentrality,
@@ -368,8 +369,8 @@ export class LinkAnalysisToolboxComponent {
     readonly profileId = input<DomainProfileId | null>(null);
     /**
      * The server's per-algorithm `inlineNodeCeiling` (`GET /inv/graph/algorithms`), by algorithm id; null until it is
-     * known. The selection algorithms have no browser cap, so the browser threshold is {@link selectionNodeCapValue}
-     * LOWERED to this where the server states a smaller one.
+     * known. The selection algorithms never refuse in the browser, so their threshold is {@link selectionNodeCapValue}
+     * LOWERED to their own `browser_algorithms.<id>` item and to this where either is smaller.
      */
     readonly serverCeilings = input<Record<string, number> | null>(null);
     readonly canRunOnServer = input(true);
@@ -652,10 +653,15 @@ export class LinkAnalysisToolboxComponent {
                       note: `${subject} has ${n} nodes - above the ${cap}-node limit for running this in the browser.`,
                   }
                 : null;
-        const analysis = analysisNodeCapValue();
-        // Selection algorithms: no browser cap of their own - one shared threshold, lowered by the server's ceiling.
-        const selCap = (algorithm: string) =>
-            Math.min(selectionNodeCapValue(), this.serverCeilings()?.[algorithm] ?? Number.POSITIVE_INFINITY);
+        // Each guarded algorithm hands over above ITS OWN browser cap (CL-3) - the cap it refuses at locally.
+        const own = (algorithm: BrowserCappedAlgorithm) => spec(algorithm, browserAlgorithmCapValue(algorithm));
+        // Selection algorithms never refuse: one shared threshold, lowered by their own item and the server's ceiling.
+        const selCap = (algorithm: BrowserCappedAlgorithm) =>
+            Math.min(
+                selectionNodeCapValue(),
+                browserAlgorithmCapValue(algorithm),
+                this.serverCeilings()?.[algorithm] ?? Number.POSITIVE_INFINITY,
+            );
         const pick = (a: string, b: string) => {
             const from = this.serverIds()?.serverNode(a);
             const to = this.serverIds()?.serverNode(b);
@@ -663,34 +669,32 @@ export class LinkAnalysisToolboxComponent {
         };
         const named = (prefix: string, s: ServerRunSpec | null): ServerRunSpec | null =>
             s && { ...s, note: prefix + s.note };
-        const pathAlgorithm = this.pathMetric() === 'weighted' ? 'weightedShortestPath' : 'shortestPath';
+        const pathAlgorithm: BrowserCappedAlgorithm =
+            this.pathMetric() === 'weighted' ? 'weightedShortestPath' : 'shortestPath';
         const pathPick = pick(this.pathFrom(), this.pathTo());
         const metric = this.centralityMetric();
         const centrality =
             metric === 'betweenness'
-                ? spec('betweennessCentrality', suspicionNodeCapValue())
+                ? own('betweennessCentrality')
                 : metric === 'closeness'
-                  ? spec('closenessCentrality', analysis)
+                  ? own('closenessCentrality')
                   : metric === 'eigenvector'
-                    ? spec('eigenvectorCentrality', analysis)
+                    ? own('eigenvectorCentrality')
                     : metric === 'katz'
-                      ? spec('katzCentrality', analysis)
+                      ? own('katzCentrality')
                       : metric === 'hub' || metric === 'authority'
-                        ? spec('hits', analysis)
+                        ? own('hits')
                         : null; // degree and PageRank have no browser cap
         const from = this.serverIds()?.serverNode(this.flowFrom());
         const to = this.serverIds()?.serverNode(this.flowTo());
         return {
             centrality,
-            communities: spec(
-                this.communityMethod() === 'louvain' ? 'louvainCommunities' : 'detectCommunities',
-                analysis,
-            ),
-            cliques: this.cohesionMetric() === 'cliques' ? spec('cliques', analysis) : null,
-            prediction: spec('linkPrediction', analysis),
+            communities: own(this.communityMethod() === 'louvain' ? 'louvainCommunities' : 'detectCommunities'),
+            cliques: this.cohesionMetric() === 'cliques' ? own('cliques') : null,
+            prediction: own('linkPrediction'),
             flow: spec(
                 'maxFlow',
-                analysis,
+                browserAlgorithmCapValue('maxFlow'),
                 from && to ? { from, to } : {},
                 from && to ? '' : 'Pick a source and a sink first.',
             ),

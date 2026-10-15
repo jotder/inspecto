@@ -428,7 +428,47 @@ class ControlApiSettingsTest {
             assertEquals(422, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":1099511627777}").statusCode(), "above 1 TiB");
             assertEquals(422, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":\"lots\"}").statusCode(), "not an integer");
             assertEquals(200, send(c.port, "PUT", url, "{}").statusCode());
-            assertTrue(json(send(c.port, "GET", url, null)).get("maxInvestigationBytes").isNull(), "a save that omits it returns to inherit");
+            assertEquals(1_099_511_627_776L, json(send(c.port, "GET", url, null)).get("maxInvestigationBytes").asLong(),
+                    "a save that omits a limit keeps it (limits are edited at /settings/link-analysis/limits)");
+            assertEquals(200, send(c.port, "PUT", url, "{\"maxInvestigationBytes\":null}").statusCode());
+            assertTrue(json(send(c.port, "GET", url, null)).get("maxInvestigationBytes").isNull(), "a stated null returns to inherit");
+        }
+    }
+
+    /**
+     * LA-CONFIG-LIMITS-1 CL-17: every limit is edited in one place (the limits route), so the settings pane no longer sends
+     * them - and a save of the NON-limit settings must not clear a limit it leaves out, top level or inside a block. A
+     * non-limit key the body leaves out is still replaced (cleared), as before.
+     */
+    @Test
+    void linkAnalysisSaveThatLeavesOutTheLimitsKeepsThem(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String url = "/spaces/acme/settings/link-analysis";
+            assertEquals(200, send(c.port, "PUT", url, "{\"projectionNodeCap\":900,\"hubThreshold\":250,\"maskingMode\":\"all\","
+                    + "\"graphRun\":{\"maxNodes\":7000,\"propagatedRiskWeights\":[1.0,0.5]},\"index\":{\"enabled\":true,\"keepVersions\":5},"
+                    + "\"drafts\":{\"maxOpen\":9},\"embed\":{\"maxTtlHours\":100,\"refuseClassifications\":[\"PII\"]}}").statusCode());
+            // what the pane now sends: the non-limit settings only
+            HttpResponse<String> put = send(c.port, "PUT", url, "{\"maskingMode\":\"none\",\"graphRun\":{\"propagatedRiskWeights\":null},"
+                    + "\"index\":{\"enabled\":false}}");
+            assertEquals(200, put.statusCode(), put.body());
+            JsonNode back = json(send(c.port, "GET", url, null));
+            assertEquals(900, back.get("projectionNodeCap").asInt(), "a top-level limit left out is kept");
+            assertEquals(250, back.get("hubThreshold").asInt());
+            assertEquals(7000, back.get("graphRun").get("maxNodes").asInt(), "a block limit left out is kept");
+            assertEquals(5, back.get("index").get("keepVersions").asInt());
+            assertEquals(9, back.get("drafts").get("maxOpen").asInt(), "a whole block of limits left out is kept");
+            assertEquals(100, back.get("embed").get("maxTtlHours").asInt());
+            assertEquals("none", back.get("maskingMode").asText(), "a non-limit key is the body's");
+            assertFalse(back.get("index").get("enabled").asBoolean());
+            assertTrue(back.get("graphRun").get("propagatedRiskWeights").isNull(), "a stated null clears a non-limit key");
+            assertTrue(back.get("embed").get("refuseClassifications").isNull(), "a non-limit key left out is still replaced");
+            // the probe that would otherwise succeed: a stated null still clears a limit
+            assertEquals(200, send(c.port, "PUT", url, "{\"projectionNodeCap\":null,\"graphRun\":{\"maxNodes\":null}}").statusCode());
+            JsonNode cleared = json(send(c.port, "GET", url, null));
+            assertTrue(cleared.get("projectionNodeCap").isNull());
+            assertTrue(cleared.get("graphRun").isNull(), "its last stated key cleared: the block is gone");
+            assertEquals(250, cleared.get("hubThreshold").asInt());
         }
     }
 
@@ -580,7 +620,9 @@ class ControlApiSettingsTest {
             // positive controls: the same shapes one step inside the limit are accepted
             assertEquals(200, send(c.port, "PUT", path, "{\"drafts\":{\"hibernateAfterMinutes\":10080,\"expireAfterDays\":8}}").statusCode());
             assertEquals(200, send(c.port, "PUT", path, "{\"drafts\":{\"maxOpen\":1000,\"expireAfterDays\":3650}}").statusCode());
-            assertTrue(json(send(c.port, "PUT", path, "{}")).get("drafts").isNull(), "an unstated block reads back as inherit");
+            assertEquals(1000, json(send(c.port, "PUT", path, "{}")).get("drafts").get("maxOpen").asInt(),
+                    "an unstated block of limits is kept (limits are edited at /settings/link-analysis/limits)");
+            assertTrue(json(send(c.port, "PUT", path, "{\"drafts\":null}")).get("drafts").isNull(), "a stated null block reads back as inherit");
         }
     }
 
