@@ -56,7 +56,8 @@ class LaLimitsTest {
         Set<LaLimit> nullable = new HashSet<>();
         for (LaLimit l : LaLimit.values()) if (l.nullable()) nullable.add(l);
         assertEquals(Set.of(LaLimit.FOUR_EYES_BUDGET_ABOVE, LaLimit.FOUR_EYES_FAN_OUT_ABOVE, LaLimit.INDEX_BUILD_MEMORY_PCT), nullable);
-        assertEquals(29, java.util.Arrays.stream(LaLimit.values()).filter(l -> l.path().startsWith("browser_algorithms.")).count());
+        assertEquals(28, java.util.Arrays.stream(LaLimit.values()).filter(l -> l.path().startsWith("browser_algorithms.")).count(),
+                "one per graph algorithm but suspicionScore, whose cap is suspicion_node_cap");
     }
 
     @Test
@@ -159,7 +160,7 @@ class LaLimitsTest {
         LaLimitValues v = LaLimits.forSpace(root);
         assertEquals(600_000, v.get(LaLimit.GRAPH_RUN_CEILING_NODES));
         assertEquals(0.25, v.getDecimal(LaLimit.RATE_LINK_ANALYSIS_PER_S));
-        assertEquals(500, v.get(LaLimit.PROJECTION_NODE_CAP), "a SPACE item is never read from the install document");
+        assertEquals(1_000, v.get(LaLimit.PROJECTION_NODE_CAP), "a SPACE item is never read from the install document");
     }
 
     @Test

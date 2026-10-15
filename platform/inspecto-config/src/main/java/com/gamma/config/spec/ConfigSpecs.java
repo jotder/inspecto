@@ -1287,9 +1287,12 @@ public final class ConfigSpecs {
                 FieldSpec.of("projection_node_cap", "Projection node cap", FieldType.INT,
                         "Nodes admitted to one projection (1..100000); absent = the shipped default."),
                 FieldSpec.of("analysis_node_cap", "Analysis node cap", FieldType.INT,
-                        "Nodes above which the browser-side graph algorithms refuse; absent = the shipped default."),
+                        "Nodes above which the selection algorithms run on the server instead of the browser, and a "
+                                + "branching pattern is refused in the browser; each other algorithm has its own "
+                                + "browser_algorithms item; absent = the shipped default."),
                 FieldSpec.of("suspicion_node_cap", "Suspicion score node cap", FieldType.INT,
-                        "Nodes above which suspicion score alone refuses (D-S3); absent = the shipped default."),
+                        "Nodes above which suspicion score refuses in the browser and runs as a job on the server "
+                                + "(one value for both); absent = the shipped default."),
                 FieldSpec.enumField("masking_mode", "Entity masking", LINK_ANALYSIS_MASKING_MODES,
                         LINK_ANALYSIS_MASKING_MODES.get(0),
                         "Which entity ids Investigation responses mask (D-U6): typed = ids whose Entity Type "

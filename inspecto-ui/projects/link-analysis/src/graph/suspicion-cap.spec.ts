@@ -10,10 +10,11 @@ import { G6GraphData } from '@inspecto/core/graph/index';
 import { LA_LIMIT_FALLBACKS, configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
- * Decision D-S3 (operator, 2026-09-22): suspicion score gets its OWN, lower cap. The shared
- * `ANALYSIS_NODE_CAP` is sized for the other 26 algorithms, which stay under 60 ms at 2 000 nodes;
- * suspicion score takes ~7 s there because betweenness dominates and the growth is quadratic
- * (measured: 750 → 972 ms, 1 000 → 1 608 ms, 2 000 → 7 277 ms).
+ * Suspicion score has its OWN cap, `suspicion_node_cap` (D-S3, 2026-09-22) - and since LA-CONFIG-LIMITS-1 CL-2
+ * (operator, 2026-10-15) it is ONE value for the browser and the server, default 1 000: the browser refuses above it and
+ * the server runs a larger one as a job (GraphRunRoutes reads the same key). Betweenness, which it blends, has its own
+ * lower item (`browser_algorithms.betweennessCentrality`, 500) - and that one must never refuse a suspicion score.
+ * Measured suspicion score end to end: 750 → 972 ms, 1 000 → 1 608 ms, 2 000 → 7 277 ms.
  */
 function ring(n: number): G6GraphData {
     const nodes = Array.from({ length: n }, (_, i) => ({
@@ -29,22 +30,22 @@ function ring(n: number): G6GraphData {
     return { nodes, edges };
 }
 
-describe('suspicion score has its own cap (D-S3)', () => {
+describe('suspicion score has its own cap, shared with the server (D-S3, CL-2)', () => {
     afterEach(() => resetLaLimits());
 
-    it('defaults lower than the shared analysis cap', () => {
-        expect(LA_LIMIT_FALLBACKS.suspicion_node_cap).toBe(750);
+    it('ships 1 000, below the general cap', () => {
+        expect(LA_LIMIT_FALLBACKS.suspicion_node_cap).toBe(1000);
         expect(LA_LIMIT_FALLBACKS.suspicion_node_cap).toBeLessThan(LA_LIMIT_FALLBACKS.analysis_node_cap);
         expect(suspicionNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.suspicion_node_cap);
     });
 
-    // The point of the decision: a graph that is fine for every other algorithm is refused by this one.
-    it('refuses a graph the shared cap would admit, and names its own cap', () => {
+    // The point of the decision: a graph that is fine for the cheap algorithms is refused by this one.
+    it('refuses above its own cap, and names it', () => {
         configureLaLimits({ analysis_node_cap: 2000, suspicion_node_cap: 100 });
         const g = ring(150);
 
         expect(() => degreeCentrality(g)).not.toThrow();
-        expect(() => suspicionScore(g)).toThrow(/capped at 100 nodes/);
+        expect(() => suspicionScore(g)).toThrow(/Suspicion scoring is capped at 100 nodes/);
     });
 
     it('runs when the graph is under its own cap', () => {
@@ -53,16 +54,15 @@ describe('suspicion score has its own cap (D-S3)', () => {
         expect(suspicionScore(g).length).toBe(40);
     });
 
-    it('is settable independently of the shared cap', () => {
+    it('is settable independently of the general cap', () => {
         configureLaLimits({ suspicion_node_cap: 900 });
 
         expect(suspicionNodeCapValue()).toBe(900);
         expect(analysisNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.analysis_node_cap);
     });
 
-    // Fail closed, exactly as the other two caps do: a cap of 0 or NaN would put EVERY graph over the
-    // limit and switch the tool off, which is worse than ignoring the bad setting. This spec goes red if
-    // the guard is mutated away, because the bad value would then be applied.
+    // Fail closed: a cap of 0 or NaN would put EVERY graph over the limit and switch the tool off, which is worse
+    // than ignoring the bad setting. This spec goes red if the guard is mutated away.
     it('ignores a nonsense cap and leaves the previous value standing', () => {
         configureLaLimits({ suspicion_node_cap: 900 });
 
@@ -84,24 +84,24 @@ describe('suspicion score has its own cap (D-S3)', () => {
     });
 
     /**
-     * 🔴 The cap belongs to BETWEENNESS, not to its caller. D-S3 set it on `suspicionScore` believing that
-     * was the outlier; measured 2026-09-23, suspicion score is slow ONLY because it calls betweenness
-     * (9 757 ms of a 9 359 ms blend at 2 000 nodes, every other component under 130 ms combined). While
-     * betweenness sat behind the shared 2 000 cap, choosing "Betweenness" from the centrality list froze
-     * the main thread for about ten seconds — the exact freeze D-S3 believed it had removed.
+     * 🔴 Since P2 betweenness has a LOWER cap (500) than suspicion score (1 000), yet suspicion score blends
+     * betweenness. If it called the guarded `betweennessCentrality`, every suspicion score between the two caps would
+     * be refused in betweenness's words - the Space's suspicion cap silently lowered to betweenness's.
      */
-    it('caps betweenness with the LOW ceiling, not the shared analysis cap', () => {
-        configureLaLimits({ analysis_node_cap: 2000, suspicion_node_cap: 100 });
-        const g = ring(150);
+    it("betweenness's own lower cap never refuses a suspicion score the Space allows", () => {
+        configureLaLimits({ 'browser_algorithms.betweennessCentrality': 10, suspicion_node_cap: 100 });
+        const g = ring(40);
 
-        expect(() => betweennessCentrality(g)).toThrow(/capped at 100 nodes/);
-        // its cheap siblings stay on the shared cap and keep working at this size
-        expect(() => degreeCentrality(g)).not.toThrow();
+        expect(() => betweennessCentrality(g)).toThrow(/Betweenness is capped at 10 nodes/);
+        expect(suspicionScore(g).length).toBe(40);
+        expect(suspicionScore(g)[0].factors).toHaveProperty('betweenness');
     });
 
-    it('lets betweenness run under its own ceiling', () => {
-        configureLaLimits({ suspicion_node_cap: 900 });
+    it('the suspicion cap does not gate betweenness, which has its own item', () => {
+        configureLaLimits({ suspicion_node_cap: 10, 'browser_algorithms.betweennessCentrality': 1000 });
+        const g = ring(20);
 
-        expect(betweennessCentrality(ring(40)).length).toBe(40);
+        expect(() => betweennessCentrality(g)).not.toThrow();
+        expect(() => suspicionScore(g)).toThrow(/capped at 10 nodes/);
     });
 });

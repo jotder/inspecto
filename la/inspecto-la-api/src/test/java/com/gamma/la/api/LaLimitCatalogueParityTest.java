@@ -11,23 +11,29 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code LA-CONFIG-LIMITS-1} P1 ships TODAY's values: every {@link LaLimit} default equals the code constant it will
- * replace, read here from that constant (reflection, since most are private), so the catalogue cannot drift from the
- * code until the phase that rewires the site moves both together. And there is exactly one
- * {@code browser_algorithms.<id>} item per {@link Algorithm}.
+ * {@code LA-CONFIG-LIMITS-1}: every {@link LaLimit} default equals the code constant it will replace, read here from that
+ * constant (reflection, since most are private), so the catalogue cannot drift from the code until the phase that rewires
+ * the site moves both together. P2 (canvas and browser algorithms) pins its decided defaults instead, derives each
+ * {@code browser_algorithms.<id>} default from the measured server ceiling ({@link Algorithm#inlineNodeCeiling()}), and
+ * holds the SPA's one fallback table ({@code la-limits.ts}) to the catalogue.
  */
 class LaLimitCatalogueParityTest {
 
@@ -41,12 +47,82 @@ class LaLimitCatalogueParityTest {
         }
     }
 
+    /** One per algorithm, EXCEPT suspicionScore: its cap is {@code suspicion_node_cap}, one key for browser and server (CL-2). */
     @Test
-    void oneBrowserAlgorithmItemPerAlgorithm() {
+    void oneBrowserAlgorithmItemPerAlgorithmButSuspicionScore() {
         Set<String> items = Arrays.stream(LaLimit.values()).map(LaLimit::path).filter(p -> p.startsWith("browser_algorithms."))
                 .map(p -> p.substring("browser_algorithms.".length())).collect(Collectors.toCollection(TreeSet::new));
-        Set<String> algorithms = Arrays.stream(Algorithm.values()).map(Algorithm::id).collect(Collectors.toCollection(TreeSet::new));
+        Set<String> algorithms = Arrays.stream(Algorithm.values()).filter(a -> a != Algorithm.SUSPICION_SCORE).map(Algorithm::id)
+                .collect(Collectors.toCollection(TreeSet::new));
         assertEquals(algorithms, items);
+        assertTrue(LaLimit.byPath("browser_algorithms.suspicionScore").isEmpty(), "suspicion_node_cap is the one key");
+    }
+
+    /** CL-3: 2,500 per algorithm, or the measured (server inline) ceiling where that is lower. */
+    @Test
+    void eachBrowserAlgorithmDefaultIsTheGeneralCapOrItsLowerMeasuredCeiling() {
+        List<String> drift = new ArrayList<>();
+        for (Algorithm a : Algorithm.values()) {
+            if (a == Algorithm.SUSPICION_SCORE) continue;
+            long want = Math.min(2_500, a.inlineNodeCeiling());
+            Number got = LaLimit.byPath("browser_algorithms." + a.id()).orElseThrow().defaultValue();
+            if (got.longValue() != want) drift.add(a.id() + ": catalogue " + got + ", measured " + want);
+        }
+        assertTrue(drift.isEmpty(), drift.toString());
+        assertEquals(500L, LaLimit.BROWSER_BETWEENNESS_CENTRALITY.defaultValue(), "the slowest browser algorithm");
+        assertEquals(2_500L, LaLimit.BROWSER_PAGE_RANK.defaultValue());
+    }
+
+    /** CL-1 / CL-2 / CL-3: the decided P2 defaults (operator 2026-10-15). */
+    @Test
+    void theCanvasAndBrowserDefaultsAreTheDecidedOnes() {
+        assertEquals(1_000L, LaLimit.PROJECTION_NODE_CAP.defaultValue());
+        assertEquals(1_000L, LaLimit.SUSPICION_NODE_CAP.defaultValue());
+        assertEquals(2_500L, LaLimit.ANALYSIS_NODE_CAP.defaultValue());
+    }
+
+    /** {@code inspecto-ui/projects/link-analysis/src/link-analysis/la-limits.ts}, from this module's directory. */
+    private static final Path SPA_FALLBACKS = Path.of("..", "..", "inspecto-ui", "projects", "link-analysis", "src", "link-analysis",
+            "la-limits.ts");
+
+    /** The {@code LA_LIMIT_FALLBACKS} object literal: {@code key: number} per line, a key bare or single-quoted. */
+    static Map<String, Long> spaFallbacks(String ts) {
+        int from = ts.indexOf("export const LA_LIMIT_FALLBACKS = {");
+        int to = ts.indexOf("} as const", from);
+        assertTrue(from >= 0 && to > from, "LA_LIMIT_FALLBACKS not found in la-limits.ts");
+        Map<String, Long> out = new TreeMap<>();
+        Matcher m = Pattern.compile("^\\s*'?([A-Za-z_][\\w.]*)'?\\s*:\\s*([\\d_]+)\\s*,?\\s*(//.*)?$", Pattern.MULTILINE)
+                .matcher(ts.substring(from, to));
+        while (m.find()) out.put(m.group(1), Long.parseLong(m.group(2).replace("_", "")));
+        return out;
+    }
+
+    /**
+     * The SPA's ONE fallback table (used only until the server answers) states the catalogue's own default for every key it
+     * holds, and holds only catalogue keys, so the browser never runs on a number the server would not have said.
+     */
+    @Test
+    void theSpaFallbackTableAgreesWithTheCatalogue() throws Exception {
+        Map<String, Long> spa = spaFallbacks(Files.readString(SPA_FALLBACKS));
+        assertTrue(spa.size() >= 20, "parsed too few keys - the table's shape changed: " + spa);
+        List<String> disagree = new ArrayList<>();
+        spa.forEach((k, v) -> {
+            var item = LaLimit.byPath(k);
+            if (item.isEmpty()) disagree.add(k + ": not a catalogue key");
+            else if (item.get().nullable() || item.get().defaultValue().longValue() != v)
+                disagree.add(k + ": SPA " + v + ", catalogue " + item.get().defaultValue());
+        });
+        assertTrue(disagree.isEmpty(), "la-limits.ts LA_LIMIT_FALLBACKS vs LaLimit: " + disagree);
+        for (String k : List.of("projection_node_cap", "analysis_node_cap", "suspicion_node_cap", "browser_algorithms.betweennessCentrality"))
+            assertTrue(spa.containsKey(k), "the SPA reads " + k);
+    }
+
+    /** The parser itself: a table whose number moved is caught (the probe that would otherwise pass). */
+    @Test
+    void theFallbackParserReadsBareQuotedAndUnderscoredKeys() {
+        Map<String, Long> m = spaFallbacks("export const LA_LIMIT_FALLBACKS = {\n    // c\n    projection_node_cap: 1000,\n"
+                + "    'display.lod_label_cap': 300,\n    'graph_run.max_result_items': 10_000,\n} as const;");
+        assertEquals(Map.of("projection_node_cap", 1_000L, "display.lod_label_cap", 300L, "graph_run.max_result_items", 10_000L), m);
     }
 
     @Test

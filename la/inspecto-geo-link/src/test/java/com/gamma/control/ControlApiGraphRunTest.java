@@ -328,6 +328,44 @@ class ControlApiGraphRunTest {
         }
     }
 
+    private static int ceiling(JsonNode catalogue, String algorithm) {
+        for (JsonNode a : catalogue.get("algorithms")) if (algorithm.equals(a.get("id").asText())) return a.get("inlineNodeCeiling").asInt();
+        throw new AssertionError("no " + algorithm + " in " + catalogue);
+    }
+
+    /**
+     * LA-CONFIG-LIMITS-1 CL-2: suspicionScore's inline ceiling is the Space's {@code suspicion_node_cap} - the value the
+     * browser refuses above - echoed by the catalogue AND decided on by a run. The other algorithms keep the catalogue's.
+     */
+    @Test
+    void suspicionScoresInlineCeilingIsTheSpacesSuspicionNodeCap(@TempDir Path cfg, @TempDir Path root, @TempDir Path cfg2,
+                                                                 @TempDir Path root2) throws Exception {
+        subjects();
+        // the probe that would otherwise succeed: at the cap (5 nodes, cap 5) the run is waited for and answered inline
+        try (Ctx c = open(cfg, root, "masking_mode: none\nsuspicion_node_cap: 5\n")) {
+            investigation(c);
+            JsonNode cat = ok(c, "GET", "/inv/graph/algorithms", null, READER);
+            assertEquals(5, ceiling(cat, "suspicionScore"), "the Space's suspicion_node_cap");
+            assertEquals(Algorithm.BETWEENNESS_CENTRALITY.inlineNodeCeiling(), ceiling(cat, "betweennessCentrality"));
+            JsonNode d = ok(c, "POST", "/inv/graph/runs", run("suspicionScore", ""), ANALYST);
+            assertEquals("COMPLETED", d.get("status").asText());
+        }
+        Blocking engine = new Blocking();
+        GraphRunRoutes.forTest(engine, 60_000);                       // would wait a minute if the Space value did not decide
+        try (Ctx c = open(cfg2, root2, "masking_mode: none\nsuspicion_node_cap: 4\n")) {
+            investigation(c);
+            assertEquals(4, ceiling(ok(c, "GET", "/inv/graph/algorithms", null, READER), "suspicionScore"));
+            long t0 = System.nanoTime();
+            HttpResponse<String> r = start(c, run("suspicionScore", ""), ANALYST);
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+            JsonNode d = data(r, 202);
+            assertTrue(ms < 30_000, "5 nodes over a cap of 4: a job, answered without waiting (" + ms + " ms)");
+            assertEquals(5, d.get("input").get("nodes").asInt());
+        } finally {
+            engine.release.countDown();
+        }
+    }
+
     // ── never a silent cap ──────────────────────────────────────────────────────────────────────────────────────
 
     /** The probe that would otherwise succeed: the SAME request completes with a result when its budget is not tiny. */

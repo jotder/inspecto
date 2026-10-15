@@ -10,15 +10,37 @@ import { signal } from '@angular/core';
  * constant of its own. The pure modules (graph algorithms, projections, form validators) read it at call time; the
  * store is a signal, so a template or `computed()` that reads it re-renders when the limits arrive or change.
  *
- * <p>⚠ {@link LA_LIMIT_FALLBACKS} is what the server's catalogue ships TODAY (P1 changes no behaviour). It is used
- * only while the GET has not answered, when it failed, or when the server does not publish a key — never as a second
- * opinion beside a served value. Every key here is the backend catalogue's own (`LaLimit`), spelled exactly as served.
+ * <p>⚠ {@link LA_LIMIT_FALLBACKS} is what the server's catalogue ships. It is used only while the GET has not answered,
+ * when it failed, or when the server does not publish a key — never as a second opinion beside a served value. Every
+ * key here is the backend catalogue's own (`LaLimit`), spelled exactly as served, with the catalogue's default:
+ * `LaLimitCatalogueParityTest` (inspecto-la-api) reads this table and fails when the two disagree.
  */
 export const LA_LIMIT_FALLBACKS = {
-    // SPACE, browser-overridable (§7)
-    projection_node_cap: 500,
-    analysis_node_cap: 2000,
-    suspicion_node_cap: 750,
+    // SPACE, browser-overridable (§7). P2: canvas 1 000 (CL-1), suspicion 1 000 for browser AND server (CL-2),
+    // general browser cap 2 500 (CL-3).
+    projection_node_cap: 1000,
+    analysis_node_cap: 2500,
+    suspicion_node_cap: 1000,
+    // CL-3: one cap per browser algorithm the SPA guards - 2 500, or the measured (server inline) ceiling where lower.
+    // suspicionScore has none: suspicion_node_cap is its one key.
+    'browser_algorithms.betweennessCentrality': 500,
+    'browser_algorithms.closenessCentrality': 1000,
+    'browser_algorithms.eigenvectorCentrality': 1000,
+    'browser_algorithms.katzCentrality': 1000,
+    'browser_algorithms.hits': 1000,
+    'browser_algorithms.cliques': 1000,
+    'browser_algorithms.maxFlow': 1000, // vocab-allow: the max-flow graph algorithm id
+    'browser_algorithms.linkPrediction': 1000,
+    'browser_algorithms.louvainCommunities': 2500,
+    'browser_algorithms.detectCommunities': 2500,
+    // the selection algorithms hand over to the server above min(analysis_node_cap, their own cap)
+    'browser_algorithms.shortestPath': 2500,
+    'browser_algorithms.weightedShortestPath': 2500,
+    'browser_algorithms.allPaths': 2500,
+    'browser_algorithms.findCycles': 2500,
+    'browser_algorithms.articulationPoints': 2500,
+    'browser_algorithms.bridges': 2500,
+    'browser_algorithms.maximumSpanningForest': 2500,
     'display.lod_label_cap': 300,
     'display.layered_max_nodes': 30,
     'display.force_atlas_max_nodes': 800,

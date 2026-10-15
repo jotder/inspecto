@@ -818,31 +818,27 @@ describe('graph limits are configurable (D-S3)', () => {
         expect(analysisNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.analysis_node_cap);
     });
 
-    // ⚠ These use closeness, not betweenness. Betweenness was the vehicle until 2026-09-23, when it moved
-    // onto the LOWER `suspicionNodeCap` — it is the one genuinely slow algorithm (9.8 s at 2 000 nodes,
-    // against 129 ms for every other component combined), so the shared cap never governed it well. The
-    // subject here is the SHARED cap being configurable, so the vehicle must be an algorithm still on it.
+    // Since P2 (CL-3) closeness has its OWN item; the shared cap no longer gates it (browser-algorithm-caps.spec.ts).
     it('a deployment override takes effect, and the refusal names the NEW limit not the old one', () => {
-        configureLaLimits({ analysis_node_cap: 10 });
-        expect(analysisNodeCapValue()).toBe(10);
+        configureLaLimits({ 'browser_algorithms.closenessCentrality': 10 });
         expect(() => closenessCentrality(ring(20))).toThrowError(/capped at 10 nodes/);
         // ...and a graph under the new limit still runs
         expect(() => closenessCentrality(ring(5))).not.toThrow();
     });
 
-    it('raising the cap lets a graph through that the default would have refused', () => {
+    it('raising the cap lets a graph through that a lower one refused', () => {
         const g = ring(30);
-        configureLaLimits({ analysis_node_cap: 10 });
+        configureLaLimits({ 'browser_algorithms.closenessCentrality': 10 });
         expect(() => closenessCentrality(g)).toThrow();
-        configureLaLimits({ analysis_node_cap: 100 });
+        configureLaLimits({ 'browser_algorithms.closenessCentrality': 100 });
         expect(() => closenessCentrality(g)).not.toThrow();
     });
 
-    // And the counterpart: the shared cap must NOT govern betweenness any more.
-    it('the shared cap does not gate betweenness, which has its own lower ceiling', () => {
-        configureLaLimits({ analysis_node_cap: 10, suspicion_node_cap: 1000 });
+    // And the counterpart: the shared cap governs NEITHER any more.
+    it('the shared cap gates neither closeness nor betweenness, which each have their own', () => {
+        configureLaLimits({ analysis_node_cap: 10 });
 
-        expect(() => closenessCentrality(ring(20))).toThrow();
+        expect(() => closenessCentrality(ring(20))).not.toThrow();
         expect(() => betweennessCentrality(ring(20))).not.toThrow();
     });
 

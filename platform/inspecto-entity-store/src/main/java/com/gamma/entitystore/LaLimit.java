@@ -12,8 +12,8 @@ import java.util.Optional;
  * ({@link LaLimits#INSTALL_FILE}). {@link #browser} items may additionally carry a per-analyst value in the browser,
  * clamped to the Space's value.
  *
- * <p>⚠ <b>Every {@link #defaultValue} is TODAY's value</b> (P1 changes no behaviour); the phase that moves a default
- * (P2 canvas, P3 doubled analysis limits, P4 host resources) changes it here. {@link #min} / {@link #max} are the
+ * <p>⚠ <b>P1 shipped TODAY's values</b> (no behaviour change); the phase that moves a default (P2 canvas and browser
+ * algorithms - done, CL-1..CL-3; P3 doubled analysis limits, P4 host resources) changes it here. {@link #min} / {@link #max} are the
  * per-item range (CL-16): a write outside it is refused 422 naming the range, and a stored value outside it reads as
  * the default. For the keys that existed before this catalogue the range is the one their write route already
  * enforced, so a value the old route accepted reads exactly as before. ⚠ Two floors are LOWER than that route's:
@@ -27,43 +27,57 @@ import java.util.Optional;
 public enum LaLimit {
 
     // ── canvas (SPACE, browser) ───────────────────────────────────────────────────────────────────────────────
-    PROJECTION_NODE_CAP("projection_node_cap", Layer.SPACE, true, "canvas", "nodes", 500, 1, 100_000,
+    /** P2 (CL-1): 1,000 (was 500). */
+    PROJECTION_NODE_CAP("projection_node_cap", Layer.SPACE, true, "canvas", "nodes", 1_000, 1, 100_000,
             "Entities admitted to one canvas projection."),
 
     // ── browser algorithms (SPACE, browser) ──────────────────────────────────────────────────────────────────
-    ANALYSIS_NODE_CAP("analysis_node_cap", Layer.SPACE, true, "browser_algorithms", "nodes", 2_000, 1, 100_000,
-            "Nodes above which the browser-side graph algorithms refuse to run."),
-    SUSPICION_NODE_CAP("suspicion_node_cap", Layer.SPACE, true, "browser_algorithms", "nodes", 750, 1, 100_000,
-            "Nodes above which the browser-side suspicion score refuses to run (its cost is quadratic)."),
-    BROWSER_SHORTEST_PATH("shortestPath"),
-    BROWSER_NEIGHBORHOOD("neighborhood"),
-    BROWSER_EGO_NETWORK("egoNetwork"),
-    BROWSER_DEGREE_CENTRALITY("degreeCentrality"),
-    BROWSER_CONNECTED_COMPONENTS("connectedComponents"),
-    BROWSER_K_CORE("kCore"),
-    BROWSER_TRIANGLE_COUNT("triangleCount"),
-    BROWSER_ARTICULATION_POINTS("articulationPoints"),
-    BROWSER_BRIDGES("bridges"),
-    BROWSER_IS_FOREST("isForest"),
-    BROWSER_DESCENDANTS("descendants"),
-    BROWSER_WEIGHTED_SHORTEST_PATH("weightedShortestPath"),
-    BROWSER_MAXIMUM_SPANNING_FOREST("maximumSpanningForest"),
-    BROWSER_JACCARD_SIMILARITY("jaccardSimilarity"),
-    BROWSER_PAGE_RANK("pageRank"),
-    BROWSER_BETWEENNESS_CENTRALITY("betweennessCentrality"),
-    BROWSER_CLOSENESS_CENTRALITY("closenessCentrality"),
-    BROWSER_SUSPICION_SCORE("suspicionScore"),
-    BROWSER_LOUVAIN_COMMUNITIES("louvainCommunities"),
-    BROWSER_DETECT_COMMUNITIES("detectCommunities"),
-    BROWSER_CLIQUES("cliques"),
-    BROWSER_FIND_CYCLES("findCycles"),
-    BROWSER_ALL_PATHS("allPaths"),
-    BROWSER_MAX_FLOW("maxFlow"),   // vocab-allow: the max-flow graph algorithm (Algorithm.MAX_FLOW), the sanctioned lowercase sense
-    BROWSER_LINK_PREDICTION("linkPrediction"),
-    BROWSER_EIGENVECTOR_CENTRALITY("eigenvectorCentrality"),
-    BROWSER_KATZ_CENTRALITY("katzCentrality"),
-    BROWSER_HITS("hits"),
-    BROWSER_PROPAGATED_RISK("propagatedRisk"),
+    /**
+     * P2 (CL-3): 2,500 (was 2,000). The GENERAL browser cap: the threshold above which the selection algorithms (paths,
+     * cycles, cut points, spanning forest) go to the server, and the cap of a browser analysis with no item of its own
+     * (branching patterns). Each catalogue algorithm has its own {@code browser_algorithms.<id>} item below.
+     */
+    ANALYSIS_NODE_CAP("analysis_node_cap", Layer.SPACE, true, "browser_algorithms", "nodes", 2_500, 1, 100_000,
+            "Nodes above which the selection algorithms (paths, cycles, cut points, spanning forest) run on the server "
+                    + "instead of the browser, and above which a branching pattern is refused in the browser."),
+    /**
+     * P2 (CL-2): 1,000, ONE value for the browser and the server (was 750 in the browser, 500 on the server). The browser
+     * refuses suspicion score above it; a server run above it is a job, not an inline answer ({@code GraphRunRoutes}).
+     * ⚠ So there is NO {@code browser_algorithms.suspicionScore} item: this is it (one concept, one key).
+     */
+    SUSPICION_NODE_CAP("suspicion_node_cap", Layer.SPACE, true, "browser_algorithms", "nodes", 1_000, 1, 100_000,
+            "Nodes above which suspicion score refuses to run in the browser, and above which a server run of it is a "
+                    + "job rather than an inline answer."),
+    // One item per catalogue algorithm (com.gamma.la.core.Algorithm) except suspicionScore (SUSPICION_NODE_CAP).
+    // P2 (CL-3) defaults: 2,500, or the algorithm's measured server inline ceiling where that is lower.
+    BROWSER_SHORTEST_PATH("shortestPath", Use.HANDOVER),
+    BROWSER_NEIGHBORHOOD("neighborhood", Use.NONE),
+    BROWSER_EGO_NETWORK("egoNetwork", Use.NONE),
+    BROWSER_DEGREE_CENTRALITY("degreeCentrality", Use.NONE),
+    BROWSER_CONNECTED_COMPONENTS("connectedComponents", Use.NONE),
+    BROWSER_K_CORE("kCore", Use.NONE),
+    BROWSER_TRIANGLE_COUNT("triangleCount", Use.NONE),
+    BROWSER_ARTICULATION_POINTS("articulationPoints", Use.HANDOVER),
+    BROWSER_BRIDGES("bridges", Use.HANDOVER),
+    BROWSER_IS_FOREST("isForest", Use.NONE),
+    BROWSER_DESCENDANTS("descendants", Use.NONE),
+    BROWSER_WEIGHTED_SHORTEST_PATH("weightedShortestPath", Use.HANDOVER),
+    BROWSER_MAXIMUM_SPANNING_FOREST("maximumSpanningForest", Use.HANDOVER),
+    BROWSER_JACCARD_SIMILARITY("jaccardSimilarity", Use.NONE),
+    BROWSER_PAGE_RANK("pageRank", Use.NONE),
+    BROWSER_BETWEENNESS_CENTRALITY("betweennessCentrality", Use.REFUSE, 500),
+    BROWSER_CLOSENESS_CENTRALITY("closenessCentrality", Use.REFUSE, 1_000),
+    BROWSER_LOUVAIN_COMMUNITIES("louvainCommunities", Use.REFUSE),
+    BROWSER_DETECT_COMMUNITIES("detectCommunities", Use.HANDOVER),
+    BROWSER_CLIQUES("cliques", Use.REFUSE, 1_000),
+    BROWSER_FIND_CYCLES("findCycles", Use.HANDOVER),
+    BROWSER_ALL_PATHS("allPaths", Use.HANDOVER),
+    BROWSER_MAX_FLOW("maxFlow", Use.REFUSE, 1_000),   // vocab-allow: the max-flow graph algorithm (Algorithm.MAX_FLOW), the sanctioned lowercase sense
+    BROWSER_LINK_PREDICTION("linkPrediction", Use.REFUSE, 1_000),
+    BROWSER_EIGENVECTOR_CENTRALITY("eigenvectorCentrality", Use.REFUSE, 1_000),
+    BROWSER_KATZ_CENTRALITY("katzCentrality", Use.REFUSE, 1_000),
+    BROWSER_HITS("hits", Use.REFUSE, 1_000),
+    BROWSER_PROPAGATED_RISK("propagatedRisk", Use.NONE, 1_000),
 
     // ── display (SPACE, browser; SPA-only today) ─────────────────────────────────────────────────────────────
     DISPLAY_LOD_LABEL_CAP("display.lod_label_cap", Layer.SPACE, true, "display", "count", 300, 1, 30_000,
@@ -336,8 +350,16 @@ public enum LaLimit {
         }
     }
 
-    /** The shipped default of every {@code browser_algorithms.<algorithmId>} item: today's browser analysis cap. */
-    static final int BROWSER_ALGORITHM_DEFAULT = 2_000;
+    /** The shipped default of a {@code browser_algorithms.<algorithmId>} item whose algorithm measured no lower ceiling (CL-3). */
+    static final int BROWSER_ALGORITHM_DEFAULT = 2_500;
+
+    /**
+     * What the browser does with a {@code browser_algorithms.<algorithmId>} item, which its description states: {@code REFUSE}
+     * = the algorithm refuses above it (an open Investigation can run it on the server); {@code HANDOVER} = above it the run
+     * goes to the server when an Investigation is open (a selection algorithm never above {@link #ANALYSIS_NODE_CAP}); {@code
+     * NONE} = the browser does not consult it (it never refuses the algorithm, or the algorithm is server-only).
+     */
+    private enum Use { REFUSE, HANDOVER, NONE }
 
     private final String path;
     private final Layer layer;
@@ -362,10 +384,21 @@ public enum LaLimit {
         this.description = description;
     }
 
-    /** A {@code browser_algorithms.<algorithmId>} item: SPACE, browser, nodes, today's analysis cap. */
-    LaLimit(String algorithmId) {
-        this("browser_algorithms." + algorithmId, Layer.SPACE, true, "browser_algorithms", "nodes", BROWSER_ALGORITHM_DEFAULT, 1, 100_000,
-                "Nodes above which the browser-side " + algorithmId + " algorithm refuses to run.");
+    /** A {@code browser_algorithms.<algorithmId>} item with the general default ({@value #BROWSER_ALGORITHM_DEFAULT}). */
+    LaLimit(String algorithmId, Use use) {
+        this(algorithmId, use, BROWSER_ALGORITHM_DEFAULT);
+    }
+
+    /** A {@code browser_algorithms.<algorithmId>} item: SPACE, browser, nodes; {@code measured} = its measured lower ceiling. */
+    LaLimit(String algorithmId, Use use, int measured) {
+        this("browser_algorithms." + algorithmId, Layer.SPACE, true, "browser_algorithms", "nodes", measured, 1, 100_000,
+                switch (use) {
+                    case REFUSE -> "Nodes above which the browser refuses to run " + algorithmId
+                            + " (an open Investigation can run it on the server).";
+                    case HANDOVER -> "Nodes above which " + algorithmId
+                            + " runs on the server instead of the browser when an Investigation is open.";
+                    case NONE -> "Not consulted yet: the browser runs " + algorithmId + " at any size, or never (server-only).";
+                });
     }
 
     public String path() { return path; }
