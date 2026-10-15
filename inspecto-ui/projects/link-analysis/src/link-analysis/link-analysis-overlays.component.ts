@@ -74,6 +74,13 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
     imports: [MatButtonModule, MatIconModule, MatTooltipModule, ChipComponent],
     host: { class: 'block' },
     styles: `
+        /* WCAG 2.5.8: the chip inside is 20 px high, the pressable target must be at least 24 px */
+        .link-kind {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            min-width: 24px;
+        }
         .link-kind:focus-visible {
             outline: 2px solid currentColor;
             outline-offset: 2px;

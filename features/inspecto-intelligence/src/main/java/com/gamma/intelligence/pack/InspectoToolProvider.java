@@ -28,7 +28,7 @@ final class InspectoToolProvider implements ToolProvider {
         // 2026-09-29: every gated tool enforces the caller's capability itself (ToolCapabilities.enforcing), so
         // a model-driven call from a session meets the same check as POST /agent/tools/{name}.
         return InspectoTools.tools(service).stream().map(t -> ToolCapabilities.haltable(t, killSwitch))
-                .map(ToolCapabilities::enforcing).map(DraftArtifacts::recording).toList();
+                .map(ToolCapabilities::enforcing).map(EgressMasking.system()::decorate).map(DraftArtifacts::recording).toList();
     }
 
     @Override

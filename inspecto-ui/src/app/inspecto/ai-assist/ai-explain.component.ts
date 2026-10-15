@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -27,8 +27,8 @@ import { AiExplainDialog } from './ai-explain.dialog';
         <button
             mat-icon-button
             type="button"
-            [attr.aria-label]="'About ' + screen()"
-            [matTooltip]="'About ' + screen()"
+            [attr.aria-label]="name()"
+            [matTooltip]="name()"
             (click)="open()"
         >
             <mat-icon svgIcon="heroicons_outline:question-mark-circle" />
@@ -43,6 +43,11 @@ export class AiExplainComponent {
 
     /** The canonical terms this screen is built on — `docs/GLOSSARY.md` spellings, never synonyms. */
     readonly terms = input.required<string[]>();
+
+    /** The button's name when a screen carries a second affordance (a tool rail beside the header's): never two buttons with one name. */
+    readonly label = input<string>();
+
+    protected readonly name = computed(() => this.label() ?? 'About ' + this.screen());
 
     open(): void {
         this.dialog.open(AiExplainDialog, { data: { screen: this.screen(), terms: this.terms() } });

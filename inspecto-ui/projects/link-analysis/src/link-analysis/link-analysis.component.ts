@@ -150,6 +150,7 @@ import {
     GraphEmphasis,
     GraphLayoutId,
     GraphViewComponent,
+    GraphViewInteraction,
     GraphViewPlugins,
     baseEdgeKind,
     edgeLabelsHiddenByDensity,
@@ -207,10 +208,11 @@ import { LinkAnalysisInvestigationComponent } from './link-analysis-investigatio
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
-import { rawIdsOf } from './investigation-state';
+import { idsInWorkingSet, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
-import { InspectoPageHeaderComponent } from '@inspecto/core/components/page-header.component';
+import { AiExplainComponent } from '@inspecto/core/ai-assist/ai-explain.component';
+import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 
 /** Level of detail: displayed-node count above which labels are dropped (they are unreadable there anyway). */
 export const LOD_LABEL_CAP = 300;
@@ -233,6 +235,8 @@ interface PresentationSnapshot {
     timeColumn: string;
     timeCutoff: number | null;
     collapsedRoots: string[];
+    /** Nodes taken off the exploration canvas (Hide on canvas / Hide selected): presentation only, so undoable. */
+    hiddenNodeIds: string[];
     nodeLabels: boolean;
     edgeLabels: boolean;
     allEdgeLabels: boolean;
@@ -308,7 +312,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         LinkAnalysisModulesComponent,
-        InspectoPageHeaderComponent,
+        AiExplainComponent,
         ChipComponent,
         FormsModule,
         ReactiveFormsModule,
@@ -419,6 +423,7 @@ export class LinkAnalysisComponent implements OnInit {
     @ViewChild(LinkAnalysisQueryPanelComponent) private queryPanel?: LinkAnalysisQueryPanelComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
+    @ViewChild('graphRegion') private graphRegion?: ElementRef<HTMLElement>;
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
     @ViewChild('viewsTrigger') private viewsTrigger?: MatMenuTrigger;
 
@@ -521,7 +526,8 @@ export class LinkAnalysisComponent implements OnInit {
     readonly viewBehaviors: { id: NonNullable<GraphViewPlugins['behaviors']>[number]; label: string; hint: string }[] =
         [
             { id: 'hover-activate', label: 'Hover activate', hint: 'light up a node and its links' },
-            { id: 'brush-select', label: 'Brush select', hint: 'shift + drag a box' },
+            // 'brush-select' is no longer offered: a plain drag on the empty canvas ALWAYS draws the selection box here
+            // (canvasInteraction.boxSelect). A saved view that still names it opens fine; the host folds it into that box.
             { id: 'lasso-select', label: 'Lasso select', hint: 'shift + free-hand' },
         ];
 
@@ -945,8 +951,9 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     // ── display options (persisted with a saved view; applied on load) ──
-    readonly nodeLabels = signal(true);
-    readonly edgeLabels = signal(true);
+    /** Node and link labels start OFF (operator 2026-10-15): a fresh graph is the shapes; labels are one checkbox away. */
+    readonly nodeLabels = signal(false);
+    readonly edgeLabels = signal(false);
     /** Override the density rule: label every link even on a dense graph (persisted as `display.allEdgeLabels`). */
     readonly allEdgeLabels = signal(false);
     readonly denseEdgeLabelCap = DENSE_EDGE_LABEL_CAP;
@@ -1026,8 +1033,8 @@ export class LinkAnalysisComponent implements OnInit {
     /** True when any display option deviates from the defaults (tints the paint-brush button). */
     readonly displayCustomized = computed<boolean>(
         () =>
-            !this.nodeLabels() ||
-            !this.edgeLabels() ||
+            this.nodeLabels() ||
+            this.edgeLabels() ||
             this.allEdgeLabels() ||
             Object.keys(this.nodeColors()).length > 0 ||
             Object.keys(this.edgeColors()).length > 0 ||
@@ -1425,6 +1432,8 @@ export class LinkAnalysisComponent implements OnInit {
     private async execute(sourceId: GraphSourceId, q: GraphSourceQuery): Promise<void> {
         const source = this.graphSources.byId(sourceId);
         if (!source) return;
+        const firstDraw = !this.graph();
+        const focusBefore = this.focusHolder();
         this.loading.set(true);
         this.loadError.set('');
         // A fresh graph clears the canvas emphasis + presentation filters and the analysis toolbox's results.
@@ -1456,6 +1465,7 @@ export class LinkAnalysisComponent implements OnInit {
             this.kindFilter.set([]);
             this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
             this.queryOpen.set(false); // smart form: collapse to the selected-values summary
+            if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
         } catch (err) {
             this.graph.set(null);
             this.lastRun.set(null);
@@ -1473,6 +1483,28 @@ export class LinkAnalysisComponent implements OnInit {
         } finally {
             this.loading.set(false);
         }
+    }
+
+    /** What holds keyboard focus now: a starter card the draw is about to remove is a different holder after it. */
+    private focusHolder(): Element | null {
+        const a = document.activeElement;
+        return a && a !== document.body ? a : null;
+    }
+
+    /** Announced in the sr-only live region after the first draw; the text is the only place the count is spoken. */
+    readonly drawAnnouncement = signal('');
+
+    /**
+     * WCAG 2.4.3: the control that started the first draw (a landing card) is removed with the landing state, so
+     * focus would fall to the page body. Once per first draw, move it to the graph region - but only when focus is
+     * still where the draw began (the removed trigger, or nowhere); a user who moved on is never pulled back.
+     */
+    private focusDrawnGraph(before: Element | null, nodes: number, links: number): void {
+        this.drawAnnouncement.set(`Graph drawn, ${nodes} nodes, ${links} links`);
+        this.cdr.detectChanges(); // the card is removed and the region mounted in this pass
+        const now = document.activeElement;
+        const stillAtTrigger = !now || now === document.body || (before !== null && now === before && !before.isConnected);
+        if (stillAtTrigger) this.graphRegion?.nativeElement.focus({ preventScroll: false });
     }
 
     // ── the two-stage query loop ──
@@ -1560,7 +1592,8 @@ export class LinkAnalysisComponent implements OnInit {
                 g.nodes.filter((n) => !n.data.missing).length,
             ),
             caseId: this.deepLinkedCaseId(),
-            selectedNodeIds: this.emphasis()?.nodeIds ?? [],
+            // The box-selected nodes win: "Attach selected to a Case" records exactly them, else what the emphasis lit.
+            selectedNodeIds: this.selectedOnCanvas().length ? this.selectedOnCanvas() : (this.emphasis()?.nodeIds ?? []),
             investigationId,
         };
     }
@@ -1793,6 +1826,7 @@ export class LinkAnalysisComponent implements OnInit {
             timeColumn: this.timeColumn(),
             timeCutoff: this.timeCutoff(),
             collapsedRoots: this.collapsedRoots(),
+            hiddenNodeIds: this.hiddenNodeIds(),
             nodeLabels: this.nodeLabels(),
             edgeLabels: this.edgeLabels(),
             allEdgeLabels: this.allEdgeLabels(),
@@ -1811,6 +1845,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.timeColumn.set(s.timeColumn);
         this.timeCutoff.set(s.timeCutoff);
         this.collapsedRoots.set(s.collapsedRoots);
+        this.hiddenNodeIds.set(s.hiddenNodeIds);
         this.nodeLabels.set(s.nodeLabels);
         this.edgeLabels.set(s.edgeLabels);
         this.allEdgeLabels.set(s.allEdgeLabels);
@@ -1856,8 +1891,8 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     private applyDisplay(display: GraphDisplayOptions | undefined): void {
-        this.nodeLabels.set(display?.nodeLabels ?? true);
-        this.edgeLabels.set(display?.edgeLabels ?? true);
+        this.nodeLabels.set(display?.nodeLabels ?? false);
+        this.edgeLabels.set(display?.edgeLabels ?? false);
         this.allEdgeLabels.set(display?.allEdgeLabels ?? false);
         this.nodeColors.set(display?.nodeColors ?? {});
         this.edgeColors.set(display?.edgeColors ?? {});
@@ -1905,6 +1940,234 @@ export class LinkAnalysisComponent implements OnInit {
 
     expandAll(): void {
         this.collapsedRoots.set([]);
+    }
+
+    // ── the canvas pointer model: box select, double click, keyboard view moves (operator 2026-10-15) ──
+
+    /**
+     * A drag on the EMPTY canvas draws a selection box instead of panning (the Minimap, the wheel and the arrow keys move
+     * the view); a double click toggles expand / fold; the view re-fits after a data change. Opt-in on the shared host.
+     */
+    readonly canvasInteraction: GraphViewInteraction = {
+        panByDrag: false,
+        boxSelect: true,
+        doubleClick: true,
+        fitOnDataChange: true,
+        fitOnResize: true,
+    };
+
+    /** What the box (or Select all) picked. Read through {@link selectedOnCanvas}: a hide, a fold or a new run drops what is gone. */
+    private readonly selectedNodeIds = signal<string[]>([]);
+    readonly selectedOnCanvas = computed<string[]>(() => {
+        const ids = this.selectedNodeIds();
+        if (!ids.length) return [];
+        const drawn = new Set((this.canvasData()?.nodes ?? []).map((n) => n.id));
+        const kept = ids.filter((id) => drawn.has(id));
+        return kept.length === ids.length ? ids : kept;
+    });
+    /** The selection spoken in an sr-only live region: the count is otherwise only visible in the toolbar. */
+    readonly selectionAnnouncement = signal('');
+    /** Nodes one 'Expand from the selected nodes' will fetch in exploration (each is its own request). */
+    readonly selectionExpandCap = 25;
+
+    private announceSelection(n: number): void {
+        this.selectionAnnouncement.set(n ? `${n} ${n === 1 ? 'node' : 'nodes'} selected` : 'Selection cleared');
+    }
+
+    onSelectionChange(ids: string[]): void {
+        this.selectedNodeIds.set(ids);
+        this.announceSelection(ids.length);
+    }
+
+    clearSelection(): void {
+        if (!this.selectedNodeIds().length) return;
+        this.selectedNodeIds.set([]);
+        this.announceSelection(0);
+    }
+
+    /** Every drawn node (a super-node is a stand-in, not a node an op can name). The keyboard path to a box select. */
+    selectAll(): void {
+        const ids = (this.canvasData()?.nodes ?? []).filter((n) => n.data.kind !== SUPER_NODE_KIND).map((n) => n.id);
+        this.selectedNodeIds.set(ids);
+        this.announceSelection(ids.length);
+    }
+
+    private selectedNodes(): G6GraphData['nodes'] {
+        const picked = new Set(this.selectedOnCanvas());
+        return (this.canvasData()?.nodes ?? []).filter((n) => picked.has(n.id));
+    }
+
+    /** The selection's raw ids that are entities of the open Investigation's Working Set - what an op may name (else 422). */
+    private selectedWorkingSetIds(): string[] {
+        const ws = this.investigation.workingSet();
+        return [...new Set(this.selectedNodes().flatMap((n) => idsInWorkingSet(n, ws)))];
+    }
+
+    /** True while the canvas draws an open Investigation's Working Set: ops are LOGGED steps and need the write capability. */
+    private writesToInvestigation(): boolean {
+        if (this.investigation.canvas() === null) return false;
+        if (!this.lens.canManageIncidents()) {
+            this.toastr.info('This changes the Investigation log and needs the Incident management capability.');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * An expand over `nodes` as the Investigation's own logged `expand` step - the same request, presets and one-hop
+     * bookkeeping as the Investigation tab's Expand, so four-eyes, masking and the budget gates apply unchanged.
+     */
+    private async expandInInvestigation(nodes: G6GraphData['nodes']): Promise<boolean> {
+        const ws = this.investigation.workingSet();
+        const ids = [...new Set(nodes.flatMap((n) => idsInWorkingSet(n, ws)))];
+        if (!ids.length) {
+            this.toastr.info('None of these nodes is in the Working Set.');
+            return false;
+        }
+        const ok = await this.investigation.apply({
+            op: 'expand',
+            ids,
+            ...this.investigation.withPresets(this.degreePresets(), {}),
+        });
+        if (!ok) {
+            this.toastr.error(this.investigation.error() || 'The expand was refused.');
+            return false;
+        }
+        const step = this.investigation.lastStep();
+        if (step?.status === 'pending' && step.pending?.id) this.investigation.markOneHop(step.pending.id, ids);
+        return true;
+    }
+
+    /** The selection bar's "Expand from the N selected nodes". */
+    async expandFromSelected(): Promise<void> {
+        const nodes = this.selectedNodes();
+        if (!nodes.length) return;
+        if (this.investigation.canvas() !== null) {
+            if (this.writesToInvestigation()) await this.expandInInvestigation(nodes);
+            return;
+        }
+        // Exploration: one hop per node, each its own fetch, so the number is bounded and said.
+        const todo = nodes.filter((n) => !this.expandedNodeIds().includes(n.id));
+        if (!todo.length) {
+            this.toastr.info('Every selected node is already expanded.');
+            return;
+        }
+        const batch = todo.slice(0, this.selectionExpandCap);
+        for (const n of batch) await this.expandNode(n.id, n.data.label, n.data.spellings);
+        if (todo.length > batch.length)
+            this.toastr.info(`Expanded the first ${batch.length} of ${todo.length} selected nodes - run it again for the rest.`);
+    }
+
+    /** "Hide selected": a LOGGED `hide` step inside an Investigation, a presentation hide (undoable) in exploration. */
+    async hideSelected(): Promise<void> {
+        const nodes = this.selectedNodes();
+        if (!nodes.length) return;
+        if (this.investigation.canvas() !== null) {
+            if (!this.writesToInvestigation()) return;
+            const ids = this.selectedWorkingSetIds();
+            if (!ids.length) return;
+            if (await this.investigation.apply({ op: 'hide', ids })) this.clearSelection();
+            else this.toastr.error(this.investigation.error() || 'The hide was refused.');
+            return;
+        }
+        this.recordHistory();
+        this.hiddenNodeIds.update((h) => [...new Set([...h, ...nodes.map((n) => n.id)])]);
+        this.clearSelection();
+    }
+
+    /** "Exclude selected" (Investigation only): a logged `exclude` step with a required reason, asked in the shared reason prompt. */
+    excludeSelected(): void {
+        if (this.investigation.canvas() === null || !this.writesToInvestigation()) return;
+        const ids = this.selectedWorkingSetIds();
+        if (!ids.length) return;
+        this.dialog
+            .open<EntityListReasonDialog, EntityListReasonData, string | undefined>(EntityListReasonDialog, {
+                width: '28rem',
+                data: {
+                    title: `Exclude ${ids.length} ${ids.length === 1 ? 'entity' : 'entities'}`,
+                    message: 'They leave the Working Set and their links go with them. The step is logged with this reason.',
+                    confirmLabel: 'Exclude',
+                    destructive: true,
+                    maxLength: 200,
+                },
+            })
+            .afterClosed()
+            .subscribe(async (reason) => {
+                if (!reason) return;
+                if (await this.investigation.apply({ op: 'exclude', ids, reason })) this.clearSelection();
+                else this.toastr.error(this.investigation.error() || 'The exclusion was refused.');
+            });
+    }
+
+    /**
+     * A double click on a node toggles it. Not yet expanded: fetch its neighbours (the node dialog's Expand neighbours, or the
+     * Investigation's logged Expand). Already expanded: fold the branch it brought in; a second double click unfolds it.
+     * Folding is a presentation action and exists only while exploring (the Investigation's Working Set is sealed server-side).
+     */
+    async onNodeDblClick(id: string): Promise<void> {
+        const shown = this.displayed()?.nodes.find((n) => n.id === id);
+        if (shown?.data.kind === SUPER_NODE_KIND) {
+            this.toggleSuperNode(id);
+            return;
+        }
+        const node = this.canvasData()?.nodes.find((n) => n.id === id);
+        if (!node) return;
+        if (this.investigation.canvas() !== null) {
+            if (!node.data.unexpanded) {
+                this.drawAnnouncement.set(`${node.data.label} is already expanded.`);
+                return;
+            }
+            if (this.writesToInvestigation()) await this.expandInInvestigation([node]);
+            return;
+        }
+        if (this.collapsedRoots().includes(id)) {
+            this.expandBranch(id);
+            this.drawAnnouncement.set(`Unfolded the branch of ${node.data.label}.`);
+            return;
+        }
+        const canExpand = !!this.graphSources.byId(this.sourceId())?.expand;
+        if (!this.expandedNodeIds().includes(id) && canExpand) {
+            await this.expandNode(id, node.data.label, node.data.spellings);
+            this.drawAnnouncement.set(`Expanded ${node.data.label}.`);
+            return;
+        }
+        const g = this.baseGraph();
+        if (g && descendants(g, id).size) {
+            this.collapseBranch(id);
+            this.drawAnnouncement.set(`Folded the branch of ${node.data.label}.`);
+        } else this.drawAnnouncement.set(`${node.data.label} has no branch to fold.`);
+    }
+
+    /**
+     * The keyboard equivalents of the pointer gestures (WCAG 2.5.7 Dragging Movements) while the graph region has focus:
+     * arrows move the view (Shift = a larger step), + and - zoom, Ctrl/Cmd+A selects every node, Escape clears the selection.
+     */
+    onGraphKeydown(e: KeyboardEvent): void {
+        const t = e.target as HTMLElement | null;
+        if (t && ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
+        const step = e.shiftKey ? 240 : 80;
+        const move: Record<string, [number, number]> = {
+            ArrowLeft: [step, 0],
+            ArrowRight: [-step, 0],
+            ArrowUp: [0, step],
+            ArrowDown: [0, -step],
+        };
+        if (e.key in move && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            this.graphView?.panBy(...move[e.key]);
+        } else if ((e.key === '+' || e.key === '=') && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            this.graphView?.zoomBy(1.2);
+        } else if ((e.key === '-' || e.key === '_') && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            this.graphView?.zoomBy(1 / 1.2);
+        } else if (e.key.toLowerCase() === 'a' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+            e.preventDefault();
+            this.selectAll();
+        } else if (e.key === 'Escape' && this.selectedNodeIds().length) {
+            e.preventDefault();
+            this.clearSelection();
+        }
     }
 
     // ── element details (canvas click → full-detail popup) ──
@@ -2055,7 +2318,10 @@ export class LinkAnalysisComponent implements OnInit {
                 else if (action === 'collapse') this.collapseBranch(id);
                 else if (action === 'expand') this.expandBranch(id);
                 else if (action === 'expand-neighbors') this.expandNode(id, node.data.label, node.data.spellings);
-                else if (action === 'hide') this.hiddenNodeIds.update((h) => (h.includes(id) ? h : [...h, id]));
+                else if (action === 'hide') {
+                    this.recordHistory();
+                    this.hiddenNodeIds.update((h) => (h.includes(id) ? h : [...h, id]));
+                }
                 else if (action === 'open-record' && objectRef) {
                     this.router.navigate(['/' + (objectRef.type === 'CASE' ? 'cases' : 'incidents'), objectRef.id]);
                 }

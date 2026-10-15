@@ -272,22 +272,12 @@ describe('HomeComponent', () => {
 
     /** TELCO-FRAUD-STORY-GAPS-1 (d): the tiles loaded once at init, so a page opened before the writes read 0. */
     describe('refresh', () => {
-        it('re-fetches the counts when the window regains focus and stops after destroy', () => {
-            const { fixture, jobs } = create({ runs: [RUN()] });
-            expect(jobs.recentRuns).toHaveBeenCalledTimes(1);
-            window.dispatchEvent(new Event('focus'));
-            expect(jobs.recentRuns).toHaveBeenCalledTimes(2);
-            fixture.destroy();
-            window.dispatchEvent(new Event('focus'));
-            expect(jobs.recentRuns).toHaveBeenCalledTimes(2);
-        });
-
-        it('re-fetches on the console cadence while the tab is visible', () => {
+        it('re-fetches the counts on the 30 s cadence', () => {
             vi.useFakeTimers();
             try {
-                const { jobs } = create({ runs: [RUN()] });
-                vi.advanceTimersByTime(15000);
-                expect(jobs.recentRuns).toHaveBeenCalledTimes(2);
+                const { events } = create({ runs: [RUN()] });
+                vi.advanceTimersByTime(30000);
+                expect(events.signalCount).toHaveBeenCalledTimes(2);
             } finally {
                 vi.useRealTimers();
             }

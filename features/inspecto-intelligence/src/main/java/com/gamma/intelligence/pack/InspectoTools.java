@@ -94,6 +94,11 @@ final class InspectoTools {
      */
     static List<Tool> tools(ReadModel service, ComponentStore components,
                             Supplier<List<BrowsableStore>> browseStores) {
+        return tools(service, components, browseStores, EgressMasking.system());
+    }
+
+    static List<Tool> tools(ReadModel service, ComponentStore components,
+                            Supplier<List<BrowsableStore>> browseStores, EgressMasking egress) {
         // P3 (L2) act tools are mutating=true. They are always registered but stay hidden and fail
         // closed unless the MUTATING_ACTIONS feature is on (opt-in AgentApprovals.enabled()); the eoiagent
         // ToolRegistry routes each through the approval gate (dry-run → human approve → audited mutation).
@@ -101,9 +106,9 @@ final class InspectoTools {
         return List.of(glossaryLookup(), docsSearch(), statusGet(service),
                 signalsQuery(service), signalTimeline(service),
                 timelineBuild(service, components), diffBatches(service),
-                configVersionsDiff(components), anomalyScan(browseStores),
+                configVersionsDiff(components), anomalyScan(browseStores, egress),
                 configSchema(), componentDraft(), queryAuthor(service, components), kpiReportBuilder(components),
-                pipelineAuthor(), projectionAuthor(), suggestExpectations(browseStores),
+                pipelineAuthor(), projectionAuthor(), suggestExpectations(browseStores, egress),
                 componentApply(controlPlane), componentRollback(controlPlane),
                 jobRun(controlPlane), pipelineRerun(controlPlane),
                 alertAck(controlPlane), scheduleApply(controlPlane),
@@ -542,7 +547,13 @@ final class InspectoTools {
         return s.length() <= DIFF_VALUE_MAX_CHARS ? s : s.substring(0, DIFF_VALUE_MAX_CHARS) + "…";
     }
 
-    private static Tool anomalyScan(Supplier<List<BrowsableStore>> browseStores) {
+    /** The operational stores whose tables are run / ingest / provenance METRICS. The object, link, note, tag-assignment,
+     *  event and delivery-receipt stores carry entity keys and free-form attributes (Incident {@code key.*}, recipients),
+     *  so the row-reading scan tools refuse them (an allow-list: a future store is refused until listed here). */
+    private static final java.util.Set<String> METRIC_STORES = java.util.Set.of(
+            "acquire", "consignment-outputs", "file-stages", "jobs", "provenance", "status");
+
+    private static Tool anomalyScan(Supplier<List<BrowsableStore>> browseStores, EgressMasking egress) {
         ToolSpec spec = new ToolSpec("anomaly_scan",
                 "Deterministic outlier scan over a numeric column of a DB-backed operational store "
                         + "table: z-score (default, cutoff 3.0) or a fixed threshold bound — pure SQL "
@@ -574,6 +585,9 @@ final class InspectoTools {
             BrowsableStore store = browseStores.get().stream()
                     .filter(s -> s.browseTables().contains(table)).findFirst().orElse(null);
             if (store == null) return error("unknown table: '" + table + "' (no DB-backed store exposes it)");
+            if (!METRIC_STORES.contains(store.browseId()))
+                return error("table '" + table + "' holds entity keys or free-form attributes; "
+                        + "only run/ingest/provenance metric stores can be scanned");
             String t = sqlIdent(table);
             String c = sqlIdent(column);
             try {
@@ -608,10 +622,12 @@ final class InspectoTools {
                 BrowsableStore.Page page = store.browseQuery(outSql, cap, 0);
                 String idCol = page.columns().isEmpty() ? null : page.columns().get(0).name();
                 List<Map<String, Object>> flagged = new ArrayList<>();
+                java.util.Optional<EgressMasking.Masker> mask = egress.active();
                 for (Map<String, Object> row : page.rows()) {
                     Map<String, Object> f = new LinkedHashMap<>();
-                    f.put("value", row.get(column));
-                    if (idCol != null && !idCol.equalsIgnoreCase(column)) f.put("rowIdentifier", row.get(idCol));
+                    f.put("value", mask.isPresent() ? mask.get().cell(column, row.get(column)) : row.get(column));
+                    if (idCol != null && !idCol.equalsIgnoreCase(column))
+                        f.put("rowIdentifier", mask.isPresent() ? mask.get().cell(idCol, row.get(idCol)) : row.get(idCol));
                     f.put("zscore", row.get("__z") instanceof Number zn ? zn.doubleValue() : null);
                     flagged.add(f);
                 }
@@ -633,7 +649,7 @@ final class InspectoTools {
      * keep; a chosen draft goes through {@code component_draft} to validate, then a human applies it.
      * Persists nothing; unknown table/column is an {@code ok=false} result, never a throw.
      */
-    private static Tool suggestExpectations(Supplier<List<BrowsableStore>> browseStores) {
+    private static Tool suggestExpectations(Supplier<List<BrowsableStore>> browseStores, EgressMasking egress) {
         ToolSpec spec = new ToolSpec("suggest_expectations",
                 "Profile a column of a DB-backed operational store (row count, null count/fraction, distinct "
                         + "count, numeric min/max) and derive candidate Expectation drafts (non_null when never "
@@ -655,6 +671,9 @@ final class InspectoTools {
             BrowsableStore store = browseStores.get().stream()
                     .filter(s -> s.browseTables().contains(table)).findFirst().orElse(null);
             if (store == null) return error("unknown table: '" + table + "' (no DB-backed store exposes it)");
+            if (!METRIC_STORES.contains(store.browseId()))
+                return error("table '" + table + "' holds entity keys or free-form attributes; "
+                        + "only run/ingest/provenance metric stores can be scanned");
             String t = sqlIdent(table);
             String c = sqlIdent(column);
             try {
@@ -680,9 +699,11 @@ final class InspectoTools {
                 profile.put("nullFraction", n > 0 ? (double) nulls / n : 0d);
                 profile.put("distinct", distinct);
                 profile.put("numeric", isNumeric);
+                java.util.Optional<EgressMasking.Masker> mask = egress.active();
+                boolean maskedColumn = mask.isPresent() && mask.get().masksColumn(column);
                 if (isNumeric) {
-                    profile.put("min", r0.get("__min"));
-                    profile.put("max", r0.get("__max"));
+                    profile.put("min", maskedColumn ? mask.get().token(r0.get("__min")) : r0.get("__min"));
+                    profile.put("max", maskedColumn ? mask.get().token(r0.get("__max")) : r0.get("__max"));
                 }
 
                 List<Map<String, Object>> suggestions = new ArrayList<>();
@@ -691,7 +712,7 @@ final class InspectoTools {
                             table + "_" + column + "_not_null",
                             column + " was never null across " + n + " rows", null, null));
                 }
-                if (isNumeric && r0.get("__min") != null && r0.get("__max") != null) {
+                if (isNumeric && !maskedColumn && r0.get("__min") != null && r0.get("__max") != null) {
                     suggestions.add(expectationDraft(column, target, "range",
                             table + "_" + column + "_range",
                             "observed numeric bounds over " + nonNull + " values",

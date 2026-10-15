@@ -43,7 +43,7 @@ export function caseMemberCandidates(graph: G6GraphData, originDataset: string |
                 });
             continue;
         }
-        if (!ENTITY_NODE_ID.test(n.id)) continue;
+        if (!ENTITY_NODE_ID.test(n.id) || MASKED_NODE_ID.test(n.id)) continue;
         const dataset = datasetOf(n, originDataset);
         if (!dataset) continue;
         out.push({
@@ -58,6 +58,9 @@ export function caseMemberCandidates(graph: G6GraphData, originDataset: string |
 
 /** An Entity node id: untyped `entity:<key>` or typed `<type>:<key>` (D-M6) — the server's `EntityMember` rule. */
 const ENTITY_NODE_ID = /^[a-z][a-z0-9_]{0,31}:./;
+
+/** A masked pseudonym (`masked:<hex>`, bare or after a type): the server refuses it as a Case key (422), so it is never offered. */
+const MASKED_NODE_ID = /^([a-z][a-z0-9_]{0,31}:)?masked:/;
 
 function datasetOf(n: G6Node, originDataset: string | undefined): string | undefined {
     const p = n.data.provenance?.filter((x) => !!x) ?? [];

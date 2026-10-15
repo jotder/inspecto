@@ -262,8 +262,8 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         if (session == null) {
             throw new IllegalArgumentException("unknown intelligence session: '" + sessionId + "'");
         }
-        AgentAnswer answer = ToolCaller.with(callerOf(sessionId),
-                () -> session.ask(new UserMessage(request.question(), toPageContext(request.page()), Instant.now())));
+        AgentAnswer answer = ToolCaller.with(callerOf(sessionId), () -> ToolCaller.modelBound(
+                () -> session.ask(new UserMessage(request.question(), toPageContext(request.page()), Instant.now()))));
         return toResult(answer);
     }
 
@@ -465,7 +465,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             return;
         }
         UserMessage msg = new UserMessage(request.question(), toPageContext(request.page()), Instant.now());
-        ToolCaller.with(callerOf(sessionId), () -> { askStreamBound(session, msg, sink); return null; });
+        ToolCaller.with(callerOf(sessionId), () -> ToolCaller.modelBound(() -> { askStreamBound(session, msg, sink); return null; }));
     }
 
     private void askStreamBound(AgentSession session, UserMessage msg, AgentAnswerSink sink) {

@@ -141,13 +141,13 @@ class ControlApiDatasetFilesTest {
             assertTrue(d.get("assessed").asBoolean());
             assertEquals(4, d.get("total").asInt());
             JsonNode items = d.get("items");
-            assertEquals("c.csv", items.get(0).get("name").asText(), "newest ingested-at first");
-            assertEquals("WAITING", items.get(0).get("indexState").asText());
+            assertEquals("a.csv", items.get(0).get("name").asText(), "event day newest first, then name; the File with no day last");
+            assertEquals("INDEXED", items.get(0).get("indexState").asText());
             assertFalse(items.get(0).has("outputFiles"), "server paths are not served to a view-only caller");
-            assertTrue(items.get(0).get("indexVersion").isNull());
-            assertEquals("INDEXED", items.get(2).get("indexState").asText());
-            assertEquals(1, items.get(2).get("indexVersion").asInt());
-            JsonNode empty = items.get(1);
+            assertEquals(1, items.get(0).get("indexVersion").asInt());
+            assertEquals("WAITING", items.get(2).get("indexState").asText());
+            assertTrue(items.get(2).get("indexVersion").isNull());
+            JsonNode empty = items.get(3);
             assertEquals("empty.csv", empty.get("name").asText());
             assertEquals(0, empty.get("rows").asLong(), "a File with no rows is a row with 0, not an absent row");
             assertTrue(empty.get("indexState").isNull(), "it wrote no partition file");
@@ -164,12 +164,43 @@ class ControlApiDatasetFilesTest {
             JsonNode page = data(get(c, "/inv/datasets/private_ds/files?limit=1&offset=1", OWNER));
             assertEquals(4, page.get("total").asInt());
             assertEquals(1, page.get("items").size());
-            assertEquals("empty.csv", page.get("items").get(0).get("name").asText());
+            assertEquals("b.csv", page.get("items").get(0).get("name").asText());
 
             JsonNode filtered = data(get(c, "/inv/datasets/private_ds/files?name=B.C", OWNER));
             assertEquals(1, filtered.get("total").asInt());
             assertEquals("b.csv", filtered.get("items").get(0).get("name").asText());
         }
+    }
+
+    /** LA-DATA-TRUST-POLISH-1 #7: a bulk delivery lands in one second; the order is event day desc, name asc, and holds across pages. */
+    @Test
+    void aSameSecondBulkDeliveryIsOrderedByEventDayThenNameAndPagesDoNotShuffle(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        String t = "2026-09-05T10:00:00Z";                          // the whole bulk delivery: one ingested-at
+        port(dayFile("m.csv", "2026-09-02", t), dayFile("b.csv", "2026-09-03", t), dayFile("a.csv", "2026-09-02", t),
+                dayFile("z.csv", "2026-09-04", t), dayFile("c.csv", "2026-09-03", t), dayFile("nodate.csv", null, t),
+                dayFile("a.csv", "2026-09-04", t));
+        List<String> expected = List.of("2026-09-04/a.csv", "2026-09-04/z.csv", "2026-09-03/b.csv", "2026-09-03/c.csv",
+                "2026-09-02/a.csv", "2026-09-02/m.csv", "null/nodate.csv");
+        try (Ctx c = open(cfg, root)) {
+            JsonNode all = data(get(c, "/inv/datasets/private_ds/files", OWNER));
+            assertEquals(expected, order(all.get("items")));
+            List<String> paged = new java.util.ArrayList<>();
+            for (int offset = 0; offset < 7; offset += 3) {         // pages of 3: the boundary falls inside a day
+                paged.addAll(order(data(get(c, "/inv/datasets/private_ds/files?limit=3&offset=" + offset, OWNER)).get("items")));
+            }
+            assertEquals(expected, paged, "the page boundary neither repeats nor drops a File");
+        }
+    }
+
+    private static CollectorCoveragePort.FileEntry dayFile(String name, String day, String ingestedAt) {
+        return new CollectorCoveragePort.FileEntry(name, day, 1, 0, ingestedAt, "SUCCESS", "c1", "p1", "b-" + day + name, List.of());
+    }
+
+    private static List<String> order(JsonNode items) {
+        List<String> out = new java.util.ArrayList<>();
+        items.forEach(i -> out.add(i.get("day").asText("null") + "/" + i.get("name").asText()));
+        return out;
     }
 
     @Test

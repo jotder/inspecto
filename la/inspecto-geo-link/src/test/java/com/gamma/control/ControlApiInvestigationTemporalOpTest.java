@@ -254,7 +254,8 @@ class ControlApiInvestigationTemporalOpTest {
             post(c, OPS, BURST);
             String h1 = send(c, "GET", "/inv/investigations/case-a/dossier?format=html", null, null).body();
             String h2 = send(c, "GET", "/inv/investigations/case-a/dossier?format=html", null, null).body();
-            assertEquals(h1.replaceAll("generated [^<]*", ""), h2.replaceAll("generated [^<]*", ""), "deterministic apart from the stamp");
+            assertEquals(h1.replaceAll("generated [^<]*", "").replaceAll("generatedAt</th><td>[^<]*", ""),
+                    h2.replaceAll("generated [^<]*", "").replaceAll("generatedAt</th><td>[^<]*", ""), "deterministic apart from the stamp");
             assertTrue(h1.contains("<h2>Temporal findings</h2>"), h1);
             assertTrue(h1.contains("<th>events</th>") || h1.contains("<th>results</th>"), h1);
             String section = h1.substring(h1.indexOf("<h2>Temporal findings</h2>"), h1.indexOf("<h2>Integrity</h2>"));

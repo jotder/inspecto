@@ -86,6 +86,14 @@ public final class PublicInvestigationRoutes implements RouteModule {
     }
 
     private static Object view(ApiContext api, HttpExchange ex, String token) throws IOException {
+        try {
+            return viewOf(api, ex, token);
+        } finally {
+            org.slf4j.MDC.remove(com.gamma.util.CurrentSpace.SPACE_MDC_KEY);   // bound below once the token's Space is known; never left on the thread
+        }
+    }
+
+    private static Object viewOf(ApiContext api, HttpExchange ex, String token) throws IOException {
         harden(ex);
         ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, null);   // the holder is never a Subject, even if the caller also sent a session
         Instant now = Instant.now();
@@ -118,7 +126,10 @@ public final class PublicInvestigationRoutes implements RouteModule {
             if (r != null) throw denied(ex, null, token, r.denied().name());
             throw denied(ex, null, token, broken ? "STORE_UNAVAILABLE" : "UNKNOWN");
         }
-        if (!r.ok()) throw denied(ex, null, token, r.denied().name());
+        // The path names no Space, so the host bound none: bind the grant's own, or the VIEWED / DENIED / REVOKED rows below would go to the
+        // in-memory global log and reach no Space's event store.
+        api.spaceIdOf(root).ifPresent(id -> org.slf4j.MDC.put(com.gamma.util.CurrentSpace.SPACE_MDC_KEY, id));
+        if (!r.ok()) throw denied(ex, r.record(), token, r.denied().name());   // a known grant: the row names it (id, Investigation), never the token
         Map<String, Object> rec = r.record();
         String grantId = String.valueOf(rec.get("grantId"));
         String invId = String.valueOf(rec.get("investigationId"));
@@ -278,7 +289,7 @@ public final class PublicInvestigationRoutes implements RouteModule {
     private static ApiException denied(HttpExchange ex, Map<String, Object> rec, String token, String reason) {
         Object grantId = rec == null ? null : rec.get("grantId");
         emit(LinkEventTypes.LINK_EMBED_DENIED, "embed:" + (grantId == null ? "unknown" : grantId), "link.embed.denied", "link.embed.denied", ex,
-                b -> b.attr("reason", reason).attr("tokenHash", EmbedGrants.hashPrefix(token)).attr("grantId", grantId)
+                b -> b.attr("reason", reason).attr("presentedHash", EmbedGrants.hashPrefix(token)).attr("grantId", grantId)
                         .attr("investigationId", rec == null ? null : rec.get("investigationId")));
         return notFound();
     }

@@ -45,4 +45,15 @@ describe('caseMemberCandidates', () => {
     it('offers no Entity it cannot key — no provenance and no Dataset on the pane', () => {
         expect(caseMemberCandidates(G, undefined).map((x) => x.nodeId)).toEqual(['entity:account:bob', 'entity:inc-7']);
     });
+
+    it('offers no masked Entity — its node id is a pseudonym, which the server refuses as a Case key', () => {
+        const masked: G6GraphData = {
+            nodes: [
+                { id: 'masked:0123456789abcdef', data: { label: 'masked', kind: 'entity' } },
+                { id: 'msisdn:masked:0123456789abcdef', data: { label: 'masked', kind: 'entity' } },
+            ],
+            edges: [],
+        };
+        expect(caseMemberCandidates(masked, 'calls')).toEqual([]);
+    });
 });

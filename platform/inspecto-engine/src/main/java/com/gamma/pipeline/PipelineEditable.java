@@ -993,7 +993,7 @@ public final class PipelineEditable {
             processing.remove("batch_max_files");
             processing.remove("batch_max_bytes");
         }
-        overlayOwned(collector, "gap_detection", gap == null ? null : gapSection(gap), strict);
+        overlayOwned(collector, "gap_detection", gap == null ? null : gapSection(gap, collector.get("gap_detection")), strict);
 
         // record-grain dedup → processing.dedup ({keys, order_by} — the QUALIFY the engine applies)
         if (recordDedup != null) {
@@ -1515,9 +1515,15 @@ public final class PipelineEditable {
         return n.cfg("dir") != null && n.cfg("database") == null;
     }
 
-    private static Map<String, Object> gapSection(PipelineNode gap) {
+    /**
+     * The {@code enabled} flag is the file's, not the node's ({@code enabled} on a node means "stopped", a
+     * different thing): an existing {@code gap_detection} section keeps its own value, or none when it had
+     * none. Only a gap node with no section to inherit from (newly added) is written {@code enabled: true}.
+     */
+    private static Map<String, Object> gapSection(PipelineNode gap, Object existing) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("enabled", true);
+        if (!(existing instanceof Map<?, ?> prev)) m.put("enabled", true);
+        else if (prev.containsKey("enabled")) m.put("enabled", prev.get("enabled"));
         m.putAll(gap.config());
         return m;
     }

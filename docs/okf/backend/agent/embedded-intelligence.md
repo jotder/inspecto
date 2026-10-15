@@ -431,3 +431,30 @@ populate `ApprovalRequest.preview` instead of `AgentApprovals`' own previewer. ð
 "has no per-tool `DryRunProvider` seam ... so low priority" until 2026-09-09, a day-one contradiction of
 the discharge recorded in `assistant.md` Â§4. Functional parity holds today; it is P2, not blocked.
 See `docs/BACKLOG.md`.
+
+## Outbound masking of tool results (`AGENT-EGRESS-MASK-1`, 2026-10-15)
+
+A tool result fed back to a model-bound turn reaches the configured chat provider, hosted third party or not, whatever
+the caller may see on the direct `POST /agent/tools/{name}` route. `EgressMasking` (`pack/`) is a generic `Tool`
+decorator in `InspectoToolProvider.tools()` (after `ToolCapabilities.enforcing`, before `DraftArtifacts`), so any future
+tool is covered; `Investigator` (RCA evidence goes to `gateway.chat`) and `ContextBroker` (the live Signal overlay in the
+prompt) use the same masker.
+
+- **Rule.** A direct dispatch is masked unless the bound `ToolCaller` holds `canRevealLinkEntities`. A model-bound call
+  (`ToolCaller.modelBound`, set around `ask` / `askStream`) is masked whenever the provider is not local
+  (`ModelSettings.local()`: ollama, llamacpp), even for a revealer, and with a local provider unless the caller reveals.
+  An unbound caller fails closed.
+- **What.** The Space's `masked:<16 hex>` token (`EvidenceMasker.tokenFor`, the same key as `/db/query`, `/bi/query` and
+  the audit read) for a map value keyed by a column the Datasets classify sensitive, or a key-like name (`msisdn`,
+  `imsi`, `imei`, `entityKey`, `key.*`); and a `msisdn=<value>` pair inside free text (`Signal.message`, payload,
+  timeline detail, overlay lines). Prose is otherwise untouched; with an untraceable lineage only the key-like names apply.
+- **`anomaly_scan` / `suggest_expectations`** mask `value`, `rowIdentifier` and the profile bounds by column, and drop the
+  `range` draft of a masked column. They only reach operational stores, never the stores behind a Dataset (`physicalRef`), so `BiResultMasking`
+  (which resolves a Dataset by `physicalRef`) does not apply to them; they now scan an allow-list of metric stores
+  (`acquire`, `consignment-outputs`, `file-stages`, `jobs`, `provenance`, `status`) and REFUSE the object, link, note,
+  tag-assignment, event and delivery-receipt stores outright: those ARE in `ReadModel.browsableStores()` and hold Incident
+  `key.*` / `entityKey` attributes (`inspecto_ops_objects.attributes`, `inspecto_ops_object_entity_ref.value_lc`).
+- **Operator-visible change.** Model-bound tool results (and the prompt overlay, and stored RCA evidence) now show
+  `masked:<16 hex>` for classified keys; a hosted provider never sees the raw value, even for a revealer.
+  Tests: `EgressMaskingTest` (module `inspecto-intelligence`; real-HTTP over the core is not reachable from there, the
+  agent is an add-on absent from the core's test classpath).

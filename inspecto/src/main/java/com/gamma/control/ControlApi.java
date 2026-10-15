@@ -1726,6 +1726,13 @@ public final class ControlApi implements AutoCloseable, HostContext {
         return out;
     }
 
+    @Override public java.util.Optional<String> spaceIdOf(Path configRoot) {
+        for (var ctx : spaces.all())
+            if (configRoot != null && configRoot.equals(ctx.root().config()) && !EventLog.DEFAULT_SPACE_ID.equals(ctx.id().value()))
+                return java.util.Optional.of(ctx.id().value());
+        return java.util.Optional.empty();
+    }
+
     @Override public java.util.Set<String> registeredFeatures() { return java.util.Collections.unmodifiableSet(registeredFeatures); }
 
     @Override public boolean hasRoute(String method, String pattern) { return registeredRoutes.contains(method + " " + pattern); }

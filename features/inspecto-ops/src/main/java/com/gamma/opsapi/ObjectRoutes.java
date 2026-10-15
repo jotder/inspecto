@@ -80,8 +80,8 @@ public final class ObjectRoutes implements RouteModule {
         // answer as `POST /recon/promote`, deliberately: both perform the one act of OPENING an Incident,
         // and a second precedent for one concept is what the call was made to avoid. ⚠ Distinct from the
         // `canWorkIncidents` gates on ack/resolve below: opening an Incident and working it are two names.
-        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, actorOf(e, api.body(e)), null))));
-        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> { Map<String, Object> b = api.body(e); return transition(api, ApiContext.name(m), "resolve", null, actorOf(e, b), ApiContext.str(b, "disposition")); })));
+        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, e, ApiContext.name(m), "ack", null, actorOf(e, api.body(e)), null))));
+        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> { Map<String, Object> b = api.body(e); return transition(api, e, ApiContext.name(m), "resolve", null, actorOf(e, b), ApiContext.str(b, "disposition")); })));
         api.post("/objects/([^/]+)/transition", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transitionFromBody(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/assign", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> assign(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
@@ -89,9 +89,9 @@ public final class ObjectRoutes implements RouteModule {
         api.delete("/objects/([^/]+)/links", scoped(api, (e, m) -> deleteLink(api, ApiContext.name(m), e)));
         api.get("/objects/([^/]+)/graph", scoped(api, (e, m) -> objectGraph(api, ApiContext.name(m), e)));
         api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, e, ApiContext.name(m), api.body(e))));
-        api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT))));
+        api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> maskedNotes(api, e, ApiContext.name(m), toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT)))));
         api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, ApiContext.name(m), api.body(e))));
-        api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT))));
+        api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> maskedNotes(api, e, ApiContext.name(m), toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT)))));
         api.post("/objects/([^/]+)/rca", scoped(api, (e, m) -> applyRca(api, ApiContext.name(m), api.body(e))));
         // Operator decision 2026-09-25: saving a Case's FINDINGS VALUES is collaboration, like a comment — open
         // to anyone who can see the object (the scope guard still answers 404), recorded in
@@ -108,7 +108,7 @@ public final class ObjectRoutes implements RouteModule {
         // postmortem / category: recording what an Incident cost is part of finishing it. Its own narrow PUT, not
         // the canAdminister PATCH, for the same reason those two are.
         api.put("/objects/([^/]+)/impact", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveImpact(api, e, ApiContext.name(m), exactBody(api, e)))));
-        api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
+        api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, e, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, e, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
         // The effective (possibly *_workflow.toon-overridden) lifecycle for a type — lets the UI derive
@@ -262,6 +262,11 @@ public final class ObjectRoutes implements RouteModule {
         return o.correlationId() == null ? "" : o.correlationId();
     }
 
+    /** A write route's echo of the object it just changed: the same read masking as GET (one helper for every route). */
+    private static Map<String, Object> echo(ApiContext api, HttpExchange ex, OperationalObject o) {
+        return ObjectReadMasking.echo(api, ex, o.toMap());
+    }
+
     /** Each object as its JSON row, masked on read for a caller who cannot reveal ({@link ObjectReadMasking}). */
     private static List<Map<String, Object>> toObjectMaps(ApiContext api, HttpExchange ex, List<OperationalObject> objs) {
         ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
@@ -280,8 +285,15 @@ public final class ObjectRoutes implements RouteModule {
      * list is instead cursor-paginated ({@link #objectsPage}), so the two share this one route.
      */
     private Object objectsList(ApiContext api, HttpExchange e) {
-        if (!ApiContext.v1(e))
-            return toObjectMaps(api, e, visibleOnly(OpsEngine.of(api).query(objectQuery(e)), e));
+        if (!ApiContext.v1(e)) {
+            ObjectReadMasking masking = ObjectReadMasking.forRequest(api, e);
+            if (masking == null) return toObjectMaps(api, e, visibleOnly(OpsEngine.of(api).query(objectQuery(e, true)), e));
+            // A caller who cannot reveal keys filters on what they SEE: q / correlationId match the masked row, so
+            // neither can probe whether a raw key exists. The page is sliced after that filter.
+            ObjectQuery q = objectQuery(e, false);
+            List<OperationalObject> all = matchMasked(masking, visibleOnly(OpsEngine.of(api).query(q.unbounded()), e), e);
+            return toObjectMaps(api, e, all.stream().skip(q.offset()).limit(q.limit()).toList());
+        }
         return objectsPage(api, e);
     }
 
@@ -294,14 +306,15 @@ public final class ObjectRoutes implements RouteModule {
      * grants. The v1 envelope's {@code metadata.pagination} carries {@code cursor/nextCursor/limit/total}.
      */
     private Object objectsPage(ApiContext api, HttpExchange e) {
-        ObjectQuery q = objectQuery(e);
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, e);
+        ObjectQuery q = objectQuery(e, masking == null);
         int limit = q.limit();
         String cursor = ApiContext.query(e, "cursor");
         List<String> key = Cursor.decode(cursor);
         Long afterCreatedAt = key.size() == 2 ? parseLongOr(key.get(0), Long.MIN_VALUE) : null;
         String afterId = key.size() == 2 ? key.get(1) : null;
 
-        List<OperationalObject> visible = visibleOnly(OpsEngine.of(api).query(q.unbounded()), e)
+        List<OperationalObject> visible = matchMasked(masking, visibleOnly(OpsEngine.of(api).query(q.unbounded()), e), e)
                 .stream().sorted(KEYSET_ORDER).toList();
         long total = visible.size();
         List<OperationalObject> after = visible.stream()
@@ -319,16 +332,40 @@ public final class ObjectRoutes implements RouteModule {
         return toObjectMaps(api, e, page);
     }
 
-    /** Build an {@link ObjectQuery} from {@code ?type=&status=&severity=&assignee=&owner=&correlationId=&q=&limit=&offset=}. */
-    private static ObjectQuery objectQuery(HttpExchange ex) {
+    /**
+     * {@code objs} narrowed by {@code ?correlationId=} / {@code ?q=} evaluated against the MASKED row, for a caller
+     * under {@link ObjectReadMasking} (the store query was built without those two filters, {@code rawText} false).
+     * A {@code null} masking (revealer / no Subject) leaves {@code objs} alone: the store already applied them raw.
+     * A masked token ({@code masked:<16 hex>}) therefore matches the rows that show it; a raw key matches nothing.
+     */
+    private static List<OperationalObject> matchMasked(ObjectReadMasking masking, List<OperationalObject> objs, HttpExchange ex) {
+        if (masking == null) return objs;
+        String cid = ApiContext.query(ex, "correlationId");
+        String q = ApiContext.query(ex, "q");
+        String needle = q == null || q.isBlank() ? null : q.trim().toLowerCase(java.util.Locale.ROOT);
+        if ((cid == null || cid.isBlank()) && needle == null) return objs;
+        return objs.stream().filter(o -> {
+            Map<String, Object> row = ObjectReadMasking.object(masking, o.toMap());
+            if (cid != null && !cid.isBlank() && !cid.trim().equals(row.get("correlationId"))) return false;
+            return needle == null || containsIgnoreCase(row.get("title"), needle) || containsIgnoreCase(row.get("description"), needle);
+        }).toList();
+    }
+
+    private static boolean containsIgnoreCase(Object text, String lowerNeedle) {
+        return text instanceof String s && s.toLowerCase(java.util.Locale.ROOT).contains(lowerNeedle);
+    }
+
+    /** Build an {@link ObjectQuery} from {@code ?type=&status=&severity=&assignee=&owner=&correlationId=&q=&limit=&offset=};
+     *  {@code rawText} false leaves {@code correlationId} / {@code q} out (see {@link #matchMasked}). */
+    private static ObjectQuery objectQuery(HttpExchange ex, boolean rawText) {
         return ObjectQuery.builder()
                 .objectType(parseObjectType(ApiContext.query(ex, "type")))
                 .status(ApiContext.query(ex, "status"))
                 .severity(ApiContext.query(ex, "severity"))
                 .assignee(ApiContext.query(ex, "assignee"))
                 .owner(ApiContext.query(ex, "owner"))
-                .correlationId(ApiContext.query(ex, "correlationId"))
-                .textContains(ApiContext.query(ex, "q"))
+                .correlationId(rawText ? ApiContext.query(ex, "correlationId") : null)
+                .textContains(rawText ? ApiContext.query(ex, "q") : null)
                 .limit(ApiContext.parseIntOr(ApiContext.query(ex, "limit"), ObjectQuery.DEFAULT_LIMIT))
                 .offset(ApiContext.parseIntOr(ApiContext.query(ex, "offset"), 0))
                 .build();
@@ -391,7 +428,7 @@ public final class ObjectRoutes implements RouteModule {
         String actor = ApiContext.str(body, "actor");
         for (LinkSpec l : links)
             OpsEngine.of(api).link(created.id(), l.to(), l.relationship(), actor);
-        return created.toMap();
+        return echo(api, ex, created);
     }
 
     /** One entry of the create body's mandatory {@code links} array. */
@@ -499,12 +536,20 @@ public final class ObjectRoutes implements RouteModule {
         }
         List<Map<String, Object>> nodes = (List<Map<String, Object>>) g.get("nodes");
         java.util.Set<String> visible = new java.util.HashSet<>();
-        List<Map<String, Object>> keptNodes = nodes.stream().filter(n -> {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        List<Map<String, Object>> keptNodes = new java.util.ArrayList<>();
+        for (Map<String, Object> n : nodes) {
             String nid = String.valueOf(n.get("id"));
-            boolean ok = OpsEngine.of(api).get(nid).map(o -> visibleTo(ex, o)).orElse(false);
-            if (ok) visible.add(nid);
-            return ok;
-        }).toList();
+            OperationalObject o = OpsEngine.of(api).get(nid).orElse(null);
+            if (o == null || !visibleTo(ex, o)) continue;
+            visible.add(nid);
+            Map<String, Object> node = n;
+            if (masking != null && n.get("title") != null) {   // the title can embed the node's own key
+                node = new java.util.LinkedHashMap<>(n);
+                node.put("title", ObjectReadMasking.object(masking, o.toMap()).get("title"));
+            }
+            keptNodes.add(node);
+        }
         List<Map<String, Object>> keptEdges = ((List<Map<String, Object>>) g.get("edges")).stream()
                 .filter(l -> visible.contains(String.valueOf(l.get("from")))
                         && visible.contains(String.valueOf(l.get("to")))).toList();
@@ -523,7 +568,7 @@ public final class ObjectRoutes implements RouteModule {
         if (text == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'body'");
         String author = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.str(body, "author"));
         try {
-            return OpsEngine.of(api).comment(id, author, text).toMap();
+            return maskedNotes(api, ex, id, List.of(OpsEngine.of(api).comment(id, author, text).toMap())).get(0);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -543,6 +588,14 @@ public final class ObjectRoutes implements RouteModule {
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
+    }
+
+    /** An object's notes for this caller: free text can carry the object's raw key, masked unless the caller reveals. */
+    private static List<Map<String, Object>> maskedNotes(ApiContext api, HttpExchange ex, String id, List<Map<String, Object>> notes) {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        if (masking == null) return notes;
+        Map<String, Object> row = OpsEngine.of(api).get(id).map(OperationalObject::toMap).orElse(Map.of());
+        return notes.stream().map(n -> ObjectReadMasking.note(masking, row, n)).toList();
     }
 
     private static List<Map<String, Object>> toNoteMaps(List<ObjectNote> notes) {
@@ -591,7 +644,7 @@ public final class ObjectRoutes implements RouteModule {
         String assignee = ApiContext.str(body, "assignee");
         if (assignee == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'assignee'");
         return RouteErrors.mapCaseErrors(
-                () -> OpsEngine.of(api).assign(id, assignee, actorOf(ex, body)).toMap());
+                () -> echo(api, ex, OpsEngine.of(api).assign(id, assignee, actorOf(ex, body))));
     }
 
     /**
@@ -614,7 +667,7 @@ public final class ObjectRoutes implements RouteModule {
      * (Postgres multi-user, 2026-10-06). No workflow involvement — status changes stay on
      * {@code /objects/{id}/transition}.
      */
-    private Object patchObject(ApiContext api, String id, Map<String, Object> body) {
+    private Object patchObject(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         Map<String, String> attrs = null;
         if (body.get("attributes") instanceof Map<?, ?> bag) {
             Map<String, String> collected = new LinkedHashMap<>();
@@ -639,7 +692,7 @@ public final class ObjectRoutes implements RouteModule {
             validateFindings(api, id, attrs);
         }
         try {
-            return OpsEngine.of(api).patch(id, expectedVersion, priority, severity, assignee, attrs).toMap();
+            return echo(api, ex, OpsEngine.of(api).patch(id, expectedVersion, priority, severity, assignee, attrs));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -685,7 +738,7 @@ public final class ObjectRoutes implements RouteModule {
         validateFindings(api, id, attrs);
         if (caseImpact) saveFindingsImpact(api, ex, target, impactValue);
         try {
-            return OpsEngine.of(api).saveFindings(id, attrs, ApiContext.actor(ex)).toMap();
+            return echo(api, ex, OpsEngine.of(api).saveFindings(id, attrs, ApiContext.actor(ex)));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -788,7 +841,7 @@ public final class ObjectRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         try {
-            return OpsEngine.of(api).saveImpact(id, impact, ApiContext.actor(ex)).toMap();
+            return echo(api, ex, OpsEngine.of(api).saveImpact(id, impact, ApiContext.actor(ex)));
         } catch (NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalArgumentException wrongType) {
@@ -835,7 +888,7 @@ public final class ObjectRoutes implements RouteModule {
 
     private static Object saveAttribute(ApiContext api, HttpExchange ex, String id, String key, String value) {
         try {
-            return OpsEngine.of(api).saveAttributes(id, Map.of(key, value), ApiContext.actor(ex), key).toMap();
+            return echo(api, ex, OpsEngine.of(api).saveAttributes(id, Map.of(key, value), ApiContext.actor(ex), key));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -881,8 +934,8 @@ public final class ObjectRoutes implements RouteModule {
 
     /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} per {@link #actorOf}.
      *  Resolve takes an optional {@code disposition} (WS-10: an Incident needs one → else 422). */
-    private Object transition(ApiContext api, String id, String action, String target, String actor, String disposition) {
-        return doTransition(api, id, action, target, actor, disposition);
+    private Object transition(ApiContext api, HttpExchange ex, String id, String action, String target, String actor, String disposition) {
+        return doTransition(api, ex, id, action, target, actor, disposition);
     }
 
     /** {@code POST /objects/{id}/transition} — body {@code {action}} or {@code {status|to}} (+ optional
@@ -893,16 +946,16 @@ public final class ObjectRoutes implements RouteModule {
         if (target == null) target = ApiContext.str(body, "to");
         if (action == null && target == null)
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'action' or 'status'");
-        return doTransition(api, id, action, target, actorOf(ex, body), ApiContext.str(body, "disposition"));
+        return doTransition(api, ex, id, action, target, actorOf(ex, body), ApiContext.str(body, "disposition"));
     }
 
     /** Apply a lifecycle transition, mapping the service's exceptions to 404 (unknown id) / 422 (illegal move). */
-    private Object doTransition(ApiContext api, String id, String action, String target, String actor, String disposition) {
+    private Object doTransition(ApiContext api, HttpExchange ex, String id, String action, String target, String actor, String disposition) {
         try {
             OperationalObject updated = (action != null)
                     ? OpsEngine.of(api).transition(id, action, actor, disposition)
                     : OpsEngine.of(api).transitionTo(id, target, actor, disposition);
-            return updated.toMap();
+            return echo(api, ex, updated);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalStateException | IllegalArgumentException illegal) {

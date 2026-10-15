@@ -40,6 +40,24 @@ public record ToolCaller(Set<String> capabilities) {
         }
     }
 
+    private static final ThreadLocal<Boolean> MODEL_BOUND = new ThreadLocal<>();
+
+    /** Run {@code body} as a MODEL-BOUND tool call: its results are fed back to the chat model, so
+     *  {@link EgressMasking} applies the outbound rule instead of the direct-route one. */
+    public static <T> T modelBound(Supplier<T> body) {
+        Boolean previous = MODEL_BOUND.get();
+        MODEL_BOUND.set(Boolean.TRUE);
+        try {
+            return body.get();
+        } finally {
+            if (previous == null) MODEL_BOUND.remove(); else MODEL_BOUND.set(previous);
+        }
+    }
+
+    static boolean isModelBound() {
+        return Boolean.TRUE.equals(MODEL_BOUND.get());
+    }
+
     /** The bound caller, or {@code fallback} when none is bound. */
     public static ToolCaller currentOr(ToolCaller fallback) {
         ToolCaller c = CURRENT.get();

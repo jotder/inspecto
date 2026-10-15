@@ -1,6 +1,7 @@
 package com.gamma.opsapi;
 
 import com.gamma.control.AnnotationTargets;
+import com.gamma.control.ObjectReadMasking;
 import com.gamma.control.RouteErrors;
 
 import com.gamma.spi.http.ApiContext;
@@ -61,8 +62,15 @@ public final class NoteRoutes implements RouteModule {
 
     /** {@code GET /notes/{targetKind}/{targetId}[/comments|/attachments]} — a target's notes, newest-first. */
     private Object notesOf(ApiContext api, HttpExchange ex, String targetKind, String targetId, NoteKind kind) {
-        return RouteErrors.mapErrors(() -> notes(api, ex).notesOf(targetKind, targetId, kind).stream()
-                .map(ObjectNote::toMap).toList());
+        return RouteErrors.mapErrors(() -> {
+            var maps = notes(api, ex).notesOf(targetKind, targetId, kind).stream().map(ObjectNote::toMap).toList();
+            // An object's free text can carry its raw key: masked for a caller who may not reveal (as /objects/{id}/comments).
+            ObjectReadMasking masking = com.gamma.objects.AnnotationKinds.OBJECT.equals(targetKind)
+                    ? ObjectReadMasking.forRequest(api, ex) : null;
+            if (masking == null) return maps;
+            Map<String, Object> row = OpsEngine.of(api).get(targetId).map(o -> o.toMap()).orElse(Map.of());
+            return maps.stream().map(n -> ObjectReadMasking.note(masking, row, n)).toList();
+        });
     }
 
     /**

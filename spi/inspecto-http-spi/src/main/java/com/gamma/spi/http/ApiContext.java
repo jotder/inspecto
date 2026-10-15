@@ -346,6 +346,15 @@ public interface ApiContext extends WriteRootProvider {
         return root == null ? java.util.Map.of() : java.util.Map.of(root, disabledFeatures());
     }
 
+    /**
+     * The id of the attached Space whose config root is {@code configRoot} ({@link #attachedSpaceRoots()} keys), or empty when it is the
+     * default Space or none matches. A route addressed by a credential has no Space in its path, so the host never bound one; this lets
+     * it bind the Space its credential lives in for the audit rows it writes, which would otherwise reach no Space's event store.
+     */
+    default java.util.Optional<String> spaceIdOf(Path configRoot) {
+        return java.util.Optional.empty();
+    }
+
     /** The bound space's data directory (where partition stores live), or {@code null} if unavailable.
      *  Used by query execution to resolve a dataset's {@code physicalRef} to its at-rest Parquet (W4). */
     Path dataRoot();

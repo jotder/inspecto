@@ -9,6 +9,7 @@ import com.gamma.opsapi.TagRoutes;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.Subject;
+import com.gamma.control.ObjectReadMasking;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.control.RouteErrors;
@@ -90,23 +91,31 @@ public final class CaseRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_CASE_ENTITIES + " entities per Case, got " + raw.size());
         List<CaseOperations.EntityMember> entities = new java.util.ArrayList<>();
         List<String> existing = new java.util.ArrayList<>();
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
         try {
             for (Object o : raw) {
                 if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each entity must be an object");
                 Object objectId = m.get("objectId");
                 if (objectId != null && !objectId.toString().isBlank()) existing.add(objectId.toString().trim());
-                else entities.add(new CaseOperations.EntityMember(text(m.get("id")), text(m.get("dataset")),
-                        text(m.get("label"))));
+                else {
+                    CaseOperations.EntityMember member = new CaseOperations.EntityMember(text(m.get("id")),
+                            text(m.get("dataset")), text(m.get("label")));
+                    // A caller who may not reveal must not mint from (nor, through the reuse path, probe for) a raw key
+                    // of a classified Dataset: refused value-free, identically whether or not an Incident exists.
+                    if (masking != null && masking.hides(Map.of("entityDataset", member.dataset()), "entityKey"))
+                        throw new IllegalArgumentException("an entity of a classified Dataset needs canRevealLinkEntities");
+                    entities.add(member);
+                }
             }
             CaseOperations.EntityCase made = cases(api).openCaseFromEntities(title,
                     ApiContext.str(body, "description"), entities, existing, o -> ObjectRoutes.visibleTo(ex, o),
                     ApiContext.str(body, "actor"), ApiContext.subject(ex).map(Subject::id).orElse(null));
             List<Map<String, Object>> members = made.members().stream().map(o -> {
-                Map<String, Object> row = new LinkedHashMap<>(o.toMap());
+                Map<String, Object> row = new LinkedHashMap<>(ObjectReadMasking.echo(api, ex, o.toMap()));
                 row.put("minted", made.minted().contains(o.id()));
                 return row;
             }).toList();
-            return Map.of("case", made.caseObject().toMap(), "members", members);
+            return Map.of("case", ObjectReadMasking.echo(api, ex, made.caseObject().toMap()), "members", members);
         } catch (IllegalArgumentException refused) {
             // Only the refusals. A store that FAILS (IllegalStateException) stays a 500 — reporting it as a
             // bad body would send the analyst to fix input that was never wrong.
@@ -190,7 +199,7 @@ public final class CaseRoutes implements RouteModule {
         return RouteErrors.mapCaseErrors(() -> {
             var result = cases(api).mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("survivor", result.survivor().toMap());
+            out.put("survivor", ObjectReadMasking.echo(api, ex, result.survivor().toMap()));
             out.put("merged", result.merged());
             out.put("membersMoved", result.membersMoved());
             return out;
@@ -213,7 +222,7 @@ public final class CaseRoutes implements RouteModule {
             var result = cases(api).splitCase(caseId, title, members,
                     ApiContext.str(body, "assignee"), ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("case", result.part().toMap());
+            out.put("case", ObjectReadMasking.echo(api, ex, result.part().toMap()));
             out.put("membersMoved", result.membersMoved());
             return out;
         });

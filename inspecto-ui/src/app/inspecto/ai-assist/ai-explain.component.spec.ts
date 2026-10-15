@@ -31,4 +31,15 @@ describe('AiExplainComponent', () => {
         });
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    it('a screen with two explain buttons can name the second one apart', () => {
+        TestBed.configureTestingModule({ imports: [AiExplainComponent], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(AiExplainComponent);
+        fixture.componentRef.setInput('screen', 'Link Analysis');
+        fixture.componentRef.setInput('terms', ['Entity']);
+        fixture.componentRef.setInput('label', 'About Link Analysis tools');
+        fixture.detectChanges();
+        const button = (fixture.nativeElement as HTMLElement).querySelector('button') as HTMLButtonElement;
+        expect(button.getAttribute('aria-label')).toBe('About Link Analysis tools');
+    });
 });

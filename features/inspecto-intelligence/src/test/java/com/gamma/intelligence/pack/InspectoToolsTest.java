@@ -335,7 +335,7 @@ class InspectoToolsTest {
                         + "(6,10),(7,10),(8,10),(9,10),(10,1000)");
             }
             BrowsableStore store = new BrowsableStore() {
-                @Override public String browseId() { return "test"; }
+                @Override public String browseId() { return "jobs"; }
                 @Override public String browseLabel() { return "Test"; }
                 @Override public List<String> browseTables() { return List.of("metrics"); }
                 @Override public ConnectionSource browseSource() { return JdbcDrivers.source(conn); }
@@ -733,7 +733,7 @@ class InspectoToolsTest {
                 st.execute("INSERT INTO people VALUES (1,30,'a'),(2,40,'b'),(3,50,NULL),(4,20,'d')");
             }
             BrowsableStore store = new BrowsableStore() {
-                @Override public String browseId() { return "test"; }
+                @Override public String browseId() { return "jobs"; }
                 @Override public String browseLabel() { return "Test"; }
                 @Override public List<String> browseTables() { return List.of("people"); }
                 @Override public ConnectionSource browseSource() { return JdbcDrivers.source(conn); }

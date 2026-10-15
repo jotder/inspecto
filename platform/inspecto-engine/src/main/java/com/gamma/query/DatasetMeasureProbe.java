@@ -231,6 +231,56 @@ public final class DatasetMeasureProbe {
      * absent or not a date/time type, or the read fails - never "now".
      */
     public java.util.OptionalLong dataAsOf(String datasetId, String column) {
+        if (column == null) return java.util.OptionalLong.empty();
+        String stamp = inputStamp(datasetId);
+        String key = writeRoot.get() + "|" + dataRoot.get() + "|" + datasetId + "|" + column;
+        if (stamp != null) {
+            AsOfEntry hit = AS_OF_CACHE.get(key);
+            if (hit != null && hit.stamp().equals(stamp)) return hit.value();
+        }
+        java.util.OptionalLong read = readDataAsOf(datasetId, column);
+        if (read == null) return java.util.OptionalLong.empty();   // a failed read is never cached: a transient lock must not outlive itself
+        if (stamp != null) AS_OF_CACHE.put(key, new AsOfEntry(stamp, read));
+        return read;
+    }
+
+    /** One cached reading of {@link #dataAsOf}: the maximum, valid for exactly the input-file stamp it was read under. */
+    private record AsOfEntry(String stamp, java.util.OptionalLong value) {}
+
+    /** Per (roots, Dataset, column); a Dataset count is small, so the map is unbounded by design. */
+    private static final java.util.concurrent.ConcurrentHashMap<String, AsOfEntry> AS_OF_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Most input files a stamp is taken over: more, and the stat walk costs as much as the read it would save. */
+    private static final int STAMP_MAX_FILES = 2000;
+
+    /**
+     * The identity of everything {@link #dataAsOf} reads: the relation SQL plus every input file's path, size and mtime (the
+     * SAME file set the relation resolves, Consignment subtraction included). A new commit adds or replaces a file, so the
+     * stamp moves and the cached maximum is dropped - the cache can never answer for data that is not what is on disk now.
+     * {@code null} (= read the parquet, cache nothing) whenever the stamp cannot be trusted: no registry, an unknown or
+     * view-backed Dataset (no enumerable files), more than {@link #STAMP_MAX_FILES} files, or a relation that reads the clock.
+     */
+    private String inputStamp(String datasetId) {
+        try {
+            Path root = writeRoot.get();
+            if (root == null) return null;
+            Map<String, Object> dataset = new ComponentStore(root.resolve("registry")).get("dataset", datasetId)
+                    .map(ComponentRegistry.Component::content).orElse(null);
+            if (dataset == null) return null;
+            String sql = DatasetRelation.relationSql(dataset, dataRoot.get(), new ViewStore(root.resolve("views")));
+            if (sql == null || sql.toLowerCase(java.util.Locale.ROOT).matches("(?s).*\\b(now|current_\\w+|today|random)\\b.*")) return null;
+            var files = DatasetRelation.inputFiles(dataset, dataRoot.get(), STAMP_MAX_FILES);
+            if (files.isEmpty() || files.get().overLimit() || files.get().files().isEmpty()) return null;
+            StringBuilder sb = new StringBuilder(sql);
+            for (var f : files.get().files()) sb.append('\n').append(f.path()).append('|').append(f.size()).append('|').append(f.mtimeMillis());
+            return sb.toString();
+        } catch (Exception cannotStamp) {
+            return null;
+        }
+    }
+
+    /** The parquet read; {@code null} when it FAILED (as opposed to an empty answer), so the caller does not cache it. */
+    private java.util.OptionalLong readDataAsOf(String datasetId, String column) {
         try {
             if (column == null || !columns(datasetId).contains(column)) return java.util.OptionalLong.empty();
             String type = columnType(datasetId, column);
@@ -248,7 +298,7 @@ public final class DatasetMeasureProbe {
             return v instanceof Number n ? java.util.OptionalLong.of(n.longValue()) : java.util.OptionalLong.empty();
         } catch (Exception e) {
             log.warn("data-as-of probe failed over dataset '{}': {}", datasetId, e.getMessage());
-            return java.util.OptionalLong.empty();
+            return null;
         }
     }
 
