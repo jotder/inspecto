@@ -3,10 +3,11 @@ import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { Dossier, DossierBundleVerifyResult, DossierVerifyResult, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
+import { configureLaLimits, laLimit, resetLaLimits } from './la-limits';
 
 @Component({
     standalone: true,
@@ -291,7 +292,14 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         expect(el.textContent).toContain('b.json is not JSON');
     });
 
-    it('builds at a chosen step with chosen snapshots, capped at 20, and refuses a step beyond the log', async () => {
+    it('ships dossier.max_snapshots 40 (CL-10)', () => {
+        expect(laLimit('dossier.max_snapshots')).toBe(40);
+    });
+
+    // Behaviour AT the cap, driven through the limit in force (here 20) so the shipped default can move freely.
+    it('builds at a chosen step with chosen snapshots, capped at the limit in force, and refuses a step beyond the log', async () => {
+        configureLaLimits({ 'dossier.max_snapshots': 20 });
+        onTestFinished(() => resetLaLimits());
         const { f, c, el, inv } = create();
         await c.build();
         await c.loadSnapshots();

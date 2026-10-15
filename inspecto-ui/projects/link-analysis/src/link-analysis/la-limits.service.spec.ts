@@ -71,7 +71,7 @@ describe('LaLimitsService', () => {
     it('falls back to the shipped catalogue defaults until the GET answers', () => {
         TestBed.tick();
         expect(svc.inForce('projection_node_cap')).toBe(LA_LIMIT_FALLBACKS.projection_node_cap);
-        expect(laLimit('connect.max_seeds')).toBe(20);
+        expect(laLimit('connect.max_seeds')).toBe(LA_LIMIT_FALLBACKS['connect.max_seeds']);
         http.expectOne(GET).flush({ items: ITEMS });
     });
 

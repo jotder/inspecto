@@ -10,7 +10,7 @@ import { parseSeedList } from './seed-list';
 
 /**
  * LA-SEED-CONNECT-1 — paste several numbers, then *Connect seeds*: ONE sealed `connect` step that seeds them and adds the
- * shortest connecting route for EVERY pair within `connect.max_hops` hops (a pair with none is shown as not connected
+ * shortest connecting route for EVERY pair within `connect.default_hops` hops (never above `connect.max_hops`) (a pair with none is shown as not connected
  * within the limit, never searched deeper). The result grid is the step's pair table (aliases when the Space masks entity ids);
  * *Expand from these nodes* then expands one hop from every node on the connecting routes, as one `expand` step. The grid
  * shows the latest `connect` of this session; the step itself is in the op log and the Dossier for good.
@@ -45,7 +45,7 @@ import { parseSeedList } from './seed-list';
                 @if (list().ids.length || list().invalid.length) {
                     <p class="text-secondary m-0 text-xs" data-testid="seed-summary">
                         {{ list().ids.length }} seed{{ list().ids.length === 1 ? '' : 's' }} to connect (up to
-                        {{ maxSeeds() }}, within {{ maxHops() }} hops).
+                        {{ maxSeeds() }}, within {{ hops() }} hops).
                         @if (list().duplicates) {
                             {{ list().duplicates }} repeated.
                         }
@@ -75,7 +75,7 @@ import { parseSeedList } from './seed-list';
             }
             @if (result(); as r) {
                 <p class="m-0 text-xs" data-testid="connect-summary">
-                    {{ r.joined }} of {{ r.pairs.length }} pairs connected within {{ maxHops() }} hops;
+                    {{ r.joined }} of {{ r.pairs.length }} pairs connected within {{ hops() }} hops;
                     {{ r.pairs.length - r.joined }} not connected.
                 </p>
                 @if (r.truncated) {
@@ -129,9 +129,13 @@ import { parseSeedList } from './seed-list';
 })
 export class InvestigationConnectOpComponent {
     readonly store = inject(InvestigationSessionStore);
-    /** The server's caps for one `connect` (`connect.max_seeds`, `connect.max_hops`). */
+    /** The server's cap on seeds for one `connect` (`connect.max_seeds`). */
     readonly maxSeeds = computed(() => laLimit('connect.max_seeds'));
-    readonly maxHops = computed(() => laLimit('connect.max_hops'));
+    /**
+     * The hops one `connect` walks: the Space's `connect.default_hops` (CL-11, default 3), never above `connect.max_hops`
+     * (default 6) - the max is only the ceiling of what may be asked; work grows with degree to the power of hops.
+     */
+    readonly hops = computed(() => Math.min(laLimit('connect.default_hops'), laLimit('connect.max_hops')));
     /** The profile's presets (window, budget, fan-out cap): an expand without them is unbounded and held for four-eyes. */
     readonly presets = input<DegreePresets>({});
     readonly text = signal('');
@@ -157,7 +161,7 @@ export class InvestigationConnectOpComponent {
     verdict(p: ConnectPair): string {
         if (!p.connected) {
             const held = p.notWalked?.length ? ` (stopped at high-connectivity ${p.notWalked.join(', ')})` : '';
-            return `Not connected within ${this.maxHops()} hops${held}`;
+            return `Not connected within ${this.hops()} hops${held}`;
         }
         return `${p.hops} hop${p.hops === 1 ? '' : 's'} · ${p.routes} route${p.routes === 1 ? '' : 's'}`;
     }
@@ -171,7 +175,7 @@ export class InvestigationConnectOpComponent {
         this.error.set('');
         const ids = this.list().ids;
         if (ids.length < 2) return;
-        if (!(await this.store.apply({ op: 'connect', ids, maxHops: this.maxHops() }))) this.error.set(this.store.error());
+        if (!(await this.store.apply({ op: 'connect', ids, maxHops: this.hops() }))) this.error.set(this.store.error());
     }
 
     /** One `expand` step from the nodes on the connecting routes (they are all in the Working Set). */

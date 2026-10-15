@@ -38,10 +38,30 @@ const UNITS: Record<string, string> = {
 /** Every value is a whole number except a `per_s` rate, which is a decimal (the wire contract). */
 const numberPattern = (i: LaLimitItem): RegExp => (i.unit === 'per_s' ? /^\d+(\.\d+)?$/ : /^\d+$/);
 
-/** `display.lod_label_cap` → "Lod label cap"; a group id the same way. */
+/** Words written in capitals wherever they appear in a key (a generic rule, not a per-item label). */
+const ACRONYMS: Record<string, string> = { hits: 'HITS', lod: 'LOD', id: 'ID', ids: 'IDs', url: 'URL', ttl: 'TTL', mb: 'MB', ram: 'RAM' };
+/** A trailing word that qualifies the name rather than being part of it: `expand_budget_default` → "Expand budget" + "default". */
+const QUALIFIERS = new Set(['default', 'max', 'min']);
+
+/**
+ * A key's last segment in readable words: snake_case and camelCase split, sentence case, acronyms kept, and a trailing
+ * default / max / min split off as a qualifier. `browser_algorithms.betweennessCentrality` → "Betweenness centrality";
+ * `investigation.expand_budget_default` → "Expand budget" + "default"; `display.lod_label_cap` → "LOD label cap".
+ */
+export function limitWords(key: string): { name: string; qualifier: string | null } {
+    const parts = key
+        .slice(key.lastIndexOf('.') + 1)
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .split('_')
+        .filter((w) => w.length > 0)
+        .map((w) => w.toLowerCase());
+    const qualifier = parts.length > 1 && QUALIFIERS.has(parts[parts.length - 1]) ? parts.pop()! : null;
+    const text = parts.map((w) => ACRONYMS[w] ?? w).join(' ');
+    return { name: text.charAt(0).toUpperCase() + text.slice(1), qualifier };
+}
+
 function words(key: string): string {
-    const last = key.slice(key.lastIndexOf('.') + 1).replace(/_/g, ' ');
-    return last.charAt(0).toUpperCase() + last.slice(1);
+    return limitWords(key).name;
 }
 
 function groupsOf(items: LaLimitItem[]): { group: string; items: LaLimitItem[] }[] {
@@ -295,9 +315,11 @@ export class LinkAnalysisLimitsComponent {
         return new FormGroup(controls);
     });
 
+    /** "Expand budget (default, rows)", "Betweenness centrality (nodes)", "Hub threshold": derived from the key, never hand-written. */
     label(i: LaLimitItem): string {
-        const unit = UNITS[i.unit] ?? i.unit;
-        return unit ? `${words(i.key)} (${unit})` : words(i.key);
+        const { name, qualifier } = limitWords(i.key);
+        const note = [qualifier, UNITS[i.unit] ?? i.unit].filter((x) => !!x).join(', ');
+        return note ? `${name} (${note})` : name;
     }
 
     groupLabel(group: string): string {

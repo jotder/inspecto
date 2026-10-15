@@ -52,13 +52,29 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 3 });
     });
 
-    it('states and sends the connect.max_seeds / connect.max_hops limits in force (LA-CONFIG-LIMITS-1)', async () => {
-        configureLaLimits({ 'connect.max_seeds': 2, 'connect.max_hops': 2 });
+    it('states and sends the connect.max_seeds / connect.default_hops limits in force (LA-CONFIG-LIMITS-1)', async () => {
+        configureLaLimits({ 'connect.max_seeds': 2, 'connect.default_hops': 2 });
         try {
             const { fixture, cmp, store, el } = setup();
             cmp.text.set('5551110001\n5551110002\n5551110003');
             fixture.detectChanges();
             expect(el.querySelector('[data-testid="seed-summary"]')?.textContent).toContain('(up to 2, within 2 hops)');
+            await cmp.connect();
+            expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 2 });
+        } finally {
+            resetLaLimits();
+        }
+    });
+
+    // CL-11: the max is only the ceiling. The probe that would otherwise pass: raising the max alone changes nothing.
+    it('walks connect.default_hops, never above connect.max_hops (CL-11)', async () => {
+        try {
+            configureLaLimits({ 'connect.max_hops': 6, 'connect.default_hops': 3 });
+            const { cmp, store } = setup();
+            cmp.text.set('5551110001 5551110002');
+            await cmp.connect();
+            expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 3 });
+            configureLaLimits({ 'connect.max_hops': 2, 'connect.default_hops': 5 }); // a default above the max is clamped
             await cmp.connect();
             expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 2 });
         } finally {

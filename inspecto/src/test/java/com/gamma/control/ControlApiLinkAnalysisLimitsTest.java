@@ -154,10 +154,10 @@ class ControlApiLinkAnalysisLimitsTest {
             assertEquals(403, send(c, "PUT", SPACE, "{\"traversal.timeout_s\":7}", ADMIN).statusCode(), "no canAuthorWorkbench");
             assertFalse(Files.exists(doc));
             JsonNode v = data(send(c, "PUT", SPACE, "{\"traversal.timeout_s\":7,\"projection_node_cap\":900,"
-                    + "\"browser_algorithms.pageRank\":1500}", AUTHOR), 200);
+                    + "\"browser_algorithms.closenessCentrality\":1500}", AUTHOR), 200);
             assertEquals(7, item(v, "traversal.timeout_s").get("value").asInt());
             assertEquals(7, item(v, "traversal.timeout_s").get("inForce").asInt());
-            assertEquals(1500, item(v, "browser_algorithms.pageRank").get("inForce").asInt());
+            assertEquals(1500, item(v, "browser_algorithms.closenessCentrality").get("inForce").asInt());
             assertEquals(7, LaLimits.forSpace(c.root).get(LaLimit.TRAVERSAL_TIMEOUT_S), "persisted in the Space's link-analysis.toon");
             v = data(send(c, "PUT", SPACE, "{\"traversal.timeout_s\":null}", AUTHOR), 200);
             assertTrue(item(v, "traversal.timeout_s").get("value").isNull(), "null clears = inherit");

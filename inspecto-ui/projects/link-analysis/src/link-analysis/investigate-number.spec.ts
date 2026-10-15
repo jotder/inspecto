@@ -212,7 +212,7 @@ describe('investigate-number - next degree', () => {
 
     it('is blocked above the server frontier cap', () => {
         const many = Array.from({ length: laLimit('investigation.max_frontier') + 1 }, (_, i) => entity(`n${i}`, 2));
-        expect(degreeState(ws(entity('s', 0), ...many), 4).blocked).toContain('one expand names at most 1,000');
+        expect(degreeState(ws(entity('s', 0), ...many), 4).blocked).toContain(`one expand names at most ${laLimit('investigation.max_frontier').toLocaleString('en-US')}`);
     });
 
     it('follows the investigation.max_frontier / expand_budget_default limits in force (LA-CONFIG-LIMITS-1)', () => {
@@ -610,7 +610,8 @@ describe('investigate-number - four-eyes clarity (LA-EXPAND-FOUREYES-CLARITY-1)'
 
     it('a default one-hop expand is never held under the shipped defaults (no threshold set)', () => {
         const a = expandApproval({}, none);
-        expect(a).toEqual({ budget: 2000, fanOut: null, exceeded: [] });
+        expect(a).toEqual({ budget: laLimit('investigation.expand_budget_default'), fanOut: null, exceeded: [] });
+        expect(laLimit('investigation.expand_budget_default')).toBe(4000); // CL-10: doubled
     });
 
     it("the telecom profile's presets stay under la-showcase's fan-out threshold", () => {

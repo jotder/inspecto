@@ -54,6 +54,7 @@ export const LA_LIMIT_FALLBACKS = {
     'investigation.max_frontier': 2000,
     'connect.max_seeds': 40,
     'connect.max_hops': 6,
+    'connect.default_hops': 3,
     'measures.max_window_days': 31,
     'dossier.max_snapshots': 40,
     'input.link_kinds': 100,

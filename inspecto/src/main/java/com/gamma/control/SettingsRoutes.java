@@ -24,13 +24,16 @@ import com.gamma.access.WriteGates;
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
- *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, maxInvestigationBytes, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems,propagatedRiskWeights},
- *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue,maxAgeHours},
+ *                                 mergedDistinctCap, seedByDistinctCap, maxSetBytes, maxInvestigationBytes, graphRun{maxNodes,maxEdges,timeoutMs,maxResultItems,propagatedRiskWeights},
+ *                                 index{enabled,maxDiskBytes,keepVersions,maxAgeHours}, embed{defaultTtlHours,maxTtlHours,refuseClassifications,frameAncestors},
  *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}, plus read-only *InForce echoes incl.
- *                                 graphRunInForce{threads,queue,maxResultItems}} (nulls = shipped defaults)
- *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding); a LIMIT key
- *                                 the body leaves out keeps its stored value (limits are edited at
- *                                 /settings/link-analysis/limits), a stated null clears it
+ *                                 graphRunInForce{maxResultItems}} (nulls = shipped defaults; the graph-run and index workers and
+ *                                 waiting lines are install-wide, at /settings/link-analysis/limits)
+ *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding). KEEP-UNSENT-LIMITS:
+ *                                 a numeric LIMIT key (the caps, thresholds, budgets and the numeric graphRun / index /
+ *                                 drafts / embed knobs - see LIMIT_KEYS) the body leaves out keeps its stored value, because
+ *                                 limits are edited in one place, PUT /settings/link-analysis/limits; a stated null clears it.
+ *                                 A non-limit key the body leaves out is cleared, as before
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
  *   PUT /settings/pipeline-history   replace it (same gates as branding)

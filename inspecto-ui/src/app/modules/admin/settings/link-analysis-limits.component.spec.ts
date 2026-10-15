@@ -10,7 +10,7 @@ import { SessionService, SpacesService, apiUrl } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { LaLimitItem, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
-import { LinkAnalysisLimitsComponent } from './link-analysis-limits.component';
+import { LinkAnalysisLimitsComponent, limitWords } from './link-analysis-limits.component';
 
 const GET = apiUrl('/settings/link-analysis/limits');
 
@@ -100,6 +100,8 @@ describe('LinkAnalysisLimitsComponent', () => {
         expect(section('space').textContent).toContain('Projection node cap (nodes)');
         expect(section('space').textContent).toContain('In force: 500 nodes');
         expect(section('space').textContent).toContain('Max seeds');
+        expect(section('space').textContent).toContain('LOD label cap');
+        expect(section('space').textContent).toContain('Labels drop above this.'); // the description is the hint
         expect(input('space', 'connect.max_seeds').disabled).toBe(false);
         // the install item is read-only for this caller, and says why
         expect(input('install', 'graph_run.ceiling_nodes').disabled).toBe(true);
@@ -218,5 +220,21 @@ describe('LinkAnalysisLimitsComponent', () => {
         submit('browser');
         expect(svc.personal('projection_node_cap')).toBeNull();
         expect(el.querySelector('form[data-section="browser"] mat-error')?.textContent).toContain('from 1 to 500');
+    });
+});
+
+/** Item labels are DERIVED from the key (no per-item template): words, sentence case, acronyms, a qualifier split off. */
+describe('limitWords', () => {
+    it.each([
+        ['browser_algorithms.betweennessCentrality', 'Betweenness centrality', null],
+        ['projection_node_cap', 'Projection node cap', null],
+        ['investigation.expand_budget_default', 'Expand budget', 'default'],
+        ['traversal.depth_max', 'Depth', 'max'],
+        ['display.lod_label_cap', 'LOD label cap', null],
+        ['browser_algorithms.hits', 'HITS', null],
+        ['drafts.max_open', 'Max open', null],
+        ['rate.link_analysis_per_s', 'Link analysis per s', null],
+    ])('%s → %s', (key, name, qualifier) => {
+        expect(limitWords(key)).toEqual({ name, qualifier });
     });
 });

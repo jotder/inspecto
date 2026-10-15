@@ -1,4 +1,5 @@
-import { vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { beforeEach, vi } from 'vitest';
 import { environment } from '../../../environments/environment';
 import { setAppEnvironment } from '../api/app-environment';
 
@@ -13,3 +14,11 @@ setAppEnvironment(environment);
 // catching a genuinely stuck test. `vi.setConfig` here applies to every test file that loads this
 // setup (wired via the unit-test builder's `setupFiles`).
 vi.setConfig({ testTimeout: 15000, hookTimeout: 15000 });
+
+// The unit-test builder runs Vitest NON-isolated (one TestBed shared by every spec file in a worker). A test that leaves
+// an async continuation behind (a promise or timer that injects or creates a component after its own afterEach reset)
+// instantiates the shared TestBed again, and the NEXT file's first `configureTestingModule` then dies with "Cannot
+// configure the test module when the test module has already been instantiated" - a failure that moves between files
+// with the worker's file order (seen on link-analysis-query-panel and la-host.providers, 2026-10-15). Resetting before
+// every test makes each test start from a clean TestBed whatever ran before it in the worker.
+beforeEach(() => TestBed.resetTestingModule());

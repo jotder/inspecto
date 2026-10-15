@@ -56,8 +56,8 @@ class LaLimitsTest {
         Set<LaLimit> nullable = new HashSet<>();
         for (LaLimit l : LaLimit.values()) if (l.nullable()) nullable.add(l);
         assertEquals(Set.of(LaLimit.FOUR_EYES_BUDGET_ABOVE, LaLimit.FOUR_EYES_FAN_OUT_ABOVE), nullable);
-        assertEquals(28, java.util.Arrays.stream(LaLimit.values()).filter(l -> l.path().startsWith("browser_algorithms.")).count(),
-                "one per graph algorithm but suspicionScore, whose cap is suspicion_node_cap");
+        assertEquals(17, java.util.Arrays.stream(LaLimit.values()).filter(l -> l.path().startsWith("browser_algorithms.")).count(),
+                "one per graph algorithm the browser consults; suspicionScore's cap is suspicion_node_cap");
     }
 
     @Test
@@ -127,11 +127,11 @@ class LaLimitsTest {
     @Test
     void aStatedValueInsideItsRangeIsInForceAndOneOutsideReadsAsTheDefault(@TempDir Path root) throws Exception {
         LaLimitValues v = write(root, "projection_node_cap: 900\nfour_eyes_budget_above: 300\ntraversal:\n  timeout_s: 7\n"
-                + "  depth_max: 999\n  paths_max: lots\nbrowser_algorithms:\n  pageRank: 1500\n");
+                + "  depth_max: 999\n  paths_max: lots\nbrowser_algorithms:\n  closenessCentrality: 1500\n");
         assertEquals(900, v.get(LaLimit.PROJECTION_NODE_CAP));
         assertEquals(300L, v.getNullable(LaLimit.FOUR_EYES_BUDGET_ABOVE));
         assertEquals(7, v.get(LaLimit.TRAVERSAL_TIMEOUT_S));
-        assertEquals(1500, v.get(LaLimit.BROWSER_PAGE_RANK));
+        assertEquals(1500, v.get(LaLimit.BROWSER_CLOSENESS_CENTRALITY));
         assertEquals(20, v.get(LaLimit.TRAVERSAL_DEPTH_MAX), "999 is outside 1..50: a hand edit cannot pass the range");
         assertNull(v.stated(LaLimit.TRAVERSAL_DEPTH_MAX));
         assertEquals(20_000, v.get(LaLimit.TRAVERSAL_PATHS_MAX), "not a number: the default");

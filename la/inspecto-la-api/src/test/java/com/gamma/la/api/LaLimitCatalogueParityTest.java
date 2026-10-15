@@ -55,15 +55,24 @@ class LaLimitCatalogueParityTest {
         }
     }
 
-    /** One per algorithm, EXCEPT suspicionScore: its cap is {@code suspicion_node_cap}, one key for browser and server (CL-2). */
+    /**
+     * One item per algorithm the browser CONSULTS (it refuses above it, or hands the run to the server) - exactly the
+     * {@code browser_algorithms.*} keys the SPA's fallback table holds - each a real catalogue algorithm. No item for one the
+     * browser never caps (lead decision 2026-10-15: no dead settings), and none for suspicionScore: its cap is
+     * {@code suspicion_node_cap}, one key for browser and server (CL-2).
+     */
     @Test
-    void oneBrowserAlgorithmItemPerAlgorithmButSuspicionScore() {
+    void oneBrowserAlgorithmItemPerConsultedAlgorithm() throws Exception {
         Set<String> items = Arrays.stream(LaLimit.values()).map(LaLimit::path).filter(p -> p.startsWith("browser_algorithms."))
-                .map(p -> p.substring("browser_algorithms.".length())).collect(Collectors.toCollection(TreeSet::new));
-        Set<String> algorithms = Arrays.stream(Algorithm.values()).filter(a -> a != Algorithm.SUSPICION_SCORE).map(Algorithm::id)
                 .collect(Collectors.toCollection(TreeSet::new));
-        assertEquals(algorithms, items);
-        assertTrue(LaLimit.byPath("browser_algorithms.suspicionScore").isEmpty(), "suspicion_node_cap is the one key");
+        Set<String> spa = spaFallbacks(Files.readString(SPA_FALLBACKS)).keySet().stream().filter(k -> k.startsWith("browser_algorithms."))
+                .collect(Collectors.toCollection(TreeSet::new));
+        assertEquals(spa, items, "the catalogue's browser_algorithms items are exactly the ones the SPA reads");
+        Set<String> algorithms = Arrays.stream(Algorithm.values()).map(Algorithm::id).collect(Collectors.toCollection(TreeSet::new));
+        for (String k : items) assertTrue(algorithms.contains(k.substring("browser_algorithms.".length())), k + " names no algorithm");
+        assertEquals(17, items.size());
+        for (String never : List.of("suspicionScore", "pageRank", "degreeCentrality", "propagatedRisk"))
+            assertTrue(LaLimit.byPath("browser_algorithms." + never).isEmpty(), never);
     }
 
     /** CL-3: 2,500 per algorithm, or the measured (server inline) ceiling where that is lower. */
@@ -71,14 +80,15 @@ class LaLimitCatalogueParityTest {
     void eachBrowserAlgorithmDefaultIsTheGeneralCapOrItsLowerMeasuredCeiling() {
         List<String> drift = new ArrayList<>();
         for (Algorithm a : Algorithm.values()) {
-            if (a == Algorithm.SUSPICION_SCORE) continue;
+            var item = LaLimit.byPath("browser_algorithms." + a.id());
+            if (item.isEmpty()) continue;                                  // not consulted by the browser: no item
             long want = Math.min(2_500, a.inlineNodeCeiling());
-            Number got = LaLimit.byPath("browser_algorithms." + a.id()).orElseThrow().defaultValue();
+            Number got = item.get().defaultValue();
             if (got.longValue() != want) drift.add(a.id() + ": catalogue " + got + ", measured " + want);
         }
         assertTrue(drift.isEmpty(), drift.toString());
         assertEquals(500L, LaLimit.BROWSER_BETWEENNESS_CENTRALITY.defaultValue(), "the slowest browser algorithm");
-        assertEquals(2_500L, LaLimit.BROWSER_PAGE_RANK.defaultValue());
+        assertEquals(2_500L, LaLimit.BROWSER_LOUVAIN_COMMUNITIES.defaultValue());
     }
 
     /** CL-1 / CL-2 / CL-3: the decided P2 defaults (operator 2026-10-15). */

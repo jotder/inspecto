@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
-import { configureLaLimits, resetLaLimits } from './la-limits';
+import { configureLaLimits, laLimit, resetLaLimits } from './la-limits';
 
 function setup() {
     TestBed.configureTestingModule({
@@ -42,13 +42,14 @@ describe('InvestigationExpandRungComponent (LA-SPA-OWED-SURFACES-1)', () => {
             maxFanOut: 10,
         });
 
-        cmp.form.patchValue({ budget: 20_001, minEvents: 0, candidateDegreeMin: 60, maxFanOut: 1.5 });
+        const max = laLimit('investigation.expand_budget_max'); // 40 000 shipped (CL-10)
+        cmp.form.patchValue({ budget: max + 1, minEvents: 0, candidateDegreeMin: 60, maxFanOut: 1.5 });
         expect(cmp.open()).toBe(false);
         expect(cmp.rung()).toBeNull();
         fixture.detectChanges();
         expect(cmp.open()).toBe(true);
         const errors = Array.from(el.querySelectorAll('mat-error')).map((e) => e.textContent!.trim());
-        expect(errors).toContain('A whole number from 1 to 20000.');
+        expect(errors).toContain(`A whole number from 1 to ${max}.`);
         expect(errors.filter((e) => e === 'A whole number of at least 1.').length).toBe(2);
         expect(el.querySelector('[role="alert"]')!.textContent).toContain('must not exceed the maximum');
         await expectNoA11yViolations(el);

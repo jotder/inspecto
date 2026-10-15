@@ -47,23 +47,15 @@ public enum LaLimit {
     SUSPICION_NODE_CAP("suspicion_node_cap", Layer.SPACE, true, "browser_algorithms", "nodes", 1_000, 1, 100_000,
             "Nodes above which suspicion score refuses to run in the browser, and above which a server run of it is a "
                     + "job rather than an inline answer."),
-    // One item per catalogue algorithm (com.gamma.la.core.Algorithm) except suspicionScore (SUSPICION_NODE_CAP).
-    // P2 (CL-3) defaults: 2,500, or the algorithm's measured server inline ceiling where that is lower.
+    // One item per catalogue algorithm (com.gamma.la.core.Algorithm) the browser CONSULTS - it refuses above it, or hands
+    // the run to the server - and never one the browser runs at any size or not at all (lead decision 2026-10-15: no dead
+    // settings in the menu). suspicionScore's is SUSPICION_NODE_CAP. P2 (CL-3) defaults: 2,500, or the algorithm's
+    // measured server inline ceiling where that is lower.
     BROWSER_SHORTEST_PATH("shortestPath", Use.HANDOVER),
-    BROWSER_NEIGHBORHOOD("neighborhood", Use.NONE),
-    BROWSER_EGO_NETWORK("egoNetwork", Use.NONE),
-    BROWSER_DEGREE_CENTRALITY("degreeCentrality", Use.NONE),
-    BROWSER_CONNECTED_COMPONENTS("connectedComponents", Use.NONE),
-    BROWSER_K_CORE("kCore", Use.NONE),
-    BROWSER_TRIANGLE_COUNT("triangleCount", Use.NONE),
     BROWSER_ARTICULATION_POINTS("articulationPoints", Use.HANDOVER),
     BROWSER_BRIDGES("bridges", Use.HANDOVER),
-    BROWSER_IS_FOREST("isForest", Use.NONE),
-    BROWSER_DESCENDANTS("descendants", Use.NONE),
     BROWSER_WEIGHTED_SHORTEST_PATH("weightedShortestPath", Use.HANDOVER),
     BROWSER_MAXIMUM_SPANNING_FOREST("maximumSpanningForest", Use.HANDOVER),
-    BROWSER_JACCARD_SIMILARITY("jaccardSimilarity", Use.NONE),
-    BROWSER_PAGE_RANK("pageRank", Use.NONE),
     BROWSER_BETWEENNESS_CENTRALITY("betweennessCentrality", Use.REFUSE, 500),
     BROWSER_CLOSENESS_CENTRALITY("closenessCentrality", Use.REFUSE, 1_000),
     BROWSER_LOUVAIN_COMMUNITIES("louvainCommunities", Use.REFUSE),
@@ -76,7 +68,6 @@ public enum LaLimit {
     BROWSER_EIGENVECTOR_CENTRALITY("eigenvectorCentrality", Use.REFUSE, 1_000),
     BROWSER_KATZ_CENTRALITY("katzCentrality", Use.REFUSE, 1_000),
     BROWSER_HITS("hits", Use.REFUSE, 1_000),
-    BROWSER_PROPAGATED_RISK("propagatedRisk", Use.NONE, 1_000),
 
     // ── display (SPACE, browser; SPA-only today) ─────────────────────────────────────────────────────────────
     DISPLAY_LOD_LABEL_CAP("display.lod_label_cap", Layer.SPACE, true, "display", "count", 300, 1, 30_000,
@@ -355,10 +346,9 @@ public enum LaLimit {
     /**
      * What the browser does with a {@code browser_algorithms.<algorithmId>} item, which its description states: {@code REFUSE}
      * = the algorithm refuses above it (an open Investigation can run it on the server); {@code HANDOVER} = above it the run
-     * goes to the server when an Investigation is open (a selection algorithm never above {@link #ANALYSIS_NODE_CAP}); {@code
-     * NONE} = the browser does not consult it (it never refuses the algorithm, or the algorithm is server-only).
+     * goes to the server when an Investigation is open (a selection algorithm never above {@link #ANALYSIS_NODE_CAP}).
      */
-    private enum Use { REFUSE, HANDOVER, NONE }
+    private enum Use { REFUSE, HANDOVER }
 
     private final String path;
     private final Layer layer;
@@ -396,7 +386,6 @@ public enum LaLimit {
                             + " (an open Investigation can run it on the server).";
                     case HANDOVER -> "Nodes above which " + algorithmId
                             + " runs on the server instead of the browser when an Investigation is open.";
-                    case NONE -> "Not consulted yet: the browser runs " + algorithmId + " at any size, or never (server-only).";
                 });
     }
 
