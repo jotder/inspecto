@@ -89,7 +89,11 @@ class DeliveryCheckTest {
     @Test
     void aSameNameFileChangedAfterItsMarkerIsSkippedLoudlyOnceAndAnUnchangedOneIsNot(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = config(dir, true);
-        File f = dir.resolve("XDR_20260901_part0001.csv").toFile();
+        // Inside the poll dir, as a delivered file is: outside it the marker path becomes markers/../<name>, which
+        // Linux cannot resolve while markers/ does not exist yet (Windows normalises it lexically, so it passed there).
+        Path poll = java.nio.file.Paths.get(cfg.dirs().poll());
+        Files.createDirectories(poll);
+        File f = poll.resolve("XDR_20260901_part0001.csv").toFile();
         Files.writeString(f.toPath(), "x");
         Path marker = com.gamma.etl.MarkerManager.getMarkerPath(f, cfg);
         Files.createDirectories(marker.getParent());
