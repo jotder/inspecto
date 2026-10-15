@@ -4,6 +4,8 @@
 the shipped product; every control named here is a label you will see on screen. The developer-level mechanism
 is in [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md).*
 
+New to Link Analysis? Start with the shorter [end user guide](link-analysis-end-user-guide.md); this manual is the reference.
+
 ---
 
 ## 1. What Link Analysis is
@@ -299,7 +301,7 @@ Pattern match opens on the first pack (its description is shown); *Custom motif*
 
 Patterns can require **time order** ("after the previous hop", "within N hours"), which needs a time column. If
 the data cannot answer — no time column, or your filter removed every leg — the tool **says so and why** rather
-than returning "none". When the loaded graph was truncated, **Run on server** repeats the search across the whole
+than returning "none". To supply one, add the time column under **Attribute columns** in the Query panel, run the query again and pick it as the **Time column** under **Filter edges by time**; the starter-card graphs do not carry one. The message is raised at the top of the Toolbox and scrolls into view. When the loaded graph was truncated, **Run on server** repeats the search across the whole
 Dataset.
 
 A pack that pins link kinds needs a **link kind column**, and a pack with a window or an ordering needs a **time
@@ -316,7 +318,7 @@ after the projection, so set **Link type** in the Query panel and re-run the que
 | Action | What it keeps | Notes |
 |---|---|---|
 | **Save the current view** | The setup: source, mapping, layout, profile, display options, filters | A **view** re-projects *live* data — not evidence. Loadable from **Open saved views**; has version history, comments and tags. |
-| **Save this analysis** | A **sealed snapshot** of exactly what is on screen, with a SHA-256 fingerprint | Choose a Case to attach to, or **create a new Case from graph nodes** — tick the nodes that become the Case's first members (each becomes an Incident; the same entity reused later is reused, not duplicated). What is on screen means the Working Set while an Investigation is open. |
+| **Save this analysis** | A **sealed snapshot** of exactly what is on screen, with a SHA-256 fingerprint | Choose a Case to attach to, or **create a new Case from graph nodes** — tick the nodes that become the Case's first members (each becomes an Incident; the same entity reused later is reused, not duplicated). The button is disabled, with the reason, without *Incident management*. A masked entity cannot become a member (the server refuses a masked pseudonym as a Case key): on a Space that masks accounts the dialog says so, and you attach an Investigation to the Case or ask for Reveal rights instead. What is on screen means the Working Set while an Investigation is open. |
 | **Attach to Case** | One step: **seals** what is on screen and attaches it to a Case — no separate save first | Pick an existing Case or **create a new Case from the selected nodes**. While an Investigation is open you may also **link the Investigation to the Case**. If a step after the seal fails, the dialog stays open and names the sealed snapshot id; **Retry** resumes from the failed step and never seals twice. A new Case that was created stays the target of the retry. If creating the Case got no definite answer (a timeout or server error), it **may have been created**: the dialog will not create another — check Cases, pick it under *An existing Case*, and retry. Needs the Incident management capability (`canManageIncidents`); without it the button is disabled and says why. |
 | **Export** | PNG, SVG, JSON, GraphML | For reports and other tools. |
 | **Share / Exchange** | A view can be shared with other Spaces | Comments travel with it. |
@@ -394,8 +396,8 @@ Reading a Dataset's links (Explore a Dataset, Follow the money, saved views) is 
 
 **Four-eyes (large expands).** An expand whose budget or fan-out cap is above the Space's four-eyes thresholds
 (**Settings → Link Analysis**) does not run: it answers *Waiting for approval* and is held as a request, one at a time
-per Investigation. Someone **other than you** who holds *Approve link expansions* decides it under **Approvals Inbox →
-Link expansions**: each request shows the Investigation, who asked and when, its purpose, why it was held and, in
+per Investigation. Someone **other than you** who holds *Approve link expansions* decides it in the **Oversight** card at the bottom of the Investigation tab (in the studio it is also listed under **Approvals Inbox →
+Link expansions**; the standalone application has no Approvals Inbox): each request shows the Investigation, who asked and when, its purpose, why it was held and, in
 plain words, what it will read (frontier, Dataset, direction, link kinds, budget). **Approve** runs it at once as
 your step, sealed with who approved it; **Deny…** takes an optional reason (at most 200 characters) and reads
 nothing. You never see your own requests there, and the server refuses you deciding them. Where the Investigation
@@ -590,7 +592,7 @@ its Dataset is no longer shared with you — the system answers the same for all
 **Masking.** Per Space, entity keys are shown *typed* (only sensitive types masked), *all* masked, or *none*.
 Masked values appear as stable tokens you can still group and count by.
 The same rule applies on the query graph, the node list, paths, patterns and Value Measures as in the Working Set: a *Masking: typed|all|none*
-badge in the query panel says which applies. A masked entity shows as an alias (`masked:...`); pick, seed and expand it as you
+badge in the query panel says which applies, and stays visible after the panel collapses to its summary. A masked entity shows as an alias (`masked:...`); pick, seed and expand it as you
 would a name. The Investigation gives the seeded entity its own alias, so the Working Set row differs from the query graph's;
 the Selected line keeps them one entity and marks it *(masked)*. After a server restart an old alias is refused: run the query again.
 
