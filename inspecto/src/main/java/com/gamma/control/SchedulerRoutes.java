@@ -88,6 +88,11 @@ final class SchedulerRoutes implements RouteModule {
     // ── boot install: a configured file must take effect without any request ──────
 
     private void installAtBoot(ApiContext api) {
+        try {   // LA-CONFIG-LIMITS-1: the install-wide Link Analysis limits live beside this document
+            com.gamma.entitystore.LaLimits.installDocPath(systemDocPath(api, com.gamma.entitystore.LaLimits.INSTALL_FILE));
+        } catch (RuntimeException e) {
+            log.warn("Link Analysis install-wide limits home not resolved: {}", e.getMessage());
+        }
         try {
             ConcurrencyBroker broker = ConcurrencyBroker.shared();
             broker.setSystemCap(effectiveSystemCap(api));
@@ -454,12 +459,17 @@ final class SchedulerRoutes implements RouteModule {
     /** The server-wide document home: {@code -Dsystem.config.dir} → spaces container root → sole
      *  space's write root; {@code null} when none is available. */
     private static Path systemDocPath(ApiContext api) {
+        return systemDocPath(api, SchedulerSettings.FILE);
+    }
+
+    /** {@code file} in the server-wide document home (the same resolution as {@code scheduler.toon}); {@code null} when none. */
+    static Path systemDocPath(ApiContext api, String file) {
         String dir = System.getProperty("system.config.dir");
-        if (dir != null && !dir.isBlank()) return Path.of(dir).resolve(SchedulerSettings.FILE);
+        if (dir != null && !dir.isBlank()) return Path.of(dir).resolve(file);
         Path container = HostContext.of(api).spaces() != null ? HostContext.of(api).spaces().containerRoot() : null;
-        if (container != null) return container.resolve(SchedulerSettings.FILE);
+        if (container != null) return container.resolve(file);
         Path wr = api.writeRoot();
-        return wr == null ? null : wr.resolve(SchedulerSettings.FILE);
+        return wr == null ? null : wr.resolve(file);
     }
 
     /** The effective server-wide cap under the §3 precedence: stored cap → property → 0 (unbounded).

@@ -400,6 +400,10 @@ public final class CapabilityManifest {
             new Entry("PUT", "/settings/link-analysis", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/pipeline-history", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/timezone", Roles.CAN_AUTHOR_WORKBENCH),
+            // LinkAnalysisLimitsRoutes (LA-CONFIG-LIMITS-1) — a Space's Link Analysis limits are authored like its other
+            // Link Analysis settings; the install-wide (host resource) limits are administration.
+            new Entry("PUT", "/settings/link-analysis/limits", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("PUT", "/system/link-analysis/limits", Roles.CAN_ADMINISTER),
             // SchedulerRoutes — tuning the live Consignment concurrency caps is runtime operation,
             // not workbench authoring.
             new Entry("PUT", "/system/scheduler", Roles.CAN_OPERATE_RUNS),

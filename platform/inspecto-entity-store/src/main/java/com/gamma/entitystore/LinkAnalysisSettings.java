@@ -113,12 +113,12 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
         /** The longest a link may live, in hours: the stated cap, else {@link #DEFAULT_MAX_TTL_HOURS}. */
         public int maxTtlHoursInForce() {
-            return maxTtlHours != null ? maxTtlHours : DEFAULT_MAX_TTL_HOURS;
+            return (int) LaLimit.EMBED_MAX_TTL_HOURS.resolve(maxTtlHours);
         }
 
         /** The lifetime of a link whose mint states none: the stated default, else 72 h, never above the cap in force. */
         public int defaultTtlHoursInForce() {
-            return Math.min(defaultTtlHours != null ? defaultTtlHours : DEFAULT_TTL_HOURS, maxTtlHoursInForce());
+            return Math.min((int) LaLimit.EMBED_DEFAULT_TTL_HOURS.resolve(defaultTtlHours), maxTtlHoursInForce());
         }
 
         /** The classifications minting is refused for, upper-case; empty = none. */
@@ -171,7 +171,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
         /** The stated list length cap applied: a stated value above the hard ceiling is clamped, as the run service does. */
         public int maxResultItemsInForce() {
-            return Math.min(maxResultItems != null ? maxResultItems : DEFAULT_MAX_RESULT_ITEMS, CEILING_MAX_RESULT_ITEMS);
+            return Math.min((int) LaLimit.GRAPH_RUN_MAX_RESULT_ITEMS.resolve(maxResultItems), CEILING_MAX_RESULT_ITEMS);
         }
 
         /** The per-hop weights in force: the stated list, else {@link #DEFAULT_PROPAGATED_RISK_WEIGHTS}. */
@@ -213,11 +213,11 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
         /** The disk budget in force in bytes; 0 = no limit. */
         public long maxDiskBytesInForce() {
-            return maxDiskBytes != null ? maxDiskBytes : 0L;
+            return LaLimit.INDEX_MAX_DISK_BYTES.resolve(maxDiskBytes);
         }
 
         public int keepVersionsInForce() {
-            return keepVersions != null ? keepVersions : DEFAULT_KEEP_VERSIONS;
+            return (int) LaLimit.INDEX_KEEP_VERSIONS.resolve(keepVersions);
         }
 
         public int threadsInForce() {
@@ -230,7 +230,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
         /** How old (hours since the build) an index may be and still answer a read of a Dataset whose input files cannot be fingerprinted (LA-INDEX-MAX-AGE-1). */
         public int maxAgeHoursInForce() {
-            return maxAgeHours != null ? maxAgeHours : DEFAULT_MAX_AGE_HOURS;
+            return (int) LaLimit.INDEX_MAX_AGE_HOURS.resolve(maxAgeHours);
         }
     }
 
@@ -252,15 +252,15 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         }
 
         public int maxOpenInForce() {
-            return maxOpen != null ? maxOpen : DEFAULT_MAX_OPEN;
+            return (int) LaLimit.DRAFTS_MAX_OPEN.resolve(maxOpen);
         }
 
         public java.time.Duration hibernateAfterInForce() {
-            return java.time.Duration.ofMinutes(hibernateAfterMinutes != null ? hibernateAfterMinutes : DEFAULT_HIBERNATE_AFTER_MINUTES);
+            return java.time.Duration.ofMinutes(LaLimit.DRAFTS_HIBERNATE_AFTER_MINUTES.resolve(hibernateAfterMinutes));
         }
 
         public java.time.Duration expireAfterInForce() {
-            return java.time.Duration.ofDays(expireAfterDays != null ? expireAfterDays : DEFAULT_EXPIRE_AFTER_DAYS);
+            return java.time.Duration.ofDays(LaLimit.DRAFTS_EXPIRE_AFTER_DAYS.resolve(expireAfterDays));
         }
 
         /** Whether the expiry is longer than the hibernation (a Draft must sleep before it can die). */
@@ -277,7 +277,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
     /** The merged-expand distinct-value cap in force: the stated one, else {@link #DEFAULT_MERGED_DISTINCT_CAP}. */
     public int effectiveMergedDistinctCap() {
-        return mergedDistinctCap != null ? mergedDistinctCap : DEFAULT_MERGED_DISTINCT_CAP;
+        return (int) LaLimit.MERGED_DISTINCT_CAP.resolve(mergedDistinctCap);
     }
 
     /** The shipped default of {@code seed_by_distinct_cap}. */
@@ -285,7 +285,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
     /** The seedBy distinct-value cap in force: the stated one, else {@link #DEFAULT_SEED_BY_DISTINCT_CAP}. */
     public int effectiveSeedByDistinctCap() {
-        return seedByDistinctCap != null ? seedByDistinctCap : DEFAULT_SEED_BY_DISTINCT_CAP;
+        return (int) LaLimit.SEED_BY_DISTINCT_CAP.resolve(seedByDistinctCap);
     }
 
     /** The shipped default of {@code max_set_bytes}: 64 MiB of sealed Working Set text per step. */
@@ -293,7 +293,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
     /** The per-set size limit in force, in bytes: the stated one, else {@link #DEFAULT_MAX_SET_BYTES}. */
     public int effectiveMaxSetBytes() {
-        return maxSetBytes != null ? maxSetBytes : DEFAULT_MAX_SET_BYTES;
+        return (int) LaLimit.MAX_SET_BYTES.resolve(maxSetBytes);
     }
 
     /** The shipped default of {@code max_investigation_bytes}: 4 GiB of sealed Working Set text per Investigation (main + live Drafts). */
@@ -301,7 +301,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
     /** The per-Investigation total set budget in force, in bytes: the stated one, else {@link #DEFAULT_MAX_INVESTIGATION_BYTES}. */
     public long effectiveMaxInvestigationBytes() {
-        return maxInvestigationBytes != null ? maxInvestigationBytes : DEFAULT_MAX_INVESTIGATION_BYTES;
+        return LaLimit.MAX_INVESTIGATION_BYTES.resolve(maxInvestigationBytes);
     }
 
     /** The shipped default of {@code hub_threshold}: an expand candidate with more distinct contacts than this is flagged. */
@@ -313,7 +313,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * flagged {@code highConnectivity}, and not expanded further unless the analyst overrides.
      */
     public int effectiveHubThreshold() {
-        return hubThreshold != null ? hubThreshold : DEFAULT_HUB_THRESHOLD;
+        return (int) LaLimit.HUB_THRESHOLD.resolve(hubThreshold);
     }
 
     /** The graph-run knobs in force: the stated ones; a field never stated is {@code null} inside (the service's default). */
@@ -346,9 +346,34 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         return entityTypes != null ? entityTypes : EntityTypes.DEFAULTS;
     }
 
-    /** Write to {@code link-analysis.toon} at {@code path} (canonical TOON, crash-safe). */
+    /** The top-level keys {@link #write} models; a block's own sub-keys are listed beside its {@code block(...)} call. */
+    private static final List<String> MODELLED = List.of("projection_node_cap", "analysis_node_cap", "suspicion_node_cap",
+            "masking_mode", "four_eyes_budget_above", "four_eyes_fan_out_above", "entity_types", "merged_distinct_cap",
+            "seed_by_distinct_cap", "max_set_bytes", "max_investigation_bytes", "hub_threshold", "graph_run", "index", "drafts", "embed");
+
+    /**
+     * Write to {@code link-analysis.toon} at {@code path} (canonical TOON, crash-safe) as a read-modify-write over the
+     * raw TOON map ({@code LA-CONFIG-LIMITS-1}): the keys this record models are replaced (absent = cleared, the
+     * replace semantics of {@code PUT /settings/link-analysis}), and EVERY other key the document holds - a
+     * {@link LaLimit} item written by {@code PUT /settings/link-analysis/limits}, a key a newer build wrote - is kept,
+     * top-level and inside a modelled block alike. A document that does not parse is replaced, as before.
+     */
     public void write(Path path) throws IOException {
+        synchronized (LaLimits.WRITE_LOCK) {
+            writeLocked(path);
+        }
+    }
+
+    private void writeLocked(Path path) throws IOException {
+        Map<String, Object> existing;
+        try {
+            existing = LaLimits.loadRaw(path);
+        } catch (IOException unreadable) {
+            existing = new LinkedHashMap<>();
+        }
         Map<String, Object> m = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : existing.entrySet())
+            if (!MODELLED.contains(e.getKey())) m.put(e.getKey(), e.getValue());
         if (projectionNodeCap != null) m.put("projection_node_cap", projectionNodeCap);
         if (analysisNodeCap != null) m.put("analysis_node_cap", analysisNodeCap);
         if (suspicionNodeCap != null) m.put("suspicion_node_cap", suspicionNodeCap);
@@ -361,8 +386,9 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (maxSetBytes != null) m.put("max_set_bytes", maxSetBytes);
         if (maxInvestigationBytes != null) m.put("max_investigation_bytes", maxInvestigationBytes);
         if (hubThreshold != null) m.put("hub_threshold", hubThreshold);
-        if (graphRun != null && !graphRun.isNone()) {
+        {
             Map<String, Object> g = new LinkedHashMap<>();
+            GraphRun graphRun = this.graphRun != null ? this.graphRun : GraphRun.NONE;
             if (graphRun.maxNodes() != null) g.put("max_nodes", graphRun.maxNodes());
             if (graphRun.maxEdges() != null) g.put("max_edges", graphRun.maxEdges());
             if (graphRun.timeoutMs() != null) g.put("timeout_ms", graphRun.timeoutMs());
@@ -370,34 +396,48 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (graphRun.queue() != null) g.put("queue", graphRun.queue());
             if (graphRun.maxResultItems() != null) g.put("max_result_items", graphRun.maxResultItems());
             if (graphRun.propagatedRiskWeights() != null) g.put("propagated_risk_weights", graphRun.propagatedRiskWeights());
-            m.put("graph_run", g);
+            block(m, existing, "graph_run", g, "max_nodes", "max_edges", "timeout_ms", "threads", "queue", "max_result_items",
+                    "propagated_risk_weights");
         }
-        if (index != null && !index.isNone()) {
+        {
             Map<String, Object> x = new LinkedHashMap<>();
+            Index index = this.index != null ? this.index : Index.NONE;
             if (index.enabled() != null) x.put("enabled", index.enabled());
             if (index.maxDiskBytes() != null) x.put("max_disk_bytes", index.maxDiskBytes());
             if (index.keepVersions() != null) x.put("keep_versions", index.keepVersions());
             if (index.threads() != null) x.put("threads", index.threads());
             if (index.queue() != null) x.put("queue", index.queue());
             if (index.maxAgeHours() != null) x.put("max_age_hours", index.maxAgeHours());
-            m.put("index", x);
+            block(m, existing, "index", x, "enabled", "max_disk_bytes", "keep_versions", "threads", "queue", "max_age_hours");
         }
-        if (drafts != null && !drafts.isNone()) {
+        {
             Map<String, Object> x = new LinkedHashMap<>();
+            Drafts drafts = this.drafts != null ? this.drafts : Drafts.NONE;
             if (drafts.maxOpen() != null) x.put("max_open", drafts.maxOpen());
             if (drafts.hibernateAfterMinutes() != null) x.put("hibernate_after_minutes", drafts.hibernateAfterMinutes());
             if (drafts.expireAfterDays() != null) x.put("expire_after_days", drafts.expireAfterDays());
-            m.put("drafts", x);
+            block(m, existing, "drafts", x, "max_open", "hibernate_after_minutes", "expire_after_days");
         }
-        if (embed != null && !embed.isNone()) {
+        {
             Map<String, Object> x = new LinkedHashMap<>();
+            Embed embed = this.embed != null ? this.embed : Embed.NONE;
             if (embed.defaultTtlHours() != null) x.put("default_ttl_hours", embed.defaultTtlHours());
             if (embed.maxTtlHours() != null) x.put("max_ttl_hours", embed.maxTtlHours());
             if (embed.refuseClassifications() != null) x.put("refuse_classifications", embed.refuseClassifications());
             if (embed.frameAncestors() != null) x.put("frame_ancestors", embed.frameAncestors());
-            m.put("embed", x);
+            block(m, existing, "embed", x, "default_ttl_hours", "max_ttl_hours", "refuse_classifications", "frame_ancestors");
         }
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
+    }
+
+    /** Put block {@code name}: its {@code stated} modelled keys, then every key of the stored block this record does not model; omitted when both are empty. */
+    @SuppressWarnings("unchecked")
+    private static void block(Map<String, Object> m, Map<String, Object> existing, String name, Map<String, Object> stated,
+                              String... modelled) {
+        if (existing.get(name) instanceof Map<?, ?> stored)
+            for (Map.Entry<String, Object> e : ((Map<String, Object>) stored).entrySet())
+                if (!List.of(modelled).contains(e.getKey())) stated.put(e.getKey(), e.getValue());
+        if (!stated.isEmpty()) m.put(name, stated);
     }
 
     /** The settings of the Space whose config root is {@code writeRoot}; {@link #EMPTY} when there is none. */
