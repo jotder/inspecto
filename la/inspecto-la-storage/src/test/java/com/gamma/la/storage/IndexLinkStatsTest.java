@@ -61,13 +61,18 @@ class IndexLinkStatsTest {
     }
 
     private static IndexBuilder.Result build(Path root, Path data, IndexMapping m, IndexBuilder.Mode mode, List<String> files,
-                                             String srcType, String dstType) throws Exception {
+                                             IndexBuilder.EndpointKey srcType, IndexBuilder.EndpointKey dstType) throws Exception {
         return IndexBuilder.build(new IndexBuilder.Request(DS, m, relation(data, files), new IndexStore(root, DS, m.hash()),
                 "fp-" + files.size(), IndexBuilder.Options.defaults(), stamps(data, files), mode, added -> relation(data, added),
                 List.of(data), IndexPlan.DEFAULT_MAX_DELTAS, srcType, dstType));
     }
 
     private static final List<String> BOTH = List.of("f0.parquet", "f1.parquet");
+
+    /** A type keyed by the raw id (the test's stand-in for a normaliser that changes nothing). */
+    private static IndexBuilder.EndpointKey type(String id) {
+        return new IndexBuilder.EndpointKey(id, "default", c -> c);
+    }
 
     @Test
     void aFullBuildRecordsKindCountsDegreeQuantilesOfTheStarAndTheTimeSpan(@TempDir Path tmp) throws Exception {
@@ -79,13 +84,29 @@ class IndexLinkStatsTest {
         assertEquals(List.of("call", "sms"), List.copyOf(m.kindEdges().keySet()), "most edges first");
         // 101 nodes: 100 leaves of degree 1 and the hub of degree 100
         assertEquals(new IndexManifest.Degree(1, 1, 1, 100), m.degree());
+        assertEquals(Map.of(1L, 100L, 100L, 1L), m.degreeHistogram());
+        assertEquals(new IndexManifest.EndpointTypes(null, null), m.endpointTypes());
         assertEquals(new IndexManifest.TimeSpan("2026-01-01T00:00:00Z", "2026-01-05T03:00:00Z"), m.timeSpan(),
                 "leaf 0 to leaf 99 (99 hours later); the NULL ts of leaf 7 is skipped");
         assertEquals(Map.of(), m.typeNodes(), "untyped endpoint columns: recorded, and empty");
 
-        IndexManifest onDisk = IndexManifest.read(build(tmp.resolve("ix"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, null).directory());
+        IndexBuilder.Result again = build(tmp.resolve("ix"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, null);
+        IndexManifest onDisk = IndexManifest.read(again.directory());
         assertEquals(Map.of("call", 50L, "sms", 49L), onDisk.kindEdges(), "the statistics are written to manifest.json");
         assertEquals(new IndexManifest.Degree(1, 1, 1, 100), onDisk.degree());
+
+        // one key's links, folded the same way: the hub's 100 neighbours, its NULL-kind link as a null kind
+        try (IndexReader r = IndexReader.open(again.directory(), onDisk, com.gamma.sql.SqlSandboxPolicy.defaultPolicy())) {
+            IndexReader.KeyLinks hub = r.keyLinks("src", "dst", "H");
+            assertEquals(100, hub.degree());
+            java.util.Map<String, Long> kinds = new java.util.HashMap<>();
+            kinds.put("call", 50L);
+            kinds.put("sms", 49L);
+            kinds.put(null, 1L);
+            assertEquals(kinds, hub.kinds());
+            assertEquals(1, r.keyLinks("src", "dst", "L42").degree());
+            assertEquals(0, r.keyLinks("src", "dst", "nobody").degree());
+        }
     }
 
     @Test
@@ -93,12 +114,12 @@ class IndexLinkStatsTest {
         Path data = tmp.resolve("data");
         plant(data);
         assertEquals(Map.of("msisdn", 101L),
-                build(tmp.resolve("a"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, "msisdn", "msisdn").manifest().typeNodes());
+                build(tmp.resolve("a"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, type("msisdn"), type("msisdn")).manifest().typeNodes());
         assertEquals(Map.of("msisdn", 1L, "imei", 100L),
-                build(tmp.resolve("b"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, "msisdn", "imei").manifest().typeNodes(),
+                build(tmp.resolve("b"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, type("msisdn"), type("imei")).manifest().typeNodes(),
                 "the hub is only ever a source, the leaves only ever targets");
         assertEquals(Map.of("imei", 100L),
-                build(tmp.resolve("c"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, "imei").manifest().typeNodes());
+                build(tmp.resolve("c"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, type("imei")).manifest().typeNodes());
     }
 
     @Test
@@ -116,39 +137,44 @@ class IndexLinkStatsTest {
     void anAppendAndACompactionRecordWhatAFullRebuildOfTheSameFilesRecords(@TempDir Path tmp) throws Exception {
         Path data = tmp.resolve("data");
         plant(data);
-        IndexManifest full = build(tmp.resolve("full"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, "msisdn", "imei").manifest();
+        IndexManifest full = build(tmp.resolve("full"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, type("msisdn"), type("imei")).manifest();
 
         Path root = tmp.resolve("inc");
-        IndexManifest first = build(root, data, MAPPING, IndexBuilder.Mode.FULL, List.of("f0.parquet"), "msisdn", "imei").manifest();
+        IndexManifest first = build(root, data, MAPPING, IndexBuilder.Mode.FULL, List.of("f0.parquet"), type("msisdn"), type("imei")).manifest();
         assertEquals(50, first.degree().max(), "the hub has 50 leaves in f0");
-        IndexManifest appended = build(root, data, MAPPING, IndexBuilder.Mode.APPEND, BOTH, "msisdn", "imei").manifest();
+        IndexManifest appended = build(root, data, MAPPING, IndexBuilder.Mode.APPEND, BOTH, type("msisdn"), type("imei")).manifest();
         assertEquals(IndexManifest.Builder.APPEND, appended.builder());
         // the hub has a node row in the main AND in the delta: its degree is their sum, not either one
         assertStatsEqual(full, appended);
-        IndexManifest compacted = build(root, data, MAPPING, IndexBuilder.Mode.COMPACT, BOTH, "msisdn", "imei").manifest();
+        IndexManifest compacted = build(root, data, MAPPING, IndexBuilder.Mode.COMPACT, BOTH, type("msisdn"), type("imei")).manifest();
         assertEquals(IndexManifest.Builder.COMPACT, compacted.builder());
         assertStatsEqual(full, compacted);
     }
 
     @Test
-    void anAppendOverAParentWithoutRecordedKindsRecountsThem(@TempDir Path tmp) throws Exception {
+    void theEndsAreKeyedByTheirTypesNormalisedKeyAndFoldedToDistinctLinksWithoutSelfLinks(@TempDir Path tmp) throws Exception {
         Path data = tmp.resolve("data");
         plant(data);
-        Path root = tmp.resolve("ix");
-        IndexBuilder.Result first = build(root, data, MAPPING, IndexBuilder.Mode.FULL, List.of("f0.parquet"), null, null);
-        IndexManifest old = first.manifest();                             // rewrite it as a manifest written before the statistics
-        new IndexManifest(old.version(), old.builtAt(), old.builder(), old.duckdbVersion(), old.bucketFn(), old.buckets(),
-                old.rowGroupSize(), old.mapping(), old.mappingHash(), old.dataset(), old.relationSqlHash(), old.baseFingerprint(),
-                old.timeColZone(), old.tables(), old.droppedNull(), old.deltas(), old.parent(), old.inputFiles(), old.bucketSizing())
-                .write(first.directory());
-        assertNull(IndexManifest.read(first.directory()).kindEdges());
+        // a "normaliser" that folds every leaf to the one key L: the 100 edges become the links (H, L, call) and (H, L, sms)
+        // (leaf 99's NULL kind is a third link, not a kind)
+        IndexBuilder.EndpointKey leaves = new IndexBuilder.EndpointKey("t", "fold", c -> "CASE WHEN " + c + " LIKE 'L%' THEN 'L' ELSE " + c + " END");
+        IndexManifest m = build(tmp.resolve("a"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, leaves, leaves).manifest();
+        assertEquals(Map.of("call", 1L, "sms", 1L), m.kindEdges());
+        assertEquals(Map.of(1L, 2L), m.degreeHistogram(), "H and L each have one neighbour");
+        assertEquals(Map.of("t", 2L), m.typeNodes());
+        assertEquals(new IndexManifest.EndpointTypes(new IndexManifest.EndpointType("t", "fold"), new IndexManifest.EndpointType("t", "fold")),
+                m.endpointTypes());
 
-        IndexManifest appended = build(root, data, MAPPING, IndexBuilder.Mode.APPEND, BOTH, null, null).manifest();
-        assertEquals(Map.of("call", 50L, "sms", 49L), appended.kindEdges(), "main + delta, not the delta alone");
+        // every end folds to one key: every link is a self-link, so there is nothing to count - and the build still publishes
+        IndexBuilder.EndpointKey all = new IndexBuilder.EndpointKey("t", "one", c -> "'K'");
+        IndexManifest none = build(tmp.resolve("b"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, all, all).manifest();
+        assertEquals(Map.of(), none.kindEdges());
+        assertEquals(Map.of(), none.degreeHistogram());
+        assertEquals(new IndexManifest.Degree(0, 0, 0, 0), none.degree());
     }
 
     @Test
-    void aManifestWrittenBeforeTheStatisticsReadsThemAsNotRecordedAndTheyRoundTrip() throws Exception {
+    void aManifestWrittenBeforeTheStatisticsReadsThemAsNotRecordedAndTheyRoundTrip() {
         IndexManifest old = new IndexManifest(3, "2026-10-01T00:00:00Z", IndexManifest.Builder.FULL, "v1.4.1", BucketFunction.NAME, 4,
                 IndexBuilder.ROW_GROUP_SIZE, MAPPING, MAPPING.hash(), DS, "h", "fp", "UTC",
                 Map.of("out", new IndexManifest.TableStats(3, 1, 10)), 0, null, null, null, null);
@@ -160,9 +186,12 @@ class IndexLinkStatsTest {
         assertNull(read.typeNodes());
         assertNull(read.degree());
         assertNull(read.timeSpan());
+        assertNull(read.degreeHistogram());
+        assertNull(read.endpointTypes());
 
         IndexManifest with = old.withLinkStats(Map.of("call", 2L), Map.of(), new IndexManifest.Degree(1, 2, 3, 4),
-                new IndexManifest.TimeSpan("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"));
+                new IndexManifest.TimeSpan("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"), Map.of(1L, 3L, 4L, 1L),
+                new IndexManifest.EndpointTypes(new IndexManifest.EndpointType("msisdn", "e164"), null));
         IndexManifest back = IndexManifest.fromJson(with.toJson());
         assertEquals(with, back);
         assertEquals(Map.of(), back.typeNodes(), "an empty map stays empty, not unrecorded");
@@ -173,5 +202,6 @@ class IndexLinkStatsTest {
         assertEquals(want.typeNodes(), got.typeNodes(), "typeNodes");
         assertEquals(want.degree(), got.degree(), "degree");
         assertEquals(want.timeSpan(), got.timeSpan(), "timeSpan");
+        assertEquals(want.degreeHistogram(), got.degreeHistogram(), "degreeHistogram");
     }
 }

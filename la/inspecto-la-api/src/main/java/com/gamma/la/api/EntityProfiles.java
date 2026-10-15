@@ -61,7 +61,7 @@ final class EntityProfiles {
     private static final String SENTINEL_SQL = "lower(trim(raw)) IN ('', '-99', '0', 'null', 'unknown', 'n/a')";
 
     /** D-EP4: asked in order, the first answer wins. The index source goes first once the manifest carries link statistics. */
-    static final List<LinkStatsSource> LINK_SOURCES = List.of(new DatasetLinkStats());
+    static final List<LinkStatsSource> LINK_SOURCES = List.of(new IndexLinkStats(), new DatasetLinkStats());
 
     /** Days and instants are read in UTC (DuckDB's session zone is otherwise the host's); DuckDB knows "UTC", not "Z". */
     private static final ZoneId UTC = ZoneId.of("UTC");

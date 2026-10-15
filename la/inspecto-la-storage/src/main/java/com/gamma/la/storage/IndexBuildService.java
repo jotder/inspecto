@@ -90,11 +90,11 @@ public final class IndexBuildService implements AutoCloseable {
      * {@code deltaSql} (APPEND only) maps the added input files to the relation over just them; null = this Dataset cannot be appended to.
      * {@code readRoots} are the directories the relation may read (the Dataset's roots); the build's DuckDB connection is sealed to
      * them plus the index store, so a relation reading anywhere else fails. {@code srcType} / {@code dstType} are the Entity
-     * Types the mapping's source / target columns are typed as (null = untyped), recorded as the manifest's {@code typeNodes}.
+     * Types the mapping's source / target columns are typed as (null = untyped): the manifest's link statistics key by them.
      */
     public record Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles,
-                           Function<List<String>, String> deltaSql, List<java.nio.file.Path> readRoots, String srcType,
-                           String dstType) {
+                           Function<List<String>, String> deltaSql, List<java.nio.file.Path> readRoots,
+                           IndexBuilder.EndpointKey srcType, IndexBuilder.EndpointKey dstType) {
         public Relation {
             Objects.requireNonNull(relationSql, "relationSql");
             readRoots = readRoots == null ? List.of() : List.copyOf(readRoots);
