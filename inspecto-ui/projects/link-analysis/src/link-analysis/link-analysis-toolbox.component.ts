@@ -1,5 +1,6 @@
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { DecimalPipe } from '@angular/common';
+import type { InvestigationHeader } from '@inspecto/link-analysis/api/inv.service';
 import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { RiskScorePanelComponent } from '@inspecto/core/components/risk-score-panel.component';
 import { AnomalyPanelComponent } from '@inspecto/core/components/anomaly-panel.component';
@@ -9,11 +10,13 @@ import {
     computed,
     DestroyRef,
     effect,
+    ElementRef,
     inject,
     input,
     output,
     signal,
     untracked,
+    viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -233,7 +236,15 @@ export class LinkAnalysisToolboxComponent {
     // reusing it is a duplicate-identifier compile error, not a shadow.
     private componentsApi = inject(ComponentsService);
 
+    /** The Analysis alert sits above every tool; a refusal from a button far down the panel must not go unseen. */
+    private readonly analysisAlert = viewChild<ElementRef<HTMLElement>>('analysisAlert');
+
     constructor() {
+        effect(() => {
+            if (!this.analysisError()) return;
+            // The alert is rendered by the same change-detection pass; scroll once it exists.
+            queueMicrotask(() => this.analysisAlert()?.nativeElement.scrollIntoView?.({ block: 'nearest' }));
+        });
         // Never open the Pattern tool on a blank motif — that matches every link. Start from the first pack.
         // Until the investigator picks one, the default follows the domain profile (telecom ⇒ a telecom pack,
         // this Space's own first) and re-resolves when the Space's authored packs arrive.
@@ -335,6 +346,8 @@ export class LinkAnalysisToolboxComponent {
     readonly investigationPatternTarget = input<InvestigationPatternTarget | null>(null);
     /** The open Investigation's bound time column ('' = none / no Investigation open), whatever the canvas draws. */
     readonly investigationTimeCol = input<string>('');
+    /** The open Investigation's header, so Value Measures start from its Dataset and columns instead of empty fields. */
+    readonly investigationHeader = input<InvestigationHeader | null>(null);
 
     /**
      * D-4 step 7: the Investigation whose Working Set the canvas draws (null = the canvas shows a query graph, so a

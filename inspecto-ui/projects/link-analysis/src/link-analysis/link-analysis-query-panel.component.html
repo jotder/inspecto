@@ -310,6 +310,15 @@
     </form>
 } @else {
     <div class="flex flex-wrap items-center gap-x-6 gap-y-2" role="group" aria-label="Active query summary">
+        @if (masking(); as m) {
+            <span
+                class="rounded-md border px-2 py-0.5 text-xs"
+                style="border-color: var(--gamma-border)"
+                data-testid="masking-badge"
+                [attr.title]="m.basis"
+                >Masking: {{ m.mode }}{{ m.masked === true ? ' (ids shown as aliases)' : '' }}</span
+            >
+        }
         <div class="flex items-center gap-2 text-sm">
             <mat-icon class="icon-size-4" svgIcon="heroicons_outline:circle-stack"></mat-icon>
             <span class="text-secondary">Source</span>
