@@ -15,6 +15,8 @@ import com.gamma.la.core.FingerprintBudget;
 import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.storage.IndexBuilder;
+import com.gamma.la.storage.IndexManifest;
+import com.gamma.la.storage.IndexStore;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -246,6 +248,44 @@ class ControlApiIndexTest {
             String again = start(c, PRIVATE_BUILD, OWNER);
             awaitStatus(c, again, OWNER, "COMPLETED");
             assertEquals(2, ok(c, "GET", "/inv/index", null, OWNER).get("indexes").get(0).get("version").asInt());
+        }
+    }
+
+    @Test
+    void theListingCarriesTheLinkStatisticsAndTypedEndpointsCountNodesPerEntityType(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "")) {
+            // alice->bob call, bob->carol sms, alice->carol call: every node takes part in two edges
+            awaitStatus(c, start(c, PRIVATE_BUILD, OWNER), OWNER, "COMPLETED");
+            JsonNode ix = ok(c, "GET", "/inv/index", null, OWNER).get("indexes").get(0);
+            assertEquals(2, ix.at("/kindEdges/call").asLong());
+            assertEquals(1, ix.at("/kindEdges/sms").asLong());
+            assertEquals(JSON.readTree("{\"p50\":2,\"p90\":2,\"p99\":2,\"max\":2}"), ix.get("degree"));
+            assertEquals(JSON.readTree("{\"min\":\"2026-01-01T00:00:00Z\",\"max\":\"2026-01-03T00:00:00Z\"}"), ix.get("timeSpan"));
+            assertEquals(0, ix.get("typeNodes").size(), "untyped endpoint columns: recorded and empty");
+
+            // an index built before the statistics existed is still listed, its statistics null (not recorded, never zero)
+            Path dir = new IndexStore(root.resolve("la-index"), "private_ds", ix.get("mappingHash").asText()).current().orElseThrow();
+            IndexManifest m = IndexManifest.read(dir);
+            new IndexManifest(m.version(), m.builtAt(), m.builder(), m.duckdbVersion(), m.bucketFn(), m.buckets(), m.rowGroupSize(),
+                    m.mapping(), m.mappingHash(), m.dataset(), m.relationSqlHash(), m.baseFingerprint(), m.timeColZone(), m.tables(),
+                    m.droppedNull(), m.deltas(), m.parent(), m.inputFiles(), m.bucketSizing()).write(dir);
+            JsonNode old = ok(c, "GET", "/inv/index", null, OWNER).get("indexes").get(0);
+            for (String f : List.of("kindEdges", "typeNodes", "degree", "timeSpan"))
+                assertTrue(old.get(f).isNull(), f + " of an older manifest: " + old);
+
+            // the same view with the endpoint columns classified as two default Entity Types; no time column mapped
+            new ComponentStore(root.resolve("registry")).write("dataset", "typed_ds", Map.of("view", "sights_view", "owner", "analyst-1",
+                    "shares", List.of(), "columns", List.of(Map.of("name", "who", "classification", "MSISDN"),
+                            Map.of("name", "other", "classification", "IMEI"))));
+            awaitStatus(c, start(c, "{\"dataset\":\"typed_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}", OWNER), OWNER, "COMPLETED");
+            JsonNode typed = null;
+            for (JsonNode i : ok(c, "GET", "/inv/index", null, OWNER).get("indexes"))
+                if ("typed_ds".equals(i.get("dataset").asText())) typed = i;
+            assertTrue(typed != null, "typed_ds is listed");
+            assertEquals(JSON.readTree("{\"msisdn\":2,\"imei\":2}"), typed.get("typeNodes"), "sources {alice, bob}, targets {bob, carol}");
+            assertEquals(0, typed.get("kindEdges").size(), "no kind column: no kinds");
+            assertTrue(typed.get("timeSpan").isNull(), "no time column: no time span");
         }
     }
 

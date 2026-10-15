@@ -4,6 +4,7 @@ import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.access.ComponentAccess;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LaLimits;
@@ -206,7 +207,7 @@ public final class IndexRoutes implements RouteModule {
         RunView v;
         try {
             v = service(writeRoot).submit(new IndexBuildService.Request(callerId(ex), dataset, mapping,
-                    ds -> relation(api.dataRoot(), writeRoot, dataset, relationSql),
+                    ds -> relation(api.dataRoot(), writeRoot, dataset, relationSql, mapping),
                     ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode, SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS)));
         } catch (Refused refused) {
             throw map(refused);
@@ -218,8 +219,11 @@ public final class IndexRoutes implements RouteModule {
         return ApiContext.respondJson(ex, 202, view(v));
     }
 
-    /** The relation to build over with its input fingerprint (and file list, when small enough to record). Runs on the submitting thread. */
-    static IndexBuildService.Relation relation(Path dataRoot, Path writeRoot, String dataset, String relationSql) {
+    /**
+     * The relation to build over with its input fingerprint (and file list, when small enough to record) and the Entity Types
+     * of the mapping's endpoint columns. Runs on the submitting thread.
+     */
+    static IndexBuildService.Relation relation(Path dataRoot, Path writeRoot, String dataset, String relationSql, IndexMapping mapping) {
         InputFingerprint fp = currentInput(dataRoot, writeRoot, dataset);
         List<IndexManifest.InputFile> files = null;
         if (fp != null && fp.known() && fp.files().size() <= IndexManifest.MAX_INPUT_FILES)
@@ -229,7 +233,33 @@ public final class IndexRoutes implements RouteModule {
                 .map(c -> DatasetProviders.require().relationSqlOverFiles(c, dataRoot, writeRoot, added)).orElse(null);
         List<Path> roots = DatasetProviders.require().dataset(writeRoot, dataset)
                 .map(c -> DatasetProviders.require().readRoots(c, dataRoot)).orElse(List.of());
-        return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files, deltaSql, roots);
+        return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files, deltaSql, roots,
+                entityTypeOf(writeRoot, dataset, mapping.srcColumn()), entityTypeOf(writeRoot, dataset, mapping.dstColumn()));
+    }
+
+    /**
+     * The in-force Entity Type a Dataset column is typed as: the class the pipeline-schema lineage gives the column, else the
+     * column's own declared {@code classification}, claimed by a type's {@code classifications[]} (the resolution
+     * {@link EntityMasking#maskedColumns} applies, for every type rather than the masked ones). Null when untyped or when
+     * it cannot be resolved - typing only labels the index's {@code typeNodes} and never fails a build.
+     */
+    static String entityTypeOf(Path writeRoot, String dataset, String column) {
+        try {
+            List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
+            Function<String, Optional<EntityTypes.EntityType>> typeOf = cls -> types.stream()
+                    .filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls.trim()))).findFirst();
+            DatasetProvider provider = DatasetProviders.require();
+            Map<String, Object> ds = provider.dataset(writeRoot, dataset).orElse(Map.of());
+            String cls = provider.schemaClassification(writeRoot, ds, c -> typeOf.apply(c).isPresent())
+                    .get(column.trim().toLowerCase(Locale.ROOT));
+            if (cls == null && ds.get("columns") instanceof List<?> cols)
+                for (Object o : cols)
+                    if (o instanceof Map<?, ?> c && column.equalsIgnoreCase(String.valueOf(c.get("name"))) && c.get("classification") != null)
+                        cls = String.valueOf(c.get("classification"));
+            return cls == null ? null : typeOf.apply(cls).map(EntityTypes.EntityType::id).orElse(null);
+        } catch (RuntimeException unresolvable) {
+            return null;
+        }
     }
 
     /** The body's {@code mode}: {@code full} (default), {@code append} (only the files added since the live version) or {@code compact} (merge the deltas). */
@@ -405,6 +435,25 @@ public final class IndexRoutes implements RouteModule {
         o.put("fingerprint", st.fingerprintKnown() ? "known" : "unknown");
         o.put("fingerprintReason", st.fingerprintKnown() ? null : InputFingerprint.unknownReason(input));   // no-files, too-many-files, timeout, budget, unavailable
         if (input != null && input.known()) o.put("inputFiles", input.files().size());
+        // Entity profile link statistics (D-EP4): null = not recorded (an index built before them; rebuild to record)
+        o.put("kindEdges", m.kindEdges());
+        o.put("typeNodes", m.typeNodes());
+        Map<String, Object> degree = null;
+        if (m.degree() != null) {
+            degree = new LinkedHashMap<>();
+            degree.put("p50", m.degree().p50());
+            degree.put("p90", m.degree().p90());
+            degree.put("p99", m.degree().p99());
+            degree.put("max", m.degree().max());
+        }
+        o.put("degree", degree);
+        Map<String, Object> span = null;
+        if (m.timeSpan() != null) {
+            span = new LinkedHashMap<>();
+            span.put("min", m.timeSpan().min());
+            span.put("max", m.timeSpan().max());
+        }
+        o.put("timeSpan", span);
         return o;
     }
 

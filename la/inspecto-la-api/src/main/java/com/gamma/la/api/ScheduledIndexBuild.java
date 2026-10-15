@@ -223,7 +223,7 @@ public final class ScheduledIndexBuild {
         RunView v;
         try {
             v = svc.submit(new IndexBuildService.Request(principal, r.dataset(), mapping,
-                    ds -> IndexRoutes.relation(dataRoot, writeRoot, r.dataset(), relationSql),
+                    ds -> IndexRoutes.relation(dataRoot, writeRoot, r.dataset(), relationSql, mapping),
                     ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode, SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS)));
         } catch (Refused refused) {
             return refused(m, switch (refused.kind()) {
