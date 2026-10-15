@@ -89,13 +89,20 @@ public final class IndexBuildService implements AutoCloseable {
      * What the caller's gate resolved: the trusted relation SELECT and a fingerprint of the base data it reads.
      * {@code deltaSql} (APPEND only) maps the added input files to the relation over just them; null = this Dataset cannot be appended to.
      * {@code readRoots} are the directories the relation may read (the Dataset's roots); the build's DuckDB connection is sealed to
-     * them plus the index store, so a relation reading anywhere else fails.
+     * them plus the index store, so a relation reading anywhere else fails. {@code srcType} / {@code dstType} are the Entity
+     * Types the mapping's source / target columns are typed as (null = untyped), recorded as the manifest's {@code typeNodes}.
      */
     public record Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles,
-                           Function<List<String>, String> deltaSql, List<java.nio.file.Path> readRoots) {
+                           Function<List<String>, String> deltaSql, List<java.nio.file.Path> readRoots, String srcType,
+                           String dstType) {
         public Relation {
             Objects.requireNonNull(relationSql, "relationSql");
             readRoots = readRoots == null ? List.of() : List.copyOf(readRoots);
+        }
+
+        public Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles,
+                        Function<List<String>, String> deltaSql, List<java.nio.file.Path> readRoots) {
+            this(relationSql, baseFingerprint, inputFiles, deltaSql, readRoots, null, null);
         }
 
         public Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles,
@@ -540,7 +547,7 @@ public final class IndexBuildService implements AutoCloseable {
                     p -> r.progress = new Progress(p.phase(), p.step(), p.steps()), h.sizing());
             IndexBuilder.Result result = builder.apply(new IndexBuilder.Request(r.datasetId, r.mapping, r.relation.relationSql(),
                     store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql(), r.relation.readRoots(),
-                    r.maxDeltas));
+                    r.maxDeltas, r.relation.srcType(), r.relation.dstType()));
             try {
                 store.gc(GC_MIN_AGE);                                  // best effort: a failed sweep never fails a published build
             } catch (IOException | RuntimeException ignored) {

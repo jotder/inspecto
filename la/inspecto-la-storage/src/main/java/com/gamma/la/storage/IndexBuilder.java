@@ -126,10 +126,21 @@ public final class IndexBuilder {
      *                        appended to (its relation is not row-wise over its files)
      * @param readRoots       the directories the relation may read; the connection is sealed to them plus the store directory
      * @param maxDeltas       APPEND only: the Space's {@code index.max_deltas}, the gate {@link IndexPlan#classify} re-checks
+     * @param srcType         the Entity Type the source column is typed as, null = untyped (the manifest's {@code typeNodes})
+     * @param dstType         the Entity Type the target column is typed as, null = untyped
      */
     public record Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                           Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
-                          java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots, int maxDeltas) {
+                          java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots, int maxDeltas,
+                          String srcType, String dstType) {
+        /** Endpoint columns not typed as an Entity Type. */
+        public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
+                       Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
+                       java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots, int maxDeltas) {
+            this(datasetId, mapping, relationSql, store, baseFingerprint, options, inputFiles, mode, deltaSql, readRoots, maxDeltas,
+                    null, null);
+        }
+
         /** Under the default delta cap ({@link IndexPlan#DEFAULT_MAX_DELTAS}). */
         public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                        Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
@@ -469,7 +480,60 @@ public final class IndexBuilder {
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.FULL, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), relationSqlHash(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles(),
                     opt.sizing().signature());
+            man = linkStats(man, false, null, null);
             return publish(man, spill, number, total, kept, dropped, stats, n, t0);
+        }
+
+        /**
+         * {@code man} with its link statistics, read from the tables this build just wrote into the stage (never the relation again):
+         * the {@code kind} column of {@code out} (one column of a sorted, dictionary-encoded parquet) and one aggregate over
+         * {@code nodes} (degree quantiles, endpoint-role counts and the time span from {@code first_ts}/{@code last_ts}).
+         *
+         * <p>Per mode: FULL and COMPACT RECOMPUTE all four (their {@code nodes} hold one row per id). APPEND recomputes the
+         * degree, the per-type nodes and the time span over the whole {@code nodes} table, grouping by id first (an appended
+         * delta adds a node row per id it touches, so a node can have several rows; edge counts sum exactly), and CARRIES
+         * FORWARD the kind counts: the parent's {@code kindEdges} plus the kinds of the delta's own {@code out} files (prefix
+         * {@code deltaPrefix}; null = the append added no edge). A parent without recorded {@code kindEdges} is recounted in full.
+         *
+         * @param folded      the nodes table may hold several rows per id (APPEND)
+         * @param parentKinds APPEND only: the parent's {@code kindEdges}, null = not recorded (recount)
+         */
+        IndexManifest linkStats(IndexManifest man, boolean folded, Map<String, Long> parentKinds, String deltaPrefix) throws SQLException {
+            long t = System.nanoTime();
+            IndexMapping m = req.mapping();
+            Map<String, Long> kinds = new LinkedHashMap<>();
+            if (m.kindColumn() != null) {
+                Map<String, Long> counts = new java.util.HashMap<>();
+                if (parentKinds != null) counts.putAll(parentKinds);
+                String files = parentKinds == null ? "*" : deltaPrefix == null ? null : deltaPrefix + "-*";
+                if (files != null)
+                    for (Object[] r : rows("SELECT kind, count(*) FROM read_parquet('" + sqlPath(stage.resolve("out")) + "/*/" + files
+                            + ".parquet') WHERE kind IS NOT NULL GROUP BY kind"))
+                        counts.merge(r[0].toString(), ((Number) r[1]).longValue(), Long::sum);
+                counts.entrySet().stream().sorted(Map.Entry.<String, Long>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                        .forEach(e -> kinds.put(e.getKey(), e.getValue()));
+            }
+            String nodes = "read_parquet('" + sqlPath(stage.resolve("nodes")) + "/*/*.parquet')";
+            String from = folded
+                    ? "(SELECT id, sum(out_edges) AS out_edges, sum(in_edges) AS in_edges, min(first_ts) AS first_ts, max(last_ts) AS last_ts FROM "
+                            + nodes + " GROUP BY id)"
+                    : nodes;
+            Object[] r = rows("SELECT quantile_disc(out_edges + in_edges, 0.5), quantile_disc(out_edges + in_edges, 0.9),"
+                    + " quantile_disc(out_edges + in_edges, 0.99), max(out_edges + in_edges), CAST(min(first_ts) AS VARCHAR),"
+                    + " CAST(max(last_ts) AS VARCHAR), count(*), count(*) FILTER (WHERE out_edges > 0), count(*) FILTER (WHERE in_edges > 0)"
+                    + " FROM " + from + " n").get(0);
+            IndexManifest.Degree degree = new IndexManifest.Degree(((Number) r[0]).longValue(), ((Number) r[1]).longValue(),
+                    ((Number) r[2]).longValue(), ((Number) r[3]).longValue());
+            IndexManifest.TimeSpan span = m.timeColumn() == null || r[4] == null ? null
+                    : new IndexManifest.TimeSpan(instant(r[4].toString()), instant(r[5].toString()));
+            Map<String, Long> types = new LinkedHashMap<>();
+            if (req.srcType() != null && req.srcType().equals(req.dstType())) types.put(req.srcType(), ((Number) r[6]).longValue());
+            else {
+                if (req.srcType() != null) types.put(req.srcType(), ((Number) r[7]).longValue());
+                if (req.dstType() != null) types.put(req.dstType(), ((Number) r[8]).longValue());
+            }
+            timings.put("stats", ms(t));
+            return man.withLinkStats(kinds, types, degree, span);
         }
 
         /** Writes the manifest, releases the files, deletes the scratch directories and publishes the stage. */
@@ -563,6 +627,7 @@ public final class IndexBuilder {
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.APPEND, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), req.baseFingerprint(), parent.timeColZone(), stats,
                     parent.droppedNull() + dropped, deltas, parentDir.getFileName().toString(), req.inputFiles(), parent.bucketSizing());
+            man = linkStats(man, true, parent.kindEdges(), kept > 0 ? prefix : null);
             return publish(man, spill, number, total, kept, dropped, stats, n, t0);
         }
 
@@ -606,6 +671,7 @@ public final class IndexBuilder {
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.COMPACT, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), parent.baseFingerprint(), parent.timeColZone(), stats,
                     parent.droppedNull(), null, parentDir.getFileName().toString(), parent.inputFiles(), parent.bucketSizing());
+            man = linkStats(man, false, null, null);
             return publish(man, spill, number, kept, kept, 0, stats, n, t0);
         }
 
@@ -876,6 +942,11 @@ public final class IndexBuilder {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /** DuckDB's text of a naive UTC TIMESTAMP ({@code 2026-10-09 10:36:47[.123]}) as ISO-8601 instant text. */
+    private static String instant(String naiveUtc) {
+        return naiveUtc.replace(' ', 'T') + "Z";
     }
 
     private static long ms(long fromNanos) { return (System.nanoTime() - fromNanos) / 1_000_000L; }
