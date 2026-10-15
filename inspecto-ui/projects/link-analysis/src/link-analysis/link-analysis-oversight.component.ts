@@ -61,12 +61,10 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
                             <inspecto-status-badge [value]="statusTone(p)" [label]="p.status"></inspecto-status-badge>
                         </div>
                         <span
-                            >Requested by <strong>{{ p.requestedBy ?? 'unknown' }}</strong> at {{ p.requestedAt }}</span
+                            >Requested by <strong>{{ p.requestedBy ?? 'unknown' }}</strong> at {{ when(p.requestedAt) }}</span
                         >
                         <span class="text-secondary">
-                            Four-eyes threshold crossed: {{ p.sensitivity.exceeded.join('; ') }} (budget above
-                            {{ p.sensitivity.fourEyesBudgetAbove ?? '—' }}, fan-out above
-                            {{ p.sensitivity.fourEyesFanOutAbove ?? '—' }})
+                            Four-eyes threshold crossed: {{ p.sensitivity.exceeded.join('; ') }} ({{ limits(p) }})
                         </span>
                         @if (p.status !== 'pending') {
                             <span class="text-secondary">
@@ -152,6 +150,22 @@ export class LinkAnalysisOversightComponent {
     readonly reason = signal('');
     readonly busy = signal(false);
     readonly error = signal('');
+
+    /** A request's instant in the viewer's own zone; the raw value (nanosecond ISO) when it does not parse. */
+    when(iso: string | undefined): string {
+        const d = iso ? new Date(iso) : null;
+        return d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : (iso ?? 'an unknown time');
+    }
+
+    /** The Space limits that apply, naming only the ones that are set ("—" read as a limit that was never configured). */
+    limits(p: PendingExpansion): string {
+        const s = p.sensitivity;
+        const parts = [
+            s.fourEyesBudgetAbove != null ? `budget above ${s.fourEyesBudgetAbove}` : '',
+            s.fourEyesFanOutAbove != null ? `fan-out above ${s.fourEyesFanOutAbove}` : '',
+        ].filter(Boolean);
+        return parts.length ? parts.join(', ') : 'no limit recorded';
+    }
 
     statusTone(p: PendingExpansion): string {
         return p.status === 'pending' ? 'warning' : p.status === 'approved' ? 'success' : 'error';

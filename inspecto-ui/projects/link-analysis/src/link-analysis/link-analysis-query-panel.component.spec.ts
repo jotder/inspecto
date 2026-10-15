@@ -9,6 +9,7 @@ import { GraphSourceId } from '@inspecto/core/graph';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { InspectoOptionPickerComponent } from '@inspecto/core/components/option-picker.component';
+import { InvService } from '../api/inv.service';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 
 function make(sourceId: GraphSourceId = 'entity-projection', extraProviders: unknown[] = []) {
@@ -498,6 +499,16 @@ describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-
         await settle(fixture);
         expect(columns).toHaveBeenCalledTimes(1);
         expect(c.datasetOptions().map((o) => o.value)).toEqual(['cdr', 'a_plain']);
+    });
+
+    it('keeps the masking badge visible when the panel collapses to its summary', () => {
+        const { c, fixture } = make();
+        TestBed.inject(InvService).masking.set({ mode: 'typed', masked: true, basis: 'account is a sensitive type' });
+        fixture.componentRef.setInput('queryOpen', false);
+        fixture.detectChanges();
+        const badge = fixture.debugElement.query(By.css('[data-testid=masking-badge]'));
+        expect(badge.nativeElement.textContent).toContain('Masking: typed (ids shown as aliases)');
+        expect(c.queryOpen()).toBe(false);
     });
 
     it('is a11y-clean with the guidance showing', async () => {

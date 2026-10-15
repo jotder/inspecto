@@ -91,6 +91,19 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         expect(f.componentInstance.decided).toBe(1);
     });
 
+    it('names only the limits that are set and formats the request time, never "—" or a raw nanosecond instant', () => {
+        const { c, el } = create({ approve: true, reveal: false });
+        expect(c.limits(PENDING)).toBe('budget above 100');
+        const both = { ...PENDING, sensitivity: { ...PENDING.sensitivity, fourEyesFanOutAbove: 2000 } };
+        expect(c.limits(both)).toBe('budget above 100, fan-out above 2000');
+        const none = { ...PENDING, sensitivity: { ...PENDING.sensitivity, fourEyesBudgetAbove: null } };
+        expect(c.limits(none)).toBe('no limit recorded');
+        expect(el.textContent).not.toContain('—');
+        expect(el.textContent).not.toContain('2026-10-03T10:00:00Z');
+        expect(c.when('2026-10-15T01:36:58.322167800Z')).not.toContain('322167800');
+        expect(c.when('not a date')).toBe('not a date');
+    });
+
     it('shows the server refusal of a self-approval in place and does not emit', async () => {
         const err = new HttpErrorResponse({
             status: 403,

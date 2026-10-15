@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { of } from 'rxjs';
 import { ComponentDef, ComponentsService } from '@inspecto/core/api';
@@ -49,6 +49,25 @@ function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = []) {
 }
 
 describe('LinkAnalysisToolboxComponent', () => {
+    it('scrolls the Analysis alert into view when a tool refuses, so a button far down the panel is never silent', async () => {
+        const { c, fixture } = make();
+        fixture.detectChanges();
+        const scroll = vi.fn();
+        const proto = HTMLElement.prototype as { scrollIntoView?: unknown };
+        const prior = proto.scrollIntoView;
+        proto.scrollIntoView = scroll;
+        try {
+            c.analysisError.set('This pattern requires the hops to be in time order.');
+            fixture.detectChanges();
+            await fixture.whenStable();
+            await Promise.resolve();
+            expect(fixture.nativeElement.querySelector('[data-testid=analysis-alert]')).not.toBeNull();
+            expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+        } finally {
+            proto.scrollIntoView = prior;
+        }
+    });
+
     it('shortest path: finds the hops and emits the path emphasis, else an inline error', () => {
         const { c, last } = make();
         c.pathFrom.set('a');
