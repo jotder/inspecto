@@ -199,7 +199,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         if (valueRule) {
             try {
                 spec = ValueMeasures.parse(body.get("valueMeasure") instanceof Map<?, ?> vm
-                        ? castMap(vm) : Map.of(), true);
+                        ? castMap(vm) : Map.of(), true, ValueMeasures.Fences.of(inv.writeRoot()));
             } catch (IllegalArgumentException e) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
             }
@@ -221,7 +221,8 @@ public final class InvestigationMeasureRoutes implements RouteModule {
             // The WHOLE Dataset the Investigation is bound to, R3-gated for this caller now (a sweep has none).
             String ds = inv.dataset();
             String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), ds);
-            valued = evaluate(ds, relationSql, inv.header(), spec, ValueMeasures.agents(inv.writeRoot(), spec));
+            valued = evaluate(ds, relationSql, inv.header(), spec, ValueMeasures.agents(inv.writeRoot(), spec),
+                    ValueMeasures.Fences.of(inv.writeRoot()));
             current = OptionalDouble.of(valued.entities().size());
         } else {
             WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
@@ -457,9 +458,9 @@ public final class InvestigationMeasureRoutes implements RouteModule {
 
     /** A value Measure over the whole Dataset, its failures as 422s. */
     static ValueMeasures.Result evaluate(String dataset, String relationSql, Map<String, Object> header,
-                                         ValueMeasures.Spec spec, ValueMeasures.Agents agents) {
+                                         ValueMeasures.Spec spec, ValueMeasures.Agents agents, ValueMeasures.Fences fences) {
         try {
-            return ValueMeasures.forInvestigation(dataset, relationSql, header, spec, agents);
+            return ValueMeasures.forInvestigation(dataset, relationSql, header, spec, agents, fences);
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         } catch (java.sql.SQLException | IOException e) {

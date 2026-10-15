@@ -453,7 +453,8 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             return new LinkAnalysisSettings(optInt(m, "projection_node_cap"), optInt(m, "analysis_node_cap"),
                     optInt(m, "suspicion_node_cap"), maskingMode(ToonHelper.opt(m, "masking_mode", "")),
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
-                    entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
+                    entityTypes(m.get("entity_types"), (int) LaLimits.read(m, Map.of()).get(LaLimit.INPUT_ENTITY_TYPES)),
+                    optInt(m, "merged_distinct_cap"),
                     optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")),
                     optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"), optInt(m, "hub_threshold"), embed(m.get("embed")));
         } catch (Exception e) {
@@ -558,10 +559,10 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /** A stored list that parses and validates, else {@code null} = inherit {@link EntityTypes#DEFAULTS}. */
-    private static List<EntityTypes.EntityType> entityTypes(Object raw) {
+    private static List<EntityTypes.EntityType> entityTypes(Object raw, int maxTypes) {
         if (raw == null) return null;
         try {
-            return EntityTypes.parse(raw);
+            return EntityTypes.parse(raw, maxTypes);
         } catch (IllegalArgumentException e) {
             return null;
         }

@@ -57,7 +57,7 @@ public final class InvestigationComparisonRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pass window A and window B: aFrom/aTo and bFrom/bTo (ISO-8601 with an offset), "
                     + "optionally 'timezone'");
         List<String> lines = inv.store().log(InvestigationStore.Scope.main(id));
-        int at = DossierRoutes.parseAt(ex, lines);
+        int at = DossierRoutes.parseAt(ex, lines, inv.writeRoot());
         List<Map<String, Object>> log = new ArrayList<>();
         for (String line : lines.subList(0, at)) log.add(ApiContext.JSON.readValue(line, Map.class));
         InvestigationEvaluator.State state = InvestigationEvaluator.evaluate(log, -1, null);

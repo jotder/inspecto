@@ -21,16 +21,17 @@ import java.util.Set;
  * {@code COALESCE(w, 0)}, and the optional temporal constraint (time present, monotonic, total duration) is applied the way the
  * CTE's recursive member applies it. Output is {@code ORDER BY hops, path-json} capped at {@code limit}.
  *
- * <p><b>The Path A cap (design scope decision):</b> at most {@link #MAX_DEPTH} levels and {@link #FRONTIER_CAP} distinct
- * frontier keys per level, measured on the ACTUAL frontier. A wider frontier throws {@link FrontierOverCap}: the caller discards
+ * <p><b>The Path A cap (design scope decision):</b> at most {@code depthCap} levels and {@code frontierCap} distinct
+ * frontier keys per level (the Space's {@code index.traversal_depth} / {@code index.frontier_cap}, which the caller passes;
+ * defaults {@link #DEFAULT_MAX_DEPTH} / {@link #DEFAULT_FRONTIER_CAP}), measured on the ACTUAL frontier. A wider frontier throws {@link FrontierOverCap}: the caller discards
  * everything walked so far and answers from the flat path, so one response never mixes the two.
  */
 public final class IndexedTraversal {
 
-    /** Deepest walk the index serves (design 4.1: 1 + 20 lookups at depth 2 is inside the 1.5 s criterion; depth 3 is not measured). */
-    public static final int MAX_DEPTH = 2;
-    /** Most distinct frontier keys looked up at one level (about 35 ms per key at 10^8). */
-    public static final int FRONTIER_CAP = 20;
+    /** Default deepest walk the index serves (design 4.1: 1 + 20 lookups at depth 2 is inside the 1.5 s criterion; depth 3 is not measured). */
+    public static final int DEFAULT_MAX_DEPTH = 2;
+    /** Default most distinct frontier keys looked up at one level (about 35 ms per key at 10^8). */
+    public static final int DEFAULT_FRONTIER_CAP = 20;
 
     private IndexedTraversal() { }
 
@@ -61,12 +62,12 @@ public final class IndexedTraversal {
     /** {@code limitTruncated}: more paths than {@code limit} existed; {@code yieldCapped}: some level reached its edge yield. */
     public record Result(List<PathRow> paths, boolean limitTruncated, boolean yieldCapped) { }
 
-    /** The frontier at some level had more than {@link #FRONTIER_CAP} distinct keys. */
+    /** The frontier at some level had more than the frontier cap's distinct keys. */
     public static final class FrontierOverCap extends Exception {
         private final int keys;
 
-        FrontierOverCap(int keys) {
-            super("frontier of " + keys + " keys exceeds the index cap of " + FRONTIER_CAP, null, false, false);
+        FrontierOverCap(int keys, int cap) {
+            super("frontier of " + keys + " keys exceeds the index cap of " + cap, null, false, false);
             this.keys = keys;
         }
 
@@ -75,8 +76,14 @@ public final class IndexedTraversal {
 
     private record Walk(List<String> nodes, double weight, Long firstTs, Long lastTs) { }
 
+    /** {@link #walk(IndexReader, Params, int, int)} under the default caps. */
     public static Result walk(IndexReader reader, Params p) throws SQLException, FrontierOverCap {
-        if (p.maxDepth() > MAX_DEPTH) throw new IllegalArgumentException("maxDepth " + p.maxDepth() + " exceeds the index cap " + MAX_DEPTH);
+        return walk(reader, p, DEFAULT_MAX_DEPTH, DEFAULT_FRONTIER_CAP);
+    }
+
+    /** The walk, refusing a {@code maxDepth} over {@code depthCap} and a level wider than {@code frontierCap} keys. */
+    public static Result walk(IndexReader reader, Params p, int depthCap, int frontierCap) throws SQLException, FrontierOverCap {
+        if (p.maxDepth() > depthCap) throw new IllegalArgumentException("maxDepth " + p.maxDepth() + " exceeds the index cap " + depthCap);
         List<Side> sides = p.undirected() ? List.of(Side.OUT, Side.IN) : List.of(Side.OUT);
         boolean yieldCapped = 1 >= p.maxEdgeYield();                                  // level 0 holds the one start row, as in the CTE
         List<Walk> level = List.of(new Walk(List.of(p.start()), 0.0, null, null));
@@ -91,7 +98,7 @@ public final class IndexedTraversal {
                 keys.add(end);
             }
             if (keys.isEmpty()) break;
-            if (keys.size() > FRONTIER_CAP) throw new FrontierOverCap(keys.size());
+            if (keys.size() > frontierCap) throw new FrontierOverCap(keys.size(), frontierCap);
             Map<String, List<Edge>> edges = reader.edges(new ArrayList<>(keys), sides, p.filterSql(), p.filterBinds(), p.maxEdgeYield());
             for (List<Edge> perKey : edges.values())
                 if (perKey.size() >= p.maxEdgeYield()) yieldCapped = true;            // a key's own edges reached the yield: say so

@@ -3,6 +3,7 @@ package com.gamma.la.api;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.MaskTokens;
 import com.gamma.access.WriteGates;
@@ -33,14 +34,14 @@ import java.util.TreeSet;
  * node dialog's Risk / Enrichment sections and the server-algorithms panel's "Fill nodeScores from indicators" never read
  * a whole Dataset over {@code /db/query} (which masks nothing) and look entities up in the browser.
  *
- * <p><b>Body</b> {@code {dataset, keyCol, keys: string[] (1..}{@value #MAX_KEYS}{@code ), columns?: string[], investigationId?}}.
+ * <p><b>Body</b> {@code {dataset, keyCol, keys: string[] (1..the Space's reference.max_keys), columns?: string[], investigationId?}}.
  * <b>Response</b> {@code {dataset, keyCol, columns, rows:[{key, row}], matchedKeys, unresolved, truncated, masking}}: each
  * row is tagged with the key AS ASKED (so a caller holding aliases maps rows back without ever seeing a raw id), at most
- * {@value #MAX_ROWS} rows with {@code truncated} saying the cap bit; {@code unresolved} lists the asked ALIASES the server
+ * the Space's {@code reference.max_rows} rows with {@code truncated} saying the cap bit; {@code unresolved} lists the asked ALIASES the server
  * does not know, and {@code rawKeysRefused} counts the raw keys the masking hides (counted, never echoed: a response under
  * masking carries no raw id, even one the caller sent).
  *
- * <p><b>Gates, fail closed in order:</b> write root unset 503 · malformed body 422 · more than {@value #MAX_KEYS} keys 413
+ * <p><b>Gates, fail closed in order:</b> write root unset 503 · malformed body 422 · more than {@code reference.max_keys} keys 413
  * · {@code investigationId} given: the Investigation read gate (404 absent, 403 not a reader) · unknown or not-viewable
  * Dataset 404 (R3, the {@link InvRoutes#relationFor} gate every {@code /inv} Dataset read shares — all or nothing) ·
  * more keys than the Space's four-eyes row budget 403 ({@link InvRoutes#refuseIfSensitive}, as every stateless read) ·
@@ -64,8 +65,6 @@ import java.util.TreeSet;
  */
 final class ReferenceRows {
 
-    static final int MAX_KEYS = 500;
-    static final int MAX_ROWS = 2_000;
     private static final String KEY_ALIAS_BASE = "__ref_key";
 
     private ReferenceRows() {}
@@ -77,7 +76,7 @@ final class ReferenceRows {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String keyCol = InvRoutes.ident(body, "keyCol", true);                                          // 422
         List<String> wanted = identList(body.get("columns"));
-        List<String> keys = keyList(body.get("keys"));                                                  // 422 · 413
+        List<String> keys = keyList(body.get("keys"), SpaceLimits.get(writeRoot, LaLimit.REFERENCE_MAX_KEYS));   // 422 · 413
         String invId = ApiContext.str(body, "investigationId");
 
         EntityMasking invMask = null;
@@ -150,7 +149,7 @@ final class ReferenceRows {
             DatasetProvider.Result r;
             try {
                 r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql.toString(),
-                        MAX_ROWS, 0, List.of(), List.of(), binds));
+                        SpaceLimits.get(writeRoot, LaLimit.REFERENCE_MAX_ROWS), 0, List.of(), List.of(), binds));
             } catch (SQLException e) {
                 throw DatasetReadFault.of("reference read of dataset '" + datasetId + "' failed", datasetId, null, e);
             }
@@ -266,11 +265,11 @@ final class ReferenceRows {
         return out;
     }
 
-    private static List<String> keyList(Object raw) {
+    private static List<String> keyList(Object raw, int maxKeys) {
         if (!(raw instanceof List<?> list) || list.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'keys', a non-empty list of strings");
-        if (list.size() > MAX_KEYS)
-            throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "at most " + MAX_KEYS + " keys per call, got " + list.size()
+        if (list.size() > maxKeys)
+            throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "at most " + maxKeys + " keys per call, got " + list.size()
                     + " — ask in chunks");
         LinkedHashSet<String> out = new LinkedHashSet<>();
         for (Object o : list) {

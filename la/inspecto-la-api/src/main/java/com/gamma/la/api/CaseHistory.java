@@ -4,6 +4,8 @@ import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.MaskTokens;
 import com.gamma.la.core.CasePort;
@@ -55,8 +57,7 @@ import java.util.regex.Pattern;
 final class CaseHistory {
 
     static final String DEFAULT_TYPE = "msisdn";
-    private static final int MAX_KEY = 256;
-    private static final int MAX_LIMIT = 200;
+    // The key length and page ceiling are the Space's case_history.max_key_length / case_history.page_max (LaLimit).
     /** A digit-bearing token: digits with any of {@code space . - ( )} between them, an optional leading {@code +}. */
     private static final Pattern DIGIT_TOKEN = Pattern.compile("\\+?(?<!\\d)\\d(?:[\\s.\\-()]*\\d)*(?!\\d)");
     private static final Pattern EMAIL_RE = Pattern.compile("[\\w.+%-]+@[\\w-]+(?:\\.[\\w-]+)+");
@@ -75,13 +76,15 @@ final class CaseHistory {
         if (key == null || key.isBlank())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'key', the node's id as shown");
         key = key.trim();
-        if (key.length() > MAX_KEY)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'key' may be at most " + MAX_KEY + " characters");
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxKey = SpaceLimits.get(lim, LaLimit.CASE_HISTORY_MAX_KEY_LENGTH);
+        if (key.length() > maxKey)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'key' may be at most " + maxKey + " characters");
         String status = ApiContext.str(body, "status");
         status = status == null || status.isBlank() ? "all" : status.trim().toLowerCase(Locale.ROOT);
         if (!List.of("open", "closed", "all").contains(status))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status must be one of open, closed, all");
-        int limit = limit(body.get("limit"));
+        int limit = limit(body.get("limit"), SpaceLimits.get(lim, LaLimit.CASE_HISTORY_PAGE_MAX));
         String invId = ApiContext.str(body, "investigationId");
 
         EntityMasking invMask = null;
@@ -204,9 +207,8 @@ final class CaseHistory {
         return sb.toString().replace(SENTINEL, asked);
     }
 
-    /** At most this many ADMITTED (readable) Case-linked Investigations are evaluated, and this many admitted attachment records. */
-    static final int MAX_LINKED_INVESTIGATIONS = 100;
-    static final int MAX_ATTACHMENTS = 500;
+    // At most the Space's case_history.max_linked_investigations ADMITTED (readable) Case-linked Investigations are evaluated,
+    // and its case_history.max_attachments admitted attachment records.
     /** DoS guard: total records scanned, admitted or not, is bounded to this multiple of the caps above. */
     static final int SCAN_FACTOR = 5;
 
@@ -223,7 +225,7 @@ final class CaseHistory {
      *
      * <p><b>DoS bound, and what it leaks.</b> The scan reads at most {@value #SCAN_FACTOR} x the cap records in total,
      * hidden included. When it is hit, {@code truncated} is set if the caller has at least one admitted record. That reveals
-     * one coarse Space-wide bit (at least 501 Case-linked Investigations, or 2501 attachment lines) to ANY such caller, and
+     * one coarse Space-wide bit (at least 5 x the cap + 1 Case-linked Investigations, or attachment lines) to ANY such caller, and
      * any caller can obtain an admitted record by creating its own Investigation. Accepted trade-off against silently hiding
      * that the answer is incomplete. Only the per-snapshot verdict is cached, never the parsed document.
      */
@@ -233,6 +235,9 @@ final class CaseHistory {
         Map<String, Boolean> readable = new java.util.HashMap<>();   // investigation id -> admitted by openForRead
         InvestigationStore store = InvestigationStores.of(writeRoot);
         int admitted = 0, scanned = 0;
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxLinked = SpaceLimits.get(lim, LaLimit.CASE_HISTORY_MAX_LINKED_INVESTIGATIONS);
+        int maxAttachments = SpaceLimits.get(lim, LaLimit.CASE_HISTORY_MAX_ATTACHMENTS);
         for (String id : store.ids()) {
             String caseRef;
             try {
@@ -241,10 +246,10 @@ final class CaseHistory {
                 continue;
             }
             if (caseRef == null) continue;
-            if (scanned++ >= MAX_LINKED_INVESTIGATIONS * SCAN_FACTOR) { truncated |= admitted > 0; break; }
+            if (scanned++ >= maxLinked * SCAN_FACTOR) { truncated |= admitted > 0; break; }
             InvestigationRoutes.Inv inv = readable(api, ex, id, readable);
             if (inv == null) continue;   // hidden: counts toward neither cap nor flag
-            if (admitted++ >= MAX_LINKED_INVESTIGATIONS) { truncated = true; break; }
+            if (admitted++ >= maxLinked) { truncated = true; break; }
             boolean member = false;
             try {
                 for (Map<String, Object> row : WorkingSetRoutes.relation(inv, new boolean[1]).tables().get("entities"))
@@ -259,7 +264,7 @@ final class CaseHistory {
         SnapshotStore snapshots = new SnapshotStore(writeRoot);
         Map<String, Boolean> contains = new java.util.HashMap<>();   // sid -> holds raw; null value = not admitted (no document kept)
         int admittedLines = 0;
-        for (String line : snapshots.recentAttachments(MAX_ATTACHMENTS * SCAN_FACTOR, cut)) {
+        for (String line : snapshots.recentAttachments(maxAttachments * SCAN_FACTOR, cut)) {
             String sid, caseId;
             try {
                 @SuppressWarnings("unchecked") Map<String, Object> a = ApiContext.JSON.readValue(line, Map.class);
@@ -272,7 +277,7 @@ final class CaseHistory {
             if (!contains.containsKey(sid)) contains.put(sid, admittedContains(api, ex, snapshots, sid, raw, writeRoot, readable));
             Boolean in = contains.get(sid);
             if (in == null) continue;   // not anchored to a readable Investigation: hidden, counted nowhere
-            if (admittedLines++ >= MAX_ATTACHMENTS) { truncated = true; cut[0] = false; break; }
+            if (admittedLines++ >= maxAttachments) { truncated = true; cut[0] = false; break; }
             if (in) caseRow(api, ex, port, caseId, status, "snapshot", sid, out);
         }
         return truncated || cut[0] && admittedLines > 0;
@@ -340,11 +345,11 @@ final class CaseHistory {
         }
     }
 
-    private static int limit(Object v) {
-        if (v == null) return 50;
-        if (v instanceof Number n && n.doubleValue() == n.intValue() && n.intValue() >= 1 && n.intValue() <= MAX_LIMIT)
+    private static int limit(Object v, int maxLimit) {
+        if (v == null) return Math.min(50, maxLimit);
+        if (v instanceof Number n && n.doubleValue() == n.intValue() && n.intValue() >= 1 && n.intValue() <= maxLimit)
             return n.intValue();
-        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be an integer in [1, " + MAX_LIMIT + "]");
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be an integer in [1, " + maxLimit + "]");
     }
 
     /** Best effort, like every LA read (LA-04): counts only, the key is never recorded. */

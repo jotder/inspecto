@@ -9,6 +9,8 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.access.ComponentAccess;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.access.WriteGates;
@@ -74,21 +76,12 @@ import java.util.regex.Pattern;
 public final class InvRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    private static final int DEFAULT_LIMIT = 2_000;
-    private static final int MAX_LIMIT = 20_000;
-    /** LA-15 pair budget: one DuckDB query per measured pair, so the cap is a query-count cap. */
-    private static final int DEFAULT_PAIRS = 100;
-    private static final int MAX_PAIRS = 500;
+    // LA-CONFIG-LIMITS-1 P3: the read caps below are the Space's limits in force (SpaceLimits): traversal.rows_* (projection and
+    // neighbour rows), traversal.pairs_* (LA-15: one DuckDB query per measured pair, so a query-count cap), traversal.depth_*,
+    // traversal.edge_yield_*, traversal.paths_*, traversal.timeout_s (LA-11 fences, plan §3.3: the edge yield bounds each
+    // recursion LEVEL; the timeout is per statement), snapshots.page_*, neighbours.page_* and input.projection_mappings.
     /** The synthetic relation name a pair's {@code A UNION ALL B} is registered under (LA-15). */
     private static final String PAIR_RELATION = "__overlap_pair";
-    /** LA-11 fences (plan §3.3): depth default 6; the edge yield bounds each recursion LEVEL; the timeout is per statement. */
-    private static final int DEFAULT_DEPTH = 6;
-    private static final int MAX_DEPTH = 10;
-    private static final int DEFAULT_EDGE_YIELD = 10_000;
-    private static final int MAX_EDGE_YIELD = 100_000;
-    private static final int DEFAULT_PATHS = 1_000;
-    private static final int MAX_PATHS = 10_000;
-    private static final int TRAVERSAL_TIMEOUT_SECONDS = 5;
 
     @Override
     public java.util.Set<String> featureIds() {
@@ -120,9 +113,6 @@ public final class InvRoutes implements RouteModule {
         api.post("/inv/snapshots/attach", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> attachSnapshot(api, e, api.body(e))));
     }
-
-    private static final int SNAPSHOT_LIST_DEFAULT = 100;
-    private static final int SNAPSHOT_LIST_MAX = 1000;
 
     /**
      * {@code POST /inv/snapshots} (LA-03) — seal one Link Analysis evidence snapshot.
@@ -174,13 +164,14 @@ public final class InvRoutes implements RouteModule {
 
     /**
      * {@code GET /inv/snapshots?limit=n} — sealed snapshot ids, newest first. Bounded like every other
-     * diagnostic read here: {@code limit} defaults to {@value #SNAPSHOT_LIST_DEFAULT}, clamps to
-     * {@value #SNAPSHOT_LIST_MAX}, and the TRUE total ships alongside so a bounded read never reads as a
+     * diagnostic read here: {@code limit} defaults to the Space's {@code snapshots.page_default}, clamps to
+     * {@code snapshots.page_max}, and the TRUE total ships alongside so a bounded read never reads as a
      * complete one.
      */
     private Object listSnapshots(ApiContext api, HttpExchange ex) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis snapshot list");
-        int limit = SNAPSHOT_LIST_DEFAULT;
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int limit = SpaceLimits.get(lim, LaLimit.SNAPSHOTS_PAGE_DEFAULT);
         String raw = ApiContext.query(ex, "limit");
         if (raw != null && !raw.isBlank()) {
             try {
@@ -189,7 +180,7 @@ public final class InvRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be an integer, got '" + raw + "'");
             }
         }
-        limit = Math.min(Math.max(limit, 1), SNAPSHOT_LIST_MAX);
+        limit = Math.min(Math.max(limit, 1), SpaceLimits.get(lim, LaLimit.SNAPSHOTS_PAGE_MAX));
         SnapshotStore store = new SnapshotStore(writeRoot);
         int[] total = new int[1];
         List<String> ids = store.list(limit, total);
@@ -384,7 +375,7 @@ public final class InvRoutes implements RouteModule {
      *
      * <p><b>Bounded.</b> Only <em>cross-Dataset</em> pairs are measured (a column against another column of
      * its own Dataset is not an implicit foreign key), in a deterministic order, capped at {@code limit}
-     * (default {@value #DEFAULT_PAIRS}, max {@value #MAX_PAIRS}) with {@code pairsConsidered} reporting the
+     * (default the Space's {@code traversal.pairs_default}, max {@code traversal.pairs_max}) with {@code pairsConsidered} reporting the
      * TRUE total and {@code truncated} saying the cap bit.
      *
      * <p><b>Fail closed.</b> Every caller-supplied column name is a validated identifier AND must be a real
@@ -398,8 +389,8 @@ public final class InvRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "column overlap profiling");
         List<String> wantDatasets = nameList(body, "datasets", false);
         List<String> wantColumns = nameList(body, "columns", true);
-        int maxPairs = body.get("limit") instanceof Number n
-                ? Math.max(1, Math.min(MAX_PAIRS, n.intValue())) : DEFAULT_PAIRS;
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxPairs = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_PAIRS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_PAIRS_MAX));
 
         List<ColumnStats> columns = new ArrayList<>();
         List<String> seenColumns = new ArrayList<>();
@@ -588,10 +579,6 @@ public final class InvRoutes implements RouteModule {
         return project(api, ex, body, value);
     }
 
-    /** LA-EXPAND-PICK-NEIGHBOURS-1: neighbours per page in the {@code list} form of the neighbours read (default / ceiling). */
-    private static final int NEIGHBOUR_PAGE_DEFAULT = 50;
-    private static final int NEIGHBOUR_PAGE_MAX = 200;
-
     /**
      * The {@code list} form of {@code POST /inv/projection/neighbors}: ONE entity's neighbours folded per neighbour (events,
      * link kinds), strongest first, with the REAL total of distinct neighbours and a window ({@code offset}, {@code limit}).
@@ -606,8 +593,8 @@ public final class InvRoutes implements RouteModule {
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
-        int limit = body.get("limit") instanceof Number n
-                ? Math.max(1, Math.min(NEIGHBOUR_PAGE_MAX, n.intValue())) : NEIGHBOUR_PAGE_DEFAULT;
+        LaLimitValues lim = SpaceLimits.of(writeRoot);   // LA-EXPAND-PICK-NEIGHBOURS-1: neighbours per page (default / ceiling)
+        int limit = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.NEIGHBOURS_PAGE_DEFAULT), SpaceLimits.get(lim, LaLimit.NEIGHBOURS_PAGE_MAX));
         int offset = body.get("offset") instanceof Number n ? Math.max(0, n.intValue()) : 0;
         String relationSql = relationFor(api, ex, writeRoot, datasetId);
         ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
@@ -654,8 +641,6 @@ public final class InvRoutes implements RouteModule {
         }
     }
 
-    /** LA-08 bound on the query count: one DuckDB query per mapping. */
-    private static final int MAX_MAPPINGS = 16;
     /** LA-08: the tag on every node and edge naming the Dataset that produced it (contract §5.2). */
     private static final String PROVENANCE = "__provenance_dataset";
 
@@ -689,10 +674,11 @@ public final class InvRoutes implements RouteModule {
         List<Map<String, Object>> edgeSpecs = mappingList(body, "edges");
         if (nodeSpecs.isEmpty() && edgeSpecs.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include at least one of 'nodes' or 'edges'");
-        if (nodeSpecs.size() + edgeSpecs.size() > MAX_MAPPINGS)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_MAPPINGS + " mappings per call");
-        int limit = body.get("limit") instanceof Number n
-                ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxMappings = SpaceLimits.get(lim, LaLimit.INPUT_PROJECTION_MAPPINGS);   // LA-08 bound on the query count: one query per mapping
+        if (nodeSpecs.size() + edgeSpecs.size() > maxMappings)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + maxMappings + " mappings per call");
+        int limit = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_MAX));
 
         List<Mapping> plan = new ArrayList<>();
         for (Map<String, Object> m : nodeSpecs) {
@@ -836,8 +822,8 @@ public final class InvRoutes implements RouteModule {
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
         List<String> attrCols = attrCols(body);
-        int limit = body.get("limit") instanceof Number n
-                ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int limit = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_MAX));
 
         String relationSql = relationFor(api, ex, writeRoot, datasetId);
         // DR-D2: the read's ids leave as aliases when the Space masks them; an alias handed back (expand's value) is resolved here.
@@ -876,7 +862,7 @@ public final class InvRoutes implements RouteModule {
         IndexedRead.Outcome<IndexedNeighbors.Result> indexed = null;
         if (neighborsOf != null) {
             indexed = IndexedNeighbors.attempt(writeRoot, api.dataRoot(), relationSql, new IndexedNeighbors.Request(datasetId, sourceCol,
-                    targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit), traversalPolicy());
+                    targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit), traversalPolicy(writeRoot));
             if (indexed.served()) {
                 List<Map<String, Object>> rows = new ArrayList<>(indexed.result().rows().size());
                 for (Map<String, Object> row : indexed.result().rows())
@@ -1028,13 +1014,13 @@ public final class InvRoutes implements RouteModule {
      * <p>⛔ <b>Every fence lives INSIDE the recursion</b>, because the executor's {@code LIMIT n+1} sits outside
      * the derived table and bounds the RESULT, never the WORK ({@code QueryExecutorRecursiveCteTest}):
      * <ul>
-     *   <li><b>depth</b> — a BOUND {@code ?} in the recursive member (clamped to {@value #MAX_DEPTH}); the
+     *   <li><b>depth</b> — a BOUND {@code ?} in the recursive member (clamped to the Space's {@code traversal.depth_max}); the
      *       caller's number never becomes statement text;</li>
      *   <li><b>cycles</b> — a step onto a node already on the path is refused ({@code list_contains}), so
      *       only simple paths are walked and a cycle cannot re-feed the frontier;</li>
      *   <li><b>edge yield</b> — a bound {@code LIMIT} on each recursion level, so total work is at most
      *       depth × yield rows; a level that reached it sets {@code edgeYieldCapped} (and {@code truncated});</li>
-     *   <li><b>timeout</b> — a {@value #TRAVERSAL_TIMEOUT_SECONDS} s statement timeout via a route-local
+     *   <li><b>timeout</b> — the Space's {@code traversal.timeout_s} statement timeout via a route-local
      *       sandbox policy, tighter than the JVM-wide default.</li>
      * </ul>
      * {@code __walk} is {@code MATERIALIZED}: it is read twice (the paths and the per-level widths), and inlined
@@ -1079,8 +1065,10 @@ public final class InvRoutes implements RouteModule {
                 maxGapHoursIn = g.doubleValue();
             }
         }
-        int maxDepth = clamp(body.get("maxDepth"), DEFAULT_DEPTH, MAX_DEPTH);
-        int maxEdgesIn = clamp(body.get("maxEdgeYield"), DEFAULT_EDGE_YIELD, MAX_EDGE_YIELD);
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxDepth = clamp(body.get("maxDepth"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_DEPTH_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_DEPTH_MAX));
+        int maxEdgesIn = clamp(body.get("maxEdgeYield"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_EDGE_YIELD_DEFAULT),
+                SpaceLimits.get(lim, LaLimit.TRAVERSAL_EDGE_YIELD_MAX));
         // A DEFAULT is not a declaration (operator 2026-10-11): a caller that sent no maxEdgeYield gets the default clamped to
         // four_eyes_fan_out_above instead of a refusal; an explicitly declared bound above it is still refused below.
         if (body.get("maxEdgeYield") == null) {
@@ -1088,7 +1076,8 @@ public final class InvRoutes implements RouteModule {
             if (fanOutAbove != null && maxEdgesIn > fanOutAbove) maxEdgesIn = Math.max(1, fanOutAbove);
         }
         int maxEdges = maxEdgesIn;
-        int limit = clamp(body.get("limit"), DEFAULT_PATHS, MAX_PATHS);
+        int limit = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_PATHS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_PATHS_MAX));
+        int timeoutSeconds = SpaceLimits.get(lim, LaLimit.TRAVERSAL_TIMEOUT_S);
 
         String relationSql = relationFor(api, ex, writeRoot, datasetId);
         String tsCol = tsColIn;
@@ -1101,7 +1090,7 @@ public final class InvRoutes implements RouteModule {
         IndexedRead.Outcome<com.gamma.la.storage.IndexedTraversal.Result> indexed = IndexedRecursivePaths.attempt(writeRoot, api.dataRoot(), relationSql,
                 new IndexedRecursivePaths.Request(datasetId, sourceCol, targetCol, weightCol, tsCol, body.get("filter"), startNode,
                         targetNode, direction.equals("UNDIRECTED"), maxDepth, maxEdges, limit, monotonic, maxHours, maxGapHours),
-                traversalPolicy(), () -> refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
+                traversalPolicy(writeRoot), () -> refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
                         (long) maxDepth * maxEdges, maxEdges));
         if (indexed.served()) {
             List<Map<String, Object>> paths = new ArrayList<>(indexed.result().paths().size());
@@ -1118,7 +1107,7 @@ public final class InvRoutes implements RouteModule {
             out.put("truncated", truncated);
             out.put("edgeYieldCapped", indexed.result().yieldCapped());
             out.put("masking", mask.describe());
-            out.put("fences", traversalFences(maxDepth, maxEdges));
+            out.put("fences", traversalFences(maxDepth, maxEdges, timeoutSeconds));
             out.put("source", indexed.source());
             auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);
             return out;
@@ -1185,7 +1174,7 @@ public final class InvRoutes implements RouteModule {
         };
 
         try {
-            DatasetProvider.Result r = DatasetProviders.require().runPlanned(datasetId, relationSql, traversalPolicy(), planner);
+            DatasetProvider.Result r = DatasetProviders.require().runPlanned(datasetId, relationSql, traversalPolicy(writeRoot), planner);
             List<Map<String, Object>> paths = new ArrayList<>(r.rows().size());
             boolean yieldCapped = false;
             for (Map<String, Object> row : r.rows()) {
@@ -1197,7 +1186,7 @@ public final class InvRoutes implements RouteModule {
                 paths.add(out);
                 yieldCapped |= num(row.get("widest")) >= maxEdges;
             }
-            Map<String, Object> fences = traversalFences(maxDepth, maxEdges);
+            Map<String, Object> fences = traversalFences(maxDepth, maxEdges, timeoutSeconds);
             boolean truncated = r.truncated() || yieldCapped;
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("paths", paths);
@@ -1213,28 +1202,28 @@ public final class InvRoutes implements RouteModule {
         }
     }
 
-    private static Map<String, Object> traversalFences(int maxDepth, int maxEdges) {
+    private static Map<String, Object> traversalFences(int maxDepth, int maxEdges, int timeoutSeconds) {
         Map<String, Object> fences = new LinkedHashMap<>();
         fences.put("maxDepth", maxDepth);
         fences.put("maxEdgeYield", maxEdges);
-        fences.put("timeoutMs", TRAVERSAL_TIMEOUT_SECONDS * 1000);
+        fences.put("timeoutMs", timeoutSeconds * 1000);
         return fences;
     }
 
     /**
      * The JVM-wide sandbox caps ({@code assist.sql.memory_limit} / {@code assist.sql.threads}) with the route's
-     * own statement timeout. It used to be {@code withCaps(null, 0, timeout)}, which silently replaced the
+     * own statement timeout - the Space's {@code traversal.timeout_s} for {@code writeRoot} ({@code null} = the default). It used to be {@code withCaps(null, 0, timeout)}, which silently replaced the
      * operator's memory and thread caps with the hard-coded 1 GB / 2 threads (G-R4 profiling, 2026-09-30).
      * Threads come from the traversal-only {@code assist.sql.traversal_threads} (default 4, operator 2026-09-30).
      */
-    static SqlSandboxPolicy traversalPolicy() {
+    static SqlSandboxPolicy traversalPolicy(Path writeRoot) {
         SqlSandboxPolicy configured = SqlSandboxPolicy.defaultPolicy();
-        return SqlSandboxPolicy.withCaps(configured.memoryLimit(), SqlSandboxPolicy.traversalThreads(), TRAVERSAL_TIMEOUT_SECONDS);
+        return SqlSandboxPolicy.withCaps(configured.memoryLimit(), SqlSandboxPolicy.traversalThreads(), SpaceLimits.get(writeRoot, LaLimit.TRAVERSAL_TIMEOUT_S));
     }
 
-    /** An optional positive integer body field, defaulted when absent and clamped to {@code max}. */
+    /** An optional positive integer body field, defaulted when absent and clamped to {@code max} (a default above it, too). */
     private static int clamp(Object raw, int def, int max) {
-        return raw instanceof Number n ? Math.max(1, Math.min(max, n.intValue())) : def;
+        return raw instanceof Number n ? Math.max(1, Math.min(max, n.intValue())) : Math.min(def, max);
     }
 
     /** Best-effort audit of one traversal (LA-04 pattern): a multi-hop walk is its own analytic act. */

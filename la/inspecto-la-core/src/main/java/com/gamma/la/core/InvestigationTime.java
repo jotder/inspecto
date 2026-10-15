@@ -54,7 +54,7 @@ import java.util.TreeMap;
  * optionally with a {@code name}; a bare {@code "YYYY-MM-DD"} string is shorthand for {@code {date}}. Like the day
  * mask they are wall-clock notions: they test the local calendar day ON WHICH THE EVENT FELL in the window's
  * {@code timezone}, which is therefore required. They are canonicalised to {@code {from, to[, name]}} sorted by
- * date, so the same exclusions seal the same bytes. At most {@link #MAX_EXCLUDES} entries.
+ * date, so the same exclusions seal the same bytes. At most {@code maxExcludes} entries.
  *
  * <h2>Recurring exclusion rules</h2>
  * An {@code exclude} entry may instead be a RULE: {@code {rule:"yearly", month, day[, name]}} (every 25 Dec) or
@@ -65,17 +65,18 @@ import java.util.TreeMap;
  * calendar day in the window's {@code timezone}, exactly like a named date ({@link #matches} for Java readers,
  * the same arithmetic in {@link #predicates} SQL), which is deterministic: no clock, no host zone. A yearly
  * {@code 02-29} matches leap years only. Canonical order: concrete entries (by date) then rules (by month, day or
- * nth/weekday, name); at most {@link #MAX_RULES} rules, on top of {@link #MAX_EXCLUDES} dates.
+ * nth/weekday, name); at most the Space's {@code input.recurring_excludes} rules (default {@link #DEFAULT_MAX_RULES}), on top of
+ * its {@code input.excludes} dates (default {@link #DEFAULT_MAX_EXCLUDES}).
  */
 public final class InvestigationTime {
 
     private InvestigationTime() {}
 
     public static final List<String> DAYS = List.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
-    /** The cap on {@code exclude} entries: a calendar of holidays, not a second Dataset. */
-    public static final int MAX_EXCLUDES = 366;
-    /** The cap on recurring {@code exclude} rules: a handful of annual holidays, not a calendar. */
-    public static final int MAX_RULES = 32;
+    /** The default cap on {@code exclude} entries (the Space's {@code input.excludes}): a calendar of holidays, not a second Dataset. */
+    public static final int DEFAULT_MAX_EXCLUDES = 366;
+    /** The default cap on recurring {@code exclude} rules (the Space's {@code input.recurring_excludes}): a handful of annual holidays. */
+    public static final int DEFAULT_MAX_RULES = 32;
     private static final Set<String> WINDOW_KEYS = Set.of("from", "to", "slot", "days", "exclude", "timezone");
 
     /**
@@ -83,8 +84,13 @@ public final class InvestigationTime {
      * the slot as {@code HH:mm}, the days in week order. Unknown keys, naive instants, an empty window, an
      * inverted range, an ambiguous slot or a zone-less slot/mask are all 422.
      */
-    @SuppressWarnings("unchecked")
     public static Map<String, Object> window(Object raw, String origin) {
+        return window(raw, origin, DEFAULT_MAX_EXCLUDES, DEFAULT_MAX_RULES);
+    }
+
+    /** {@link #window(Object, String)} under the caller's Space caps: at most {@code maxExcludes} dates plus {@code maxRules} rules. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> window(Object raw, String origin, int maxExcludes, int maxRules) {
         if (!(raw instanceof Map<?, ?> m)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be an object");
         Map<String, Object> w = (Map<String, Object>) m;
         for (String k : w.keySet())
@@ -122,7 +128,7 @@ public final class InvestigationTime {
         }
         out.put("days", days);
 
-        List<Map<String, Object>> exclude = excludes(w.get("exclude"), origin + ".exclude");
+        List<Map<String, Object>> exclude = excludes(w.get("exclude"), origin + ".exclude", maxExcludes, maxRules);
         out.put("exclude", exclude);
 
         String zone = w.get("timezone") == null ? null : String.valueOf(w.get("timezone"));
@@ -139,11 +145,11 @@ public final class InvestigationTime {
         return out;
     }
 
-    private static List<Map<String, Object>> excludes(Object raw, String origin) {
+    private static List<Map<String, Object>> excludes(Object raw, String origin, int maxExcludes, int maxRules) {
         if (raw == null) return null;
-        if (!(raw instanceof List<?> l) || l.isEmpty() || l.size() > MAX_EXCLUDES + MAX_RULES)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be a non-empty list of at most " + MAX_EXCLUDES
-                    + " dates plus " + MAX_RULES + " rules: a 'YYYY-MM-DD' string, {date}, {from, to} (inclusive), "
+        if (!(raw instanceof List<?> l) || l.isEmpty() || l.size() > maxExcludes + maxRules)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be a non-empty list of at most " + maxExcludes
+                    + " dates plus " + maxRules + " rules: a 'YYYY-MM-DD' string, {date}, {from, to} (inclusive), "
                     + "{rule:'yearly', month, day}, {rule:'nthWeekday', month, weekday, nth} or {rule:'lastWeekday', month, weekday}, each with an optional 'name'");
         TreeMap<String, Map<String, Object>> sorted = new TreeMap<>();
         int i = 0, rules = 0;
@@ -152,8 +158,8 @@ public final class InvestigationTime {
             LocalDate from, to;
             String name = null;
             if (e instanceof Map<?, ?> rm && rm.get("rule") != null) {
-                if (++rules > MAX_RULES)
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " holds at most " + MAX_RULES + " recurring rules");
+                if (++rules > maxRules)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " holds at most " + maxRules + " recurring rules");
                 Map<String, Object> rule = rule(rm, at);
                 int month = (Integer) rule.get("month");
                 String order = rule.containsKey("day") ? String.format("%02d", (Integer) rule.get("day"))

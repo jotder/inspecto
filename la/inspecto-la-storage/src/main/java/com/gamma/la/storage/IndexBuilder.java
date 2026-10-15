@@ -113,10 +113,19 @@ public final class IndexBuilder {
      * @param deltaSql        APPEND only: the relation SQL over just the given (added) input files, null = the Dataset cannot be
      *                        appended to (its relation is not row-wise over its files)
      * @param readRoots       the directories the relation may read; the connection is sealed to them plus the store directory
+     * @param maxDeltas       APPEND only: the Space's {@code index.max_deltas}, the gate {@link IndexPlan#classify} re-checks
      */
     public record Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                           Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
-                          java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots) {
+                          java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots, int maxDeltas) {
+        /** Under the default delta cap ({@link IndexPlan#DEFAULT_MAX_DELTAS}). */
+        public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
+                       Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
+                       java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots) {
+            this(datasetId, mapping, relationSql, store, baseFingerprint, options, inputFiles, mode, deltaSql, readRoots,
+                    IndexPlan.DEFAULT_MAX_DELTAS);
+        }
+
         public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                        Options options, List<IndexManifest.InputFile> inputFiles) {
             this(datasetId, mapping, relationSql, store, baseFingerprint, options, inputFiles, Mode.FULL, null, null);
@@ -492,7 +501,8 @@ public final class IndexBuilder {
             IndexManifest parent = parentManifest(pd);
             Path parentDir = pd[0];
             String duck = duckdbVersion();
-            IndexPlan.Plan plan = IndexPlan.classify(parent, req.inputFiles(), relationSqlHash(req.relationSql()), BucketFunction.NAME, duck);
+            IndexPlan.Plan plan = IndexPlan.classify(parent, req.inputFiles(), relationSqlHash(req.relationSql()), BucketFunction.NAME, duck,
+                    req.maxDeltas());
             if (!plan.appendable())
                 throw new NotApplicableException("an append is not possible now (" + (plan.reasons().isEmpty() ? "no input file was added" : String.join(", ", plan.reasons()))
                         + ") - " + (plan.recommended() == IndexPlan.Action.COMPACT ? "compact first" : "run a full build"));

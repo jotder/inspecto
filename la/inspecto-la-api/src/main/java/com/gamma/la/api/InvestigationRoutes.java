@@ -17,6 +17,8 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.access.ComponentAccess;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.access.RowScope;
 import com.gamma.spi.http.RouteModule;
@@ -127,25 +129,12 @@ public final class InvestigationRoutes implements RouteModule {
             "excludeBy", "seedBy", "resolve", "threshold", "snapshot", "compare", "temporal", "connect");
     /** The ops over a named Entity List (LA-17, design §4.4.1): they carry {@code listId}, never ids. */
     static final Set<String> LIST_OPS = Set.of("excludeBy", "seedBy");
-    /** A list op seals at most this many members (design §4.4.1: bounded like every other op payload). */
-    private static final int MAX_LIST_MEMBERS = 5_000;
     /** An {@code expand} rung's traversal direction (plan §2.4). */
     private static final List<String> DIRECTIONS = List.of("either", "out", "in", "reciprocal");
-    private static final int MAX_IDS = 1_000;
-    private static final int MAX_ID_LENGTH = 512;
-    /** LA-EXPAND-PICK-NEIGHBOURS-1: an expand restricted to at most this many chosen neighbours is never held for four-eyes (operator, 2026-10-13). */
-    static final int ONLY_EXEMPT_MAX = 50;
-    private static final int MAX_NOTE_LENGTH = 2_000;
-    private static final int MAX_PURPOSE_LENGTH = 1_000;
-    private static final int MAX_REVEAL = 100;
-    private static final int MAX_FRONTIER = 1_000;
-    private static final int MAX_LINK_KINDS = 100;
-    private static final int DEFAULT_EXPAND_BUDGET = 2_000;
-    private static final int MAX_EXPAND_BUDGET = 20_000;
-    private static final int LOG_DEFAULT = 500;
-    private static final int LOG_MAX = 5_000;
-    private static final int LIST_DEFAULT = 100;
-    private static final int LIST_MAX = 1_000;
+    // LA-CONFIG-LIMITS-1 P3: every size, page and budget limit here is the Space's value in force (SpaceLimits), a LaLimit item:
+    // input.* (ids, id length, note, purpose, reveal, link kinds, list members, excluded dates and rules), investigation.* (expand
+    // budget default / max, frontier, the four-eyes 'only' exemption, log and list pages) and connect.*. Only the NUMBER moved:
+    // each site refuses, clamps or exempts exactly as it did.
 
     @Override
     public void register(ApiContext api) {
@@ -245,7 +234,7 @@ public final class InvestigationRoutes implements RouteModule {
         String given = ApiContext.str(body, "id");
         String id = given != null ? given : "inv-" + UUID.randomUUID();
         requireSafeId(id);
-        String purpose = purpose(body);
+        String purpose = purpose(body, writeRoot);
         String dataset = ApiContext.str(body, "dataset");
         if (dataset == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
@@ -306,7 +295,9 @@ public final class InvestigationRoutes implements RouteModule {
      */
     private Object list(ApiContext api, HttpExchange ex) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation list");
-        int limit = Math.min(Math.max(queryInt(ex, "limit", LIST_DEFAULT), 1), LIST_MAX);
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int limit = Math.min(Math.max(queryInt(ex, "limit", SpaceLimits.get(lim, LaLimit.INVESTIGATION_LIST_PAGE_DEFAULT)), 1),
+                SpaceLimits.get(lim, LaLimit.INVESTIGATION_LIST_PAGE_MAX));
         int offset = queryInt(ex, "offset", 0);
         if (offset < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "offset must be >= 0");
         Optional<Subject> subject = ApiContext.subject(ex);
@@ -369,7 +360,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (op == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'op'");
         if (!SHIPPED.contains(op))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
-        Map<String, Object> params = params(op, resolvePseudonyms(inv, body));
+        Map<String, Object> params = params(op, resolvePseudonyms(inv, body), SpaceLimits.of(inv.writeRoot()));
         if (params.get("links") != null) resolveLinkPseudonyms(inv, params);
         requireBindings(inv.header(), op, params, "");
 
@@ -417,8 +408,9 @@ public final class InvestigationRoutes implements RouteModule {
                 Frontier fr = frontier(ids, params, before, true);
                 List<String> frontier = fr.ids();
                 if (frontier.isEmpty()) throw nothingToExpand("", fr);
-                if (frontier.size() > MAX_FRONTIER)
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER
+                int maxFrontier = SpaceLimits.get(inv.writeRoot(), LaLimit.INVESTIGATION_MAX_FRONTIER);
+                if (frontier.size() > maxFrontier)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + maxFrontier
                             + " entities; name them with 'ids'");
                 Map<String, Object> sensitive = sensitivity(inv, params);
                 if (sensitive != null && inv.draft() != null)   // D7-3: the four-eyes queue belongs to the main log (D-U7); promote (D7-5) is where it meets a Draft
@@ -476,8 +468,9 @@ public final class InvestigationRoutes implements RouteModule {
             Frontier fr = frontier(ids, params, state, true);
             List<String> frontier = fr.ids();
             if (frontier.isEmpty()) throw nothingToExpand("", fr);
-            if (frontier.size() > MAX_FRONTIER)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
+            int maxFrontier = SpaceLimits.get(inv.writeRoot(), LaLimit.INVESTIGATION_MAX_FRONTIER);
+            if (frontier.size() > maxFrontier)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + maxFrontier + " entities");
             e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, state, ""), pins == null ? Map.of() : pins, state.entities.keySet()));
         }
         return e;
@@ -660,7 +653,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (store.header(id).isPresent()) throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
 
         Map<String, Object> h = new LinkedHashMap<>(header);
-        h.put("purpose", purpose(header));   // D-U5: an instantiated Investigation states its purpose like a created one
+        h.put("purpose", purpose(header, writeRoot));   // D-U5: an instantiated Investigation states its purpose like a created one
         h.remove("timeCol");
         h.remove("timeColZone");
         if (timeCol != null) {
@@ -682,7 +675,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (!SHIPPED.contains(op)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
             Map<String, Object> e = entry(++step, "op", ex);
             e.put("op", op);
-            Map<String, Object> params = params(op, body);
+            Map<String, Object> params = params(op, body, SpaceLimits.of(writeRoot));
             requireBindings(h, op, params, "template step " + step + ": ");
             e.put("params", params);
             e.put("derivedFrom", body.get("derivedFrom"));
@@ -698,9 +691,10 @@ public final class InvestigationRoutes implements RouteModule {
                 Frontier fr = frontier(List.of(), params, state, false);
                 List<String> frontier = fr.ids();
                 if (frontier.isEmpty()) throw nothingToExpand("template step " + step + ": ", fr);
-                if (frontier.size() > MAX_FRONTIER)
+                int maxFrontier = SpaceLimits.get(writeRoot, LaLimit.INVESTIGATION_MAX_FRONTIER);
+                if (frontier.size() > maxFrontier)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " would expand " + frontier.size()
-                            + " entities; an expand frontier is capped at " + MAX_FRONTIER);
+                            + " entities; an expand frontier is capped at " + maxFrontier);
                 // D-U7: a template names no entities, so there is no frontier a second person could approve in
                 // advance — a sensitive step is refused rather than run unapproved.
                 Map<String, Object> sensitive = sensitivity(inv, params);
@@ -817,7 +811,8 @@ public final class InvestigationRoutes implements RouteModule {
     /** The log answer over an opened view; for a Draft (D7-3) only its OWN entries (steps after {@code baseStep}) are listed. */
     Object logOf(HttpExchange ex, Inv inv) throws IOException {
         int skip = inv.draft() == null ? 0 : inv.draft().baseStep();
-        int limit = LOG_DEFAULT;
+        LaLimitValues lim = SpaceLimits.of(inv.writeRoot());
+        int limit = SpaceLimits.get(lim, LaLimit.INVESTIGATION_LOG_PAGE_DEFAULT);
         String raw = ApiContext.query(ex, "limit");
         if (raw != null && !raw.isBlank()) {
             try {
@@ -826,7 +821,7 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be an integer, got '" + raw + "'");
             }
         }
-        limit = Math.min(Math.max(limit, 1), LOG_MAX);
+        limit = Math.min(Math.max(limit, 1), SpaceLimits.get(lim, LaLimit.INVESTIGATION_LOG_PAGE_MAX));
         List<Map<String, Object>> log = readLog(inv);
         Map<Integer, Integer> undoneBy = new LinkedHashMap<>();
         for (Map<String, Object> e : log)
@@ -1035,9 +1030,10 @@ public final class InvestigationRoutes implements RouteModule {
             if (!s.entities.containsKey(e.getKey())) anchorOf.put(e.getKey(), anchor.get(e.getValue()));
         TreeSet<String> widened = new TreeSet<>(frontier);
         widened.addAll(groupOf.keySet());
-        if (widened.size() > MAX_FRONTIER)
+        int maxFrontier = SpaceLimits.get(inv.writeRoot(), LaLimit.INVESTIGATION_MAX_FRONTIER);
+        if (widened.size() > maxFrontier)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "a merged expand widens its frontier to " + widened.size()
-                    + " member values; an expand frontier is capped at " + MAX_FRONTIER);
+                    + " member values; an expand frontier is capped at " + maxFrontier);
         q.put("frontier", new ArrayList<>(widened));
         Map<String, Object> merged = new LinkedHashMap<>();
         merged.put("groupOf", groupOf);
@@ -1187,7 +1183,7 @@ public final class InvestigationRoutes implements RouteModule {
                     direction, ((Number) query.get("minEvents")).longValue(), fanOut, budget, window != null, minDays != null,
                     degMin != null || degMax != null, query.get("merged") != null,
                     hdr.get("eventsCol") == null ? null : String.valueOf(hdr.get("eventsCol")), admitted,
-                    query.get("hubThreshold") instanceof Number t ? t.intValue() : null, only), InvRoutes.traversalPolicy(), pins);
+                    query.get("hubThreshold") instanceof Number t ? t.intValue() : null, only), InvRoutes.traversalPolicy(inv.writeRoot()), pins);
             if (indexed.served()) {
                 rows = new ArrayList<>(indexed.result().rows());
                 truncated = indexed.result().truncated();
@@ -1384,7 +1380,7 @@ public final class InvestigationRoutes implements RouteModule {
      * LA-17 (design §4.4.1) — resolve Entity List {@code listId} at the identity fact log's HEAD and seal it:
      * {@code {listId, atSeq, headHash, entityType, normaliser, purpose, masked, members[]}}, the members as they are now, so
      * replay never re-reads the list. Refusals, in order: unknown list 404 · retired 409 · its Entity Type no longer
-     * in force 409 · more than {@link #MAX_LIST_MEMBERS} members 422. A broken fact chain is a 500.
+     * in force 409 · more than the Space's {@code input.list_members} members 422. A broken fact chain is a 500.
      */
     private static Map<String, Object> sealList(Path writeRoot, String listId, String where) throws IOException {
         EntityFactLog.Log head = EntityListFacts.read(new EntityFactLog(writeRoot));
@@ -1394,9 +1390,10 @@ public final class InvestigationRoutes implements RouteModule {
         EntityTypes.EntityType type = EntityListFacts.type(writeRoot, l.entityType()).orElseThrow(() -> new ApiException(409,
                 ErrorCodes.CONFLICT, where + "entity list '" + listId + "' is of Entity Type '" + l.entityType()
                         + "', which is no longer in force"));
-        if (l.members().size() > MAX_LIST_MEMBERS)
+        int maxMembers = SpaceLimits.get(writeRoot, LaLimit.INPUT_LIST_MEMBERS);
+        if (l.members().size() > maxMembers)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "entity list '" + listId + "' has "
-                    + l.members().size() + " members; a list op seals at most " + MAX_LIST_MEMBERS);
+                    + l.members().size() + " members; a list op seals at most " + maxMembers);
         Map<String, Object> sealed = new LinkedHashMap<>();
         sealed.put("listId", listId);
         sealed.put("atSeq", head.headSeq());
@@ -1420,7 +1417,7 @@ public final class InvestigationRoutes implements RouteModule {
      * closed); {@code columnTypes} are the bound columns' types by registry classification, as the projection routes
      * report them ({@code InvRoutes.columnTypes}). {@code atHash} is the chain hash of the fact AT {@code atSeq} (null at
      * 0), so the pinned prefix is itself verifiable. Refusals: {@code atSeq} past the head 422 · more than
-     * {@link #MAX_LIST_MEMBERS} member keys in all 422 (bounded like a list op). A broken fact chain is a 500.
+     * the Space's {@code input.list_members} member keys in all 422 (bounded like a list op). A broken fact chain is a 500.
      */
     static Map<String, Object> sealResolution(Path writeRoot, Map<String, Object> header, Object atSeq, String where)
             throws IOException {
@@ -1453,9 +1450,10 @@ public final class InvestigationRoutes implements RouteModule {
             m.put("assertions", joined);
             groups.add(m);
         }
-        if (keys > MAX_LIST_MEMBERS)
+        int maxMembers = SpaceLimits.get(writeRoot, LaLimit.INPUT_LIST_MEMBERS);
+        if (keys > maxMembers)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "the identity resolution at seq " + at + " has "
-                    + keys + " member keys; a resolve seals at most " + MAX_LIST_MEMBERS);
+                    + keys + " member keys; a resolve seals at most " + maxMembers);
         String atHash = null;
         for (EntityFactLog.Fact f : head.facts()) if (f.seq() == at) atHash = f.hash();
         Map<String, Object> types = new java.util.TreeMap<>();
@@ -1620,8 +1618,8 @@ public final class InvestigationRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "'linkKinds' needs a link-kind column — this Investigation has none");
     }
 
-    /** Validate and normalise one op's parameters (422 on anything malformed). */
-    private static Map<String, Object> params(String op, Map<String, Object> body) {
+    /** Validate and normalise one op's parameters (422 on anything malformed) under the Space's limits {@code lim}. */
+    private static Map<String, Object> params(String op, Map<String, Object> body, LaLimitValues lim) {
         Map<String, Object> p = new LinkedHashMap<>();
         if (LIST_OPS.contains(op)) {   // LA-17: over a named Entity List, which the append seals — never over ids
             if (body.containsKey("ids"))
@@ -1647,7 +1645,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (op.equals("window")) {   // no ids: an intensional op over time, not over entities
             Object w = body.get("window");
             if (w == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'window' requires 'window': an object, or \"full\" to clear it");
-            p.put("window", "full".equals(w) ? null : InvestigationTime.window(w, "window"));
+            p.put("window", "full".equals(w) ? null : window(w, "window", lim));
             return p;
         }
         if (op.equals("compare")) {   // no ids: two windows of the bound time column, diffed over the Working Set at this position
@@ -1657,7 +1655,7 @@ public final class InvestigationRoutes implements RouteModule {
                 if (body.get(w) == null)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'compare' requires '" + w + "': {from?, to?, timezone?}, or \"inherit\" "
                             + "(the Investigation's window at this step)");
-                p.put(w, "inherit".equals(body.get(w)) ? "inherit" : InvestigationTime.window(body.get(w), w));
+                p.put(w, "inherit".equals(body.get(w)) ? "inherit" : window(body.get(w), w, lim));
             }
             Object mode = body.get("mode");
             if (mode != null && !"presence".equals(mode) && !"activity".equals(mode))
@@ -1671,14 +1669,15 @@ public final class InvestigationRoutes implements RouteModule {
             }
             return p;
         }
-        if (op.equals("temporal")) return TemporalFindings.params(body);   // no ids: the scan knobs; the columns are the Investigation's own
+        if (op.equals("temporal")) return TemporalFindings.params(body, lim);   // no ids: the scan knobs; the columns are the Investigation's own
         if (op.equals("threshold") || op.equals("snapshot")) {   // no ids: over the whole Working Set / a log position
             if (body.containsKey("ids"))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + op + "' applies to the whole Working Set, not ids");
             if (op.equals("snapshot")) {
                 String label = ApiContext.str(body, "label");
-                if (label != null && label.length() > MAX_NOTE_LENGTH)
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' is at most " + MAX_NOTE_LENGTH + " chars");
+                int maxNote = SpaceLimits.get(lim, LaLimit.INPUT_NOTE_LENGTH);
+                if (label != null && label.length() > maxNote)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' is at most " + maxNote + " chars");
                 if (label != null) p.put("label", label);
                 return p;
             }
@@ -1703,13 +1702,14 @@ public final class InvestigationRoutes implements RouteModule {
         Object rawIds = body.get("ids");
         if (rawIds != null && !(rawIds instanceof List<?>)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'ids' must be a list");
         LinkedHashSet<String> ids = new LinkedHashSet<>();
+        int maxIdLength = SpaceLimits.get(lim, LaLimit.INPUT_ID_LENGTH), maxIds = SpaceLimits.get(lim, LaLimit.INPUT_MAX_IDS);
         if (rawIds instanceof List<?> l) for (Object o : l) {
             String v = o == null ? "" : String.valueOf(o);
-            if (v.isBlank() || v.length() > MAX_ID_LENGTH)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every id must be a non-blank string of at most " + MAX_ID_LENGTH + " chars");
+            if (v.isBlank() || v.length() > maxIdLength)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every id must be a non-blank string of at most " + maxIdLength + " chars");
             ids.add(v);
         }
-        if (ids.size() > MAX_IDS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_IDS + " ids per op");
+        if (ids.size() > maxIds) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + maxIds + " ids per op");
         boolean linkNote = op.equals("annotate") && body.get("links") != null;   // D-U9: an annotate may name only links
         if (!op.equals("expand") && ids.isEmpty() && !linkNote)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' requires 'ids'");
@@ -1721,10 +1721,10 @@ public final class InvestigationRoutes implements RouteModule {
                 p.put("entityType", type);
             }
             case "expand" -> {
-                expandParams(body, p);
+                expandParams(body, p, lim);
                 merged(body, p);
             }
-            case "connect" -> connectParams(body, p);
+            case "connect" -> connectParams(body, p, lim);
             case "exclude" -> {
                 p.put("reason", exclusionReason(body, op));
                 merged(body, p);
@@ -1732,8 +1732,9 @@ public final class InvestigationRoutes implements RouteModule {
             case "annotate" -> {
                 String note = ApiContext.str(body, "note");
                 if (note == null || note.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'annotate' requires a 'note'");
-                if (note.length() > MAX_NOTE_LENGTH)
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'note' is at most " + MAX_NOTE_LENGTH + " chars");
+                int maxNote = SpaceLimits.get(lim, LaLimit.INPUT_NOTE_LENGTH);
+                if (note.length() > maxNote)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'note' is at most " + maxNote + " chars");
                 p.put("note", note);
                 // D-U9: an Admiralty grade (A-F x 1-6). Absent when not given, so an ungraded annotate is sealed
                 // byte-for-byte as it was before the grade existed.
@@ -1741,7 +1742,7 @@ public final class InvestigationRoutes implements RouteModule {
                 // D-U9 remainder: links named by their wire id (LinkIds), sealed as the decoded {source, target, kind}
                 // (pseudonyms are resolved by the append, which has the Investigation). Absent when none, so an
                 // entity-only annotate seals exactly as before.
-                if (linkNote) p.put("links", linkParams(body.get("links")));
+                if (linkNote) p.put("links", linkParams(body.get("links"), lim));
             }
             default -> { }
         }
@@ -1749,23 +1750,25 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /**
-     * LA-SEED-CONNECT-1: a {@code connect}'s params - the seeds ({@code ids}, 2 to {@link ConnectSeeds#MAX_SEEDS}), {@code maxHops}
-     * (default and ceiling {@link ConnectSeeds#MAX_HOPS}) and the read knobs an expand shares: {@code budget} (rows per level read),
+     * LA-SEED-CONNECT-1: a {@code connect}'s params - the seeds ({@code ids}, 2 to the Space's {@code connect.max_seeds}),
+     * {@code maxHops} (default {@code connect.default_hops}, never above the ceiling {@code connect.max_hops}) and the read knobs an expand shares: {@code budget} (rows per level read),
      * {@code linkKinds}, {@code window}, {@code minEvents}, {@code hubThreshold}. Direction is always {@code either}; fan-out caps,
      * degree bounds and the four-eyes thresholds are expand's and do not apply (a path search must not drop candidates).
      */
-    private static void connectParams(Map<String, Object> body, Map<String, Object> p) {
+    private static void connectParams(Map<String, Object> body, Map<String, Object> p, LaLimitValues lim) {
         List<String> ids = strings(p.get("ids"));
-        if (ids.size() < 2 || ids.size() > ConnectSeeds.MAX_SEEDS)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'connect' takes 2 to " + ConnectSeeds.MAX_SEEDS + " seeds, got " + ids.size());
-        int maxHops = body.get("maxHops") == null ? ConnectSeeds.MAX_HOPS : positive(body, "maxHops", 1);
-        if (maxHops > ConnectSeeds.MAX_HOPS)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxHops' is at most " + ConnectSeeds.MAX_HOPS
+        int maxSeeds = SpaceLimits.get(lim, LaLimit.CONNECT_MAX_SEEDS), hopCeiling = SpaceLimits.get(lim, LaLimit.CONNECT_MAX_HOPS);
+        if (ids.size() < 2 || ids.size() > maxSeeds)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'connect' takes 2 to " + maxSeeds + " seeds, got " + ids.size());
+        int maxHops = body.get("maxHops") == null ? Math.min(SpaceLimits.get(lim, LaLimit.CONNECT_DEFAULT_HOPS), hopCeiling)
+                : positive(body, "maxHops", 1);
+        if (maxHops > hopCeiling)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxHops' is at most " + hopCeiling
                     + " - a pair with no route within it is disconnected, never searched deeper");
         Map<String, Object> knobs = new LinkedHashMap<>();
         for (String k : List.of("budget", "linkKinds", "window", "minEvents", "hubThreshold"))
             if (body.get(k) != null) knobs.put(k, body.get(k));
-        expandParams(knobs, p);
+        expandParams(knobs, p, lim);
         if (knobs.get("hubThreshold") != null) p.put("hubThreshold", positive(knobs, "hubThreshold", 1));
         p.put("maxHops", maxHops);
         String type = ApiContext.str(body, "entityType");   // as a seed's: it decides masking, so it is sealed with the seeds
@@ -1826,10 +1829,11 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /** An annotate's {@code links}: a non-empty list of {@link LinkIds} wire ids, each decoded (duplicates dropped). */
-    private static List<Map<String, Object>> linkParams(Object raw) {
+    private static List<Map<String, Object>> linkParams(Object raw, LaLimitValues lim) {
         if (!(raw instanceof List<?> l) || l.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'links' must be a non-empty list of link ids");
-        if (l.size() > MAX_IDS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_IDS + " links per op");
+        int maxIds = SpaceLimits.get(lim, LaLimit.INPUT_MAX_IDS);
+        if (l.size() > maxIds) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + maxIds + " links per op");
         Set<String> seen = new HashSet<>();
         List<Map<String, Object>> out = new ArrayList<>();
         for (Object o : l) {
@@ -1885,26 +1889,29 @@ public final class InvestigationRoutes implements RouteModule {
      * analyst's override, {@code includeHubs: true} (every flagged entity) or {@code expandHubs: [ids]} (those named) —
      * see {@link #frontier}. Unlike {@code candidateDegreeMax}, which drops a candidate, a hub is ADMITTED and flagged.
      */
-    private static void expandParams(Map<String, Object> body, Map<String, Object> p) {
+    private static void expandParams(Map<String, Object> body, Map<String, Object> p, LaLimitValues lim) {
         if (body.containsKey("limit"))   // renamed by LA-13 — refused, never silently replaced by the default
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'limit' is now 'budget' (plan §2.4: the rung's row budget)");
-        p.put("budget", body.get("budget") == null ? DEFAULT_EXPAND_BUDGET
-                : Math.min(MAX_EXPAND_BUDGET, positive(body, "budget", 1)));
+        int maxBudget = SpaceLimits.get(lim, LaLimit.INVESTIGATION_EXPAND_BUDGET_MAX);
+        p.put("budget", body.get("budget") == null ? Math.min(SpaceLimits.get(lim, LaLimit.INVESTIGATION_EXPAND_BUDGET_DEFAULT), maxBudget)
+                : Math.min(maxBudget, positive(body, "budget", 1)));
+        int maxIds = SpaceLimits.get(lim, LaLimit.INPUT_MAX_IDS), maxIdLength = SpaceLimits.get(lim, LaLimit.INPUT_ID_LENGTH);
+        int maxKinds = SpaceLimits.get(lim, LaLimit.INPUT_LINK_KINDS);
         String direction = body.get("direction") == null ? "either" : String.valueOf(body.get("direction"));
         if (!DIRECTIONS.contains(direction))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be one of " + DIRECTIONS + ", got '" + direction + "'");
         p.put("direction", direction);
         List<String> kinds = null;
         if (body.get("linkKinds") != null) {
-            if (!(body.get("linkKinds") instanceof List<?> l) || l.isEmpty() || l.size() > MAX_LINK_KINDS)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'linkKinds' must be a non-empty list of at most " + MAX_LINK_KINDS
+            if (!(body.get("linkKinds") instanceof List<?> l) || l.isEmpty() || l.size() > maxKinds)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'linkKinds' must be a non-empty list of at most " + maxKinds
                         + " kinds (omit it for all kinds)");
             kinds = new ArrayList<>(new java.util.TreeSet<>(strings(l)));
         }
         p.put("linkKinds", kinds);
         Object w = body.get("window");
         p.put("window", w == null || "inherit".equals(w) ? "inherit" : "full".equals(w) ? "full"
-                : InvestigationTime.window(w, "expand.window"));
+                : window(w, "expand.window", lim));
         p.put("minEvents", body.get("minEvents") == null ? 1 : positive(body, "minEvents", 1));
         p.put("minDistinctDays", body.get("minDistinctDays") == null ? null : positive(body, "minDistinctDays", 1));
         Integer dMin = body.get("candidateDegreeMin") == null ? null : positive(body, "candidateDegreeMin", 0);
@@ -1923,32 +1930,38 @@ public final class InvestigationRoutes implements RouteModule {
         // LA-EXPAND-PICK-NEIGHBOURS-1: restrict the read to chosen neighbours; sealed only when stated, so an older rung seals as before.
         Object only = body.get("only");
         if (only != null) {
-            if (!(only instanceof List<?> l) || l.size() > MAX_IDS)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'only' must be a list of at most " + MAX_IDS + " neighbour ids");
+            if (!(only instanceof List<?> l) || l.size() > maxIds)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'only' must be a list of at most " + maxIds + " neighbour ids");
             java.util.TreeSet<String> chosen = new java.util.TreeSet<>();
             for (Object o : l) {
                 String v = o == null ? "" : String.valueOf(o);
-                if (v.isBlank() || v.length() > MAX_ID_LENGTH)
+                if (v.isBlank() || v.length() > maxIdLength)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every 'only' id must be a non-blank string of at most "
-                            + MAX_ID_LENGTH + " chars");
+                            + maxIdLength + " chars");
                 chosen.add(v);
             }
             if (!chosen.isEmpty()) p.put("only", new ArrayList<>(chosen));
         }
         Object expandHubs = body.get("expandHubs");
         if (expandHubs != null) {
-            if (!(expandHubs instanceof List<?> l) || l.size() > MAX_IDS)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expandHubs' must be a list of at most " + MAX_IDS + " entity ids");
+            if (!(expandHubs instanceof List<?> l) || l.size() > maxIds)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expandHubs' must be a list of at most " + maxIds + " entity ids");
             java.util.TreeSet<String> hubs = new java.util.TreeSet<>();
             for (Object o : l) {
                 String v = o == null ? "" : String.valueOf(o);
-                if (v.isBlank() || v.length() > MAX_ID_LENGTH)
+                if (v.isBlank() || v.length() > maxIdLength)
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every 'expandHubs' id must be a non-blank string of at most "
-                            + MAX_ID_LENGTH + " chars");
+                            + maxIdLength + " chars");
                 hubs.add(v);
             }
             if (!hubs.isEmpty()) p.put("expandHubs", new ArrayList<>(hubs));
         }
+    }
+
+    /** An authored time window under the Space's {@code input.excludes} / {@code input.recurring_excludes} caps. */
+    static Map<String, Object> window(Object raw, String origin, LaLimitValues lim) {
+        return InvestigationTime.window(raw, origin, SpaceLimits.get(lim, LaLimit.INPUT_EXCLUDES),
+                SpaceLimits.get(lim, LaLimit.INPUT_RECURRING_EXCLUDES));
     }
 
     private static int positive(Map<String, Object> body, String key, int min) {
@@ -2334,13 +2347,14 @@ public final class InvestigationRoutes implements RouteModule {
     // ── LA-19 controls: purpose (D-U5), masking (D-U6), four-eyes (D-U7) ─────────────────────────────────────
 
     /** The stated purpose / legal basis (D-U5): required, non-blank, bounded. Recorded, not enforced. */
-    private static String purpose(Map<String, Object> body) {
+    private static String purpose(Map<String, Object> body, Path writeRoot) {
         String purpose = ApiContext.str(body, "purpose");
         if (purpose == null || purpose.isBlank())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'purpose' — the stated purpose / legal basis of this "
                     + "Investigation (D-U5); it is recorded in the sealed header and shown in the Dossier, not enforced");
-        if (purpose.length() > MAX_PURPOSE_LENGTH)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'purpose' is at most " + MAX_PURPOSE_LENGTH + " chars");
+        int max = SpaceLimits.get(writeRoot, LaLimit.INPUT_PURPOSE_LENGTH);
+        if (purpose.length() > max)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'purpose' is at most " + max + " chars");
         return purpose.trim();
     }
 
@@ -2412,7 +2426,8 @@ public final class InvestigationRoutes implements RouteModule {
     private static Map<String, Object> sensitivity(Inv inv, Map<String, Object> params) {
         LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(inv.writeRoot());
         // LA-EXPAND-PICK-NEIGHBOURS-1 (operator 2026-10-13): a short list of chosen neighbours is exempt from four-eyes
-        if (params.get("only") instanceof List<?> chosen && !chosen.isEmpty() && chosen.size() <= ONLY_EXEMPT_MAX) return null;
+        if (params.get("only") instanceof List<?> chosen && !chosen.isEmpty()
+                && chosen.size() <= SpaceLimits.get(inv.writeRoot(), LaLimit.INVESTIGATION_ONLY_EXEMPT_MAX)) return null;
         List<String> exceeded = new ArrayList<>();
         int budget = ((Number) params.get("budget")).intValue();
         if (s.fourEyesBudgetAbove() != null && budget > s.fourEyesBudgetAbove())
@@ -2492,7 +2507,9 @@ public final class InvestigationRoutes implements RouteModule {
         status = status == null || status.isBlank() ? "pending" : status.trim();
         if (!INBOX_STATUSES.contains(status))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status must be one of pending, approved, denied, all; got '" + status + "'");
-        int limit = Math.min(Math.max(queryInt(ex, "limit", LIST_DEFAULT), 1), LIST_MAX);
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int limit = Math.min(Math.max(queryInt(ex, "limit", SpaceLimits.get(lim, LaLimit.INVESTIGATION_LIST_PAGE_DEFAULT)), 1),
+                SpaceLimits.get(lim, LaLimit.INVESTIGATION_LIST_PAGE_MAX));
         InvestigationStore store = InvestigationStores.of(writeRoot);
         List<Map<String, Object>> items = new ArrayList<>();
         for (String id : store.ids()) {
@@ -2657,8 +2674,9 @@ public final class InvestigationRoutes implements RouteModule {
                         ? "nothing left to expand — the entities this request names have left the Working Set since it was made; deny it instead"
                         : "nothing left to expand — the entities this request names " + fr.held() + " have been flagged high connectivity "
                                 + "since it was made, and it does not override that; deny it and request an expand naming them in 'expandHubs'");
-            if (frontier.size() > MAX_FRONTIER)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
+            int maxFrontier = SpaceLimits.get(inv.writeRoot(), LaLimit.INVESTIGATION_MAX_FRONTIER);
+            if (frontier.size() > maxFrontier)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + maxFrontier + " entities");
             Map<String, Object> entry = entry(log.size() + 1, "op", ex);
             entry.put("author", rec.get("requestedBy"));   // the requester's op; the approver is recorded beside it
             entry.put("op", "expand");
@@ -2692,8 +2710,9 @@ public final class InvestigationRoutes implements RouteModule {
      */
     private Object reveal(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         Inv inv = open(api, ex, id);
-        if (!(body.get("tokens") instanceof List<?> raw) || raw.isEmpty() || raw.size() > MAX_REVEAL)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'tokens', a list of 1.." + MAX_REVEAL + " masked ids to reveal");
+        int maxReveal = SpaceLimits.get(inv.writeRoot(), LaLimit.INPUT_REVEAL_IDS);
+        if (!(body.get("tokens") instanceof List<?> raw) || raw.isEmpty() || raw.size() > maxReveal)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'tokens', a list of 1.." + maxReveal + " masked ids to reveal");
         EntityMasking mask = EntityMasking.of(inv, List.of());
         List<Map<String, Object>> revealed = new ArrayList<>();
         List<String> unknown = new ArrayList<>();

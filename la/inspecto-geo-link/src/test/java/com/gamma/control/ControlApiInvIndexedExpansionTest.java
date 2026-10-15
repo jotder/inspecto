@@ -496,6 +496,11 @@ class ControlApiInvIndexedExpansionTest {
             JsonNode over = expand(c, "[" + String.join(",", ids) + "]", List.of(), "", "");
             assertEquals("rung_not_indexable", why(over));
             assertTrue(over.at("/read/fallback/details").asText().contains("21 entities"), over.get("read").toString());
+            // LA-CONFIG-LIMITS-1 P3: the frontier cap is the Space's index.frontier_cap - at 21 the same rung is served
+            settings(c, ENABLED + "  frontier_cap: 21\n");
+            JsonNode raised = expand(c, "[" + String.join(",", ids) + "]", List.of(), "", "");
+            assertTrue(raised.at("/read/fallback").isMissingNode(), "served under the Space's raised cap: " + raised.get("read"));
+            settings(c, ENABLED);
             // a kind column the index was not built with
             String id = "k" + seq.incrementAndGet();
             post(c, "/inv/investigations", "{\"purpose\":\"t\",\"id\":\"" + id + "\",\"dataset\":\"n_ds\",\"sourceCol\":\"s\",\"targetCol\":\"t\",\"linkKindCol\":\"c\"}");

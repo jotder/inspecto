@@ -4,6 +4,7 @@ import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.access.ComponentAccess;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.access.Roles;
 import com.gamma.spi.http.RouteModule;
@@ -178,7 +179,7 @@ public final class IndexRoutes implements RouteModule {
         try {
             v = service(writeRoot).submit(new IndexBuildService.Request(callerId(ex), dataset, mapping,
                     ds -> relation(api.dataRoot(), writeRoot, dataset, relationSql),
-                    ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode));
+                    ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode, SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS)));
         } catch (Refused refused) {
             throw map(refused);
         } catch (IllegalArgumentException unsafe) {
@@ -309,7 +310,7 @@ public final class IndexRoutes implements RouteModule {
         InputFingerprint input = currentInput(api, writeRoot, c.content(), budget);
         List<Map<String, Object>> items = new ArrayList<>();
         for (String hash : hashes) {
-            Map<String, Object> item = item(root, c.name(), hash, currentSqlHash, input);
+            Map<String, Object> item = item(root, c.name(), hash, currentSqlHash, input, SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS));
             if (item != null) items.add(item);
         }
         return items;
@@ -325,7 +326,8 @@ public final class IndexRoutes implements RouteModule {
     }
 
     /** One index's summary, or null when it has no published version, or its manifest is unreadable, or it belongs to another Dataset. */
-    private static Map<String, Object> item(Path root, String dataset, String hash, String currentSqlHash, InputFingerprint input) {
+    private static Map<String, Object> item(Path root, String dataset, String hash, String currentSqlHash, InputFingerprint input,
+                                            int maxDeltas) {
         Optional<Path> current = new IndexStore(root, dataset, hash).current();
         if (current.isEmpty()) return null;
         IndexManifest m;
@@ -371,7 +373,7 @@ public final class IndexRoutes implements RouteModule {
         o.put("reasons", st.reasons());
         o.put("removedInput", st.removedInput());
         o.put("deltas", m.deltas().size());
-        o.put("plan", plan(m, currentSqlHash, input, duck));
+        o.put("plan", plan(m, currentSqlHash, input, duck, maxDeltas));
         o.put("fingerprint", st.fingerprintKnown() ? "known" : "unknown");
         o.put("fingerprintReason", st.fingerprintKnown() ? null : InputFingerprint.unknownReason(input));   // no-files, too-many-files, timeout, budget, unavailable
         if (input != null && input.known()) o.put("inputFiles", input.files().size());
@@ -403,12 +405,12 @@ public final class IndexRoutes implements RouteModule {
     /**
      * The staleness probe's advice (D-3 step 8): what differs between the live version and the Dataset now, and which build would
      * close the gap - {@code append} (only new files), {@code full} (anything removed, rewritten or redefined), {@code compact}
-     * (the delta cap), {@code none}. It only REPORTS; nothing is ever built or switched by looking.
+     * (the Space's delta cap {@code index.max_deltas}), {@code none}. It only REPORTS; nothing is ever built or switched by looking.
      */
-    private static Map<String, Object> plan(IndexManifest m, String currentSqlHash, InputFingerprint input, String duck) {
+    private static Map<String, Object> plan(IndexManifest m, String currentSqlHash, InputFingerprint input, String duck, int maxDeltas) {
         List<IndexManifest.InputFile> now = input != null && input.known()
                 ? input.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList() : null;
-        IndexPlan.Plan p = IndexPlan.classify(m, now, currentSqlHash, BucketFunction.NAME, duck);
+        IndexPlan.Plan p = IndexPlan.classify(m, now, currentSqlHash, BucketFunction.NAME, duck, maxDeltas);
         Map<String, Object> o = new LinkedHashMap<>();
         o.put("recommended", p.recommended().name().toLowerCase(Locale.ROOT));
         o.put("appendable", p.appendable());

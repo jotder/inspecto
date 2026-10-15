@@ -5,6 +5,8 @@ import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -170,7 +172,7 @@ final class SettingsRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, "link-analysis settings write");
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
-                nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
+                nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body, root),
                 nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body),
                 setBytes(body), investigationBytes(body), nodeCap(body, "hubThreshold"), embed(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
@@ -451,12 +453,13 @@ final class SettingsRoutes implements RouteModule {
     }
 
     /** Stated Entity Types (LA-17): {@code null}/absent = inherit {@link EntityTypes#DEFAULTS}; otherwise a list
-     *  that passes {@link EntityTypes#parse} or the write is refused (422) — never trimmed to fit. */
-    private static List<EntityTypes.EntityType> entityTypes(Map<String, Object> body) {
+     *  that passes {@link EntityTypes#parse} under the Space's {@code input.entity_types} in force or the write is refused
+     *  (422) — never trimmed to fit. */
+    private static List<EntityTypes.EntityType> entityTypes(Map<String, Object> body, Path root) {
         Object raw = body.get("entityTypes");
         if (raw == null) return null;
         try {
-            return EntityTypes.parse(raw);
+            return EntityTypes.parse(raw, (int) LaLimits.forSpace(root).get(LaLimit.INPUT_ENTITY_TYPES));
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }

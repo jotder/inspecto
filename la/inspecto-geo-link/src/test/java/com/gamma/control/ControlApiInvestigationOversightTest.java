@@ -470,8 +470,8 @@ class ControlApiInvestigationOversightTest {
             assertEquals(2, post(c, nb, neighbours("calls_ds", "caller", 100)).get("rows").size(),
                     "the same read AT the threshold runs — the 403 above is the gate, not the body");
             HttpResponse<String> deep = send(c.port, "POST", rp, traversal(null, null), null);
-            assertEquals(403, deep.statusCode(), "the defaults read 6 × 10 000 rows: " + deep.body());
-            assertTrue(deep.body().contains("rows 60000 > 100"), deep.body());
+            assertEquals(403, deep.statusCode(), "the defaults read 12 × 20 000 rows: " + deep.body());
+            assertTrue(deep.body().contains("rows 240000 > 100"), deep.body());
             assertTrue(post(c, rp, traversal(2, 50)).get("paths").size() > 0, "2 × 50 = 100 rows is not above 100");
 
             // Gate order: an absent Dataset still answers as absent (the 404 is judged first, so the gate cannot

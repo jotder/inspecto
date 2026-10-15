@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
@@ -30,10 +32,10 @@ final class TemporalFindings {
     private TemporalFindings() {}
 
     /** Validate and normalise the op's parameters: the scan knobs only (no ids; the columns are the Investigation's own). */
-    static Map<String, Object> params(Map<String, Object> body) {
+    static Map<String, Object> params(Map<String, Object> body, LaLimitValues lim) {
         if (body.containsKey("ids"))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'temporal' applies to the whole Working Set, not ids");
-        return PatternRoutes.temporalKnobs(body);
+        return PatternRoutes.temporalKnobs(body, lim);
     }
 
     /** The scan, narrowed to {@code state}; RAW ids (the caller masks). */
@@ -47,7 +49,7 @@ final class TemporalFindings {
         req.put("sourceCol", h.get("sourceCol"));
         req.put("targetCol", h.get("targetCol"));
         req.put("timeCol", h.get("timeCol"));
-        req.put("limit", 1_000);   // the route's maximum: the op's own limit cuts AFTER the Working Set narrowing
+        req.put("limit", SpaceLimits.get(inv.writeRoot(), LaLimit.PATTERN_TEMPORAL_LIMIT_MAX));   // the route's maximum: the op's own limit cuts AFTER the Working Set narrowing
         Map<String, Object> scan;
         try {
             scan = PatternRoutes.scan(api, ex, req);

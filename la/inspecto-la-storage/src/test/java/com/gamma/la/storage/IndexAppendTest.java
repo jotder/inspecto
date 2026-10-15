@@ -352,13 +352,17 @@ class IndexAppendTest {
         assertFull(IndexPlan.classify(manifest(m, null, List.of(), "sqlhash", "hashfn", "1.0"), plus, "sqlhash", "hashfn", "1.0"), "input_files_unknown");
 
         List<IndexManifest.Delta> eight = new ArrayList<>();
-        for (int i = 1; i <= IndexPlan.MAX_DELTAS; i++) eight.add(new IndexManifest.Delta("d" + i, 1, 1));
+        for (int i = 1; i <= IndexPlan.DEFAULT_MAX_DELTAS; i++) eight.add(new IndexManifest.Delta("d" + i, 1, 1));
         IndexManifest capped = manifest(m, covered, eight, "sqlhash", "hashfn", "1.0");
         IndexPlan.Plan atCap = IndexPlan.classify(capped, plus, "sqlhash", "hashfn", "1.0");
         assertEquals(IndexPlan.Action.COMPACT, atCap.recommended());
         assertFalse(atCap.appendable());
         assertEquals(List.of("delta_cap_reached"), atCap.reasons());
         assertEquals(IndexPlan.Action.COMPACT, IndexPlan.classify(capped, covered, "sqlhash", "hashfn", "1.0").recommended());
+        // the Space's index.max_deltas is the cap: raised above the deltas carried, the same append is sound; lowered, it is refused
+        assertTrue(IndexPlan.classify(capped, plus, "sqlhash", "hashfn", "1.0", IndexPlan.DEFAULT_MAX_DELTAS + 1).appendable());
+        assertEquals(IndexPlan.Action.COMPACT, IndexPlan.classify(manifest(m, covered, eight.subList(0, 2), "sqlhash", "hashfn", "1.0"),
+                plus, "sqlhash", "hashfn", "1.0", 2).recommended());
     }
 
     private static void assertFull(IndexPlan.Plan p, String reason) {
@@ -491,7 +495,7 @@ class IndexAppendTest {
     /**
      * T7 (LA-DAILY-INGEST-1, R-07): a 30-day backfill is ONE full build over the landed range, and it must answer every read like
      * the day-by-day run the scheduled Job performs (first day full, then an append per day, compacting at the delta cap before
-     * the append - the {@code la.index.build} policy). 30 days cross the cap of {@link IndexPlan#MAX_DELTAS} three times.
+     * the append - the {@code la.index.build} policy). 30 days cross the cap of {@link IndexPlan#DEFAULT_MAX_DELTAS} three times.
      */
     @Test
     void aThirtyDayBackfillAnswersEveryReadLikeTheDayByDayRunAcrossThreeCompactions(@TempDir Path tmp) throws Exception {
@@ -503,7 +507,7 @@ class IndexAppendTest {
         IndexBuilder.Result live = buildOver(daily, data, IndexBuilder.Mode.FULL, days.subList(0, 1), null);
         int compactions = 0;
         for (int d = 2; d <= DAYS; d++) {
-            if (live.manifest().deltas().size() >= IndexPlan.MAX_DELTAS) {
+            if (live.manifest().deltas().size() >= IndexPlan.DEFAULT_MAX_DELTAS) {
                 live = buildOver(daily, data, IndexBuilder.Mode.COMPACT, days.subList(0, d - 1), null);
                 compactions++;
             }

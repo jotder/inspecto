@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
@@ -82,8 +84,6 @@ public final class WorkingSetRoutes implements RouteModule {
         return java.util.Set.of("geoLink");
     }
 
-    private static final int DEFAULT_LIMIT = 1_000;
-    private static final int MAX_LIMIT = 10_000;
     private static final int CACHE_ENTRIES = 32;
 
     public static final Map<String, List<String>> COLUMNS = Map.of(
@@ -121,7 +121,9 @@ public final class WorkingSetRoutes implements RouteModule {
         if (of == null || of.isBlank()) of = "entities";
         if (!COLUMNS.containsKey(of))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'of' must be one of entities, links, excluded — got '" + of + "'");
-        int limit = Math.min(Math.max(intParam(ex, "limit", DEFAULT_LIMIT), 1), MAX_LIMIT);
+        LaLimitValues lim = SpaceLimits.of(inv.writeRoot());   // the Space's working_set.page_default / working_set.page_max
+        int limit = Math.min(Math.max(intParam(ex, "limit", SpaceLimits.get(lim, LaLimit.WORKING_SET_PAGE_DEFAULT)), 1),
+                SpaceLimits.get(lim, LaLimit.WORKING_SET_PAGE_MAX));
         int offset = intParam(ex, "offset", 0);
         if (offset < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "offset must be >= 0");
         int at = intParam(ex, "at", -1);

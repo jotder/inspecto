@@ -155,7 +155,7 @@ class ControlApiInvPatternTest {
             assertNull(data.get("refusal"), data.toString());
             assertEquals(expected(fx), canonAll(data), "the server must answer exactly what the browser golden says");
             assertFalse(data.get("truncated").asBoolean());
-            assertEquals(5000, data.at("/fences/timeoutMs").asInt());
+            assertEquals(10_000, data.at("/fences/timeoutMs").asInt(), "pattern.timeout_s: 10 s by default");
         }
     }
 
@@ -226,8 +226,9 @@ class ControlApiInvPatternTest {
     @Test
     void theRingTheProjectionCutIsStillFound(@TempDir Path cfg, @TempDir Path root) throws Exception {
         JsonNode fx = fixture();
-        // 2 100 heavy pairs, three rows each: every one outweighs a one-off deposit in `cnt DESC` order.
-        String heavy = "SELECT 'HEAVY-' || i, 'PAYEE-' || i, '2026-04-01 10:00:00', 50000.0 FROM range(2100) r(i), range(3) k(j)";
+        // 4 100 heavy pairs (over the 4 000-row projection default, traversal.rows_default), three rows each: every one
+        // outweighs a one-off deposit in `cnt DESC` order.
+        String heavy = "SELECT 'HEAVY-' || i, 'PAYEE-' || i, '2026-04-01 10:00:00', 50000.0 FROM range(4100) r(i), range(3) k(j)";
         try (Ctx c = open(cfg, root)) {
             seed(c, rowsSql(fx, heavy));
             HttpResponse<String> proj = post(c.port, "/inv/projection",

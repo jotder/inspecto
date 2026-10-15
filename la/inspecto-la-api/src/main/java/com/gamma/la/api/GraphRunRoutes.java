@@ -3,6 +3,8 @@ package com.gamma.la.api;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.access.Roles;
 import com.gamma.spi.http.RouteModule;
@@ -145,7 +147,8 @@ public final class GraphRunRoutes implements RouteModule {
                 g.threads() != null ? g.threads() : std.threads(), g.queue() != null ? g.queue() : std.queue(),
                 std.runTtlMs(), std.maxRuns(), std.cacheTtlMs(), std.cacheEntries());
         GraphEngine engine = new RoutingGraphEngine(engineOverride != null ? engineOverride : new InMemoryGraphEngine(),
-                new SqlGraphEngine(InvRoutes.traversalPolicy()));
+                new SqlGraphEngine(InvRoutes.traversalPolicy(root), () -> SpaceLimits.get(root, LaLimit.INDEX_TRAVERSAL_DEPTH),
+                        () -> SpaceLimits.get(root, LaLimit.INDEX_FRONTIER_CAP)));
         return new GraphRunService(engine, limits, System::currentTimeMillis, GraphRunRoutes::auditTerminal);
     }
 
@@ -464,8 +467,10 @@ public final class GraphRunRoutes implements RouteModule {
         if (at >= 0)
             throw bad("'at' cannot be combined with input \"index\": the index holds the Dataset as built, with no Working Set history "
                     + "(and no time-zone contract yet)");
-        if (algorithm == Algorithm.NEIGHBORHOOD && params.get("hops") instanceof Number h && h.intValue() > SqlGraphEngine.MAX_HOPS)
-            throw bad("hops " + h + " is over the index cap of " + SqlGraphEngine.MAX_HOPS + " hops; run it with input \"workingSet\"");
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxHops = SpaceLimits.get(lim, LaLimit.INDEX_TRAVERSAL_DEPTH), frontierCap = SpaceLimits.get(lim, LaLimit.INDEX_FRONTIER_CAP);
+        if (algorithm == Algorithm.NEIGHBORHOOD && params.get("hops") instanceof Number h && h.intValue() > maxHops)
+            throw bad("hops " + h + " is over the index cap of " + maxHops + " hops; run it with input \"workingSet\"");
         String dataset = ApiContext.str(body, "dataset");
         if (dataset == null || dataset.isBlank()) throw bad("input \"index\" needs 'dataset' (the Dataset whose edge index to read)");
         String sourceCol = InvRoutes.ident(body, "sourceCol", true);
@@ -477,8 +482,8 @@ public final class GraphRunRoutes implements RouteModule {
         if (algorithm == Algorithm.DEGREE_CENTRALITY) {
             if (!(body.get("seeds") instanceof List<?> raw) || raw.isEmpty() || raw.stream().anyMatch(o -> !(o instanceof String s) || s.isBlank()))
                 throw bad("degreeCentrality from the index scores the SEED nodes only: 'seeds' must be a non-empty list of node ids");
-            if (raw.size() > SqlGraphEngine.FRONTIER_CAP)
-                throw bad("'seeds' lists " + raw.size() + " nodes; the index cap is " + SqlGraphEngine.FRONTIER_CAP + " keys per level");
+            if (raw.size() > frontierCap)
+                throw bad("'seeds' lists " + raw.size() + " nodes; the index cap is " + frontierCap + " keys per level");
             for (Object o : raw) {
                 String s = (String) o;
                 seeds.add(mask.hidesRaw(s) ? ABSENT_NODE + "seed" : mask.resolve(List.of(s)).get(0));
@@ -498,7 +503,7 @@ public final class GraphRunRoutes implements RouteModule {
         GraphRunService.Limits std = GraphRunService.Limits.standard();
         long bound = asked.maxEdges() > 0 ? asked.maxEdges()
                 : settingsDefaults(LinkAnalysisSettings.forRoot(writeRoot).effectiveGraphRun(), std).maxEdges();
-        InvRoutes.refuseIfSensitive(writeRoot, "a graph run from the index (budget " + bound + ")", bound, SqlGraphEngine.FRONTIER_CAP);
+        InvRoutes.refuseIfSensitive(writeRoot, "a graph run from the index (budget " + bound + ")", bound, frontierCap);
 
         IndexedRead.Selection sel = IndexedRead.select(writeRoot, api.dataRoot(), relationSql, dataset, sourceCol, targetCol, (m, utc) -> {
             boolean indexHasKind = m.kindColumn() != null;
@@ -512,7 +517,7 @@ public final class GraphRunRoutes implements RouteModule {
                     + "); input \"index\" never falls back to the Working Set - fix the cause or run it with input \"workingSet\"");
         }
         long nodes = 0, edges = 0;
-        try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), InvRoutes.traversalPolicy())) {
+        try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), InvRoutes.traversalPolicy(writeRoot))) {
             for (String seed : seeds) {
                 if (seed.indexOf((char) 0) >= 0) continue;                                               // a masked raw id: names no node
                 long d = reader.degree(seed);

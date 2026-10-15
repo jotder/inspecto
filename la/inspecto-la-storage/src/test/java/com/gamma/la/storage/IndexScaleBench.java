@@ -171,7 +171,7 @@ class IndexScaleBench {
 
         // K = 8: append one delta file at a time, measure after 1, 2, 4, 6, 8 (the cap), then compact
         long deltaEdges = num("deltaEdges", 100_000);
-        int maxDeltas = (int) num("maxDeltas", IndexPlan.MAX_DELTAS);
+        int maxDeltas = (int) num("maxDeltas", IndexPlan.DEFAULT_MAX_DELTAS);
         List<String> all = new ArrayList<>(files);
         IndexBuilder.Result cur = base;
         for (int d = 1; d <= maxDeltas; d++) {

@@ -76,7 +76,7 @@ public final class DossierBundleRoutes implements RouteModule {
     private static Object export(ApiContext api, HttpExchange ex, String id) throws IOException {
         DossierRoutes.Opened inv = DossierRoutes.open(api, ex, id);
         List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
-        int at = DossierRoutes.parseAt(ex, log);
+        int at = DossierRoutes.parseAt(ex, log, inv.writeRoot());
         List<String> snapshotIds = DossierRoutes.parseSnapshotIds(ex);
         DossierRoutes.Masked built = DossierRoutes.maskedDossier(ex, inv, log, at, snapshotIds);
         Map<String, Object> dossier = built.dossier();

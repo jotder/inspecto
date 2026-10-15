@@ -249,7 +249,7 @@ class ControlApiDatasetFilesTest {
             assertEquals(get(c, "/inv/datasets/private_ds/files", STRANGER).body().replace("private_ds", "x").replaceAll("\"correlationId\":\"[^\"]*\"", ""),
                     get(c, "/inv/datasets/no_such/files", STRANGER).body().replace("no_such", "x").replaceAll("\"correlationId\":\"[^\"]*\"", ""), "not viewable reads exactly as absent");
             assertEquals(422, get(c, "/inv/datasets/private_ds/files?limit=0", OWNER).statusCode());
-            assertEquals(422, get(c, "/inv/datasets/private_ds/files?limit=1001", OWNER).statusCode());
+            assertEquals(422, get(c, "/inv/datasets/private_ds/files?limit=2001", OWNER).statusCode(), "files.page_max: 2,000 by default");
             assertEquals(422, get(c, "/inv/datasets/private_ds/files?offset=-1", OWNER).statusCode());
             assertEquals(422, get(c, "/inv/datasets/private_ds/files?limit=abc", OWNER).statusCode());
         }

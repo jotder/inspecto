@@ -75,9 +75,10 @@ public final class ValueMeasureRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + k);
             roles.put(k, v);
         }
+        ValueMeasures.Fences fences = ValueMeasures.Fences.of(writeRoot);
         ValueMeasures.Spec spec;
         try {
-            spec = ValueMeasures.parse(block, false);
+            spec = ValueMeasures.parse(block, false, fences);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
@@ -85,7 +86,7 @@ public final class ValueMeasureRoutes implements RouteModule {
         ValueMeasures.Result r;
         try {
             r = ValueMeasures.forInvestigation(datasetId.trim(), relationSql, roles, spec,
-                    ValueMeasures.agents(writeRoot, spec));
+                    ValueMeasures.agents(writeRoot, spec), fences);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException | java.io.IOException e) {
@@ -106,8 +107,7 @@ public final class ValueMeasureRoutes implements RouteModule {
             }
             out.put("entities", shown);
         }
-        out.put("fences", Map.of("maxEntities", ValueMeasures.MAX_ENTITIES, "timeoutSeconds",
-                ValueMeasures.TIMEOUT_SECONDS, "maxWindowDays", ValueMeasures.MAX_WINDOW_DAYS));
+        out.put("fences", fences.toMap());
         try {
             EventSink.current().emit(Event.builder(LinkEventTypes.LINK_VALUE_MEASURED).source("inv")
                     .message("link.value.measured — " + spec.name() + " over " + datasetId)
