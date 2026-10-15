@@ -12,12 +12,13 @@ import {
 } from '@inspecto/link-analysis/geo';
 import { GeoProjectionResult, GeoService } from '@inspecto/link-analysis/api/geo.service';
 import { LA_DATASETS, type LaDatasets } from '@inspecto/link-analysis/la-host';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * The `dataset` **GeoSource**: project a Dataset's rows onto the map — each row with a valid
  * WGS84 lat/lon becomes a {@link GeoPoint}. Since Phase 4 (`GeoRoutes`, 2026-07-22) this is
  * **backend-first**: `POST /geo/projection` does the DuckDB-side fold over the real Dataset
- * (scaling far beyond the browser's {@link GEO_POINT_CAP}) and {@link foldServerResult} maps the
+ * (scaling far beyond the browser's `display.geo_point_cap`) and {@link foldServerResult} maps the
  * result into the identical `GeoPoint` shape. A backend failure **surfaces** — there is no
  * client-side fallback since the offline mock backend was removed (`f1553136`). Mirrors the Link
  * Analysis studio's `EntityProjectionGraphSource`/`InvService` backend-first pattern.
@@ -27,9 +28,6 @@ import { LA_DATASETS, type LaDatasets } from '@inspecto/link-analysis/la-host';
  * `geo-case-studies.spec.ts` runs the CS1–CS5 sample datasets through to pin their invariants
  * against the live `app/inspecto/geo` analytics. Delete them and that guard goes with them.
  */
-
-/** Above this many points the projection truncates (and says so) rather than melt the map. */
-export const GEO_POINT_CAP = 5000;
 
 /** A projection failure the UI can render inline (bad mapping ≠ a thrown stack). */
 export interface GeoProjectionError {
@@ -66,7 +64,7 @@ export function projectPoints(rows: Record<string, unknown>[], p: GeoProjection)
             skipped++;
             continue;
         }
-        if (points.length >= GEO_POINT_CAP) {
+        if (points.length >= laLimit('display.geo_point_cap')) {
             truncated = true;
             break;
         }
@@ -122,7 +120,7 @@ export function projectRoutes(rows: Record<string, unknown>[], p: RouteProjectio
         const label = name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
         const id = `ep:${label}`;
         if (!points.has(id)) {
-            if (points.size >= GEO_POINT_CAP) {
+            if (points.size >= laLimit('display.geo_point_cap')) {
                 truncated = true;
                 return null;
             }

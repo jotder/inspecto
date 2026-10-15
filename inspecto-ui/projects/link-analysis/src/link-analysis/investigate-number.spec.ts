@@ -6,7 +6,6 @@ import {
     expandApproval,
     thresholdWords,
     DegreeOutcome,
-    MAX_EXPAND_FRONTIER,
     admittedHop,
     degreeOutcome,
     degreeOutcomesFromLog,
@@ -40,6 +39,7 @@ import {
     seedError,
     windowLabel,
 } from './investigate-number';
+import { configureLaLimits, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 const entity = (id: string, hop: number, hidden = false): WorkingSetEntity => ({
     id,
@@ -211,8 +211,19 @@ describe('investigate-number - next degree', () => {
     });
 
     it('is blocked above the server frontier cap', () => {
-        const many = Array.from({ length: MAX_EXPAND_FRONTIER + 1 }, (_, i) => entity(`n${i}`, 2));
+        const many = Array.from({ length: laLimit('investigation.max_frontier') + 1 }, (_, i) => entity(`n${i}`, 2));
         expect(degreeState(ws(entity('s', 0), ...many), 4).blocked).toContain('one expand names at most 1,000');
+    });
+
+    it('follows the investigation.max_frontier / expand_budget_default limits in force (LA-CONFIG-LIMITS-1)', () => {
+        configureLaLimits({ 'investigation.max_frontier': 2, 'investigation.expand_budget_default': 300 });
+        try {
+            const three = [entity('n1', 2), entity('n2', 2), entity('n3', 2)];
+            expect(degreeState(ws(entity('s', 0), ...three), 4).blocked).toContain('one expand names at most 2.');
+            expect(expandApproval({}, { budgetAbove: 299, fanOutAbove: null }).budget).toBe(300);
+        } finally {
+            resetLaLimits();
+        }
     });
 
     it('anchors the window at the Dataset latest event time, never today; no end = no window', () => {

@@ -1,6 +1,7 @@
 import type { ColDef } from 'ag-grid-community';
 import type { AttributeSpec } from '@inspecto/core/component-model';
 import type { ValueMeasureName, ValueMeasureQuery } from '@inspecto/link-analysis/api/inv.service';
+import { laLimit } from './la-limits';
 
 /**
  * LA-18 value Measures (plan §2.6.1) — the SPA side of `GET /inv/value-measures`. Framework-free: the form's
@@ -135,9 +136,6 @@ const LAST = '[1-9]\\d{0,5}[hd]';
 /** `EntityListFacts.LIST_ID`: the id an Entity List is minted with. */
 const AGENT_LIST = '[a-z0-9][a-z0-9_-]{0,63}';
 
-/** `ValueMeasures.MAX_WINDOW_DAYS`: a window the server reads is at most this long (`from`/`to`, or a rolling `last`). */
-export const MAX_WINDOW_DAYS = 31;
-
 const DAY_MS = 24 * 3_600_000;
 
 /** A rolling `last` ('24h' | '7d') as days, or null when it is not one. */
@@ -146,21 +144,21 @@ function lastDays(last: string): number | null {
     return m ? (m[2] === 'h' ? Number(m[1]) / 24 : Number(m[1])) : null;
 }
 
-/** The server's "exactly one window" rule (and its {@link MAX_WINDOW_DAYS} cap), stated before the call: `from` + `to`, or `last`, never both. */
+/** The server's "exactly one window" rule (and its `measures.max_window_days` cap), stated before the call: `from` + `to`, or `last`, never both. */
 export function valueMeasureWindowIssue(v: Record<string, unknown>): string | null {
     const set = (k: string) => typeof v[k] === 'string' && (v[k] as string).trim() !== '';
     const fixed = set('from') || set('to');
     if (fixed && set('last')) return 'Use either From and To or a rolling window (last), not both.';
     if (!fixed && !set('last')) return 'Give a window: From and To, or a rolling window such as 7d.';
     if (fixed && !(set('from') && set('to'))) return 'A fixed window needs both From and To.';
+    const maxDays = laLimit('measures.max_window_days');
     if (fixed) {
         const days = (Date.parse(String(v['to'])) - Date.parse(String(v['from']))) / DAY_MS;
         if (days <= 0) return 'To must be after From.';
-        if (days > MAX_WINDOW_DAYS)
-            return `The window is at most ${MAX_WINDOW_DAYS} days; this one is ${Math.ceil(days)}.`;
+        if (days > maxDays) return `The window is at most ${maxDays} days; this one is ${Math.ceil(days)}.`;
     } else {
         const days = lastDays(String(v['last']));
-        if (days !== null && days > MAX_WINDOW_DAYS) return `The window is at most ${MAX_WINDOW_DAYS} days (744h).`;
+        if (days !== null && days > maxDays) return `The window is at most ${maxDays} days (${maxDays * 24}h).`;
     }
     return null;
 }

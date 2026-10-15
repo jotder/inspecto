@@ -3,13 +3,13 @@ import { of, throwError } from 'rxjs';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import {
     DatasetGeoSource,
-    GEO_POINT_CAP,
     ProjectedGeo,
     RouteProjectionGeoSource,
     isGeoProjectionError,
     projectPoints,
     projectRoutes,
 } from './geo-projection';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 const ROWS = [
     { site: 'T1', lat: 23.81, lon: 90.41, type: 'tower', seen: '2026-06-01T10:00:00Z' },
@@ -120,14 +120,14 @@ describe('projectPoints', () => {
     });
 
     it('truncates at the point cap and says so', () => {
-        const many = Array.from({ length: GEO_POINT_CAP + 10 }, (_, i) => ({
+        const many = Array.from({ length: laLimit('display.geo_point_cap') + 10 }, (_, i) => ({
             lat: 10 + (i % 50) * 0.01,
             lon: 20,
             site: `s${i}`,
         }));
         const out = projectPoints(many, { datasetId: 'x', latCol: 'lat', lonCol: 'lon' });
         if (isGeoProjectionError(out)) throw new Error(out.error);
-        expect(out.points).toHaveLength(GEO_POINT_CAP);
+        expect(out.points).toHaveLength(laLimit('display.geo_point_cap'));
         expect(out.truncated).toBe(true);
     });
 });

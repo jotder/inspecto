@@ -42,11 +42,9 @@ import {
     aggregateSuperNodes,
     SUPER_NODE_KIND,
     superNodeId,
-    ANALYSIS_NODE_CAP_DEFAULT,
     analysisNodeCapValue,
-    configureGraphLimits,
-    resetGraphLimits,
 } from './graph-analysis';
+import { LA_LIMIT_FALLBACKS, configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 const node = (id: string, kind = 'entity', label = id): G6GraphData['nodes'][0] => ({ id, data: { label, kind } });
 const edge = (source: string, target: string, kind = 'link'): G6GraphData['edges'][0] => ({
@@ -803,7 +801,7 @@ describe('aggregateSuperNodes', () => {
 // ── Configurable limits. The shipped numbers were measured on one host with one synthetic graph
 // shape, so they are DEFAULTS; a deployment tunes them per space. ──
 describe('graph limits are configurable (D-S3)', () => {
-    afterEach(() => resetGraphLimits());
+    afterEach(() => resetLaLimits());
 
     function ring(n: number): G6GraphData {
         const nodes = Array.from({ length: n }, (_, i) => ({ id: 'n' + i, data: { label: 'n' + i, kind: 'acct' } }));
@@ -817,7 +815,7 @@ describe('graph limits are configurable (D-S3)', () => {
     }
 
     it('starts at the measured default', () => {
-        expect(analysisNodeCapValue()).toBe(ANALYSIS_NODE_CAP_DEFAULT);
+        expect(analysisNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.analysis_node_cap);
     });
 
     // ⚠ These use closeness, not betweenness. Betweenness was the vehicle until 2026-09-23, when it moved
@@ -825,7 +823,7 @@ describe('graph limits are configurable (D-S3)', () => {
     // against 129 ms for every other component combined), so the shared cap never governed it well. The
     // subject here is the SHARED cap being configurable, so the vehicle must be an algorithm still on it.
     it('a deployment override takes effect, and the refusal names the NEW limit not the old one', () => {
-        configureGraphLimits({ analysisNodeCap: 10 });
+        configureLaLimits({ analysis_node_cap: 10 });
         expect(analysisNodeCapValue()).toBe(10);
         expect(() => closenessCentrality(ring(20))).toThrowError(/capped at 10 nodes/);
         // ...and a graph under the new limit still runs
@@ -834,15 +832,15 @@ describe('graph limits are configurable (D-S3)', () => {
 
     it('raising the cap lets a graph through that the default would have refused', () => {
         const g = ring(30);
-        configureGraphLimits({ analysisNodeCap: 10 });
+        configureLaLimits({ analysis_node_cap: 10 });
         expect(() => closenessCentrality(g)).toThrow();
-        configureGraphLimits({ analysisNodeCap: 100 });
+        configureLaLimits({ analysis_node_cap: 100 });
         expect(() => closenessCentrality(g)).not.toThrow();
     });
 
     // And the counterpart: the shared cap must NOT govern betweenness any more.
     it('the shared cap does not gate betweenness, which has its own lower ceiling', () => {
-        configureGraphLimits({ analysisNodeCap: 10, suspicionNodeCap: 1000 });
+        configureLaLimits({ analysis_node_cap: 10, suspicion_node_cap: 1000 });
 
         expect(() => closenessCentrality(ring(20))).toThrow();
         expect(() => betweennessCentrality(ring(20))).not.toThrow();
@@ -851,30 +849,30 @@ describe('graph limits are configurable (D-S3)', () => {
     it('⛔ REFUSES a nonsense cap and keeps the previous value', () => {
         // A cap of 0 or NaN would put every graph over the limit and turn the whole toolbox off —
         // far worse than ignoring a bad setting, so the setter fails closed.
-        configureGraphLimits({ analysisNodeCap: 50 });
+        configureLaLimits({ analysis_node_cap: 50 });
         for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
-            configureGraphLimits({ analysisNodeCap: bad });
+            configureLaLimits({ analysis_node_cap: bad });
             expect(analysisNodeCapValue(), `cap ${bad} must be refused`).toBe(50);
         }
     });
 
     it('ignores an absent field and a null payload, so a partial response is safe', () => {
-        configureGraphLimits({ analysisNodeCap: 42 });
-        configureGraphLimits({});
-        configureGraphLimits(null);
-        configureGraphLimits(undefined);
+        configureLaLimits({ analysis_node_cap: 42 });
+        configureLaLimits({});
+        configureLaLimits(null);
+        configureLaLimits(undefined);
         expect(analysisNodeCapValue()).toBe(42);
     });
 
     it('floors a fractional cap rather than refusing it', () => {
-        configureGraphLimits({ analysisNodeCap: 12.9 });
+        configureLaLimits({ analysis_node_cap: 12.9 });
         expect(analysisNodeCapValue()).toBe(12);
     });
 
     it('reset restores the shipped default', () => {
-        configureGraphLimits({ analysisNodeCap: 7 });
-        resetGraphLimits();
-        expect(analysisNodeCapValue()).toBe(ANALYSIS_NODE_CAP_DEFAULT);
+        configureLaLimits({ analysis_node_cap: 7 });
+        resetLaLimits();
+        expect(analysisNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.analysis_node_cap);
     });
 });
 

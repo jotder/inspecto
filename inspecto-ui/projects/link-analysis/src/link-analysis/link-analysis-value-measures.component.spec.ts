@@ -11,6 +11,7 @@ import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/gri
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisValueMeasuresComponent, valueMeasureErrorMessage } from './link-analysis-value-measures.component';
 import { valueMeasureQuery, valueMeasureWindowIssue } from './value-measures';
+import { configureLaLimits, resetLaLimits } from './la-limits';
 
 const HEADER: InvestigationHeader = {
     id: 'inv-1',
@@ -374,6 +375,19 @@ describe('valueMeasureWindowIssue and agentList', () => {
         expect(valueMeasureWindowIssue({ from: '2026-09-01', last: '24h' })).toContain('not both');
         expect(valueMeasureWindowIssue({ from: '2026-09-01' })).toContain('both From and To');
         expect(valueMeasureWindowIssue({ from: ' ', last: '' })).toContain('Give a window');
+    });
+
+    it('caps the window at the measures.max_window_days limit in force (LA-CONFIG-LIMITS-1)', () => {
+        configureLaLimits({ 'measures.max_window_days': 7 });
+        try {
+            expect(valueMeasureWindowIssue({ from: '2026-09-01', to: '2026-09-08' })).toBeNull();
+            expect(valueMeasureWindowIssue({ from: '2026-09-01', to: '2026-09-09' })).toContain(
+                'at most 7 days; this one is 8',
+            );
+            expect(valueMeasureWindowIssue({ last: '8d' })).toBe('The window is at most 7 days (168h).');
+        } finally {
+            resetLaLimits();
+        }
     });
 
     it('sends agentList only for cash-out concentration, and never another Measure', () => {

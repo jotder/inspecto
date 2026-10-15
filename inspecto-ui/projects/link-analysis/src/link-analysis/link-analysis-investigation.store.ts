@@ -49,11 +49,10 @@ import {
     requestedDegree,
     windowLabel,
 } from './investigate-number';
+import { laLimit } from './la-limits';
 
 /** The query parameter that keeps the open Investigation across a reload (`?investigation=<id>`). */
 export const INVESTIGATION_PARAM = 'investigation';
-/** The most Working Set rows read for the flagged entities' contact counts (the route's own cap). */
-const HUB_ROWS_LIMIT = 10_000;
 
 const EMPTY_SET: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
 
@@ -769,8 +768,9 @@ export class InvestigationSessionStore {
         if (!missing || key === this.hubRowsRead) return;
         this.hubRowsRead = key;
         try {
+            // the most Working Set rows read for the flagged entities' contact counts (the route's own cap)
             const page = await firstValueFrom(
-                this.inv.workingSetRelation(id, { of: 'entities', limit: HUB_ROWS_LIMIT }),
+                this.inv.workingSetRelation(id, { of: 'entities', limit: laLimit('graph_run.max_result_items') }),
             );
             if (this.activeId() !== id) return;
             const read = hubContactsFromRows(page.rows ?? []);

@@ -15,9 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
-
-/** `InvestigationRoutes.MAX_NOTE_LENGTH` — the server refuses a longer snapshot label. */
-export const MAX_SNAPSHOT_LABEL = 2000;
+import { laLimit } from './la-limits';
 
 const blank = (v: unknown): boolean => v === null || v === undefined || String(v).trim() === '';
 
@@ -172,7 +170,7 @@ export class InvestigationThresholdOpComponent {
                     <input matInput formControlName="label" placeholder="Before the weekend burst" />
                     <mat-hint>Marks this position in the log; the Working Set does not change.</mat-hint>
                     @if (form.controls.label.hasError('maxlength')) {
-                        <mat-error>At most {{ max }} characters.</mat-error>
+                        <mat-error>At most {{ max() }} characters.</mat-error>
                     }
                 </mat-form-field>
                 <button mat-stroked-button type="submit" class="self-start" [disabled]="!canWrite() || store.busy()">
@@ -189,9 +187,10 @@ export class InvestigationSnapshotOpComponent {
     readonly store = inject(InvestigationSessionStore);
     private readonly lens = inject(LensService);
     readonly canWrite = computed(() => this.lens.canManageIncidents());
-    readonly max = MAX_SNAPSHOT_LABEL;
+    /** `input.note_length` — the server refuses a longer snapshot label (`InvestigationRoutes.MAX_NOTE_LENGTH`). */
+    readonly max = computed(() => laLimit('input.note_length'));
     readonly form = new FormGroup({
-        label: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(MAX_SNAPSHOT_LABEL)] }),
+        label: new FormControl('', { nonNullable: true, validators: [(c) => Validators.maxLength(this.max())(c)] }),
     });
     readonly error = signal('');
 

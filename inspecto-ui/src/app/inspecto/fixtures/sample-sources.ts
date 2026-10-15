@@ -420,7 +420,7 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     // detection over dense tracks, and cross-border co-location.
 
     // CS1 — SIM-box farms (STRESS): 3 static farms × 40 SIMs × 12 calls + 350 roaming
-    // subscribers × 12 events = 5,640 valid rows (trips GEO_POINT_CAP=5000 → Truncated banner)
+    // subscribers × 12 events = 5,640 valid rows (trips the display.geo_point_cap default of 5000 → Truncated banner)
     // + 25 leading broken rows (→ Rows-skipped banner). Farms are dwell/co-location goldmines.
     simbox_sweep: (() => {
         const rand = lcg(11);

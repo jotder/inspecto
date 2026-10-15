@@ -19,8 +19,10 @@ import {
     LinkAnalysisSettingsService,
 } from '@inspecto/link-analysis/link-analysis/link-analysis-settings.service';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { LinkAnalysisLimitsComponent } from './link-analysis-limits.component';
 
 /** `SettingsRoutes.MAX_NODE_CAP` — every integer setting on this route is 1..100 000 or refused (422). */
 const MAX = 100_000;
@@ -163,6 +165,7 @@ function expiryAfterHibernation(
         MatSelectModule,
         InspectoAlertComponent,
         InspectoPageHeaderComponent,
+        LinkAnalysisLimitsComponent,
     ],
     template: `
         <div class="flex flex-col gap-6 p-6">
@@ -475,12 +478,14 @@ function expiryAfterHibernation(
                     }
                 </form>
             }
+            <inspecto-link-analysis-limits />
         </div>
     `,
 })
 export class LinkAnalysisSettingsComponent implements OnInit {
     private api = inject(LinkAnalysisSettingsService);
     private runs = inject(GraphRunsService);
+    private laLimits = inject(LaLimitsService);
     private lens = inject(LensService);
     private toastr = inject(ToastrService);
 
@@ -729,6 +734,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
                 this.writesDisabled.set(null);
                 this.apply(s);
                 this.loadCatalogue(); // the budget in force follows the saved defaults
+                this.laLimits.reload(); // so do the limits in force (hub threshold, graph-run defaults, …)
                 this.toastr.success('Link Analysis settings saved.');
             },
             error: (err) => {

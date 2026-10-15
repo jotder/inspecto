@@ -20,6 +20,7 @@ import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-en
 import { factorLine, nodeScoresFor, numberOf, riskMappingFor, riskOf, round1 } from './node-risk';
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
+import { laLimit } from './la-limits';
 
 /** What the node detail dialog's insight sections know about the clicked node and the graph around it. */
 export interface NodeInsightContext {
@@ -52,8 +53,6 @@ interface Membership {
     list: EntityListSummary;
     matched: boolean;
 }
-
-const LIST_REASON_MAX = 1000;
 
 /**
  * The node detail dialog's **Risk**, **Enrichment** and **Actions** sections (telecom demo S2 UI, storyboard W4 / W11).
@@ -516,7 +515,7 @@ export class NodeInsightComponent implements OnInit {
                         title: `Add to ${list.title}`,
                         message: `Add ${this.ctx().label} to the ${list.purpose} list "${list.title}".`,
                         confirmLabel: 'Add',
-                        maxLength: LIST_REASON_MAX,
+                        maxLength: laLimit('input.purpose_length'),
                     },
                 })
                 .afterClosed(),

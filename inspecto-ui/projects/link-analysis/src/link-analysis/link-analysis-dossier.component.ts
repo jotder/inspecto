@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -16,9 +16,8 @@ import {
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { formatDay } from './data-trust';
 import { investigationErrorMessage } from './investigation-state';
+import { laLimit } from './la-limits';
 
-/** `DossierRoutes.MAX_SNAPSHOTS` — the server refuses more with a 422. */
-export const DOSSIER_MAX_SNAPSHOTS = 20;
 /** How many sealed ids the picker lists (`GET /inv/snapshots` defaults to 100, clamps to 1 000). */
 const SNAPSHOT_LIST_LIMIT = 100;
 
@@ -80,7 +79,7 @@ function saveBlob(blob: Blob, name: string): void {
                         {{ snapshotList() ? 'Reload snapshots' : 'Include snapshots…' }}
                     </button>
                     <span class="text-secondary tabular-nums" aria-live="polite">
-                        {{ selected().length }} of at most {{ maxSnapshots }} snapshots included
+                        {{ selected().length }} of at most {{ maxSnapshots() }} snapshots included
                     </span>
                 </div>
             </div>
@@ -99,7 +98,7 @@ function saveBlob(blob: Blob, name: string): void {
                         @for (id of list.ids; track id) {
                             <mat-checkbox
                                 [checked]="selected().includes(id)"
-                                [disabled]="!selected().includes(id) && selected().length >= maxSnapshots"
+                                [disabled]="!selected().includes(id) && selected().length >= maxSnapshots()"
                                 (change)="toggleSnapshot(id, $event.checked)"
                                 >{{ id }}</mat-checkbox
                             >
@@ -306,7 +305,8 @@ export class LinkAnalysisDossierComponent {
     readonly bundleResult = signal<DossierBundleVerifyResult | null>(null);
     readonly busy = signal(false);
     readonly error = signal('');
-    readonly maxSnapshots = DOSSIER_MAX_SNAPSHOTS;
+    /** `dossier.max_snapshots` — the server refuses more with a 422 (`DossierRoutes.MAX_SNAPSHOTS`). */
+    readonly maxSnapshots = computed(() => laLimit('dossier.max_snapshots'));
     readonly asOfText = (iso: string | null): string => formatDay(iso) || 'not assessed';
     /** The log length, known once a dossier has been built (its `summary.steps`). */
     readonly steps = signal<number | null>(null);
@@ -369,7 +369,7 @@ export class LinkAnalysisDossierComponent {
 
     toggleSnapshot(id: string, on: boolean): void {
         const cur = this.selected().filter((s) => s !== id);
-        if (on && cur.length < DOSSIER_MAX_SNAPSHOTS) cur.push(id);
+        if (on && cur.length < this.maxSnapshots()) cur.push(id);
         this.selected.set(cur);
     }
 

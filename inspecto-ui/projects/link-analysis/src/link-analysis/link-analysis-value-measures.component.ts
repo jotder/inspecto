@@ -30,10 +30,10 @@ import { InspectoSchemaFormComponent } from '@inspecto/core/components/schema-fo
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { isUnavailable } from './link-analysis-template.dialogs';
 import { limitRefusalMessage } from './limit-refusal';
+import { laLimit } from './la-limits';
 import { LinkAnalysisBoundRulesComponent } from './link-analysis-bound-rules.component';
 import { LinkAnalysisStandingMonitorComponent } from './link-analysis-standing-monitor.component';
 import {
-    MAX_WINDOW_DAYS,
     VALUE_MEASURES,
     VALUE_MEASURE_THRESHOLDS,
     valueMeasureAttributes,
@@ -98,7 +98,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
             </h3>
             <p class="text-secondary m-0" data-test="vm-intro">
                 Reads the whole Dataset in the window — never the filtered view on screen. A window is at most
-                {{ maxDays }} days: From and To, or a rolling last (up to 744h).
+                {{ maxDays() }} days: From and To, or a rolling last (up to {{ maxDays() * 24 }}h).
             </p>
             <inspecto-schema-form
                 [specs]="specs"
@@ -232,7 +232,7 @@ export class LinkAnalysisValueMeasuresComponent {
     private inv = inject(InvService);
     private lens = inject(LensService);
 
-    readonly maxDays = MAX_WINDOW_DAYS;
+    readonly maxDays = computed(() => laLimit('measures.max_window_days'));
     /** Shows a name error as soon as the field is edited, not only after it is left (DR-D6). */
     readonly onDirty = new ShowOnDirtyErrorStateMatcher();
     /** Arming a rule needs Alert Rule authoring; without it the Watch form is replaced by a plain sentence (DR-D6). */

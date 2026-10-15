@@ -2,14 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { BranchingPatternResult, ProjectionTriple } from '@inspecto/link-analysis/api/inv.service';
 import { BranchStage, matchBranchingPattern } from '@inspecto/link-analysis/graph/branching-pattern-engine';
 import { G6GraphData } from '@inspecto/core/graph';
-import { GraphSelection, configureGraphLimits, resetGraphLimits } from '@inspecto/link-analysis/graph/graph-analysis';
-import {
-    branchingResultToGraph,
-    configureProjectionLimits,
-    projectTriples,
-    resetProjectionLimits,
-} from './entity-projection';
+import { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysis';
+import { branchingResultToGraph, projectTriples } from './entity-projection';
 import fixture from './branching-parity.fixture.json';
+import { configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * LA-14b parity — the browser half. `branching-parity.fixture.json` is ALSO run through the server compiler by
@@ -47,8 +43,7 @@ function canon(g: G6GraphData, m: GraphSelection & { layers: string[][] }) {
 
 describe('LA-14b branching parity (browser half of the shared golden)', () => {
     afterEach(() => {
-        resetGraphLimits();
-        resetProjectionLimits();
+        resetLaLimits();
     });
 
     it('the browser matcher finds exactly the golden matches', () => {
@@ -62,8 +57,8 @@ describe('LA-14b branching parity (browser half of the shared golden)', () => {
         // The server sorts `cnt DESC, source, target` and keeps 2 000: 2 100 heavy pairs (count 3) outrank every
         // one-off deposit, so no structuring leg survives and the browser can only refuse. Both browser node caps
         // are lifted so the LINK cap alone is what cuts the ring here (the 500-node projection cap would cut it too).
-        configureProjectionLimits({ projectionNodeCap: 10_000 });
-        configureGraphLimits({ analysisNodeCap: 10_000 });
+        configureLaLimits({ projection_node_cap: 10_000 });
+        configureLaLimits({ analysis_node_cap: 10_000 });
         const heavy: Row[] = Array.from({ length: 2100 }, (_, i) => [
             `HEAVY-${i}`,
             `PAYEE-${i}`,

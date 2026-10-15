@@ -13,6 +13,7 @@ import {
     DomainProfileId,
     profileForEntityType,
 } from '@inspecto/link-analysis/graph/domain-profile';
+import { laLimit } from './la-limits';
 
 /**
  * Sprint 1 "Investigate a number" — the pure half: the deep link's parameters, the Investigation binding a profile
@@ -23,8 +24,6 @@ import {
 export const LINK_ANALYSIS_ROUTE = '/studio/link-analysis';
 /** The entity type a deep link without `entityType` investigates. */
 export const DEFAULT_INVESTIGATE_ENTITY_TYPE = 'msisdn';
-/** The server's cap on the ids one `expand` names (`InvestigationRoutes.MAX_FRONTIER`). */
-export const MAX_EXPAND_FRONTIER = 1000;
 /** A seed id's bound — the server compares raw values; anything longer is not an id. */
 const MAX_SEED_LENGTH = 200;
 
@@ -354,9 +353,6 @@ export interface DegreeOutcome {
     oneHop?: string;
 }
 
-/** The server's default row budget for an expand that states none (`InvestigationRoutes.DEFAULT_EXPAND_BUDGET`). */
-export const DEFAULT_EXPAND_BUDGET = 2000;
-
 const BUDGET_KEY = 'four_eyes_budget_above';
 const FAN_OUT_KEY = 'four_eyes_fan_out_above';
 
@@ -376,7 +372,8 @@ export function expandApproval(
     rung: ExpandRung,
     limits: FourEyesLimits,
 ): { budget: number; fanOut: number | null; exceeded: string[] } {
-    const budget = rung.budget ?? DEFAULT_EXPAND_BUDGET;
+    // the server's default row budget for an expand that states none (`investigation.expand_budget_default`)
+    const budget = rung.budget ?? laLimit('investigation.expand_budget_default');
     const fanOut = rung.maxFanOut ?? null;
     const exceeded: string[] = [];
     if (limits.budgetAbove != null && budget > limits.budgetAbove)
@@ -580,10 +577,11 @@ export function degreeState(
         blocked =
             `Every entity at degree ${current} is flagged high connectivity, so none is expanded. Tick ` +
             '“Include hubs” or use “Expand anyway” on one of them.';
-    else if (frontier.length > MAX_EXPAND_FRONTIER)
+    // the server's cap on the ids one `expand` names (`investigation.max_frontier`)
+    else if (frontier.length > laLimit('investigation.max_frontier'))
         blocked =
             `Degree ${current} has ${frontier.length.toLocaleString('en')} entities; one expand names at most ` +
-            `${MAX_EXPAND_FRONTIER.toLocaleString('en')}. Exclude or hide hubs first.`;
+            `${laLimit('investigation.max_frontier').toLocaleString('en')}. Exclude or hide hubs first.`;
     return { current, frontier, heldHubs, maxDegree, blocked };
 }
 

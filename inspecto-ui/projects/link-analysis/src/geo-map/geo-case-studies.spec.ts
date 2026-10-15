@@ -8,7 +8,8 @@ import {
     timeExtent,
     validCoordinate,
 } from '@inspecto/link-analysis/geo';
-import { GEO_POINT_CAP, isGeoProjectionError, projectPoints, projectRoutes } from './geo-projection';
+import { isGeoProjectionError, projectPoints, projectRoutes } from './geo-projection';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * Invariants for the CS1–CS5 case-study datasets (docs/superpower/geo-map-case-studies.md).
@@ -27,10 +28,10 @@ function project(source: string, p: { entityCol: string; kindCol: string; timeCo
 describe('geo case studies (CS1–CS5)', () => {
     it('CS1 simbox_sweep trips the point cap AND the skip banner; farms dwell', () => {
         const rows = SAMPLE_SOURCES['simbox_sweep'];
-        expect(rows.length).toBeGreaterThan(GEO_POINT_CAP + 500);
+        expect(rows.length).toBeGreaterThan(laLimit('display.geo_point_cap') + 500);
         const out = project('simbox_sweep', { entityCol: 'msisdn', kindCol: 'role', timeCol: 'event_time' });
         expect(out.truncated).toBe(true);
-        expect(out.points).toHaveLength(GEO_POINT_CAP);
+        expect(out.points).toHaveLength(laLimit('display.geo_point_cap'));
         expect(out.skipped).toBe(25); // the leading broken rows
         // Farm SIMs are static → stay-point detection fires on the farm points.
         const farmPoints = out.points.filter((p) => p.kind === 'simbox');

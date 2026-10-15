@@ -23,7 +23,6 @@ import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import {
     CANVAS_MIN_PX,
-    FORCE_ATLAS_MAX_NODES,
     LinkAnalysisComponent,
     defaultLayoutFor,
     snapshotTitle,
@@ -31,6 +30,7 @@ import {
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 const DS: Dataset = {
     id: 'links-ds',
@@ -2155,7 +2155,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
     it('a restored Clustering force (force-atlas2) opens as Force above the node cap; a pick made here is kept', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
-        Object.defineProperty(c, 'canvasData', { value: () => chain(FORCE_ATLAS_MAX_NODES + 1) });
+        Object.defineProperty(c, 'canvasData', { value: () => chain(laLimit('display.force_atlas_max_nodes') + 1) });
         c.pickedLayout.set('force-cluster'); // as a saved view / undo restores it
         expect(c.layoutId()).toBe('force');
         c.setLayout('force-cluster');

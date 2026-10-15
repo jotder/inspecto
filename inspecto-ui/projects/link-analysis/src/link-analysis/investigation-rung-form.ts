@@ -6,6 +6,7 @@ import type {
     InvestigationWindowExclude,
     WindowDay,
 } from '@inspecto/link-analysis/api/inv.service';
+import { laLimit } from './la-limits';
 
 /**
  * LA-SPA-OWED-SURFACES-1 — the client-side mirror of the server's expand rung and `window` op bounds
@@ -13,12 +14,8 @@ import type {
  * request the server is known to refuse, and its 422 message is still shown verbatim.
  */
 
-/** `InvestigationRoutes.MAX_EXPAND_BUDGET` — a larger budget is clamped server-side, so it is refused here. */
-export const MAX_EXPAND_BUDGET = 20_000;
 export const EXPAND_DIRECTIONS: ExpandDirection[] = ['either', 'out', 'in', 'reciprocal'];
 export const WINDOW_DAYS: WindowDay[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-/** `InvestigationTime.MAX_RULES` — more recurring exclusion rules than this is refused with 422. */
-export const MAX_RECURRING_RULES = 32;
 
 const int = (min: number, max?: number): ValidatorFn[] => [
     Validators.pattern(/^-?\d+$/),
@@ -39,9 +36,6 @@ function num(v: unknown): number | null {
     return Number.isFinite(n) ? n : null;
 }
 
-/** `InvestigationRoutes.MAX_LINK_KINDS` — the server refuses a longer list. */
-export const MAX_LINK_KINDS = 100;
-
 /** The kinds typed into the field: comma-separated, trimmed, blanks and repeats dropped. */
 export function parseKinds(text: string): string[] {
     return [
@@ -54,13 +48,18 @@ export function parseKinds(text: string): string[] {
     ];
 }
 
+/** `input.link_kinds` — the server refuses a longer list. */
 const maxKinds: ValidatorFn = (c: AbstractControl): ValidationErrors | null =>
-    parseKinds(String(c.value ?? '')).length > MAX_LINK_KINDS ? { maxKinds: true } : null;
+    parseKinds(String(c.value ?? '')).length > laLimit('input.link_kinds') ? { maxKinds: true } : null;
+
+/** `investigation.expand_budget_max` — a larger budget is clamped server-side, so it is refused here (read at validation time). */
+const maxBudget: ValidatorFn = (c: AbstractControl): ValidationErrors | null =>
+    Validators.max(laLimit('investigation.expand_budget_max'))(c);
 
 export function rungForm() {
     return new FormGroup(
         {
-            budget: new FormControl<number | string | null>(null, { validators: int(1, MAX_EXPAND_BUDGET) }),
+            budget: new FormControl<number | string | null>(null, { validators: [...int(1), maxBudget] }),
             direction: new FormControl<ExpandDirection>('either', { nonNullable: true }),
             window: new FormControl<'inherit' | 'full' | 'override'>('inherit', { nonNullable: true }),
             /** Comma-separated link kinds; blank = all kinds. */
@@ -144,7 +143,7 @@ function parseRecurring(body: string): InvestigationWindowExclude | null | undef
  * The calendar-exclusion text -> the wire entries. One entry per comma / newline: `[Name=]DATE` or `[Name=]DATE..DATE`
  * (both ends inclusive), DATE = `YYYY-MM-DD`; or a recurring rule `[Name=]*-MM-DD` / `[Name=]*-MM-DOW#N` / `[Name=]*-MM-DOW#L` (see
  * {@link parseRecurring}). `null` when any entry is malformed (the server's own 422 shapes) or there are more than
- * {@link MAX_RECURRING_RULES} rules.
+ * `input.recurring_excludes` rules (`InvestigationTime.MAX_RULES`, refused with 422).
  */
 export function parseExcludes(text: string): InvestigationWindowExclude[] | null {
     const out: InvestigationWindowExclude[] = [];
@@ -172,7 +171,7 @@ export function parseExcludes(text: string): InvestigationWindowExclude[] | null
             b === undefined ? { date: a, ...(name ? { name } : {}) } : { from: a, to: b, ...(name ? { name } : {}) },
         );
     }
-    if (out.filter((e) => e.rule).length > MAX_RECURRING_RULES) return null;
+    if (out.filter((e) => e.rule).length > laLimit('input.recurring_excludes')) return null;
     return out;
 }
 

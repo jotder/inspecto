@@ -6,9 +6,9 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import {
     InvestigationSnapshotOpComponent,
     InvestigationThresholdOpComponent,
-    MAX_SNAPSHOT_LABEL,
 } from './investigation-band-ops.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 function setup<T>(component: new () => T, applyOk = true, serverError = '') {
     const store = {
@@ -94,7 +94,7 @@ describe('InvestigationSnapshotOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', (
             false,
             "'label' is at most 2000 chars",
         );
-        cmp.form.patchValue({ label: 'x'.repeat(MAX_SNAPSHOT_LABEL + 1) });
+        cmp.form.patchValue({ label: 'x'.repeat(laLimit('input.note_length') + 1) });
         await cmp.submit();
         expect(store.apply).not.toHaveBeenCalled();
         cmp.form.patchValue({ label: 'ok' });
