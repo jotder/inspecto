@@ -21,8 +21,7 @@ import java.util.Optional;
  * hand-edited budget is how the budget contract tests drive a refusal); P1 changes no behaviour.
  *
  * <p>Only two items have no default ("no threshold"): {@link #FOUR_EYES_BUDGET_ABOVE} and
- * {@link #FOUR_EYES_FAN_OUT_ABOVE}; plus {@link #INDEX_BUILD_MEMORY_PCT}, whose today's value is "none" (a build
- * falls through to the shared DuckDB cap) until P4 gives it its own 80 % default.
+ * {@link #FOUR_EYES_FAN_OUT_ABOVE}. {@link #INDEX_BUILD_MEMORY_PCT} had none until P4 gave it its own 80 % (CL-8).
  */
 public enum LaLimit {
 
@@ -316,8 +315,8 @@ public enum LaLimit {
             "Index build workers."),
     INDEX_QUEUE("index.queue", Layer.INSTALL, false, "index", "count", 4, 1, 1_000,
             "Index builds that may wait for a worker."),
-    INDEX_BUILD_MEMORY_PCT("index.build_memory_pct", Layer.INSTALL, false, "index", "pct_ram", null, 1, 100,
-            "Memory an index build may use, as a share of the host's RAM; empty = the shared DuckDB cap."),
+    INDEX_BUILD_MEMORY_PCT("index.build_memory_pct", Layer.INSTALL, false, "index", "pct_ram", 80, 1, 100,
+            "Memory an index build may use, as a share of the host's RAM; a build waits while ingest runs, so the two never overlap."),
     INDEX_EDGES_PER_BUCKET("index.edges_per_bucket", Layer.INSTALL, false, "index", "edges", 4_000_000, 1_000, 1_000_000_000,
             "Edges per index bucket; a change forces full rebuilds."),
     INDEX_MIN_BUCKETS("index.min_buckets", Layer.INSTALL, false, "index", "count", 16, 1, 1_024,

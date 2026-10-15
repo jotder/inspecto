@@ -44,12 +44,16 @@ import java.util.Objects;
  *                        null when not recorded (an older manifest, an unenumerable Dataset, or more than
  *                        {@link #MAX_INPUT_FILES} files - then only {@code baseFingerprint} remains). Optional and additive:
  *                        {@link #FORMAT_VERSION} stays 1, an older reader ignores it, a missing field reads as null
+ * @param bucketSizing    the {@link BucketFunction.Sizing#signature() bucket sizing} that chose {@code buckets} (an append or
+ *                        compact keeps its parent's), or null when not recorded (a manifest written before the sizing was
+ *                        configurable: it was {@link BucketFunction.Sizing#DEFAULT}, see {@link #bucketSizingInForce()}).
+ *                        Optional and additive like {@code inputFiles}
  */
 public record IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn,
                             int buckets, int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset,
                             String relationSqlHash, String baseFingerprint, String timeColZone,
                             Map<String, TableStats> tables, long droppedNull, List<Delta> deltas, String parent,
-                            List<InputFile> inputFiles) {
+                            List<InputFile> inputFiles, String bucketSizing) {
 
     public static final int FORMAT_VERSION = 1;
     public static final String FILE_NAME = "manifest.json";
@@ -66,6 +70,15 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
 
     /** One input file the build read: path relative to the data root, size in bytes, mtime in epoch millis. */
     public record InputFile(String path, long size, long mtimeMillis) { }
+
+    /** A manifest with no recorded bucket sizing (what every manifest written before the sizing was configurable reads as). */
+    public IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn, int buckets,
+                         int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset, String relationSqlHash,
+                         String baseFingerprint, String timeColZone, Map<String, TableStats> tables, long droppedNull,
+                         List<Delta> deltas, String parent, List<InputFile> inputFiles) {
+        this(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash, dataset,
+                relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles, null);
+    }
 
     /** A manifest with no recorded input-file list (what every manifest written before the list existed reads as). */
     public IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn, int buckets,
@@ -86,6 +99,11 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         inputFiles = inputFiles == null ? null : List.copyOf(inputFiles);
     }
 
+    /** The sizing signature that chose {@code buckets}: the recorded one, else the shipped {@link BucketFunction.Sizing#DEFAULT}. */
+    public String bucketSizingInForce() {
+        return bucketSizing != null ? bucketSizing : BucketFunction.Sizing.DEFAULT.signature();
+    }
+
     public String toJson() {
         ObjectNode n = JSON.createObjectNode();
         n.put("formatVersion", FORMAT_VERSION);
@@ -95,6 +113,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         n.putObject("duckdb").put("version", duckdbVersion);
         n.put("bucketFn", bucketFn);
         n.put("buckets", buckets);
+        if (bucketSizing != null) n.put("bucketSizing", bucketSizing);
         n.put("rowGroupSize", rowGroupSize);
         ObjectNode m = n.putObject("mapping");
         m.put("srcColumn", mapping.srcColumn());
@@ -164,7 +183,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                 text(n, "bucketFn"), n.path("buckets").asInt(), n.path("rowGroupSize").asInt(), mapping,
                 req(n, "mappingHash").asText(), req(n, "dataset").asText(), text(n, "relationSqlHash"),
                 text(n, "baseFingerprint"), text(n, "timeColZone"), tables, n.path("droppedNull").asLong(), deltas,
-                text(n, "parent"), inputFiles);
+                text(n, "parent"), inputFiles, text(n, "bucketSizing"));
     }
 
     public void write(Path dir) throws IOException {

@@ -1330,7 +1330,8 @@ public final class ConfigSpecs {
                 FieldSpec.of("graph_run", "Graph run service", FieldType.MAP,
                         "The server-side graph-run service (D-4): {max_nodes, max_edges, timeout_ms} is the DEFAULT "
                                 + "budget of a run that states none (clamped to the server's hard ceilings, echoed by "
-                                + "GET /inv/graph/algorithms); {threads, queue} size the workers and the waiting line; "
+                                + "GET /inv/graph/algorithms; the ceilings and the worker / waiting-line sizes are install-wide, "
+                                + "PUT /system/link-analysis/limits); "
                                 + "max_result_items caps each list of a run's result on the way out (cut lists say "
                                 + "truncated/total/limit; absent = 10000, hard ceiling 1000000); "
                                 + "propagated_risk_weights = the Space's default per-hop weights of propagatedRisk when a run "
@@ -1340,7 +1341,7 @@ public final class ConfigSpecs {
                         "The edge/node index (D-3): enabled = whether reads may use an index (absent = false, nothing "
                                 + "reads one yet); max_disk_bytes = a build whose estimate is above it is refused up front "
                                 + "(absent or 0 = no limit); keep_versions = published versions kept per index (absent = 2); "
-                                + "{threads, queue} size the build workers and the waiting line; max_age_hours = how old (hours) an index may be and still serve a Dataset whose input files cannot be fingerprinted (absent = 24); "
+                                + "max_age_hours = how old (hours) an index may be and still serve a Dataset whose input files cannot be fingerprinted (absent = 24); "
                                 + "traversal_depth / frontier_cap / max_deltas = the index fences (LA-CONFIG-LIMITS-1); every key absent = the "
                                 + "shipped default."),
                 FieldSpec.of("drafts", "Draft lifecycle", FieldType.MAP,

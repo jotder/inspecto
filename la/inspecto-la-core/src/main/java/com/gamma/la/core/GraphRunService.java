@@ -1,5 +1,8 @@
 package com.gamma.la.core;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.la.graph.GraphAborted;
 import com.gamma.la.graph.RunControl;
 
@@ -15,9 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -66,9 +69,18 @@ public final class GraphRunService implements AutoCloseable {
      */
     public record Limits(GraphBudget defaults, GraphBudget ceilings, int threads, int queue, long runTtlMs, int maxRuns,
                          long cacheTtlMs, int cacheEntries) {
+        /**
+         * The limits in force: the hard ceilings and the worker / waiting-line sizes are the install-wide
+         * {@code graph_run.ceiling_*}, {@code graph_run.threads} and {@code graph_run.queue} ({@code LA-CONFIG-LIMITS-1},
+         * {@link LaLimits#forSpace} with no Space: the server-wide document, else the catalogue defaults 500,000 / 5,000,000 /
+         * 300 s, 2 and 16), read at each call; the default budget and retention are the shipped values.
+         */
         public static Limits standard() {
-            return new Limits(new GraphBudget(50_000, 500_000, 30_000), new GraphBudget(500_000, 5_000_000, 300_000),
-                    2, 16, 3_600_000L, 200, 600_000L, 32);
+            LaLimitValues v = LaLimits.forSpace(null);
+            return new Limits(new GraphBudget(50_000, 500_000, 30_000),
+                    new GraphBudget((int) v.get(LaLimit.GRAPH_RUN_CEILING_NODES), (int) v.get(LaLimit.GRAPH_RUN_CEILING_EDGES),
+                            v.get(LaLimit.GRAPH_RUN_CEILING_TIMEOUT_MS)),
+                    (int) v.get(LaLimit.GRAPH_RUN_THREADS), (int) v.get(LaLimit.GRAPH_RUN_QUEUE), 3_600_000L, 200, 600_000L, 32);
         }
     }
 
@@ -108,7 +120,7 @@ public final class GraphRunService implements AutoCloseable {
                           long createdAt, long finishedAt, String exceededDetail, String inputKind, long indexVersion) {}
 
     private final GraphEngine engine;
-    private final Limits limits;
+    private volatile Limits limits;
     private final LongSupplier clock;
     private final Consumer<RunView> onTerminal;
     private final ThreadPoolExecutor pool;
@@ -143,8 +155,9 @@ public final class GraphRunService implements AutoCloseable {
         this.clock = clock;
         this.onTerminal = onTerminal;
         AtomicInteger n = new AtomicInteger();
+        // The waiting line is bounded by submit (limits.queue()), not by the queue's capacity, so retune can resize it.
         this.pool = new ThreadPoolExecutor(limits.threads(), limits.threads(), workerKeepAliveMs, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(limits.queue()), r -> {
+                new LinkedBlockingQueue<>(), r -> {
             Thread t = new Thread(r, "la-graph-run-" + n.incrementAndGet());
             t.setDaemon(true);
             return t;
@@ -185,6 +198,25 @@ public final class GraphRunService implements AutoCloseable {
     }
 
     /**
+     * Applies new limits to this live service ({@code LA-CONFIG-LIMITS-1}: the install-wide ceilings and pool sizes): the
+     * ceilings and budget defaults gate the next submit; a pool shrink drains (running and waiting runs finish, the new sizes
+     * gate the next submit). A no-op when nothing changed.
+     */
+    public void retune(Limits next) {
+        synchronized (pool) {
+            if (next.equals(limits)) return;
+            if (next.threads() > pool.getMaximumPoolSize()) {
+                pool.setMaximumPoolSize(next.threads());
+                pool.setCorePoolSize(next.threads());
+            } else {
+                pool.setCorePoolSize(next.threads());
+                pool.setMaximumPoolSize(next.threads());
+            }
+            limits = next;
+        }
+    }
+
+    /**
      * Starts a run and returns its view at once: {@code QUEUED}, a terminal {@code BUDGET_EXCEEDED} (the input is over
      * the budget — the engine is never reached), or a terminal {@code COMPLETED} straight from the cache.
      *
@@ -193,6 +225,7 @@ public final class GraphRunService implements AutoCloseable {
      */
     public RunView submit(Request req) {
         Map<String, Object> params = req.algorithm().resolve(req.params());          // refuses BEFORE any state
+        Limits limits = this.limits;                                                  // one snapshot per submit
         GraphBudget budget = req.budget().resolve(limits.defaults(), limits.ceilings());
         boolean clamped = limits.ceilings().clamps(req.budget());
         long now = clock.getAsLong();
@@ -214,14 +247,18 @@ public final class GraphRunService implements AutoCloseable {
         }
         run.cacheKey = key;
         store(run);
-        try {
-            pool.execute(() -> execute(run));
-        } catch (RejectedExecutionException e) {
-            synchronized (runs) {
-                runs.remove(run.id);
+        synchronized (pool) {                                           // the waiting-line check and the hand-off are one step
+            Limits l = this.limits;
+            try {
+                if (pool.getQueue().size() >= l.queue()) throw new RejectedExecutionException("the waiting line is full");
+                pool.execute(() -> execute(run));
+            } catch (RejectedExecutionException e) {
+                synchronized (runs) {
+                    runs.remove(run.id);
+                }
+                throw new GraphRunException(GraphRunException.Kind.REJECTED,
+                        "the graph run queue is full (" + l.threads() + " running, " + l.queue() + " waiting) - try again shortly");
             }
-            throw new GraphRunException(GraphRunException.Kind.REJECTED,
-                    "the graph run queue is full (" + limits.threads() + " running, " + limits.queue() + " waiting) - try again shortly");
         }
         return run.view();
     }

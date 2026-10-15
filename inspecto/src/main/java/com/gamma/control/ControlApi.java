@@ -247,12 +247,23 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private final RateLimiter callbackLimiter = RateLimiter.callback();
     /** {@code POST /streams/{id}/records}'s own per-caller bucket (ASSURE-PUSH-INGEST-1) — see {@link RateLimiter#push()}. */
     private final RateLimiter pushLimiter = RateLimiter.push();
-    /** The expensive Link Analysis routes' own per-subject bucket - see {@link LinkAnalysisRateClasses}. */
-    private final RateLimiter linkAnalysisLimiter = RateLimiter.linkAnalysis();
-    /** The embedded-Investigation public view's PER-TOKEN bucket (LA-EMBED-VIEW-1) - see {@link RateLimiter#embed()}. */
-    private final RateLimiter embedLimiter = RateLimiter.embed();
+    /** The expensive Link Analysis routes' own per-subject bucket - see {@link LinkAnalysisRateClasses}; install-wide, re-applied by {@link #applyInstallRateLimits()}. */
+    private volatile RateLimiter linkAnalysisLimiter = RateLimiter.linkAnalysis();
+    /** The embedded-Investigation public view's PER-TOKEN bucket (LA-EMBED-VIEW-1) - see {@link RateLimiter#embed()}; install-wide like the above. */
+    private volatile RateLimiter embedLimiter = RateLimiter.embed();
     /** ...and its per-IP bucket, so guessing many tokens from one address is throttled too. */
     private final RateLimiter embedIpLimiter = RateLimiter.callback();
+
+    /**
+     * {@code LA-CONFIG-LIMITS-1} CL-13: rebuilds the Link Analysis and embed buckets from the install-wide {@code rate.*} limits in
+     * force - at boot (once the server-wide document's home is installed) and after every {@code PUT /system/link-analysis/limits}.
+     * An unchanged budget keeps its buckets; a changed one starts every caller with a full bucket.
+     */
+    void applyInstallRateLimits() {
+        com.gamma.entitystore.LaLimitValues v = com.gamma.entitystore.LaLimits.forSpace(null);
+        linkAnalysisLimiter = linkAnalysisLimiter.retunedTo(RateLimiter.linkAnalysis(v));
+        embedLimiter = embedLimiter.retunedTo(RateLimiter.embed(v));
+    }
 
     /** Test seam: drive every rate-limit bucket from {@code nanos} (deterministic refill in real-HTTP tests). */
     void useRateLimitClock(java.util.function.LongSupplier nanos) {
@@ -636,6 +647,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes(),
                 new ModulesRoutes(), new ModuleSettingsRoutes()))   // MODULE-REORG-1 P2a/P2b: GET /modules, /settings/modules — appended LAST (order is load-bearing)
             module.register(this);
+        applyInstallRateLimits();   // SchedulerRoutes installed the server-wide la-limits.toon home: its rate.* values apply from boot
 
         // Optional-module route groups (EDG-01 cell 3a, 2026-09-07): discovered through
         // META-INF/services/com.gamma.spi.http.RouteModule and registered AFTER the built-in list, never

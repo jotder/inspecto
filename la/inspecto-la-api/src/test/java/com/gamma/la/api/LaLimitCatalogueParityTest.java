@@ -1,14 +1,17 @@
 package com.gamma.la.api;
 
 import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.la.core.Algorithm;
 import com.gamma.la.core.GraphRunService;
 import com.gamma.la.core.InvestigationTime;
 import com.gamma.la.storage.BucketFunction;
+import com.gamma.la.storage.IndexBuildService;
 import com.gamma.la.storage.IndexPlan;
 import com.gamma.la.storage.IndexedTraversal;
 import com.gamma.la.storage.SqlGraphEngine;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -277,11 +280,11 @@ class LaLimitCatalogueParityTest {
         code.put(LaLimit.GRAPH_RUN_MAX_NODES, (long) std.defaults().maxNodes());
         code.put(LaLimit.GRAPH_RUN_MAX_EDGES, (long) std.defaults().maxEdges());
         code.put(LaLimit.GRAPH_RUN_TIMEOUT_MS, std.defaults().timeoutMs());
-        code.put(LaLimit.GRAPH_RUN_CEILING_NODES, (long) std.ceilings().maxNodes());
-        code.put(LaLimit.GRAPH_RUN_CEILING_EDGES, (long) std.ceilings().maxEdges());
-        code.put(LaLimit.GRAPH_RUN_CEILING_TIMEOUT_MS, std.ceilings().timeoutMs());
-        code.put(LaLimit.GRAPH_RUN_THREADS, (long) std.threads());
-        code.put(LaLimit.GRAPH_RUN_QUEUE, (long) std.queue());
+        // P4: the graph run ceilings and pool are READ from the catalogue (Limits.standard()) - pinned by
+        // installWideItemsAreReadFromTheCatalogueAndTheServerWideDocument below; the host-free index pool keeps its constant
+        IndexBuildService.Limits idx = IndexBuildService.Limits.standard();
+        code.put(LaLimit.INDEX_THREADS, (long) idx.threads());
+        code.put(LaLimit.INDEX_QUEUE, (long) idx.queue());
         code.put(LaLimit.TRAVERSAL_THREADS, (long) com.gamma.sql.SqlSandboxPolicy.traversalThreads());
         Method heavy = DraftAdmission.class.getDeclaredMethod("defaultHeavyLimit");
         heavy.setAccessible(true);
@@ -293,5 +296,48 @@ class LaLimitCatalogueParityTest {
             if (!v.equals(l.defaultValue())) drift.add(l.path() + ": catalogue " + l.defaultValue() + ", code " + v);
         });
         assertTrue(drift.isEmpty(), "catalogue defaults that are not today's value: " + drift);
+    }
+
+    /**
+     * LA-CONFIG-LIMITS-1 P4: the install-wide items are read at their sites from the server-wide document, else the catalogue
+     * default - so with no document every site answers the catalogue default, and a stated value reaches the site.
+     */
+    @Test
+    void installWideItemsAreReadFromTheCatalogueAndTheServerWideDocument(@TempDir Path dir) throws Exception {
+        Path prior = LaLimits.installDocPath();
+        try {
+            LaLimits.installDocPath(null);
+            GraphRunService.Limits std = GraphRunService.Limits.standard();
+            assertEquals(LaLimit.GRAPH_RUN_CEILING_NODES.defaultValue(), (long) std.ceilings().maxNodes());
+            assertEquals(LaLimit.GRAPH_RUN_CEILING_EDGES.defaultValue(), (long) std.ceilings().maxEdges());
+            assertEquals(LaLimit.GRAPH_RUN_CEILING_TIMEOUT_MS.defaultValue(), std.ceilings().timeoutMs());
+            assertEquals(LaLimit.GRAPH_RUN_THREADS.defaultValue(), (long) std.threads());
+            assertEquals(LaLimit.GRAPH_RUN_QUEUE.defaultValue(), (long) std.queue());
+            assertEquals(IndexBuildService.Limits.standard(), IndexRoutes.installLimits());
+            assertEquals(BucketFunction.Sizing.DEFAULT, IndexRoutes.installSizing());
+
+            Path doc = dir.resolve(LaLimits.INSTALL_FILE);
+            LaLimits.installDocPath(doc);
+            Map<LaLimit, Number> set = new EnumMap<>(LaLimit.class);
+            set.put(LaLimit.GRAPH_RUN_CEILING_NODES, 1_234L);
+            set.put(LaLimit.GRAPH_RUN_CEILING_TIMEOUT_MS, 9_000L);
+            set.put(LaLimit.GRAPH_RUN_THREADS, 5L);
+            set.put(LaLimit.INDEX_THREADS, 3L);
+            set.put(LaLimit.INDEX_QUEUE, 7L);
+            set.put(LaLimit.INDEX_EDGES_PER_BUCKET, 2_000L);
+            set.put(LaLimit.INDEX_BUILD_MEMORY_PCT, 50L);
+            LaLimits.writeInstall(doc, set);
+            std = GraphRunService.Limits.standard();
+            assertEquals(1_234, std.ceilings().maxNodes());
+            assertEquals(9_000, std.ceilings().timeoutMs());
+            assertEquals(5, std.threads());
+            assertEquals(LaLimit.GRAPH_RUN_CEILING_EDGES.defaultValue(), (long) std.ceilings().maxEdges(), "an unstated item keeps its default");
+            assertEquals(3, IndexRoutes.installLimits().threads());
+            assertEquals(7, IndexRoutes.installLimits().queue());
+            assertEquals(new BucketFunction.Sizing(2_000L, 16, 1_024), IndexRoutes.installSizing());
+            assertEquals(IndexBuildService.memoryLimit(50, com.gamma.util.DuckDbUtil.physicalMemoryBytes()), IndexRoutes.installHost().memoryLimit());
+        } finally {
+            LaLimits.installDocPath(prior);
+        }
     }
 }

@@ -14,7 +14,8 @@ import java.util.Set;
  *
  * <p><b>The gate.</b> An APPEND is sound only when the index's input files are a SUBSET of the files now, every one of them with
  * the same size and mtime (nothing removed, superseded or rewritten), the relation SQL definition is unchanged, the bucket
- * function and DuckDB version are the ones that wrote it, and at least one file is new. Anything else needs a FULL rebuild,
+ * function, the bucket sizing ({@code LA-CONFIG-LIMITS-1} CL-9: a changed sizing must re-bucket, which only a FULL build does)
+ * and DuckDB version are the ones that wrote it, and at least one file is new. Anything else needs a FULL rebuild,
  * because the index would otherwise keep rows the Dataset no longer has (or miss rows it now computes differently). When the
  * manifest or the caller cannot list the files, nothing is known and only FULL is offered - 'cannot know' is never 'only added'.
  *
@@ -41,7 +42,8 @@ public final class IndexPlan {
      * @param changed     input files present in both with a different size or mtime, sorted
      * @param reasons     why FULL (or COMPACT) is needed, empty otherwise: codes {@code input_files_unknown},
      *                    {@code input_files_removed}, {@code input_files_changed}, {@code relation_sql_changed},
-     *                    {@code relation_unresolvable}, {@code bucket_function_changed}, {@code duckdb_version_changed},
+     *                    {@code relation_unresolvable}, {@code bucket_function_changed}, {@code bucket_sizing_changed},
+     *                    {@code duckdb_version_changed},
      *                    {@code delta_cap_reached}
      * @param deltas      deltas the index version already carries
      */
@@ -51,20 +53,25 @@ public final class IndexPlan {
     /**
      * @param current         the Dataset's input files now; null = they cannot be listed
      * @param relationSqlHash {@link IndexBuilder#relationSqlHash} of the relation now; null = it cannot be resolved
+     * @param sizing          the bucket sizing in force on this server now
      * @param duckdbVersion   this server's DuckDB version; null = could not be read (then no claim either way)
      */
     public static Plan classify(IndexManifest m, List<IndexManifest.InputFile> current, String relationSqlHash, String bucketFn,
-                                String duckdbVersion) {
-        return classify(m, current, relationSqlHash, bucketFn, duckdbVersion, DEFAULT_MAX_DELTAS);
+                                BucketFunction.Sizing sizing, String duckdbVersion) {
+        return classify(m, current, relationSqlHash, bucketFn, sizing, duckdbVersion, DEFAULT_MAX_DELTAS);
     }
 
-    /** {@link #classify(IndexManifest, List, String, String, String)} with the caller's Space delta cap {@code maxDeltas}. */
+    /**
+     * {@link #classify(IndexManifest, List, String, String, BucketFunction.Sizing, String)} with the caller's Space delta cap
+     * {@code maxDeltas} ({@code index.max_deltas}); the bucket sizing is the install-wide one.
+     */
     public static Plan classify(IndexManifest m, List<IndexManifest.InputFile> current, String relationSqlHash, String bucketFn,
-                                String duckdbVersion, int maxDeltas) {
+                                BucketFunction.Sizing sizing, String duckdbVersion, int maxDeltas) {
         List<String> force = new ArrayList<>();
         if (relationSqlHash == null) force.add("relation_unresolvable");
         else if (!relationSqlHash.equals(m.relationSqlHash())) force.add("relation_sql_changed");
         if (!bucketFn.equals(m.bucketFn())) force.add("bucket_function_changed");
+        if (!sizing.signature().equals(m.bucketSizingInForce())) force.add("bucket_sizing_changed");
         if (duckdbVersion != null && !duckdbVersion.equals(m.duckdbVersion())) force.add("duckdb_version_changed");
 
         List<String> added = new ArrayList<>(), removed = new ArrayList<>(), changed = new ArrayList<>();

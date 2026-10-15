@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.audit.Event;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.event.EventLog;
 import com.gamma.la.api.GraphRunRoutes;
 import com.gamma.la.core.Algorithm;
@@ -78,6 +79,13 @@ class ControlApiGraphRunTest {
     void reset() {
         Authenticators.forTest(null);
         GraphRunRoutes.forTest(null, -1);
+        LaLimits.installDocPath(null);
+    }
+
+    /** Sets install-wide Link Analysis limits as the system admin ({@code PUT /system/link-analysis/limits}, LA-CONFIG-LIMITS-1). */
+    private void install(Ctx c, String body) throws Exception {
+        HttpResponse<String> r = send(c, "PUT", "/system/link-analysis/limits", body, ADMIN);
+        assertEquals(200, r.statusCode(), r.body());
     }
 
     private static void subjects() {
@@ -191,7 +199,7 @@ class ControlApiGraphRunTest {
     @Test
     void theCatalogueListsAll29WithCeilingsAndTheSpacesDefaultsClampedAndEchoed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
-        try (Ctx c = open(cfg, root, "masking_mode: none\ngraph_run:\n  max_nodes: 77\n  timeout_ms: 9000\n  threads: 3\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: none\ngraph_run:\n  max_nodes: 77\n  timeout_ms: 9000\n")) {
             JsonNode d = ok(c, "GET", "/inv/graph/algorithms", null, READER);       // a read: no capability
             assertEquals("memory", d.get("engine").asText());
             assertEquals(29, d.get("algorithms").size());
@@ -206,7 +214,8 @@ class ControlApiGraphRunTest {
             assertEquals(9000, d.get("defaults").get("timeoutMs").asInt());
             assertEquals(500_000, d.get("defaults").get("maxEdges").asInt(), "unstated fields keep the shipped default");
             assertFalse(d.get("defaults").get("clamped").asBoolean());
-            assertEquals(3, d.get("pool").get("threads").asInt());
+            assertEquals(2, d.get("pool").get("threads").asInt(), "the install-wide default (graph_run.threads)");
+            assertEquals(16, d.get("pool").get("queue").asInt());
         }
         try (Ctx c = open(cfg, root, "graph_run:\n  max_nodes: 9999999\n")) {
             JsonNode d = ok(c, "GET", "/inv/graph/algorithms", null, READER);
@@ -758,7 +767,8 @@ class ControlApiGraphRunTest {
         subjects();
         Blocking engine = new Blocking();
         GraphRunRoutes.forTest(engine, 0);
-        try (Ctx c = open(cfg, root, "masking_mode: none\ngraph_run:\n  threads: 1\n  queue: 1\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            install(c, "{\"graph_run.threads\":1,\"graph_run.queue\":1}");          // install-wide since LA-CONFIG-LIMITS-1
             investigation(c);
             String first = data(start(c, run("degreeCentrality", ""), ANALYST), 202).get("runId").asText();
             until(() -> "RUNNING".equals(status(c, first, ANALYST)));
@@ -772,6 +782,34 @@ class ControlApiGraphRunTest {
                     Map.of("view", "calls_view", "owner", "analyst-9", "shares", List.of()));
             assertEquals(404, send(c, "GET", "/inv/graph/runs/" + first, null, ANALYST).statusCode());
             engine.release.countDown();
+        }
+    }
+
+    /**
+     * LA-CONFIG-LIMITS-1 CL-7: the hard ceilings are the install-wide {@code graph_run.ceiling_*}. Lowered by the system admin,
+     * they clamp the NEXT run of a service that already exists (it was built by the first run), and the catalogue echoes them.
+     */
+    @Test
+    void aLoweredInstallCeilingClampsTheNextRunOfALiveServiceAndIsEchoed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            String asked = run("degreeCentrality", "\"budget\":{\"maxNodes\":400000}");
+            JsonNode before = ok(c, "POST", "/inv/graph/runs", asked, ANALYST);       // builds the Space's service
+            assertEquals("COMPLETED", before.get("status").asText());
+            assertEquals(400_000, before.get("budget").get("maxNodes").asInt());
+            assertFalse(before.get("budgetClamped").asBoolean());
+
+            install(c, "{\"graph_run.ceiling_nodes\":3}");
+            assertEquals(3, ok(c, "GET", "/inv/graph/algorithms", null, READER).get("ceilings").get("maxNodes").asInt());
+            JsonNode after = ok(c, "POST", "/inv/graph/runs", asked, ANALYST);
+            assertEquals(3, after.get("budget").get("maxNodes").asInt(), "the live service took the lowered ceiling");
+            assertTrue(after.get("budgetClamped").asBoolean());
+            assertEquals("BUDGET_EXCEEDED", after.get("status").asText(), "five nodes are over a ceiling of three");
+            assertEquals("NODES", after.get("exceeded").asText());
+
+            install(c, "{\"graph_run.ceiling_nodes\":null}");                          // cleared = the shipped 500,000 again
+            assertEquals("COMPLETED", ok(c, "POST", "/inv/graph/runs", asked, ANALYST).get("status").asText());
         }
     }
 

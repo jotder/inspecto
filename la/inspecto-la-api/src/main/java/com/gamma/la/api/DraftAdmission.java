@@ -31,8 +31,9 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
  *       so an expired one never holds a seat.</li>
  *   <li><b>Heavy-job cap (D7-Q6).</b> At most {@code min(4, cores/3)} (at least 1) heavy Draft jobs - a rebase / conflict-report replay, a
  *       cold Working Set relation build, an {@code expand} op - run at once. {@link #heavy} NEVER waits: when every permit is taken it
- *       answers 429 {@code RATE_LIMITED} with a sentence, so a caller retries instead of silently queueing. Override:
- *       {@code -Dinspecto.la.draft.heavy=N} or {@link #setHeavyLimit}.</li>
+ *       answers 429 {@code RATE_LIMITED} with a sentence, so a caller retries instead of silently queueing. Override: the
+ *       install-wide {@code drafts.heavy_jobs} ({@code LA-CONFIG-LIMITS-1}; applied at the next heavy job after a change), else
+ *       {@code -Dinspecto.la.draft.heavy=N}; {@link #setHeavyLimit} for tests.</li>
  *   <li><b>Idle policy (D7-Q5).</b> {@link #maintain} runs lazily on every Draft list / open / fork of an Investigation: it recovers the
  *       crash leftovers of a rebase, HIBERNATES a Draft idle for 1 h (marker + the in-memory checkpoint and cached relation released; log,
  *       sets and pins untouched; the next access takes one cold fold) and EXPIRES one idle for 30 d (closed exactly like a discard: marker
@@ -51,6 +52,8 @@ public final class DraftAdmission {
 
     private static volatile Semaphore heavy = new Semaphore(defaultHeavyLimit());
     private static volatile int heavyLimit = defaultHeavyLimit();
+    /** The limit last resolved from the configuration ({@link #configuredHeavyLimit}); a change of it replaces the semaphore. */
+    private static volatile int configuredLimit = defaultHeavyLimit();
 
     static int defaultHeavyLimit() {
         String o = System.getProperty("inspecto.la.draft.heavy");
@@ -69,8 +72,26 @@ public final class DraftAdmission {
         return heavyLimit;
     }
 
+    /** The limit the configuration states: the install-wide {@code drafts.heavy_jobs} when stated, else {@link #defaultHeavyLimit()}. */
+    static int configuredHeavyLimit() {
+        Number stated = com.gamma.entitystore.LaLimits.forSpace(null).stated(com.gamma.entitystore.LaLimit.DRAFTS_HEAVY_JOBS);
+        return stated != null ? stated.intValue() : defaultHeavyLimit();
+    }
+
+    /** Applies a CHANGED configured limit (a fresh semaphore; running jobs keep their permits); an unchanged one leaves {@link #setHeavyLimit} alone. */
+    private static void applyConfiguredLimit() {
+        int c = configuredHeavyLimit();
+        if (c == configuredLimit) return;
+        synchronized (DraftAdmission.class) {
+            if (c == configuredLimit) return;
+            configuredLimit = c;
+            setHeavyLimit(c);
+        }
+    }
+
     /** Run {@code job} under a heavy-job permit, or refuse at once with 429 when all are taken. */
     public static <T> T heavy(String what, Job<T> job) throws IOException {
+        applyConfiguredLimit();
         Semaphore s = heavy;
         if (!s.tryAcquire())
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "all " + heavyLimit + " heavy Draft jobs are already running - '" + what

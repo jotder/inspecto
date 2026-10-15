@@ -1215,10 +1215,16 @@ public final class InvRoutes implements RouteModule {
      * own statement timeout - the Space's {@code traversal.timeout_s} for {@code writeRoot} ({@code null} = the default). It used to be {@code withCaps(null, 0, timeout)}, which silently replaced the
      * operator's memory and thread caps with the hard-coded 1 GB / 2 threads (G-R4 profiling, 2026-09-30).
      * Threads come from the traversal-only {@code assist.sql.traversal_threads} (default 4, operator 2026-09-30).
+     * {@code LA-CONFIG-LIMITS-1}: the install-wide {@code traversal.memory_limit_mb} / {@code traversal.threads} win over both
+     * properties when the server-wide document states them; read per call, so a change applies to the next traversal.
      */
     static SqlSandboxPolicy traversalPolicy(Path writeRoot) {
         SqlSandboxPolicy configured = SqlSandboxPolicy.defaultPolicy();
-        return SqlSandboxPolicy.withCaps(configured.memoryLimit(), SqlSandboxPolicy.traversalThreads(), SpaceLimits.get(writeRoot, LaLimit.TRAVERSAL_TIMEOUT_S));
+        LaLimitValues install = com.gamma.entitystore.LaLimits.forSpace(null);
+        Number mb = install.stated(LaLimit.TRAVERSAL_MEMORY_LIMIT_MB);
+        Number threads = install.stated(LaLimit.TRAVERSAL_THREADS);
+        return SqlSandboxPolicy.withCaps(mb != null ? mb.longValue() + "MiB" : configured.memoryLimit(),
+                threads != null ? threads.intValue() : SqlSandboxPolicy.traversalThreads(), SpaceLimits.get(writeRoot, LaLimit.TRAVERSAL_TIMEOUT_S));
     }
 
     /** An optional positive integer body field, defaulted when absent and clamped to {@code max} (a default above it, too). */
