@@ -566,24 +566,61 @@ Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Pe
 
 ## 9. Concurrency and resource bounds (summary)
 
-> **Being made configurable (`LA-CONFIG-LIMITS-1`, decided 2026-10-15, nothing built yet).** Every bound below, the
-> Graph Run and per-algorithm ceilings, the index fences and the input-shape caps become configuration items, one key
-> read by backend and SPA and gated by the server, with new defaults for several (canvas 1,000, suspicion 1,000,
-> expand and traversal doubled, index build memory 80 % of RAM). The values on this page are today's code until each
-> phase ships; plan and decisions: [`superpower/la-configurable-limits-plan.md`](../../../superpower/la-configurable-limits-plan.md).
-> ⚠ The "8 GB" index-build figure in the scale measurements is the bench's `inspecto.bench.buildMemory`; production
-> builds pass no memory limit and share the DuckDB cap (`processing.duckdb.memory_limit`, else 40 % of RAM / 4, floor 1 GiB).
+**Every bound is a configuration item (`LA-CONFIG-LIMITS-1`, built 2026-10-15).** One catalogue, `LaLimit`
+(`platform/inspecto-entity-store`), holds every Link Analysis limit: key (= its TOON path and wire key), layer, whether
+an analyst may override it in their browser, group, unit, default, per-item `min..max`. Decisions CL-1…CL-18 and the
+lane record: [`archived plan`](../../../archived-documents/plans-archive/la-configurable-limits-plan.md).
 
-| Resource | Bound | On overflow |
+* **Three layers.** SPACE items live in the Space's `link-analysis.toon` (Space admin, `canAuthorWorkbench`); INSTALL
+  items live in `la-limits.toon` in the server-wide document home (resolved like `/system/scheduler`:
+  `-Dsystem.config.dir`, spaces container root, sole Space's write root; installed at boot; reserved in
+  `ReservedConfigPaths`) and are edited by `canAdminister`; `browser:true` SPACE items may also carry a per-analyst
+  value in the browser's `localStorage`, clamped to `[min, Space value]`.
+* **Routes.** `GET /settings/link-analysis/limits` (every item with `default`, `min`, `max`, stated `value`,
+  `inForce`, `editable` for the caller; pod-scoped), `PUT /settings/link-analysis/limits` (SPACE keys) and
+  `PUT /system/link-analysis/limits` (INSTALL keys): all or nothing, an unknown key, a wrong-layer key or a value
+  outside `min..max` is 422 naming the key and the range; Draft expiry > hibernation and embed default TTL ≤ max are
+  checked when the body touches them.
+* **Reading.** `LaLimits.forSpace(writeRoot)` → `LaLimitValues`, cached on file CONTENT; a stored value outside its
+  range reads as the default. la-api sites read through `SpaceLimits`; library code (la-storage, la-core) takes the
+  value as a parameter from its la-api caller. INSTALL values: install doc, else the old JVM property where one
+  existed (`control.rateLimit.*`, `assist.sql.*`, `inspecto.la.draft.heavy`), else the default.
+* **Writers are read-modify-write over the raw TOON map** (`LinkAnalysisSettings.write`), and the old
+  `PUT /settings/link-analysis` keeps any limit key its body leaves out (`SettingsRoutes.keepUnsentLimits`; a stated
+  null still clears). ⚠ Before this, the old PUT dropped every key it did not model.
+* **Hot apply.** Graph Run ceilings and pool size: `GraphRunService.retune` on every request (the queue is bounded at
+  submit so it can shrink); index pools: `IndexBuildService.retune`; rate buckets: rebuilt at boot and after the
+  system PUT (a hand edit of `la-limits.toon` applies at the next PUT or restart); traversal memory / threads: read per
+  call; heavy Draft permits: re-read per heavy job. A Graph Run service's SQL engine keeps the traversal policy it was
+  built with until it idles out.
+* **Index build memory.** `index.build_memory_pct` (default 80) → a DuckDB `memory_limit` of that share of physical
+  RAM, passed to `IndexBuilder.Options` (unknown RAM → the shared DuckDB cap). **A build waits while ingest runs**:
+  `IngestActivity` (inspecto-util) counts Consignments from before `ConcurrencyBroker` grants a slot until it is
+  released; a build stays QUEUED in phase `waiting_for_ingest` (backoff 0.5 → 5 s, cancellable, FAILED
+  `IngestStillActiveException` after 6 h). One-way: ingest that starts after a build starts is not held back.
+  ⚠ The "8 GB" in the scale measurements is the bench's `inspecto.bench.buildMemory`, not production.
+* **Bucket sizing** (`index.edges_per_bucket`, `min_buckets`, `max_buckets`, INSTALL): a full build records
+  `bucketSizing` in the manifest; a changed sizing makes `IndexPlan.classify` force a full build
+  (`bucket_sizing_changed`; append refused 409).
+* **Suspicion score has ONE cap** for browser and server: `suspicion_node_cap` (default 1,000) drives the browser
+  refusal, the server's inline-or-job decision and the ceiling echoed by `GET /inv/graph/algorithms`.
+* **Parity.** `LaLimitCatalogueParityTest` parses the SPA's `LA_LIMIT_FALLBACKS` (`la-limits.ts`) and fails on a key
+  the catalogue lacks or a default that differs; it also pins that no wired site still holds its old constant.
+
+| Resource (key) | Default | On overflow |
 |---|---|---|
-| Graph Run pool | 2 threads, queue 16 | `REJECTED` |
-| Index builds per Space | 1 thread, queue 4, one per (Dataset, mapping) | 503 / 409 |
-| Index disk | `max_disk_bytes`, estimate `rows × 34 B` | 422 before any work |
-| Index deltas | 8 | `append` refused, `compact` advised |
-| Index traversal | depth 2, frontier 20 | flat fallback with a closed `Reason` |
-| Open Drafts | 50 per Space, 1 per member | 409 |
-| Heavy Draft ops | `max(1, min(4, cores/3))` permits, never waited for | 429 |
-| Expensive exploration POSTs | per-subject `linkAnalysis` bucket | 429 |
+| Graph Run pool (`graph_run.threads` / `queue`, INSTALL) | 2 threads, queue 16 | `REJECTED` |
+| Graph Run ceilings (`graph_run.ceiling_*`, INSTALL) | 500,000 nodes, 5,000,000 edges, 300 s | budget clamped, `budgetClamped` echoed |
+| Index builds (`index.threads` / `queue`, INSTALL) | 1 thread, queue 4, one per (Dataset, mapping) | 503 / 409 |
+| Index disk (`index.max_disk_bytes`) | none; estimate `rows × 34 B` | 422 before any work |
+| Index deltas (`index.max_deltas`) | 8 | `append` refused, `compact` advised |
+| Index traversal (`index.traversal_depth` / `frontier_cap`) | depth 2, frontier 20 | flat fallback with a closed `Reason` |
+| Recursive paths (`traversal.*`) | depth 12 / max 20, 10 s, paths 2,000 / 20,000 | fenced, `truncated` |
+| Expand (`investigation.expand_budget_*`, `max_frontier`) | 4,000 / 40,000 rows, frontier 2,000 | clamped / refused |
+| Connect (`connect.*`) | 40 seeds, 3 hops default, 6 max | 422 |
+| Open Drafts (`drafts.max_open`) | 50 per Space, 1 per member | 409 |
+| Heavy Draft ops (`drafts.heavy_jobs`, INSTALL) | `max(1, min(4, cores/3))`, never waited for | 429 |
+| Expensive exploration POSTs (`rate.link_analysis_*`, INSTALL) | burst 30, 1 per 2 s per subject | 429 |
 
 ## 10. Known seams and residuals
 

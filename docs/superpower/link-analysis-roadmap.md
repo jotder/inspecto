@@ -21,7 +21,7 @@
 | Embed view | deferred | `LA-EMBED-VIEW-1` (§1) |
 | Data preparation (CDR → fast index) | **plan; spikes SP1, SP2 (indicative), SP4, SP5 measured 2026-10-06; WP3 index builder still unbuilt** | LDP-D1…D11 open, WP0…WP10 (§2) |
 | Daily ingestion (CSV / Hive / database to the index) | **ingest chain built and accepted (T1-T9)** | `LA-DAILY-INGEST-1` T1…T9, decisions D-ING1…D-ING6 answered (D-ING5 file-first), T1/T2/T3/T4/T6/T7/T9 done, T5/T8 built; open: follow-ups in the BACKLOG row |
-| Configurable limits (`LA-CONFIG-LIMITS-1`) | **decided 2026-10-15, nothing built** | every hardcoded limit becomes a server-gated configuration item, phases P1–P4: [`superpower/la-configurable-limits-plan.md`](la-configurable-limits-plan.md) |
+| Configurable limits (`LA-CONFIG-LIMITS-1`) | **built 2026-10-15** (every limit a server-gated configuration item; plan archived) | `LA-CONFIG-LIMITS-RESIDUALS-1`; as-built: [`okf/backend/modules/link-analysis.md`](../okf/backend/modules/link-analysis.md) §9 |
 | Investigation store | S0–S7 closed | demand-gated items (§2) |
 | Entity model LA-17 | slice 1 + slice 2 built | SPA member browsing, `excludeBy` range/CIDR (§3) |
 | Live detection | LD-1…LD-7 built | operator confirmation of D-LD2…D-LD18; template sharing (§3) |

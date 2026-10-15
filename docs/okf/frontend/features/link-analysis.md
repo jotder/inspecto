@@ -280,11 +280,29 @@ node labels are untouched; the legend still names every link type.
 
 ## Grounded limits and consequences (code read 2026-09-20 / 2026-09-22)
 
-> **Being made configurable (`LA-CONFIG-LIMITS-1`, decided 2026-10-15, nothing built yet).** The SPA's hardcoded caps
-> and its copies of server values will be read from a server-published in-force limits block; canvas, browser-algorithm
-> and display caps gain a per-analyst *My browser* layer bounded by the Space ceiling (new defaults: canvas 1,000,
-> suspicion 1,000, per-algorithm 2,500). Until each phase ships, the values below are today's code. Plan:
-> [`superpower/la-configurable-limits-plan.md`](../../../superpower/la-configurable-limits-plan.md).
+> **Every limit is now configuration (`LA-CONFIG-LIMITS-1`, built 2026-10-15) — the numbers in this section's older
+> tables are the 2026-09 baseline, not the defaults in force.** The SPA keeps no copy of a server value:
+> `LaLimitsService` (`projects/link-analysis/src/link-analysis/la-limits.service.ts`) loads
+> `GET /settings/link-analysis/limits` per Space and publishes into the `laLimit(key)` store (`la-limits.ts`); code
+> reads `laLimit(key)` — the analyst's own value for `browser:true` items, else the Space value. `LA_LIMIT_FALLBACKS`
+> in `la-limits.ts` is the ONE fallback table (used only before the GET answers, after it fails, or in the embed viewer,
+> which makes no call), pinned to the server catalogue by `LaLimitCatalogueParityTest`.
+>
+> * **Defaults now:** canvas `projection_node_cap` 1,000; general `analysis_node_cap` 2,500 (selection algorithms hand
+>   over to the server above it, the branching matcher refuses); `suspicion_node_cap` 1,000, the ONE value the server
+>   also uses for suspicion score (it computes betweenness without betweenness's own guard, so a 501–1,000 node run is
+>   not refused by betweenness's 500); per-algorithm `browser_algorithms.<id>` = min(2,500, the algorithm's server
+>   inline ceiling) for the algorithms the browser consults (betweenness 500; closeness, cliques, max flow, link
+>   prediction, eigenvector, Katz, HITS 1,000; Louvain, label propagation 2,500); refusals name the algorithm and the
+>   cap in force. Display caps (`display.*`: LOD labels 300, layered 30, force-atlas 800, embed 80 / 3,000, geo 5,000)
+>   are per-analyst; the server's `/geo` default limit is `display.geo_point_cap` in force.
+> * **Menu:** the Link Analysis Settings pane hosts `link-analysis-limits.component.ts` with three sections rendered
+>   from the GET (Analysis = Space items, Host resources = install items read-only unless `canAdminister`, My browser =
+>   personal value + *Reset to Space value*); the old hand-built numeric fields are gone and the old form's save body
+>   carries no limit key. Personal values: `localStorage` key `inspecto.la.limits.personal.<space>.<actor>`.
+> * **Connect** sends `connect.default_hops` (3); `connect.max_hops` (6) is only the ceiling the analyst may pick.
+> * `MAX_CASE_MEMBERS` (100) stays an SPA constant: the server has no matching constant. The dashboard link and geo
+>   widgets do not load the service and use the fallbacks.
 
 Durable as-built facts distilled from the archived `link-analysis-spec.md`. Open work against them is
 tracked on the board (`docs/BACKLOG.md` §3.12 — see *Closed-plan record* below); the plan that held it is

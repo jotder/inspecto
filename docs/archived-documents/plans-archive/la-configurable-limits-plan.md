@@ -1,6 +1,6 @@
 # Link Analysis configurable limits — interview record and plan (`LA-CONFIG-LIMITS-1`)
 
-**Status: DECIDED 2026-10-15 (interview complete, CL-1…CL-18) — nothing built; P1 next.** When built: distil the
+**Status: ARCHIVED 2026-10-15 — SHIPPED (P1a, P1b, P2, P3, P4 built and merged locally; as-built in `okf/backend/modules/link-analysis.md` §9 and `okf/frontend/features/link-analysis.md` §Grounded limits; residuals on `LA-CONFIG-LIMITS-RESIDUALS-1`).** When built: distil the
 as-built facts into `okf/backend/modules/link-analysis.md` and `okf/frontend/features/link-analysis.md`, move
 residuals to `docs/BACKLOG.md`, archive this file.
 
@@ -195,3 +195,24 @@ Ranges: counts `1` to 100× the default unless stated; byte, time and thread ite
 | `rate.embed_burst`, `rate.embed_per_s` | 60, 2 | same | `RateLimiter.embed()` |
 | `traversal.memory_limit_mb`, `traversal.threads` | 1,024, 4 | same | `SqlSandboxPolicy` (JVM properties) |
 | `drafts.heavy_jobs` | min(4, cores / 3) | same | `DraftAdmission` (JVM property) |
+
+## 8. As built — where the build departed from §6 / §7 (2026-10-15)
+
+- **Catalogue size:** 150 items at P1 (132 SPACE, 18 INSTALL); P2 removed `browser_algorithms.suspicionScore` (one
+  concept, one key: `suspicion_node_cap`) and the browser items the SPA never consults (lead decision: no dead
+  settings), leaving per-algorithm items only for the algorithms the browser checks.
+- **Pools moved to INSTALL for real** (P4): `graph_run.threads` / `queue` and `index.threads` / `queue` were removed from
+  the Space settings and the old `PUT /settings/link-analysis` shape (now 422 "has no key"). Still one pool per Space,
+  sized by the install value; not one global pool.
+- **`index.build_memory_pct`** default 80 (P4); the P1 catalogue had it nullable.
+- **Byte budgets** keep a minimum of 1 (not the old PUT's 1 KiB / 1 MiB) so hand-tuned test stores keep working.
+- **A stored value above its range now reads as the default** — the one behaviour change of P1 (hand edits only).
+- **Not doubled** (read as outside CL-10): `reference.max_keys`, identity import caps, Investigation log / list pages,
+  `only_exempt_max`, `measures.max_window_days`, `case_history.max_key_length`.
+- **The old `PUT /settings/link-analysis` keeps unsent limit keys** (P2, `SettingsRoutes.keepUnsentLimits`) — it used
+  to clear any modelled key its body left out, which would have wiped limits once the pane stopped sending them.
+- **Build waits for ingest** via a process-wide `IngestActivity` counter in inspecto-util (LA modules do not depend on
+  the engine); one-way, cancellable, 6 h bound.
+- **Merges:** P3 and P4 conflicted in eight index / traversal files (both kept: Space `max_deltas` + install `Sizing`;
+  Space traversal timeout + install memory / threads).
+- **Bug found at integration:** connect sent `connect.max_hops` as the default (6 hops); fixed to `connect.default_hops`.
