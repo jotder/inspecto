@@ -40,6 +40,11 @@ public final class EngineDatasetProvider implements DatasetProvider {
         return DatasetRead.datasets(writeRoot).stream().map(EngineDatasetProvider::entry).toList();
     }
 
+    @Override
+    public List<Entry> linkAnalysisViews(Path writeRoot) {
+        return DatasetRead.registry(writeRoot).list("link-analysis-view").stream().map(EngineDatasetProvider::entry).toList();
+    }
+
     private static Entry entry(ComponentRegistry.Component c) {
         return new Entry(c.name(), c.content());
     }

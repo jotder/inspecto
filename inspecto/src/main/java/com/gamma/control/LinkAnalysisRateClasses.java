@@ -34,6 +34,9 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/projection"},
             {"POST", "/inv/reference-rows"},
             {"POST", "/inv/case-history"},
+            // la-entity-profile-plan §4.5: a profile aggregates every bound Dataset (the type's) or filters each (one Entity's)
+            {"GET", "/inv/entity-types/([^/]+)/profile"},
+            {"GET", "/inv/entities/([^/]+)/([^/]+)/profile"},
             // LA-EMBED-VIEW-1: the public embed view is anonymous and re-evaluates an Investigation's sealed log per request
             // (ControlApi throttles it per TOKEN and per IP, on its own buckets).
             {"GET", "/public/investigations/([^/]+)"},
@@ -112,6 +115,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/graph/runs/([^/]+)/cancel"},
             {"GET", "/inv/index"},
             {"GET", "/inv/datasets/([^/]+)/files"},
+            {"GET", "/inv/entity-types"},
             {"GET", "/inv/index/builds/([^/]+)"},
             {"POST", "/inv/index/builds/([^/]+)/cancel"},
             {"GET", "/entity-lists"},

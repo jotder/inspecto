@@ -217,6 +217,22 @@ public enum LaLimit {
     IDENTITY_IMPORT_TIMEOUT_S("identity.import_timeout_s", Layer.SPACE, false, "identity", "s", 10, 1, 300,
             "Statement timeout of one identity import."),
 
+    // ── entity profile (SPACE; la-entity-profile-plan §4.4 / §4.5) ──────────────────────────────────────────────
+    ENTITY_PROFILE_TIMEOUT_S("entity_profile.timeout_s", Layer.SPACE, false, "entity_profile", "s", 30, 1, 600,
+            "Statement timeout of one Entity profile read."),
+    ENTITY_PROFILE_MAX_DATASETS("entity_profile.max_datasets", Layer.SPACE, false, "entity_profile", "count", 20, 1, 2_000,
+            "Bound Datasets one Entity Type profile reads; the rest are left out and the profile says truncated."),
+    ENTITY_PROFILE_SHAPE_SAMPLE_ROWS("entity_profile.shape_sample_rows", Layer.SPACE, false, "entity_profile", "rows", 1_000_000, 1,
+            1_000_000_000, "Values the value-shape histograms read; above it they read a sample."),
+    ENTITY_PROFILE_TOP_N("entity_profile.top_n", Layer.SPACE, false, "entity_profile", "count", 20, 1, 2_000,
+            "Entries each histogram or list of an Entity profile returns."),
+    ENTITY_PROFILE_SENTINEL_SHARE("entity_profile.sentinel_share", Layer.SPACE, false, "entity_profile", "pct", 20, 1, 100,
+            "A single value holding more than this share of a column's values is reported as a dominant sentinel."),
+    ENTITY_PROFILE_TIMELINE_DAYS("entity_profile.timeline_days", Layer.SPACE, false, "entity_profile", "days", 400, 1, 36_600,
+            "Days an Entity profile timeline returns, newest first."),
+    ENTITY_PROFILE_RELATIONSHIP_THRESHOLD("entity_profile.relationship_threshold", Layer.SPACE, false, "entity_profile", "count", 6, 2,
+            1_000_000, "Entities carrying at least this many of another Entity Type in the same rows are counted as outliers."),
+
     // ── input shape caps (SPACE) ─────────────────────────────────────────────────────────────────────────────
     INPUT_ID_LENGTH("input.id_length", Layer.SPACE, false, "input", "chars", 512, 1, 51_200,
             "The longest entity id an Investigation op may carry."),

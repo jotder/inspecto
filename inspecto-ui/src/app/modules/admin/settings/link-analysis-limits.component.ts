@@ -32,6 +32,7 @@ const UNITS: Record<string, string> = {
     hops: 'hops',
     per_s: 'per second',
     pct_ram: '% of RAM',
+    pct: '%',
     mb: 'MB',
 };
 
