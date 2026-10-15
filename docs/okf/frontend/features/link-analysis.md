@@ -280,6 +280,12 @@ node labels are untouched; the legend still names every link type.
 
 ## Grounded limits and consequences (code read 2026-09-20 / 2026-09-22)
 
+> **Being made configurable (`LA-CONFIG-LIMITS-1`, decided 2026-10-15, nothing built yet).** The SPA's hardcoded caps
+> and its copies of server values will be read from a server-published in-force limits block; canvas, browser-algorithm
+> and display caps gain a per-analyst *My browser* layer bounded by the Space ceiling (new defaults: canvas 1,000,
+> suspicion 1,000, per-algorithm 2,500). Until each phase ships, the values below are today's code. Plan:
+> [`superpower/la-configurable-limits-plan.md`](../../../superpower/la-configurable-limits-plan.md).
+
 Durable as-built facts distilled from the archived `link-analysis-spec.md`. Open work against them is
 tracked on the board (`docs/BACKLOG.md` §3.12 — see *Closed-plan record* below); the plan that held it is
 archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-archive/link-analysis-backlog-plan.md).
