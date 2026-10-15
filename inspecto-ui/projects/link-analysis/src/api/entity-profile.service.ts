@@ -189,6 +189,16 @@ export interface EntityProfile extends Assessed {
     dataAsOf: DatasetAsOf[];
 }
 
+/**
+ * `POST /inv/entities/{type}/resolve`: a typed or pasted value as the key the Entity page is addressed by - the alias for
+ * a masked type, the normalised value otherwise. Raw identifiers never go in a URL (operator, 2026-10-15).
+ */
+export interface EntityResolution {
+    type: string;
+    key: string;
+    masked: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class EntityProfileService {
     private http = inject(HttpClient);
@@ -205,7 +215,12 @@ export class EntityProfileService {
         });
     }
 
-    /** One Entity's profile; `key` is the raw value or the exploration alias. */
+    /** Resolve a typed value (raw or alias) to the key a URL may carry. The raw value travels in the body only. */
+    resolveEntity(type: string, key: string): Observable<EntityResolution> {
+        return this.http.post<EntityResolution>(apiUrl(`/inv/entities/${encodeURIComponent(type)}/resolve`), { key });
+    }
+
+    /** One Entity's profile; `key` is the alias for a masked type (a raw value is refused 422), else the value. */
     entityProfile(type: string, key: string): Observable<EntityProfile> {
         return this.http.get<EntityProfile>(
             apiUrl(`/inv/entities/${encodeURIComponent(type)}/${encodeURIComponent(key)}/profile`),

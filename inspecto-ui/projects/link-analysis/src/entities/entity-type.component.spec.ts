@@ -158,6 +158,7 @@ describe('EntityTypeComponent (Entity Type Profile)', () => {
         expect(section(el, 'identity').classList).toContain('mat-expanded');
         expect(section(el, 'volume').classList).not.toContain('mat-expanded');
         expect(section(el, 'identity').textContent).toContain('e164');
+        expect(el.querySelector('inspecto-la-entity-lookup form[aria-label="Open an Entity"]')).toBeTruthy();
     });
 
     it('marks approximate counts, and never shows a dominant value', () => {

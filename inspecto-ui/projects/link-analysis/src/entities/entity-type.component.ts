@@ -19,6 +19,7 @@ import {
     ProfileSentinel,
 } from '@inspecto/link-analysis/api/entity-profile.service';
 import { EntityBarListComponent, EntityDayCalendarComponent } from './entity-charts.component';
+import { EntityLookupComponent } from './entity-lookup.component';
 import {
     NOT_RETURNED,
     bars,
@@ -56,6 +57,7 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
         DataTableComponent,
         EntityBarListComponent,
         EntityDayCalendarComponent,
+        EntityLookupComponent,
     ],
     template: `
         <inspecto-page-header
@@ -65,6 +67,9 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
             backLabel="Entities"
         ></inspecto-page-header>
         <div class="flex flex-col gap-4 p-6">
+            @if (typeId()) {
+                <inspecto-la-entity-lookup [type]="typeId()" [base]="base"></inspecto-la-entity-lookup>
+            }
             @if (error(); as e) {
                 <inspecto-alert variant="error" data-testid="profile-error">{{ e }}</inspecto-alert>
             } @else if (profile(); as p) {
