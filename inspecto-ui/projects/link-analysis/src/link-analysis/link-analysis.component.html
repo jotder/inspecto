@@ -960,7 +960,7 @@
                             <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
                         </button>
                     </div>
-                    <div class="min-h-0 flex-auto overflow-y-auto p-3">
+                    <div #toolboxScroll data-testid="toolbox-scroll" class="min-h-0 flex-auto overflow-y-auto p-3">
                         <!-- Analysis (the graph-algorithms toolbox). Kept mounted via `[hidden]` so its results
                              survive tab switches; emits emphasis for the canvas. -->
                         <inspecto-link-analysis-toolbox

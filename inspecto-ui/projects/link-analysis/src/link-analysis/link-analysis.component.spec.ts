@@ -677,6 +677,21 @@ describe('LinkAnalysisComponent', () => {
         expect(view()!.classList.contains('hidden')).toBe(false);
     });
 
+    it('a toolbox tab opens at its top: the three tabs share one scroll container', async () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.toolboxDockOpen.set(true);
+        c.toolboxTab.set('analysis');
+        fixture.detectChanges();
+        const box = fixture.nativeElement.querySelector('[data-testid=toolbox-scroll]') as HTMLElement;
+        expect(box).not.toBeNull();
+        box.scrollTop = 400;
+        c.openInvestigation();
+        fixture.detectChanges();
+        await Promise.resolve();
+        expect(box.scrollTop).toBe(0);
+    });
+
     it('workspace: a failed query keeps the form open; the docks open, collapse to rails and maximize', async () => {
         const { fixture } = create({ fail: true });
         fixture.detectChanges();
