@@ -13,6 +13,12 @@ export const LA_APP_NAV = [
         blurb: 'Place entities and routes on a map, over any Dataset with coordinates.',
     },
     {
+        path: 'entities',
+        label: 'Entities',
+        icon: 'heroicons_outline:identification',
+        blurb: 'See what the data says about each Entity Type and each Entity: how many, where, how fresh.',
+    },
+    {
         path: 'entity-lists',
         label: 'Entity Lists',
         icon: 'heroicons_outline:queue-list',

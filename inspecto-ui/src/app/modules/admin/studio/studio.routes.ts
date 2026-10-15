@@ -13,5 +13,6 @@ export default [
     { path: 'dashboards', loadChildren: () => import('./dashboards/dashboards.routes') },
     { path: 'templates', loadChildren: () => import('./templates/templates.routes') },
     { path: 'link-analysis', data: { hideShellFooter: true }, loadChildren: () => import('@inspecto/link-analysis/link-analysis/link-analysis.routes') },
+    { path: 'entities', loadChildren: () => import('@inspecto/link-analysis/entities/entities.routes') },
     { path: 'geo-map', loadChildren: () => import('@inspecto/link-analysis/geo-map/geo-map.routes') },
 ] as Routes;

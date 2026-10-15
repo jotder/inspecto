@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, si
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, UrlTree } from '@angular/router';
 import { firstValueFrom, forkJoin, of, catchError, map } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -47,6 +47,8 @@ export interface NodeInsightContext {
     onListChanged?: () => void;
     /** Hide is offered in exploration only (an Investigation hides through its own op). */
     canHide: boolean;
+    /** The Entity Profile page of this node's Entity, when the host mounts the Entities pages and the type is known. */
+    entityPage?: UrlTree | null;
 }
 
 interface Membership {
@@ -69,6 +71,11 @@ interface Membership {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [MatButtonModule, InspectoAlertComponent, ChipComponent, RouterLink, DatePipe],
     template: `
+        @if (ctx().entityPage; as page) {
+            <p class="mt-2 text-sm">
+                <a [routerLink]="page" data-testid="entity-page-link">Open the Entity page</a>
+            </p>
+        }
         <section class="mt-4" aria-labelledby="ni-risk">
             <h3 id="ni-risk" class="text-base font-semibold">Risk</h3>
             @if (!mapping()) {
