@@ -240,6 +240,7 @@
     "/system/operational-db",
     "/system/operational-db/test",
     "/system/scheduler",
+    "/system/link-analysis/limits",
     "/settings/scheduler",
     "/test-discovered/ping",
     "/geo/projection",
@@ -309,6 +310,7 @@
     "/audit/route-inventory",
     "/assist/skills",
     "/settings/link-analysis",
+    "/settings/link-analysis/limits",
     "/settings/pipeline-history",
     "/settings/timezone",
     "/inv/schema/overlap-profile",
@@ -6451,6 +6453,20 @@
         "x-generated" : true
       }
     },
+    "/system/link-analysis/limits" : {
+      "put" : {
+        "tags" : [ "system" ],
+        "summary" : "PUT /system/link-analysis/limits (generated skeleton)",
+        "operationId" : "putSystemLinkAnalysisLimits",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/settings/scheduler" : {
       "get" : {
         "tags" : [ "settings" ],
@@ -6600,6 +6616,32 @@
         "tags" : [ "settings" ],
         "summary" : "PUT /settings/link-analysis (generated skeleton)",
         "operationId" : "putSettingsLinkAnalysis",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/settings/link-analysis/limits" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "GET /settings/link-analysis/limits (generated skeleton)",
+        "operationId" : "getSettingsLinkAnalysisLimits",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "PUT /settings/link-analysis/limits (generated skeleton)",
+        "operationId" : "putSettingsLinkAnalysisLimits",
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
         "responses" : {
           "default" : {

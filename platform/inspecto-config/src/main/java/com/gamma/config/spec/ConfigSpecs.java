@@ -1277,6 +1277,11 @@ public final class ConfigSpecs {
      * {@code /config/spec/{type}} and the generic config write routes must not accept it. Every key is optional and
      * an absent key means "the shipped default" — never "unbounded" and never "off by accident".
      */
+    /** The top-level blocks of {@code link-analysis.toon} that hold only {@code LaLimit} catalogue items (LA-CONFIG-LIMITS-1). */
+    public static final List<String> LINK_ANALYSIS_LIMIT_GROUPS = List.of("browser_algorithms", "display", "investigation",
+            "connect", "traversal", "neighbours", "snapshots", "files", "working_set", "pattern", "measures", "comparison",
+            "reference", "case_history", "dossier", "identity", "input");
+
     public static ConfigSpec linkAnalysisSettings() {
         List<FieldSpec> fields = List.of(
                 FieldSpec.of("projection_node_cap", "Projection node cap", FieldType.INT,
@@ -1332,7 +1337,8 @@ public final class ConfigSpecs {
                         "The edge/node index (D-3): enabled = whether reads may use an index (absent = false, nothing "
                                 + "reads one yet); max_disk_bytes = a build whose estimate is above it is refused up front "
                                 + "(absent or 0 = no limit); keep_versions = published versions kept per index (absent = 2); "
-                                + "{threads, queue} size the build workers and the waiting line; max_age_hours = how old (hours) an index may be and still serve a Dataset whose input files cannot be fingerprinted (absent = 24); every key absent = the "
+                                + "{threads, queue} size the build workers and the waiting line; max_age_hours = how old (hours) an index may be and still serve a Dataset whose input files cannot be fingerprinted (absent = 24); "
+                                + "traversal_depth / frontier_cap / max_deltas = the index fences (LA-CONFIG-LIMITS-1); every key absent = the "
                                 + "shipped default."),
                 FieldSpec.of("drafts", "Draft lifecycle", FieldType.MAP,
                         "The Draft lifecycle (D21, D7-Q5): max_open = the most open Drafts one Space holds (1..1000; absent = 50); "
@@ -1348,7 +1354,14 @@ public final class ConfigSpecs {
                                 + "frame_ancestors = the https origins (host[:port], no wildcard) allowed to FRAME the embed viewer page "
                                 + "(absent = none: link-only); every key absent = the shipped default.")
         );
-        return new ConfigSpec("link-analysis-settings", fields, List.of());
+        // LA-CONFIG-LIMITS-1: the Space limit groups of the LaLimit catalogue (entity-store) - each a block of numeric
+        // items whose keys, units and min..max ranges the catalogue declares and GET /settings/link-analysis/limits lists.
+        List<FieldSpec> all = new java.util.ArrayList<>(fields);
+        for (String group : LINK_ANALYSIS_LIMIT_GROUPS)
+            all.add(FieldSpec.of(group, "Link Analysis limits: " + group, FieldType.MAP,
+                    "Link Analysis limits of group '" + group + "' (LA-CONFIG-LIMITS-1): each key is one catalogue item, a number "
+                            + "inside the item's min..max (written with PUT /settings/link-analysis/limits); every key absent = the shipped default."));
+        return new ConfigSpec("link-analysis-settings", all, List.of());
     }
 
     /**

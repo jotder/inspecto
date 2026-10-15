@@ -349,6 +349,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/egress` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java:54` |
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:78` |
 | PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:81` |
+| PUT | `/settings/link-analysis/limits` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/LinkAnalysisLimitsRoutes.java:47` |
 | PUT | `/settings/mail-attachments` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/MailAttachmentRoutes.java:39` |
 | PUT | `/settings/modules` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ModuleSettingsRoutes.java:46` |
 | PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:84` |
@@ -361,6 +362,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:78` |
 | POST | `/spaces/import` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:76` |
 | POST | `/streams/([^/]+)/records` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/StreamPushRoutes.java:89` |
+| PUT | `/system/link-analysis/limits` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/LinkAnalysisLimitsRoutes.java:49` |
 | POST | `/system/operational-db/test` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/SystemRoutes.java:44` |
 | PUT | `/system/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:80` |
 | POST | `/tags` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:53` |
