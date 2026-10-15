@@ -356,20 +356,20 @@ class ControlApiSettingsTest {
             JsonNode def = json(send(c.port, "GET", url, null));
             assertEquals("typed", def.get("maskingModeInForce").asText());
             assertEquals("fs", def.get("investigationStoreInForce").asText(), "default backend is the filesystem");
-            assertEquals(1, def.get("indexInForce").get("threads").asInt());
-            assertEquals(4, def.get("indexInForce").get("queue").asInt());
+            assertFalse(def.get("indexInForce").has("threads"), "the build pool is install-wide (GET /settings/link-analysis/limits)");
+            assertFalse(def.get("indexInForce").has("queue"));
             System.setProperty("investigations.backend", "db");
             assertEquals("db", json(send(c.port, "GET", url, null)).get("investigationStoreInForce").asText());
             System.setProperty("investigations.backend", "bogus");
             assertEquals("fs", json(send(c.port, "GET", url, null)).get("investigationStoreInForce").asText(), "anything but db reads as fs");
 
             String doc = "{\"maskingMode\":\"none\",\"graphRun\":{\"maxNodes\":1000,\"maxEdges\":2000,\"timeoutMs\":5000},"
-                    + "\"index\":{\"enabled\":true,\"threads\":2,\"queue\":8,\"maxDiskBytes\":1048576}}";
+                    + "\"index\":{\"enabled\":true,\"keepVersions\":3,\"maxDiskBytes\":1048576}}";
             assertEquals(200, send(c.port, "PUT", url, doc).statusCode());
             JsonNode got = json(send(c.port, "GET", url, null));
             assertEquals("none", got.get("maskingModeInForce").asText());
             assertTrue(got.get("indexInForce").get("enabled").asBoolean());
-            assertEquals(8, got.get("indexInForce").get("queue").asInt());
+            assertEquals(3, got.get("indexInForce").get("keepVersions").asInt());
             // The SPA's save: the whole document as read (echo keys included) with one unrelated key edited keeps every other key.
             com.fasterxml.jackson.databind.node.ObjectNode back = (com.fasterxml.jackson.databind.node.ObjectNode) got.deepCopy();
             back.put("fourEyesBudgetAbove", 77);
@@ -378,7 +378,7 @@ class ControlApiSettingsTest {
             assertEquals("none", after.get("maskingMode").asText());
             assertEquals(1000, after.get("graphRun").get("maxNodes").asInt());
             assertEquals(5000, after.get("graphRun").get("timeoutMs").asInt());
-            assertEquals(2, after.get("index").get("threads").asInt());
+            assertEquals(3, after.get("index").get("keepVersions").asInt());
             assertEquals(1048576, after.get("index").get("maxDiskBytes").asLong());
             assertEquals(77, after.get("fourEyesBudgetAbove").asInt());
         } finally {
@@ -439,22 +439,26 @@ class ControlApiSettingsTest {
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
             assertTrue(json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRun").isNull(), "absent => inherit");
             HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
-                    "{\"graphRun\":{\"maxNodes\":900,\"timeoutMs\":4000,\"threads\":3,\"maxResultItems\":250}}");
+                    "{\"graphRun\":{\"maxNodes\":900,\"timeoutMs\":4000,\"maxResultItems\":250}}");
             assertEquals(200, put.statusCode(), put.body());
             String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
             assertTrue(toon.contains("graph_run") && toon.contains("max_nodes: 900") && toon.contains("timeout_ms: 4000"), toon);
             JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRun");
             assertEquals(900, got.get("maxNodes").asInt());
-            assertEquals(3, got.get("threads").asInt());
             assertEquals(250, got.get("maxResultItems").asInt());
+            assertFalse(got.has("threads") || got.has("queue"), "the pool is install-wide, not a Space knob");
             JsonNode inForce = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRunInForce");
-            assertEquals(3, inForce.get("threads").asInt(), "stated");
-            assertEquals(16, inForce.get("queue").asInt(), "unstated = shipped default");
+            assertFalse(inForce.has("threads") || inForce.has("queue"));
             assertEquals(250, inForce.get("maxResultItems").asInt());
             assertTrue(toon.contains("max_result_items: 250"), toon);
             assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"maxResultItems\":0}}").statusCode());
-            assertTrue(got.get("maxEdges").isNull() && got.get("queue").isNull(), "unstated knobs stay unstated");
-            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"threads\":0}}").statusCode());
+            assertTrue(got.get("maxEdges").isNull(), "unstated knobs stay unstated");
+            // LA-CONFIG-LIMITS-1: the pool moved to PUT /system/link-analysis/limits - a Space key for it is unknown here
+            for (String moved : new String[] {"{\"graphRun\":{\"threads\":3}}", "{\"graphRun\":{\"queue\":3}}"}) {
+                HttpResponse<String> r = send(c.port, "PUT", "/spaces/acme/settings/link-analysis", moved);
+                assertEquals(422, r.statusCode(), moved);
+                assertTrue(r.body().contains("graphRun has no key"), r.body());
+            }
             assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"bogus\":1}}").statusCode());
             assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":7}").statusCode());
         }
@@ -489,7 +493,7 @@ class ControlApiSettingsTest {
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
             assertTrue(json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("index").isNull(), "absent => inherit");
             HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
-                    "{\"index\":{\"enabled\":false,\"maxDiskBytes\":5000000000,\"keepVersions\":3,\"threads\":2,\"maxAgeHours\":48}}");
+                    "{\"index\":{\"enabled\":false,\"maxDiskBytes\":5000000000,\"keepVersions\":3,\"maxAgeHours\":48}}");
             assertEquals(200, put.statusCode(), put.body());
             String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
             assertTrue(toon.contains("index") && toon.contains("max_disk_bytes: 5000000000") && toon.contains("keep_versions: 3") && toon.contains("max_age_hours: 48")
@@ -498,12 +502,11 @@ class ControlApiSettingsTest {
             assertFalse(got.get("enabled").asBoolean(), "an explicit false survives the round trip");
             assertEquals(5_000_000_000L, got.get("maxDiskBytes").asLong());
             assertEquals(3, got.get("keepVersions").asInt());
-            assertEquals(2, got.get("threads").asInt());
-            assertTrue(got.get("queue").isNull(), "unstated knobs stay unstated");
+            assertFalse(got.has("threads") || got.has("queue"), "the build pool is install-wide, not a Space knob");
             assertEquals(48, got.get("maxAgeHours").asInt());
             assertEquals(48, json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("indexInForce").get("maxAgeHours").asInt());
             assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"index\":{\"maxDiskBytes\":0}}").statusCode(), "0 = no limit");
-            for (String bad : new String[] {"{\"index\":{\"keepVersions\":0}}", "{\"index\":{\"threads\":65}}", "{\"index\":{\"queue\":1001}}", "{\"index\":{\"maxAgeHours\":0}}", "{\"index\":{\"maxAgeHours\":8761}}",
+            for (String bad : new String[] {"{\"index\":{\"keepVersions\":0}}", "{\"index\":{\"threads\":2}}", "{\"index\":{\"queue\":8}}", "{\"index\":{\"maxAgeHours\":0}}", "{\"index\":{\"maxAgeHours\":8761}}",
                     "{\"index\":{\"maxDiskBytes\":-1}}", "{\"index\":{\"enabled\":\"yes\"}}", "{\"index\":{\"bogus\":1}}", "{\"index\":7}"})
                 assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", bad).statusCode(), bad);
             for (String bad : new String[] {"{\"index\":{\"maxAgeHours\":0}}", "{\"index\":{\"maxAgeHours\":8761}}"})   // both refusals name the SAME range

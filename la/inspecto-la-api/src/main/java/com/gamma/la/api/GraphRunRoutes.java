@@ -135,17 +135,19 @@ public final class GraphRunRoutes implements RouteModule {
         services.close();
     }
 
+    /**
+     * A Space's service, retuned to the install-wide limits in force ({@code LA-CONFIG-LIMITS-1}: ceilings, workers, waiting
+     * line), so a {@code PUT /system/link-analysis/limits} applies to the next run of a live service, not only to a new one.
+     */
     private GraphRunService service(Path writeRoot) {
-        return services.get(writeRoot);
+        GraphRunService s = services.get(writeRoot);
+        s.retune(GraphRunService.Limits.standard());
+        return s;
     }
 
-    /** A Space's service, with that Space's {@code threads}/{@code queue} (read now; they apply for this service's lifetime). */
+    /** A Space's service, sized by the install-wide limits in force ({@link GraphRunService.Limits#standard()}). */
     private static GraphRunService newService(Path root) {
-        GraphRunService.Limits std = GraphRunService.Limits.standard();
-        LinkAnalysisSettings.GraphRun g = LinkAnalysisSettings.forRoot(root).effectiveGraphRun();
-        GraphRunService.Limits limits = new GraphRunService.Limits(std.defaults(), std.ceilings(),
-                g.threads() != null ? g.threads() : std.threads(), g.queue() != null ? g.queue() : std.queue(),
-                std.runTtlMs(), std.maxRuns(), std.cacheTtlMs(), std.cacheEntries());
+        GraphRunService.Limits limits = GraphRunService.Limits.standard();
         GraphEngine engine = new RoutingGraphEngine(engineOverride != null ? engineOverride : new InMemoryGraphEngine(),
                 new SqlGraphEngine(InvRoutes.traversalPolicy(root), () -> SpaceLimits.get(root, LaLimit.INDEX_TRAVERSAL_DEPTH),
                         () -> SpaceLimits.get(root, LaLimit.INDEX_FRONTIER_CAP)));
@@ -205,9 +207,9 @@ public final class GraphRunRoutes implements RouteModule {
         Map<String, Object> defaults = budget(inForce);
         defaults.put("clamped", std.ceilings().clamps(stated));
         out.put("defaults", defaults);
-        Map<String, Object> pool = new LinkedHashMap<>();
-        pool.put("threads", g.threads() != null ? g.threads() : std.threads());
-        pool.put("queue", g.queue() != null ? g.queue() : std.queue());
+        Map<String, Object> pool = new LinkedHashMap<>();                     // install-wide (graph_run.threads / queue)
+        pool.put("threads", std.threads());
+        pool.put("queue", std.queue());
         out.put("pool", pool);
         out.put("inlineWaitMs", inlineWaitMs());
         Map<String, Object> items = new LinkedHashMap<>();                   // the response-size policy, stated like the budget

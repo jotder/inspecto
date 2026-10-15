@@ -5,6 +5,8 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.access.ComponentAccess;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.access.Roles;
 import com.gamma.spi.http.RouteModule;
@@ -28,6 +30,8 @@ import com.gamma.la.storage.IndexManifest;
 import com.gamma.la.storage.IndexMapping;
 import com.gamma.la.storage.IndexPlan;
 import com.gamma.la.storage.IndexStore;
+import com.gamma.util.DuckDbUtil;
+import com.gamma.util.IngestActivity;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -67,9 +71,12 @@ import java.util.function.Supplier;
  * Dataset gains one, this gate no longer covers the index.
  *
  * <p><b>Where.</b> {@code <Space write root>/la-index} ({@link WriteGates#requireWriteRoot}: 503 when none). One
- * {@link IndexBuildService} per Space, created on first use with that Space's {@code index.threads} / {@code index.queue}
- * (applied when it is built), closed with the API or when idle ({@link IndexBuildServices}). The disk budget
- * ({@code index.max_disk_bytes}) and {@code index.keep_versions} are read per request.
+ * {@link IndexBuildService} per Space, created on first use and closed with the API or when idle ({@link IndexBuildServices}).
+ * Its workers and waiting line are the install-wide {@code index.threads} / {@code index.queue} ({@code LA-CONFIG-LIMITS-1},
+ * {@link #installLimits}), re-applied to the live service on every use; the build memory ({@code index.build_memory_pct} of
+ * the host's RAM) and bucket sizing are read when a build starts ({@link #installHost}), and a build waits while ingest runs
+ * ({@link IngestActivity}, CL-12). The disk budget ({@code index.max_disk_bytes}) and {@code index.keep_versions} are read per
+ * request.
  *
  * <p><b>The index is ON by default</b> (operator 2026-10-10): {@code index.enabled} is unset = on, an explicit {@code false} disables; it is echoed by
  * {@code GET /inv/index}. A read uses it only when a fresh published index exists, otherwise the flat Dataset answers (design 5).
@@ -107,7 +114,7 @@ public final class IndexRoutes implements RouteModule {
     /** The per-Space build service the HTTP routes use, or null when no control API is registered (a scheduled build then refuses). */
     static IndexBuildService scheduledService(Path writeRoot) {
         IndexRoutes r = active;
-        return r == null ? null : r.services.get(writeRoot);
+        return r == null ? null : r.service(writeRoot);
     }
 
     private final IndexBuildServices services = new IndexBuildServices(IndexRoutes::newService, System::currentTimeMillis,
@@ -127,12 +134,33 @@ public final class IndexRoutes implements RouteModule {
     }
 
     private static IndexBuildService newService(Path writeRoot) {
-        IndexBuildService.Limits std = IndexBuildService.Limits.standard();
-        LinkAnalysisSettings.Index ix = LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex();
-        IndexBuildService.Limits limits = new IndexBuildService.Limits(ix.threadsInForce(), ix.queueInForce(), std.runTtlMs(), std.maxRuns());
         Function<IndexBuilder.Request, IndexBuilder.Result> b = builderOverride != null ? builderOverride : IndexBuilder::build;
-        return new IndexBuildService(indexRoot(writeRoot), limits, System::currentTimeMillis, IndexRoutes::auditTerminal,
-                IndexBuildService.WORKER_KEEPALIVE_MS, b);
+        return new IndexBuildService(indexRoot(writeRoot), installLimits(), System::currentTimeMillis, IndexRoutes::auditTerminal,
+                IndexBuildService.WORKER_KEEPALIVE_MS, b, IndexRoutes::installHost, IngestActivity::active);
+    }
+
+    /** The build workers and waiting line in force: the install-wide {@code index.threads} / {@code index.queue}. */
+    static IndexBuildService.Limits installLimits() {
+        IndexBuildService.Limits std = IndexBuildService.Limits.standard();
+        LaLimitValues v = LaLimits.forSpace(null);
+        return new IndexBuildService.Limits((int) v.get(LaLimit.INDEX_THREADS), (int) v.get(LaLimit.INDEX_QUEUE), std.runTtlMs(), std.maxRuns());
+    }
+
+    /** The build resources in force: {@code index.build_memory_pct} of the RAM this JVM sees, and the bucket sizing. */
+    static IndexBuildService.Host installHost() {
+        LaLimitValues v = LaLimits.forSpace(null);
+        return new IndexBuildService.Host(IndexBuildService.memoryLimit((int) v.get(LaLimit.INDEX_BUILD_MEMORY_PCT),
+                DuckDbUtil.physicalMemoryBytes()), sizing(v));
+    }
+
+    /** The bucket sizing in force: the install-wide {@code index.edges_per_bucket} / {@code min_buckets} / {@code max_buckets}. */
+    static BucketFunction.Sizing installSizing() {
+        return sizing(LaLimits.forSpace(null));
+    }
+
+    private static BucketFunction.Sizing sizing(LaLimitValues v) {
+        return new BucketFunction.Sizing(v.get(LaLimit.INDEX_EDGES_PER_BUCKET), (int) v.get(LaLimit.INDEX_MIN_BUCKETS),
+                (int) v.get(LaLimit.INDEX_MAX_BUCKETS));
     }
 
     static Path indexRoot(Path writeRoot) {
@@ -410,7 +438,7 @@ public final class IndexRoutes implements RouteModule {
     private static Map<String, Object> plan(IndexManifest m, String currentSqlHash, InputFingerprint input, String duck, int maxDeltas) {
         List<IndexManifest.InputFile> now = input != null && input.known()
                 ? input.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList() : null;
-        IndexPlan.Plan p = IndexPlan.classify(m, now, currentSqlHash, BucketFunction.NAME, duck, maxDeltas);
+        IndexPlan.Plan p = IndexPlan.classify(m, now, currentSqlHash, BucketFunction.NAME, installSizing(), duck, maxDeltas);
         Map<String, Object> o = new LinkedHashMap<>();
         o.put("recommended", p.recommended().name().toLowerCase(Locale.ROOT));
         o.put("appendable", p.appendable());
@@ -537,8 +565,11 @@ public final class IndexRoutes implements RouteModule {
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────────────
 
+    /** A Space's build service, retuned to the install-wide pool in force (a {@code PUT /system/link-analysis/limits} applies to the next submit). */
     private IndexBuildService service(Path writeRoot) {
-        return services.get(writeRoot);
+        IndexBuildService s = services.get(writeRoot);
+        s.retune(installLimits());
+        return s;
     }
 
     private static ApiException bad(String message) {

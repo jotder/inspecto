@@ -19,6 +19,7 @@ import com.gamma.api.PublicApi;
 import com.gamma.etl.*;
 import com.gamma.audit.EventType;
 import com.gamma.metrics.MetricRegistry;
+import com.gamma.util.IngestActivity;
 import com.gamma.util.LogSetup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -267,7 +268,10 @@ public class CollectorProcessor {
                 futures.add(executor.submit(() -> {
                     if (mdc != null) MDC.setContextMap(mdc);
                     try {
-                        try (ConcurrencyBroker.Permit permit =
+                        // CL-12: the Consignment counts as ingest from before it asks for a slot until the slot is released,
+                        // so a Link Analysis index build (which waits on IngestActivity) never overlaps it.
+                        try (IngestActivity.Scope ingest = IngestActivity.begin();
+                             ConcurrencyBroker.Permit permit =
                                      broker.admit(spaceId, pipelineId, pool, maxConcurrent, priority, b.batchId())) {
                             if (permit.queueReason() != null)
                                 log.info("Consignment {} running in pool '{}' after {} ms queued ({})",

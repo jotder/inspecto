@@ -53,11 +53,39 @@ public final class BucketFunction {
         return (int) Long.remainderUnsigned(lower, buckets);
     }
 
-    /** {@code clamp(pow2(ceil(edges / 4e6)), 16, 1024)} - the signed bucket-count formula; pow2 rounds UP to a power of two. */
+    /** {@code clamp(pow2(ceil(edges / 4e6)), 16, 1024)} - the signed bucket-count formula at the shipped {@link Sizing#DEFAULT}. */
     public static int bucketsFor(long edges) {
-        long want = Math.max(1, (edges + EDGES_PER_BUCKET - 1) / EDGES_PER_BUCKET);
-        long pow2 = Long.highestOneBit(want) == want ? want : Long.highestOneBit(want) << 1;
-        return (int) Math.max(MIN_BUCKETS, Math.min(MAX_BUCKETS, pow2));
+        return Sizing.DEFAULT.bucketsFor(edges);
+    }
+
+    /**
+     * The bucket-count sizing ({@code LA-CONFIG-LIMITS-1} CL-9: the install-wide {@code index.edges_per_bucket},
+     * {@code index.min_buckets}, {@code index.max_buckets}, passed in by the caller - this module reads no settings). The
+     * manifest records the {@link #signature} a FULL build used, and {@code IndexPlan} requires a FULL rebuild once the
+     * sizing in force differs ({@code bucket_sizing_changed}): an append keeps its parent's bucket count, so only a full
+     * build can re-bucket. A {@code maxBuckets} below {@code minBuckets} reads as {@code minBuckets}.
+     */
+    public record Sizing(long edgesPerBucket, int minBuckets, int maxBuckets) {
+        /** The shipped sizing (the catalogue defaults). */
+        public static final Sizing DEFAULT = new Sizing(EDGES_PER_BUCKET, MIN_BUCKETS, MAX_BUCKETS);
+
+        public Sizing {
+            if (edgesPerBucket < 1 || minBuckets < 1 || maxBuckets < 1)
+                throw new IllegalArgumentException("bucket sizing must be positive: " + edgesPerBucket + "/" + minBuckets + "/" + maxBuckets);
+            maxBuckets = Math.max(minBuckets, maxBuckets);
+        }
+
+        /** {@code clamp(pow2(ceil(edges / edgesPerBucket)), minBuckets, maxBuckets)}; pow2 rounds UP to a power of two. */
+        public int bucketsFor(long edges) {
+            long want = Math.max(1, edges / edgesPerBucket + (edges % edgesPerBucket == 0 ? 0 : 1));
+            long pow2 = Long.highestOneBit(want) == want ? want : Long.highestOneBit(want) << 1;
+            return (int) Math.max(minBuckets, Math.min(maxBuckets, pow2));
+        }
+
+        /** The manifest's {@code bucketSizing} value: {@code <edgesPerBucket>/<minBuckets>/<maxBuckets>}. */
+        public String signature() {
+            return edgesPerBucket + "/" + minBuckets + "/" + maxBuckets;
+        }
     }
 
     private static void checkBuckets(int buckets) {
