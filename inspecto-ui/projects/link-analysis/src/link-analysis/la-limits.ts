@@ -10,7 +10,7 @@ import { signal } from '@angular/core';
  * constant of its own. The pure modules (graph algorithms, projections, form validators) read it at call time; the
  * store is a signal, so a template or `computed()` that reads it re-renders when the limits arrive or change.
  *
- * <p>⚠ {@link LA_LIMIT_FALLBACKS} is what the server's catalogue ships TODAY (P1 changes no behaviour). It is used
+ * <p>⚠ {@link LA_LIMIT_FALLBACKS} is what the server's catalogue (`LaLimit`) ships as its defaults. It is used
  * only while the GET has not answered, when it failed, or when the server does not publish a key — never as a second
  * opinion beside a served value. Every key here is the backend catalogue's own (`LaLimit`), spelled exactly as served.
  */
@@ -27,13 +27,13 @@ export const LA_LIMIT_FALLBACKS = {
     'display.geo_point_cap': 5000,
     // SPACE (§7)
     'graph_run.max_result_items': 10_000,
-    'investigation.expand_budget_default': 2000,
-    'investigation.expand_budget_max': 20_000,
-    'investigation.max_frontier': 1000,
-    'connect.max_seeds': 20,
-    'connect.max_hops': 3,
+    'investigation.expand_budget_default': 4000,
+    'investigation.expand_budget_max': 40_000,
+    'investigation.max_frontier': 2000,
+    'connect.max_seeds': 40,
+    'connect.max_hops': 6,
     'measures.max_window_days': 31,
-    'dossier.max_snapshots': 20,
+    'dossier.max_snapshots': 40,
     'input.link_kinds': 100,
     'input.recurring_excludes': 32,
     'input.note_length': 2000,
