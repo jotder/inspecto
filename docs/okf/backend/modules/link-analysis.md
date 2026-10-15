@@ -118,7 +118,7 @@ entry at write time, so an index rebuild or a Dataset change cannot alter a reco
 | `la-graph` | Leaf algorithm library, line-for-line port of the SPA's `graph-analysis.ts` | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `GraphPropagation` (server-only), `RunControl`, `GraphAborted` |
 | `la-core` (platform, optional, boot) | Domain + ports, no HTTP routes | `InvestigationEvaluator`, `InvestigationStore`/`InvestigationStores`/`FsInvestigationStore`, `InvestigationMembers`, `DraftStore`/`DraftLifecycle`/`DraftCheckpoints`/`DraftIndex`, `GraphRunService`, `GraphEngine`, `InMemoryGraphEngine`, `GraphInput`, `Algorithm`, `GraphBudget`, `LinkEventTypes`, ports `DatasetProvider`/`CasePort`/`CollectorCoveragePort` |
 | `la-storage` | The link index (D-3) and the index-backed engine | `IndexBuilder`, `IndexBuildService`, `IndexStore`, `IndexManifest`, `IndexMapping`, `IndexPlan`, `IndexReader`, `IndexPins`, `BucketFunction`, `IndexedTraversal`, `SqlGraphEngine`, `RoutingGraphEngine` |
-| `la-api` (feature `geoLink`) | HTTP surface and orchestration | 18 `RouteModule`s (below), `EntityMasking`, `InvestigationMemberStore`, `DraftAdmission`/`DraftRebase`/`DraftPromote`, `IndexedRead` + `Indexed*`, `IndexStaleness`, `IndexBuildServices`, `GraphRunServices`, `StandingDetection`, `ScheduledIndexBuild` |
+| `la-api` (feature `geoLink`) | HTTP surface and orchestration | 21 `RouteModule`s (below), `EntityMasking`, `InvestigationMemberStore`, `DraftAdmission`/`DraftRebase`/`DraftPromote`, `IndexedRead` + `Indexed*`, `IndexStaleness`, `IndexBuildServices`, `GraphRunServices`, `StandingDetection`, `ScheduledIndexBuild` |
 | `geo-link` | Bridge to the host | `EngineDatasetProvider`, `HostCasePort`, `HostCollectorCoveragePort`, `ScheduledLinkIndexBuilder`, `WorkingSetMeasures`, `InvestigationMeasureRoutes` |
 | `la-store-pg` (provider) | Postgres backend for Investigations | `PgInvestigationStore`, `PgInvestigationStoreProvider` |
 | `entity-store` (platform, base) | Space-wide identity data; not LA-only | `EntityFactLog`, `EntityRegistry`, `EntityTypes`, `EntityListEntries`, `EntityListFacts`, `EntityListSidecar`, `MaskTokens`, `LinkAnalysisSettings` |
@@ -140,9 +140,9 @@ Design rules visible in the dependency graph:
 
 * An Investigation is a header, an append-only `log.jsonl` of **ops**, and one sealed Working Set file per step
   (`sets/<step>.json`, the audit/replay record, not the evaluation input).
-* `InvestigationEvaluator` is a **pure fold** of the log. The apply switch handles 14 labels: `seed`, `seedBy`,
-  `expand`, `exclude`, `excludeBy`, `hide`, `keep`, `threshold`, `annotate`, `window`, `resolve`, and the markers
-  `snapshot`, `compare`, `temporal`. An unknown op throws "not evaluable" (fail closed).
+* `InvestigationEvaluator` is a **pure fold** of the log. The apply switch handles 15 labels: `seed`, `seedBy`,
+  `expand`, `exclude`, `excludeBy`, `hide`, `keep`, `threshold`, `annotate`, `window`, `resolve`, `connect`
+  (2026-10-13, below), and the markers `snapshot`, `compare`, `temporal`. An unknown op throws "not evaluable" (fail closed).
 * **Sealed reads (D-E3).** `expand` stores the rows it read, `compare`/`temporal` store their findings with a
   fingerprint, so replay needs no Dataset and a Dataset change cannot rewrite history.
 * **Hashing.** State hash = `sha256(canonical(workingSet))`, recorded per log entry; the prefix hash
@@ -270,14 +270,17 @@ references, Case link and Alert Rule binding are last-writer-wins by design on F
 ### 3.4 Masking
 
 `MaskTokens` (entity-store): token = `masked:` + first 16 hex of HMAC-SHA256(key, id); the 32-byte key is published
-by hard link so a race loser reads the winner's key. One key per Investigation and one per Space fact log, so a
-list member's token differs from an Investigation's for the same value. `LinkAnalysisSettings.maskingMode` defaults
+by hard link so a race loser reads the winner's key. One key per Investigation (`mask.key` in its directory) and ONE
+Space identity key (`MaskTokens.spaceKey`: `<write root>.secrets/.risk-score-mask.key`, owner-only, outside every
+exported, imported and backed-up tree; D-M7, 2026-10-13, moved from `audit/entity-facts/mask.key`, so a token minted
+before the move differs from one minted after) shared by LA exploration, Entity Lists, Screening, BI and Risk /
+Anomaly Scores. A list member's token therefore differs from an Investigation's for the same value. `LinkAnalysisSettings.maskingMode` defaults
 to `typed` (fail closed). `EntityMasking` (la-api) masks on the way **out**: engine results and caches stay raw; a
 raw id that masking hides is answered as a nonexistent node; `reveal` needs `canRevealLinkEntities`.
 
 **Mask the same way everywhere (DR-D2, operator 2026-10-10).** The stateless exploration reads (`/inv/projection{,/neighbors,/multi}`,
 `/inv/traversal/recursive-paths`, `/inv/pattern/*`, `/inv/value-measures`) have no Investigation, so `ExplorationMasking`
-(la-api) masks them under the **Space** key (the identity fact log's `mask.key`, the key an Entity List member uses): `all`
+(la-api) masks them under the **Space** identity key (`MaskTokens.spaceKey`, the key an Entity List member uses; D-M7): `all`
 masks every id; `typed` masks every id when a bound endpoint column's classification is claimed by a masked Entity Type
 (`EntityMasking.maskedColumns`, the rule an Investigation applies); `none` shows raw. Each answer carries
 `masking {mode, masked, basis}`, which the SPA shows as a *Masking: mode* badge in the query panel. An alias handed back (an
@@ -442,6 +445,7 @@ the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all presen
 | Identity | `/inv/entity-identities`, `/group`, `/import`, `/{id}/retract` | `canManageIncidents` (the reads too; `/import` has no UI) |
 | Graph Run | `/inv/graph/runs`, `/algorithms`, `/runs/{id}`, `/cancel` | `canRunLinkGraphAnalysis` on the POST that starts a run; list/get are read-gated; cancel is owner-or-admin, else 404 |
 | Index | `/inv/index`, `/inv/index/builds`, `/builds/{id}`, `/cancel` | `canBuildLinkIndex` on the POST that starts a build; the reads and cancel are not capability-gated |
+| Data trust (LA-DATA-TRUST-1, 2026-10-14) | `GET /inv/datasets/{id}/files` (one row per File: outcome, event day, rows, error rows, index state; la-api `DatasetFilesRoutes`), `GET …/{id}/data-changes` (corrected-day warning; geo-link `InvestigationDataChangesRoutes`), `…/{id}/coverage` | read-only; Dataset view gate / Investigation `open` gate. As built: [frontend concept §Data trust](../../frontend/features/link-analysis.md) |
 | Embed link | `…/{id}/embeds` (POST mint, GET list), `…/embeds/{grantId}/revoke`, and the public `GET /public/investigations/{token}` | `canShareInvestigation` on mint and revoke (+ lead role); the list is read-gated; the public GET is authenticated by its token alone (§6.2) |
 | Measures & detection (geo-link) | `…/{id}/measures`, `…/alert-rules`, `…/standing-detection` | `canAuthorAlertRules` |
 
@@ -528,7 +532,7 @@ Code: `EmbedGrants` (token, hashing, resolve, revoke, counters), `InvestigationE
 
 ## 7. Host registration, Jobs and live detection
 
-* **ServiceLoader files:** la-api → `RouteModule` (20); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
+* **ServiceLoader files:** la-api → `RouteModule` (21); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
   `CasePort`, `CollectorCoveragePort`, `DatasetProvider`, `LinkIndexBuilder`; la-store-pg →
   `InvestigationStoreProvider`.
 * **Host wiring:** `CollectorService` registers Platform Service `link-index` and wires the alerting Investigation
@@ -560,6 +564,14 @@ Jars are staged by `inspecto/package.ps1`; `-Ui la-app` swaps the bundled SPA, n
 Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Permitted (capability + gates above).
 
 ## 9. Concurrency and resource bounds (summary)
+
+> **Being made configurable (`LA-CONFIG-LIMITS-1`, decided 2026-10-15, nothing built yet).** Every bound below, the
+> Graph Run and per-algorithm ceilings, the index fences and the input-shape caps become configuration items, one key
+> read by backend and SPA and gated by the server, with new defaults for several (canvas 1,000, suspicion 1,000,
+> expand and traversal doubled, index build memory 80 % of RAM). The values on this page are today's code until each
+> phase ships; plan and decisions: [`superpower/la-configurable-limits-plan.md`](../../../superpower/la-configurable-limits-plan.md).
+> ⚠ The "8 GB" index-build figure in the scale measurements is the bench's `inspecto.bench.buildMemory`; production
+> builds pass no memory limit and share the DuckDB cap (`processing.duckdb.memory_limit`, else 40 % of RAM / 4, floor 1 GiB).
 
 | Resource | Bound | On overflow |
 |---|---|---|
