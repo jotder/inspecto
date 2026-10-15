@@ -101,6 +101,9 @@ class ImportLoaderInventoryTest {
                 + "and no import lands outside <config>");
         ALLOWED.put("nodes", "the LA index's node-table directory (IndexBuilder, D-3) inside a staged index version under "
                 + "<write root>/la-index/... - a derived artefact, outside the config tree and never read as config");
+        ALLOWED.put("out", "the LA index's out-edge table directory (IndexBuilder, D-3; read again since 2026-10-15 for the "
+                + "link statistics kindEdges / degree) inside a staged index version under <write root>/la-index/... - a derived "
+                + "artefact, outside the config tree and never read as config");
         ALLOWED.put("audit-anchoring.json", "the durable \"anchoring started\" record (AuditAnchors) in "
                 + "<config root>.secrets/ beside the key — a SIBLING of the config tree, so no import reaches it");
         ALLOWED.put("META-INF/inspecto/module.toon", "a classpath resource read from module jars by ModuleManifests, "
