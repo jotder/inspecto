@@ -75,13 +75,24 @@ final class DatasetRoutes implements RouteModule {
      * Dataset's data is covered THROUGH, read from the newest value of the event-date column its config names
      * ({@code eventDate:}); a DATE counts through its end. {@code {dataset, eventDateColumn, dataAsOf}}, where
      * {@code dataAsOf} is an ISO-8601 instant or {@code null} (no column named, column absent or not a date/time, empty
-     * Dataset). Never a row value besides that one maximum.
+     * Dataset), and {@code reason} says why it is null. Never a row value besides that one maximum.
      *
-     * <p>Read-only, so no capability gate (as {@code /rows}). Fail-closed: write root unset → 503 · unknown or
-     * shared-away Dataset → 404 · an id the store refuses → 400.
+     * <p>A READ gate only (D-EP7, Entity profile plan): the Dataset's view permission, as {@code GET /components/dataset/{id}};
+     * no capability gate and no write root. A host with no write root has no registry to read, so it answers 200 with
+     * {@code dataAsOf: null} and the reason, never 503. Unknown or shared-away Dataset → 404 · an id the store refuses → 400.
      */
     private Object freshness(ApiContext api, HttpExchange ex, String id) {
-        Path writeRoot = WriteGates.requireWriteRoot(api, "dataset freshness");
+        Path writeRoot = api.writeRoot();
+        if (writeRoot == null) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("dataset", id);
+            out.put("eventDateColumn", null);
+            out.put("dataAsOf", null);
+            out.put("reason", "not readable here: this host has no write root, so it holds no Dataset registry to read the "
+                    + "event-date column from");
+            out.put("verdicts", List.of());
+            return out;
+        }
         Map<String, Object> dataset;
         try {
             dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", id)
@@ -100,6 +111,9 @@ final class DatasetRoutes implements RouteModule {
         out.put("dataset", id);
         out.put("eventDateColumn", column);
         out.put("dataAsOf", asOf.isPresent() ? java.time.Instant.ofEpochMilli(asOf.getAsLong()).toString() : null);
+        out.put("reason", asOf.isPresent() ? null : column == null
+                ? "the Dataset names no event-date column (eventDate:)"
+                : "no date read from '" + column + "': the column is absent, not a date/time, or the Dataset is empty or unreadable");
         // LA-DATA-TRUST-1 S3: the verdict of each freshness Alert Rule on this Dataset - the very reading the sweep fires on.
         long now = System.currentTimeMillis();
         out.put("verdicts", HostContext.of(api).service().alertService()
