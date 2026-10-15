@@ -5,6 +5,7 @@ import { firstValueFrom, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { provideAppEnvironment } from '@inspecto/core/api/app-environment';
+import { configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { EMBED_SCRUBBED_PATH, EmbedViewPageComponent } from './embed-view.page';
 import { EmbedView, EmbedViewService } from './embed-view.service';
 
@@ -49,6 +50,18 @@ describe('embed view page', () => {
         expect(el.querySelector('a, form, textarea, select'), 'no link out and no write control').toBeNull();
         expect(el.querySelectorAll('tbody tr').length).toBe(3);
         await expectNoA11yViolations(el);
+    });
+
+    it('draws at most the display.embed_edge_limit links in force, and says so (LA-CONFIG-LIMITS-1)', async () => {
+        configureLaLimits({ 'display.embed_edge_limit': 1 });
+        try {
+            const links = [...VIEW.workingSet.links, { source: 'a', target: 'msisdn:****12', kind: 'calls', count: 1 }];
+            const { el } = await render({}, { ...VIEW, workingSet: { ...VIEW.workingSet, links } });
+            expect(el.querySelectorAll('svg line').length).toBe(1);
+            expect(el.textContent).toContain('Only the first 1 links are drawn');
+        } finally {
+            resetLaLimits();
+        }
     });
 
     it('paints its own scheme background: outside the shell the text tokens were drawn on white (LA-A11Y-AUDIT-1, 2.56:1 live)', async () => {

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import type { InvestigationStepResult } from '@inspecto/link-analysis/api/inv.service';
 import { InvestigationConnectOpComponent } from './investigation-connect-op.component';
+import { configureLaLimits, resetLaLimits } from './la-limits';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
 const STEP = {
@@ -49,6 +50,20 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         await cmp.connect();
         expect(store.apply).toHaveBeenCalledTimes(1);
         expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 3 });
+    });
+
+    it('states and sends the connect.max_seeds / connect.max_hops limits in force (LA-CONFIG-LIMITS-1)', async () => {
+        configureLaLimits({ 'connect.max_seeds': 2, 'connect.max_hops': 2 });
+        try {
+            const { fixture, cmp, store, el } = setup();
+            cmp.text.set('5551110001\n5551110002\n5551110003');
+            fixture.detectChanges();
+            expect(el.querySelector('[data-testid="seed-summary"]')?.textContent).toContain('(up to 2, within 2 hops)');
+            await cmp.connect();
+            expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 2 });
+        } finally {
+            resetLaLimits();
+        }
     });
 
     it('a click on a connected pair row hands its example route to the canvas, and records nothing', () => {

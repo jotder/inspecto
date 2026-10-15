@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { G6GraphData } from '@inspecto/core/graph/graph-types';
-import { configureGraphLimits, matchPattern, resetGraphLimits } from './graph-analysis';
+import { matchPattern } from './graph-analysis';
 import { PATTERN_PACKS } from '../link-analysis/pattern-packs';
 import { BranchStage, branchingNeedsTime, matchBranchingPattern, thresholdLabel } from './branching-pattern-engine';
+import { configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * LA-14b — the branching matcher. Gate G-R5: "100 % of synthetic smurfing chains found; out-of-order
@@ -49,7 +50,7 @@ const noise: Leg[] = [
 ];
 
 describe('matchBranchingPattern (LA-14b)', () => {
-    afterEach(() => resetGraphLimits());
+    afterEach(() => resetLaLimits());
 
     it('finds a structuring motif: fan-in of sub-threshold legs, split, re-convergence', () => {
         const g = graph([...deposits, ...split, ...converge, ...noise]);
@@ -148,7 +149,7 @@ describe('matchBranchingPattern (LA-14b)', () => {
     });
 
     it('refuses — does not throw — above the analysis node cap', () => {
-        configureGraphLimits({ analysisNodeCap: 5 });
+        configureLaLimits({ analysis_node_cap: 5 });
         const g = graph([...deposits, ...split, ...converge]);
         let res!: ReturnType<typeof matchBranchingPattern>;
         expect(() => (res = matchBranchingPattern(g, STRUCTURING, { timeAttr: 'AT' }))).not.toThrow();

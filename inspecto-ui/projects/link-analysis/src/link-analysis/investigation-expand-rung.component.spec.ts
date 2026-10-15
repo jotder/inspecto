@@ -3,6 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
+import { configureLaLimits, resetLaLimits } from './la-limits';
 
 function setup() {
     TestBed.configureTestingModule({
@@ -51,6 +52,24 @@ describe('InvestigationExpandRungComponent (LA-SPA-OWED-SURFACES-1)', () => {
         expect(errors.filter((e) => e === 'A whole number of at least 1.').length).toBe(2);
         expect(el.querySelector('[role="alert"]')!.textContent).toContain('must not exceed the maximum');
         await expectNoA11yViolations(el);
+    });
+
+    it('bounds the budget and the link kinds by the limits in force (LA-CONFIG-LIMITS-1)', () => {
+        configureLaLimits({ 'investigation.expand_budget_max': 100, 'input.link_kinds': 2 });
+        try {
+            const { fixture, cmp, el } = setup();
+            cmp.form.patchValue({ budget: 101, linkKinds: 'calls, sms, mms' });
+            expect(cmp.rung()).toBeNull();
+            fixture.detectChanges(); // an invalid field opens the disclosure that holds it
+            fixture.detectChanges();
+            const errors = Array.from(el.querySelectorAll('mat-error')).map((e) => e.textContent!.trim());
+            expect(errors).toContain('A whole number from 1 to 100.');
+            expect(errors).toContain('At most 2 kinds.');
+            cmp.form.patchValue({ budget: 100, linkKinds: 'calls, sms' });
+            expect(cmp.rung()).toEqual({ budget: 100, linkKinds: ['calls', 'sms'] });
+        } finally {
+            resetLaLimits();
+        }
     });
 
     it("shows the server's refusal verbatim", async () => {

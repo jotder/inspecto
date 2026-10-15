@@ -1,5 +1,6 @@
 import type { GraphDirection } from '@inspecto/core/api';
 import type { G6Edge, G6GraphData, G6Node } from '@inspecto/core/graph/graph-types';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * Pure, source-agnostic graph analysis over the shared {@link G6GraphData} shape — the Link Analysis
@@ -7,27 +8,17 @@ import type { G6Edge, G6GraphData, G6Node } from '@inspecto/core/graph/graph-typ
  * mutates its input. Guarded by {@link analysisNodeCapValue} where the algorithm is super-linear.
  */
 
-/** Above this node count the super-linear analyses (betweenness) refuse to run. */
 /**
- * DEFAULT ceiling for the browser-side algorithms, in nodes.
+ * The ceiling for the browser-side algorithms, in nodes: `analysis_node_cap` (LA-CONFIG-LIMITS-1), the Space's value
+ * or the analyst's lower one for this browser, published by `GET /settings/link-analysis/limits`.
  *
- * ⚠ This is a **default, not a truth**. It was measured on one host, one browser and one synthetic graph
- * shape (2026-09-22, plan §1.7): 25 of the 27 algorithms stay under 60 ms even at ~2 000 nodes, while
- * suspicion score alone takes 6.7 s there. An analyst's laptop, a denser graph or a different
- * edge-to-node ratio all move that. ⇒ deployments override it via {@link configureGraphLimits}, fed from
- * the per-space `GET|PUT /settings/link-analysis`.
- * ⚠ This block previously said the value is published at `/bootstrap` (`limits.analysisNodeCap`). It is
- * NOT — verified 2026-09-22: the caps appear in exactly three Java files (the settings record, its route
- * and its test) and no `limits` key is served anywhere. Corrected rather than left, because a comment
- * naming a mechanism that does not exist is how the next reader wires against nothing.
+ * ⚠ Its shipped default is a **default, not a truth**. It was measured on one host, one browser and one synthetic
+ * graph shape (2026-09-22, plan §1.7): 25 of the 27 algorithms stay under 60 ms even at ~2 000 nodes, while
+ * suspicion score alone takes 6.7 s there. An analyst's laptop, a denser graph or a different edge-to-node ratio all
+ * move that, which is why it is a configuration item. Read it — never cache it — so a change takes effect.
  */
-export const ANALYSIS_NODE_CAP_DEFAULT = 2000;
-
-let analysisNodeCap = ANALYSIS_NODE_CAP_DEFAULT;
-
-/** The ceiling currently in force. Read it — never cache it — so a deployment override takes effect. */
 export function analysisNodeCapValue(): number {
-    return analysisNodeCap;
+    return laLimit('analysis_node_cap');
 }
 
 /**
@@ -40,29 +31,12 @@ export function analysisNodeCapValue(): number {
  * server's own per-algorithm `inlineNodeCeiling` can only LOWER it (see the toolbox), never raise it.
  */
 export function selectionNodeCapValue(): number {
-    return analysisNodeCap;
-}
-
-/**
- * Apply a deployment's tuning limits, normally once at startup from `/bootstrap`.
- *
- * ⛔ **Fails closed on nonsense rather than applying it.** A cap that is not a finite number ≥ 1 is
- * REFUSED and the previous value stands: a cap of 0 or NaN would make every graph "over the limit" and
- * turn the whole analysis toolbox off, which is a far worse outcome than ignoring a bad setting. Passing
- * `undefined` leaves the value alone, so a partial payload is safe.
- */
-export function configureGraphLimits(
-    limits: { analysisNodeCap?: number; suspicionNodeCap?: number } | null | undefined,
-): void {
-    const v = limits?.analysisNodeCap;
-    if (typeof v === 'number' && Number.isFinite(v) && v >= 1) analysisNodeCap = Math.floor(v);
-    const sv = limits?.suspicionNodeCap;
-    if (typeof sv === 'number' && Number.isFinite(sv) && sv >= 1) suspicionNodeCap = Math.floor(sv);
+    return laLimit('analysis_node_cap');
 }
 
 /**
  * The ceiling for the **betweenness-bearing** algorithms — `betweennessCentrality` and `suspicionScore`,
- * which is slow only because it calls it (decision D-S3, operator 2026-09-22).
+ * which is slow only because it calls it (decision D-S3, operator 2026-09-22): `suspicion_node_cap`.
  *
  * 🔴 **Corrected 2026-09-23.** This was applied to suspicion score alone, on the plan's §1.7 claim that
  * "25 of 27 algorithms stay under 60 ms at 1 999 nodes" (the count then; the server catalogue now lists 29) with suspicion score the sole outlier. That claim
@@ -72,9 +46,8 @@ export function configureGraphLimits(
  * while the CAUSE stayed on the shared 2 000 ceiling, and an analyst selecting "Betweenness" from the
  * centrality list froze the main thread for about ten seconds.
  *
- * ⚠ The persisted setting is still keyed `suspicionNodeCap` (`GET|PUT /settings/link-analysis`). That name
- * is now narrower than what it governs; renaming a setting shipped the day before is an operator call and
- * is deliberately NOT taken here.
+ * ⚠ The setting is still keyed `suspicion_node_cap`. That name is now narrower than what it governs; renaming a
+ * setting shipped the day before is an operator call and is deliberately NOT taken here.
  *
  * Measured on the dev host, median of 3, ~3 edges per node — suspicion score end to end:
  * 250 → 103 ms · 500 → 402 ms · **750 → 972 ms** · 1 000 → 1 608 ms · 1 500 → 3 774 ms · 2 000 → 7 277 ms.
@@ -83,24 +56,13 @@ export function configureGraphLimits(
  *
  * 🔴 **The curve is quadratic** — betweenness dominates, and doubling the nodes costs ~4.5× the time,
  * so this cap is far more sensitive than a linear one: halving it from 2 000 to 1 000 cuts the work to
- * about a quarter, not a half. 750 is chosen as the last MEASURED point under one second; the
+ * about a quarter, not a half. The shipped default 750 is the last MEASURED point under one second; the
  * interpolated crossing is ~760, and a default should be a number someone actually observed.
  *
- * ⚠ Like the others this is a DEFAULT, not a truth — one host, one browser, one synthetic shape.
+ * ⚠ Like the others this is a DEFAULT, not a truth — one host, one browser, one synthetic shape. Read it — never cache it.
  */
-export const SUSPICION_NODE_CAP_DEFAULT = 750;
-
-let suspicionNodeCap = SUSPICION_NODE_CAP_DEFAULT;
-
-/** The suspicion-score ceiling currently in force. Read it — never cache it. */
 export function suspicionNodeCapValue(): number {
-    return suspicionNodeCap;
-}
-
-/** Restore the measured defaults — for tests, and for a deployment that clears its override. */
-export function resetGraphLimits(): void {
-    analysisNodeCap = ANALYSIS_NODE_CAP_DEFAULT;
-    suspicionNodeCap = SUSPICION_NODE_CAP_DEFAULT;
+    return laLimit('suspicion_node_cap');
 }
 
 /** A highlightable analysis result: the node/edge ids to emphasize on the canvas. */

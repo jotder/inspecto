@@ -12,10 +12,9 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import type { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
 import { FourEyesLimits, expandApproval } from './investigate-number';
 import { InvestigationWindowFieldsComponent } from './investigation-window-fields.component';
+import { laLimit } from './la-limits';
 import {
     EXPAND_DIRECTIONS,
-    MAX_EXPAND_BUDGET,
-    MAX_LINK_KINDS,
     rungForm,
     rungOf,
     windowForm,
@@ -61,9 +60,9 @@ import {
             <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>Row budget</mat-label>
                 <input matInput type="number" formControlName="budget" placeholder="2000" />
-                <mat-hint>Rows read; a breach marks the step incomplete. At most {{ maxBudget }}.</mat-hint>
+                <mat-hint>Rows read; a breach marks the step incomplete. At most {{ maxBudget() }}.</mat-hint>
                 @if (form.controls.budget.invalid) {
-                    <mat-error>A whole number from 1 to {{ maxBudget }}.</mat-error>
+                    <mat-error>A whole number from 1 to {{ maxBudget() }}.</mat-error>
                 }
             </mat-form-field>
             <inspecto-option-picker label="Direction" formControlName="direction" [options]="directionOptions" />
@@ -81,7 +80,7 @@ import {
                 <input matInput formControlName="linkKinds" placeholder="call, sms" />
                 <mat-hint>Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</mat-hint>
                 @if (form.controls.linkKinds.invalid) {
-                    <mat-error>At most {{ maxKinds }} kinds.</mat-error>
+                    <mat-error>At most {{ maxKinds() }} kinds.</mat-error>
                 }
             </mat-form-field>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -176,7 +175,7 @@ export class InvestigationExpandRungComponent {
     });
     readonly open = signal(false);
     readonly error = signal('');
-    readonly maxBudget = MAX_EXPAND_BUDGET;
+    readonly maxBudget = computed(() => laLimit('investigation.expand_budget_max'));
     readonly directionOptions: PickerOption[] = EXPAND_DIRECTIONS.map((d) => ({
         value: d,
         label: { either: 'Either way', out: 'Outgoing', in: 'Incoming', reciprocal: 'Reciprocal (both ways)' }[d],
@@ -188,7 +187,7 @@ export class InvestigationExpandRungComponent {
     ];
     /** The rung's own window (`window: {from, to, slot, days, timezone}`), read only while the picker says so. */
     readonly override = windowForm();
-    readonly maxKinds = MAX_LINK_KINDS;
+    readonly maxKinds = computed(() => laLimit('input.link_kinds'));
     /** The analyst's opt-in to expand THROUGH flagged entities (`includeHubs: true`) — off by default, every time. */
     readonly includeHubs = new FormControl(false, { nonNullable: true });
     /** {@link includeHubs} as a signal, for the host's "Expand next degree" frontier. */

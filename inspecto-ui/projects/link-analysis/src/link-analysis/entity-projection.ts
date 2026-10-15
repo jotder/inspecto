@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { BranchingMatch } from '@inspecto/link-analysis/graph/branching-pattern-engine';
+import { laLimit } from './la-limits';
 import {
     G6Edge,
     G6GraphData,
@@ -50,38 +51,17 @@ import { combineSources } from './index-source';
  * graph sources are pinned through. Delete it and both guards go with it.
  */
 
-/** Above this many entities the projection truncates (and says so) rather than melt the canvas. */
 /**
- * DEFAULT ceiling on nodes admitted to one projection.
+ * The ceiling on nodes admitted to one projection: `projection_node_cap` (LA-CONFIG-LIMITS-1), the Space's value or
+ * the analyst's lower one for this browser, published by `GET /settings/link-analysis/limits`.
  *
- * ⚠ A **default, not a truth** — measured on one host and one graph shape (plan §1.7). It is the real
- * governor of what an analyst sees, and it is set by LAYOUT cost, not by the algorithms: the default
- * layered layout renders 500 nodes in ~0.9 s but 750 in ~10.7 s. A different host, layout or data shape
- * moves that cliff. ⇒ deployments override it via {@link configureProjectionLimits}; the server
- * publishes the value at `/bootstrap` (`limits.projectionNodeCap`).
+ * ⚠ Its shipped default is a **default, not a truth** — measured on one host and one graph shape (plan §1.7). It is
+ * the real governor of what an analyst sees, and it is set by LAYOUT cost, not by the algorithms: the default layered
+ * layout renders 500 nodes in ~0.9 s but 750 in ~10.7 s. A different host, layout or data shape moves that cliff.
+ * Read it — never cache it.
  */
-export const PROJECTION_NODE_CAP_DEFAULT = 500;
-
-let projectionNodeCap = PROJECTION_NODE_CAP_DEFAULT;
-
-/** The ceiling currently in force. Read it — never cache it. */
 export function projectionNodeCapValue(): number {
-    return projectionNodeCap;
-}
-
-/**
- * Apply a deployment's projection limit. ⛔ Fails closed on nonsense: a cap that is not a finite number
- * ≥ 1 is refused and the previous value stands, because a cap of 0 would yield an empty graph for every
- * query and read as "no data" rather than "misconfigured".
- */
-export function configureProjectionLimits(limits: { projectionNodeCap?: number } | null | undefined): void {
-    const v = limits?.projectionNodeCap;
-    if (typeof v === 'number' && Number.isFinite(v) && v >= 1) projectionNodeCap = Math.floor(v);
-}
-
-/** Restore the measured default — for tests, and for a deployment that clears its override. */
-export function resetProjectionLimits(): void {
-    projectionNodeCap = PROJECTION_NODE_CAP_DEFAULT;
+    return laLimit('projection_node_cap');
 }
 
 /**

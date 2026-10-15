@@ -2,11 +2,10 @@ import { Location } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { EmbedGraph, EmbedView, EmbedViewService, layoutEmbedGraph } from './embed-view.service';
 
 const PAGE_SIZE = 25;
-const LABEL_LIMIT = 80;
-const EDGE_LIMIT = 3000;
 
 /** What the address bar shows once the link has been read: the token is the credential, so it must not stay in history or a screenshot. */
 export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
@@ -119,7 +118,7 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                     {{ g.nodes.length }} entities on {{ rings() }} ring(s) - the centre is the seed, each ring one hop
                                     further.
                                     @if (truncated()) {
-                                        Only the first {{ edgeLimit }} links are drawn; the table lists every entity.
+                                        Only the first {{ edgeLimit() }} links are drawn; the table lists every entity.
                                     }
                                 </p>
                             } @else {
@@ -234,7 +233,12 @@ export class EmbedViewPageComponent {
     readonly token = input.required<string>();
     protected readonly state = signal<'loading' | 'ready' | 'unavailable' | 'unreachable'>('loading');
     protected readonly view = signal<EmbedView | null>(null);
-    protected readonly edgeLimit = EDGE_LIMIT;
+    /**
+     * `display.embed_edge_limit` / `display.embed_label_limit` (LA-CONFIG-LIMITS-1), read from the limits store and NOT
+     * fetched: this page makes no call but its one read, and its holder has no account to read a Space's settings with.
+     */
+    protected readonly edgeLimit = computed(() => laLimit('display.embed_edge_limit'));
+    private readonly labelLimit = computed(() => laLimit('display.embed_label_limit'));
 
     private readonly laidOut = computed<EmbedGraph | null>(() => {
         const v = this.view();
@@ -242,9 +246,9 @@ export class EmbedViewPageComponent {
     });
     protected readonly graph = computed<EmbedGraph | null>(() => {
         const g = this.laidOut();
-        return g ? { ...g, edges: g.edges.slice(0, EDGE_LIMIT) } : null;
+        return g ? { ...g, edges: g.edges.slice(0, this.edgeLimit()) } : null;
     });
-    protected readonly truncated = computed(() => (this.laidOut()?.edges.length ?? 0) > EDGE_LIMIT);
+    protected readonly truncated = computed(() => (this.laidOut()?.edges.length ?? 0) > this.edgeLimit());
     protected readonly rings = computed(() => new Set(this.graph()?.nodes.map((n) => n.hop)).size);
     protected readonly nodeR = computed(() => Math.max(3, (this.graph()?.extent ?? 200) / 70));
     protected readonly labelSize = computed(() => (this.graph()?.extent ?? 200) / 22);
@@ -388,7 +392,7 @@ export class EmbedViewPageComponent {
 
     protected showLabel(g: EmbedGraph, id: string): boolean {
         const s = this.selected();
-        return g.nodes.length <= LABEL_LIMIT || id === s || (s !== null && g.edges.some((e) => this.touches(e) && (e.source === id || e.target === id)));
+        return g.nodes.length <= this.labelLimit() || id === s || (s !== null && g.edges.some((e) => this.touches(e) && (e.source === id || e.target === id)));
     }
 
     protected linksOf(id: string) {

@@ -1,4 +1,6 @@
-import { MAX_CONNECT_SEEDS, parseSeedList } from './seed-list';
+import { describe, expect, it } from 'vitest';
+import { parseSeedList } from './seed-list';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 describe('parseSeedList (LA-SEED-CONNECT-1)', () => {
     it('reads numbers split by lines, commas, semicolons and spaces, normalised and once each', () => {
@@ -16,10 +18,10 @@ describe('parseSeedList (LA-SEED-CONNECT-1)', () => {
     });
 
     it('caps the seeds and names the overflow', () => {
-        const numbers = Array.from({ length: MAX_CONNECT_SEEDS + 3 }, (_, i) => String(5551230000 + i));
+        const numbers = Array.from({ length: laLimit('connect.max_seeds') + 3 }, (_, i) => String(5551230000 + i));
         const r = parseSeedList(numbers.join('\n'));
-        expect(r.ids.length).toBe(MAX_CONNECT_SEEDS);
-        expect(r.overCap).toEqual(numbers.slice(MAX_CONNECT_SEEDS));
+        expect(r.ids.length).toBe(laLimit('connect.max_seeds'));
+        expect(r.overCap).toEqual(numbers.slice(laLimit('connect.max_seeds')));
     });
 
     it('is empty for blank text', () => {

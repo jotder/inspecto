@@ -906,7 +906,7 @@
                                 <span>Investigation Working Set</span>
                             }
                             @if (lodLabelsOff()) {
-                                <span>labels off above {{ lodLabelCap }} nodes (level of detail)</span>
+                                <span>labels off above {{ lodLabelCap() }} nodes (level of detail)</span>
                             }
                             <inspecto-link-analysis-modules class="ml-auto" />
                             <span>
@@ -1168,7 +1168,7 @@
                                 <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
                                     Level of detail
                                     <span class="text-secondary text-xs"
-                                        >(labels off above {{ lodLabelCap }} nodes)</span
+                                        >(labels off above {{ lodLabelCap() }} nodes)</span
                                     >
                                 </mat-checkbox>
                                 <mat-checkbox

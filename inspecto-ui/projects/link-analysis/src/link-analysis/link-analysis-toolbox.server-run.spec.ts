@@ -14,11 +14,11 @@ import {
 } from '@inspecto/link-analysis/api/graph-runs.service';
 import { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { EntityProjection } from '@inspecto/core/graph';
-import { configureGraphLimits, resetGraphLimits } from '@inspecto/link-analysis/graph/graph-analysis';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import { buildServerIdMap } from './graph-run-apply';
 import { workingSetToGraph } from './investigation-state';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
+import { configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * D-4 step 7 - "browser first under the cap, server above": the toolbox runs locally at or under an algorithm's cap
@@ -140,7 +140,7 @@ function make(
 }
 
 describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
-    afterEach(() => resetGraphLimits());
+    afterEach(() => resetLaLimits());
 
     it('at or under the cap the local run is unchanged and no server control exists', () => {
         const { fixture, c, el, button, run } = make();
@@ -156,7 +156,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('above the cap the browser control becomes Run on server - and no "capped at" refusal is shown', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const { fixture, c, el, button } = make();
         c.tab.set('centrality');
         c.centralityMetric.set('betweenness');
@@ -169,7 +169,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('an algorithm without a browser cap (degree) stays local even on a big graph', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const { fixture, c, button } = make();
         c.tab.set('centrality');
         c.centralityMetric.set('degree');
@@ -179,7 +179,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a completed server ranking lands on the canvas ids through the same ranking code a local run uses', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const result: GraphRunResult = {
             algorithm: 'betweennessCentrality',
             kind: 'SCORES',
@@ -205,7 +205,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a returned min-cut edge highlights the intended canvas edge (flow, params carry the server node ids)', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const result: GraphRunResult = {
             algorithm: 'maxFlow',
             kind: 'FLOW',
@@ -237,7 +237,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a server BUDGET_EXCEEDED leaves the canvas and every result untouched', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const probe: GraphRunResult = {
             algorithm: 'betweennessCentrality',
             kind: 'SCORES',
@@ -259,7 +259,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('without the capability the control is disabled with a stated reason and no run is sent', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const { fixture, c, button, run, el } = make({ allowed: false });
         c.tab.set('scoring');
         fixture.detectChanges();
@@ -270,14 +270,14 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('with no Investigation open it says so instead of running', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const { fixture, c, el } = make({ investigationId: null });
         c.tab.set('communities');
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="blocked-reason"]')!.textContent).toMatch(/Investigation/);
     });
     it('with a Working Set open the decision is made on ITS size, not the query graph under it', () => {
-        configureGraphLimits({ analysisNodeCap: 750, suspicionNodeCap: 750 });
+        configureLaLimits({ analysis_node_cap: 750, suspicion_node_cap: 750 });
         // no query graph loaded at all, but an Investigation whose Working Set has 1 225 nodes
         const big = make({ graph: null, workingSetNodes: 1225 });
         big.c.tab.set('scoring');
@@ -289,7 +289,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     });
 
     it('a Working Set under the cap stays local even when the query graph beside it is over', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const { c } = make({ workingSetNodes: 2 }); // CANVAS has 5 nodes, over the 3-node cap
         expect(c.serverSpecs().scoring).toBeNull();
     });
@@ -301,8 +301,8 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
  * `selectionNodeCapValue()` (the analysis cap), lowered by the server's per-algorithm `inlineNodeCeiling`.
  */
 describe('LinkAnalysisToolboxComponent - selection algorithms on the server', () => {
-    afterEach(() => resetGraphLimits());
-    const over = () => configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+    afterEach(() => resetLaLimits());
+    const over = () => configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
     const sel = (nodes: string[], edges: [string, string][]) => ({
         nodeIds: nodes,
         edgeIds: edges.map(([s, t]) => linkId(s, t, 'calls')),
@@ -484,7 +484,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
     });
 
     it('the threshold is ONE shared cap, lowered (never raised) by the server ceiling', () => {
-        configureGraphLimits({ analysisNodeCap: 100, suspicionNodeCap: 100 });
+        configureLaLimits({ analysis_node_cap: 100, suspicion_node_cap: 100 });
         // 5 nodes: under the 100 cap, so the browser runs it...
         expect(make().c.serverSpecs().cycles).toBeNull();
         TestBed.resetTestingModule();
@@ -492,7 +492,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
         expect(make({ serverCeilings: { findCycles: 3 } }).c.serverSpecs().cycles?.algorithm).toBe('findCycles');
         TestBed.resetTestingModule();
         // a HIGHER server ceiling never raises the browser threshold
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         expect(make({ serverCeilings: { findCycles: 100_000 } }).c.serverSpecs().cycles?.algorithm).toBe('findCycles');
     });
 
@@ -537,8 +537,8 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
 });
 
 describe('LinkAnalysisToolboxComponent - the server result cap is never silent (D1)', () => {
-    afterEach(() => resetGraphLimits());
-    const over = () => configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+    afterEach(() => resetLaLimits());
+    const over = () => configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
     const ranking = (more: Partial<GraphRunResult>): GraphRunResult => ({
         algorithm: 'betweennessCentrality',
         kind: 'SCORES',
@@ -615,7 +615,7 @@ describe('LinkAnalysisToolboxComponent - the server result cap is never silent (
 });
 
 describe('LinkAnalysisToolboxComponent - a server cut-points answer never combines with another Working Set (D2)', () => {
-    afterEach(() => resetGraphLimits());
+    afterEach(() => resetLaLimits());
     const result = (more: Partial<GraphRunResult>): GraphRunResult => ({
         algorithm: 'x',
         kind: 'IDS',
@@ -625,7 +625,7 @@ describe('LinkAnalysisToolboxComponent - a server cut-points answer never combin
     });
 
     it('articulation on one Working Set, then bridges on another: the bridges answer carries no old cut nodes', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const answers: Record<string, GraphRunResult> = {
             articulationPoints: result({ algorithm: 'articulationPoints', ids: ['b', 'c'] }),
             bridges: result({ algorithm: 'bridges', ids: [linkId('a', 'b', 'calls')] }),
@@ -651,7 +651,7 @@ describe('LinkAnalysisToolboxComponent - a server cut-points answer never combin
     });
 
     it('"No cut points" is claimed only when both halves were checked on this Working Set', () => {
-        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        configureLaLimits({ analysis_node_cap: 3, suspicion_node_cap: 3 });
         const answers: Record<string, GraphRunResult> = {
             articulationPoints: result({ algorithm: 'articulationPoints', ids: [] }),
             bridges: result({ algorithm: 'bridges', ids: [] }),

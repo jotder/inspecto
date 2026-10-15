@@ -11,14 +11,12 @@ import {
     mergeProjectedGraphs,
     projectEntities,
     projectTriples,
-    PROJECTION_NODE_CAP_DEFAULT,
-    configureProjectionLimits,
     projectionNodeCapValue,
-    resetProjectionLimits,
     resolveRunQuery,
     withColumnTypes,
 } from './entity-projection';
 import { endpointId } from '@inspecto/core/graph';
+import { LA_LIMIT_FALLBACKS, configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 const rows = [
     { source: 'sub-01', target: 'dev-01', link_type: 'shared_device', weight: 5 },
@@ -410,38 +408,38 @@ describe('mergeProjectedGraphs', () => {
 });
 
 describe('projection limit is configurable (D-S3)', () => {
-    afterEach(() => resetProjectionLimits());
+    afterEach(() => resetLaLimits());
 
     it('starts at the measured default', () => {
-        expect(projectionNodeCapValue()).toBe(PROJECTION_NODE_CAP_DEFAULT);
+        expect(projectionNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.projection_node_cap);
     });
 
     it('a deployment override takes effect', () => {
-        configureProjectionLimits({ projectionNodeCap: 25 });
+        configureLaLimits({ projection_node_cap: 25 });
         expect(projectionNodeCapValue()).toBe(25);
     });
 
     it('⛔ REFUSES a nonsense cap and keeps the previous value', () => {
         // A cap of 0 would yield an empty graph for every query, which reads as "no data" rather than
         // "misconfigured" — the worst possible failure for an investigative tool.
-        configureProjectionLimits({ projectionNodeCap: 25 });
+        configureLaLimits({ projection_node_cap: 25 });
         for (const bad of [0, -5, Number.NaN]) {
-            configureProjectionLimits({ projectionNodeCap: bad });
+            configureLaLimits({ projection_node_cap: bad });
             expect(projectionNodeCapValue(), `cap ${bad} must be refused`).toBe(25);
         }
     });
 
     it('ignores an absent field, so a partial response is safe', () => {
-        configureProjectionLimits({ projectionNodeCap: 33 });
-        configureProjectionLimits({});
-        configureProjectionLimits(null);
+        configureLaLimits({ projection_node_cap: 33 });
+        configureLaLimits({});
+        configureLaLimits(null);
         expect(projectionNodeCapValue()).toBe(33);
     });
 
     it('reset restores the shipped default', () => {
-        configureProjectionLimits({ projectionNodeCap: 9 });
-        resetProjectionLimits();
-        expect(projectionNodeCapValue()).toBe(PROJECTION_NODE_CAP_DEFAULT);
+        configureLaLimits({ projection_node_cap: 9 });
+        resetLaLimits();
+        expect(projectionNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.projection_node_cap);
     });
 });
 

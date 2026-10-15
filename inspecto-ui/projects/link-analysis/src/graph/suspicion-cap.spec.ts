@@ -1,16 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-    ANALYSIS_NODE_CAP_DEFAULT,
-    SUSPICION_NODE_CAP_DEFAULT,
     analysisNodeCapValue,
-    configureGraphLimits,
     betweennessCentrality,
     degreeCentrality,
-    resetGraphLimits,
     suspicionNodeCapValue,
     suspicionScore,
 } from './graph-analysis';
 import { G6GraphData } from '@inspecto/core/graph/index';
+import { LA_LIMIT_FALLBACKS, configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * Decision D-S3 (operator, 2026-09-22): suspicion score gets its OWN, lower cap. The shared
@@ -33,17 +30,17 @@ function ring(n: number): G6GraphData {
 }
 
 describe('suspicion score has its own cap (D-S3)', () => {
-    afterEach(() => resetGraphLimits());
+    afterEach(() => resetLaLimits());
 
     it('defaults lower than the shared analysis cap', () => {
-        expect(SUSPICION_NODE_CAP_DEFAULT).toBe(750);
-        expect(SUSPICION_NODE_CAP_DEFAULT).toBeLessThan(ANALYSIS_NODE_CAP_DEFAULT);
-        expect(suspicionNodeCapValue()).toBe(SUSPICION_NODE_CAP_DEFAULT);
+        expect(LA_LIMIT_FALLBACKS.suspicion_node_cap).toBe(750);
+        expect(LA_LIMIT_FALLBACKS.suspicion_node_cap).toBeLessThan(LA_LIMIT_FALLBACKS.analysis_node_cap);
+        expect(suspicionNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.suspicion_node_cap);
     });
 
     // The point of the decision: a graph that is fine for every other algorithm is refused by this one.
     it('refuses a graph the shared cap would admit, and names its own cap', () => {
-        configureGraphLimits({ analysisNodeCap: 2000, suspicionNodeCap: 100 });
+        configureLaLimits({ analysis_node_cap: 2000, suspicion_node_cap: 100 });
         const g = ring(150);
 
         expect(() => degreeCentrality(g)).not.toThrow();
@@ -57,33 +54,33 @@ describe('suspicion score has its own cap (D-S3)', () => {
     });
 
     it('is settable independently of the shared cap', () => {
-        configureGraphLimits({ suspicionNodeCap: 900 });
+        configureLaLimits({ suspicion_node_cap: 900 });
 
         expect(suspicionNodeCapValue()).toBe(900);
-        expect(analysisNodeCapValue()).toBe(ANALYSIS_NODE_CAP_DEFAULT);
+        expect(analysisNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.analysis_node_cap);
     });
 
     // Fail closed, exactly as the other two caps do: a cap of 0 or NaN would put EVERY graph over the
     // limit and switch the tool off, which is worse than ignoring the bad setting. This spec goes red if
     // the guard is mutated away, because the bad value would then be applied.
     it('ignores a nonsense cap and leaves the previous value standing', () => {
-        configureGraphLimits({ suspicionNodeCap: 900 });
+        configureLaLimits({ suspicion_node_cap: 900 });
 
-        configureGraphLimits({ suspicionNodeCap: 0 });
+        configureLaLimits({ suspicion_node_cap: 0 });
         expect(suspicionNodeCapValue()).toBe(900);
 
-        configureGraphLimits({ suspicionNodeCap: Number.NaN });
+        configureLaLimits({ suspicion_node_cap: Number.NaN });
         expect(suspicionNodeCapValue()).toBe(900);
 
-        configureGraphLimits({ suspicionNodeCap: -5 });
+        configureLaLimits({ suspicion_node_cap: -5 });
         expect(suspicionNodeCapValue()).toBe(900);
     });
 
     it('resets to the shipped default, so one space cannot tune another', () => {
-        configureGraphLimits({ suspicionNodeCap: 900 });
-        resetGraphLimits();
+        configureLaLimits({ suspicion_node_cap: 900 });
+        resetLaLimits();
 
-        expect(suspicionNodeCapValue()).toBe(SUSPICION_NODE_CAP_DEFAULT);
+        expect(suspicionNodeCapValue()).toBe(LA_LIMIT_FALLBACKS.suspicion_node_cap);
     });
 
     /**
@@ -94,7 +91,7 @@ describe('suspicion score has its own cap (D-S3)', () => {
      * the main thread for about ten seconds — the exact freeze D-S3 believed it had removed.
      */
     it('caps betweenness with the LOW ceiling, not the shared analysis cap', () => {
-        configureGraphLimits({ analysisNodeCap: 2000, suspicionNodeCap: 100 });
+        configureLaLimits({ analysis_node_cap: 2000, suspicion_node_cap: 100 });
         const g = ring(150);
 
         expect(() => betweennessCentrality(g)).toThrow(/capped at 100 nodes/);
@@ -103,7 +100,7 @@ describe('suspicion score has its own cap (D-S3)', () => {
     });
 
     it('lets betweenness run under its own ceiling', () => {
-        configureGraphLimits({ suspicionNodeCap: 900 });
+        configureLaLimits({ suspicion_node_cap: 900 });
 
         expect(betweennessCentrality(ring(40)).length).toBe(40);
     });

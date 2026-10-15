@@ -1,4 +1,5 @@
 import { MSISDN_PATTERN, normaliseMsisdn } from './investigate-number';
+import { laLimit } from './la-limits';
 
 /** Any other id (an account, a device): one token of letters, digits and `. : @ _ - + /`, kept exactly as typed. */
 const ID_PATTERN = /^[\w.:@+/-]{1,200}$/;
@@ -10,14 +11,9 @@ function seedId(part: string): string | null {
     return ID_PATTERN.test(part) ? part : null;
 }
 
-/** The server's seed cap for one `connect` (`ConnectSeeds.MAX_SEEDS`): 20 seeds are 190 pairs from 20 searches. */
-export const MAX_CONNECT_SEEDS = 20;
-/** The server's hop ceiling for one `connect` (`ConnectSeeds.MAX_HOPS`). */
-export const MAX_CONNECT_HOPS = 3;
-
 /** A pasted list of numbers, read: the seeds to send, and what was left out and why (nothing is dropped silently). */
 export interface SeedList {
-    /** Normalised, de-duplicated, in the order pasted, at most {@link MAX_CONNECT_SEEDS}. */
+    /** Normalised, de-duplicated, in the order pasted, at most `connect.max_seeds` (the server's seed cap for one `connect`). */
     ids: string[];
     /** Entries that are neither a number nor an id token (illegal characters, or over 200), as typed. */
     invalid: string[];
@@ -56,7 +52,7 @@ export function parseSeedList(text: string): SeedList {
                 continue;
             }
             seen.add(id);
-            if (ids.length < MAX_CONNECT_SEEDS) ids.push(id);
+            if (ids.length < laLimit('connect.max_seeds')) ids.push(id);
             else overCap.push(id);
         }
     }

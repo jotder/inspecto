@@ -213,9 +213,8 @@ import { NodeInsightComponent, NodeInsightContext } from './node-insight.compone
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { AiExplainComponent } from '@inspecto/core/ai-assist/ai-explain.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-
-/** Level of detail: displayed-node count above which labels are dropped (they are unreadable there anyway). */
-export const LOD_LABEL_CAP = 300;
+import { laLimit } from './la-limits';
+import { LaLimitsService } from './la-limits.service';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -288,15 +287,12 @@ export function snapshotTitle(onInvestigation: boolean, invTitle: string | undef
 
 /**
  * The layout a fresh graph opens with when the analyst has not picked one: Layered (dagre LR) draws a big or
- * hub-shaped graph as a thin column, so an Investigation canvas, a graph over {@link LAYERED_MAX_NODES} nodes or a
+ * hub-shaped graph as a thin column, so an Investigation canvas, a graph over `display.layered_max_nodes` nodes or a
  * hub-shaped one opens in Force (d3-force; never force-atlas2, which froze the tab on ~1.6k nodes).
  */
-export const LAYERED_MAX_NODES = 30;
-/** Above this many nodes a force-atlas2 layout the analyst did not pick in this session opens as Force instead. */
-export const FORCE_ATLAS_MAX_NODES = 800;
 export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean): GraphLayoutId {
     if (!g) return 'dagre';
-    if (onInvestigation || g.nodes.length > LAYERED_MAX_NODES) return 'force';
+    if (onInvestigation || g.nodes.length > laLimit('display.layered_max_nodes')) return 'force';
     const deg = new Map<string, number>();
     for (const e of g.edges) {
         deg.set(e.source, (deg.get(e.source) ?? 0) + 1);
@@ -402,12 +398,13 @@ export class LinkAnalysisComponent implements OnInit {
     private readonly exchangeEnabled = inject(LA_FEATURES).exchange;
     readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
     private datasetsService = inject(LA_DATASETS);
-    /**
-     * Injected for its side effect, not for a value: constructing it applies the active space's tuning
-     * limits to the two pure graph modules. Without an injector asking for it, a `providedIn: 'root'`
-     * service is never constructed and the caps would silently stay at the shipped defaults.
-     */
     private readonly limits = inject(LinkAnalysisSettingsService);
+    /**
+     * Injected for its side effect, not for a value: constructing it loads the active space's limits into the store
+     * every limit is read from (`laLimit`). Without an injector asking for it, a `providedIn: 'root'` service is never
+     * constructed and the limits would silently stay at the shipped defaults.
+     */
+    private readonly laLimits = inject(LaLimitsService);
     private pipelinesService = inject(PipelinesService);
     private viewsService = inject(LinkAnalysisService);
     private components = inject(ComponentsService);
@@ -968,16 +965,15 @@ export class LinkAnalysisComponent implements OnInit {
     readonly edgeSizes = signal<Record<string, number>>({});
     // ── level of detail (mockup review point 5): labels are the first thing to go on a big canvas ──
     readonly levelOfDetail = signal(true);
-    /** Above this many displayed nodes, labels are dropped while level of detail is on. */
-    readonly lodLabelCap = LOD_LABEL_CAP;
+    /** Above this many displayed nodes, labels are dropped while level of detail is on (`display.lod_label_cap`). */
+    readonly lodLabelCap = computed(() => laLimit('display.lod_label_cap'));
     readonly lodLabelsOff = computed(
-        () => this.levelOfDetail() && (this.displayed()?.nodes.length ?? 0) > LOD_LABEL_CAP,
+        () => this.levelOfDetail() && (this.displayed()?.nodes.length ?? 0) > this.lodLabelCap(),
     );
     /** The published size limits the footer states — the server-side projection cap and the browser analysis cap. */
     /**
      * The limits currently IN FORCE, read live rather than captured, so a deployment's override reaches
-     * the footer. A getter and not a `computed()` on purpose: these are set once from settings at
-     * startup, not signals, and a computed would never see the change.
+     * the footer (both read the limits store, a signal, so the template re-renders when they change).
      */
     get caps(): { projection: number; analysis: number } {
         return { projection: projectionNodeCapValue(), analysis: analysisNodeCapValue() };
@@ -1054,7 +1050,11 @@ export class LinkAnalysisComponent implements OnInit {
         if (!picked) return defaultLayoutFor(g, this.investigation.canvas() !== null);
         // A RESTORED force-atlas2 ("Clustering force") froze the tab for ~60 s on a big graph; only a pick made here
         // keeps it there.
-        if (picked === 'force-cluster' && !this.layoutPickedHere() && (g?.nodes.length ?? 0) > FORCE_ATLAS_MAX_NODES)
+        if (
+            picked === 'force-cluster' &&
+            !this.layoutPickedHere() &&
+            (g?.nodes.length ?? 0) > laLimit('display.force_atlas_max_nodes')
+        )
             return 'force';
         return picked;
     });

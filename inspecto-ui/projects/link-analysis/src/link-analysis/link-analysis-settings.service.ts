@@ -2,21 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { SpacesService, apiUrl } from '@inspecto/core/api';
-import {
-    ANALYSIS_NODE_CAP_DEFAULT,
-    SUSPICION_NODE_CAP_DEFAULT,
-    analysisNodeCapValue,
-    configureGraphLimits,
-    resetGraphLimits,
-    suspicionNodeCapValue,
-} from '@inspecto/link-analysis/graph/graph-analysis';
 import { type EntityNormaliser } from '@inspecto/core/graph';
-import {
-    PROJECTION_NODE_CAP_DEFAULT,
-    configureProjectionLimits,
-    projectionNodeCapValue,
-    resetProjectionLimits,
-} from './entity-projection';
 
 /**
  * Per-space Link Analysis tuning limits. Each field is `null` when unset, meaning **use the shipped
@@ -140,25 +126,14 @@ const UNSET: LinkAnalysisLimits = {
 };
 
 /**
- * Holds the active space's graph limits and applies them to the two pure graph modules.
+ * Holds the active space's Link Analysis settings document (`GET|PUT /settings/link-analysis`).
  *
- * <p><b>Why this exists.</b> The shipped caps were measured on ONE host, ONE browser and ONE synthetic
- * graph shape (plan §1.7): the default layered layout draws 500 nodes in ~0.9 s but 750 in ~10.7 s, and
- * 25 of the 27 algorithms then counted (29 today) are trivial at 2 000 nodes while suspicion score alone takes ~7 s — which is why it
- * now carries its OWN lower cap (750, the last measured point under a second; the curve is quadratic).
- * An analyst's
- * laptop, a denser graph or a different edge-to-node ratio all move those numbers, so a single
- * compiled-in constant is necessarily someone else's wrong answer. The measured values stay as
- * DEFAULTS; a deployment tunes them per space.
+ * <p>⚠ The numeric limits the canvas and the algorithms obey are NOT applied from here any more: they are items of
+ * `GET /settings/link-analysis/limits`, read by `LaLimitsService` (LA-CONFIG-LIMITS-1). This document still carries
+ * their stated values, so a save here round-trips them.
  *
- * <p>The graph modules are pure libraries with no dependency injection, so the values are pushed into
- * them ({@link configureGraphLimits}, {@link configureProjectionLimits}) rather than read out — and both
- * setters refuse a value that is not a finite integer ≥ 1, so a bad setting leaves the default standing
- * instead of turning the analysis toolbox off.
- *
- * <p>⚠ The limits are per space, so an `effect` re-applies them whenever the active space changes; a
- * failed fetch RESETS to the shipped defaults rather than leaving the previous space's override in
- * force, which would silently tune one space by another's settings.
+ * <p>⚠ The settings are per space, so an `effect` re-reads them whenever the active space changes; a failed fetch
+ * RESETS to the unset document rather than leaving the previous space's values in force.
  */
 @Injectable({ providedIn: 'root' })
 export class LinkAnalysisSettingsService {
@@ -167,12 +142,6 @@ export class LinkAnalysisSettingsService {
 
     /** What the server last said, `null` fields meaning "inherit". */
     readonly limits = signal<LinkAnalysisLimits>(UNSET);
-    /** The shipped defaults, for a settings form to show as placeholder text. */
-    readonly defaults = {
-        projectionNodeCap: PROJECTION_NODE_CAP_DEFAULT,
-        analysisNodeCap: ANALYSIS_NODE_CAP_DEFAULT,
-        suspicionNodeCap: SUSPICION_NODE_CAP_DEFAULT,
-    };
 
     constructor() {
         effect(() => {
@@ -194,23 +163,7 @@ export class LinkAnalysisSettingsService {
             .pipe(tap((l) => this.apply(l)));
     }
 
-    /** The values actually in force right now — what the footer publishes to the analyst. */
-    effective(): { projectionNodeCap: number; analysisNodeCap: number; suspicionNodeCap: number } {
-        return {
-            projectionNodeCap: projectionNodeCapValue(),
-            analysisNodeCap: analysisNodeCapValue(),
-            suspicionNodeCap: suspicionNodeCapValue(),
-        };
-    }
-
     private apply(l: LinkAnalysisLimits): void {
         this.limits.set(l ?? UNSET);
-        // Reset first: an absent field means "inherit the default", and without the reset it would
-        // instead mean "keep whatever the previous space set", which is a different and wrong answer.
-        resetGraphLimits();
-        resetProjectionLimits();
-        if (l?.analysisNodeCap != null) configureGraphLimits({ analysisNodeCap: l.analysisNodeCap });
-        if (l?.suspicionNodeCap != null) configureGraphLimits({ suspicionNodeCap: l.suspicionNodeCap });
-        if (l?.projectionNodeCap != null) configureProjectionLimits({ projectionNodeCap: l.projectionNodeCap });
     }
 }

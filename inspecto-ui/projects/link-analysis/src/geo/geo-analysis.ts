@@ -1,4 +1,5 @@
 import { normalizeEntityKey, type G6GraphData } from '@inspecto/core/graph';
+import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { GeoData, GeoPoint } from './geo-types';
 
 /**
@@ -7,9 +8,6 @@ import { GeoData, GeoPoint } from './geo-types';
  * distances are meters (great-circle / haversine — no routing engine, by design; see
  * docs/superpower/geo-map-analysis-plan.md).
  */
-
-/** Guard for super-linear algorithms (mirrors graph-analysis's ANALYSIS_NODE_CAP). */
-export const ANALYSIS_POINT_CAP = 5000;
 
 const EARTH_RADIUS_M = 6_371_000;
 const rad = (deg: number): number => (deg * Math.PI) / 180;
@@ -281,7 +279,7 @@ export interface FrequentLocation {
 export function frequentLocations(points: readonly GeoPoint[], radiusM: number, minVisits = 2): FrequentLocation[] {
     const out: FrequentLocation[] = [];
     const byEntity = new Map<string, GeoPoint[]>();
-    for (const p of points.slice(0, ANALYSIS_POINT_CAP)) {
+    for (const p of points.slice(0, laLimit('display.geo_point_cap'))) {
         if (!p.label) continue;
         (byEntity.get(p.label) ?? byEntity.set(p.label, []).get(p.label)!).push(p);
     }
@@ -331,10 +329,10 @@ export interface CoLocation {
 
 /**
  * Repeated co-location detection: cross-entity point pairs close in space AND time, folded per
- * entity pair (order-independent), most-met first. O(n²), capped at {@link ANALYSIS_POINT_CAP}.
+ * entity pair (order-independent), most-met first. O(n²), capped at `display.geo_point_cap`.
  */
 export function coLocations(points: readonly GeoPoint[], radiusM: number, windowMs: number): CoLocation[] {
-    const pts = points.slice(0, ANALYSIS_POINT_CAP).filter((p) => p.label && p.time !== undefined);
+    const pts = points.slice(0, laLimit('display.geo_point_cap')).filter((p) => p.label && p.time !== undefined);
     const byPair = new Map<string, CoLocation>();
     // A point's identity is its mapped key, falling back to the display label when none is mapped — which
     // keeps the pre-D-U3 behaviour for every projection that maps no key column. Either way it is the shared
@@ -411,7 +409,7 @@ export function coLocationGraph(pairs: readonly CoLocation[]): G6GraphData {
 /** Timed, labeled points grouped per entity and sorted chronologically. */
 function byEntityChronological(points: readonly GeoPoint[]): Map<string, GeoPoint[]> {
     const byEntity = new Map<string, GeoPoint[]>();
-    for (const p of points.slice(0, ANALYSIS_POINT_CAP)) {
+    for (const p of points.slice(0, laLimit('display.geo_point_cap'))) {
         if (!p.label || p.time === undefined) continue;
         (byEntity.get(p.label) ?? byEntity.set(p.label, []).get(p.label)!).push(p);
     }
@@ -422,10 +420,10 @@ function byEntityChronological(points: readonly GeoPoint[]): Map<string, GeoPoin
 /**
  * Location clustering: greedy DBSCAN-style grouping — points within `radiusM` of a cluster
  * seed join it. Returns point-id groups, biggest first; singletons excluded. Capped at
- * {@link ANALYSIS_POINT_CAP} points (O(n²) worst case).
+ * `display.geo_point_cap` points (O(n²) worst case).
  */
 export function clusterLocations(points: readonly GeoPoint[], radiusM: number): string[][] {
-    const pts = points.slice(0, ANALYSIS_POINT_CAP);
+    const pts = points.slice(0, laLimit('display.geo_point_cap'));
     const assigned = new Set<string>();
     const clusters: string[][] = [];
     for (const seed of pts) {

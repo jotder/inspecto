@@ -65,6 +65,7 @@ import { uniqueNameValidator } from '@inspecto/core/investigation';
 import { ComponentsService, apiErrorMessage } from '@inspecto/core/api';
 import { invErrorMessage } from '@inspecto/link-analysis/link-analysis/entity-projection';
 import { GeoSettingsService } from '@inspecto/link-analysis/api/geo-settings.service';
+import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { LA_DATASETS, LA_FEATURES, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from '@inspecto/link-analysis/la-host';
 import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
@@ -175,6 +176,8 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     /** LA-22: the shared Geo ↔ Link brush (keyed by `GeoPoint.key`, D-U3). */
     private brush = inject(GeoLinkBrushService);
     private geoSettings = inject(GeoSettingsService);
+    /** Injected for its side effect: it loads the Space's limits (`display.geo_point_cap`) into the store geo analysis reads. */
+    private readonly laLimits = inject(LaLimitsService);
     private geocoder = inject(GeocoderService);
     private datasetRowsSvc = inject(DatasetRowsService);
 
