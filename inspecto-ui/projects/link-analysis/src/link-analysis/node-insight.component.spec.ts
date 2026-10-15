@@ -286,6 +286,13 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(close).toHaveBeenCalledWith('hide');
     });
 
+    it('asks Entity Lists with the exploration alias when the node holds an Investigation alias', async () => {
+        const { fixture, svc } = make({ key: 'masked:inv0000000000001', listKey: 'masked:exp0000000000001' });
+        await settle(fixture);
+        expect(svc.match).toHaveBeenCalledWith('bl', ['masked:exp0000000000001']);
+        expect(svc.match).not.toHaveBeenCalledWith(expect.anything(), ['masked:inv0000000000001']);
+    });
+
     it('works in a masked Space: reads the node by its key, notes the masking, and still offers Compute risk', async () => {
         const { fixture, el, svc } = make({}, { masked: true });
         await settle(fixture);

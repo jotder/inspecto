@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +52,9 @@ import com.gamma.entitystore.MaskTokens;
  *   <li>{@code POST /entity-lists/{id}/members} {@code {add?, remove?, reason}} → 200 + the list + {@code changed}.</li>
  *   <li>{@code POST /entity-lists/{id}/retire} {@code {reason}} → 200 + the list.</li>
  *   <li>{@code POST /entity-lists/{id}/match} {@code {values[]}} → {@code {matches: [{value, matched, entry?, match?}]}}
- *       (ASSURE-ENTITY-LISTS-1; read-shaped: a POST so keys never ride in a URL).</li>
+ *       (ASSURE-ENTITY-LISTS-1; read-shaped: a POST so keys never ride in a URL). A value may be a {@code masked:}
+ *       alias - the Space key's token, what Link Analysis exploration shows a masked node as - and matches the member it
+ *       tokenises, answered with that same alias.</li>
  * </ul>
  *
  * <p><b>ASSURE-ENTITY-LISTS-1 (WS-12)</b> adds the assurance entries. {@code members} also takes
@@ -186,11 +189,29 @@ public final class EntityListRoutes implements RouteModule {
         boolean masked = masked(root, l);
         byte[] key = masked ? log.maskKey() : null;
         Instant now = Instant.now();
+        Map<String, String> memberOfAlias = null;
         List<Map<String, Object>> out = new ArrayList<>();
         for (String v : values) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("value", v);
-            String entry = l.retired() ? null : l.match(v, now);   // a retired list matches nothing
+            // A masked node arrives as its alias: the Space key's token of the id, the same key and token members are
+            // shown with. Resolve it to the member key it tokenises, then match that; an alias of no member matches
+            // nothing (a range entry has no key to tokenise). The raw key is never answered for it.
+            boolean alias = v.startsWith(MaskTokens.TOKEN_PREFIX);
+            if (alias && memberOfAlias == null) {
+                byte[] spaceKey = log.maskKey();
+                memberOfAlias = new HashMap<>();
+                for (String k : l.members()) memberOfAlias.put(MaskTokens.token(spaceKey, k), k);
+            }
+            String asked = alias ? memberOfAlias.get(v) : v;
+            String entry = l.retired() || asked == null ? null : l.match(asked, now);   // a retired list matches nothing
+            if (alias && asked != null && asked.equals(entry)) {
+                m.put("matched", true);
+                m.put("match", "key");
+                m.put("entry", v);
+                out.add(m);
+                continue;
+            }
             m.put("matched", entry != null);
             if (entry != null) {
                 boolean exact = entry.equals(EntityTypes.normalise(l.normaliser(), v)) && l.members().contains(entry);
