@@ -63,6 +63,26 @@ describe('EntityLookupComponent (Open an Entity)', () => {
         expect(JSON.stringify(nav.mock.calls)).not.toContain('249 911');
     });
 
+    it('opens on Enter in the editor, without a click on Open', async () => {
+        const { fixture, pen, resolveEntity, router } = make(() =>
+            of({ type: 'msisdn', key: 'masked:f01a9b8ca40c4eb1', masked: true }),
+        );
+        penEdit(fixture, pen, RAW);
+        await fixture.whenStable();
+        expect(resolveEntity).toHaveBeenCalledTimes(1);
+        expect(resolveEntity).toHaveBeenCalledWith('msisdn', RAW);
+        expect(router.url).toBe('/studio/entities/msisdn/masked:f01a9b8ca40c4eb1');
+    });
+
+    it('Enter on the closed row only starts editing: no resolve, no error', () => {
+        const { fixture, pen, resolveEntity } = make(() => of({ type: 'msisdn', key: 'x', masked: false }));
+        const row = pen.querySelector('button') as HTMLButtonElement;
+        row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+        expect(resolveEntity).not.toHaveBeenCalled();
+        expect(penError(pen)).toBe('');
+    });
+
     it('shows a 422 refusal from resolve in place, with its reason, and does not navigate', async () => {
         const { fixture, pen, submit, router } = make(() =>
             throwError(

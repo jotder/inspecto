@@ -41,7 +41,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiEntityProfileIndexLinksTest {
 
     private static final String TYPE_LINKS = "/inv/entity-types/msisdn/profile?sections=links";
-    private static final String ENTITY_A = "/inv/entities/msisdn/" + enc(A) + "/profile";
+    /** A's Entity page path: msisdn is masked, so the key is resolved through the body first, never put raw in a URL. */
+    private static String entityA(EntityProfileFixture.Ctx c) throws Exception {
+        String key = noRaw(send(c, "POST", "/inv/entities/msisdn/resolve", "{\"key\":\"" + A + "\"}", OWNER)).get("key").asText();
+        return "/inv/entities/msisdn/" + enc(key) + "/profile";
+    }
     private static final String BUILD = "{\"dataset\":\"calls_ds\",\"sourceCol\":\"a_msisdn\",\"targetCol\":\"b_msisdn\",\"kindCol\":\"kind\"}";
 
     @AfterEach
@@ -86,7 +90,7 @@ class ControlApiEntityProfileIndexLinksTest {
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {
             settings(c, "hub_threshold: 3\n");                               // so hubs is not trivially zero: A has 4 neighbours
             JsonNode flatType = noRaw(get(c, TYPE_LINKS, OWNER)).get("links");
-            JsonNode flatA = noRaw(get(c, ENTITY_A, OWNER)).get("links");
+            JsonNode flatA = noRaw(get(c, entityA(c), OWNER)).get("links");
             assertEquals("dataset", flatType.get("from").asText(), "no index yet: " + flatType);
             assertEquals("dataset", flatA.get("from").asText());
 
@@ -98,7 +102,7 @@ class ControlApiEntityProfileIndexLinksTest {
             assertEquals(1, type.get("hubs").asLong());
             assertEquals(2, type.get("singleLink").asLong(), "D and 99");
 
-            JsonNode a = noRaw(get(c, ENTITY_A, OWNER)).get("links");
+            JsonNode a = noRaw(get(c, entityA(c), OWNER)).get("links");
             assertEquals("index", a.get("from").asText(), a.toString());
             assertEquals(numbers(flatA), numbers(a));
             assertEquals(4, a.get("degree").asLong(), "B, C, D and 99 - the raw -99 is keyed 99, as the fallback keys it");
@@ -121,7 +125,7 @@ class ControlApiEntityProfileIndexLinksTest {
             JsonNode type = noRaw(get(c, TYPE_LINKS, OWNER)).get("links");
             assertEquals("dataset", type.get("from").asText(), type.toString());
             assertEquals(1, type.get("kinds").size(), "the Dataset now holds calls only");
-            assertEquals("dataset", noRaw(get(c, ENTITY_A, OWNER)).at("/links/from").asText());
+            assertEquals("dataset", noRaw(get(c, entityA(c), OWNER)).at("/links/from").asText());
         }
     }
 

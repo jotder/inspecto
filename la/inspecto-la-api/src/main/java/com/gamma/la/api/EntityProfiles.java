@@ -350,7 +350,7 @@ final class EntityProfiles {
 
     /** Volume and quality: distinct Entities across every binding, and the sentinels of each column (D-EP8). */
     private static Map<String, Object> volume(Frame f) throws Exception {
-        Map<String, Object> total = f.keys("SELECT APPROX_COUNT_DISTINCT(NULLIF(k, '')) AS d, COUNT(*) AS n FROM " + KEYS, 1, List.of())
+        Map<String, Object> total = f.keys("SELECT LEAST(APPROX_COUNT_DISTINCT(NULLIF(k, '')), COUNT(*)) AS d, COUNT(*) AS n FROM " + KEYS, 1, List.of())
                 .rows().get(0);
         Map<Integer, Long> nonNull = new TreeMap<>();
         for (Map<String, Object> r : f.keys("SELECT b, COUNT(*) AS n FROM " + KEYS + " GROUP BY b", f.usable.size(), List.of()).rows())
@@ -447,7 +447,7 @@ final class EntityProfiles {
         }
         Map<String, Object> span = f.keys("SELECT strftime(MIN(ts), '%Y-%m-%dT%H:%M:%SZ') AS mn, strftime(MAX(ts), '%Y-%m-%dT%H:%M:%SZ') AS mx FROM "
                 + KEYS + " WHERE ts IS NOT NULL AND k <> ''", 1, List.of()).rows().get(0);
-        DatasetProvider.Result days = f.keys("SELECT CAST(CAST(ts AS DATE) AS VARCHAR) AS day, COUNT(*) AS n, APPROX_COUNT_DISTINCT(k) AS d FROM "
+        DatasetProvider.Result days = f.keys("SELECT CAST(CAST(ts AS DATE) AS VARCHAR) AS day, COUNT(*) AS n, LEAST(APPROX_COUNT_DISTINCT(k), COUNT(*)) AS d FROM "
                 + KEYS + " WHERE ts IS NOT NULL AND k <> '' GROUP BY day ORDER BY day DESC", f.lim.timelineDays(), List.of());
         List<Map<String, Object>> perDay = new ArrayList<>();
         for (Map<String, Object> r : days.rows()) {

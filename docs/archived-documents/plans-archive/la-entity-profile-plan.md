@@ -1,8 +1,8 @@
 # Link Analysis: Entity profile pages (what the data says about each Entity Type and each Entity)
 
-**Status: IN FLIGHT 2026-10-15. Decisions D-EP1..D-EP8 taken (section 7, operator interview); scope this round P0-P3, P4 deferred; built in parallel lanes against the contract in section 4.5.** Generic for every Space and every
+**Status: SHIPPED 2026-10-15 (P0-P3; P4 deferred to `LA-ENTITY-PROFILE-RESIDUALS-1`). As built in section 9, live pass in section 10; archived.** Generic for every Space and every
 industry pack: nothing here names a telecom column. The model for the content is the "What the data is" section of the
-IMS showcase plan ([`la-ims-showcase-plan.md`](la-ims-showcase-plan.md) section 1): volumes, distinct values, value
+IMS showcase plan ([`la-ims-showcase-plan.md`](../../superpower/la-ims-showcase-plan.md) section 1): volumes, distinct values, value
 shapes, sentinel values, time span, freshness, where the rows come from, how the identifiers relate, and what the
 data does NOT contain. That section was written by hand with ad-hoc SQL; this plan makes the platform produce it, for
 any **Entity Type**, from the Space's own Datasets.
@@ -252,9 +252,58 @@ pass; the push waits for the operator.
   each binding so a wrong one is visible, and a binding whose values mostly fail the normaliser is flagged.
 - **Masking leaks through shapes** if prefixes are too long: the normaliser-declared safe prefix length is the gate.
 
+## 9. As built (2026-10-15, P0-P3)
+
+Four parallel lanes against the section 4.5 contract, integrated on `ep-integ` and merged to `master`:
+
+| Lane | Commits | What |
+|---|---|---|
+| A routes | `d7c4b1348` `f3dbb3b3c` `b3a585044` | `ColumnProfile` helper; `EntityTypeBindings`, `EntityProfiles`, `EntityProfileRoutes`, `EntityKeySql`, `LinkStatsSource`; the three GET routes plus `POST /inv/entities/{type}/resolve`; three `LINK_ENTITY_*` audit events; the seven `entity_profile.*` limits; openapi entries |
+| B index stats | `18e1b68e7` `69e2d2b5e` `fa81c88f8` | `IndexManifest` gains `kindEdges`, `typeNodes`, `degree`, `timeSpan`; `GET /inv/index` serves them; `IndexLinkStats` is the index-first Links source |
+| C P0 fixes | `dc12afd24` `9f5e0a4b7` | an Entity List match accepts the masked alias (node dialog passes the key it shows); `GET /datasets/{id}/freshness` is a read gate only (D-EP7) |
+| D UI | `f1f486fea` `7ebd57658` | `projects/link-analysis/src/entities/*`: Entities list, Entity Type page, Entity page, lookup; la-app nav entry, full-SPA route, node dialog link |
+| integration | `094560e9f` + the live-pass fixes | route counts (`AbsentModuleRoutesTest` 88, module doc 88/81), the `out` fixed name in `ImportLoaderInventoryTest`; see the live pass below |
+
+Deviations from the contract, deliberate:
+
+- **Raw keys never travel in a URL** (operator, during the build). A typed value is resolved by
+  `POST /inv/entities/{type}/resolve {key}`; the Entity page URL carries only the returned key. For a masked type the
+  GET is alias-only and answers **422** to a raw key. The contract's "raw value or alias" in the path is withdrawn.
+- **No 403 path of its own:** the routes inherit the exploration read gate; a Dataset the caller cannot view is simply
+  not a binding, and a section that needs one says `assessed:false` with the reason.
+- **Extra fields** beyond section 4.5: `sentinelShare`, `truncated` and `sampleRows` per section, `masking.mode`.
+- **View-backed Datasets are not cached** (no input-file fingerprint to key on); they are read on each request under
+  the timeout.
+
+## 10. Live pass (2026-10-15, IMS Space, Enterprise demo bundle with Demo Auth, index v37)
+
+API, as `fm.analyst` (`ep_live` script): **34/35 + 6/6**. The one miss was by design: the raw-key GET on a masked type
+answers 422 after the resolve decision; the resolve-then-alias flow passes 6/6.
+
+- Entity Types: IMSI 21,314, IMEI 17,203, MSISDN 26,937 distinct (approx.), every one masked, data as of 9 Oct 2026.
+- **The 15-SIM device appears as a count** (P2 done-when): IMEI to IMSI, most per Entity 15, 1 Entity at or above 6.
+- MSISDN Links come **from the index**; the burst number resolves to an alias, degree 8, percentile 100, 8 related
+  IMSIs. No raw identifier in any response body, page text or URL (regex scan for the data's identifier shapes).
+- Cold profile read 2.2-5.4 s; the cached read about 200 ms.
+
+Browser (la-app, Demo FM Analyst): Entities list, Entity Type page (all eight sections; Links `Not assessed` with its
+reason, listed again under What is not here), lookup, Entity page on `/entities/msisdn/masked:...`.
+
+Found and fixed in the pass:
+
+- **Distinct above rows** (IMEI, 2026-10-08: 104 rows, 109 distinct): the approximate sketch overshoots on small
+  counts. Every approximate distinct is now capped at its row count (`LEAST(...)`, `ColumnProfile` and
+  `EntityProfiles`).
+- **Enter in Open an Entity did nothing:** the pen field takes Enter to commit, so the form never submitted. The lookup
+  opens on Enter in the editor; Enter on the closed row only starts editing (two new specs).
+
+Open, moved to `BACKLOG.md`: dominance ignores values that fail the normaliser (`other_msisdn` is dominated by a
+non-number value, yet MSISDN shows no sentinel); a one-to-one share of 99.95 % renders as 100 % next to a maximum of 15;
+P4 (scheduled profile Job, drift Alert Rules, history).
+
 ## References
 
-- IMS showcase plan section 1 (the model for the content): [`la-ims-showcase-plan.md`](la-ims-showcase-plan.md)
-- Data trust as built: [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md)
-- Entity model design: [`archived-documents/plans-archive/link-analysis-entity-model-design.md`](../archived-documents/plans-archive/link-analysis-entity-model-design.md)
-- Configurable limits plan (shipped, archived): [`la-configurable-limits-plan.md`](../archived-documents/plans-archive/la-configurable-limits-plan.md)
+- IMS showcase plan section 1 (the model for the content): [`la-ims-showcase-plan.md`](../../superpower/la-ims-showcase-plan.md)
+- Data trust as built: [`okf/frontend/features/link-analysis.md`](../../okf/frontend/features/link-analysis.md)
+- Entity model design: [`archived-documents/plans-archive/link-analysis-entity-model-design.md`](link-analysis-entity-model-design.md)
+- Configurable limits plan (shipped, archived): [`la-configurable-limits-plan.md`](la-configurable-limits-plan.md)

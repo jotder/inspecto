@@ -52,7 +52,8 @@ final class ColumnProfile {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS row_count");
         for (int i = 0; i < cols.size(); i++) {
             String c = SqlIdent.q(cols.get(i));
-            sql.append(", APPROX_COUNT_DISTINCT(").append(distinctOf.apply(c)).append(") AS d_").append(i)
+            // The sketch can overshoot on small counts: never more distinct values than non-NULL rows.
+            sql.append(", LEAST(APPROX_COUNT_DISTINCT(").append(distinctOf.apply(c)).append("), COUNT(").append(c).append(")) AS d_").append(i)
                .append(", COUNT(").append(c).append(") AS n_").append(i);
         }
         sql.append(" FROM ").append(SqlIdent.q(dataset));

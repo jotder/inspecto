@@ -31,6 +31,7 @@ import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile
                 formControlName="value"
                 [maxlength]="200"
                 [error]="error()"
+                (keydown.enter)="onEnter($event)"
             ></inspecto-pen-field>
             <button mat-stroked-button type="submit" data-testid="lookup-open" [disabled]="busy()">Open</button>
         </form>
@@ -48,6 +49,14 @@ export class EntityLookupComponent {
     readonly form = new FormGroup({ value: new FormControl('', { nonNullable: true }) });
     readonly error = signal('');
     readonly busy = signal(false);
+
+    /**
+     * Enter in the editor opens the Entity. The pen field takes Enter to commit (and so the form never submits); the
+     * event still bubbles here after the commit. Enter on the closed row only starts editing.
+     */
+    onEnter(e: Event): void {
+        if ((e.target as HTMLElement).tagName === 'INPUT') this.open();
+    }
 
     open(): void {
         const raw = this.form.controls.value.value.trim();
