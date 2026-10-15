@@ -1411,7 +1411,7 @@ describe('LinkAnalysisComponent', () => {
 
         c.levelOfDetail.set(false);
         expect(c.displayOptions().nodeLabels).toBe(true);
-        expect(c.caps).toEqual({ projection: 500, analysis: 2000 });
+        expect(c.caps).toEqual({ projection: 1000, analysis: 2500 }); // CL-1, CL-3
     });
 
     it('LA-11 find paths: sends the RAW spelling over the loaded mapping, merges the walk and highlights it', async () => {
