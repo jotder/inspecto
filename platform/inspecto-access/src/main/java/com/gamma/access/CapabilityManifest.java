@@ -512,6 +512,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
             new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing"),
             new Exemption("POST", "/inv/case-history", "read-shaped", "reads one Entity's Incident / Case history, resolving a masked key server-side; persists nothing"),
+            new Exemption("POST", "/inv/entities/([^/]+)/resolve", "read-shaped", "resolves one Entity key (raw value in the body) to the alias its Entity page takes; reads no Dataset, persists nothing"),
             new Exemption("POST", "/inv/traversal/recursive-paths", "read-shaped", "walks paths over a Dataset (LA-11); persists nothing"),
             new Exemption("POST", "/inv/pattern/branching", "read-shaped", "matches a branching motif over a Dataset (LA-14b); persists nothing"),
             new Exemption("POST", "/inv/pattern/temporal", "read-shaped", "burst / periodicity over a Dataset's link event times; persists nothing"),

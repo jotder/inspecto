@@ -24,7 +24,8 @@ import java.util.function.UnaryOperator;
  * The Entities pages' reads (plan {@code la-entity-profile-plan.md} §4.5, P1-P3): {@code GET /inv/entity-types} (the types in
  * force, their bindings and a cached headline - never a query), {@code GET /inv/entity-types/{id}/profile?sections=} (the
  * Entity Type profile, aggregates only) and {@code GET /inv/entities/{type}/{key}/profile} (one Entity, by raw value or
- * exploration alias). The computation is {@link EntityProfiles}.
+ * exploration alias), and {@code POST /inv/entities/{type}/resolve} (a raw value, in the body, to the key the Entity page takes).
+ * The computation is {@link EntityProfiles}.
  *
  * <p>Gated like the exploration reads ({@code POST /inv/projection}): the geoLink feature, a write root (503), R3
  * {@code canView} on every Dataset read (a binding on a Dataset the caller cannot view is not there for them) and no capability
@@ -47,6 +48,7 @@ public final class EntityProfileRoutes implements RouteModule {
         api.get("/inv/entity-types", (e, m) -> list(api, e));
         api.get("/inv/entity-types/([^/]+)/profile", (e, m) -> typeProfile(api, e, m.group(1)));
         api.get("/inv/entities/([^/]+)/([^/]+)/profile", (e, m) -> entityProfile(api, e, m.group(1), m.group(2)));
+        api.post("/inv/entities/([^/]+)/resolve", (e, m) -> resolve(api, e, m.group(1), api.body(e)));
     }
 
     private static Object list(ApiContext api, HttpExchange ex) {
@@ -83,26 +85,75 @@ public final class EntityProfileRoutes implements RouteModule {
         return out;
     }
 
-    private static Object entityProfile(ApiContext api, HttpExchange ex, String type, String rawKey) {
+    /**
+     * {@code GET /inv/entities/{type}/{key}/profile}. For a type masked under the Space's mode the key must be the alias: a raw
+     * value is refused 422 BEFORE anything is read, pointing at {@code POST /inv/entities/{type}/resolve}, so a raw identifier
+     * is never looked up through a URL (operator 2026-10-15: never in a URL or a log). The refusal never repeats the key.
+     */
+    private static Object entityProfile(ApiContext api, HttpExchange ex, String type, String urlKey) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity profile");
+        EntityTypes.EntityType t = type(writeRoot, type);
+        String mode = LinkAnalysisSettings.forRoot(writeRoot).effectiveMaskingMode();
+        boolean masked = EntityProfiles.maskedUnder(mode, t);
+        if (masked && (urlKey == null || !urlKey.startsWith(MaskTokens.TOKEN_PREFIX)))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Entity Type '" + type + "' is masked: its Entity profile "
+                    + "takes the alias (masked:<16 hex>), never a raw value in a URL - POST /inv/entities/" + type
+                    + "/resolve with {\"key\": ...} first");
+        Resolved r = resolveKey(writeRoot, t, mode, urlKey);
         EntityProfiles.Frame f = frame(api, ex, writeRoot, type);
-        if (rawKey == null || rawKey.isBlank())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the Entity key is empty");
-        String raw = rawKey;
-        if (rawKey.startsWith(MaskTokens.TOKEN_PREFIX))
-            raw = ExplorationMasking.forced(writeRoot, f.maskMode, "entity profile key").in(rawKey);   // 422 for an alias this server never minted
-        String key = EntityTypes.normalise(f.type.normaliser(), raw);
-        if (key.isEmpty())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the key normalises to nothing under '" + f.type.normaliser()
-                    + "' - it is not an Entity of type '" + type + "'");
-        String shown = !f.masked() ? key : rawKey.startsWith(MaskTokens.TOKEN_PREFIX) ? rawKey : ExplorationMasking.alias(writeRoot, raw);
-        Map<String, Object> out = EntityProfiles.entityProfile(f, key, shown);
+        Map<String, Object> out = EntityProfiles.entityProfile(f, r.key(), r.shown());
         boolean found = out.get("where") instanceof List<?> w && !w.isEmpty();
         audit(ex, LinkEventTypes.LINK_ENTITY_PROFILED, "link.entity.profiled",
                 "link.entity.profiled " + type + (found ? "" : " (not seen)"),
                 b -> b.target("entity_type", type).attr("entityType", type).attr("found", found)
                         .attr("datasets", f.datasets().size()).attr("assessed", out.get("assessed")));
         return out;
+    }
+
+    /**
+     * {@code POST /inv/entities/{type}/resolve} - body {@code {key}}, a raw value or an exploration alias - answers
+     * {@code {type, key, masked}}: the alias of the normalised key for a type masked under the Space's mode (the key the Entity
+     * page's URL takes), else the normalised value. The raw value travels in the body only; nothing is read from any Dataset.
+     */
+    private static Object resolve(ApiContext api, HttpExchange ex, String type, Map<String, Object> body) {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "entity key resolve");
+        EntityTypes.EntityType t = type(writeRoot, type);
+        String mode = LinkAnalysisSettings.forRoot(writeRoot).effectiveMaskingMode();
+        Object k = body.get("key");
+        if (!(k instanceof String key) || key.isBlank())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include a non-empty string 'key'");
+        Resolved r = resolveKey(writeRoot, t, mode, key);
+        audit(ex, LinkEventTypes.LINK_ENTITY_KEY_RESOLVED, "link.entity.key_resolved", "link.entity.key_resolved " + type,
+                b -> b.target("entity_type", type).attr("entityType", type).attr("masked", r.masked())
+                        .attr("from", key.startsWith(MaskTokens.TOKEN_PREFIX) ? "alias" : "value"));
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("type", type);
+        out.put("key", r.shown());
+        out.put("masked", r.masked());
+        return out;
+    }
+
+    /** A key resolved: the normalised typed key the profile reads by, and the key the caller is shown. */
+    private record Resolved(String key, String shown, boolean masked) {}
+
+    /** Raw value or alias to the normalised key; 422 for an alias this server never minted or a key that folds to nothing. */
+    private static Resolved resolveKey(Path writeRoot, EntityTypes.EntityType t, String mode, String given) {
+        if (given == null || given.isBlank())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the Entity key is empty");
+        boolean alias = given.startsWith(MaskTokens.TOKEN_PREFIX);
+        String raw = alias ? ExplorationMasking.forced(writeRoot, mode, "entity key").in(given) : given;
+        String key = EntityTypes.normalise(t.normaliser(), raw);
+        if (key.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the key normalises to nothing under '" + t.normaliser()
+                    + "' - it is not an Entity of type '" + t.id() + "'");
+        boolean masked = EntityProfiles.maskedUnder(mode, t);
+        String shown = !masked ? key : alias ? given : ExplorationMasking.alias(writeRoot, key);
+        return new Resolved(key, shown, masked);
+    }
+
+    private static EntityTypes.EntityType type(Path writeRoot, String id) {
+        return LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes().stream().filter(t -> t.id().equals(id)).findFirst()
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no entity type '" + id + "'"));
     }
 
     /** The type's frame, 404 for a type not in force. */

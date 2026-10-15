@@ -1271,7 +1271,7 @@
         "tags" : [ "inv" ],
         "summary" : "Read one Entity's profile by raw value or exploration alias",
         "operationId" : "getInvEntityProfile",
-        "description" : "la-entity-profile-plan section 4.5. The key is the raw value or the exploration alias (masked:<16 hex>), resolved through the same masking as the exploration reads, then normalised by the type's normaliser. {entity {type, key (the alias when the type is masked under the Space's maskingMode), masked}, firstSeen, lastSeen, activeDays, coveredDays, perDay [{day, rows}], where [{dataset, column, rows}], links {degree, kinds [{kind, count}], percentile, from, assessed, reason}, related [{type, count, keys (aliases when either type is masked)}], dataAsOf [{dataset, dataAsOf}], truncated, assessed, reason}. An Entity seen nowhere answers 200 with an empty where. Gated like POST /inv/projection. Audited as LINK_ENTITY_PROFILED (the key is never recorded).",
+        "description" : "la-entity-profile-plan section 4.5. For a type masked under the Space's maskingMode the key is the exploration alias (masked:<16 hex>) only - a raw value is refused 422, pointing at POST /inv/entities/{type}/resolve, so a raw identifier never travels in a URL; for an unmasked type the value itself. The key is resolved through the same masking as the exploration reads, then normalised by the type's normaliser. {entity {type, key (the alias when the type is masked under the Space's maskingMode), masked}, firstSeen, lastSeen, activeDays, coveredDays, perDay [{day, rows}], where [{dataset, column, rows}], links {degree, kinds [{kind, count}], percentile, from, assessed, reason}, related [{type, count, keys (aliases when either type is masked)}], dataAsOf [{dataset, dataAsOf}], truncated, assessed, reason}. An Entity seen nowhere answers 200 with an empty where. Gated like POST /inv/projection. Audited as LINK_ENTITY_PROFILED (the key is never recorded).",
         "parameters" : [ {
           "name" : "entityType",
           "in" : "path",
@@ -1282,7 +1282,7 @@
           "name" : "entityKey",
           "in" : "path",
           "required" : true,
-          "description" : "The raw value or the exploration alias (URL-encoded).",
+          "description" : "The exploration alias for a masked type; the value (URL-encoded) for an unmasked one.",
           "schema" : { "type" : "string" }
         } ],
         "responses" : {
@@ -1293,10 +1293,54 @@
             "description" : "No such Entity Type in force."
           },
           "422" : {
-            "description" : "An alias this server never minted, or a key that normalises to nothing."
+            "description" : "A raw value for a masked type (use the resolve route), an alias this server never minted, or a key that normalises to nothing."
           },
           "503" : {
             "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/entities/{entityType}/resolve" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Resolve a raw value or an alias to the key an Entity profile URL takes",
+        "operationId" : "postInvEntityResolve",
+        "description" : "la-entity-profile-plan section 4.5 (operator 2026-10-15: a raw identifier never travels in a URL). Body {key: a raw value or an exploration alias}. Answers {type, key, masked}: for a type masked under the Space's maskingMode the exploration alias (masked:<16 hex>) of the normalised key, else the normalised value. Reads no Dataset and persists nothing. Gated by the geoLink feature and a write root; no capability. Rate-limited like the Entity profile. Audited as LINK_ENTITY_KEY_RESOLVED (the key is never recorded).",
+        "parameters" : [ {
+          "name" : "entityType",
+          "in" : "path",
+          "required" : true,
+          "description" : "The Entity Type id.",
+          "schema" : { "type" : "string" }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "key" ],
+                "properties" : {
+                  "key" : { "type" : "string", "description" : "A raw value or an exploration alias." }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "{type, key, masked}."
+          },
+          "404" : {
+            "description" : "No such Entity Type in force."
+          },
+          "422" : {
+            "description" : "No key, a key that normalises to nothing, or an alias this server never minted."
+          },
+          "503" : {
+            "description" : "No write root."
           }
         },
         "x-optional-module" : true

@@ -37,6 +37,7 @@ final class LinkAnalysisRateClasses {
             // la-entity-profile-plan §4.5: a profile aggregates every bound Dataset (the type's) or filters each (one Entity's)
             {"GET", "/inv/entity-types/([^/]+)/profile"},
             {"GET", "/inv/entities/([^/]+)/([^/]+)/profile"},
+            {"POST", "/inv/entities/([^/]+)/resolve"},           // rate-classed like the GET it serves (operator 2026-10-15)
             // LA-EMBED-VIEW-1: the public embed view is anonymous and re-evaluates an Investigation's sealed log per request
             // (ControlApi throttles it per TOKEN and per IP, on its own buckets).
             {"GET", "/public/investigations/([^/]+)"},
