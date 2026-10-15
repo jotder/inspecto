@@ -449,6 +449,15 @@ export class LinkAnalysisComponent implements OnInit {
         }
     });
     readonly toolboxTab = signal<'analysis' | 'view' | 'investigation'>('analysis');
+    @ViewChild('toolboxScroll') private toolboxScroll?: ElementRef<HTMLElement>;
+    /** The three tabs share one scroll container; a new tab must open at its top, not where the last one was scrolled to. */
+    private readonly resetToolboxScroll = effect(() => {
+        this.toolboxTab();
+        queueMicrotask(() => {
+            const el = this.toolboxScroll?.nativeElement;
+            if (el) el.scrollTop = 0;
+        });
+    });
     /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). */
     readonly toolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
         { id: 'analysis', label: 'Analysis' },

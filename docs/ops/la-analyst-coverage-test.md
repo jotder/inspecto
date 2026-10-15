@@ -40,10 +40,10 @@ testing from it.** Driven through the browser as Demo Users; the pane was 875-14
 | UC4 | Investigation end to end | PARTIAL: opened `mule-hub-case` (9 entities, 7 links, 1 excluded), Expand next degree. Seed, exclude, window, identity, snapshot, replay not driven. |
 | UC5 | Four-eyes | PASS: analyst's expand held ("waiting for approval", request p1); manager approved it in the Oversight card; ran as step 9; Working Set 9 -> 15 entities. |
 | UC6 | Evidence hand-over | NOT DRIVEN |
-| UC7 | Investigate a number | NOT DRIVEN |
+| UC7 | Investigate a number | PASS: MSISDN card switched the profile to Telecom, asked the purpose, created the Investigation and expanded one degree: 403 entities, 403 links (30 days to 29 Sep 2026). Found F-14. |
 | UC8 | Data trust | PARTIAL: strip reads "Data as of 4 Sep 2026 . 3 of 3 days . index v2". The seed reported "4 covered, missing 2026-09-05"; not reconciled. |
 | UC9 | Read-only reviewer (`ra.analyst`) | PASS: opens and reads; 31 controls disabled, each with the missing capability named. |
-| UC10 | Admin | NOT DRIVEN |
+| UC10 | Admin | PASS (read): Settings shows each limit with its in-force value; Entity Lists shows both lists and a verified Identity Fact chain (7 facts). Opening another user's Investigation link as admin gives a clear red "not available" message. Minting an embed link and Reveal not driven. |
 | UC11 | Usability sweep | PARTIAL, findings below. No axe pass this run. |
 
 ### Findings
@@ -62,6 +62,9 @@ testing from it.** Driven through the browser as Demo Users; the pane was 875-14
 | F-3 | P3 | Stacked layout (< 960 px): a Toolbox rail icon opens its panel below the fold without scrolling it into view. | OPEN, seen once |
 | F-4 | P3 | Sign-in (studio shell, 800 px): Demo User name overlaps its title line. | OPEN, screenshot only; not re-seen in the la-app bundle |
 | F-5 | P3 | In the studio shell the analyst lands on a Business Lens pointing at `kpi-reports`. | OPEN, observation (the la-app bundle is the product shape) |
+| F-14 | P2 | The Investigation tab keeps the previous tab's scroll position (the three tabs share one scroll container), so the *Investigate a number* card switches to it with the required **Purpose** field out of view; seen three times. | FIXED (resets to the top on a tab change; spec fails with the fix removed). Confirmed live only by the unit spec: the fix was built after the last live pass. |
 | F-13 | P3 | The *Open by id* row of the Investigation tab shows "—" with a pencil and a disabled Open button before anything is typed. | OPEN, observation |
 
 Not a defect, recorded so nobody repeats it: `/approvals` in the la-app bundle redirects to `/`; four-eyes decisions are made in the Oversight card of the Investigation.
+
+**Still not driven:** UC2 (graph by hand), UC6 (Dossier, Save this analysis, Case from nodes), embed link and Reveal, the Layering chain on a graph that carries a time column, and an axe pass.
