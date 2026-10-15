@@ -274,16 +274,17 @@ class ControlApiIndexTest {
             for (String f : List.of("kindEdges", "typeNodes", "degree", "timeSpan"))
                 assertTrue(old.get(f).isNull(), f + " of an older manifest: " + old);
 
-            // the same view with the endpoint columns classified as two default Entity Types; no time column mapped
+            // the same view with the endpoint columns classified as two default Entity Types whose normaliser keeps a name
+            // (under MSISDN's e164 'alice' keys to nothing and is no Entity); no time column mapped
             new ComponentStore(root.resolve("registry")).write("dataset", "typed_ds", Map.of("view", "sights_view", "owner", "analyst-1",
-                    "shares", List.of(), "columns", List.of(Map.of("name", "who", "classification", "MSISDN"),
-                            Map.of("name", "other", "classification", "IMEI"))));
+                    "shares", List.of(), "columns", List.of(Map.of("name", "who", "classification", "SUBSCRIBER"),
+                            Map.of("name", "other", "classification", "HANDSET"))));
             awaitStatus(c, start(c, "{\"dataset\":\"typed_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}", OWNER), OWNER, "COMPLETED");
             JsonNode typed = null;
             for (JsonNode i : ok(c, "GET", "/inv/index", null, OWNER).get("indexes"))
                 if ("typed_ds".equals(i.get("dataset").asText())) typed = i;
             assertTrue(typed != null, "typed_ds is listed");
-            assertEquals(JSON.readTree("{\"msisdn\":2,\"imei\":2}"), typed.get("typeNodes"), "sources {alice, bob}, targets {bob, carol}");
+            assertEquals(JSON.readTree("{\"subscriber\":2,\"handset\":2}"), typed.get("typeNodes"), "sources {alice, bob}, targets {bob, carol}");
             assertEquals(0, typed.get("kindEdges").size(), "no kind column: no kinds");
             assertTrue(typed.get("timeSpan").isNull(), "no time column: no time span");
         }

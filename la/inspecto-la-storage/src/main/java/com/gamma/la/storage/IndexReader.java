@@ -349,6 +349,34 @@ public final class IndexReader implements AutoCloseable {
         return total;
     }
 
+    /** One key's links as the manifest's link statistics count them: its distinct neighbours and its links per kind (a NULL kind as a null key). */
+    public record KeyLinks(long degree, Map<String, Long> kinds) { }
+
+    /**
+     * The links of one Entity key (Entity profile D-EP4), folded exactly as {@link IndexBuilder} folds them for the manifest:
+     * each edge's ends keyed by {@code srcKeySql} / {@code dstKeySql} (TRUSTED SQL over {@code src} / {@code dst}, the endpoint
+     * types' normalised keys), distinct {@code (a, b, kind)}, self-links and empty keys left out. A key need not be a raw id, so
+     * no bucket narrows the read: one scan of {@code out}'s three columns.
+     */
+    public KeyLinks keyLinks(String srcKeySql, String dstKeySql, String key) throws SQLException {
+        String sql = "WITH l AS (SELECT DISTINCT a, b, kind FROM (SELECT " + srcKeySql + " AS a, " + dstKeySql + " AS b, kind FROM e_out) x"
+                + " WHERE (a = ? OR b = ?) AND a <> '' AND b <> '' AND a <> b)"
+                + " SELECT kind, count(*) AS n, (SELECT count(DISTINCT CASE WHEN a = ? THEN b ELSE a END) FROM l) AS deg FROM l"
+                + " GROUP BY kind ORDER BY n DESC, kind";
+        Map<String, Long> kinds = new java.util.LinkedHashMap<>();
+        long degree = 0;
+        try (PreparedStatement ps = sandbox.preparedStatement(sql)) {
+            for (int i = 1; i <= 3; i++) ps.setString(i, key);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    kinds.put(rs.getString(1), rs.getLong(2));
+                    degree = rs.getLong(3);
+                }
+            }
+        }
+        return new KeyLinks(degree, kinds);
+    }
+
     /** The sealed connection, for the test that proves it cannot read outside the version directory. */
     Connection connection() {
         return sandbox.connection();

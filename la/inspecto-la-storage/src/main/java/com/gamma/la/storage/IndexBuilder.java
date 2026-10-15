@@ -113,6 +113,22 @@ public final class IndexBuilder {
         public static Options defaults() { return new Options(null, null, null, null, null); }
     }
 
+    /**
+     * An endpoint column's Entity Type: its id, its normaliser and {@code keySql}, the TRUSTED SQL of the normalised key of a
+     * VARCHAR column expression (the caller renders it from the type's normaliser; the builder applies it to {@code src} /
+     * {@code dst} of the written edges).
+     */
+    public record EndpointKey(String type, String normaliser, java.util.function.UnaryOperator<String> keySql) {
+        public EndpointKey {
+            Objects.requireNonNull(type, "type");
+            Objects.requireNonNull(keySql, "keySql");
+        }
+
+        IndexManifest.EndpointType asManifest() {
+            return new IndexManifest.EndpointType(type, normaliser);
+        }
+    }
+
     /** What a build does: FULL rebuilds from the relation; APPEND adds a delta of new files to the live version; COMPACT merges deltas into one sorted main. */
     public enum Mode { FULL, APPEND, COMPACT }
 
@@ -126,13 +142,14 @@ public final class IndexBuilder {
      *                        appended to (its relation is not row-wise over its files)
      * @param readRoots       the directories the relation may read; the connection is sealed to them plus the store directory
      * @param maxDeltas       APPEND only: the Space's {@code index.max_deltas}, the gate {@link IndexPlan#classify} re-checks
-     * @param srcType         the Entity Type the source column is typed as, null = untyped (the manifest's {@code typeNodes})
+     * @param srcType         the Entity Type the source column is typed as, null = untyped: the manifest's link statistics key
+     *                        the column's values by it
      * @param dstType         the Entity Type the target column is typed as, null = untyped
      */
     public record Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                           Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
                           java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots, int maxDeltas,
-                          String srcType, String dstType) {
+                          EndpointKey srcType, EndpointKey dstType) {
         /** Endpoint columns not typed as an Entity Type. */
         public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                        Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
@@ -480,60 +497,54 @@ public final class IndexBuilder {
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.FULL, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), relationSqlHash(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles(),
                     opt.sizing().signature());
-            man = linkStats(man, false, null, null);
+            man = linkStats(man);
             return publish(man, spill, number, total, kept, dropped, stats, n, t0);
         }
 
         /**
-         * {@code man} with its link statistics, read from the tables this build just wrote into the stage (never the relation again):
-         * the {@code kind} column of {@code out} (one column of a sorted, dictionary-encoded parquet) and one aggregate over
-         * {@code nodes} (degree quantiles, endpoint-role counts and the time span from {@code first_ts}/{@code last_ts}).
+         * {@code man} with its link statistics (see {@link IndexManifest}), read from the tables this build just wrote into the
+         * stage - never the relation again. The edges of {@code out} are keyed by their endpoint types ({@link EndpointKey#keySql},
+         * the raw id for an untyped end) and folded to distinct {@code (a, b, kind)} links without self-links, exactly as the
+         * Entity profile's Dataset fallback folds them, so an index answer and a Dataset answer agree. Two temp tables (the links,
+         * then each key's distinct-neighbour degree) feed the kind counts, the per-type key counts, the quantiles and the
+         * histogram; {@code nodes} gives the time span.
          *
-         * <p>Per mode: FULL and COMPACT RECOMPUTE all four (their {@code nodes} hold one row per id). APPEND recomputes the
-         * degree, the per-type nodes and the time span over the whole {@code nodes} table, grouping by id first (an appended
-         * delta adds a node row per id it touches, so a node can have several rows; edge counts sum exactly), and CARRIES
-         * FORWARD the kind counts: the parent's {@code kindEdges} plus the kinds of the delta's own {@code out} files (prefix
-         * {@code deltaPrefix}; null = the append added no edge). A parent without recorded {@code kindEdges} is recounted in full.
-         *
-         * @param folded      the nodes table may hold several rows per id (APPEND)
-         * @param parentKinds APPEND only: the parent's {@code kindEdges}, null = not recorded (recount)
+         * <p>Every mode RECOMPUTES them over the whole version (an APPEND included: distinct counts do not add up across a delta);
+         * the cost is one more aggregation over {@code out}, of the size of the {@code nodes} step.
          */
-        IndexManifest linkStats(IndexManifest man, boolean folded, Map<String, Long> parentKinds, String deltaPrefix) throws SQLException {
+        IndexManifest linkStats(IndexManifest man) throws SQLException {
             long t = System.nanoTime();
             IndexMapping m = req.mapping();
+            EndpointKey st = req.srcType(), dt = req.dstType();
+            exec("CREATE TEMP TABLE __la_links AS SELECT DISTINCT a, b, kind FROM (SELECT " + (st == null ? "src" : st.keySql().apply("src"))
+                    + " AS a, " + (dt == null ? "dst" : dt.keySql().apply("dst")) + " AS b, kind FROM read_parquet('" + sqlPath(stage.resolve("out"))
+                    + "/*/*.parquet', hive_partitioning = false)) l WHERE a <> '' AND b <> '' AND a <> b");
+            exec("CREATE TEMP TABLE __la_degree AS SELECT x, count(DISTINCT o) AS d FROM (SELECT a AS x, b AS o FROM __la_links"
+                    + " UNION ALL SELECT b AS x, a AS o FROM __la_links) e GROUP BY x");
             Map<String, Long> kinds = new LinkedHashMap<>();
-            if (m.kindColumn() != null) {
-                Map<String, Long> counts = new java.util.HashMap<>();
-                if (parentKinds != null) counts.putAll(parentKinds);
-                String files = parentKinds == null ? "*" : deltaPrefix == null ? null : deltaPrefix + "-*";
-                if (files != null)
-                    for (Object[] r : rows("SELECT kind, count(*) FROM read_parquet('" + sqlPath(stage.resolve("out")) + "/*/" + files
-                            + ".parquet') WHERE kind IS NOT NULL GROUP BY kind"))
-                        counts.merge(r[0].toString(), ((Number) r[1]).longValue(), Long::sum);
-                counts.entrySet().stream().sorted(Map.Entry.<String, Long>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
-                        .forEach(e -> kinds.put(e.getKey(), e.getValue()));
-            }
-            String nodes = "read_parquet('" + sqlPath(stage.resolve("nodes")) + "/*/*.parquet')";
-            String from = folded
-                    ? "(SELECT id, sum(out_edges) AS out_edges, sum(in_edges) AS in_edges, min(first_ts) AS first_ts, max(last_ts) AS last_ts FROM "
-                            + nodes + " GROUP BY id)"
-                    : nodes;
-            Object[] r = rows("SELECT quantile_disc(out_edges + in_edges, 0.5), quantile_disc(out_edges + in_edges, 0.9),"
-                    + " quantile_disc(out_edges + in_edges, 0.99), max(out_edges + in_edges), CAST(min(first_ts) AS VARCHAR),"
-                    + " CAST(max(last_ts) AS VARCHAR), count(*), count(*) FILTER (WHERE out_edges > 0), count(*) FILTER (WHERE in_edges > 0)"
-                    + " FROM " + from + " n").get(0);
-            IndexManifest.Degree degree = new IndexManifest.Degree(((Number) r[0]).longValue(), ((Number) r[1]).longValue(),
-                    ((Number) r[2]).longValue(), ((Number) r[3]).longValue());
-            IndexManifest.TimeSpan span = m.timeColumn() == null || r[4] == null ? null
-                    : new IndexManifest.TimeSpan(instant(r[4].toString()), instant(r[5].toString()));
+            if (m.kindColumn() != null)
+                for (Object[] r : rows("SELECT kind, count(*) AS n FROM __la_links WHERE kind IS NOT NULL GROUP BY kind ORDER BY n DESC, kind"))
+                    kinds.put(r[0].toString(), ((Number) r[1]).longValue());
+            Object[] q = rows("SELECT coalesce(quantile_disc(d, 0.5), 0), coalesce(quantile_disc(d, 0.9), 0), coalesce(quantile_disc(d, 0.99), 0),"
+                    + " coalesce(max(d), 0), count(*), (SELECT count(DISTINCT a) FROM __la_links), (SELECT count(DISTINCT b) FROM __la_links)"
+                    + " FROM __la_degree").get(0);
+            Map<Long, Long> histogram = new LinkedHashMap<>();
+            for (Object[] r : rows("SELECT d, count(*) FROM __la_degree GROUP BY d ORDER BY d"))
+                histogram.put(((Number) r[0]).longValue(), ((Number) r[1]).longValue());
+            Object[] span = rows("SELECT CAST(min(first_ts) AS VARCHAR), CAST(max(last_ts) AS VARCHAR) FROM read_parquet('"
+                    + sqlPath(stage.resolve("nodes")) + "/*/*.parquet', hive_partitioning = false)").get(0);
+            exec("DROP TABLE __la_degree");
+            exec("DROP TABLE __la_links");
             Map<String, Long> types = new LinkedHashMap<>();
-            if (req.srcType() != null && req.srcType().equals(req.dstType())) types.put(req.srcType(), ((Number) r[6]).longValue());
+            if (st != null && dt != null && st.type().equals(dt.type())) types.put(st.type(), num(q[4]));
             else {
-                if (req.srcType() != null) types.put(req.srcType(), ((Number) r[7]).longValue());
-                if (req.dstType() != null) types.put(req.dstType(), ((Number) r[8]).longValue());
+                if (st != null) types.put(st.type(), num(q[5]));
+                if (dt != null) types.put(dt.type(), num(q[6]));
             }
             timings.put("stats", ms(t));
-            return man.withLinkStats(kinds, types, degree, span);
+            return man.withLinkStats(kinds, types, new IndexManifest.Degree(num(q[0]), num(q[1]), num(q[2]), num(q[3])),
+                    m.timeColumn() == null || span[0] == null ? null : new IndexManifest.TimeSpan(instant(span[0].toString()), instant(span[1].toString())),
+                    histogram, new IndexManifest.EndpointTypes(st == null ? null : st.asManifest(), dt == null ? null : dt.asManifest()));
         }
 
         /** Writes the manifest, releases the files, deletes the scratch directories and publishes the stage. */
@@ -627,7 +638,7 @@ public final class IndexBuilder {
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.APPEND, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), req.baseFingerprint(), parent.timeColZone(), stats,
                     parent.droppedNull() + dropped, deltas, parentDir.getFileName().toString(), req.inputFiles(), parent.bucketSizing());
-            man = linkStats(man, true, parent.kindEdges(), kept > 0 ? prefix : null);
+            man = linkStats(man);
             return publish(man, spill, number, total, kept, dropped, stats, n, t0);
         }
 
@@ -671,7 +682,7 @@ public final class IndexBuilder {
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.COMPACT, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), parent.baseFingerprint(), parent.timeColZone(), stats,
                     parent.droppedNull(), null, parentDir.getFileName().toString(), parent.inputFiles(), parent.bucketSizing());
-            man = linkStats(man, false, null, null);
+            man = linkStats(man);
             return publish(man, spill, number, kept, kept, 0, stats, n, t0);
         }
 
@@ -947,6 +958,10 @@ public final class IndexBuilder {
     /** DuckDB's text of a naive UTC TIMESTAMP ({@code 2026-10-09 10:36:47[.123]}) as ISO-8601 instant text. */
     private static String instant(String naiveUtc) {
         return naiveUtc.replace(' ', 'T') + "Z";
+    }
+
+    private static long num(Object o) {
+        return o == null ? 0L : ((Number) o).longValue();
     }
 
     private static long ms(long fromNanos) { return (System.nanoTime() - fromNanos) / 1_000_000L; }

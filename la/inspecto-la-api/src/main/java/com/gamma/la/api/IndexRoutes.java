@@ -234,7 +234,13 @@ public final class IndexRoutes implements RouteModule {
         List<Path> roots = DatasetProviders.require().dataset(writeRoot, dataset)
                 .map(c -> DatasetProviders.require().readRoots(c, dataRoot)).orElse(List.of());
         return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files, deltaSql, roots,
-                entityTypeOf(writeRoot, dataset, mapping.srcColumn()), entityTypeOf(writeRoot, dataset, mapping.dstColumn()));
+                endpointKey(writeRoot, dataset, mapping.srcColumn()), endpointKey(writeRoot, dataset, mapping.dstColumn()));
+    }
+
+    /** The column's Entity Type as the build keys it ({@link EntityKeySql}: the profile's normalised key), or null when untyped. */
+    static IndexBuilder.EndpointKey endpointKey(Path writeRoot, String dataset, String column) {
+        EntityTypes.EntityType t = entityTypeOf(writeRoot, dataset, column);
+        return t == null ? null : new IndexBuilder.EndpointKey(t.id(), t.normaliser(), c -> EntityKeySql.key(t.normaliser(), c));
     }
 
     /**
@@ -243,7 +249,7 @@ public final class IndexRoutes implements RouteModule {
      * {@link EntityMasking#maskedColumns} applies, for every type rather than the masked ones). Null when untyped or when
      * it cannot be resolved - typing only labels the index's {@code typeNodes} and never fails a build.
      */
-    static String entityTypeOf(Path writeRoot, String dataset, String column) {
+    static EntityTypes.EntityType entityTypeOf(Path writeRoot, String dataset, String column) {
         try {
             List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
             Function<String, Optional<EntityTypes.EntityType>> typeOf = cls -> types.stream()
@@ -256,7 +262,7 @@ public final class IndexRoutes implements RouteModule {
                 for (Object o : cols)
                     if (o instanceof Map<?, ?> c && column.equalsIgnoreCase(String.valueOf(c.get("name"))) && c.get("classification") != null)
                         cls = String.valueOf(c.get("classification"));
-            return cls == null ? null : typeOf.apply(cls).map(EntityTypes.EntityType::id).orElse(null);
+            return cls == null ? null : typeOf.apply(cls).orElse(null);
         } catch (RuntimeException unresolvable) {
             return null;
         }
