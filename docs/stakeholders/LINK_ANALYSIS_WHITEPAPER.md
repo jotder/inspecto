@@ -584,11 +584,11 @@ To prevent denial-of-service conditions during interactive exploration, Inspecto
 
 ### 6.3 Resource budgets & concurrency safeguards
 
-Inspecto implements hard operational fences to guarantee host stability in multi-tenant enterprise environments:
+Inspecto implements operational fences to guarantee host stability in multi-tenant enterprise environments. Every fence below is a **configuration item with a validated range**, not a code constant: Space administrators set analysis limits, system administrators set host resources (Graph Run ceilings and pools, index build memory, rate limits), and analysts tune browser-only caps for their machine; the values quoted are the shipped defaults:
 
 - **Graph Run Resource Budgets**:
   - Default Per-Run Limits: $50,000\text{ nodes}$, $500,000\text{ edges}$, $30\text{ second statement timeout}$.
-  - Maximum Space Ceilings: $500,000\text{ nodes}$, $5,000,000\text{ edges}$, $300\text{ second timeout}$.
+  - Maximum Ceilings (install-wide, configurable): $500,000\text{ nodes}$, $5,000,000\text{ edges}$, $300\text{ second timeout}$.
   - Exceeding any budget aborts execution immediately with a clear **`200 OK` + `BUDGET_EXCEEDED`** status payload, never returning corrupt, partially computed results.
 - **Execution Pool Throttling**:
   - In-process Graph Run Pool: Maximum 2 concurrent active executions, with a waiting queue capped at 16 requests.

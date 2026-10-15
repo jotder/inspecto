@@ -158,8 +158,11 @@ condition*).
 
 ### 4.4 Size limits — and being told honestly
 
-* The server returns at most **2 000 links** (hard ceiling 20 000) and the projection is capped at **500 nodes**;
-  analysis in the browser is capped at **2 000 nodes**. The footer prints the caps.
+* By default the server returns at most **4 000 links** (ceiling 40 000), the canvas admits **1 000 nodes**, and
+  analysis in the browser runs up to **2 500 nodes** (the heavier scores stop sooner and say so). The footer prints
+  the caps in force. Every one of these numbers is a setting: your Space administrator sets the Space's values,
+  and you can lower or raise the browser ones for your own machine (see *Settings → Link Analysis → My browser*,
+  section 12).
 * When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query, or use a server-side
   tool (*Find paths (server)*, *Run on server* for patterns, the Measures panel). The Analysis tab's
   **All algorithms (server)** group lists every algorithm the server offers (29), builds its form from the
@@ -250,7 +253,8 @@ A profile (*Generic graph, Financial crime, Telecom, Supply chain, Cyber*) renam
 ## 6. The analysis tools (Toolbox → **Analysis**)
 
 One group opens at a time; results stay while you switch tabs. Everything runs in the browser over the graph you
-loaded (cap 2 000 nodes; the heavier scores are capped lower and say so).
+loaded (default cap 2 500 nodes; each heavier score has its own lower cap, for example betweenness 500 and
+suspicion score 1 000, and says so). Above an algorithm's cap the tool offers **Run on server** instead.
 
 | Group | Answers |
 |---|---|
@@ -608,6 +612,13 @@ capability every field is read only.
 * The server-side path search works directly over a Dataset and is certified at about one million links (5-hop walk, warm p95 under
   350 ms); above that a Space can switch on the edge index (Space setting `index.enabled`, on by default since 2026-10-10; set it false to switch it off), measured to 100 million links.
 * An Alert on an Investigation watches its **sealed** Working Set, not live data.
+* **Every limit is a setting.** *Settings → Link Analysis* lists each one with its default, its allowed range and
+  the value in force, in three sections: **Analysis** (the Space's limits: expand budgets, path depth and time,
+  connect seeds and hops, page sizes; set by a Space administrator), **Host resources** (the server's own:
+  Graph Run ceilings and pools, index build memory, rate limits; set by a system administrator, read-only for
+  everyone else), and **My browser** (canvas, labels, layouts and browser algorithm caps for your own machine,
+  never above the Space's value; *Reset to Space value* undoes yours). A value outside its range is refused with
+  the range in the message.
 
 ## 13. Troubleshooting
 

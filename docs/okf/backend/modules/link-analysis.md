@@ -422,7 +422,8 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
   the weights a `propagatedRisk` run takes when its params state none; the start response echoes
   `propagatedRiskWeights {weights, source: request | space}`; `GET /settings/link-analysis` echoes `propagatedRiskWeightsInForce`.
 * **Budgets** (`GraphRunService`): shipped default 50,000 nodes / 500,000 edges / 30 s; ceilings 500,000 / 5,000,000 /
-  300 s (both are Space settings under `graphRun`, as are `index.threads` and `index.queue`). Size is checked before work, the deadline at `RunControl` checkpoints; overrun ends `BUDGET_EXCEEDED` with
+  300 s (the defaults are Space settings `graph_run.max_nodes` / `max_edges` / `timeout_ms`; the ceilings, the pool
+  and `index.threads` / `index.queue` are install-wide limits since `LA-CONFIG-LIMITS-1`, see §9). Size is checked before work, the deadline at `RunControl` checkpoints; overrun ends `BUDGET_EXCEEDED` with
   no result — never a silent cap.
 * **Pool:** 2 threads, queue 16 (`AbortPolicy` → `REJECTED`, HTTP 503), finished-run retention 200, result cache 32 entries /
   10 min. Cache key = relation + row-scope fingerprint (a tripwire against crossing scopes) + algorithm + resolved
@@ -459,7 +460,7 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
 
 1. `ControlApi.authenticate` → Subject (401 audited).
 2. `rateLimit` → `LinkAnalysisRateClasses`: 12 expensive POSTs share a per-subject `linkAnalysis` bucket (capacity 30,
-   refill 1 per 2 s, tunable `control.rateLimit.linkAnalysis.*`; 429); Investigation routes are exempt (pinned by `LinkAnalysisRateClassCoverageTest`).
+   refill 1 per 2 s; install limits `rate.link_analysis_burst` / `_per_s`, else `control.rateLimit.linkAnalysis.*`; 429); Investigation routes are exempt (pinned by `LinkAnalysisRateClassCoverageTest`).
 3. `authorize` → host ABAC PEP.
 4. `requireModuleEnabled` → feature `geoLink` in the Space's `modules.toon` (404 `MODULE_DISABLED`); then the host's
    idempotency check, before the handler. ⚠ The gate only covers a route whose `RouteModule` overrides

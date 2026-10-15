@@ -523,7 +523,8 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 
 * **Settings ▸ Link Analysis** (2026-09-30, `settings/link-analysis-settings.component`): the four-eyes thresholds
   (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and
-  `seedByDistinctCap` only when the server reports that key. ⚠ `PUT /settings/link-analysis` REPLACES the
+  `seedByDistinctCap` only when the server reports that key. ⚠ (Superseded 2026-10-15: the numeric limits moved to the limits section of the pane and
+  `PUT /settings/link-analysis` now keeps any limit key its body leaves out; see §*Grounded limits*.) `PUT /settings/link-analysis` REPLACES the
   document, so the save sends every other stated key back as read (node caps, masking mode, Entity Types, `maxSetBytes`). `maxSetBytes` (`max_set_bytes`, 2026-10-10) is the per-set size limit of a sealed Working Set, default 64 MiB (`maxSetBytesInForce`), 1 KiB..1 GiB; a step over it is refused `413` naming the limit; it HAS a field in the settings pane (shown only when the server reports the key). Its sibling `maxInvestigationBytes` (`max_investigation_bytes`, 2026-10-10; `maxInvestigationBytesInForce`) is the per-Investigation TOTAL of sealed Working Sets (main plus open Drafts), default 4 GiB, 1 MiB..1 TiB; a write that would take the total over it is refused `413` naming the Investigation, its total and the budget, and it HAS a field in the settings pane ("In force: 4 GiB (4294967296 bytes)"), shown only when the server reports the key.
   2026-10-10 (DR-U3, `LA-UI-SETTINGS-MASKING-1`): the pane also edits `maskingMode` (select typed | all | none, blank = inherit, with `maskingModeInForce`), `index.enabled` (a three-way select: inherit / on / off, worded neutrally because the shipped default is changing) with `threads` 1..64, `queue` 1..1000 and `maxDiskBytes` 0..10^15 (0 = no limit), and the `graphRun` default budget `maxNodes` / `maxEdges` / `timeoutMs` (1..10 000 000 each; in-force value and server ceilings read from `GET /inv/graph/algorithms`, shown as "-" if that route fails). Read only: `entityTypesInForce` (no editor), `indexInForce` and `investigationStoreInForce` (`fs` | `db`, the process-wide `-Dinvestigations.backend`, echoed by the existing GET; not a setting). A save keeps `keepVersions` and the graph-run `threads` / `queue` / `maxResultItems` as read, sends no `*InForce` key, and omits a wholly blank `index` / `graphRun` block. The two selects are disabled (not hidden) without `canAuthorWorkbench`.
   Since 2026-10-01 the document also holds `graphRun` (`graph_run` in `link-analysis.toon`; LA separation D-4 step 6):
@@ -1193,8 +1194,10 @@ the actor of a terminal event is the run's owner (the canceller is not recorded)
 
 **Where it runs — the SPA** (`GraphRunsService`, `LinkAnalysisServerRunComponent`, `graph-run-apply.ts`). Browser-first under the cap,
 server above it. A tool group shows **Run on server** INSTEAD of its local button when the Working Set's node count exceeds that
-algorithm's browser cap (`suspicionNodeCap` for betweenness and suspicion; `analysisNodeCap` for closeness, eigenvector, Katz, HITS,
-label propagation, Louvain, cliques, link prediction, max-flow); the server's `inlineNodeCeiling` is not used for the decision. The count
+algorithm's browser cap (⚠ superseded 2026-10-15 by `LA-CONFIG-LIMITS-1`: each algorithm reads its own
+`browser_algorithms.<id>` limit, default min(2,500, its server inline ceiling), and suspicion score reads
+`suspicion_node_cap`, the one value browser and server share; see §*Grounded limits*). Originally: `suspicionNodeCap` for betweenness and suspicion; `analysisNodeCap` for closeness, eigenvector, Katz, HITS,
+label propagation, Louvain, cliques, link prediction, max-flow; the server's `inlineNodeCeiling` was not used for the decision. The count
 is the Working Set's (hidden entities left out), not the displayed query graph's; with no Investigation open the control is disabled with
 the stated reason "open an Investigation". No `at` is sent (the canvas shows the committed head). `run()` starts, then polls at 1 s until
 terminal. The id map (`buildServerIdMap`) matches server node ids against every raw spelling a canvas node folded and maps a `linkId` by
@@ -1950,7 +1953,7 @@ route: warm p95 **209 / 188 / 171 ms** from a median-degree / p99 / top-hub star
 on warm runs, cold p95 388 / 181 / 163 ms over 5 runs). The fix that mattered: `EXPLAIN ANALYZE` showed the
 recursion running TWICE (`__walk` read by the paths and again by the level widths) → `__walk AS MATERIALIZED`.
 Also: the column probe is folded into the walk's own session (`QueryExecutor.runPlanned`), and the walk runs under
-its own `-Dassist.sql.traversal_threads` (default 4; every other sandbox query keeps `assist.sql.threads`, 2).
+its own thread cap (install limit `traversal.threads`, else `-Dassist.sql.traversal_threads`; default 4; every other sandbox query keeps `assist.sql.threads`, 2).
 Harness `InvTraversalBench` (`@Tag("bench")`, skipped unless `-Dinspecto.bench.dir`); method in
 `la-separation-feasibility-plan.md` §7.10.1.
 

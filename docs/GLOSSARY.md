@@ -1022,6 +1022,13 @@ pick a **GraphSource** + query, render via the shared G6 host, analyze (paths, n
 communities). A saved investigation is a **Link-Analysis View** (Component kind `link-analysis-view`); when
 its source is `entity-projection` it is a **Widget** (a Graph Visualization Type bound to a Dataset).
 
+**Link Analysis limit** — One configurable bound of Link Analysis (a cap, budget, timeout, page size, pool size or
+rate), declared once in the catalogue `LaLimit` with a default and an allowed range and enforced by the server. Three
+layers: a **Space** limit (Space administrator, the Space's `link-analysis.toon`), an **install** limit (system
+administrator, the server-wide `la-limits.toon`: host resources) and a **My browser** value (an analyst's own, for
+browser-only caps, never above the Space value). Edited at *Settings → Link Analysis*; API
+`/settings/link-analysis/limits` and `/system/link-analysis/limits`. ⛔ Not a *Measure* or an *Alert Rule* threshold.
+
 **Entity Type** *(Type — added 2026-09-26, `LA-17`; ✅ built 2026-09-26: `EntityTypes`, `GET|PUT /settings/link-analysis` `entityTypes`)* — A named kind of business identifier (`subscriber`,
 `imsi`, `imei`, `msisdn`, `wallet`, `account`, `agent`, `handset`, `cell`), configured **per Space** in
 `link-analysis.toon`. It carries a normaliser (one of a closed set shared by Java and the SPA) and a `masked` flag, and names the Dataset column

@@ -408,7 +408,7 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | `acquire.ledger.db.user` / `.password` | (unset) | ledger creds |
 | `assist.sql.memory_limit` | `1GB` | SQL sandbox memory cap |
 | `assist.sql.threads` | `2` | SQL sandbox thread cap |
-| `assist.sql.traversal_threads` | `4` | Thread cap for the Link Analysis recursive-paths walk only (every other sandbox query keeps `assist.sql.threads`) |
+| `assist.sql.traversal_threads` | `4` | Thread cap for the Link Analysis recursive-paths walk only (every other sandbox query keeps `assist.sql.threads`). Overridden by the install limit `traversal.threads` (and `assist.sql.memory_limit` for that walk by `traversal.memory_limit_mb`) in `la-limits.toon`, edited at *Settings → Link Analysis → Host resources* or `PUT /system/link-analysis/limits` |
 | `assist.sql.timeout_seconds` | `30` | SQL sandbox per-query timeout |
 | `assist.safety.roots` | `""` (→ **no roots**, ⛔ not CWD) | `;`-separated allowed config-safety path roots |
 
