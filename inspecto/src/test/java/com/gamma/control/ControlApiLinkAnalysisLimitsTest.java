@@ -161,7 +161,7 @@ class ControlApiLinkAnalysisLimitsTest {
             assertEquals(7, LaLimits.forSpace(c.root).get(LaLimit.TRAVERSAL_TIMEOUT_S), "persisted in the Space's link-analysis.toon");
             v = data(send(c, "PUT", SPACE, "{\"traversal.timeout_s\":null}", AUTHOR), 200);
             assertTrue(item(v, "traversal.timeout_s").get("value").isNull(), "null clears = inherit");
-            assertEquals(5, item(v, "traversal.timeout_s").get("inForce").asInt());
+            assertEquals(10, item(v, "traversal.timeout_s").get("inForce").asInt());
             assertEquals(900, item(v, "projection_node_cap").get("value").asInt(), "a key the body does not name is kept");
         }
     }

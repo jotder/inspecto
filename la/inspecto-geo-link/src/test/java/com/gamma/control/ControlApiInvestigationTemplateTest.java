@@ -130,7 +130,7 @@ class ControlApiInvestigationTemplateTest {
             assertEquals(3, tpl.get("ops").size(), "seed, expand, expand — the judgements are not steps of the method");
             assertEquals("seed1", tpl.at("/ops/0/param").asText());
             assertEquals("expand", tpl.at("/ops/1/op").asText());
-            assertEquals(2000, tpl.at("/ops/1/budget").asInt());
+            assertEquals(4000, tpl.at("/ops/1/budget").asInt(), "the Space's investigation.expand_budget_default (4,000)");
             assertEquals("[{\"step\":3,\"op\":\"exclude\",\"count\":1},{\"step\":5,\"op\":\"hide\",\"count\":1},"
                     + "{\"step\":6,\"op\":\"keep\",\"count\":1}]", tpl.get("dropped").toString());
             assertEquals("calls_ds", tpl.at("/roles/dataset").asText());

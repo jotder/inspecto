@@ -150,9 +150,10 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
         }
         String relationSql = com.gamma.query.DatasetRead.relationSql(dataset, dataRoot, writeRoot);
         // parsed NOW: a rolling `last` window resolves against the sweep's clock (UTC), never the binding's
-        ValueMeasures.Spec spec = ValueMeasures.parse(rule.valueMeasure(), true);
+        ValueMeasures.Fences fences = ValueMeasures.Fences.of(writeRoot);   // the Space's measures.* limits, read LIVE at this sweep
+        ValueMeasures.Spec spec = ValueMeasures.parse(rule.valueMeasure(), true, fences);
         ValueMeasures.Agents agents = ValueMeasures.agents(writeRoot, spec);   // read LIVE at this sweep
-        List<Map<String, Object>> breaching = ValueMeasures.forInvestigation(ds, relationSql, header, spec, agents)
+        List<Map<String, Object>> breaching = ValueMeasures.forInvestigation(ds, relationSql, header, spec, agents, fences)
                 .entities();
         OptionalDouble value = OptionalDouble.of(breaching.size());
         // LA-DETECT-ALERT-AGGREGATE-1 (invariant 2): aggregate breach facts only — never an entity id, name or alias

@@ -109,11 +109,18 @@ public final class IndexBuildService implements AutoCloseable {
     }
 
     /**
-     * One build to start. {@code maxDiskBytes} (0 = no limit) and {@code keepVersions} are the caller's CURRENT policy, read per
-     * request, so a changed setting applies to the next build and not only to a freshly created service.
+     * One build to start. {@code maxDiskBytes} (0 = no limit), {@code keepVersions} and {@code maxDeltas} (the Space's
+     * {@code index.max_deltas}) are the caller's CURRENT policy, read per request, so a changed setting applies to the next build
+     * and not only to a freshly created service.
      */
     public record Request(String owner, String datasetId, IndexMapping mapping, RelationSource source, long maxDiskBytes,
-                          int keepVersions, IndexBuilder.Mode mode) {
+                          int keepVersions, IndexBuilder.Mode mode, int maxDeltas) {
+        /** Under the default delta cap ({@link IndexPlan#DEFAULT_MAX_DELTAS}). */
+        public Request(String owner, String datasetId, IndexMapping mapping, RelationSource source, long maxDiskBytes,
+                       int keepVersions, IndexBuilder.Mode mode) {
+            this(owner, datasetId, mapping, source, maxDiskBytes, keepVersions, mode, IndexPlan.DEFAULT_MAX_DELTAS);
+        }
+
         /** A FULL build under the given policy. */
         public Request(String owner, String datasetId, IndexMapping mapping, RelationSource source, long maxDiskBytes, int keepVersions) {
             this(owner, datasetId, mapping, source, maxDiskBytes, keepVersions, IndexBuilder.Mode.FULL);
@@ -125,7 +132,8 @@ public final class IndexBuildService implements AutoCloseable {
             if (datasetId == null || datasetId.isBlank()) throw new IllegalArgumentException("a build needs a dataset");
             Objects.requireNonNull(mapping, "mapping");
             Objects.requireNonNull(source, "source");
-            if (maxDiskBytes < 0 || keepVersions < 1) throw new IllegalArgumentException("maxDiskBytes must be >= 0 and keepVersions >= 1");
+            if (maxDiskBytes < 0 || keepVersions < 1 || maxDeltas < 1)
+                throw new IllegalArgumentException("maxDiskBytes must be >= 0, keepVersions >= 1 and maxDeltas >= 1");
         }
 
         /** The default policy: no disk limit, {@link IndexStore#DEFAULT_KEEP_VERSIONS} versions kept. */
@@ -344,7 +352,8 @@ public final class IndexBuildService implements AutoCloseable {
         } catch (RuntimeException unknown) {
             duck = null;
         }
-        IndexPlan.Plan plan = IndexPlan.classify(live, rel.inputFiles(), IndexBuilder.relationSqlHash(rel.relationSql()), BucketFunction.NAME, duck);
+        IndexPlan.Plan plan = IndexPlan.classify(live, rel.inputFiles(), IndexBuilder.relationSqlHash(rel.relationSql()), BucketFunction.NAME, duck,
+                req.maxDeltas());
         if (!plan.appendable())
             throw new Refused(Refused.Kind.NOT_APPLICABLE, "an append is not possible now ("
                     + (plan.reasons().isEmpty() ? "no input file was added since the live version" : String.join(", ", plan.reasons())) + ") - "
@@ -431,7 +440,8 @@ public final class IndexBuildService implements AutoCloseable {
             IndexBuilder.Options opt = new IndexBuilder.Options(null, null, null, r.token,
                     p -> r.progress = new Progress(p.phase(), p.step(), p.steps()));
             IndexBuilder.Result result = builder.apply(new IndexBuilder.Request(r.datasetId, r.mapping, r.relation.relationSql(),
-                    store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql(), r.relation.readRoots()));
+                    store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql(), r.relation.readRoots(),
+                    r.maxDeltas));
             try {
                 store.gc(GC_MIN_AGE);                                  // best effort: a failed sweep never fails a published build
             } catch (IOException | RuntimeException ignored) {
@@ -488,7 +498,7 @@ public final class IndexBuildService implements AutoCloseable {
         final String id, owner, datasetId, mappingHash, key;
         final IndexMapping mapping;
         final Relation relation;
-        final int keepVersions;
+        final int keepVersions, maxDeltas;
         final IndexBuilder.Mode mode;
         final long createdAt;
         final IndexBuilder.CancelToken token = new IndexBuilder.CancelToken();
@@ -508,6 +518,7 @@ public final class IndexBuildService implements AutoCloseable {
             this.mapping = req.mapping();
             this.relation = relation;
             this.keepVersions = req.keepVersions();
+            this.maxDeltas = req.maxDeltas();
             this.mode = req.mode();
             this.mappingHash = mappingHash;
             this.key = key;

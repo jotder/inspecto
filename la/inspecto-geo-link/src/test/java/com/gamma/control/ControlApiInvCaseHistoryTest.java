@@ -44,8 +44,13 @@ class ControlApiInvCaseHistoryTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String A = "27820000001", B = "27820000002", C = "27820000003";
     private static final List<String> RAW = List.of(A, B, C);
-    /** Mirror CaseHistory.MAX_LINKED_INVESTIGATIONS / MAX_ATTACHMENTS (package-private in another module). */
+    /**
+     * The caps the cap tests run under: the Space STATES them (case_history.max_linked_investigations / max_attachments,
+     * LA-CONFIG-LIMITS-1), below the catalogue defaults of 200 / 1,000, so these tests also prove the route reads the Space's value.
+     */
     private static final int CAP_INVESTIGATIONS = 100, CAP_ATTACHMENTS = 500;
+    private static final String CAPS = "case_history:\n  max_linked_investigations: " + CAP_INVESTIGATIONS
+            + "\n  max_attachments: " + CAP_ATTACHMENTS + "\n";
     private static final String ROUTE = "/inv/case-history";
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -370,7 +375,7 @@ class ControlApiInvCaseHistoryTest {
     /** Item (6): the caps count only records the caller may read, so hidden Investigations neither crowd out nor flag. */
     @Test
     void hiddenCaseLinkedInvestigationsNeitherConsumeTheCapNorSetTruncated(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n" + CAPS)) {
             armCaps(c);
             // the stranger's readable one is the OLDEST id; 101 hidden ones (> the cap of 100) follow
             String alias = aliasOfA(c, "Bearer stranger"), ownerAlias = aliasOfA(c, "Bearer owner");
@@ -385,7 +390,7 @@ class ControlApiInvCaseHistoryTest {
 
     @Test
     void boundaryPinInvestigationsTruncateAtOneAdmittedBeyondTheCap(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n" + CAPS)) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger");
             int cap = CAP_INVESTIGATIONS;
@@ -398,7 +403,7 @@ class ControlApiInvCaseHistoryTest {
 
     @Test
     void hiddenSnapshotAttachmentsNeitherConsumeTheCapNorSetTruncated(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n" + CAPS)) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger");
             create(c, "Bearer stranger", "inv-s");   // NOT linked to a Case: CASE-S is reachable only via the snapshot attachment
@@ -418,7 +423,7 @@ class ControlApiInvCaseHistoryTest {
 
     @Test
     void boundaryPinAttachmentsTruncateAtOneAdmittedBeyondTheCap(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n" + CAPS)) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger");
             assertEquals(200, send(c, "/inv/investigations", "{\"id\":\"inv-s\",\"purpose\":\"caps\",\"dataset\":\"calls_ds\","
@@ -436,7 +441,7 @@ class ControlApiInvCaseHistoryTest {
     /** The 5x DoS bound: readable records beyond the scan window are not seen; the flag follows the documented rule. */
     @Test
     void investigationScanBoundSetsTruncatedOnlyForACallerWithAnAdmittedRecord(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n" + CAPS)) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger"), ownerAlias = aliasOfA(c, "Bearer owner"), otherAlias = aliasOfA(c, "Bearer other");
             linked(c, "Bearer stranger", alias, "inv-0-own", "CASE-S");                          // inside the window
@@ -457,7 +462,7 @@ class ControlApiInvCaseHistoryTest {
 
     @Test
     void attachmentScanBoundSetsTruncatedOnlyForACallerWithAnAdmittedRecord(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n" + CAPS)) {
             armCaps(c);
             String alias = aliasOfA(c, "Bearer stranger"), otherAlias = aliasOfA(c, "Bearer other");
             create(c, "Bearer stranger", "inv-s");
@@ -483,7 +488,7 @@ class ControlApiInvCaseHistoryTest {
         try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
             for (String bad : List.of("{}", "{\"key\":\" \"}", "{\"key\":1}", "{\"key\":\"" + "9".repeat(257) + "\"}",
                     "{\"key\":\"" + A + "\",\"status\":\"pending\"}", "{\"key\":\"" + A + "\",\"limit\":0}",
-                    "{\"key\":\"" + A + "\",\"limit\":201}", "{\"key\":\"" + A + "\",\"limit\":\"x\"}"))
+                    "{\"key\":\"" + A + "\",\"limit\":401}", "{\"key\":\"" + A + "\",\"limit\":\"x\"}"))
                 assertEquals(422, send(c, ROUTE, bad).statusCode(), bad);
             assertEquals(404, send(c, ROUTE, "{\"key\":\"" + A + "\",\"investigationId\":\"ghost\"}").statusCode());
             // the host's 422 names the folded key: the route replaces the message

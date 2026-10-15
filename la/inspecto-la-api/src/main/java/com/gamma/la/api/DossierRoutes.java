@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
@@ -63,8 +65,7 @@ public final class DossierRoutes implements RouteModule {
         return java.util.Set.of("geoLink");
     }
 
-    static final int MAX_STEPS = 5_000;
-    static final int MAX_SNAPSHOTS = 20;
+    // A dossier covers at most the Space's dossier.max_steps log steps and dossier.max_snapshots snapshots (LaLimit).
 
     @Override
     public void register(ApiContext api) {
@@ -77,8 +78,11 @@ public final class DossierRoutes implements RouteModule {
     /** A built Dossier, already masked as it leaves, with the masking that was applied. */
     record Masked(Map<String, Object> dossier, EntityMasking mask) {}
 
-    /** The {@code at} query parameter: a step count in {@code [0, log.size()]}, default the whole log; 422 otherwise. */
-    static int parseAt(HttpExchange ex, List<String> log) {
+    /**
+     * The {@code at} query parameter: a step count in {@code [0, log.size()]}, default the whole log; 422 otherwise, and 422 above
+     * the Space's {@code dossier.max_steps} (the Space whose config root is {@code writeRoot}).
+     */
+    static int parseAt(HttpExchange ex, List<String> log, Path writeRoot) {
         int at = log.size();
         String rawAt = ApiContext.query(ex, "at");
         if (rawAt != null && !rawAt.isBlank()) {
@@ -90,8 +94,9 @@ public final class DossierRoutes implements RouteModule {
             if (at < 0 || at > log.size())
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at must be between 0 and " + log.size() + ", got " + at);
         }
-        if (at > MAX_STEPS)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a dossier covers at most " + MAX_STEPS + " steps; pass 'at'");
+        int maxSteps = SpaceLimits.get(writeRoot, LaLimit.DOSSIER_MAX_STEPS);
+        if (at > maxSteps)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a dossier covers at most " + maxSteps + " steps; pass 'at'");
         return at;
     }
 
@@ -124,7 +129,7 @@ public final class DossierRoutes implements RouteModule {
         if (!List.of("json", "steps", "method", "html").contains(format))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "format must be json, steps, method or html, got '" + format + "'");
         List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
-        int at = parseAt(ex, log);
+        int at = parseAt(ex, log, inv.writeRoot());
         List<String> snapshotIds = parseSnapshotIds(ex);
         Masked built = maskedDossier(ex, inv, log, at, snapshotIds);
         EntityMasking mask = built.mask();
@@ -216,10 +221,12 @@ public final class DossierRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the manifest is for investigation '" + submitted.get("investigation")
                     + "', not '" + id + "'");
         List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
-        int at = Math.max(0, Math.min(n.intValue(), Math.min(log.size(), MAX_STEPS)));
+        LaLimitValues lim = SpaceLimits.of(inv.writeRoot());
+        int at = Math.max(0, Math.min(n.intValue(), Math.min(log.size(), SpaceLimits.get(lim, LaLimit.DOSSIER_MAX_STEPS))));
         List<String> ids = new ArrayList<>();
         if (submitted.get("snapshots") instanceof List<?> l) for (Object o : l) ids.add(String.valueOf(o));
-        if (ids.size() > MAX_SNAPSHOTS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_SNAPSHOTS + " snapshots");
+        int maxSnapshots = SpaceLimits.get(lim, LaLimit.DOSSIER_MAX_SNAPSHOTS);
+        if (ids.size() > maxSnapshots) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + maxSnapshots + " snapshots");
 
         GraphDossierBuilder.Input in = input(inv, log, at, snapshots(ex, inv, ids, false));
         Map<String, Object> dossier = GraphDossierBuilder.build(in);
@@ -245,7 +252,8 @@ public final class DossierRoutes implements RouteModule {
      */
     static List<GraphDossierBuilder.Snapshot> snapshots(HttpExchange ex, Opened inv, List<String> ids,
                                                                 boolean strict) throws IOException {
-        if (ids.size() > MAX_SNAPSHOTS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_SNAPSHOTS + " snapshots");
+        int maxSnapshots = SpaceLimits.get(inv.writeRoot(), LaLimit.DOSSIER_MAX_SNAPSHOTS);
+        if (ids.size() > maxSnapshots) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + maxSnapshots + " snapshots");
         List<GraphDossierBuilder.Snapshot> out = new ArrayList<>();
         for (String sid : new LinkedHashSet<>(ids)) {
             if (!SnapshotStore.SAFE_ID.matcher(sid).matches())

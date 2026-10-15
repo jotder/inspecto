@@ -3,6 +3,7 @@ package com.gamma.la.api;
 import com.gamma.access.RowScope;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
+import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
@@ -48,7 +49,6 @@ public final class InvestigationEmbedRoutes implements RouteModule {
         return java.util.Set.of("geoLink");
     }
 
-    private static final int MAX_LABEL = 200;
 
     @Override
     public void register(ApiContext api) {
@@ -68,7 +68,7 @@ public final class InvestigationEmbedRoutes implements RouteModule {
         out.put("investigationId", id);
         out.put("enabled", EmbedGrants.enabled());
         out.put("grants", EmbedGrants.summaries(inv.store(), id, now));
-        out.put("max", EmbedGrants.MAX_ACTIVE);
+        out.put("max", SpaceLimits.get(inv.writeRoot(), LaLimit.INPUT_EMBED_ACTIVE_GRANTS));
         return out;
     }
 
@@ -84,7 +84,7 @@ public final class InvestigationEmbedRoutes implements RouteModule {
                         : "body has no field '" + k + "' (ttl_hours, label, scope, masking_mode)");
         LinkAnalysisSettings.Embed cfg = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveEmbed();
         long ttl = ttlHours(body.get("ttl_hours"), cfg);
-        String label = label(body.get("label"));
+        String label = label(body.get("label"), SpaceLimits.get(inv.writeRoot(), LaLimit.INPUT_REFERENCE_LABEL_LENGTH));
         String scope = scope(body.get("scope"));
         String spaceMode = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveMaskingMode();
         String linkMode = linkMasking(body.get("masking_mode"), spaceMode);
@@ -105,7 +105,8 @@ public final class InvestigationEmbedRoutes implements RouteModule {
         Instant now = Instant.now();
         String actor = ApiContext.actor(ex);
         String mode = spaceMode;
-        EmbedGrants.Minted minted = EmbedGrants.mint(inv.store(), id, actor, now, ttl, label, mode, scope, linkMode);
+        EmbedGrants.Minted minted = EmbedGrants.mint(inv.store(), id, actor, now, ttl, label, mode, scope, linkMode,
+                SpaceLimits.get(inv.writeRoot(), LaLimit.INPUT_EMBED_ACTIVE_GRANTS));
         Map<String, Object> rec = minted.record();
         emit(ex, LinkEventTypes.LINK_EMBED_MINTED, "link.embed.minted", "link.embed.minted - " + id + " " + rec.get("grantId"),
                 b -> b.attr("investigationId", id).attr("grantId", rec.get("grantId")).attr("issuedBy", actor)
@@ -170,14 +171,14 @@ public final class InvestigationEmbedRoutes implements RouteModule {
         return s;
     }
 
-    private static String label(Object raw) {
+    private static String label(Object raw, int maxLabel) {
         if (raw == null) return null;
         if (!(raw instanceof String s))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must be a string");
         String v = s.strip();
         if (v.isEmpty()) return null;
-        if (v.length() > MAX_LABEL)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' is at most " + MAX_LABEL + " characters");
+        if (v.length() > maxLabel)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' is at most " + maxLabel + " characters");
         for (int i = 0; i < v.length(); i++)
             if (Character.isISOControl(v.charAt(i)))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must not contain control characters");

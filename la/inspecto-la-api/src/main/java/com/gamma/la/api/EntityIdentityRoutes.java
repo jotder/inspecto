@@ -6,6 +6,8 @@ import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.access.WriteGates;
@@ -77,10 +79,8 @@ public final class EntityIdentityRoutes implements RouteModule {
 
     static final String ASSERTED = "identity.asserted";
     static final String RETRACTED = "identity.retracted";
-    private static final int MAX_KEY_LENGTH = 512;
-    static final int IMPORT_DEFAULT_LIMIT = 1_000;
-    static final int IMPORT_MAX_LIMIT = 10_000;
-    static final int IMPORT_TIMEOUT_SECONDS = 10;
+    // The key length and the import's row default / ceiling / statement timeout are the Space's input.identity_key_length
+    // and identity.import_* limits (LaLimit).
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     @Override
@@ -173,8 +173,8 @@ public final class EntityIdentityRoutes implements RouteModule {
      * <p>Gates: capability → write root 503 → body 422 → {@link InvRoutes#relationFor} (unknown or not viewable: the same
      * 404, R3) → both columns against the relation's REAL columns 422 → types 422 (a column's registry classification
      * decides it; a stated type may only agree) → D-U7 four-eyes 403 ({@link InvRoutes#refuseIfSensitive}: there is no
-     * Investigation to hold a request) → one bounded read ({@code limit}, default {@value #IMPORT_DEFAULT_LIMIT}, max
-     * {@value #IMPORT_MAX_LIMIT}; a {@value #IMPORT_TIMEOUT_SECONDS} s statement timeout; {@code ORDER BY}, so a
+     * Investigation to hold a request) → one bounded read ({@code limit}, default the Space's {@code identity.import_default},
+     * max {@code identity.import_max}; its {@code identity.import_timeout_s} statement timeout; {@code ORDER BY}, so a
      * truncated read is the same rows every time) → append under the log lock.
      *
      * <p><b>Provenance.</b> {@code fingerprint} = SHA-256 of the JSON {@code [dataset, aCol, bCol, rows]} exactly as read
@@ -193,10 +193,12 @@ public final class EntityIdentityRoutes implements RouteModule {
         String aCol = ident(body, "aCol"), bCol = ident(body, "bCol");
         if (aCol.equalsIgnoreCase(bCol))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'aCol' and 'bCol' must be two different columns");
-        int limit = IMPORT_DEFAULT_LIMIT;
+        LaLimitValues lim = SpaceLimits.of(root);
+        int maxLimit = SpaceLimits.get(lim, LaLimit.IDENTITY_IMPORT_MAX), timeoutSeconds = SpaceLimits.get(lim, LaLimit.IDENTITY_IMPORT_TIMEOUT_S);
+        int limit = Math.min(SpaceLimits.get(lim, LaLimit.IDENTITY_IMPORT_DEFAULT), maxLimit);
         if (body.get("limit") != null) {
-            if (!(body.get("limit") instanceof Number n) || n.intValue() < 1 || n.intValue() > IMPORT_MAX_LIMIT)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'limit' must be an integer 1.." + IMPORT_MAX_LIMIT);
+            if (!(body.get("limit") instanceof Number n) || n.intValue() < 1 || n.intValue() > maxLimit)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'limit' must be an integer 1.." + maxLimit);
             limit = n.intValue();
         }
 
@@ -218,7 +220,7 @@ public final class EntityIdentityRoutes implements RouteModule {
         DatasetProvider.Result read;
         try {
             read = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql, limit, 0, List.of(), List.of()),
-                    SqlSandboxPolicy.withCaps(null, 0, IMPORT_TIMEOUT_SECONDS));
+                    SqlSandboxPolicy.withCaps(null, 0, timeoutSeconds));
         } catch (SQLException e) {
             throw DatasetReadFault.of("the import read failed", datasetId, null, e);
         }
@@ -297,7 +299,7 @@ public final class EntityIdentityRoutes implements RouteModule {
             out.put("types", Map.of("a", aType.id(), "b", bType.id()));
             out.put("fingerprint", fingerprint);
             out.put("via", via);
-            out.put("fences", Map.of("limit", limit, "timeoutMs", IMPORT_TIMEOUT_SECONDS * 1000));
+            out.put("fences", Map.of("limit", limit, "timeoutMs", timeoutSeconds * 1000));
             out.put("fromSeq", imported == 0 ? null : fromSeq);
             out.put("atSeq", head.headSeq());
             out.put("headHash", head.headHash());
@@ -386,9 +388,10 @@ public final class EntityIdentityRoutes implements RouteModule {
     /** {@code body[field]} as a typed key: {@code <type>:<value>}, the type in force, the value normalised by its rule. */
     private static String typedKey(Path root, Map<String, Object> body, String field) {
         Object raw = body.get(field);
-        if (!(raw instanceof String s) || s.length() > MAX_KEY_LENGTH)
+        int maxKeyLength = SpaceLimits.get(root, LaLimit.INPUT_IDENTITY_KEY_LENGTH);
+        if (!(raw instanceof String s) || s.length() > maxKeyLength)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + field + "', a typed Entity "
-                    + "key <type>:<value> of at most " + MAX_KEY_LENGTH + " characters");
+                    + "key <type>:<value> of at most " + maxKeyLength + " characters");
         int colon = s.indexOf(':');
         if (colon <= 0)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + field + "' must be a typed Entity key "

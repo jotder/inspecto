@@ -30,14 +30,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.IntSupplier;
 
 /**
  * The index-backed {@link GraphEngine} (D-3 step 7, design 4.2): {@code neighborhood}, {@code egoNetwork} and a seeds-only
  * {@code degreeCentrality}, answered from ONE pinned index version by one equality statement per key
  * ({@link IndexReader#fold}); nothing is materialised beyond the keys it looked up.
  *
- * <p><b>Fences, never a reroute.</b> At most {@link #MAX_HOPS} hops, and at most {@link #FRONTIER_CAP} keys looked up at any one
- * level - the expansion levels AND the final pass that collects the edges among the kept nodes. A walk that needs more throws
+ * <p><b>Fences, never a reroute.</b> At most the Space's {@code index.traversal_depth} hops, and at most its
+ * {@code index.frontier_cap} keys looked up at any one level (read per run through the suppliers the caller hands in) - the
+ * expansion levels AND the final pass that collects the edges among the kept nodes. A walk that needs more throws
  * {@link IndexCapExceeded} naming the cap and the measured figure, dropping whatever it had gathered; the caller chose the
  * index, so nothing answers instead.
  *
@@ -55,10 +57,6 @@ import java.util.TreeMap;
 public final class SqlGraphEngine implements GraphEngine {
 
     public static final String ENGINE_ID = "index";
-    /** The walk's depth ceiling (the same figure as {@link IndexedTraversal#MAX_DEPTH}). */
-    public static final int MAX_HOPS = IndexedTraversal.MAX_DEPTH;
-    /** Keys looked up per level (the same figure as {@link IndexedTraversal#FRONTIER_CAP}). */
-    public static final int FRONTIER_CAP = IndexedTraversal.FRONTIER_CAP;
     /** The cap's name in the refusal. */
     public static final String FRONTIER_CAP_NAME = "frontier keys looked up per level";
 
@@ -67,14 +65,24 @@ public final class SqlGraphEngine implements GraphEngine {
             Comparator.comparingDouble(Score::score).reversed().thenComparing(Score::id).thenComparing(Score::label);
 
     private final SqlSandboxPolicy policy;
+    private final IntSupplier maxHops;
+    private final IntSupplier frontierCap;
 
     /** The algorithms an index can answer: the catalogue's `engines` and the route's refusal read this one set. */
     public static Set<Algorithm> nativeAlgorithms() {
         return SUPPORTED;
     }
 
+    /** Under the default fences ({@link IndexedTraversal#DEFAULT_MAX_DEPTH} hops, {@link IndexedTraversal#DEFAULT_FRONTIER_CAP} keys). */
     public SqlGraphEngine(SqlSandboxPolicy policy) {
+        this(policy, () -> IndexedTraversal.DEFAULT_MAX_DEPTH, () -> IndexedTraversal.DEFAULT_FRONTIER_CAP);
+    }
+
+    /** {@code maxHops} / {@code frontierCap}: the Space's index fences, read at each run so a changed setting applies to the next one. */
+    public SqlGraphEngine(SqlSandboxPolicy policy, IntSupplier maxHops, IntSupplier frontierCap) {
         this.policy = policy;
+        this.maxHops = maxHops;
+        this.frontierCap = frontierCap;
     }
 
     @Override
@@ -103,15 +111,17 @@ public final class SqlGraphEngine implements GraphEngine {
             case EGO_NETWORK -> 1;
             default -> 0;
         };
-        if (hops > MAX_HOPS)
+        int hopCap = maxHops.getAsInt();
+        if (hops > hopCap)
             throw new InvalidGraphRequest(InvalidGraphRequest.Reason.OUT_OF_RANGE, "hops",
-                    "hops " + hops + " is over the index cap of " + MAX_HOPS + " (a deeper neighbourhood runs on the Working Set)");
+                    "hops " + hops + " is over the index cap of " + hopCap + " (a deeper neighbourhood runs on the Working Set)");
+        int cap = frontierCap.getAsInt();
         long t0 = System.nanoTime();
         try (IndexReader reader = IndexReader.borrow(ref.versionDir(), IndexManifest.read(ref.versionDir()), policy)) {
             GraphResult.Payload payload = algorithm == Algorithm.DEGREE_CENTRALITY
-                    ? new GraphResult.Scores(degrees(reader, ref, c))
+                    ? new GraphResult.Scores(degrees(reader, ref, c, cap))
                     : new GraphResult.SubGraph(subGraph(reader, ref, (String) p.get(Algorithm.NODE), hops,
-                            Direction.valueOf(((String) p.get("direction")).toUpperCase(Locale.ROOT)), c));
+                            Direction.valueOf(((String) p.get("direction")).toUpperCase(Locale.ROOT)), c, cap));
             return new GraphResult(algorithm, payload, 0, (System.nanoTime() - t0) / 1_000_000L);
         } catch (SQLException | IOException e) {
             throw new IllegalStateException("the index could not be read: " + e.getClass().getSimpleName(), e);
@@ -120,15 +130,15 @@ public final class SqlGraphEngine implements GraphEngine {
 
     // ── neighborhood / egoNetwork ────────────────────────────────────────────────────────────────────────────
 
-    private static Graph subGraph(IndexReader reader, GraphInput.IndexRef ref, String root, int hops, Direction dir, RunControl c)
-            throws SQLException {
+    private static Graph subGraph(IndexReader reader, GraphInput.IndexRef ref, String root, int hops, Direction dir, RunControl c,
+                                  int cap) throws SQLException {
         if (root.indexOf((char) 0) >= 0 || reader.degree(root) == 0) return new Graph(List.of(), List.of());          // not a node of the index
         Set<String> kinds = ref.kinds().isEmpty() ? null : Set.copyOf(ref.kinds());
         Map<String, List<Link>> outOf = new HashMap<>(), inOf = new HashMap<>();       // looked-up keys only
         Set<String> keep = new LinkedHashSet<>(List.of(root));
         List<String> frontier = List.of(root);
         for (int h = 0; h < hops && !frontier.isEmpty(); h++) {
-            guard(frontier.size());
+            guard(frontier.size(), cap);
             List<String> next = new ArrayList<>();
             for (String key : frontier) {
                 c.checkpoint();
@@ -139,7 +149,7 @@ public final class SqlGraphEngine implements GraphEngine {
             }
             frontier = next;
         }
-        guard(keep.size());                                   // the edges among the kept nodes: one OUT lookup per kept node
+        guard(keep.size(), cap);                                // the edges among the kept nodes: one OUT lookup per kept node
         TreeMap<String, Edge> edges = new TreeMap<>();
         for (String key : keep) {
             c.checkpoint();
@@ -151,8 +161,8 @@ public final class SqlGraphEngine implements GraphEngine {
         return new Graph(nodes, new ArrayList<>(edges.values()));
     }
 
-    private static void guard(int keys) {
-        if (keys > FRONTIER_CAP) throw new IndexCapExceeded(FRONTIER_CAP_NAME, keys, FRONTIER_CAP);
+    private static void guard(int keys, int cap) {
+        if (keys > cap) throw new IndexCapExceeded(FRONTIER_CAP_NAME, keys, cap);
     }
 
     // ── degreeCentrality (seeds only) ────────────────────────────────────────────────────────────────────────
@@ -162,8 +172,8 @@ public final class SqlGraphEngine implements GraphEngine {
      * as target (a self-loop is both, so it counts twice), exactly the in-memory engine's figure for that node. A seed that is not
      * a node of the index is absent from the ranking.
      */
-    private static List<Score> degrees(IndexReader reader, GraphInput.IndexRef ref, RunControl c) throws SQLException {
-        guard(ref.seeds().size());
+    private static List<Score> degrees(IndexReader reader, GraphInput.IndexRef ref, RunControl c, int cap) throws SQLException {
+        guard(ref.seeds().size(), cap);
         Set<String> kinds = ref.kinds().isEmpty() ? null : Set.copyOf(ref.kinds());
         List<Score> out = new ArrayList<>();
         for (String seed : new LinkedHashSet<>(ref.seeds())) {

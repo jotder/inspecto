@@ -674,6 +674,12 @@ class ControlApiSettingsTest {
             }
             assertEquals(JSON.readTree(list), json(send(c.port, "GET", path, null)).get("entityTypes"),
                     "a refused write left the last good list standing");
+            // LA-CONFIG-LIMITS-1 P3: the cap is the Space's input.entity_types - stated at 1, the two-type list is refused naming 1
+            assertEquals(200, send(c.port, "PUT", path + "/limits", "{\"input.entity_types\":1}").statusCode());
+            HttpResponse<String> overCap = send(c.port, "PUT", path, "{\"maskingMode\":\"all\",\"entityTypes\":" + list + "}");
+            assertEquals(422, overCap.statusCode(), overCap.body());
+            assertTrue(overCap.body().contains("at most 1 entity types, got 2"), overCap.body());
+            assertEquals(200, send(c.port, "PUT", path + "/limits", "{\"input.entity_types\":null}").statusCode());
 
             HttpResponse<String> reset = send(c.port, "PUT", path, "{\"maskingMode\":\"all\"}");
             assertEquals(200, reset.statusCode(), reset.body());

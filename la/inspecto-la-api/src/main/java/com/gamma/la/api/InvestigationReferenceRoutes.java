@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationStore;
@@ -44,7 +46,7 @@ import java.util.regex.Pattern;
  * <p><b>Append-only, outside the sealed header</b> ({@code references.jsonl}, {@link InvestigationStore#appendReference}):
  * the header is write-once, and a reference is a relationship, not evidence — so adding one never invalidates an issued
  * Dossier. There is no edit and no delete; a wrong reference is superseded by a new one. A duplicate
- * {@code (system, type, id)} is a 409, and an Investigation holds at most {@link #MAX} references (409).
+ * {@code (system, type, id)} is a 409, and an Investigation holds at most the Space's {@code input.references} references (409).
  */
 public final class InvestigationReferenceRoutes implements RouteModule {
 
@@ -54,11 +56,8 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         return java.util.Set.of("geoLink");
     }
 
-    /** The most references one Investigation may carry. */
-    static final int MAX = 200;
-
+    // The most references one Investigation may carry, and the id / URL / label lengths, are the Space's input.reference* limits.
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
-    private static final int ID_MAX = 256, URL_MAX = 2048, LABEL_MAX = 200;
 
     @Override
     public void register(ApiContext api) {
@@ -71,7 +70,7 @@ public final class InvestigationReferenceRoutes implements RouteModule {
     /** {@code GET …/references} — gates: write root 503 → 422 id → 403 → 404 absent / not owner / R3. */
     private static Object list(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
-        return describe(inv.id(), parse(inv.store().references(id)));
+        return describe(inv.id(), parse(inv.store().references(id)), SpaceLimits.get(inv.writeRoot(), LaLimit.INPUT_REFERENCES));
     }
 
     /**
@@ -81,9 +80,11 @@ public final class InvestigationReferenceRoutes implements RouteModule {
     private static Object add(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         String system = name(body, "system"), type = name(body, "type");
-        String refId = text(body, "id", ID_MAX, true);
-        String url = text(body, "url", URL_MAX, false);
-        String label = text(body, "label", LABEL_MAX, false);
+        LaLimitValues lim = SpaceLimits.of(inv.writeRoot());
+        int max = SpaceLimits.get(lim, LaLimit.INPUT_REFERENCES);
+        String refId = text(body, "id", SpaceLimits.get(lim, LaLimit.INPUT_REFERENCE_ID_LENGTH), true);
+        String url = text(body, "url", SpaceLimits.get(lim, LaLimit.INPUT_REFERENCE_URL_LENGTH), false);
+        String label = text(body, "label", SpaceLimits.get(lim, LaLimit.INPUT_REFERENCE_LABEL_LENGTH), false);
         if (url != null) checkUrl(url);
 
         Map<String, Object> rec = new LinkedHashMap<>();
@@ -96,18 +97,18 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         rec.put("addedBy", ApiContext.actor(ex));
         rec.put("addedAt", Instant.now().toString());
         InvestigationStore.Appended r = inv.store().appendReference(id, String.valueOf(rec.get("key")),
-                ApiContext.JSON.writeValueAsString(rec), MAX);
+                ApiContext.JSON.writeValueAsString(rec), max);
         if (r == InvestigationStore.Appended.DUPLICATE)
             throw new ApiException(409, ErrorCodes.CONFLICT, "reference " + system + "/" + type + "/" + refId + " is already recorded");
         if (r == InvestigationStore.Appended.FULL)
-            throw new ApiException(409, ErrorCodes.CONFLICT, "an investigation holds at most " + MAX + " external references");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "an investigation holds at most " + max + " external references");
         List<Map<String, Object>> all = parse(inv.store().references(id));
         int seq = all.size();
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_REFERENCE_ADDED, "link.investigation.reference.added",
                 "link.investigation.reference.added — " + id + " ← " + system + "/" + type,
                 b -> b.attr("investigationId", id).attr("system", system).attr("type", type).attr("id", refId)
                         .attr("seq", seq));
-        return describe(id, all);
+        return describe(id, all, max);
     }
 
     // ── shared with the Dossier bundle ─────────────────────────────────────────────────────────────────
@@ -127,12 +128,12 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         return out;
     }
 
-    private static Map<String, Object> describe(String id, List<Map<String, Object>> refs) {
+    private static Map<String, Object> describe(String id, List<Map<String, Object>> refs, int max) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("investigationId", id);
         out.put("references", refs);
         out.put("count", refs.size());
-        out.put("max", MAX);
+        out.put("max", max);
         out.put("note", "pointers only — never fetched, never trusted, and they grant no access");
         return out;
     }

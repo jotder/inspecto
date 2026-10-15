@@ -238,6 +238,18 @@ class ControlApiGraphRunIndexTest {
             List<String> many = new ArrayList<>();
             for (int i = 0; i < 21; i++) many.add("s" + i);
             assertTrue(refused(c, run("degreeCentrality", "\"seeds\":" + JSON.writeValueAsString(many) + "," + IDX)).contains("cap is 20"));
+            // LA-CONFIG-LIMITS-1 P3: both fences are the Space's index.traversal_depth / index.frontier_cap - lowered, the route
+            // refuses at the stated value; raised, the same requests run, which also proves the index ENGINE reads the Space's
+            // depth (its own guard would otherwise refuse hops 3 behind the route)
+            settings(c, ON + "  traversal_depth: 1\n  frontier_cap: 2\n");
+            assertTrue(refused(c, run("neighborhood", "\"params\":{\"node\":\"n2\",\"hops\":2}," + IDX)).contains("index cap of 1"));
+            assertTrue(refused(c, run("degreeCentrality", "\"seeds\":[\"n1\",\"n2\",\"n3\"]," + IDX)).contains("cap is 2"));
+            settings(c, ON + "  traversal_depth: 3\n  frontier_cap: 25\n");
+            assertEquals("COMPLETED", ok(c, "POST", "/inv/graph/runs", run("neighborhood", "\"params\":{\"node\":\"n2\",\"hops\":3}," + IDX),
+                    ANALYST).get("status").asText());
+            assertEquals("COMPLETED", ok(c, "POST", "/inv/graph/runs", run("degreeCentrality", "\"seeds\":" + JSON.writeValueAsString(many) + ","
+                    + IDX), ANALYST).get("status").asText());
+            settings(c, ON);
             assertTrue(refused(c, run("egoNetwork", node + ",\"input\":\"index\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\""))
                     .contains("column_not_indexed"), "the index has a kind column the request did not name");
             assertTrue(refused(c, run("egoNetwork", node + ",\"input\":\"index\",\"dataset\":\"calls_ds\",\"sourceCol\":\"callee\",\"targetCol\":\"caller\","

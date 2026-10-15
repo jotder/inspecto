@@ -24,8 +24,11 @@ public final class IndexPlan {
 
     private IndexPlan() { }
 
-    /** Deltas allowed on one version; at this many an append is refused and COMPACT is recommended (design 3.3's K, not measured). */
-    public static final int MAX_DELTAS = 8;
+    /**
+     * Default deltas allowed on one version (the Space's {@code index.max_deltas}); at this many an append is refused and COMPACT
+     * is recommended (design 3.3's K, not measured).
+     */
+    public static final int DEFAULT_MAX_DELTAS = 8;
 
     /** What the probe recommends. {@code NONE}: the index covers the Dataset (and carries few enough deltas). */
     public enum Action { NONE, APPEND, FULL, COMPACT }
@@ -52,6 +55,12 @@ public final class IndexPlan {
      */
     public static Plan classify(IndexManifest m, List<IndexManifest.InputFile> current, String relationSqlHash, String bucketFn,
                                 String duckdbVersion) {
+        return classify(m, current, relationSqlHash, bucketFn, duckdbVersion, DEFAULT_MAX_DELTAS);
+    }
+
+    /** {@link #classify(IndexManifest, List, String, String, String)} with the caller's Space delta cap {@code maxDeltas}. */
+    public static Plan classify(IndexManifest m, List<IndexManifest.InputFile> current, String relationSqlHash, String bucketFn,
+                                String duckdbVersion, int maxDeltas) {
         List<String> force = new ArrayList<>();
         if (relationSqlHash == null) force.add("relation_unresolvable");
         else if (!relationSqlHash.equals(m.relationSqlHash())) force.add("relation_sql_changed");
@@ -80,7 +89,7 @@ public final class IndexPlan {
         }
         int deltas = m.deltas().size();
         if (!force.isEmpty()) return new Plan(Action.FULL, false, added, removed, changed, List.copyOf(force), deltas);
-        boolean capped = deltas >= MAX_DELTAS;
+        boolean capped = deltas >= maxDeltas;
         if (added.isEmpty()) {
             return new Plan(capped ? Action.COMPACT : Action.NONE, false, added, removed, changed,
                     capped ? List.of("delta_cap_reached") : List.of(), deltas);

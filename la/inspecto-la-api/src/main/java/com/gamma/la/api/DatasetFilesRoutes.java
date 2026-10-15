@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
 import com.gamma.la.core.CollectorCoveragePort;
@@ -45,9 +47,6 @@ import java.util.TreeMap;
  */
 public final class DatasetFilesRoutes implements RouteModule {
 
-    static final int DEFAULT_LIMIT = 100;
-    static final int MAX_LIMIT = 1_000;
-
     @Override
     public Set<String> featureIds() {
         return Set.of("geoLink");
@@ -64,7 +63,9 @@ public final class DatasetFilesRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'"));
         if (!ComponentAccess.canView(ex, dataset))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'");
-        int limit = intParam(ex, "limit", DEFAULT_LIMIT, 1, MAX_LIMIT);
+        LaLimitValues lim = SpaceLimits.of(writeRoot);   // the Space's files.page_default / files.page_max
+        int max = SpaceLimits.get(lim, LaLimit.FILES_PAGE_MAX);
+        int limit = intParam(ex, "limit", Math.min(SpaceLimits.get(lim, LaLimit.FILES_PAGE_DEFAULT), max), 1, max);
         int offset = intParam(ex, "offset", 0, 0, Integer.MAX_VALUE);
         return read(api, writeRoot, dataset, id, limit, offset, ApiContext.query(ex, "name"));
     }

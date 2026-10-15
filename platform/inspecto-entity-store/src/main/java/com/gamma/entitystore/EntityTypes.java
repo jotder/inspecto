@@ -38,9 +38,6 @@ public final class EntityTypes {
     /** The closed normaliser set, in declaration order. */
     public static final List<String> NORMALISERS = List.of("default", "digits", "e164", "upper-trim");
 
-    /** More types than this is refused — a curated preference, not a registry. */
-    static final int MAX_TYPES = 64;
-
     /** The seeded types a space inherits until it states its own (design §2.6). */
     public static final List<EntityType> DEFAULTS = List.of(
             new EntityType("subscriber", "Subscriber", "default", true, List.of("SUBSCRIBER")),
@@ -90,9 +87,15 @@ public final class EntityTypes {
     /**
      * The types in {@code raw} — a list of {@code {id, label, normaliser, masked, classifications}} objects, the
      * shape both the wire and {@code link-analysis.toon} carry — validated. Label and classifications are
-     * trimmed. Throws {@link IllegalArgumentException} naming the first problem; nothing is clamped or dropped.
+     * trimmed. Throws {@link IllegalArgumentException} naming the first problem; nothing is clamped or dropped. At most
+     * the catalogue default of {@link LaLimit#INPUT_ENTITY_TYPES} types.
      */
     public static List<EntityType> parse(Object raw) {
+        return parse(raw, (int) LaLimit.INPUT_ENTITY_TYPES.defaultValue().longValue());
+    }
+
+    /** {@link #parse(Object)} under the Space's {@code input.entity_types} in force: more types than {@code maxTypes} is refused. */
+    public static List<EntityType> parse(Object raw, int maxTypes) {
         if (!(raw instanceof List<?> list)) throw new IllegalArgumentException("entityTypes must be a list");
         List<EntityType> out = new ArrayList<>();
         for (Object o : list) {
@@ -110,7 +113,7 @@ public final class EntityTypes {
             }
             out.add(new EntityType(id, str(m, "label").trim(), str(m, "normaliser"), masked, classifications));
         }
-        validate(out);
+        validate(out, maxTypes);
         return List.copyOf(out);
     }
 
@@ -120,13 +123,18 @@ public final class EntityTypes {
         return s;
     }
 
-    /** Refuse (with a message) what a stated list may not be: see design §4.1 for each rule. */
+    /** {@link #validate(List, int)} under the catalogue default of {@link LaLimit#INPUT_ENTITY_TYPES}. */
     static void validate(List<EntityType> types) {
+        validate(types, (int) LaLimit.INPUT_ENTITY_TYPES.defaultValue().longValue());
+    }
+
+    /** Refuse (with a message) what a stated list may not be: see design §4.1 for each rule; more than {@code maxTypes} types (a curated preference, not a registry). */
+    static void validate(List<EntityType> types, int maxTypes) {
         if (types.isEmpty())
             throw new IllegalArgumentException("entityTypes may not be empty — a stated list replaces the defaults; "
                     + "send null to inherit them");
-        if (types.size() > MAX_TYPES)
-            throw new IllegalArgumentException("at most " + MAX_TYPES + " entity types, got " + types.size());
+        if (types.size() > maxTypes)
+            throw new IllegalArgumentException("at most " + maxTypes + " entity types, got " + types.size());
         Set<String> ids = new HashSet<>();
         Map<String, String> owner = new HashMap<>();
         for (EntityType t : types) {

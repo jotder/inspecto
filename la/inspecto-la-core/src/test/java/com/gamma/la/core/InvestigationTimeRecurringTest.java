@@ -125,7 +125,20 @@ class InvestigationTimeRecurringTest {
                 Map.of("rule", "yearly", "month", 4, "day", 1, "weekday", "MON")))
             assertThrows(ApiException.class, () -> sealed(bad), bad.toString());
         List<Object> many = new ArrayList<>();
-        for (int i = 0; i <= InvestigationTime.MAX_RULES; i++) many.add(Map.of("rule", "yearly", "month", 1, "day", 1, "name", "n" + i));
+        for (int i = 0; i <= InvestigationTime.DEFAULT_MAX_RULES; i++) many.add(Map.of("rule", "yearly", "month", 1, "day", 1, "name", "n" + i));
         assertThrows(ApiException.class, () -> sealed(many.toArray()));
+    }
+
+    @Test
+    void theCallersCapsAreTheOnesApplied() {
+        List<Object> three = List.of(Map.of("rule", "yearly", "month", 1, "day", 1), Map.of("rule", "yearly", "month", 2, "day", 1),
+                Map.of("rule", "yearly", "month", 3, "day", 1));
+        ApiException e = assertThrows(ApiException.class,
+                () -> InvestigationTime.window(Map.of("exclude", three, "timezone", "UTC"), "w", 366, 2));
+        assertTrue(e.getMessage().contains("at most 2 recurring rules"), e.getMessage());
+        ApiException dates = assertThrows(ApiException.class,
+                () -> InvestigationTime.window(Map.of("exclude", List.of("2026-01-01", "2026-01-02", "2026-01-03"), "timezone", "UTC"), "w", 1, 1));
+        assertTrue(dates.getMessage().contains("at most 1 dates plus 1 rules"), dates.getMessage());
+        assertEquals(3, ((List<?>) InvestigationTime.window(Map.of("exclude", three, "timezone", "UTC"), "w", 366, 3).get("exclude")).size());
     }
 }

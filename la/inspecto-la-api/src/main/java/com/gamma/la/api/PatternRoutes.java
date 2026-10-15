@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.LinkTemporalDetector;
 import com.gamma.la.storage.IndexReader.LinkTime;
@@ -52,8 +54,8 @@ import java.util.regex.Pattern;
  * a threshold nothing carries or passes) are a 200 with {@code refusal} and no matches, in the SAME words.
  *
  * <p>Fences: every value bound; identifiers checked against the relation's real columns; at most
- * {@value #MAX_LEGS} legs leave DuckDB (more ⇒ {@code legCapped}, {@code truncated}); a
- * {@value #TIMEOUT_SECONDS} s statement timeout; the matcher's work budget; a match limit.
+ * the Space's {@code pattern.max_legs} legs leave DuckDB (more ⇒ {@code legCapped}, {@code truncated}); its
+ * {@code pattern.timeout_s} statement timeout; the matcher's work budget; a match limit ({@code pattern.matches_*}).
  * Read-shaped: persists nothing, audited as {@code LINK_PATTERN_MATCHED}.
  */
 public final class PatternRoutes implements RouteModule {
@@ -65,10 +67,6 @@ public final class PatternRoutes implements RouteModule {
     }
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    static final int MAX_LEGS = 100_000;
-    private static final int DEFAULT_MATCHES = 200;
-    private static final int MAX_MATCHES = 1_000;
-    static final int TIMEOUT_SECONDS = 5;
 
     @Override
     public void register(ApiContext api) {
@@ -78,9 +76,6 @@ public final class PatternRoutes implements RouteModule {
 
     // ── POST /inv/pattern/temporal — burst / periodicity over each link's event times ─────────────────────────────
 
-    static final int TEMPORAL_MAX_ROWS = 200_000;
-    private static final int TEMPORAL_DEFAULT_LIMIT = 200;
-    private static final int TEMPORAL_MAX_LIMIT = 1_000;
     private static final long DAY_SECONDS = 86_400;
 
     /**
@@ -92,8 +87,8 @@ public final class PatternRoutes implements RouteModule {
      *
      * <p>Same gates as {@code /inv/pattern/branching} (write root 503 → body 422 → Dataset 404 by the view gate → unknown column
      * 422 → filter 422), plus D-U7 four-eyes ({@link InvRoutes#refuseIfSensitive}) for the rows it may read. Fences: one bound
-     * statement of at most {@value #TEMPORAL_MAX_ROWS} rows (more ⇒ {@code rowCapped}, {@code truncated}), a
-     * {@value #TIMEOUT_SECONDS} s timeout, a result limit. Read-shaped: persists nothing, audited as
+     * statement of at most the Space's {@code pattern.temporal_max_rows} rows (more ⇒ {@code rowCapped}, {@code truncated}), its
+     * {@code pattern.timeout_s} timeout, a result limit ({@code pattern.temporal_limit_*}). Read-shaped: persists nothing, audited as
      * {@code LINK_PATTERN_MATCHED}. Output is endpoints and times the Dataset's own viewer could read - it never adds a column.
      */
     /** The scan with RAW ids, for an Investigation op that narrows it to its Working Set and masks the answer itself. */
@@ -104,6 +99,9 @@ public final class PatternRoutes implements RouteModule {
     /** {@code maskIds}: the stateless route answers aliases when the Space masks (DR-D2). */
     static Map<String, Object> scan(ApiContext api, HttpExchange ex, Map<String, Object> body, boolean maskIds) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "temporal pattern");
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxRows = SpaceLimits.get(lim, LaLimit.PATTERN_TEMPORAL_MAX_ROWS), maxLimit = SpaceLimits.get(lim, LaLimit.PATTERN_TEMPORAL_LIMIT_MAX);
+        int timeoutSeconds = SpaceLimits.get(lim, LaLimit.PATTERN_TIMEOUT_S);
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
@@ -120,7 +118,7 @@ public final class PatternRoutes implements RouteModule {
         long windowMs = 1000L * (long) boundedNumber(body, "windowSeconds", 60, 1, DAY_SECONDS);
         int minEvents = (int) boundedNumber(body, "minEvents", 5, burst ? 2 : 3, 1_000);
         double maxCv = boundedNumber(body, "maxCv", 0.1, 0, 1);
-        int limit = (int) boundedNumber(body, "limit", TEMPORAL_DEFAULT_LIMIT, 1, TEMPORAL_MAX_LIMIT);
+        int limit = (int) boundedNumber(body, "limit", Math.min(SpaceLimits.get(lim, LaLimit.PATTERN_TEMPORAL_LIMIT_DEFAULT), maxLimit), 1, maxLimit);
         for (String k : body.keySet())
             if (!TEMPORAL_KEYS.contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown field '" + k + "'");
@@ -131,13 +129,13 @@ public final class PatternRoutes implements RouteModule {
             if (!InvRoutes.containsIgnoreCase(columns, col))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
         DatasetProvider.BoundFilter filter = body.get("filter") == null ? DatasetProvider.BoundFilter.TRUE : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
-        InvRoutes.refuseIfSensitive(writeRoot, "a temporal scan (up to " + TEMPORAL_MAX_ROWS + " rows)", TEMPORAL_MAX_ROWS, 0);
+        InvRoutes.refuseIfSensitive(writeRoot, "a temporal scan (up to " + maxRows + " rows)", maxRows, 0);
 
         // LA-INVESTIGATION-OPS-DEFERRED-1: answered from the edge index when - and only when - it can answer exactly (IndexedTemporal),
         // else from the flat Dataset. Both hand the SAME ordered (source, target, time) rows to the one detection below.
         IndexedRead.Outcome<IndexedTemporal.Result> indexed = IndexedTemporal.attempt(writeRoot, api.dataRoot(), relationSql,
-                new IndexedTemporal.Request(datasetId, sourceCol, targetCol, timeCol, body.get("filter"), TEMPORAL_MAX_ROWS),
-                InvRoutes.traversalPolicy());
+                new IndexedTemporal.Request(datasetId, sourceCol, targetCol, timeCol, body.get("filter"), maxRows),
+                InvRoutes.traversalPolicy(writeRoot));
         try {
             List<LinkTime> rows = new ArrayList<>();
             boolean rowCapped;
@@ -149,9 +147,9 @@ public final class PatternRoutes implements RouteModule {
                         + " epoch_ms(TRY_CAST(CAST(\"" + timeCol + "\" AS VARCHAR) AS TIMESTAMP)) AS ts FROM \"" + datasetId + "\""
                         + " WHERE \"" + sourceCol + "\" IS NOT NULL AND \"" + targetCol + "\" IS NOT NULL AND (" + filter.sql() + ")"
                         + " ORDER BY s, t, ts";
-                SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
+                SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, timeoutSeconds);
                 DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                        datasetId, relationSql, sql, TEMPORAL_MAX_ROWS, 0, List.of(), List.of(), filter.binds()), policy);
+                        datasetId, relationSql, sql, maxRows, 0, List.of(), List.of(), filter.binds()), policy);
                 for (Map<String, Object> row : r.rows())                       // rows arrive grouped by link, times ascending
                     rows.add(new LinkTime(String.valueOf(row.get("s")), String.valueOf(row.get("t")),
                             row.get("ts") instanceof Number ts ? ts.longValue() : null));
@@ -232,9 +230,9 @@ public final class PatternRoutes implements RouteModule {
             out.put("timeNote", "Times are the Dataset's own wall-clock values read as written, in UTC-neutral milliseconds; "
                     + "gaps are exact differences of those values, so a time column read in a zone other than UTC is compared as stored");
             Map<String, Object> f = new LinkedHashMap<>();
-            f.put("maxRows", TEMPORAL_MAX_ROWS);
-            f.put("maxResults", TEMPORAL_MAX_LIMIT);
-            f.put("timeoutMs", TIMEOUT_SECONDS * 1000);
+            f.put("maxRows", maxRows);
+            f.put("maxResults", maxLimit);
+            f.put("timeoutMs", timeoutSeconds * 1000);
             out.put("fences", f);
             out.put("source", indexed.source());
             audit(ex, datasetId, results.size(), limited || rowCapped, null);
@@ -248,8 +246,9 @@ public final class PatternRoutes implements RouteModule {
      * The scan knobs of the {@code temporal} Investigation op ({@code mode}, {@code series}, {@code windowSeconds},
      * {@code minEvents}, {@code maxCv}, {@code limit}) validated with the route's own bounds (422, never clamped) and returned
      * with every default filled, so what is sealed states exactly what was asked. Columns come from the Investigation's header.
+     * The {@code limit} bounds are the Space's {@code pattern.temporal_limit_*} in {@code lim}.
      */
-    static Map<String, Object> temporalKnobs(Map<String, Object> body) {
+    static Map<String, Object> temporalKnobs(Map<String, Object> body, LaLimitValues lim) {
         String mode = ApiContext.str(body, "mode");
         if (!"burst".equals(mode) && !"periodicity".equals(mode))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'mode' must be 'burst' or 'periodicity'");
@@ -263,7 +262,8 @@ public final class PatternRoutes implements RouteModule {
         if (burst) k.put("windowSeconds", (long) boundedNumber(body, "windowSeconds", 60, 1, DAY_SECONDS));
         k.put("minEvents", (int) boundedNumber(body, "minEvents", 5, burst ? 2 : 3, 1_000));
         if (!burst) k.put("maxCv", boundedNumber(body, "maxCv", 0.1, 0, 1));
-        k.put("limit", (int) boundedNumber(body, "limit", TEMPORAL_DEFAULT_LIMIT, 1, TEMPORAL_MAX_LIMIT));
+        int maxLimit = SpaceLimits.get(lim, LaLimit.PATTERN_TEMPORAL_LIMIT_MAX);
+        k.put("limit", (int) boundedNumber(body, "limit", Math.min(SpaceLimits.get(lim, LaLimit.PATTERN_TEMPORAL_LIMIT_DEFAULT), maxLimit), 1, maxLimit));
         return k;
     }
 
@@ -323,6 +323,7 @@ public final class PatternRoutes implements RouteModule {
 
     private Object branching(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "branching pattern");
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
@@ -330,7 +331,9 @@ public final class PatternRoutes implements RouteModule {
         String kindCol = ident(body, "linkKindCol", false);
         String timeCol = ident(body, "timeCol", false);
         List<Stage> stages = PatternQueryCompiler.parseStages(body.get("stages"));
-        int limit = body.get("limit") instanceof Number n ? Math.max(1, Math.min(MAX_MATCHES, n.intValue())) : DEFAULT_MATCHES;
+        int maxMatches = SpaceLimits.get(lim, LaLimit.PATTERN_MATCHES_MAX);
+        int limit = body.get("limit") instanceof Number n ? Math.max(1, Math.min(maxMatches, n.intValue()))
+                : Math.min(SpaceLimits.get(lim, LaLimit.PATTERN_MATCHES_DEFAULT), maxMatches);
         // Run on an Investigation canvas: the Investigation read gate (non-member 404), and the ids leave under that
         // Investigation's pseudonyms (the Working Set's), not the Space's exploration aliases.
         String investigationId = ApiContext.str(body, "investigationId");
@@ -347,16 +350,16 @@ public final class PatternRoutes implements RouteModule {
         DatasetProvider.BoundFilter filter = body.get("filter") == null ? DatasetProvider.BoundFilter.TRUE : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
 
         if (PatternQueryCompiler.needsTime(stages) && timeCol == null)
-            return refusal(ex, datasetId, "This pattern has a time window or ordering — choose a time column in the Query panel first.");
+            return refusal(ex, datasetId, "This pattern has a time window or ordering — choose a time column in the Query panel first.", lim);
 
-        SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
+        SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, SpaceLimits.get(lim, LaLimit.PATTERN_TIMEOUT_S));
         try {
             String refused = probe(datasetId, relationSql, sourceCol, targetCol, kindCol, timeCol, stages, filter, policy);
-            if (refused != null) return refusal(ex, datasetId, refused);
+            if (refused != null) return refusal(ex, datasetId, refused, lim);
 
             Compiled c = PatternQueryCompiler.legs(datasetId, sourceCol, targetCol, kindCol, timeCol, stages, filter);
             DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                    datasetId, relationSql, c.sql(), MAX_LEGS, 0, List.of(), List.of(), c.binds()), policy);
+                    datasetId, relationSql, c.sql(), SpaceLimits.get(lim, LaLimit.PATTERN_MAX_LEGS), 0, List.of(), List.of(), c.binds()), policy);
 
             List<String> attrs = PatternQueryCompiler.thresholdAttrs(stages);
             List<List<Edge>> byStage = new ArrayList<>();
@@ -424,7 +427,7 @@ public final class PatternRoutes implements RouteModule {
             out.put("edges", edges);
             out.put("truncated", truncated);
             out.put("legCapped", r.truncated());
-            out.put("fences", fences());
+            out.put("fences", fences(lim));
             audit(ex, datasetId, matches.size(), truncated, null);
             return out;
         } catch (SQLException e) {
@@ -466,23 +469,23 @@ public final class PatternRoutes implements RouteModule {
         return d == Math.rint(d) && Math.abs(d) < 1e15 ? String.valueOf((long) d) : String.valueOf(d);
     }
 
-    private Map<String, Object> refusal(HttpExchange ex, String datasetId, String why) {
+    private Map<String, Object> refusal(HttpExchange ex, String datasetId, String why, LaLimitValues lim) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("matches", List.of());
         out.put("edges", List.of());
         out.put("truncated", false);
         out.put("legCapped", false);
         out.put("refusal", why);
-        out.put("fences", fences());
+        out.put("fences", fences(lim));
         audit(ex, datasetId, 0, false, why);
         return out;
     }
 
-    private static Map<String, Object> fences() {
+    private static Map<String, Object> fences(LaLimitValues lim) {
         Map<String, Object> f = new LinkedHashMap<>();
-        f.put("maxLegs", MAX_LEGS);
+        f.put("maxLegs", SpaceLimits.get(lim, LaLimit.PATTERN_MAX_LEGS));
         f.put("workBudget", BranchingPatternEngine.WORK_BUDGET);
-        f.put("timeoutMs", TIMEOUT_SECONDS * 1000);
+        f.put("timeoutMs", SpaceLimits.get(lim, LaLimit.PATTERN_TIMEOUT_S) * 1000);
         return f;
     }
 

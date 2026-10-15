@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.la.api.IndexedRead.Fitted;
 import com.gamma.la.api.IndexedRead.Outcome;
 import com.gamma.la.api.IndexedRead.Reason;
@@ -23,8 +25,8 @@ import java.sql.SQLException;
  * Kind, zone and attribute columns are not part of a traversal request, so any value of them matches. ⚠ Not servable, and
  * therefore falling back, whenever the index cannot reproduce the flat answer EXACTLY: a temporal constraint over a time
  * column read in a zone other than UTC (the flat path compares the raw wall-clock values), a {@code filter} on the weight
- * column (stored as DOUBLE, the flat path sees the original type), a depth over {@link IndexedTraversal#MAX_DEPTH}, and a
- * frontier over {@link IndexedTraversal#FRONTIER_CAP} keys (found only mid-walk, which discards the partial answer).
+ * column (stored as DOUBLE, the flat path sees the original type), a depth over the Space's {@code index.traversal_depth}, and
+ * a frontier over its {@code index.frontier_cap} keys (found only mid-walk, which discards the partial answer).
  */
 final class IndexedRecursivePaths {
 
@@ -50,13 +52,15 @@ final class IndexedRecursivePaths {
         });
         if (!sel.usable()) return sel.flat();
 
-        if (rq.maxDepth() > IndexedTraversal.MAX_DEPTH) return Outcome.flat(Reason.depth_over_index_cap);
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int depthCap = SpaceLimits.get(lim, LaLimit.INDEX_TRAVERSAL_DEPTH), frontierCap = SpaceLimits.get(lim, LaLimit.INDEX_FRONTIER_CAP);
+        if (rq.maxDepth() > depthCap) return Outcome.flat(Reason.depth_over_index_cap);
 
         beforeRead.run();                                                                    // four-eyes, exactly as the flat path
         IndexedTraversal.Params p = new IndexedTraversal.Params(rq.startNode(), rq.targetNode(), rq.undirected(), rq.maxDepth(),
                 rq.maxEdges(), rq.limit(), rq.tsCol() != null, rq.monotonic(), rq.maxHours(), rq.maxGapHours(), sel.filterSql(), sel.filterBinds());
         try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), policy)) {
-            return sel.served(IndexedTraversal.walk(reader, p));
+            return sel.served(IndexedTraversal.walk(reader, p, depthCap, frontierCap));
         } catch (IndexedTraversal.FrontierOverCap over) {
             return Outcome.flat(Reason.frontier_over_index_cap);                             // the partial walk is discarded
         } catch (SQLException | IOException | RuntimeException unreadable) {

@@ -23,7 +23,7 @@ class InvRoutesTraversalPolicyTest {
 
     @Test
     void defaultsAreFourForTraversalAndTwoElsewhere() {
-        assertEquals(4, InvRoutes.traversalPolicy().maxThreads());
+        assertEquals(4, InvRoutes.traversalPolicy(null).maxThreads());
         assertEquals(2, SqlSandboxPolicy.defaultPolicy().maxThreads());
     }
 
@@ -31,7 +31,7 @@ class InvRoutesTraversalPolicyTest {
     void traversalUsesTraversalSettingAndOtherQueriesDoNot() {
         System.setProperty(THREADS, "3");
         System.setProperty(TRAVERSAL, "7");
-        assertEquals(7, InvRoutes.traversalPolicy().maxThreads());
+        assertEquals(7, InvRoutes.traversalPolicy(null).maxThreads());
         // positive twin: the general sandbox policy ignores the traversal setting
         assertEquals(3, SqlSandboxPolicy.defaultPolicy().maxThreads());
     }
@@ -39,16 +39,16 @@ class InvRoutesTraversalPolicyTest {
     @Test
     void generalThreadSettingDoesNotReachTraversal() {
         System.setProperty(THREADS, "9");
-        assertEquals(4, InvRoutes.traversalPolicy().maxThreads());
+        assertEquals(4, InvRoutes.traversalPolicy(null).maxThreads());
     }
 
     @Test
     void invalidTraversalSettingFallsBackToDefault() {
         System.setProperty(TRAVERSAL, "abc");
-        assertEquals(4, InvRoutes.traversalPolicy().maxThreads());
+        assertEquals(4, InvRoutes.traversalPolicy(null).maxThreads());
         System.setProperty(TRAVERSAL, "0");
-        assertEquals(4, InvRoutes.traversalPolicy().maxThreads());
+        assertEquals(4, InvRoutes.traversalPolicy(null).maxThreads());
         System.setProperty(TRAVERSAL, "-2");
-        assertEquals(4, InvRoutes.traversalPolicy().maxThreads());
+        assertEquals(4, InvRoutes.traversalPolicy(null).maxThreads());
     }
 }

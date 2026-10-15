@@ -19,6 +19,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -123,6 +124,24 @@ class ControlApiGeoProjectionTest {
             assertEquals(2, data.get("points").size());
             assertTrue(data.get("truncated").asBoolean());
             assertEquals(2, data.get("skipped").asInt(), "skipped counts all bad rows, independent of the limit");
+        }
+    }
+
+    /**
+     * LA-CONFIG-LIMITS-1: a request that states no limit gets the Space's {@code display.geo_point_cap} - the cap the
+     * SPA reads - not a constant of the route's own (both geo routes share this default). The three valid points pass under the default (the test above).
+     */
+    @Test
+    void anUnstatedLimitIsTheSpacesGeoPointCap(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedPoints(c);
+            Files.writeString(root.resolve("link-analysis.toon"), "display:\n  geo_point_cap: 2\n");
+            String body = "{\"dataset\":\"sights_ds\",\"latCol\":\"lat\",\"lonCol\":\"lon\"}";
+            JsonNode capped = json(post(c.port, "geo/projection", body).body());
+            assertEquals(2, capped.get("points").size(), "the Space's cap: " + capped);
+            assertTrue(capped.get("truncated").asBoolean());
+            // a stated limit still wins, up to the route's own ceiling
+            assertEquals(3, json(post(c.port, "geo/projection", body.replace("}", ",\"limit\":10}")).body()).get("points").size());
         }
     }
 

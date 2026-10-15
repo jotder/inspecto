@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
 import com.gamma.la.api.IndexedRead.Fitted;
 import com.gamma.la.api.IndexedRead.Outcome;
 import com.gamma.la.api.IndexedRead.Reason;
@@ -27,7 +28,7 @@ import java.util.Set;
  * D-3 step 6 - the sealed one-hop read behind an Investigation {@code expand} (D-E3), answered FROM THE INDEX for a SIMPLE rung.
  * Simple means the rung needs nothing but the folded links of its frontier: no {@code window}, no {@code minDistinctDays}, no
  * candidate degree bound (a degree is a property of the whole windowed graph, not of the frontier), no merged traversal, and a
- * frontier of at most {@link #FRONTIER_CAP} distinct entities. Any other rung keeps the flat CTE untouched
+ * frontier of at most the Space's {@code index.frontier_cap} distinct entities. Any other rung keeps the flat CTE untouched
  * ({@link Reason#rung_not_indexable}, with the cause in {@code details}).
  *
  * <p>It reproduces {@code InvestigationRoutes.read}'s shape step by step, because the sealed {@code fingerprint} is
@@ -38,9 +39,6 @@ import java.util.Set;
  * {@code cnt DESC, source, target, kind NULLS FIRST} cut at the budget.
  */
 final class IndexedExpand {
-
-    /** Most distinct frontier entities the index serves (two lookups each; the same cap as the traversal's frontier). */
-    static final int FRONTIER_CAP = 20;
 
     record Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> frontier,
                    List<String> excluded, List<String> kinds, String direction, long minEvents, Integer fanOut, int budget,
@@ -66,13 +64,16 @@ final class IndexedExpand {
 
     private IndexedExpand() { }
 
-    /** Why this rung is not for the index, or null when it is. */
-    static String notIndexable(Request rq) {
+    /**
+     * Why this rung is not for the index, or null when it is. {@code frontierCap}: most distinct frontier entities the index serves
+     * (two lookups each; the Space's {@code index.frontier_cap}, the same cap as the traversal's frontier).
+     */
+    static String notIndexable(Request rq, int frontierCap) {
         if (rq.windowed()) return "the rung has a window";
         if (rq.minDays()) return "the rung has minDistinctDays";
         if (rq.degreeBounded()) return "the rung bounds candidate degree";
         if (rq.merged()) return "the rung is a merged traversal";
-        if (rq.frontier().size() > FRONTIER_CAP) return "the frontier has " + rq.frontier().size() + " entities (the index serves at most " + FRONTIER_CAP + ")";
+        if (rq.frontier().size() > frontierCap) return "the frontier has " + rq.frontier().size() + " entities (the index serves at most " + frontierCap + ")";
         if (new HashSet<>(rq.frontier()).size() != rq.frontier().size()) return "the frontier repeats an entity";
         if (rq.kinds() != null && (rq.kinds().isEmpty() || rq.kindCol() == null)) return "linkKinds cannot be applied";
         if (rq.fanOut() != null && rq.fanOut() < 1) return "maxFanOut is below 1";
@@ -86,7 +87,7 @@ final class IndexedExpand {
     /** D7-5: as above, reading each index a Draft pinned ({@code mappingHash -> version}) at that version. */
     static Outcome<Result> attempt(Path writeRoot, Path dataRoot, String relationSql, Request rq, SqlSandboxPolicy policy,
                                    java.util.Map<String, Long> pinned) {
-        String why = notIndexable(rq);
+        String why = notIndexable(rq, SpaceLimits.get(writeRoot, LaLimit.INDEX_FRONTIER_CAP));
         Selection sel = IndexedRead.select(writeRoot, dataRoot, relationSql, rq.datasetId(), rq.sourceCol(), rq.targetCol(), (m, utc) -> {
             if (why != null) return Fitted.no(Reason.rung_not_indexable);
             if (rq.kindCol() != null && !rq.kindCol().equalsIgnoreCase(m.kindColumn())) return Fitted.no(Reason.column_not_indexed);

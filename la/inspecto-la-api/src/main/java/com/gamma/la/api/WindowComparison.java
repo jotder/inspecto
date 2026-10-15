@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
@@ -39,9 +41,7 @@ final class WindowComparison {
 
     private WindowComparison() {}
 
-    static final int MAX_ENTITIES = 2_000;
-    static final int MAX_ROWS = 50_000;
-    static final int LIST_CAP = 500;
+    // The Space's comparison.* limits (LaLimit): entities compared, rows read per window, entries per returned list.
 
     /** The two windows from the query string: {@code aFrom aTo bFrom bTo} and an optional shared {@code timezone}; null when none is present. */
     static Map<String, Map<String, Object>> windows(HttpExchange ex) {
@@ -100,13 +100,16 @@ final class WindowComparison {
         Map<String, Object> h = inv.header();
         if (h.get("timeCol") == null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this Investigation has no time column - create it with 'timeCol' to compare windows");
-        if (state.entities.size() > MAX_ENTITIES)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a comparison covers at most " + MAX_ENTITIES
+        LaLimitValues lim = SpaceLimits.of(inv.writeRoot());
+        int maxEntities = SpaceLimits.get(lim, LaLimit.COMPARISON_MAX_ENTITIES), maxRows = SpaceLimits.get(lim, LaLimit.COMPARISON_MAX_ROWS);
+        int listCap = SpaceLimits.get(lim, LaLimit.COMPARISON_LIST_CAP);
+        if (state.entities.size() > maxEntities)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a comparison covers at most " + maxEntities
                     + " entities (the Working Set has " + state.entities.size() + "); exclude or threshold first");
         String dataset = inv.dataset();
         String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on the read
-        TreeMap<String, Long> a = counts(inv, dataset, relationSql, state, windows.get("a"));
-        TreeMap<String, Long> b = counts(inv, dataset, relationSql, state, windows.get("b"));
+        TreeMap<String, Long> a = counts(inv, dataset, relationSql, state, windows.get("a"), maxRows);
+        TreeMap<String, Long> b = counts(inv, dataset, relationSql, state, windows.get("b"), maxRows);
 
         List<Map<String, Object>> onlyA = new ArrayList<>(), onlyB = new ArrayList<>(), both = new ArrayList<>();
         TreeSet<String> entA = new TreeSet<>(), entB = new TreeSet<>();
@@ -150,16 +153,16 @@ final class WindowComparison {
         long entNeither = state.entities.keySet().stream().filter(x -> !entA.contains(x) && !entB.contains(x)).count();
 
         Map<String, Object> links = new LinkedHashMap<>();
-        links.put("onlyA", section(onlyA));
-        links.put("onlyB", section(onlyB));
-        links.put("both", section(both));
+        links.put("onlyA", section(onlyA, listCap));
+        links.put("onlyB", section(onlyB, listCap));
+        links.put("both", section(both, listCap));
         links.put("neither", neither);
         links.put("eventsA", eventsA);
         links.put("eventsB", eventsB);
         Map<String, Object> entities = new LinkedHashMap<>();
-        entities.put("onlyA", section(new ArrayList<>(entOnlyA)));
-        entities.put("onlyB", section(new ArrayList<>(entOnlyB)));
-        entities.put("both", section(new ArrayList<>(entBoth)));
+        entities.put("onlyA", section(new ArrayList<>(entOnlyA), listCap));
+        entities.put("onlyB", section(new ArrayList<>(entOnlyB), listCap));
+        entities.put("both", section(new ArrayList<>(entBoth), listCap));
         entities.put("neither", entNeither);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -169,7 +172,7 @@ final class WindowComparison {
         out.put("links", links);
         out.put("entities", entities);
         if (activity) out.put("mode", "activity");
-        if (activity) out.put("activity", activity(linkMoves, linkUnchanged, entCounts, minAbsDelta));
+        if (activity) out.put("activity", activity(linkMoves, linkUnchanged, entCounts, minAbsDelta, listCap));
         out.put("sealed", false);
         out.put("basis", "Working Set entities and links at the chosen log position; in-window event counts read live from the "
                 + "Dataset (not sealed into the log). A link is present in a window with at least one event there; an entity "
@@ -183,7 +186,7 @@ final class WindowComparison {
      * counted as {@code unchanged}. An entity's count is the events on the Working Set links it ends, a self-loop once.
      */
     private static Map<String, Object> activity(List<Map<String, Object>> linkMoves, long linkUnchanged, TreeMap<String, long[]> entCounts,
-                                                Long minAbsDelta) {
+                                                Long minAbsDelta, int listCap) {
         long min = minAbsDelta == null ? 0 : minAbsDelta;
         long linksBelow = linkMoves.stream().filter(m -> Math.abs((Long) m.get("delta")) < min).count();
         linkMoves.removeIf(m -> Math.abs((Long) m.get("delta")) < min);
@@ -208,9 +211,9 @@ final class WindowComparison {
                 .thenComparing(m -> String.valueOf(m.get("id"))));
         Map<String, Object> out = new LinkedHashMap<>();
         Map<String, Object> l = new LinkedHashMap<>(), en = new LinkedHashMap<>();
-        l.put("changed", section(linkMoves));
+        l.put("changed", section(linkMoves, listCap));
         l.put("unchanged", linkUnchanged);
-        en.put("changed", section(entMoves));
+        en.put("changed", section(entMoves, listCap));
         en.put("unchanged", entUnchanged);
         if (minAbsDelta != null) {   // only when asked, so a diff sealed without it is byte-identical to before
             out.put("minAbsDelta", minAbsDelta);
@@ -279,17 +282,17 @@ final class WindowComparison {
         return out;
     }
 
-    private static Map<String, Object> section(List<?> items) {
+    private static Map<String, Object> section(List<?> items, int listCap) {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("count", items.size());
-        s.put("items", items.size() > LIST_CAP ? new ArrayList<>(items.subList(0, LIST_CAP)) : items);
-        s.put("truncated", items.size() > LIST_CAP);
+        s.put("items", items.size() > listCap ? new ArrayList<>(items.subList(0, listCap)) : items);
+        s.put("truncated", items.size() > listCap);
         return s;
     }
 
     /** In-window event count per Working Set link key, from the Dataset. Exact: a read over the row cap is refused. */
     private static TreeMap<String, Long> counts(InvestigationRoutes.Inv inv, String dataset, String relationSql,
-                                                InvestigationEvaluator.State state, Map<String, Object> window) {
+                                                InvestigationEvaluator.State state, Map<String, Object> window, int maxRows) {
         Map<String, Object> h = inv.header();
         String src = SqlIdent.q(String.valueOf(h.get("sourceCol")));
         String tgt = SqlIdent.q(String.valueOf(h.get("targetCol")));
@@ -314,9 +317,9 @@ final class WindowComparison {
         sql.append(") SELECT s, t, k, COUNT(*) AS cnt FROM ev GROUP BY s, t, k ORDER BY s, t, k NULLS FIRST");
         try {
             DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                    dataset, relationSql, sql.toString(), MAX_ROWS, 0, List.of(), List.of(), binds));
+                    dataset, relationSql, sql.toString(), maxRows, 0, List.of(), List.of(), binds));
             if (r.truncated())
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the comparison reads more than " + MAX_ROWS
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the comparison reads more than " + maxRows
                         + " links in one window; narrow the window or the Working Set (no silent sample)");
             for (Map<String, Object> row : r.rows())
                 out.put(LinkIds.key(String.valueOf(row.get("s")), String.valueOf(row.get("t")), String.valueOf(row.get("k"))),

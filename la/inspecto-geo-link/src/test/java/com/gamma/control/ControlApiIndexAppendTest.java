@@ -302,6 +302,17 @@ class ControlApiIndexAppendTest {
             sameExpand(c, "[\"A\",\"B\"]", 2);
 
             plant(dir.resolve("p3.parquet"), P3, 1_700_000_002_000L);
+            // LA-CONFIG-LIMITS-1 P3: the delta cap is the Space's index.max_deltas - at 1, the one delta carried IS the cap: the
+            // probe recommends compaction and the build service refuses the append; back at the default (8) the same append runs
+            settings(c, ENABLED + "  max_deltas: 1\n");
+            JsonNode capped = indexOf(c, "f_ds");
+            assertEquals("compact", capped.at("/plan/recommended").asText(), capped.toString());
+            assertTrue(capped.at("/plan/reasons").toString().contains("delta_cap_reached"), capped.toString());
+            HttpResponse<String> refusedAppend = send(c, "POST", "/inv/index/builds", BUILD + ",\"mode\":\"append\"}", OWNER);
+            assertEquals(409, refusedAppend.statusCode(), refusedAppend.body());
+            assertTrue(refusedAppend.body().contains("compact first"), refusedAppend.body());
+            settings(c, ENABLED);
+            assertEquals("append", indexOf(c, "f_ds").at("/plan/recommended").asText(), "the default cap of 8 is not reached");
             assertEquals(3, build(c, "f_ds", "append").at("/result/version").asInt());
             assertEquals(2, indexOf(c, "f_ds").get("deltas").asInt());
             sameNeighbours(c, 3);
