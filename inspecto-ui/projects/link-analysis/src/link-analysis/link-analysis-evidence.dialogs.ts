@@ -366,7 +366,14 @@ export class LinkAnalysisSnapshotDialog {
             },
             error: (e: unknown) => {
                 this.saving.set(false);
-                this.saveError.set(e instanceof Error ? e.message : 'The analysis could not be saved.');
+                // A refusal (403 missing capability, 413, 422) carries the server's own reason; say it.
+                this.saveError.set(
+                    e instanceof HttpErrorResponse
+                        ? apiErrorMessage(e, 'The analysis could not be saved.')
+                        : e instanceof Error
+                          ? e.message
+                          : 'The analysis could not be saved.',
+                );
             },
         });
     }

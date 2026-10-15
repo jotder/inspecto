@@ -35,16 +35,16 @@ testing from it.** Driven through the browser as Demo Users; the pane was 875-14
 | Id | Use case | Result |
 |---|---|---|
 | UC1 | Mule ring from the saved view | PARTIAL: 112 nodes / 224 links as in the manual; Suspicion score top-20. Layering chain refused for want of a time column (F-6). *Explain node*, cash-out not driven. |
-| UC2 | Build a graph by hand | NOT DRIVEN |
+| UC2 | Build a graph by hand | PASS: Dataset picker lists link-like Datasets first with a reason; picking `mule_ring_legs_dataset` filled FROM_ACCOUNT / TO_ACCOUNT; Run query drew 20 nodes / 20 links with the Masking badge. Filters not driven. |
 | UC3 | Value Measures | PARTIAL: form opens; prefill defect found and fixed (F-8). A Measure was not run. |
 | UC4 | Investigation end to end | PARTIAL: opened `mule-hub-case` (9 entities, 7 links, 1 excluded), Expand next degree. Seed, exclude, window, identity, snapshot, replay not driven. |
 | UC5 | Four-eyes | PASS: analyst's expand held ("waiting for approval", request p1); manager approved it in the Oversight card; ran as step 9; Working Set 9 -> 15 entities. |
-| UC6 | Evidence hand-over | NOT DRIVEN |
+| UC6 | Evidence hand-over | PASS: *Save this analysis* froze a 112-node snapshot and showed its SHA-256; the Dossier of `mule-hub-case` reads "Log intact, all 9 recorded hashes agree", lists nine steps including the four-eyes approval, and masks an entity id inside a free-text reason. *Case from nodes* and the sealed bundle download not driven. Found F-15. |
 | UC7 | Investigate a number | PASS: MSISDN card switched the profile to Telecom, asked the purpose, created the Investigation and expanded one degree: 403 entities, 403 links (30 days to 29 Sep 2026). Found F-14. |
 | UC8 | Data trust | PARTIAL: strip reads "Data as of 4 Sep 2026 . 3 of 3 days . index v2". The seed reported "4 covered, missing 2026-09-05"; not reconciled. |
 | UC9 | Read-only reviewer (`ra.analyst`) | PASS: opens and reads; 31 controls disabled, each with the missing capability named. |
-| UC10 | Admin | PASS (read): Settings shows each limit with its in-force value; Entity Lists shows both lists and a verified Identity Fact chain (7 facts). Opening another user's Investigation link as admin gives a clear red "not available" message. Minting an embed link and Reveal not driven. |
-| UC11 | Usability sweep | PARTIAL, findings below. No axe pass this run. |
+| UC10 | Admin | PASS (read, plus Reveal): Reveal turned the hub's alias into its real id in one click, marked "reveal audited" (no reason is asked: a policy question, F-16). The embed Share card says embed links are off on this host; the mint itself was proven in the earlier LA-EMBED-VIEW-1 pass and not re-run.  Settings shows each limit with its in-force value; Entity Lists shows both lists and a verified Identity Fact chain (7 facts). Opening another user's Investigation link as admin gives a clear red "not available" message. Minting an embed link and Reveal not driven. |
+| UC11 | Usability and axe | axe-core 0 violations (dark) on Link Analysis with a graph, the open Investigation, Entity Lists, Settings, Geo and Alerts. One run on the Investigation page right after a Reveal reported 3 (colour contrast on text read as black, an ag-grid header and a grid scroll region); two re-runs were clean, so it is recorded as not reproducible. Light mode, the Save dialog and the Value Measures form were not scanned. |
 
 ### Findings
 
@@ -63,8 +63,10 @@ testing from it.** Driven through the browser as Demo Users; the pane was 875-14
 | F-4 | P3 | Sign-in (studio shell, 800 px): Demo User name overlaps its title line. | OPEN, screenshot only; not re-seen in the la-app bundle |
 | F-5 | P3 | In the studio shell the analyst lands on a Business Lens pointing at `kpi-reports`. | OPEN, observation (the la-app bundle is the product shape) |
 | F-14 | P2 | The Investigation tab keeps the previous tab's scroll position (the three tabs share one scroll container), so the *Investigate a number* card switches to it with the required **Purpose** field out of view; seen three times. | FIXED (resets to the top on a tab change; spec fails with the fix removed). Confirmed live only by the unit spec: the fix was built after the last live pass. |
+| F-15 | P2 | *Save this analysis* is enabled for a user without *Incident management*; only after typing a title does it fail, saying "The analysis could not be saved" and hiding the server's reason (`missing capability 'canManageIncidents'`). *Attach to Case* next to it is disabled with its reason. | FIXED for the message (the dialog now shows the server's reason; spec). The button itself is still enabled: OPEN. |
+| F-16 | P3 | Reveal is one click with no reason asked; each reveal is audited. Whether a reason should be required is a policy call. | OPEN, question |
 | F-13 | P3 | The *Open by id* row of the Investigation tab shows "—" with a pencil and a disabled Open button before anything is typed. | OPEN, observation |
 
 Not a defect, recorded so nobody repeats it: `/approvals` in the la-app bundle redirects to `/`; four-eyes decisions are made in the Oversight card of the Investigation.
 
-**Still not driven:** UC2 (graph by hand), UC6 (Dossier, Save this analysis, Case from nodes), embed link and Reveal, the Layering chain on a graph that carries a time column, and an axe pass.
+**Still not driven:** *Case from graph nodes* and the sealed bundle download, Filters and the Layering chain on a graph that carries a time column, light mode and the dialogs under axe, minting an embed link on a host with embeds on.
