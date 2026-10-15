@@ -70,6 +70,11 @@ public final class LinkEventTypes {
      *  {@code datasets}/{@code assessed} carry the reach; the key is never recorded (raw or alias). */
     public static final String LINK_ENTITY_PROFILED = "LINK_ENTITY_PROFILED";
 
+    /** An Entity key was resolved to the key its Entity page takes ({@code POST /inv/entities/{type}/resolve}): the alias for a
+     *  masked type, so a raw value never travels in a URL. {@code entityType}/{@code masked}/{@code from} (alias or value) carry the
+     *  act; the key is never recorded (raw or alias). */
+    public static final String LINK_ENTITY_KEY_RESOLVED = "LINK_ENTITY_KEY_RESOLVED";
+
     /** A Link Analysis evidence snapshot was SEALED ({@code POST /inv/snapshots}, LA-03).
      *  {@code snapshotId}, {@code nodes} and {@code edges} carry what was frozen. A distinct act from
      *  {@link #LINK_PROJECTED}: that one records what an analyst LOOKED AT, this one records what they
