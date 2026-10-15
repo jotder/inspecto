@@ -607,6 +607,21 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         return { fixture, close };
     }
 
+    it('names the missing capability when the server refuses the save with a 403', async () => {
+        const refusal = new HttpErrorResponse({
+            status: 403,
+            error: { error: { errorCode: 'PERMISSION_DENIED', message: "missing capability 'canManageIncidents'" } },
+        });
+        const { fixture, close } = create(() => throwError(() => refusal));
+        fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: '' });
+
+        await fixture.componentInstance.save();
+
+        expect(close).not.toHaveBeenCalled();
+        expect(fixture.componentInstance.saveError()).toContain('canManageIncidents');
+        expect(fixture.componentInstance.saveError()).not.toBe('The analysis could not be saved.');
+    });
+
     it('does not close, and says why, when the seal is refused', async () => {
         const { fixture, close } = create(() => throwError(() => new Error('snapshot already exists')));
         fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: '' });

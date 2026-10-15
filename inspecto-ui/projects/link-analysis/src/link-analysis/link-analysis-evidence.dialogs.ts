@@ -17,7 +17,7 @@ import { LA_CASES } from '@inspecto/link-analysis/la-host';
 import { ConditionGroup } from '@inspecto/core/query/query-types';
 import { firstValueFrom, of } from 'rxjs';
 import { InvService } from '@inspecto/link-analysis/api/inv.service';
-import { MAX_CASE_MEMBERS, caseMemberCandidates } from './case-members';
+import { MAX_CASE_MEMBERS, caseMemberCandidates, noCaseMemberReason } from './case-members';
 import { LinkAnalysisCaseFieldComponent } from './link-analysis-case-field.component';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 
@@ -250,7 +250,7 @@ export class LinkAnalysisSnapshotDialog {
         !this.opsEnabled()
             ? 'Creating a Case needs operational objects, which this bundle does not include (Professional edition and above).'
             : this.candidates.length === 0
-              ? 'No node on this graph can become a Case member: each must be an Entity with a known source Dataset.'
+              ? noCaseMemberReason(this.data.graph)
               : '',
     );
     private readonly submitted = signal(false);
@@ -366,7 +366,14 @@ export class LinkAnalysisSnapshotDialog {
             },
             error: (e: unknown) => {
                 this.saving.set(false);
-                this.saveError.set(e instanceof Error ? e.message : 'The analysis could not be saved.');
+                // A refusal (403 missing capability, 413, 422) carries the server's own reason; say it.
+                this.saveError.set(
+                    e instanceof HttpErrorResponse
+                        ? apiErrorMessage(e, 'The analysis could not be saved.')
+                        : e instanceof Error
+                          ? e.message
+                          : 'The analysis could not be saved.',
+                );
             },
         });
     }
@@ -575,7 +582,7 @@ export class LinkAnalysisAttachCaseDialog {
         !this.caseMgmt.available()
             ? 'Creating a Case needs operational objects, which this bundle does not include (Professional edition and above).'
             : this.candidates.length === 0
-              ? 'No node on this graph can become a Case member: each must be an Entity with a known source Dataset.'
+              ? noCaseMemberReason(this.data.graph)
               : '',
     );
     readonly submitted = signal(false);
