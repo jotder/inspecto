@@ -341,10 +341,6 @@ public final class InvRoutes implements RouteModule {
         return false;
     }
 
-    /** One column's cardinality profile — the left/right operand of a Jaccard pair. */
-    private record ColumnStats(String dataset, String column, String relationSql,
-                               long rows, long distinct, long nulls) {}
-
     /**
      * {@code POST /inv/schema/overlap-profile} (LA-15) — the <b>empirical</b> counterpart to
      * {@link #schemaRelationships}, which infers foreign keys from naming alone. This one measures how much
@@ -392,7 +388,7 @@ public final class InvRoutes implements RouteModule {
         LaLimitValues lim = SpaceLimits.of(writeRoot);
         int maxPairs = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_PAIRS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_PAIRS_MAX));
 
-        List<ColumnStats> columns = new ArrayList<>();
+        List<ColumnProfile.Stats> columns = new ArrayList<>();
         List<String> seenColumns = new ArrayList<>();
         List<String> seenDatasets = new ArrayList<>();
         int scanned = 0, skipped = 0;
@@ -407,7 +403,7 @@ public final class InvRoutes implements RouteModule {
                     seenColumns.add(col);
                     if (wantColumns.isEmpty() || containsIgnoreCase(wantColumns, col)) inScope.add(col);
                 }
-                if (!inScope.isEmpty()) columns.addAll(columnStats(c.name(), relationSql, inScope));
+                if (!inScope.isEmpty()) columns.addAll(ColumnProfile.stats(c.name(), relationSql, inScope, ColumnProfile.AS_VARCHAR));
                 scanned++;
             } catch (Exception unusable) {
                 skipped++;   // unbound dataset, bad view, etc. — degrade, don't fail the call
@@ -423,7 +419,7 @@ public final class InvRoutes implements RouteModule {
         int considered = 0;
         for (int i = 0; i < columns.size(); i++) {
             for (int j = i + 1; j < columns.size(); j++) {
-                ColumnStats a = columns.get(i), b = columns.get(j);
+                ColumnProfile.Stats a = columns.get(i), b = columns.get(j);
                 if (a.dataset().equals(b.dataset())) continue;
                 considered++;
                 if (pairs.size() >= maxPairs) continue;   // keep counting to report the TRUE total
@@ -442,7 +438,7 @@ public final class InvRoutes implements RouteModule {
         });
 
         List<Map<String, Object>> profiles = new ArrayList<>(columns.size());
-        for (ColumnStats s : columns) {
+        for (ColumnProfile.Stats s : columns) {
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("dataset", s.dataset());
             p.put("column", s.column());
@@ -479,34 +475,6 @@ public final class InvRoutes implements RouteModule {
     }
 
     /**
-     * One aggregate query per Dataset covering every in-scope column: row count, approximate distinct
-     * cardinality and NULL count. The distinct count is taken over {@code CAST(col AS VARCHAR)} so it is
-     * measured in the same domain as the union count in {@link #pair} — comparing a raw-typed cardinality
-     * against a VARCHAR union would make inclusion–exclusion meaningless across mismatched column types.
-     */
-    private static List<ColumnStats> columnStats(String dataset, String relationSql, List<String> cols)
-            throws SQLException, IOException {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS row_count");
-        for (int i = 0; i < cols.size(); i++) {
-            String c = q(cols.get(i));
-            sql.append(", APPROX_COUNT_DISTINCT(CAST(").append(c).append(" AS VARCHAR)) AS d_").append(i)
-               .append(", COUNT(").append(c).append(") AS n_").append(i);
-        }
-        sql.append(" FROM ").append(q(dataset));
-        DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                dataset, relationSql, sql.toString(), 1, 0, List.of(), List.of()));
-        Map<String, Object> row = r.rows().get(0);
-        long rows = num(row.get("row_count"));
-        List<ColumnStats> out = new ArrayList<>(cols.size());
-        for (int i = 0; i < cols.size(); i++) {
-            long nonNull = num(row.get("n_" + i));
-            out.add(new ColumnStats(dataset, cols.get(i), relationSql,
-                    rows, num(row.get("d_" + i)), rows - nonNull));
-        }
-        return out;
-    }
-
-    /**
      * The Jaccard estimate for one cross-Dataset column pair: one query for {@code |A ∪ B|} over
      * {@code A UNION ALL B}, then {@code |A ∩ B| = |A| + |B| − |A ∪ B|} clamped into the range a set size
      * can actually occupy. NULLs are excluded on both sides — a NULL is not a value two columns can share.
@@ -516,7 +484,7 @@ public final class InvRoutes implements RouteModule {
      * only place file-reading SQL may run — a Dataset backed by Parquet would be refused outright if its
      * relation reached the sealed statement instead.
      */
-    private static Map<String, Object> pair(ColumnStats a, ColumnStats b) throws SQLException, IOException {
+    private static Map<String, Object> pair(ColumnProfile.Stats a, ColumnProfile.Stats b) throws SQLException, IOException {
         String relation = valueSelect(a) + " UNION ALL " + valueSelect(b);
         DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
                 PAIR_RELATION, relation,
@@ -538,7 +506,7 @@ public final class InvRoutes implements RouteModule {
     }
 
     /** One side of the union: the column's non-NULL values as VARCHAR, over that Dataset's own relation. */
-    private static String valueSelect(ColumnStats s) {
+    private static String valueSelect(ColumnProfile.Stats s) {
         String c = q(s.column());
         return "SELECT CAST(" + c + " AS VARCHAR) AS v FROM (" + s.relationSql() + ") AS __r"
                 + " WHERE " + c + " IS NOT NULL";
