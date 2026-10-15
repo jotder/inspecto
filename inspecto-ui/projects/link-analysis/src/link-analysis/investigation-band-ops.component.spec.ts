@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { refresh } from '@inspecto/core/testing/pen-field';
 import {
     InvestigationSnapshotOpComponent,
     InvestigationThresholdOpComponent,
@@ -53,11 +54,11 @@ describe('InvestigationThresholdOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', 
     it('refuses client-side what the server refuses: no bound, min >= max, non-integer, max 0', async () => {
         const { fixture, cmp, store, el } = setup(InvestigationThresholdOpComponent);
         await cmp.submit();
-        fixture.detectChanges();
+        refresh(fixture);
         expect(alerts(el).join(' ')).toContain('Set a minimum, a maximum or both');
         cmp.form.patchValue({ min: '5', max: '5' });
         await cmp.submit();
-        fixture.detectChanges();
+        refresh(fixture);
         expect(alerts(el).join(' ')).toContain('minimum must be less than the maximum');
         cmp.form.patchValue({ min: '1.5', max: '0' });
         await cmp.submit();

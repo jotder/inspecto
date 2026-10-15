@@ -2,13 +2,13 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { ToastrService } from 'ngx-toastr';
 import { Observable } from 'rxjs';
 
 import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 import { LaLimitItem, LaLimitsResponse } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
@@ -39,7 +39,16 @@ const UNITS: Record<string, string> = {
 const numberPattern = (i: LaLimitItem): RegExp => (i.unit === 'per_s' ? /^\d+(\.\d+)?$/ : /^\d+$/);
 
 /** Words written in capitals wherever they appear in a key (a generic rule, not a per-item label). */
-const ACRONYMS: Record<string, string> = { hits: 'HITS', lod: 'LOD', id: 'ID', ids: 'IDs', url: 'URL', ttl: 'TTL', mb: 'MB', ram: 'RAM' };
+const ACRONYMS: Record<string, string> = {
+    hits: 'HITS',
+    lod: 'LOD',
+    id: 'ID',
+    ids: 'IDs',
+    url: 'URL',
+    ttl: 'TTL',
+    mb: 'MB',
+    ram: 'RAM',
+};
 /** A trailing word that qualifies the name rather than being part of it: `expand_budget_default` → "Expand budget" + "default". */
 const QUALIFIERS = new Set(['default', 'max', 'min']);
 
@@ -99,34 +108,35 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
         NgTemplateOutlet,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
+        MatExpansionModule,
+        PenFieldComponent,
         InspectoAlertComponent,
     ],
     template: `
         <ng-template #field let-i let-c="control" let-max="max" let-placeholder="placeholder">
-            <mat-form-field subscriptSizing="dynamic" class="w-full">
-                <mat-label>{{ label(i) }}</mat-label>
-                <input
-                    matInput
-                    type="number"
-                    [formControl]="c"
-                    [min]="i.min"
-                    [max]="max"
-                    [placeholder]="placeholder"
-                    [attr.data-key]="i.key"
-                />
-                <mat-hint>{{ i.description }} In force: {{ inForceText(i) }}.</mat-hint>
-                @if (c.invalid) {
-                    <mat-error
-                        >{{ i.unit === 'per_s' ? 'A number' : 'A whole number' }} from {{ num(i.min) }} to
-                        {{ num(max) }}, or blank.</mat-error
-                    >
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                [label]="label(i)"
+                type="number"
+                [formControl]="c"
+                [min]="i.min"
+                [max]="max"
+                [placeholder]="placeholder"
+                [attr.data-key]="i.key"
+                [error]="
+                    c.invalid
+                        ? (i.unit === 'per_s' ? 'A number' : 'A whole number') +
+                          ' from ' +
+                          num(i.min) +
+                          ' to ' +
+                          num(max) +
+                          ', or blank.'
+                        : ''
+                "
+            />
+            <p class="text-secondary m-0 text-xs">{{ i.description }} In force: {{ inForceText(i) }}.</p>
         </ng-template>
 
-        <div class="flex max-w-160 flex-col gap-6">
+        <div class="flex max-w-4xl flex-col gap-6">
             @if (limits.loading() && !limits.items().length) {
                 <p class="text-secondary text-sm">Reading the Link Analysis limits…</p>
             } @else if (limits.loadError()) {
@@ -144,28 +154,45 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                             (ngSubmit)="save('space')"
                             data-section="space"
                         >
-                            @for (g of spaceGroups(); track g.group) {
-                                <fieldset class="flex flex-col gap-3">
-                                    <legend class="text-sm font-semibold">{{ groupLabel(g.group) }}</legend>
-                                    @for (i of g.items; track i.key) {
-                                        <ng-container
-                                            [ngTemplateOutlet]="field"
-                                            [ngTemplateOutletContext]="{
-                                                $implicit: i,
-                                                control: ctl(spaceForm(), i.key),
-                                                max: i.max,
-                                                placeholder: 'default ' + defaultText(i),
-                                            }"
-                                        />
-                                    }
-                                </fieldset>
-                            }
+                            <mat-accordion multi class="flex flex-col gap-2">
+                                @for (g of spaceGroups(); track g.group; let first = $first) {
+                                    <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
+                                        <mat-expansion-panel-header>
+                                            <mat-panel-title
+                                                >{{ groupLabel(g.group)
+                                                }}<span class="sr-only"> — Analysis</span></mat-panel-title
+                                            >
+                                            <mat-panel-description>{{ g.items.length }}</mat-panel-description>
+                                        </mat-expansion-panel-header>
+                                        <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                                            @for (i of g.items; track i.key) {
+                                                <div class="flex min-w-0 flex-col">
+                                                    <ng-container
+                                                        [ngTemplateOutlet]="field"
+                                                        [ngTemplateOutletContext]="{
+                                                            $implicit: i,
+                                                            control: ctl(spaceForm(), i.key),
+                                                            max: i.max,
+                                                            placeholder: 'default ' + defaultText(i),
+                                                        }"
+                                                    />
+                                                </div>
+                                            }
+                                        </div>
+                                    </mat-expansion-panel>
+                                }
+                            </mat-accordion>
                             @if (errors()['space']; as e) {
                                 <inspecto-alert variant="error" title="Not saved">{{ e }}</inspecto-alert>
                             }
                             @if (anyEditable(spaceItems())) {
                                 <div>
-                                    <button mat-flat-button color="primary" type="submit" [disabled]="saving() === 'space'">
+                                    <button
+                                        mat-flat-button
+                                        color="primary"
+                                        type="submit"
+                                        [disabled]="saving() === 'space'"
+                                    >
                                         Save Analysis limits
                                     </button>
                                 </div>
@@ -195,28 +222,45 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                             (ngSubmit)="save('install')"
                             data-section="install"
                         >
-                            @for (g of installGroups(); track g.group) {
-                                <fieldset class="flex flex-col gap-3">
-                                    <legend class="text-sm font-semibold">{{ groupLabel(g.group) }}</legend>
-                                    @for (i of g.items; track i.key) {
-                                        <ng-container
-                                            [ngTemplateOutlet]="field"
-                                            [ngTemplateOutletContext]="{
-                                                $implicit: i,
-                                                control: ctl(installForm(), i.key),
-                                                max: i.max,
-                                                placeholder: 'default ' + defaultText(i),
-                                            }"
-                                        />
-                                    }
-                                </fieldset>
-                            }
+                            <mat-accordion multi class="flex flex-col gap-2">
+                                @for (g of installGroups(); track g.group; let first = $first) {
+                                    <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
+                                        <mat-expansion-panel-header>
+                                            <mat-panel-title
+                                                >{{ groupLabel(g.group)
+                                                }}<span class="sr-only"> — Host resources</span></mat-panel-title
+                                            >
+                                            <mat-panel-description>{{ g.items.length }}</mat-panel-description>
+                                        </mat-expansion-panel-header>
+                                        <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                                            @for (i of g.items; track i.key) {
+                                                <div class="flex min-w-0 flex-col">
+                                                    <ng-container
+                                                        [ngTemplateOutlet]="field"
+                                                        [ngTemplateOutletContext]="{
+                                                            $implicit: i,
+                                                            control: ctl(installForm(), i.key),
+                                                            max: i.max,
+                                                            placeholder: 'default ' + defaultText(i),
+                                                        }"
+                                                    />
+                                                </div>
+                                            }
+                                        </div>
+                                    </mat-expansion-panel>
+                                }
+                            </mat-accordion>
                             @if (errors()['install']; as e) {
                                 <inspecto-alert variant="error" title="Not saved">{{ e }}</inspecto-alert>
                             }
                             @if (anyEditable(installItems())) {
                                 <div>
-                                    <button mat-flat-button color="primary" type="submit" [disabled]="saving() === 'install'">
+                                    <button
+                                        mat-flat-button
+                                        color="primary"
+                                        type="submit"
+                                        [disabled]="saving() === 'install'"
+                                    >
                                         Save host resources
                                     </button>
                                 </div>
@@ -243,36 +287,48 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                             (ngSubmit)="keepPersonal()"
                             data-section="browser"
                         >
-                            @for (g of browserGroups(); track g.group) {
-                                <fieldset class="flex flex-col gap-3">
-                                    <legend class="text-sm font-semibold">{{ groupLabel(g.group) }}</legend>
-                                    @for (i of g.items; track i.key) {
-                                        <div class="flex flex-col gap-1">
-                                            <ng-container
-                                                [ngTemplateOutlet]="field"
-                                                [ngTemplateOutletContext]="{
-                                                    $implicit: i,
-                                                    control: ctl(browserForm(), i.key),
-                                                    max: spaceValue(i),
-                                                    placeholder: 'Space value ' + num(spaceValue(i)),
-                                                }"
-                                            />
-                                            @if (limits.personal(i.key) !== null) {
-                                                <div>
-                                                    <button
-                                                        mat-button
-                                                        type="button"
-                                                        [attr.aria-label]="'Reset ' + label(i) + ' to the Space value'"
-                                                        (click)="limits.resetPersonal(i.key)"
-                                                    >
-                                                        Reset to Space value
-                                                    </button>
+                            <mat-accordion multi class="flex flex-col gap-2">
+                                @for (g of browserGroups(); track g.group; let first = $first) {
+                                    <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
+                                        <mat-expansion-panel-header>
+                                            <mat-panel-title
+                                                >{{ groupLabel(g.group)
+                                                }}<span class="sr-only"> — My browser</span></mat-panel-title
+                                            >
+                                            <mat-panel-description>{{ g.items.length }}</mat-panel-description>
+                                        </mat-expansion-panel-header>
+                                        <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                                            @for (i of g.items; track i.key) {
+                                                <div class="flex flex-col gap-1">
+                                                    <ng-container
+                                                        [ngTemplateOutlet]="field"
+                                                        [ngTemplateOutletContext]="{
+                                                            $implicit: i,
+                                                            control: ctl(browserForm(), i.key),
+                                                            max: spaceValue(i),
+                                                            placeholder: 'Space value ' + num(spaceValue(i)),
+                                                        }"
+                                                    />
+                                                    @if (limits.personal(i.key) !== null) {
+                                                        <div>
+                                                            <button
+                                                                mat-button
+                                                                type="button"
+                                                                [attr.aria-label]="
+                                                                    'Reset ' + label(i) + ' to the Space value'
+                                                                "
+                                                                (click)="limits.resetPersonal(i.key)"
+                                                            >
+                                                                Reset to Space value
+                                                            </button>
+                                                        </div>
+                                                    }
                                                 </div>
                                             }
                                         </div>
-                                    }
-                                </fieldset>
-                            }
+                                    </mat-expansion-panel>
+                                }
+                            </mat-accordion>
                             <div>
                                 <button mat-stroked-button type="submit">Keep in this browser</button>
                             </div>

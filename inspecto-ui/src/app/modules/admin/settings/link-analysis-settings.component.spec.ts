@@ -151,7 +151,7 @@ describe('LinkAnalysisSettingsComponent', () => {
     it('edits masking, the index switch and the risk weights', () => {
         const { c, submit, body } = setup({ served: FULL });
         c.form.controls.maskingMode.setValue('none');
-        c.form.controls.index.controls.enabled.setValue(false);
+        c.form.controls.index.controls.enabled.setValue('false');
         c.form.controls.graphRun.controls.propagatedRiskWeights.setValue('1, 0.8, 0.2');
         submit();
         expect(body()['maskingMode']).toBe('none');
@@ -280,12 +280,14 @@ describe('LinkAnalysisSettingsComponent', () => {
         const all = leaves(c);
         expect(all.length).toBe(CONTROL_COUNT);
         expect(all.filter((x) => x.enabled).map((x) => x.path)).toEqual([]);
-        const dom = Array.from(el.querySelector('form')!.querySelectorAll<HTMLElement>('input, textarea, select, mat-select'));
+        // Each setting is a pen field or an option picker: read only, every one of them is an inert, disabled row
+        // (no pencil, nothing to open).
+        const dom = Array.from(
+            el.querySelector('form')!.querySelectorAll<HTMLButtonElement>('inspecto-pen-field button, inspecto-option-picker button'),
+        );
         expect(dom.length).toBeGreaterThan(0);
-        for (const d of dom) {
-            const off = (d as HTMLInputElement).disabled || d.getAttribute('aria-disabled') === 'true';
-            expect(off, d.outerHTML.slice(0, 80)).toBe(true);
-        }
+        for (const d of dom) expect(d.disabled, d.outerHTML.slice(0, 80)).toBe(true);
+        expect(el.querySelector('form')!.querySelector('inspecto-pen-field button.pen-pencil')).toBeNull();
         expect(el.querySelector('button[type="submit"]')).toBeNull();
         const form = el.querySelector('form')!;
         const reason = form.getAttribute('aria-describedby')!;

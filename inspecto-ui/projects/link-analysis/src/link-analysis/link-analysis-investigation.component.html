@@ -137,27 +137,22 @@
                     → {{ q.projection.targetCol }}), seeds {{ q.seed }} and expands one degree (Choose neighbours goes further) —
                     {{ pendingSummary() }}.
                 </p>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Title</mat-label>
-                    <input matInput [formControl]="title" />
-                    @if (title.hasError('maxlength')) {
-                        <mat-error>At most 200 characters.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Purpose / legal basis</mat-label>
-                    <input
-                        #pendingPurpose
-                        matInput
-                        required
-                        [formControl]="purpose"
-                        data-testid="investigate-purpose"
-                    />
-                    <mat-hint>Recorded with the Investigation and shown in its Dossier.</mat-hint>
-                    @if (purpose.hasError('maxlength')) {
-                        <mat-error>At most 1000 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Title"
+                    [formControl]="title"
+                    [maxlength]="200"
+                    [error]="title.hasError('maxlength') ? 'At most 200 characters.' : ''"
+                />
+                <inspecto-pen-field
+                    #pendingPurpose
+                    label="Purpose / legal basis"
+                    [required]="true"
+                    [formControl]="purpose"
+                    [maxlength]="1000"
+                    [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
+                    data-testid="investigate-purpose"
+                />
+                <p class="text-secondary m-0 text-xs">Recorded with the Investigation and shown in its Dossier.</p>
                 @if (pendingTried() && purpose.invalid && !purpose.hasError('maxlength')) {
                     <p
                         class="text-warn m-0 text-xs"
@@ -187,30 +182,25 @@
                 → {{ p.targetCol }}). Each step is recorded with who, when and why, and the reads are sealed so the log
                 replays identically. It reads the whole Dataset — the query's filter is not applied.
             </p>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Title (optional)</mat-label>
-                <input matInput [formControl]="title" (keydown.enter)="start()" />
-                @if (title.hasError('maxlength')) {
-                    <mat-error>At most 200 characters.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Purpose / legal basis</mat-label>
-                <input matInput required [formControl]="purpose" />
-                <mat-hint>Recorded with the Investigation and shown in its Dossier.</mat-hint>
-                @if (purpose.hasError('maxlength')) {
-                    <mat-error>At most 1000 characters.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Time column (optional)</mat-label>
-                <input matInput [formControl]="timeColumn" [placeholder]="timeCol()" />
-                <mat-hint
-                    >The event time windows and the coverage check read{{
-                        timeCol() ? ' — blank uses ' + timeCol() : ''
-                    }}.</mat-hint
-                >
-            </mat-form-field>
+            <inspecto-pen-field
+                label="Title (optional)"
+                [formControl]="title"
+                [maxlength]="200"
+                [error]="title.hasError('maxlength') ? 'At most 200 characters.' : ''"
+                (keydown.enter)="start()"
+            />
+            <inspecto-pen-field
+                label="Purpose / legal basis"
+                [required]="true"
+                [formControl]="purpose"
+                [maxlength]="1000"
+                [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
+            />
+            <p class="text-secondary m-0 text-xs">Recorded with the Investigation and shown in its Dossier.</p>
+            <inspecto-pen-field label="Time column (optional)" [formControl]="timeColumn" [placeholder]="timeCol()" />
+            <p class="text-secondary m-0 text-xs">
+                The event time windows and the coverage check read{{ timeCol() ? ' — blank uses ' + timeCol() : '' }}.
+            </p>
             <inspecto-option-picker
                 label="Time column zone (optional)"
                 [formControl]="timeColumnZone"
@@ -582,15 +572,19 @@
                         }
                     </div>
                 }
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Reason to exclude</mat-label>
-                    <input matInput [formControl]="reason" (keydown.enter)="exclude()" />
-                    @if (reason.hasError('required')) {
-                        <mat-error>An exclusion needs a reason — without one it cannot be challenged.</mat-error>
-                    } @else if (reason.hasError('maxlength')) {
-                        <mat-error>At most 200 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Reason to exclude"
+                    [formControl]="reason"
+                    [maxlength]="200"
+                    [error]="
+                        reason.touched && reason.hasError('required')
+                            ? 'An exclusion needs a reason — without one it cannot be challenged.'
+                            : reason.hasError('maxlength')
+                              ? 'At most 200 characters.'
+                              : ''
+                    "
+                    (keydown.enter)="exclude()"
+                />
                 <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !selectedInSet().length" (click)="exclude()">
                     Exclude
                 </button>
@@ -604,15 +598,19 @@
                         }
                     </ul>
                 }
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Note</mat-label>
-                    <textarea matInput rows="2" [formControl]="note"></textarea>
-                    @if (note.hasError('required')) {
-                        <mat-error>Write the note first.</mat-error>
-                    } @else if (note.hasError('maxlength')) {
-                        <mat-error>At most 2000 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Note"
+                    [multiline]="true"
+                    [formControl]="note"
+                    [maxlength]="2000"
+                    [error]="
+                        note.touched && note.hasError('required')
+                            ? 'Write the note first.'
+                            : note.hasError('maxlength')
+                              ? 'At most 2000 characters.'
+                              : ''
+                    "
+                />
                 <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !selectedInSet().length" (click)="annotate()">
                     Annotate
                 </button>
@@ -733,15 +731,19 @@
                     (ngModelChange)="linkPick.set($event)"
                     placeholder="Pick a link to annotate"
                 ></inspecto-option-picker>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Link note</mat-label>
-                    <textarea matInput rows="2" [formControl]="linkNote"></textarea>
-                    @if (linkNote.hasError('required')) {
-                        <mat-error>Write the note first.</mat-error>
-                    } @else if (linkNote.hasError('maxlength')) {
-                        <mat-error>At most 2000 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Link note"
+                    [multiline]="true"
+                    [formControl]="linkNote"
+                    [maxlength]="2000"
+                    [error]="
+                        linkNote.touched && linkNote.hasError('required')
+                            ? 'Write the note first.'
+                            : linkNote.hasError('maxlength')
+                              ? 'At most 2000 characters.'
+                              : ''
+                    "
+                />
                 <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !linkPick()" (click)="annotateLink()">
                     Annotate link
                 </button>
@@ -958,16 +960,17 @@
                     is told it is not available to them.
                 </p>
                 <form class="flex flex-col gap-2" [formGroup]="pinForm" (ngSubmit)="pinToWidget()">
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Widget name</mat-label>
-                        <input matInput formControlName="name" />
-                        @if (pinForm.controls.name.hasError('required')) {
-                            <mat-error>A name is required.</mat-error>
-                        }
-                        @if (pinForm.controls.name.hasError('pattern')) {
-                            <mat-error>Letters, digits, '.', '_' or '-', starting with a letter or digit.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Widget name"
+                        formControlName="name"
+                        [error]="
+                            pinForm.controls.name.touched && pinForm.controls.name.hasError('required')
+                                ? 'A name is required.'
+                                : pinForm.controls.name.hasError('pattern')
+                                  ? 'Letters, digits, \'.\', \'_\' or \'-\', starting with a letter or digit.'
+                                  : ''
+                        "
+                    />
                     <inspecto-option-picker
                         label="Relation"
                         formControlName="relation"

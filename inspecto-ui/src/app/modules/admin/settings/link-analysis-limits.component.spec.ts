@@ -8,6 +8,7 @@ import { ToastrService } from 'ngx-toastr';
 
 import { SessionService, SpacesService, apiUrl } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penEdit, penError, penText } from 'app/inspecto/testing/pen-field';
 import { LaLimitItem, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { LinkAnalysisLimitsComponent, limitWords } from './link-analysis-limits.component';
@@ -70,13 +71,9 @@ function setup(items = ITEMS) {
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     const section = (name: string) => el.querySelector<HTMLFormElement>(`form[data-section="${name}"]`)!;
-    const input = (name: string, key: string) => section(name).querySelector<HTMLInputElement>(`input[data-key="${key}"]`)!;
-    const type = (name: string, key: string, value: string) => {
-        const i = input(name, key);
-        i.value = value;
-        i.dispatchEvent(new Event('input'));
-        fixture.detectChanges();
-    };
+    /** The pen field of one item (a row: label, value, pencil). */
+    const input = (name: string, key: string) => section(name).querySelector<HTMLElement>(`inspecto-pen-field[data-key="${key}"]`)!;
+    const type = (name: string, key: string, value: string) => penEdit(fixture, input(name, key), value);
     const submit = (name: string) => {
         section(name).querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
         fixture.detectChanges();
@@ -95,22 +92,46 @@ describe('LinkAnalysisLimitsComponent', () => {
         const { el, section, input } = setup();
         const headings = Array.from(el.querySelectorAll('h2')).map((h) => h.textContent!.trim());
         expect(headings).toEqual(['Analysis', 'Host resources', 'My browser']);
-        const legends = Array.from(section('space').querySelectorAll('legend')).map((l) => l.textContent!.trim());
-        expect(legends).toEqual(['Canvas', 'Display', 'Connect']);
+        // each group is a collapsible panel: the first is open, the rest are collapsed; the items of a group sit in two columns
+        const groups = Array.from(section('space').querySelectorAll('mat-panel-title')).map((l) => l.textContent!.trim());
+        expect(groups).toEqual(['Canvas — Analysis', 'Display — Analysis', 'Connect — Analysis']);
+        const open = Array.from(section('space').querySelectorAll('mat-expansion-panel-header')).map(
+            (h) => h.getAttribute('aria-expanded') === 'true',
+        );
+        expect(open).toEqual([true, false, false]);
+        expect(section('space').querySelector('mat-expansion-panel [class*="sm:grid-cols-2"]')).not.toBeNull();
         expect(section('space').textContent).toContain('Projection node cap (nodes)');
         expect(section('space').textContent).toContain('In force: 500 nodes');
         expect(section('space').textContent).toContain('Max seeds');
         expect(section('space').textContent).toContain('LOD label cap');
         expect(section('space').textContent).toContain('Labels drop above this.'); // the description is the hint
-        expect(input('space', 'connect.max_seeds').disabled).toBe(false);
+        expect(input('space', 'connect.max_seeds').querySelector('button')!.disabled).toBe(false);
         // the install item is read-only for this caller, and says why
-        expect(input('install', 'graph_run.ceiling_nodes').disabled).toBe(true);
+        expect(input('install', 'graph_run.ceiling_nodes').querySelector('button')!.disabled).toBe(true);
+        expect(input('install', 'graph_run.ceiling_nodes').querySelector('button.pen-pencil')).toBeNull();
         expect(section('install').textContent).toContain('needs the system administrator capability');
         expect(section('install').querySelector('button[type="submit"]')).toBeNull();
         // only the browser items are offered for a personal value
-        expect(section('browser').querySelectorAll('input').length).toBe(2);
-        expect(input('browser', 'projection_node_cap').placeholder).toBe('Space value 500');
+        expect(section('browser').querySelectorAll('inspecto-pen-field').length).toBe(2);
+        expect(penText(input('browser', 'projection_node_cap'))).toBe('Space value 500');
         await expectNoA11yViolations(el);
+    });
+
+    it('a group collapses and expands from its header, and an edit in a collapsed group is still saved', () => {
+        const { fixture, http, section, type, submit } = setup();
+        const headers = () => Array.from(section('space').querySelectorAll<HTMLElement>('mat-expansion-panel-header'));
+        const expanded = () => headers().map((h) => h.getAttribute('aria-expanded') === 'true');
+        expect(expanded()).toEqual([true, false, false]);
+        headers()[2].click(); // Connect
+        fixture.detectChanges();
+        headers()[0].click(); // Canvas
+        fixture.detectChanges();
+        expect(expanded()).toEqual([false, false, true]);
+        type('space', 'projection_node_cap', '600'); // Canvas is collapsed now: its row is still part of the form
+        submit('space');
+        const req = http.expectOne(GET);
+        expect(req.request.body).toEqual({ projection_node_cap: 600 });
+        req.flush({ items: ITEMS });
     });
 
     it('saves only the changed Space keys and applies the answer', () => {
@@ -135,13 +156,11 @@ describe('LinkAnalysisLimitsComponent', () => {
     });
 
     it('refuses a value outside the item range before the call, with an inline error', () => {
-        const { http, el, type, submit } = setup();
+        const { http, input, type, submit } = setup();
         type('space', 'connect.max_seeds', '2001');
         submit('space');
         http.expectNone(GET);
-        const error = el.querySelector('form[data-section="space"] mat-error');
-        expect(error?.textContent).toContain('A whole number from 1 to 2,000');
-        expect(error?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        expect(penError(input('space', 'connect.max_seeds'))).toContain('A whole number from 1 to 2,000');
     });
 
     it("shows the server's 422 verbatim", () => {
@@ -203,11 +222,8 @@ describe('LinkAnalysisLimitsComponent', () => {
         const host = el.querySelector<HTMLFormElement>('form[data-section="install"]')!;
         expect(el.textContent).toContain('this server (pod) only');
         expect(host.textContent).toContain('In force: none.');
-        expect(host.querySelector<HTMLInputElement>('input[data-key="index.build_memory_pct"]')!.placeholder).toBe('default none');
-        const rate = host.querySelector<HTMLInputElement>('input[data-key="rate.link_analysis_per_s"]')!;
-        rate.value = '0.75';
-        rate.dispatchEvent(new Event('input'));
-        fixture.detectChanges();
+        expect(penText(host.querySelector<HTMLElement>('inspecto-pen-field[data-key="index.build_memory_pct"]')!)).toBe('default none');
+        penEdit(fixture, host.querySelector<HTMLElement>('inspecto-pen-field[data-key="rate.link_analysis_per_s"]')!, '0.75');
         host.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
         const req = http.expectOne(apiUrl('/system/link-analysis/limits'));
         expect(req.request.body).toEqual({ 'rate.link_analysis_per_s': 0.75 });
@@ -215,11 +231,11 @@ describe('LinkAnalysisLimitsComponent', () => {
     });
 
     it('refuses a personal value above the Space value', () => {
-        const { el, svc, type, submit } = setup();
+        const { input, svc, type, submit } = setup();
         type('browser', 'projection_node_cap', '600');
         submit('browser');
         expect(svc.personal('projection_node_cap')).toBeNull();
-        expect(el.querySelector('form[data-section="browser"] mat-error')?.textContent).toContain('from 1 to 500');
+        expect(penError(input('browser', 'projection_node_cap'))).toContain('from 1 to 500');
     });
 });
 

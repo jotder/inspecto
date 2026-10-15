@@ -189,7 +189,7 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         const { f, c, el } = create();
         await f.whenStable();
         f.detectChanges();
-        expect(el.querySelectorAll('mat-select').length).toBe(3);
+        expect(el.querySelectorAll('inspecto-option-picker').length).toBe(3);
         expect(c.datasets().map((d) => d.id)).toEqual(['map']);
         c.dataset.setValue('map');
         await f.whenStable();

@@ -2,8 +2,11 @@ import {
     ChangeDetectionStrategy,
     Component,
     ElementRef,
+    Injector,
+    afterNextRender,
     computed,
     forwardRef,
+    inject,
     input,
     signal,
     viewChild,
@@ -40,28 +43,48 @@ import { MatIconModule } from '@angular/material/icon';
                 </span>
             }
             @if (editing()) {
-                <input
-                    #box
-                    class="min-w-0 flex-1 rounded border px-1.5 py-0.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
-                    style="background: transparent; color: inherit"
-                    [type]="type()"
-                    [attr.min]="min()"
-                    [attr.max]="max()"
-                    [attr.aria-label]="ariaLabel() || label()"
-                    [placeholder]="placeholder()"
-                    [value]="draft()"
-                    (input)="draft.set($any($event.target).value)"
-                    (keydown)="onKey($event)"
-                    (blur)="commit()"
-                />
+                @if (multiline()) {
+                    <textarea
+                        #box
+                        rows="2"
+                        class="min-w-0 flex-1 rounded border px-1.5 py-0.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                        style="background: transparent; color: inherit"
+                        [attr.maxlength]="maxlength()"
+                        [attr.aria-label]="ariaLabel() || label()"
+                        [placeholder]="placeholder()"
+                        [value]="draft()"
+                        (input)="draft.set($any($event.target).value)"
+                        (keydown)="onKey($event)"
+                        (blur)="commit()"
+                    ></textarea>
+                } @else {
+                    <input
+                        #box
+                        class="min-w-0 flex-1 rounded border px-1.5 py-0.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                        style="background: transparent; color: inherit"
+                        [type]="type()"
+                        [attr.min]="min()"
+                        [attr.max]="max()"
+                        [attr.maxlength]="maxlength()"
+                        [attr.aria-label]="ariaLabel() || label()"
+                        [placeholder]="placeholder()"
+                        [value]="draft()"
+                        (input)="draft.set($any($event.target).value)"
+                        (keydown)="onKey($event)"
+                        (blur)="commit()"
+                    />
+                }
                 @if (hasDefault() && draft() === '') {
                     <span class="text-secondary shrink-0 text-xs" aria-hidden="true">→ {{ defaultText() }}</span>
                 }
             } @else {
                 <button
                     type="button"
-                    class="hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                    class="hover:bg-hover min-w-0 flex-1 rounded px-1 py-0.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                     [class.font-mono]="mono()"
+                    [class.truncate]="!multiline()"
+                    [class.whitespace-pre-line]="multiline()"
+                    [class.line-clamp-3]="multiline()"
                     [disabled]="disabled()"
                     [attr.aria-label]="'Edit ' + (ariaLabel() || label())"
                     (click)="startEditing()"
@@ -93,7 +116,10 @@ import { MatIconModule } from '@angular/material/icon';
 })
 export class PenFieldComponent implements ControlValueAccessor {
     readonly label = input('');
-    readonly type = input<'text' | 'number'>('text');
+    readonly type = input<'text' | 'number' | 'date'>('text');
+    /** A free-text note: edits in a two-row box (Shift+Enter breaks a line, Enter commits) and reads as wrapped text. */
+    readonly multiline = input(false);
+    readonly maxlength = input<number | null>(null);
     /** Suggested value shown as a ghost while empty; **→** accepts it. */
     readonly default = input<string | number | null>(null);
     readonly placeholder = input('');
@@ -110,7 +136,8 @@ export class PenFieldComponent implements ControlValueAccessor {
     protected readonly disabled = signal(false);
     protected readonly editing = signal(false);
     protected readonly draft = signal('');
-    private readonly box = viewChild<ElementRef<HTMLInputElement>>('box');
+    private readonly box = viewChild<ElementRef<HTMLInputElement | HTMLTextAreaElement>>('box');
+    private readonly injector = inject(Injector);
 
     protected readonly text = computed(() => (this.value() ?? '') + '');
     protected readonly hasDefault = computed(() => this.default() !== null && this.default() !== '');
@@ -132,16 +159,23 @@ export class PenFieldComponent implements ControlValueAccessor {
         this.disabled.set(d);
     }
 
+    /** Open the field for editing and put the caret in it (a host pointing at a missing value). */
+    focus(): void {
+        this.startEditing();
+    }
+
     protected startEditing(): void {
         if (this.readOnly() || this.disabled()) return;
         this.draft.set(this.text());
         this.editing.set(true);
-        queueMicrotask(() => this.box()?.nativeElement.focus());
+        // The input exists only after the next render: a microtask runs BEFORE it, so the caret was never placed.
+        afterNextRender(() => this.box()?.nativeElement.focus(), { injector: this.injector });
     }
 
     protected onKey(e: KeyboardEvent): void {
         const el = e.target as HTMLInputElement;
         if (e.key === 'Enter') {
+            if (this.multiline() && e.shiftKey) return; // Shift+Enter breaks a line in a note
             e.preventDefault();
             this.commit();
         } else if (e.key === 'Escape') {

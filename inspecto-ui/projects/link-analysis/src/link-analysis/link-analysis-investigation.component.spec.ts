@@ -23,6 +23,7 @@ import { PendingInvestigation } from './investigate-number';
 import { WidgetsService } from 'app/modules/admin/studio/widgets/widgets.service';
 import { Widget } from 'app/modules/admin/studio/widgets/widget-types';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
+import { penByLabel, penEdit, penError, penText, refresh } from '@inspecto/core/testing/pen-field';
 
 @Component({
     standalone: true,
@@ -230,14 +231,8 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         const host = fixture.componentInstance as unknown as { timeCol: { set(v: string): void } };
         host.timeCol.set('booked_at');
         fixture.detectChanges();
-        const field = Array.from(el.querySelectorAll('mat-form-field')).find((f) =>
-            f.textContent?.includes('Time column (optional)'),
-        );
-        expect((field?.querySelector('input') as HTMLInputElement).value).toBe('booked_at');
-        const purpose = el.querySelector('input[required]') as HTMLInputElement;
-        purpose.value = 'warrant 7';
-        purpose.dispatchEvent(new Event('input'));
-        fixture.detectChanges();
+        expect(penText(penByLabel(el, 'Time column (optional)')!)).toBe('booked_at');
+        penEdit(fixture, penByLabel(el, 'Purpose / legal basis')!, 'warrant 7');
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledWith(expect.objectContaining({ timeCol: 'booked_at' }));
@@ -258,17 +253,13 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
 
     it('without the capability Start Investigation is disabled with the reason, and Enter in a field fires no write', async () => {
         const ro = create({ canManage: false });
-        const purpose = ro.el.querySelector('input[required]') as HTMLInputElement;
-        purpose.value = 'warrant 7';
-        purpose.dispatchEvent(new Event('input'));
-        ro.fixture.detectChanges();
+        penEdit(ro.fixture, penByLabel(ro.el, 'Purpose / legal basis')!, 'warrant 7');
         expect(ro.button('Start Investigation').disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
             'Starting an Investigation needs the Incident management capability',
         );
-        purpose.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-        const title = ro.el.querySelector('input[maxlength]') as HTMLInputElement | null;
-        title?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        // Enter in a field commits it and asks to start: with no capability that must write nothing
+        penEdit(ro.fixture, penByLabel(ro.el, 'Title')!, 'a title');
         await ro.fixture.whenStable();
         expect(ro.inv.createInvestigation).not.toHaveBeenCalled();
 
@@ -277,12 +268,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await openInv(store);
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
-        const reason = Array.from(el.querySelectorAll('mat-form-field'))
-            .find((f) => f.textContent?.includes('Reason'))
-            ?.querySelector('input') as HTMLInputElement;
-        reason.value = 'because';
-        reason.dispatchEvent(new Event('input'));
-        reason.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        penEdit(fixture, penByLabel(el, 'Reason to exclude')!, 'because');
         await fixture.whenStable();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
     });
@@ -304,10 +290,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
 
         // D-U5: no purpose, no start — the server would answer 422.
         expect(button('Start Investigation').disabled).toBe(true);
-        const purpose = el.querySelector('input[required]') as HTMLInputElement;
-        purpose.value = 'warrant 7';
-        purpose.dispatchEvent(new Event('input'));
-        fixture.detectChanges();
+        penEdit(fixture, penByLabel(el, 'Purpose / legal basis')!, 'warrant 7');
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledWith(
@@ -330,7 +313,8 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         button('Exclude').click();
         fixture.detectChanges();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
-        expect(el.querySelector('mat-error')?.textContent).toContain('needs a reason');
+        refresh(fixture);
+        expect(penError(penByLabel(el, 'Reason to exclude')!)).toContain('needs a reason');
     });
 
     it('re-order explains the fork on screen, then forks with the new order', async () => {
@@ -411,11 +395,10 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         button('Save Widget').click(); // no name yet
         fixture.detectChanges();
         expect(widgets.save).not.toHaveBeenCalled();
-        expect(section.querySelector('mat-error')?.textContent).toContain('A name is required');
+        refresh(fixture);
+        expect(penError(penByLabel(section, 'Widget name')!)).toContain('A name is required');
 
-        const input = section.querySelector('input[formcontrolname="name"]') as HTMLInputElement;
-        input.value = 'burners_frozen';
-        input.dispatchEvent(new Event('input'));
+        penEdit(fixture, penByLabel(section, 'Widget name')!, 'burners_frozen');
         button('Save Widget').click();
         await fixture.whenStable();
         fixture.detectChanges();
@@ -429,7 +412,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
             workingSet: { relation: 'entities', mode: 'frozen', pin: { step: 2, workingSetHash: 'sha256:h2' } },
         });
         expect(el.textContent).toContain('“burners_frozen” is in the Widget library');
-        expect(section.querySelector('mat-error')).toBeNull(); // the cleared name is not left in error (found in preview)
+        expect(penError(penByLabel(section, 'Widget name')!)).toBe(''); // the cleared name is not left in error (found in preview)
 
         const comp = fixture.debugElement.children[0].componentInstance;
         comp.pinForm.setValue({ name: 'burners_live', relation: 'links', mode: 'live' });
@@ -447,7 +430,8 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         button('Annotate').click(); // no note yet
         fixture.detectChanges();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
-        expect(el.querySelector('mat-error')?.textContent).toContain('Write the note first');
+        refresh(fixture);
+        expect(penError(penByLabel(el, 'Note')!)).toContain('Write the note first');
 
         const annotated: WorkingSet = { ...WS, annotations: [{ id: 'a', step: 3, note: 'burner pattern' }] };
         inv.replayInvestigation.mockReturnValue(of({ workingSet: annotated }));
@@ -667,10 +651,7 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
         const { fixture, store, el, inv, button } = create();
         store.queueSeeds(SEEDS);
         fixture.detectChanges();
-        const purpose = el.querySelector('input[required]') as HTMLInputElement;
-        purpose.value = 'warrant 7';
-        purpose.dispatchEvent(new Event('input'));
-        fixture.detectChanges();
+        penEdit(fixture, penByLabel(el, 'Purpose / legal basis')!, 'warrant 7');
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledTimes(1);
@@ -749,9 +730,8 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         const form = el.querySelector('[data-testid="investigate-pending"]') as HTMLFormElement;
         expect(form.textContent).toContain('Investigate 966501');
         expect(form.textContent).toContain('at least 2 events per link');
-        const title = form.querySelector('input') as HTMLInputElement;
         // masking not known to be off: the raw number never goes into the title
-        expect(title.value).toBe('Suspect number');
+        expect(penText(penByLabel(form, 'Title')!)).toBe('Suspect number');
         await expectNoA11yViolations(el);
 
         // no purpose: nothing is created and the error is on screen
@@ -761,13 +741,13 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         const required = form.querySelector('[data-testid="investigate-purpose-required"]');
         expect(required?.textContent).toContain('A purpose is required to start an Investigation');
         expect(required?.getAttribute('role')).toBe('alert');
-        expect(document.activeElement).toBe(form.querySelector('[data-testid="investigate-purpose"]'));
+        await fixture.whenStable();
+        // the missing purpose is opened for editing, with the caret in it
+        expect(form.querySelector('[data-testid="investigate-purpose"]')!.contains(document.activeElement)).toBe(true);
         await expectNoA11yViolations(el);
 
         const spy = vi.spyOn(store, 'investigateNumber').mockResolvedValue(true);
-        const purpose = form.querySelector('[data-testid="investigate-purpose"]') as HTMLInputElement;
-        purpose.value = 'fraud alert 12';
-        purpose.dispatchEvent(new Event('input'));
+        penEdit(fixture, form.querySelector<HTMLElement>('[data-testid="investigate-purpose"]')!, 'fraud alert 12');
         form.dispatchEvent(new Event('submit'));
         await fixture.whenStable();
         expect(spy).toHaveBeenCalledWith(
@@ -1010,9 +990,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         await openInv(store);
         fixture.detectChanges();
         const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
-        const input = el.querySelector('input[formcontrolname="minEvents"]') as HTMLInputElement;
-        input.value = '1';
-        input.dispatchEvent(new Event('input'));
+        penEdit(fixture, penByLabel(el, 'Minimum events per link')!, '1');
         (el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement).click();
         await fixture.whenStable();
         expect(spy).toHaveBeenCalledWith(expect.anything(), expect.any(Number), false, { minEvents: 1 });

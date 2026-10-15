@@ -1,11 +1,10 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { IdentityAssertion, IdentityGroup, InvService } from '@inspecto/link-analysis/api/inv.service';
@@ -33,12 +32,11 @@ import { isUnavailable } from './link-analysis-template.dialogs';
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        PenFieldComponent,
         NgTemplateOutlet,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
@@ -92,26 +90,14 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                                 label="First identifier type"
                                 [options]="typeOptions()"
                             ></inspecto-option-picker>
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>First identifier</mat-label>
-                                <input matInput formControlName="valueA" />
-                                <mat-error>A value is required.</mat-error>
-                            </mat-form-field>
+                            <inspecto-pen-field label="First identifier" formControlName="valueA" />
                             <inspecto-option-picker
                                 formControlName="typeB"
                                 label="Second identifier type"
                                 [options]="typeOptions()"
                             ></inspecto-option-picker>
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Second identifier</mat-label>
-                                <input matInput formControlName="valueB" />
-                                <mat-error>A value is required.</mat-error>
-                            </mat-form-field>
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Reason</mat-label>
-                                <input matInput formControlName="reason" maxlength="1000" />
-                                <mat-error>A reason is required.</mat-error>
-                            </mat-form-field>
+                            <inspecto-pen-field label="Second identifier" formControlName="valueB" />
+                            <inspecto-pen-field label="Reason" formControlName="reason" [maxlength]="1000" />
                             @if (assertProblem()) {
                                 <p class="text-warn m-0" role="alert">{{ assertProblem() }}</p>
                             }
@@ -129,10 +115,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                                 label="Identifier type"
                                 [options]="typeOptions()"
                             ></inspecto-option-picker>
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Identifier</mat-label>
-                                <input matInput formControlName="value" />
-                            </mat-form-field>
+                            <inspecto-pen-field label="Identifier" formControlName="value" />
                             @if (lookupProblem()) {
                                 <p class="text-warn m-0" role="alert">{{ lookupProblem() }}</p>
                             }

@@ -1,3 +1,5 @@
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { LensService } from '@inspecto/core/api';
 import {
@@ -10,9 +12,6 @@ import {
     Validators,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { laLimit } from './la-limits';
@@ -59,11 +58,10 @@ export function thresholdForm() {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
-        MatSelectModule,
         InspectoAlertComponent,
     ],
     host: { class: 'block' },
@@ -77,31 +75,28 @@ export function thresholdForm() {
                 Threshold
             </h3>
             <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="submit()">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Measure</mat-label>
-                    <mat-select formControlName="measure">
-                        @for (m of measures; track m.value) {
-                            <mat-option [value]="m.value">{{ m.label }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <div class="flex gap-2">
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Minimum</mat-label>
-                        <input matInput inputmode="numeric" formControlName="min" placeholder="2" />
-                        <mat-hint>Kept at or above this.</mat-hint>
-                        @if (form.controls.min.hasError('pattern')) {
-                            <mat-error>A whole number, 0 or more.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Maximum</mat-label>
-                        <input matInput inputmode="numeric" formControlName="max" placeholder="50" />
-                        <mat-hint>Kept below this.</mat-hint>
-                        @if (form.controls.max.hasError('pattern') || form.controls.max.hasError('min')) {
-                            <mat-error>A whole number, 1 or more.</mat-error>
-                        }
-                    </mat-form-field>
+                <inspecto-option-picker label="Measure" formControlName="measure" [options]="measures" />
+                <div class="flex flex-col gap-2">
+                    <inspecto-pen-field
+                        label="Minimum"
+                        formControlName="min"
+                        type="number"
+                        placeholder="2"
+                        [error]="form.controls.min.hasError('pattern') ? 'A whole number, 0 or more.' : ''"
+                    />
+                    <p class="text-secondary m-0 text-xs">Kept at or above this.</p>
+                    <inspecto-pen-field
+                        label="Maximum"
+                        formControlName="max"
+                        type="number"
+                        placeholder="50"
+                        [error]="
+                            form.controls.max.hasError('pattern') || form.controls.max.hasError('min')
+                                ? 'A whole number, 1 or more.'
+                                : ''
+                        "
+                    />
+                    <p class="text-secondary m-0 text-xs">Kept below this.</p>
                 </div>
                 @if (form.hasError('empty') && form.touched) {
                     <p class="text-warn m-0 text-xs" role="alert">Set a minimum, a maximum or both.</p>
@@ -124,7 +119,7 @@ export class InvestigationThresholdOpComponent {
     private readonly lens = inject(LensService);
     readonly canWrite = computed(() => this.lens.canManageIncidents());
     readonly form = thresholdForm();
-    readonly measures = THRESHOLD_MEASURES;
+    readonly measures: PickerOption[] = THRESHOLD_MEASURES.map((m) => ({ value: m.value, label: m.label }));
     readonly error = signal('');
 
     async submit(): Promise<void> {
@@ -153,7 +148,7 @@ export class InvestigationThresholdOpComponent {
     selector: 'inspecto-la-snapshot-op',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, InspectoAlertComponent],
+    imports: [ReactiveFormsModule, MatButtonModule, PenFieldComponent, InspectoAlertComponent],
     host: { class: 'block' },
     template: `
         <section
@@ -165,14 +160,15 @@ export class InvestigationThresholdOpComponent {
                 Log marker
             </h3>
             <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="submit()">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Label (optional)</mat-label>
-                    <input matInput formControlName="label" placeholder="Before the weekend burst" />
-                    <mat-hint>Marks this position in the log; the Working Set does not change.</mat-hint>
-                    @if (form.controls.label.hasError('maxlength')) {
-                        <mat-error>At most {{ max() }} characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Label (optional)"
+                    formControlName="label"
+                    placeholder="Before the weekend burst"
+                    [error]="form.controls.label.hasError('maxlength') ? 'At most ' + max() + ' characters.' : ''"
+                />
+                <p class="text-secondary m-0 text-xs">
+                    Marks this position in the log; the Working Set does not change.
+                </p>
                 <button mat-stroked-button type="submit" class="self-start" [disabled]="!canWrite() || store.busy()">
                     Mark this position
                 </button>

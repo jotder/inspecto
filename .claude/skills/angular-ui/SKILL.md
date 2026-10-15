@@ -479,6 +479,25 @@ src/app/
   engine ▸ Auto — because a spec `default` is banned there (it materializes into every `value()` and
   mutates faithful copies of stored grammars), and the editor drops a blank whose default is blank.
   ⛔ Don't "fix" such a field by giving it `default: 'auto'`.
+- **Asking for ONE typed value → `<inspecto-pen-field>`** (`inspecto/components/pen-field.component.ts`; the
+  Link Analysis left panel's own row, extended to the Investigation tab and Settings ▸ Link Analysis 2026-10-15).
+  Pair it with `<inspecto-option-picker>` for a choice and the Link Analysis forms read as ONE idiom: **label ·
+  value · ✎**, the input only while the row is edited (Enter / blur commits, Escape drops). A `ControlValueAccessor`
+  (`formControlName` / `[formControl]` / `[(ngModel)]` as a `matInput` was), `type` `text | number | date`, `multiline`
+  for a free-text note (Shift+Enter breaks a line), `maxlength`, `placeholder`, `default` (a ghost the → key accepts),
+  `required` (the asterisk only), `[error]` (a host-rendered `role="alert"` line) and a public `focus()` for a host
+  pointing at a missing value. ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
+  ⚠ **It has no hint slot**: the helper text is a `<p class="text-secondary m-0 text-xs">` under the row, and a
+  hint beside a row that sits in a grid cell must share that cell (wrap row + hint in one `<div>`).
+  ⚠ **`[error]` is a plain input, not control state**: the host computes it (`ctl.touched && ctl.hasError(...)`), and
+  an `OnPush` host re-renders it only after a template event, so a spec that patches the form from code must
+  `markForCheck()` first (`refresh(fixture)` in `inspecto/testing/pen-field.ts`, beside `penEdit`/`penText`/
+  `penError`/`pickerSet`). 🔴 **Its caret must be placed AFTER the next render**: `queueMicrotask` ran before the
+  input existed and no pen field ever took focus (found in the preview, 2026-10-15); it uses `afterNextRender`.
+  **Configuration pages group their rows into collapsible `mat-expansion-panel`s** (Settings ▸ Link Analysis: all
+  open; the Limits: only the first group open, the item count in the header) with the rows of a group in two
+  columns (`grid grid-cols-1 sm:grid-cols-2`; `sm:` is 600 px here). ⚠ A group that appears in two sections
+  (Analysis and My browser) needs a screen-reader suffix in each header, or axe `landmark-unique` fails.
 - **Asking for an IANA time zone → `inspecto/schema/time-zones.ts`** (2026-08-29). `ianaTimeZones()` /
   `timeZoneOptions(blankLabel)` are the ONE vocabulary behind both source-zone surfaces (the Grammar
   editor's Types tab `source_timezone`, the columns table's per-column zone). ⛔ Never hand-roll a zone

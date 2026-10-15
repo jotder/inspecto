@@ -2,7 +2,6 @@ import { PenFieldComponent } from '@inspecto/core/components/pen-field.component
 import {
     ChangeDetectionStrategy,
     Component,
-    ElementRef,
     computed,
     effect,
     inject,
@@ -22,9 +21,7 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EntityProjection } from '@inspecto/core/graph';
@@ -101,9 +98,7 @@ export const APPROVAL_POLL_MS = 15_000;
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatRadioModule,
         MatTooltipModule,
         InspectoAlertComponent,
@@ -204,7 +199,7 @@ export class LinkAnalysisInvestigationComponent {
 
     /** "Investigate <id>" was pressed with the purpose missing — the required message shows until it is filled. */
     readonly pendingTried = signal(false);
-    private readonly pendingPurpose = viewChild<ElementRef<HTMLInputElement>>('pendingPurpose');
+    private readonly pendingPurpose = viewChild<PenFieldComponent>('pendingPurpose');
 
     /** "Investigate <id>": create, seed, then expand ONE degree (LA-INVESTIGATE-NUMBER-HAIRBALL-1: two drew 895 nodes on a hub-adjacent number; Choose neighbours goes further). Asks for the purpose like every Investigation. */
     async investigatePending(): Promise<void> {
@@ -216,7 +211,7 @@ export class LinkAnalysisInvestigationComponent {
             this.purpose.markAsTouched();
             // The button stays enabled (house pattern): the press says what is missing and lands on the field.
             this.pendingTried.set(true);
-            if (this.purpose.invalid) this.pendingPurpose()?.nativeElement.focus();
+            if (this.purpose.invalid) this.pendingPurpose()?.focus();
             return;
         }
         const form = this.rungForm();

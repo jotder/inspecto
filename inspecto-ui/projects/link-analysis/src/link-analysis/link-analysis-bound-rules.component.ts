@@ -1,9 +1,9 @@
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { LensService } from '@inspecto/core/api';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import {
@@ -28,10 +28,10 @@ import { isUnavailable } from './link-analysis-template.dialogs';
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
         FormsModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoAlertComponent,
         LinkAnalysisStandingDetectionComponent,
     ],
@@ -63,30 +63,23 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                     }
                     @if (editing() === r.rule['name']) {
                         <form class="flex flex-col gap-2" aria-label="Edit Alert Rule" (ngSubmit)="save(r)">
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Severity</mat-label>
-                                <select
-                                    matNativeControl
-                                    name="severity"
-                                    [(ngModel)]="severity"
-                                    data-test="edit-severity"
-                                >
-                                    <option value="INFO">Info</option>
-                                    <option value="WARNING">Warning</option>
-                                    <option value="CRITICAL">Critical (also opens an Incident)</option>
-                                </select>
-                            </mat-form-field>
+                            <inspecto-option-picker
+                                label="Severity"
+                                [ngModel]="severity"
+                                (ngModelChange)="severity = $event"
+                                [ngModelOptions]="{ standalone: true }"
+                                [options]="severityOptions"
+                                data-test="edit-severity"
+                            />
                             @if (!r.valueMeasure) {
-                                <mat-form-field subscriptSizing="dynamic">
-                                    <mat-label>Threshold</mat-label>
-                                    <input
-                                        matInput
-                                        type="number"
-                                        name="threshold"
-                                        [(ngModel)]="threshold"
-                                        data-test="edit-threshold"
-                                    />
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    label="Threshold"
+                                    type="number"
+                                    [ngModel]="threshold"
+                                    (ngModelChange)="threshold = $event"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    data-test="edit-threshold"
+                                />
                             }
                             <p class="text-secondary m-0">
                                 Saving drops standing detection for this rule: the owner enables it again.
@@ -153,6 +146,11 @@ export class LinkAnalysisBoundRulesComponent {
     readonly unavailable = signal(false);
     readonly busy = signal(false);
     readonly editing = signal('');
+    readonly severityOptions: PickerOption[] = [
+        { value: 'INFO', label: 'Info' },
+        { value: 'WARNING', label: 'Warning' },
+        { value: 'CRITICAL', label: 'Critical (also opens an Incident)' },
+    ];
     severity: AlertSeverity = 'WARNING';
     threshold = 0;
 

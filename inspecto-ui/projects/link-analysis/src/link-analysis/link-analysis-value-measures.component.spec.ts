@@ -9,6 +9,7 @@ import { ComponentsService, DbBrowserService, EventsService, LensService } from 
 import { InvService, InvestigationHeader, ValueMeasureResult } from '@inspecto/link-analysis/api/inv.service';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { penOpen, refresh } from '@inspecto/core/testing/pen-field';
 import { LinkAnalysisValueMeasuresComponent, valueMeasureErrorMessage } from './link-analysis-value-measures.component';
 import { valueMeasureQuery, valueMeasureWindowIssue } from './value-measures';
 import { configureLaLimits, resetLaLimits } from './la-limits';
@@ -276,9 +277,12 @@ describe('Value Measures form (DR-D4)', () => {
     });
 
     it('uses date pickers for the fixed window, not free text', () => {
-        const { el } = setup();
-        expect(el.querySelector('input[data-test="vm-from"]')!.getAttribute('type')).toBe('date');
-        expect(el.querySelector('input[data-test="vm-to"]')!.getAttribute('type')).toBe('date');
+        const { el, fixture } = setup();
+        for (const key of ['vm-from', 'vm-to']) {
+            const host = el.querySelector<HTMLElement>(`inspecto-pen-field[data-test="${key}"]`)!;
+            expect(host.getAttribute('type')).toBe('date');
+            expect(penOpen(fixture, host).type).toBe('date'); // the editor is the native date input
+        }
     });
 
     it('states the 31-day cap before anything is run', () => {
@@ -353,8 +357,10 @@ describe('Watch (DR-D6)', () => {
         expect(el.textContent).toContain('Letters, digits, dot, dash and underscore only.');
         c.watchForm.controls.name.setValue('has spaces');
         c.watchForm.controls.name.markAsDirty();
-        fixture.detectChanges();
-        expect(el.querySelector('mat-error')?.textContent).toContain('Letters, digits, dot, dash and underscore');
+        refresh(fixture);
+        expect(el.querySelector('inspecto-pen-field p[role="alert"]')?.textContent).toContain(
+            'Letters, digits, dot, dash and underscore',
+        );
     });
 });
 

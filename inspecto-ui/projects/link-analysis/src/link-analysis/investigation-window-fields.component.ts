@@ -1,8 +1,7 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { WINDOW_DAYS, WindowForm, crossesMidnight } from './investigation-rung-form';
@@ -18,49 +17,47 @@ import { WINDOW_DAYS, WindowForm, crossesMidnight } from './investigation-rung-f
     selector: 'inspecto-la-window-fields',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        ReactiveFormsModule,
-        MatCheckboxModule,
-        MatFormFieldModule,
-        MatInputModule,
-        InspectoOptionPickerComponent,
-    ],
+    imports: [PenFieldComponent, ReactiveFormsModule, MatCheckboxModule, InspectoOptionPickerComponent],
     host: { class: 'block' },
     template: `
         <div class="flex flex-col gap-2" [formGroup]="form()">
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>From</mat-label>
-                <input matInput formControlName="from" placeholder="2026-09-01T00:00:00Z" />
-                <mat-hint>An ISO instant with an offset or Z; the range is [from, to).</mat-hint>
-                @if (form().controls.from.hasError('pattern')) {
-                    <mat-error>Use an ISO instant WITH an offset or Z, e.g. 2026-09-01T00:00:00Z.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>To</mat-label>
-                <input matInput formControlName="to" placeholder="2026-10-01T00:00:00Z" />
-                @if (form().controls.to.hasError('pattern')) {
-                    <mat-error>Use an ISO instant WITH an offset or Z, e.g. 2026-10-01T00:00:00Z.</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                label="From"
+                formControlName="from"
+                placeholder="2026-09-01T00:00:00Z"
+                [error]="
+                    form().controls.from.hasError('pattern')
+                        ? 'Use an ISO instant WITH an offset or Z, e.g. 2026-09-01T00:00:00Z.'
+                        : ''
+                "
+            />
+            <p class="text-secondary m-0 text-xs">An ISO instant with an offset or Z; the range is [from, to).</p>
+            <inspecto-pen-field
+                label="To"
+                formControlName="to"
+                placeholder="2026-10-01T00:00:00Z"
+                [error]="
+                    form().controls.to.hasError('pattern')
+                        ? 'Use an ISO instant WITH an offset or Z, e.g. 2026-10-01T00:00:00Z.'
+                        : ''
+                "
+            />
             @if (form().hasError('inverted') && form().touched) {
                 <p class="text-warn m-0 text-xs" role="alert">'From' must be before 'To'.</p>
             }
-            <div class="flex gap-2">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Slot start</mat-label>
-                    <input matInput formControlName="slotStart" placeholder="22:00" />
-                    @if (form().controls.slotStart.hasError('pattern')) {
-                        <mat-error>HH:mm, e.g. 22:00.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Slot end</mat-label>
-                    <input matInput formControlName="slotEnd" placeholder="06:00" />
-                    @if (form().controls.slotEnd.hasError('pattern')) {
-                        <mat-error>HH:mm, e.g. 06:00.</mat-error>
-                    }
-                </mat-form-field>
+            <div class="flex flex-col gap-2">
+                <inspecto-pen-field
+                    label="Slot start"
+                    formControlName="slotStart"
+                    placeholder="22:00"
+                    [error]="form().controls.slotStart.hasError('pattern') ? 'HH:mm, e.g. 22:00.' : ''"
+                />
+                <inspecto-pen-field
+                    label="Slot end"
+                    formControlName="slotEnd"
+                    placeholder="06:00"
+                    [error]="form().controls.slotEnd.hasError('pattern') ? 'HH:mm, e.g. 06:00.' : ''"
+                />
             </div>
             @if (midnight()) {
                 <p class="text-secondary m-0 text-xs">
@@ -82,20 +79,17 @@ import { WINDOW_DAYS, WindowForm, crossesMidnight } from './investigation-rung-f
                     <mat-checkbox [formControlName]="d">{{ d }}</mat-checkbox>
                 }
             </fieldset>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Excluded dates (holidays)</mat-label>
-                <textarea
-                    matInput
-                    rows="2"
-                    formControlName="exclude"
-                    data-test="window-exclude"
-                    placeholder="2026-12-25, Winter break=2026-12-24..2026-12-26, Xmas=*-12-25, Thanksgiving=*-11-THU#4"
-                ></textarea>
-                <mat-hint
-                    >Comma or line separated: DATE, FROM..TO (inclusive), or a yearly rule *-MM-DD / *-MM-DOW#N (the Nth
-                    weekday of a month) / *-MM-DOW#L (the last one); optional "Name=" first.</mat-hint
-                >
-            </mat-form-field>
+            <inspecto-pen-field
+                label="Excluded dates (holidays)"
+                formControlName="exclude"
+                [multiline]="true"
+                placeholder="2026-12-25, Winter break=2026-12-24..2026-12-26, Xmas=*-12-25, Thanksgiving=*-11-THU#4"
+                data-test="window-exclude"
+            />
+            <p class="text-secondary m-0 text-xs">
+                Comma or line separated: DATE, FROM..TO (inclusive), or a yearly rule *-MM-DD / *-MM-DOW#N (the Nth
+                weekday of a month) / *-MM-DOW#L (the last one); optional "Name=" first.
+            </p>
             @if (form().hasError('exclude') && form().touched) {
                 <p class="text-warn m-0 text-xs" role="alert">
                     Excluded dates are YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD (the end not before the start); a yearly

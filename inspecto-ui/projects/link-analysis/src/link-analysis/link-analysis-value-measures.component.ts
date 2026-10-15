@@ -1,3 +1,4 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import {
     ChangeDetectionStrategy,
     Component,
@@ -12,8 +13,6 @@ import {
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ShowOnDirtyErrorStateMatcher } from '@angular/material/core';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom, merge } from 'rxjs';
 import {
     AlertSeverity,
@@ -79,10 +78,9 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoAlertComponent,
         DataTableComponent,
         InspectoOptionPickerComponent,
@@ -110,14 +108,8 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                 <legend class="text-secondary p-0 text-xs font-semibold">
                     Fixed window (or use the rolling one above)
                 </legend>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>From (inclusive)</mat-label>
-                    <input matInput type="date" [formControl]="fromDate" data-test="vm-from" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>To (exclusive)</mat-label>
-                    <input matInput type="date" [formControl]="toDate" data-test="vm-to" />
-                </mat-form-field>
+                <inspecto-pen-field label="From (inclusive)" [formControl]="fromDate" type="date" data-test="vm-from" />
+                <inspecto-pen-field label="To (exclusive)" [formControl]="toDate" type="date" data-test="vm-to" />
             </fieldset>
             @if (issue(); as why) {
                 <p class="text-secondary m-0" data-test="vm-issue">{{ why }}</p>
@@ -187,16 +179,18 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                             Fires ONE Alert when at least 1 entity breaches — on the count of breaching entities, not
                             per entity. Now: {{ r.count }}.
                         </p>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Alert Rule name</mat-label>
-                            <input matInput formControlName="name" autocomplete="off" [errorStateMatcher]="onDirty" />
-                            <mat-hint>Letters, digits, dot, dash and underscore only.</mat-hint>
-                            @if (watchForm.controls.name.hasError('required')) {
-                                <mat-error>A name is required.</mat-error>
-                            } @else if (watchForm.controls.name.hasError('pattern')) {
-                                <mat-error>Letters, digits, dot, dash and underscore only.</mat-error>
-                            }
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Alert Rule name"
+                            formControlName="name"
+                            [error]="
+                                watchForm.controls.name.hasError('required')
+                                    ? 'A name is required.'
+                                    : watchForm.controls.name.hasError('pattern')
+                                      ? 'Letters, digits, dot, dash and underscore only.'
+                                      : ''
+                            "
+                        />
+                        <p class="text-secondary m-0 text-xs">Letters, digits, dot, dash and underscore only.</p>
                         <inspecto-option-picker
                             label="Severity"
                             formControlName="severity"

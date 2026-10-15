@@ -1,9 +1,8 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
 import {
     Dossier,
@@ -45,11 +44,10 @@ function saveBlob(blob: Blob, name: string): void {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoAlertComponent,
     ],
     host: { class: 'block' },
@@ -66,14 +64,13 @@ function saveBlob(blob: Blob, name: string): void {
                 </button>
             </div>
             <div class="flex flex-wrap items-start gap-2" role="group" aria-label="Dossier scope">
-                <mat-form-field class="w-40" subscriptSizing="dynamic">
-                    <mat-label>At step</mat-label>
-                    <input matInput type="number" min="0" [attr.max]="steps()" [formControl]="atControl" />
-                    <mat-hint>{{ steps() == null ? 'Blank = the head' : 'Blank = the head, 0–' + steps() }}</mat-hint>
-                    @if (atControl.hasError('range')) {
-                        <mat-error>{{ atError() }}</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="At step"
+                    [formControl]="atControl"
+                    type="number"
+                    [error]="atControl.hasError('range') ? (atError()) : ''"
+                />
+                <p class="text-secondary m-0 text-xs">{{ steps() == null ? 'Blank = the head' : 'Blank = the head, 0–' + steps() }}</p>
                 <div class="flex flex-col gap-1">
                     <button mat-button [disabled]="busy()" (click)="loadSnapshots()">
                         {{ snapshotList() ? 'Reload snapshots' : 'Include snapshots…' }}

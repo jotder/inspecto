@@ -1,11 +1,10 @@
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import type { ExpandRung } from '@inspecto/link-analysis/api/inv.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
@@ -31,12 +30,11 @@ import {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         InvestigationWindowFieldsComponent,
@@ -57,14 +55,14 @@ import {
         </button>
         <div id="la-expand-rung-fields" class="flex flex-col gap-2" [hidden]="!open()" [formGroup]="form">
             <p class="text-secondary m-0 text-xs">Blank = the server default. Applies to both expand buttons.</p>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Row budget</mat-label>
-                <input matInput type="number" formControlName="budget" placeholder="2000" />
-                <mat-hint>Rows read; a breach marks the step incomplete. At most {{ maxBudget() }}.</mat-hint>
-                @if (form.controls.budget.invalid) {
-                    <mat-error>A whole number from 1 to {{ maxBudget() }}.</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                label="Row budget"
+                formControlName="budget"
+                type="number"
+                placeholder="2000"
+                [error]="form.controls.budget.invalid ? 'A whole number from 1 to ' + (maxBudget()) + '.' : ''"
+            />
+            <p class="text-secondary m-0 text-xs">Rows read; a breach marks the step incomplete. At most {{ maxBudget() }}.</p>
             <inspecto-option-picker label="Direction" formControlName="direction" [options]="directionOptions" />
             <inspecto-option-picker label="Time window" formControlName="window" [options]="windowOptions" />
             @if (form.controls.window.value === 'override') {
@@ -75,55 +73,50 @@ import {
                     <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
                 </div>
             }
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Link kinds</mat-label>
-                <input matInput formControlName="linkKinds" placeholder="call, sms" />
-                <mat-hint>Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</mat-hint>
-                @if (form.controls.linkKinds.invalid) {
-                    <mat-error>At most {{ maxKinds() }} kinds.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Minimum events per link</mat-label>
-                <input matInput type="number" formControlName="minEvents" placeholder="1" />
-                @if (form.controls.minEvents.invalid) {
-                    <mat-error>A whole number of at least 1.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Minimum distinct days</mat-label>
-                <input matInput type="number" formControlName="minDistinctDays" />
-                <mat-hint>Needs the Investigation's time column.</mat-hint>
-                @if (form.controls.minDistinctDays.invalid) {
-                    <mat-error>A whole number of at least 1.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Candidate degree — minimum</mat-label>
-                <input matInput type="number" formControlName="candidateDegreeMin" />
-                @if (form.controls.candidateDegreeMin.invalid) {
-                    <mat-error>A whole number of at least 0.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Candidate degree — maximum</mat-label>
-                <input matInput type="number" formControlName="candidateDegreeMax" />
-                <mat-hint>Skips hubs: a neighbour with more links in the window is not admitted.</mat-hint>
-                @if (form.controls.candidateDegreeMax.invalid) {
-                    <mat-error>A whole number of at least 1.</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                label="Link kinds"
+                formControlName="linkKinds"
+                placeholder="call, sms"
+                [error]="form.controls.linkKinds.invalid ? 'At most ' + (maxKinds()) + ' kinds.' : ''"
+            />
+            <p class="text-secondary m-0 text-xs">Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</p>
+            <inspecto-pen-field
+                label="Minimum events per link"
+                formControlName="minEvents"
+                type="number"
+                placeholder="1"
+                [error]="form.controls.minEvents.invalid ? 'A whole number of at least 1.' : ''"
+            />
+            <inspecto-pen-field
+                label="Minimum distinct days"
+                formControlName="minDistinctDays"
+                type="number"
+                [error]="form.controls.minDistinctDays.invalid ? 'A whole number of at least 1.' : ''"
+            />
+            <p class="text-secondary m-0 text-xs">Needs the Investigation's time column.</p>
+            <inspecto-pen-field
+                label="Candidate degree — minimum"
+                formControlName="candidateDegreeMin"
+                type="number"
+                [error]="form.controls.candidateDegreeMin.invalid ? 'A whole number of at least 0.' : ''"
+            />
+            <inspecto-pen-field
+                label="Candidate degree — maximum"
+                formControlName="candidateDegreeMax"
+                type="number"
+                [error]="form.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''"
+            />
+            <p class="text-secondary m-0 text-xs">Skips hubs: a neighbour with more links in the window is not admitted.</p>
             @if (form.hasError('degreeOrder') && form.touched) {
                 <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
             }
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Maximum fan-out per entity</mat-label>
-                <input matInput type="number" formControlName="maxFanOut" />
-                <mat-hint>Strongest links first; blank = unbounded.</mat-hint>
-                @if (form.controls.maxFanOut.invalid) {
-                    <mat-error>A whole number of at least 1.</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                label="Maximum fan-out per entity"
+                formControlName="maxFanOut"
+                type="number"
+                [error]="form.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
+            />
+            <p class="text-secondary m-0 text-xs">Strongest links first; blank = unbounded.</p>
         </div>
         <!-- Supernode suppression override: outside the collapsed section, so the opt-in is never hidden. -->
         <mat-checkbox [formControl]="includeHubs" data-testid="include-hubs">

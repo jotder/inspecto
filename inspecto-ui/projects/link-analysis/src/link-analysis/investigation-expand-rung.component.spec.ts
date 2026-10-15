@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { refresh } from '@inspecto/core/testing/pen-field';
 import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
 import { configureLaLimits, laLimit, resetLaLimits } from './la-limits';
 
@@ -46,12 +47,14 @@ describe('InvestigationExpandRungComponent (LA-SPA-OWED-SURFACES-1)', () => {
         cmp.form.patchValue({ budget: max + 1, minEvents: 0, candidateDegreeMin: 60, maxFanOut: 1.5 });
         expect(cmp.open()).toBe(false);
         expect(cmp.rung()).toBeNull();
-        fixture.detectChanges();
+        refresh(fixture);
         expect(cmp.open()).toBe(true);
-        const errors = Array.from(el.querySelectorAll('mat-error')).map((e) => e.textContent!.trim());
+        const errors = Array.from(el.querySelectorAll('inspecto-pen-field p[role="alert"]')).map((e) => e.textContent!.trim());
         expect(errors).toContain(`A whole number from 1 to ${max}.`);
         expect(errors.filter((e) => e === 'A whole number of at least 1.').length).toBe(2);
-        expect(el.querySelector('[role="alert"]')!.textContent).toContain('must not exceed the maximum');
+        expect(Array.from(el.querySelectorAll('[role="alert"]')).map((a) => a.textContent).join(' ')).toContain(
+            'must not exceed the maximum',
+        );
         await expectNoA11yViolations(el);
     });
 
@@ -61,9 +64,9 @@ describe('InvestigationExpandRungComponent (LA-SPA-OWED-SURFACES-1)', () => {
             const { fixture, cmp, el } = setup();
             cmp.form.patchValue({ budget: 101, linkKinds: 'calls, sms, mms' });
             expect(cmp.rung()).toBeNull();
-            fixture.detectChanges(); // an invalid field opens the disclosure that holds it
-            fixture.detectChanges();
-            const errors = Array.from(el.querySelectorAll('mat-error')).map((e) => e.textContent!.trim());
+            refresh(fixture); // an invalid field opens the disclosure that holds it
+            refresh(fixture);
+            const errors = Array.from(el.querySelectorAll('inspecto-pen-field p[role="alert"]')).map((e) => e.textContent!.trim());
             expect(errors).toContain('A whole number from 1 to 100.');
             expect(errors).toContain('At most 2 kinds.');
             cmp.form.patchValue({ budget: 100, linkKinds: 'calls, sms' });

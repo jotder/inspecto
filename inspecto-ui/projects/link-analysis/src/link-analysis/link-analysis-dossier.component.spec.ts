@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { Dossier, DossierBundleVerifyResult, DossierVerifyResult, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { refresh } from '@inspecto/core/testing/pen-field';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 import { configureLaLimits, laLimit, resetLaLimits } from './la-limits';
 
@@ -316,9 +317,9 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         c.toggleSnapshot('s0', false);
         c.atControl.setValue(3); // the log has 2 steps
         await c.build();
-        f.detectChanges();
+        refresh(f);
         expect(inv.dossier).toHaveBeenCalledTimes(1);
-        expect(el.querySelector('mat-error')?.textContent).toContain('from 0 to 2');
+        expect(el.querySelector('inspecto-pen-field p[role="alert"]')?.textContent).toContain('from 0 to 2');
 
         c.atControl.setValue(1);
         await c.build();

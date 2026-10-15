@@ -1,11 +1,10 @@
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { firstValueFrom } from 'rxjs';
 import { apiErrorMessage, LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -57,11 +56,10 @@ export function importFieldNames(message: string): string {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
-        MatSelectModule,
         InspectoAlertComponent,
     ],
     host: { class: 'block' },
@@ -105,42 +103,21 @@ export function importFieldNames(message: string): string {
                 aria-label="Import identity assertions"
                 (submit)="$event.preventDefault(); import()"
             >
-                <mat-form-field class="w-40" subscriptSizing="dynamic">
-                    <mat-label>Mapping Dataset</mat-label>
-                    <mat-select [formControl]="dataset">
-                        @for (d of datasets(); track d.id) {
-                            <mat-option [value]="d.id">{{ d.name || d.id }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field class="w-32" subscriptSizing="dynamic">
-                    <mat-label>Column A</mat-label>
-                    <mat-select [formControl]="aCol">
-                        @for (col of columns(); track col) {
-                            <mat-option [value]="col">{{ col }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field class="w-32" subscriptSizing="dynamic">
-                    <mat-label>Column B</mat-label>
-                    <mat-select [formControl]="bCol">
-                        @for (col of columns(); track col) {
-                            <mat-option [value]="col">{{ col }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field class="w-32" subscriptSizing="dynamic">
-                    <mat-label>Type A (optional)</mat-label>
-                    <input matInput [formControl]="aType" />
-                </mat-form-field>
-                <mat-form-field class="w-32" subscriptSizing="dynamic">
-                    <mat-label>Type B (optional)</mat-label>
-                    <input matInput [formControl]="bType" />
-                </mat-form-field>
-                <mat-form-field class="w-56" subscriptSizing="dynamic">
-                    <mat-label>Reason</mat-label>
-                    <input matInput [formControl]="reason" />
-                </mat-form-field>
+                <inspecto-option-picker label="Mapping Dataset" [formControl]="dataset" [options]="datasetOptions()" />
+                <inspecto-option-picker label="Column A" [formControl]="aCol" [options]="columnOptions()" />
+                <inspecto-option-picker label="Column B" [formControl]="bCol" [options]="columnOptions()" />
+                <inspecto-pen-field
+                    label="Type A (optional)"
+                    [formControl]="aType"
+                />
+                <inspecto-pen-field
+                    label="Type B (optional)"
+                    [formControl]="bType"
+                />
+                <inspecto-pen-field
+                    label="Reason"
+                    [formControl]="reason"
+                />
                 <button mat-flat-button type="submit" [disabled]="busy() || !valid()">Import identities</button>
             </form>
             <p class="text-secondary m-0">
@@ -170,6 +147,10 @@ export class LinkAnalysisIdentityComponent implements OnInit {
     /** The Datasets the mapping can come from, and the picked one's columns (declared, else probed). */
     readonly datasets = signal<LaDataset[]>([]);
     readonly columns = signal<string[]>([]);
+    readonly datasetOptions = computed<PickerOption[]>(() =>
+        this.datasets().map((d) => ({ value: d.id, label: d.name || d.id })),
+    );
+    readonly columnOptions = computed<PickerOption[]>(() => this.columns().map((c) => ({ value: c, label: c })));
 
     readonly head = signal<IdentityGroupIndex | null>(null);
     readonly imported = signal<IdentityImportResult | null>(null);

@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { EventsService, LensService } from '@inspecto/core/api';
 import { BoundAlertRule, InvService, InvestigationHeader } from '@inspecto/link-analysis/api/inv.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { penEdit, pickerSet } from '@inspecto/core/testing/pen-field';
 import { LinkAnalysisBoundRulesComponent } from './link-analysis-bound-rules.component';
 
 const HEADER: InvestigationHeader = {
@@ -130,14 +131,12 @@ describe('LinkAnalysisBoundRulesComponent', () => {
     });
 
     it('edits a value rule in place: severity only, name and valueMeasure unchanged, then re-reads the list', async () => {
-        const { el, inv, settle } = setup([VALUE_RULE]);
+        const { fixture, el, inv, settle } = setup([VALUE_RULE]);
         await settle();
         el.querySelector<HTMLButtonElement>('[data-test=edit-open]')!.click();
         await settle();
         expect(el.querySelector('[data-test=edit-threshold]')).toBeNull();
-        const sev = el.querySelector<HTMLSelectElement>('[data-test=edit-severity]')!;
-        sev.value = 'INFO';
-        sev.dispatchEvent(new Event('change'));
+        pickerSet(fixture, '[data-test=edit-severity]', 'INFO');
         await settle();
         el.querySelector<HTMLButtonElement>('[data-test=edit-save]')!.click();
         await settle();
@@ -150,13 +149,11 @@ describe('LinkAnalysisBoundRulesComponent', () => {
     });
 
     it('edits a Working Set rule: the threshold travels with the rest of the rule', async () => {
-        const { el, inv, settle } = setup([SEALED_RULE]);
+        const { fixture, el, inv, settle } = setup([SEALED_RULE]);
         await settle();
         el.querySelector<HTMLButtonElement>('[data-test=edit-open]')!.click();
         await settle();
-        const thr = el.querySelector<HTMLInputElement>('[data-test=edit-threshold]')!;
-        thr.value = '9';
-        thr.dispatchEvent(new Event('input'));
+        penEdit(fixture, el.querySelector<HTMLElement>('inspecto-pen-field[data-test=edit-threshold]')!, '9');
         await settle();
         el.querySelector<HTMLButtonElement>('[data-test=edit-save]')!.click();
         await settle();
