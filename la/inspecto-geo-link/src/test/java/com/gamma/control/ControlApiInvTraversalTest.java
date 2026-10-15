@@ -115,8 +115,8 @@ class ControlApiInvTraversalTest {
             assertEquals(3, data.get("paths").get(0).get("hops").asInt());
             assertEquals(120.0, data.get("paths").get(0).get("weight").asDouble(), 1e-9, "10+50+60");
             assertFalse(data.get("truncated").asBoolean());
-            assertEquals(6, data.at("/fences/maxDepth").asInt(), "the plan's default depth");
-            assertEquals(5000, data.at("/fences/timeoutMs").asInt());
+            assertEquals(12, data.at("/fences/maxDepth").asInt(), "the default depth (traversal.depth_default)");
+            assertEquals(10_000, data.at("/fences/timeoutMs").asInt(), "traversal.timeout_s: 10 s by default");
         }
     }
 
@@ -131,7 +131,7 @@ class ControlApiInvTraversalTest {
             assertEquals(3, twin.at("/fences/maxDepth").asInt());
 
             JsonNode clamped = ok(c, body("\"maxDepth\":999"));
-            assertEquals(10, clamped.at("/fences/maxDepth").asInt(), "the caller cannot lift the hard cap");
+            assertEquals(20, clamped.at("/fences/maxDepth").asInt(), "the caller cannot lift the hard cap (traversal.depth_max)");
         }
     }
 

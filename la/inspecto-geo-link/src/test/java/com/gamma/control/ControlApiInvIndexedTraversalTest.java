@@ -369,7 +369,15 @@ class ControlApiInvIndexedTraversalTest {
             JsonNode deep = traverse(c, req("g_ds", "A", "\"maxDepth\":3"));
             assertEquals("depth_over_index_cap", deep.at("/source/reason").asText());
             assertTrue(deep.get("paths").toString().contains("\"A\",\"B\",\"C\",\"D\""), "the flat path walked the third level: " + deep.get("paths"));
-            assertEquals("depth_over_index_cap", traverse(c, req("g_ds", "A", "")).at("/source/reason").asText(), "the default depth (6) is over the cap");
+            assertEquals("depth_over_index_cap", traverse(c, req("g_ds", "A", "")).at("/source/reason").asText(), "the default depth (12) is over the cap");
+            // LA-CONFIG-LIMITS-1 P3: the cap is the Space's index.traversal_depth - raised to 3 the third level is served, lowered to 1
+            // the second is not
+            settings(c, ENABLED + "  traversal_depth: 3\n");
+            JsonNode raised = traverse(c, req("g_ds", "A", "\"maxDepth\":3"));
+            assertEquals("index", raised.at("/source/kind").asText(), raised.toString());
+            assertTrue(raised.get("paths").toString().contains("\"A\",\"B\",\"C\",\"D\""), "the index walked the third level: " + raised.get("paths"));
+            settings(c, ENABLED + "  traversal_depth: 1\n");
+            assertEquals("depth_over_index_cap", traverse(c, req("g_ds", "A", "\"maxDepth\":2")).at("/source/reason").asText());
         }
     }
 
@@ -386,6 +394,14 @@ class ControlApiInvIndexedTraversalTest {
             List<String> paths = normalised(over);
             assertEquals(50, paths.size(), "complete: 25 one-hop and 25 two-hop paths, none dropped with the discarded index walk");
             assertTrue(paths.contains("H>h25>hh25|2|-"), paths.toString());
+            // LA-CONFIG-LIMITS-1 P3: the cap is the Space's index.frontier_cap - raised to 25 the same walk is served, identical;
+            // lowered to 19, the 20-key frontier that was served falls back
+            settings(c, ENABLED + "  frontier_cap: 25\n");
+            JsonNode raised = traverse(c, req("hub_ds", "H", "\"maxDepth\":2"));
+            assertEquals("index", raised.at("/source/kind").asText(), raised.toString());
+            assertEquals(paths, normalised(raised), "the index answer under the raised cap equals the flat one");
+            settings(c, ENABLED + "  frontier_cap: 19\n");
+            assertEquals("frontier_over_index_cap", traverse(c, req("hub_ds", "G", "\"maxDepth\":2")).at("/source/reason").asText());
             settings(c, DISABLED);
             assertEquals(paths, normalised(traverse(c, req("hub_ds", "H", "\"maxDepth\":2"))), "identical to the flat answer");
         }

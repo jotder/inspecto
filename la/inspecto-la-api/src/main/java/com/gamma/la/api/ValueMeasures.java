@@ -6,6 +6,9 @@ import com.gamma.util.SqlIdent;
 import com.gamma.sql.SqlSandboxPolicy;
 
 import com.gamma.spi.auth.ApiException;
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.entitystore.EntityFactLog;
@@ -40,8 +43,8 @@ import java.util.regex.Pattern;
  * is made of — the §2.6 trap.
  *
  * <p>Fences: every identifier checked against the relation's real columns by the caller and quoted here; every value
- * bound; a {@value #TIMEOUT_SECONDS} s statement timeout; at most {@value #MAX_ENTITIES} entities leave DuckDB
- * (more ⇒ {@code truncated}); the window at most {@value #MAX_WINDOW_DAYS} days.
+ * bound; the Space's {@code measures.timeout_s} statement timeout; at most its {@code measures.max_entities} entities leave
+ * DuckDB (more ⇒ {@code truncated}); the window at most {@code measures.max_window_days} days ({@link Fences}).
  *
  * <p><b>Window and timezone contract.</b> Exactly one of a fixed {@code from}/{@code to} or a ROLLING
  * {@code last: <N>h|<N>d}. Window bounds are UTC wall-clock timestamps. {@code last} is stored relative and resolved
@@ -58,9 +61,27 @@ import java.util.regex.Pattern;
  */
 public final class ValueMeasures {
 
-    public static final int MAX_ENTITIES = 10_000;
-    public static final int TIMEOUT_SECONDS = 10;
-    public static final int MAX_WINDOW_DAYS = 31;
+    /**
+     * The Space's {@code measures.*} limits a Measure is parsed and evaluated under (LA-CONFIG-LIMITS-1): entities that leave
+     * DuckDB, the statement timeout, the widest window.
+     */
+    public record Fences(int maxEntities, int timeoutSeconds, int maxWindowDays) {
+        /** The catalogue defaults: what a caller with no Space applies. */
+        public static final Fences DEFAULT = of(null);
+
+        /** The limits in force for the Space whose config root is {@code writeRoot}. */
+        public static Fences of(Path writeRoot) {
+            LaLimitValues v = LaLimits.forSpace(writeRoot);
+            return new Fences(Math.toIntExact(v.get(LaLimit.MEASURES_MAX_ENTITIES)), Math.toIntExact(v.get(LaLimit.MEASURES_TIMEOUT_S)),
+                    Math.toIntExact(v.get(LaLimit.MEASURES_MAX_WINDOW_DAYS)));
+        }
+
+        /** The {@code fences} block a route answers. */
+        public Map<String, Object> toMap() {
+            return Map.of("maxEntities", maxEntities, "timeoutSeconds", timeoutSeconds, "maxWindowDays", maxWindowDays);
+        }
+    }
+
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /** The Measures an Alert Rule may watch — {@code AlertRule#VALUE_MEASURES} mirrors this (pinned by test). */
@@ -138,11 +159,23 @@ public final class ValueMeasures {
         return parse(block, alertable, Clock.systemUTC());
     }
 
+    /** {@link #parse(Map, boolean, Clock, Fences)} against the server clock (UTC), under the caller's Space {@code fences}. */
+    public static Spec parse(Map<String, Object> block, boolean alertable, Fences fences) {
+        return parse(block, alertable, Clock.systemUTC(), fences);
+    }
+
+    /** {@link #parse(Map, boolean, Clock, Fences)} under the default fences. */
+    public static Spec parse(Map<String, Object> block, boolean alertable, Clock clock) {
+        return parse(block, alertable, clock, Fences.DEFAULT);
+    }
+
     /**
      * Parse and validate a block {@code {name, valueCol, timeCol, from + to | last, …thresholds}}; defaults fill the
-     * rest. A {@code last} window is resolved HERE against {@code clock} in UTC — so every evaluation re-parses.
+     * rest. A {@code last} window is resolved HERE against {@code clock} in UTC — so every evaluation re-parses. The window
+     * may span at most {@code fences.maxWindowDays()} days.
      */
-    public static Spec parse(Map<String, Object> block, boolean alertable, Clock clock) {
+    public static Spec parse(Map<String, Object> block, boolean alertable, Clock clock, Fences fences) {
+        int maxWindowDays = fences.maxWindowDays();
         String name = str(block.get("name"));
         if (name == null || !DEFAULTS.containsKey(name) || (alertable && !ALERTABLE.contains(name)))
             throw new IllegalArgumentException("value measure 'name' must be one of "
@@ -169,16 +202,16 @@ public final class ValueMeasures {
                 throw new IllegalArgumentException("'last' must be <N>h or <N>d (e.g. 24h, 7d), got '" + last + "'");
             long n = Long.parseLong(lm.group(1));
             Duration span = lm.group(2).equals("h") ? Duration.ofHours(n) : Duration.ofDays(n);
-            if (span.compareTo(Duration.ofDays(MAX_WINDOW_DAYS)) > 0)
-                throw new IllegalArgumentException("the window may span at most " + MAX_WINDOW_DAYS + " days");
+            if (span.compareTo(Duration.ofDays(maxWindowDays)) > 0)
+                throw new IllegalArgumentException("the window may span at most " + maxWindowDays + " days");
             to = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS);
             from = to.minus(span);
         } else {
             from = instant(block, "from");
             to = instant(block, "to");
             if (!to.isAfter(from)) throw new IllegalArgumentException("'to' must be after 'from'");
-            if (Duration.between(from, to).compareTo(Duration.ofDays(MAX_WINDOW_DAYS)) > 0)
-                throw new IllegalArgumentException("the window may span at most " + MAX_WINDOW_DAYS + " days");
+            if (Duration.between(from, to).compareTo(Duration.ofDays(maxWindowDays)) > 0)
+                throw new IllegalArgumentException("the window may span at most " + maxWindowDays + " days");
         }
         String agentList = str(block.get(AGENT_LIST));
         if (agentList != null && !EntityListFacts.LIST_ID.matcher(agentList).matches())
@@ -243,6 +276,12 @@ public final class ValueMeasures {
     /** As above, with the Measure's {@code agentList} resolved by {@link #agents} ({@code null} iff it names none). */
     public static Result evaluate(String datasetId, String relationSql, String sourceCol, String targetCol, String kindCol,
                            Spec s, Agents agents) throws SQLException, java.io.IOException {
+        return evaluate(datasetId, relationSql, sourceCol, targetCol, kindCol, s, agents, Fences.DEFAULT);
+    }
+
+    /** As above, under the caller's Space {@code fences} (entities that leave DuckDB, statement timeout). */
+    public static Result evaluate(String datasetId, String relationSql, String sourceCol, String targetCol, String kindCol,
+                           Spec s, Agents agents, Fences fences) throws SQLException, java.io.IOException {
         if ((s.agentList() != null) != (agents != null))
             throw new IllegalStateException("an agentList is resolved before evaluation, and only then");
         if (KIND_LIST.containsKey(s.name()) && kindCol == null)
@@ -254,7 +293,7 @@ public final class ValueMeasures {
                 + " AS TIMESTAMP) AS ts FROM " + q(datasetId) + " WHERE " + q(sourceCol) + " IS NOT NULL AND "
                 + q(targetCol) + " IS NOT NULL), __x AS (SELECT * FROM __l WHERE ts >= CAST(? AS TIMESTAMP) AND ts < "
                 + "CAST(? AS TIMESTAMP)), __w AS (SELECT * FROM __x WHERE v IS NOT NULL)";
-        SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
+        SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, fences.timeoutSeconds());
 
         Map<String, Object> stats = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql,
                 base + " SELECT count(*) AS n, count(*) FILTER (WHERE v IS NULL) AS unvalued FROM __x", 1, 0,
@@ -290,7 +329,7 @@ public final class ValueMeasures {
             case "cashOutConcentration" -> {
                 String kinds = placeholders(s.kinds(), binds);
                 String cte = base + ", __c AS (SELECT * FROM __w WHERE k IN (" + kinds + "))";
-                String only = agents == null ? "" : " WHERE " + agentPayees(datasetId, relationSql, cte, binds, agents, policy);
+                String only = agents == null ? "" : " WHERE " + agentPayees(datasetId, relationSql, cte, binds, agents, policy, fences.maxEntities());
                 binds.add(num(t.get("minShare")));
                 binds.add(num(t.get("minPayers")));
                 yield cte
@@ -325,7 +364,7 @@ public final class ValueMeasures {
                     + " FROM __w GROUP BY s, t, k ORDER BY total DESC, source, target";
         };
         DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql,
-                MAX_ENTITIES, 0, List.of(), List.of(), binds), policy, UTC);
+                fences.maxEntities(), 0, List.of(), List.of(), binds), policy, UTC);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> row : r.rows()) {
             Map<String, Object> out = new LinkedHashMap<>(row);
@@ -344,13 +383,13 @@ public final class ValueMeasures {
      * relation's real columns first. Throws {@link IllegalArgumentException} for an unknown column.
      */
     public static Result forInvestigation(String datasetId, String relationSql, Map<String, Object> header, Spec s,
-                                   Agents agents) throws SQLException, java.io.IOException {
+                                   Agents agents, Fences fences) throws SQLException, java.io.IOException {
         String src = str(header.get("sourceCol")), tgt = str(header.get("targetCol")), kind = str(header.get("linkKindCol"));
         List<String> columns = InvRoutes.relationColumns(datasetId, relationSql);
         for (String col : java.util.Arrays.asList(src, tgt, kind, s.valueCol(), s.timeCol()))
             if (col != null && !InvRoutes.containsIgnoreCase(columns, col))
                 throw new IllegalArgumentException("unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
-        return evaluate(datasetId, relationSql, src, tgt, kind, s, agents);
+        return evaluate(datasetId, relationSql, src, tgt, kind, s, agents, fences);
     }
 
     /**
@@ -377,16 +416,16 @@ public final class ValueMeasures {
 
     /**
      * The predicate restricting {@code __c} to the agents' payees: the DISTINCT cash-out payees in the window (at most
-     * {@link #MAX_ENTITIES}, more ⇒ refused, never sampled) normalised in Java under the list's sealed normaliser; the
+     * {@code maxEntities}, more ⇒ refused, never sampled) normalised in Java under the list's sealed normaliser; the
      * raw values whose key is a member are BOUND. No member matches ⇒ {@code FALSE}.
      */
     private static String agentPayees(String datasetId, String relationSql, String cte, List<String> binds,
-                                      Agents agents, SqlSandboxPolicy policy) throws SQLException, java.io.IOException {
+                                      Agents agents, SqlSandboxPolicy policy, int maxEntities) throws SQLException, java.io.IOException {
         DatasetProvider.Result payees = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql,
-                cte + " SELECT DISTINCT t AS p FROM __c", MAX_ENTITIES, 0, List.of(), List.of(), List.copyOf(binds)),
+                cte + " SELECT DISTINCT t AS p FROM __c", maxEntities, 0, List.of(), List.of(), List.copyOf(binds)),
                 policy, UTC);
         if (payees.truncated())
-            throw new IllegalArgumentException("more than " + MAX_ENTITIES + " distinct cash-out payees in the window — "
+            throw new IllegalArgumentException("more than " + maxEntities + " distinct cash-out payees in the window — "
                     + "never a silent sample; narrow the window");
         List<String> raw = new ArrayList<>();
         for (Map<String, Object> row : payees.rows()) {

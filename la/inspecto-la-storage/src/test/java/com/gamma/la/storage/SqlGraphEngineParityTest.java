@@ -171,7 +171,7 @@ class SqlGraphEngineParityTest {
         // the walk's first level is ONE key and is served; the pass that collects the edges among the 26 kept nodes looks up 26 keys - over the cap
         IndexCapExceeded cap = assertThrows(IndexCapExceeded.class,
                 () -> INDEX.run(Algorithm.EGO_NETWORK, params("node", "hub"), hub, null));
-        assertEquals(SqlGraphEngine.FRONTIER_CAP, cap.ceiling());
+        assertEquals(IndexedTraversal.DEFAULT_FRONTIER_CAP, cap.ceiling());
         assertEquals(26, cap.reached());
         assertTrue(cap.getMessage().contains("exceeds the cap of 20"), cap.getMessage());
         // two hops from a leaf reach the hub (level 2 holds 1 key) and then its 25 neighbours - the induced pass is over the cap too
@@ -188,6 +188,18 @@ class SqlGraphEngineParityTest {
         InvalidGraphRequest deep = assertThrows(InvalidGraphRequest.class,
                 () -> INDEX.run(Algorithm.NEIGHBORHOOD, params("node", "p", "hops", 3), ref(built, List.of("p"), List.of()), null));
         assertTrue(deep.getMessage().contains("index cap of 2"), deep.getMessage());
+
+        // the caller's fences (the Space's index.traversal_depth / index.frontier_cap) are the ones applied, read at each run
+        int[] fences = {2, 30};
+        SqlGraphEngine spaced = new SqlGraphEngine(SqlSandboxPolicy.defaultPolicy(), () -> fences[0], () -> fences[1]);
+        assertEquals(26, ((GraphResult.SubGraph) spaced.run(Algorithm.EGO_NETWORK, params("node", "hub"), hub, null).payload()).graph().nodes().size());
+        fences[1] = 5;
+        IndexCapExceeded lowered = assertThrows(IndexCapExceeded.class, () -> spaced.run(Algorithm.EGO_NETWORK, params("node", "hub"), hub, null));
+        assertEquals(5, lowered.ceiling());
+        fences[0] = 1;
+        InvalidGraphRequest shallow = assertThrows(InvalidGraphRequest.class,
+                () -> spaced.run(Algorithm.NEIGHBORHOOD, params("node", "p", "hops", 2), ref(built, List.of("p"), List.of()), null));
+        assertTrue(shallow.getMessage().contains("index cap of 1"), shallow.getMessage());
     }
 
     @Test

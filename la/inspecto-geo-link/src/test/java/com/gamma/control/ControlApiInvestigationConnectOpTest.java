@@ -189,9 +189,9 @@ class ControlApiInvestigationConnectOpTest {
             assertEquals(422, connect(c, id, "\"9001\"", "").statusCode(), "one seed has no pair");
             assertEquals(422, connect(c, id, "\"9001\",\"9001\"", "").statusCode(), "a duplicate is not a second seed");
             StringBuilder many = new StringBuilder();
-            for (int i = 0; i < 21; i++) many.append(i == 0 ? "" : ",").append("\"s").append(i).append('"');
-            assertEquals(422, connect(c, id, many.toString(), "").statusCode(), "21 seeds are over the cap of 20");
-            assertEquals(422, connect(c, id, "\"9001\",\"9002\"", ",\"maxHops\":4").statusCode(), "the hop ceiling is 3");
+            for (int i = 0; i < 41; i++) many.append(i == 0 ? "" : ",").append("\"s").append(i).append('"');
+            assertEquals(422, connect(c, id, many.toString(), "").statusCode(), "41 seeds are over the default cap of 40 (connect.max_seeds)");
+            assertEquals(422, connect(c, id, "\"9001\",\"9002\"", ",\"maxHops\":7").statusCode(), "the default hop ceiling is 6 (connect.max_hops)");
             assertEquals(422, connect(c, id, "\"9001\",\"9002\"", ",\"maxHops\":0").statusCode());
             assertEquals(422, send(c, "POST", "/inv/investigations/" + id + "/ops", "{\"op\":\"connect\"}").statusCode(), "no seeds");
             assertEquals(404, connect(c, "nope", "\"9001\",\"9002\"", "").statusCode(), "an unknown Investigation reads as absent");

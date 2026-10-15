@@ -28,10 +28,7 @@ import java.util.TreeSet;
  */
 final class ConnectSeeds {
 
-    /** The seed cap: 20 seeds are 190 pairs from 20 searches. */
-    static final int MAX_SEEDS = 20;
-    /** The hop ceiling (operator 2026-10-13: the hop limit is 3). */
-    static final int MAX_HOPS = 3;
+    // The seed cap and the hop default / ceiling are the Space's connect.* limits (LaLimit), applied where the op is validated.
     private static final int MAX_NOT_WALKED = 10;
 
     private ConnectSeeds() {}

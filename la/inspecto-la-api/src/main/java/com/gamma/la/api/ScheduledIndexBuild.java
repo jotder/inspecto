@@ -1,6 +1,7 @@
 package com.gamma.la.api;
 
 import com.gamma.access.ComponentAccess;
+import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
@@ -195,7 +196,7 @@ public final class ScheduledIndexBuild {
                 List<IndexManifest.InputFile> now = input != null && input.known()
                         ? input.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList() : null;
                 IndexPlan.Plan plan = IndexPlan.classify(live, now, hashOrNull(provider, content, dataRoot, writeRoot),
-                        BucketFunction.NAME, duckdbOrNull());
+                        BucketFunction.NAME, duckdbOrNull(), SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS));
                 switch (plan.recommended()) {
                     case NONE -> {
                         return last != null ? last : done("UP_TO_DATE", "none", "the index already covers the Dataset", live);
@@ -223,7 +224,7 @@ public final class ScheduledIndexBuild {
         try {
             v = svc.submit(new IndexBuildService.Request(principal, r.dataset(), mapping,
                     ds -> IndexRoutes.relation(dataRoot, writeRoot, r.dataset(), relationSql),
-                    ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode));
+                    ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode, SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS)));
         } catch (Refused refused) {
             return refused(m, switch (refused.kind()) {
                 case DUPLICATE -> BUILD_IN_PROGRESS;

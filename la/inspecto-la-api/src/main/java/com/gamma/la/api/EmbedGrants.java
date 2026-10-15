@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.spi.http.ApiContext;
 
@@ -40,8 +41,8 @@ final class EmbedGrants {
     /** The kill switch (fail-closed, like BI sharing's secret): with it off a mint is 503 and every public request is the uniform 404. */
     static final String ENABLED_PROPERTY = "la.embed.enabled";
 
-    /** The most links one Investigation holds live at once. */
-    static final int MAX_ACTIVE = 20;
+    /** The default of the most links one Investigation holds live at once (the Space's {@code input.embed_active_grants}). */
+    static final int DEFAULT_MAX_ACTIVE = (int) LaLimit.INPUT_EMBED_ACTIVE_GRANTS.defaultValue().longValue();
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Base64.Encoder B64 = Base64.getUrlEncoder().withoutPadding();
@@ -68,7 +69,8 @@ final class EmbedGrants {
     /** Mint a grant for {@code investigationId}: store the record (hash only) and return the token once. */
     static Minted mint(InvestigationStore store, String investigationId, String issuedBy, Instant now, long ttlHours,
                        String label, String maskingModeAtMint) throws IOException {
-        return mint(store, investigationId, issuedBy, now, ttlHours, label, maskingModeAtMint, SCOPE_FULL, maskingModeAtMint);
+        return mint(store, investigationId, issuedBy, now, ttlHours, label, maskingModeAtMint, SCOPE_FULL, maskingModeAtMint,
+                DEFAULT_MAX_ACTIVE);
     }
 
     /** What a link shows beyond the Working Set (entities + links, always): {@code working_set} only, {@code with_notes}, or {@code full} (notes + references). */
@@ -78,14 +80,15 @@ final class EmbedGrants {
     /**
      * {@code scope}: one of {@link #SCOPES}. {@code linkMasking}: the masking mode THIS link applies, never looser than the Space's
      * ({@code maskingModeAtMint}); the view masks at the stricter of the two, and the liveness check still tracks only the Space.
+     * {@code maxActive}: the most links the Investigation may hold live at once (the Space's {@code input.embed_active_grants}).
      */
     static Minted mint(InvestigationStore store, String investigationId, String issuedBy, Instant now, long ttlHours,
-                       String label, String maskingModeAtMint, String scope, String linkMasking) throws IOException {
+                       String label, String maskingModeAtMint, String scope, String linkMasking, int maxActive) throws IOException {
         purgeExpired(store, investigationId, now);
         long active = store.embedGrants(investigationId).stream().filter(j -> "active".equals(status(parse(j), now))).count();
-        if (active >= MAX_ACTIVE)
+        if (active >= maxActive)
             throw new com.gamma.spi.auth.ApiException(409, com.gamma.spi.auth.ErrorCodes.CONFLICT,
-                    "an investigation holds at most " + MAX_ACTIVE + " live embed links - revoke one first");
+                    "an investigation holds at most " + maxActive + " live embed links - revoke one first");
         for (int attempt = 0; attempt < 5; attempt++) {
             String grantId = random(12);
             String token = grantId + "." + random(32);

@@ -90,7 +90,7 @@ class LaLimitsTest {
         today.put(LaLimit.DRAFTS_EXPIRE_AFTER_DAYS, (long) LinkAnalysisSettings.Drafts.DEFAULT_EXPIRE_AFTER_DAYS);
         today.put(LaLimit.EMBED_DEFAULT_TTL_HOURS, (long) LinkAnalysisSettings.Embed.DEFAULT_TTL_HOURS);
         today.put(LaLimit.EMBED_MAX_TTL_HOURS, (long) LinkAnalysisSettings.Embed.DEFAULT_MAX_TTL_HOURS);
-        today.put(LaLimit.INPUT_ENTITY_TYPES, (long) EntityTypes.MAX_TYPES);
+        today.put(LaLimit.INPUT_ENTITY_TYPES, 64L);
         today.forEach((l, v) -> assertEquals(v, l.defaultValue(), l.path()));
         // the ranges the existing PUT /settings/link-analysis enforces, so a value it accepted reads as before
         assertEquals(LinkAnalysisSettings.Embed.CEILING_TTL_HOURS, LaLimit.EMBED_MAX_TTL_HOURS.max().intValue());
@@ -134,9 +134,9 @@ class LaLimitsTest {
         assertEquals(300L, v.getNullable(LaLimit.FOUR_EYES_BUDGET_ABOVE));
         assertEquals(7, v.get(LaLimit.TRAVERSAL_TIMEOUT_S));
         assertEquals(1500, v.get(LaLimit.BROWSER_PAGE_RANK));
-        assertEquals(10, v.get(LaLimit.TRAVERSAL_DEPTH_MAX), "999 is outside 1..50: a hand edit cannot pass the range");
+        assertEquals(20, v.get(LaLimit.TRAVERSAL_DEPTH_MAX), "999 is outside 1..50: a hand edit cannot pass the range");
         assertNull(v.stated(LaLimit.TRAVERSAL_DEPTH_MAX));
-        assertEquals(10_000, v.get(LaLimit.TRAVERSAL_PATHS_MAX), "not a number: the default");
+        assertEquals(20_000, v.get(LaLimit.TRAVERSAL_PATHS_MAX), "not a number: the default");
     }
 
     @Test

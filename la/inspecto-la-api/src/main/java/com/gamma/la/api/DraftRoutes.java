@@ -4,6 +4,7 @@ import com.gamma.la.core.InvestigationStore;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.spi.auth.Subject;
@@ -178,7 +179,7 @@ public final class DraftRoutes implements RouteModule {
         Object atRaw = body.get("at");
         if (atRaw != null && !(atRaw instanceof Number))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'at' must be a step number");
-        String label = labelOf(body.get("label"));
+        String label = labelOf(body.get("label"), SpaceLimits.get(inv.writeRoot(), LaLimit.INPUT_DRAFT_LABEL_LENGTH));
         String draftId = DraftStore.newId();
         List<Map<String, Object>> pinned = new ArrayList<>();
         Map<String, Object> header = new LinkedHashMap<>();
@@ -234,16 +235,18 @@ public final class DraftRoutes implements RouteModule {
         return ApiContext.respondJson(ex, 201, describe(o, true));
     }
 
-    static final int LABEL_MAX = 80;
 
-    /** The optional human label of a Draft: absent -> null; else trimmed, 1..80 chars, no control characters (422 otherwise). */
-    private static String labelOf(Object raw) {
+    /**
+     * The optional human label of a Draft: absent -> null; else trimmed, 1..{@code maxLabel} chars (the Space's
+     * {@code input.draft_label_length}), no control characters (422 otherwise).
+     */
+    private static String labelOf(Object raw, int maxLabel) {
         if (raw == null) return null;
         if (!(raw instanceof String s))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must be a string");
         String t = s.strip();
-        if (t.isEmpty() || t.length() > LABEL_MAX)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must be 1.." + LABEL_MAX + " characters after trimming");
+        if (t.isEmpty() || t.length() > maxLabel)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must be 1.." + maxLabel + " characters after trimming");
         if (t.codePoints().anyMatch(Character::isISOControl))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' must not contain control characters");
         return t;

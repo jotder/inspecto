@@ -183,11 +183,11 @@ class ControlApiInvTemporalTest {
     @Test
     void aScanPastTheRowCapSaysSo(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            seed(c, "big_ds", "SELECT 'A' AS a, 'B' AS b, TIMESTAMP '2026-01-01 00:00:00' + to_seconds(i) AS happened FROM range(200005) r(i)");
+            seed(c, "big_ds", "SELECT 'A' AS a, 'B' AS b, TIMESTAMP '2026-01-01 00:00:00' + to_seconds(i) AS happened FROM range(400005) r(i)");
             JsonNode d = ok(c, body("burst", "").replace("calls_ds", "big_ds"));
             assertTrue(d.get("rowCapped").asBoolean());
             assertTrue(d.get("truncated").asBoolean());
-            assertEquals(200_000, d.at("/fences/maxRows").asInt());
+            assertEquals(400_000, d.at("/fences/maxRows").asInt(), "pattern.temporal_max_rows: 400 000 by default");
             seed(c, "calls_ds", CALLS);
             assertFalse(ok(c, body("burst", "")).get("rowCapped").asBoolean(), "twin: a small Dataset is not capped");
         }
