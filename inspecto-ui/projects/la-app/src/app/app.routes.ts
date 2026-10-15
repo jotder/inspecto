@@ -32,6 +32,8 @@ export const laAppRoutes: Route[] = [
                 loadChildren: () => import('@inspecto/link-analysis/link-analysis/link-analysis.routes'),
             },
             { path: 'geo-map', loadChildren: () => import('@inspecto/link-analysis/geo-map/geo-map.routes') },
+            // The Entities pages (Entity Type Profile, Entity Profile), the library's own lazy boundary.
+            { path: 'entities', loadChildren: () => import('@inspecto/link-analysis/entities/entities.routes') },
             {
                 path: 'entity-lists',
                 loadComponent: () => import('./entity-lists.page').then((m) => m.EntityListsPageComponent),

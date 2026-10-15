@@ -34,7 +34,7 @@ import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { FormMenuDirective } from './form-menu.directive';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, UrlTree } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
@@ -2237,6 +2237,13 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     /** The node detail dialog: rows, branch/expand actions (exploration), and the Risk / Enrichment / Actions sections. */
+    /** The Entity Profile page beside this route (`…/link-analysis` -> `…/entities/<type>/<key>`); null when unknown. */
+    private entityPageOf(type: string | undefined, key: string): UrlTree | null {
+        const segs = (this.route.snapshot?.pathFromRoot ?? []).flatMap((r) => r.url.map((u) => u.path));
+        if (!type || !key || segs[segs.length - 1] !== 'link-analysis') return null;
+        return this.router.createUrlTree(['/', ...segs.slice(0, -1), 'entities', type, key]);
+    }
+
     private openNodeDetail(id: string): void {
         const onInvestigation = this.investigation.canvas() !== null;
         const g = onInvestigation ? this.canvasData() : this.baseGraph();
@@ -2277,6 +2284,7 @@ export class LinkAnalysisComponent implements OnInit {
             canManageLists: this.lens.canManageIncidents(),
             onListChanged: () => this.investigation.entityListsChanged.update((n) => n + 1),
             canHide: !this.investigation.active(),
+            entityPage: this.entityPageOf(this.profile().investigate?.entityType, rawIdsOf(node)[0] ?? node.data.label),
         };
         this.dialog
             .open(ElementDetailDialog, {

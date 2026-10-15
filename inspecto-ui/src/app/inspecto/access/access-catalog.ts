@@ -374,6 +374,7 @@ export const LENS_NAV_SCOPE: Record<Lens, string[]> = {
         'studio-dashboards',
         'studio-templates',
         'studio-link-analysis',
+        'studio-entities',
         'menus',
         'studio-geo-map',
         'catalog-group',

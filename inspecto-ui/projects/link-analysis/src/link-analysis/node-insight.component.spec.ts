@@ -12,7 +12,7 @@ import { NodeInsightComponent, NodeInsightContext } from './node-insight.compone
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { CaseHistoryService, EntityHistory, EntityHistoryItem } from './case-history.service';
 
 const item = (over: Partial<EntityHistoryItem>): EntityHistoryItem => ({
@@ -458,6 +458,17 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         c.toggleHistory();
         await settle(fixture);
         expect(byEntity).toHaveBeenCalledTimes(2);
+    });
+
+    it('links the Entity page when the host passes one, and offers nothing otherwise', () => {
+        const { fixture, el } = make();
+        expect(el.querySelector('[data-testid=entity-page-link]')).toBeNull();
+        const page = TestBed.inject(Router).createUrlTree(['/', 'studio', 'entities', 'msisdn', '999']);
+        fixture.componentRef.setInput('ctx', { ...CTX, entityPage: page });
+        fixture.detectChanges();
+        const a = el.querySelector('[data-testid=entity-page-link]')!;
+        expect(a.textContent).toContain('Open the Entity page');
+        expect(a.getAttribute('href')).toBe('/studio/entities/msisdn/999');
     });
 
     it('says when the profile maps no indicators Dataset', async () => {

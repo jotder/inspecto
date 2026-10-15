@@ -42,6 +42,11 @@ describe('la-app routes', () => {
         expect(await child('geo-map').loadChildren!()).toBeTruthy();
     }, 60_000);
 
+    it('resolves the Entities pages from the library', async () => {
+        const mod = (await child('entities').loadChildren!()) as unknown as { default: Route[] };
+        expect(mod.default.map((r) => r.path)).toEqual(['', ':type', ':type/:key']);
+    }, 60_000);
+
     it('resolves the Entity Lists page from the library', async () => {
         expect(await child('entity-lists').loadComponent!()).toBeTruthy();
     }, 60_000);

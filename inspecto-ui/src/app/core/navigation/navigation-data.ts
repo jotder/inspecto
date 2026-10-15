@@ -282,6 +282,14 @@ export const defaultNavigation: GammaNavigationItem[] = [
                         link: '/studio/link-analysis',
                     },
                     {
+                        id: 'studio-entities',
+                        navFeature: 'geoLink',
+                        title: 'Entities',
+                        type: 'basic',
+                        icon: 'heroicons_outline:identification',
+                        link: '/studio/entities',
+                    },
+                    {
                         id: 'menus',
                         title: 'Menus',
                         type: 'basic',
