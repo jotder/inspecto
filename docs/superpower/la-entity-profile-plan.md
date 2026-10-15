@@ -1,6 +1,6 @@
 # Link Analysis: Entity profile pages (what the data says about each Entity Type and each Entity)
 
-**Status: PLAN 2026-10-15, nothing built. Decisions D-EP1..D-EP8 open (section 7).** Generic for every Space and every
+**Status: IN FLIGHT 2026-10-15. Decisions D-EP1..D-EP8 taken (section 7, operator interview); scope this round P0-P3, P4 deferred; built in parallel lanes against the contract in section 4.5.** Generic for every Space and every
 industry pack: nothing here names a telecom column. The model for the content is the "What the data is" section of the
 IMS showcase plan ([`la-ims-showcase-plan.md`](la-ims-showcase-plan.md) section 1): volumes, distinct values, value
 shapes, sentinel values, time span, freshness, where the rows come from, how the identifiers relate, and what the
@@ -123,6 +123,86 @@ New limit items, server-gated like the rest: profile query timeout, Datasets per
 shapes, top-N size for histograms, sentinel share threshold, per-day timeline length. Reads past a limit return a
 partial section marked `truncated`.
 
+### 4.5 API contract (fixed 2026-10-15 for the parallel lanes)
+
+All three routes are reads, Space-scoped (`/api/v1/spaces/{space}/...`), gated like the exploration reads
+(`POST /inv/projection`), audited like them, and documented in `docs/api/openapi-v1.json`. Every section object carries
+`assessed` (boolean) and `reason` (string or null); a section that could not be read says `assessed:false` with the
+reason and never reports zero for something nobody measured. Numbers that are approximate say so (`approximate:true`).
+Masked Entity Types never return a raw identifier: a key is the exploration alias (`masked:<16 hex>`).
+
+**`GET /inv/entity-types`** - the Entity Types in force, cheap (reads the cache, never runs a profile query):
+
+```json
+{ "items": [ {
+    "id": "msisdn", "label": "MSISDN", "normaliser": "e164", "masked": true, "classifications": ["MSISDN"],
+    "bindings": [ { "dataset": "ims_links_dataset", "column": "a_msisdn", "role": "source" } ],
+    "headline": { "distinct": 20546, "approximate": true, "rows": 19638, "dataAsOf": "2026-10-09T10:36:47Z",
+                  "computedAt": "2026-10-15T09:00:00Z", "assessed": true, "reason": null } } ] }
+```
+
+`role` is `source` / `target` when the column is a link end of a Dataset's Link Analysis mapping (a saved view or an
+index mapping names it), else `attribute`. `headline.assessed:false` with reason `not computed yet` until the type's
+profile has been read once.
+
+**`GET /inv/entity-types/{id}/profile?sections=bindings,volume,shapes,time,lineage,links,relationships`** (all sections
+when `sections` is absent):
+
+```json
+{ "entityType": { "id": "...", "label": "...", "normaliser": "...", "masked": true, "classifications": [] },
+  "computedAt": "...", "cached": true, "truncated": false,
+  "bindings": [ { "dataset": "...", "column": "...", "role": "source", "timeColumn": "first_seen",
+                  "rows": 0, "nonNull": 0, "fillRate": 0.0, "distinct": 0, "approximate": true,
+                  "failNormaliser": 0, "assessed": true, "reason": null } ],
+  "volume": { "distinct": 0, "approximate": true, "rows": 0,
+              "sentinels": [ { "dataset": "...", "column": "...", "kind": "builtin", "value": "-99", "rows": 0, "share": 0.0 },
+                             { "dataset": "...", "column": "...", "kind": "dominant", "value": null, "rows": 0, "share": 0.0 } ],
+              "assessed": true, "reason": null },
+  "shapes": { "length": [ { "length": 12, "rows": 0 } ], "prefix": [ { "prefix": "249", "rows": 0 } ], "prefixLength": 3,
+              "charClass": { "digits": 0, "letters": 0, "mixed": 0 }, "sampled": false, "assessed": true, "reason": null },
+  "time": { "earliest": "...", "latest": "...", "perDay": [ { "day": "2026-10-09", "rows": 0, "distinct": 0 } ],
+            "missingDays": [], "dataAsOf": [ { "dataset": "...", "dataAsOf": "..." } ], "assessed": true, "reason": null },
+  "lineage": [ { "dataset": "...", "pipelines": [], "collectors": [], "files": 0, "rows": 0, "latestIngestedAt": "...",
+                 "waitingForIndex": 0, "problemFiles": 0, "assessed": true, "reason": null } ],
+  "links": { "from": "index", "kinds": [ { "kind": "sms", "edges": 0 } ], "degree": { "p50": 1, "p90": 2, "p99": 9, "max": 46 },
+             "hubThreshold": 500, "hubs": 0, "singleLink": 0, "assessed": true, "reason": null },
+  "relationships": [ { "otherType": "imei", "dataset": "...", "oneToOneShare": 0.999, "maxPerEntity": 15,
+                       "threshold": 6, "entitiesAtOrAboveThreshold": 1, "assessed": true, "reason": null } ],
+  "masking": { "mode": "typed" } }
+```
+
+Sentinels (D-EP8): the built-in list `''`, `-99`, `0`, `NULL`, `null`, `unknown`, `n/a` is shown by value (they are not
+identifiers); a **dominant** value (one value above the `entity_profile.sentinel_share` limit of a column) is shown
+only as `kind:"dominant"` with `value:null` (aggregates only, D-EP3). `prefixLength` is the safe prefix the normaliser
+declares (`e164`: 3, `digits`: 0 = no prefix histogram, `upper-trim`: 0, `default`: 0). Relationships are computed
+for each other Entity Type bound in the SAME Dataset row.
+
+**`GET /inv/entities/{type}/{key}/profile`** - one Entity; `key` is the raw value or the exploration alias, resolved
+through the same masking as the exploration reads:
+
+```json
+{ "entity": { "type": "msisdn", "key": "masked:f01a9b8ca40c4eb1", "masked": true },
+  "firstSeen": "...", "lastSeen": "...", "activeDays": 1, "coveredDays": 1,
+  "perDay": [ { "day": "2026-10-09", "rows": 0 } ],
+  "where": [ { "dataset": "...", "column": "...", "rows": 0 } ],
+  "links": { "degree": 8, "kinds": [ { "kind": "co_target", "count": 7 } ], "percentile": 97, "from": "index", "assessed": true, "reason": null },
+  "related": [ { "type": "imei", "count": 1, "keys": [ "masked:..." ] } ],
+  "dataAsOf": [ { "dataset": "...", "dataAsOf": "..." } ],
+  "assessed": true, "reason": null }
+```
+
+Entity List membership, identity group, Case history and Risk on the Entity page come from the existing routes.
+
+**New limit items** (LA-CONFIG-LIMITS-1 catalogue, Space layer, server-gated): `entity_profile.timeout_s` (default 30),
+`entity_profile.max_datasets` (20), `entity_profile.shape_sample_rows` (1 000 000), `entity_profile.top_n` (20),
+`entity_profile.sentinel_share` (20, a percent), `entity_profile.timeline_days` (400),
+`entity_profile.relationship_threshold` (6).
+
+**Index manifest additions** (additive, D-EP4): `kindEdges` (map kind to edges), `typeNodes` (map Entity Type to nodes,
+when the mapping's columns are typed), `degree` (`p50`, `p90`, `p99`, `max`) and `timeSpan` (`min`, `max` of the
+mapping's time column). `GET /inv/index` returns them per index. The Links section reads them; without a fresh index it
+falls back to a Dataset query under the budget, else `assessed:false`.
+
 ## 5. Privacy and governance
 
 - **Aggregates only on the Entity Type page**: counts, shares, shapes and quantiles; never a raw identifier.
@@ -147,18 +227,21 @@ partial section marked `truncated`.
 Each phase: unit tests per route and component, the openapi entry for each new route, axe on each page, a live pass
 on a seeded Space (the IMS Space and `la-showcase`) recorded in this plan.
 
-## 7. Decisions to take (operator)
+## 7. Decisions (operator interview 2026-10-15)
 
-| Id | Question | Recommended |
+| Id | Question | Decided |
 |---|---|---|
-| D-EP1 | Names: the page and the computed object | "Entities" page; **Entity Type Profile** (the Type-level object) and **Entity Profile** (one Entity), added to the glossary |
-| D-EP2 | On-demand cached profile, or a scheduled Job snapshot as well | on-demand + cache in P1; the Job in P4 only if drift alerts are wanted |
-| D-EP3 | Value examples on the type page | off; aliases with a k floor if turned on |
-| D-EP4 | Link statistics from the index only, or also from Datasets | index first, Dataset fallback under budget |
-| D-EP5 | Which identifiers count as one Entity across Datasets | the normalised typed key (`<type>:<value>`); identity groups shown, not merged, in P1 |
-| D-EP6 | Where the pages live | la-app (nav entry beside Entity Lists) and the full SPA through the shared library |
-| D-EP7 | Does a read of data as of need a write root | no: a read gate only, so a read-only host shows freshness |
-| D-EP8 | Sentinel list | a built-in list (blank, `-99`, `0`, `NULL`, `unknown`, `n/a`) plus "any one value above X % of a column", per Space overridable |
+| D-EP1 | Names | **Entities** page; **Entity Type Profile** (the Type-level object) and **Entity Profile** (one Entity), in the glossary |
+| D-EP2 | On demand or a scheduled Job | **on demand + cache** keyed by the input-file fingerprint; the Job stays in P4 (deferred) |
+| D-EP3 | Value examples on the type page | **none: aggregates only** |
+| D-EP4 | Where link statistics come from | **index first** (new manifest fields), **Dataset fallback** under the budget, else `not assessed` |
+| D-EP5 | What is one Entity across Datasets | **the normalised typed key**; identity groups shown on the Entity page, not merged into counts |
+| D-EP6 | Where the pages live | **la-app** (nav entry beside Entity Lists) **and the full SPA**, through the shared library |
+| D-EP7 | Does reading data as of need a write root | **no: a read gate only** |
+| D-EP8 | Sentinels | **built-in list + dominance** (one value above a share of a column), per Space overridable |
+
+Scope this round: **P0-P3**. Landing: the lanes are integrated on `master` locally after their tests and the guards
+pass; the push waits for the operator.
 
 ## 8. Risks
 

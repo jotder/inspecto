@@ -1037,6 +1037,10 @@ untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — 
 label (`columns[].classification`); the Entity Type is what that label maps to. Design:
 [`archived-documents/plans-archive/link-analysis-entity-model-design.md`](archived-documents/plans-archive/link-analysis-entity-model-design.md).
 
+**Entity Type Profile** *(Link Analysis, decided 2026-10-15, D-EP1; plan [`superpower/la-entity-profile-plan.md`](superpower/la-entity-profile-plan.md))* — What the Space's Datasets say about one **Entity Type**, computed on demand and cached until a new File lands: the Dataset columns bound to it, volume and fill rate, sentinel values, value shapes, time span and per-day timeline, freshness, lineage, link and relationship statistics. Aggregates only: it never names an identifier. Read by `GET /inv/entity-types/{id}/profile`; shown on the **Entities** page. ⛔ Not an *Access Profile* or a *Decode Profile* (different concepts); ⛔ not a Dataset profile (it spans every Dataset the type appears in).
+
+**Entity Profile** *(Link Analysis, decided 2026-10-15, D-EP1)* — The same facts for one **Entity** (a typed key): first and last seen, active days, where it appears, degree and its percentile among its type, related identifiers. Under masking the key is the exploration alias. Read by `GET /inv/entities/{type}/{key}/profile`.
+
 **Entity List** *(added 2026-09-26, `LA-17`; ✅ backend + SPA client built 2026-09-26: `/entity-lists*`, `EntityListRoutes`; `excludeBy`/`seedBy` and the panel not yet)* — A named, persisted, Space-scoped set of typed Entity keys
 with a stated purpose (`allow` · `block` · `watch` · `exclusion`), held as a fold over the Space's **Identity Fact** log,
 so it can be read as of any log position. Consumed by the Investigation ops `excludeBy` / `seedBy`, and it travels
