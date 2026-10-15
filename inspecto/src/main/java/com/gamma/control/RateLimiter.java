@@ -1,5 +1,9 @@
 package com.gamma.control;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimitValues;
+import com.gamma.entitystore.LaLimits;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
@@ -11,8 +15,9 @@ import java.util.function.LongSupplier;
  * instance — no config framework, no external store, matching the project's no-new-dependency bar.
  *
  * <p>Each instance is one budget: a burst of {@code capacity} requests, refilling at {@code refillPerSecond}
- * tokens/second. Three budgets exist ({@link #standard()}, {@link #dashboard()}, {@link #callback()}); all are fixed except
- * {@link #linkAnalysis()}, the only tunable budget (via {@code control.rateLimit.linkAnalysis.*}).
+ * tokens/second. The budgets below are fixed except {@link #linkAnalysis()} and {@link #embed()}, which are the install-wide
+ * Link Analysis limits {@code rate.*} ({@code LA-CONFIG-LIMITS-1} CL-13; precedence: the server-wide {@code la-limits.toon}
+ * value, else the older {@code control.rateLimit.*} system property, else the catalogue default).
  *
  * <p>⚠ {@code /bi/query} has its OWN, larger bucket (operator decision 2026-09-24): every Studio widget fires
  * one {@code POST /bi/query}, so a 10–12 tile dashboard spent half the shared 20-token burst and the next
@@ -38,22 +43,39 @@ final class RateLimiter {
     static RateLimiter push() { return new RateLimiter(60.0, 10.0); }
 
     /** The embedded-Investigation view's PER-TOKEN budget ({@code GET /public/investigations/{token}}, LA-EMBED-VIEW-1): burst 60, then
-     *  2 requests/second per link, tunable via {@code control.rateLimit.embed.*}. A viewer polls or reloads a read-only page; one
+     *  2 requests/second per link ({@code rate.embed_burst} / {@code rate.embed_per_s}). A viewer polls or reloads a read-only page; one
      *  leaked link cannot spend more than this however many hosts present it. Unknown tokens are bounded by the per-IP
      *  {@link #callback()} bucket, since each distinct guess would otherwise get a fresh per-token bucket. */
     static RateLimiter embed() {
-        return new RateLimiter(positive("control.rateLimit.embed.capacity", 60.0),
-                positive("control.rateLimit.embed.refillPerSecond", 2.0));
+        return embed(LaLimits.forSpace(null));
+    }
+
+    /** {@link #embed()} from the install-wide values {@code install}. */
+    static RateLimiter embed(LaLimitValues install) {
+        return new RateLimiter(tuned(install, LaLimit.RATE_EMBED_BURST, "control.rateLimit.embed.capacity"),
+                tuned(install, LaLimit.RATE_EMBED_PER_S, "control.rateLimit.embed.refillPerSecond"));
     }
 
     /** The expensive Link Analysis budget (projection, traversal, pattern, Graph Run, Index build): its own bucket,
      *  so a graph session cannot drain ad-hoc SQL and vice versa. Burst 30, then one request per 2 seconds: about 3x
      *  what an analyst spends (opening an Investigation spends 0, each projection / neighbour list / server algorithm
      *  / path search / index build is 1; a hard drill-down is about 10 in a minute) - LA-DAILY-INGEST-1, measured
-     *  2026-10-14; a runaway loop is still refused after the first 30. */
+     *  2026-10-14; a runaway loop is still refused after the first 30. {@code rate.link_analysis_burst} / {@code rate.link_analysis_per_s}. */
     static RateLimiter linkAnalysis() {
-        return new RateLimiter(positive("control.rateLimit.linkAnalysis.capacity", 30.0),
-                positive("control.rateLimit.linkAnalysis.refillPerSecond", 0.5));
+        return linkAnalysis(LaLimits.forSpace(null));
+    }
+
+    /** {@link #linkAnalysis()} from the install-wide values {@code install}. */
+    static RateLimiter linkAnalysis(LaLimitValues install) {
+        return new RateLimiter(tuned(install, LaLimit.RATE_LINK_ANALYSIS_BURST, "control.rateLimit.linkAnalysis.capacity"),
+                tuned(install, LaLimit.RATE_LINK_ANALYSIS_PER_S, "control.rateLimit.linkAnalysis.refillPerSecond"));
+    }
+
+    /** An install-wide rate: the value stated in the server-wide document, else {@code property} when it is a positive
+     *  number, else the catalogue default ({@code LA-CONFIG-LIMITS-1}). */
+    static double tuned(LaLimitValues install, LaLimit item, String property) {
+        Number stated = install.stated(item);
+        return stated != null ? stated.doubleValue() : positive(property, item.defaultValue().doubleValue());
     }
 
     /** An operator-tunable budget (operator, 2026-10-06): the system property when it parses to a positive
@@ -80,6 +102,23 @@ final class RateLimiter {
     RateLimiter(double capacity, double refillPerSecond) {
         this.capacity = capacity;
         this.refillPerSecond = refillPerSecond;
+    }
+
+    /** The burst. */
+    double capacity() { return capacity; }
+
+    /** The refill, tokens per second. */
+    double refillPerSecond() { return refillPerSecond; }
+
+    /**
+     * {@code next} when its budget differs from this one (taking over this limiter's clock), else this limiter unchanged -
+     * so re-applying an unchanged setting never refills anyone's bucket. A changed budget starts every caller full.
+     */
+    RateLimiter retunedTo(RateLimiter next) {
+        if (next.capacity == capacity && next.refillPerSecond == refillPerSecond) return this;
+        next.clock = clock;
+        next.lastSweepNanos.set(clock.getAsLong());
+        return next;
     }
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();

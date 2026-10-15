@@ -56,11 +56,9 @@ final class SettingsRoutes implements RouteModule {
      *  a persisted setting an operator explicitly typed, so it must come back for them to fix. */
     private static final int MAX_NODE_CAP = 100_000;
     private static final int MAX_GRAPH_RUN = 10_000_000;
-    /** D-3 index limits: a petabyte budget, a hundred kept versions, 64 build workers, a 1 000-deep waiting line. */
+    /** D-3 index limits: a petabyte budget, a hundred kept versions. */
     private static final long MAX_INDEX_DISK_BYTES = 1_000_000_000_000_000L;
     private static final int MAX_INDEX_KEEP = 100;
-    private static final int MAX_INDEX_THREADS = 64;
-    private static final int MAX_INDEX_QUEUE = 1_000;
     private static final int MAX_INDEX_MAX_AGE_HOURS = 8_760;   // one year
     /** Draft lifecycle limits: a thousand open Drafts, a week to hibernate, ten years to expire. */
     private static final int MAX_DRAFTS_OPEN = 1_000;
@@ -206,16 +204,12 @@ final class SettingsRoutes implements RouteModule {
             run.put("maxNodes", g.maxNodes());
             run.put("maxEdges", g.maxEdges());
             run.put("timeoutMs", g.timeoutMs());
-            run.put("threads", g.threads());
-            run.put("queue", g.queue());
             run.put("maxResultItems", g.maxResultItems());
             run.put("propagatedRiskWeights", g.propagatedRiskWeights());
         }
         m.put("graphRun", run);
         m.put("propagatedRiskWeightsInForce", s.effectiveGraphRun().propagatedRiskWeightsInForce());
-        Map<String, Object> runInForce = new LinkedHashMap<>();
-        runInForce.put("threads", s.effectiveGraphRun().threadsInForce());
-        runInForce.put("queue", s.effectiveGraphRun().queueInForce());
+        Map<String, Object> runInForce = new LinkedHashMap<>();   // the pool sizes are install-wide: GET /settings/link-analysis/limits
         runInForce.put("maxResultItems", s.effectiveGraphRun().maxResultItemsInForce());
         m.put("graphRunInForce", runInForce);
         LinkAnalysisSettings.Index x = s.index();
@@ -225,8 +219,6 @@ final class SettingsRoutes implements RouteModule {
             idx.put("enabled", x.enabled());
             idx.put("maxDiskBytes", x.maxDiskBytes());
             idx.put("keepVersions", x.keepVersions());
-            idx.put("threads", x.threads());
-            idx.put("queue", x.queue());
             idx.put("maxAgeHours", x.maxAgeHours());
         }
         m.put("index", idx);
@@ -235,8 +227,6 @@ final class SettingsRoutes implements RouteModule {
         idxInForce.put("enabled", ix.enabledInForce());
         idxInForce.put("maxDiskBytes", ix.maxDiskBytesInForce());
         idxInForce.put("keepVersions", ix.keepVersionsInForce());
-        idxInForce.put("threads", ix.threadsInForce());
-        idxInForce.put("queue", ix.queueInForce());
         idxInForce.put("maxAgeHours", ix.maxAgeHoursInForce());
         m.put("indexInForce", idxInForce);
         // Read-only echo of the process-wide -Dinvestigations.backend selection (fs default | db = PostgreSQL); not a setting.
@@ -277,8 +267,9 @@ final class SettingsRoutes implements RouteModule {
     }
 
     /** The graph-run knobs (D-4): absent/null = inherit; a stated block holds only positive ints (a size, a count or
-     *  milliseconds), each refused (422) outside {@code 1..MAX_GRAPH_RUN}, never clamped. The server's hard ceilings are
-     *  applied when a run starts and echoed by {@code GET /inv/graph/algorithms}; they are not a setting. */
+     *  milliseconds), each refused (422) outside {@code 1..MAX_GRAPH_RUN}, never clamped. The server's hard ceilings and the
+     *  worker / waiting-line sizes are install-wide ({@code PUT /system/link-analysis/limits}), applied when a run starts and
+     *  echoed by {@code GET /inv/graph/algorithms}; a {@code threads} or {@code queue} key here is refused as unknown. */
     @SuppressWarnings("unchecked")
     private static LinkAnalysisSettings.GraphRun graphRun(Map<String, Object> body) {
         Object raw = body.get("graphRun");
@@ -287,11 +278,10 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun must be an object, got '" + raw + "'");
         Map<String, Object> g = (Map<String, Object>) raw;
         for (String k : g.keySet())
-            if (!List.of("maxNodes", "maxEdges", "timeoutMs", "threads", "queue", "maxResultItems", "propagatedRiskWeights").contains(k))
+            if (!List.of("maxNodes", "maxEdges", "timeoutMs", "maxResultItems", "propagatedRiskWeights").contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun has no key '" + k + "'");
         return new LinkAnalysisSettings.GraphRun(boundedInt(g, "maxNodes", "graphRun.maxNodes"),
                 boundedInt(g, "maxEdges", "graphRun.maxEdges"), boundedInt(g, "timeoutMs", "graphRun.timeoutMs"),
-                boundedInt(g, "threads", "graphRun.threads"), boundedInt(g, "queue", "graphRun.queue"),
                 boundedInt(g, "maxResultItems", "graphRun.maxResultItems"), riskWeights(g.get("propagatedRiskWeights")));
     }
 
@@ -311,8 +301,8 @@ final class SettingsRoutes implements RouteModule {
     }
 
     /** The edge/node index knobs (D-3): absent/null = inherit; {@code enabled} must be a JSON boolean, {@code maxDiskBytes}
-     *  0..{@code MAX_INDEX_DISK_BYTES} (0 = no limit), {@code keepVersions} 1..{@code MAX_INDEX_KEEP}, {@code threads}
-     *  1..{@code MAX_INDEX_THREADS}, {@code queue} 1..{@code MAX_INDEX_QUEUE}; each refused (422), never clamped. */
+     *  0..{@code MAX_INDEX_DISK_BYTES} (0 = no limit), {@code keepVersions} 1..{@code MAX_INDEX_KEEP}; each refused (422),
+     *  never clamped. The build workers and waiting line are install-wide ({@code PUT /system/link-analysis/limits}). */
     @SuppressWarnings("unchecked")
     private static LinkAnalysisSettings.Index index(Map<String, Object> body) {
         Object raw = body.get("index");
@@ -321,7 +311,7 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index must be an object, got '" + raw + "'");
         Map<String, Object> g = (Map<String, Object>) raw;
         for (String k : g.keySet())
-            if (!List.of("enabled", "maxDiskBytes", "keepVersions", "threads", "queue", "maxAgeHours").contains(k))
+            if (!List.of("enabled", "maxDiskBytes", "keepVersions", "maxAgeHours").contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index has no key '" + k + "'");
         Boolean enabled = null;
         Object en = g.get("enabled");
@@ -345,7 +335,6 @@ final class SettingsRoutes implements RouteModule {
             maxDisk = v;
         }
         return new LinkAnalysisSettings.Index(enabled, maxDisk, rangedInt(g, "keepVersions", "index.keepVersions", MAX_INDEX_KEEP),
-                rangedInt(g, "threads", "index.threads", MAX_INDEX_THREADS), rangedInt(g, "queue", "index.queue", MAX_INDEX_QUEUE),
                 rangedInt(g, "maxAgeHours", "index.maxAgeHours", MAX_INDEX_MAX_AGE_HOURS));
     }
 

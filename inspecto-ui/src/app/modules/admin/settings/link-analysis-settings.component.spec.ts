@@ -127,14 +127,14 @@ describe('LinkAnalysisSettingsComponent', () => {
     });
 
     it('sends the graph-run knobs back untouched: the PUT replaces, so a save must not drop what it has no field for', () => {
-        const graphRun = { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: null };
+        const graphRun = { maxNodes: 900, maxEdges: null, timeoutMs: 4000 };
         const { api, submit } = setup({ served: { graphRun } });
         submit();
         expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ graphRun: { ...graphRun, maxResultItems: null, propagatedRiskWeights: null } }));
     });
 
     it('sends the index knobs back untouched, an explicit enabled=false included: the PUT replaces', () => {
-        const index = { enabled: false, maxDiskBytes: 5000000000, keepVersions: 3, threads: null, queue: null, maxAgeHours: null };
+        const index = { enabled: false, maxDiskBytes: 5000000000, keepVersions: 3, maxAgeHours: null };
         const { api, submit } = setup({ served: { index } });
         submit();
         expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ index }));
@@ -359,11 +359,11 @@ describe('LinkAnalysisSettingsComponent', () => {
             maskingMode: 'all',
             maskingModeInForce: 'all',
             entityTypesInForce: ET,
-            index: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8 },
-            indexInForce: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: 8, maxAgeHours: 24 },
-            graphRun: { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: 7, maxResultItems: 55, propagatedRiskWeights: [1, 0.5] },
+            index: { enabled: true, maxDiskBytes: 1000, keepVersions: 5 },
+            indexInForce: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, maxAgeHours: 24 },
+            graphRun: { maxNodes: 900, maxEdges: null, timeoutMs: 4000, maxResultItems: 55, propagatedRiskWeights: [1, 0.5] },
             propagatedRiskWeightsInForce: [1, 0.5],
-            graphRunInForce: { threads: 3, queue: 7, maxResultItems: 55 },
+            graphRunInForce: { maxResultItems: 55 },
             investigationStoreInForce: 'db',
         };
 
@@ -389,16 +389,16 @@ describe('LinkAnalysisSettingsComponent', () => {
             const { c, api, submit } = setup({ served: FULL });
             c.form.controls.maskingMode.setValue('none');
             c.form.controls.index.controls.enabled.setValue(false);
-            c.form.controls.index.controls.queue.setValue(null);
+            c.form.controls.index.controls.keepVersions.setValue(null);
             c.form.controls.index.controls.maxAgeHours.setValue(48);
             c.form.controls.graphRun.controls.maxEdges.setValue(1234);
-            c.form.controls.graphRun.controls.threads.setValue(8);
+            c.form.controls.graphRun.controls.timeoutMs.setValue(8000);
             c.form.controls.graphRun.controls.maxResultItems.setValue(null);
             submit();
             const body = api.save.mock.calls[0][0] as unknown as Record<string, unknown>;
             expect(body['maskingMode']).toBe('none');
-            expect(body['index']).toEqual({ enabled: false, maxDiskBytes: 1000, keepVersions: 5, threads: 2, queue: null, maxAgeHours: 48 });
-            expect(body['graphRun']).toEqual({ maxNodes: 900, maxEdges: 1234, timeoutMs: 4000, threads: 8, queue: 7, maxResultItems: null, propagatedRiskWeights: [1, 0.5] });
+            expect(body['index']).toEqual({ enabled: false, maxDiskBytes: 1000, keepVersions: null, maxAgeHours: 48 });
+            expect(body['graphRun']).toEqual({ maxNodes: 900, maxEdges: 1234, timeoutMs: 8000, maxResultItems: null, propagatedRiskWeights: [1, 0.5] });
             expect(body['entityTypesInForce']).toBeUndefined();
             expect(body['indexInForce']).toBeUndefined();
             expect(body['investigationStoreInForce']).toBeUndefined();
@@ -418,7 +418,7 @@ describe('LinkAnalysisSettingsComponent', () => {
             const { el, c, api, submit } = setup({ served: FULL });
             expect(c.form.controls.index.controls.keepVersions.value).toBe(5);
             expect(c.form.controls.graphRun.controls.propagatedRiskWeights.value).toBe('1, 0.5');
-            expect(el.textContent).toContain('In force: 3. Runs executing at once');
+            expect(el.textContent).not.toContain('Runs executing at once');   // the pool is install-wide (LA-CONFIG-LIMITS-1)
             expect(el.textContent).toContain('In force: 55. Each list');
             c.form.controls.index.controls.keepVersions.setValue(7);
             c.form.controls.graphRun.controls.propagatedRiskWeights.setValue('1, 0.8, 0.2');
@@ -451,15 +451,12 @@ describe('LinkAnalysisSettingsComponent', () => {
         });
 
         it.each([
-            ['index', 'threads', 65],
-            ['index', 'queue', 1001],
             ['index', 'maxDiskBytes', -1],
             ['index', 'maxAgeHours', 0],
             ['index', 'maxAgeHours', 8761],
             ['graphRun', 'maxNodes', 10000001],
             ['graphRun', 'timeoutMs', 0],
-            ['graphRun', 'threads', 0],
-            ['graphRun', 'queue', 10000001],
+            ['graphRun', 'maxEdges', 10000001],
             ['graphRun', 'maxResultItems', 0],
         ])('refuses %s.%s = %s client-side and does not save', (group, key, bad) => {
             const { c, api, submit } = setup();
@@ -471,8 +468,8 @@ describe('LinkAnalysisSettingsComponent', () => {
 
         it('accepts the index and graph-run bounds', () => {
             const { c, api, submit } = setup();
-            c.form.controls.index.patchValue({ threads: 64, queue: 1000, maxDiskBytes: 0 });
-            c.form.controls.graphRun.patchValue({ maxNodes: 10000000, threads: 1, queue: 10000000, maxResultItems: 1000000 });
+            c.form.controls.index.patchValue({ keepVersions: 100, maxDiskBytes: 0 });
+            c.form.controls.graphRun.patchValue({ maxNodes: 10000000, maxEdges: 1, timeoutMs: 10000000, maxResultItems: 1000000 });
             submit();
             expect(api.save).toHaveBeenCalledTimes(1);
         });
@@ -583,7 +580,7 @@ describe('LinkAnalysisSettingsComponent', () => {
                 embedInForce: { defaultTtlHours: 48, maxTtlHours: 100, refuseClassifications: ['PII'] },
             },
         });
-        // Finding (LA-A11Y-AUDIT-1): the knobs of the older blocks (e.g. hub threshold, threads, queue) stay ENABLED
+        // Finding (LA-A11Y-AUDIT-1): the knobs of the older blocks (e.g. hub threshold, versions kept) stay ENABLED
         // read-only; only the newer selects and the save button are withheld. Not an axe rule; recorded in the audit.
         expect(el.querySelector('button[type="submit"]')).toBeNull();
         await expectNoA11yViolations(el);
@@ -600,7 +597,7 @@ describe('LinkAnalysisSettingsComponent', () => {
         walk(c.form, '');
         return out;
     };
-    const CONTROL_COUNT = 28;
+    const CONTROL_COUNT = 24;   // LA-CONFIG-LIMITS-1: the four pool controls moved to the install-wide limits
 
     it('read only: EVERY control is disabled, Save is gone, the reason is described, and save() cannot fire (a11y)', async () => {
         const { el, c, api, fixture } = setup({ canEdit: false });

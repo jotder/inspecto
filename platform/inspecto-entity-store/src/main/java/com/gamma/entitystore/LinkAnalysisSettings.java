@@ -134,15 +134,16 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
     /**
      * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
-     * the DEFAULT budget a run takes for a field its request leaves unstated, and the worker / waiting-queue sizes. Every
-     * field is optional ({@code null} = the service's shipped default). A default above the hard server ceiling is
-     * clamped by the service, and the clamp is echoed - the ceilings themselves are not a setting.
+     * the DEFAULT budget a run takes for a field its request leaves unstated. Every field is optional ({@code null} = the
+     * service's shipped default). A default above the hard server ceiling is clamped by the service, and the clamp is
+     * echoed. The ceilings and the worker / waiting-queue sizes are install-wide ({@code LA-CONFIG-LIMITS-1}:
+     * {@code graph_run.ceiling_*}, {@code graph_run.threads}, {@code graph_run.queue} in {@code la-limits.toon}), not a Space knob.
      * {@code propagatedRiskWeights} is the Space's default per-hop weight list of {@code propagatedRisk} (1..6 values in
      * [0,1]) used when a run states no {@code weights}; {@code null} = {@link #DEFAULT_PROPAGATED_RISK_WEIGHTS}.
      */
-    public record GraphRun(Integer maxNodes, Integer maxEdges, Integer timeoutMs, Integer threads, Integer queue,
+    public record GraphRun(Integer maxNodes, Integer maxEdges, Integer timeoutMs,
                            Integer maxResultItems, List<Double> propagatedRiskWeights) {
-        public static final GraphRun NONE = new GraphRun(null, null, null, null, null, null, null);
+        public static final GraphRun NONE = new GraphRun(null, null, null, null, null);
         /** The shipped per-hop weights of {@code propagatedRisk} (the algorithm's own default). */
         public static final List<Double> DEFAULT_PROPAGATED_RISK_WEIGHTS = List.of(1.0, 0.6, 0.35, 0.15);
 
@@ -151,23 +152,13 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         }
 
         boolean isNone() {
-            return maxNodes == null && maxEdges == null && timeoutMs == null && threads == null && queue == null
+            return maxNodes == null && maxEdges == null && timeoutMs == null
                     && maxResultItems == null && propagatedRiskWeights == null;
         }
 
-        /** Shipped worker / waiting-line / result-list defaults; mirror {@code GraphRunService.Limits.standard()} and {@code GraphResultJson}. */
-        public static final int DEFAULT_THREADS = 2;
-        public static final int DEFAULT_QUEUE = 16;
+        /** Shipped result-list default; mirrors {@code GraphResultJson}. */
         public static final int DEFAULT_MAX_RESULT_ITEMS = 10_000;
         public static final int CEILING_MAX_RESULT_ITEMS = 1_000_000;
-
-        public int threadsInForce() {
-            return threads != null ? threads : DEFAULT_THREADS;
-        }
-
-        public int queueInForce() {
-            return queue != null ? queue : DEFAULT_QUEUE;
-        }
 
         /** The stated list length cap applied: a stated value above the hard ceiling is clamped, as the run service does. */
         public int maxResultItemsInForce() {
@@ -191,19 +182,17 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * The edge/node index's per-Space knobs (LA separation D-3 step 4; {@code index} in {@code link-analysis.toon}):
      * {@code enabled} - whether reads may use an index (default ON since 2026-10-10; an explicit {@code false} disables; a read
      * with no fresh published index still falls back to the flat Dataset); {@code maxDiskBytes} - the build refuses an estimate above it (0 or unstated = no limit);
-     * {@code keepVersions} - published versions kept per index (default 2); {@code threads} / {@code queue} - the build
-     * workers and waiting line; {@code maxAgeHours} - the oldest an index may be and still serve a Dataset whose input files cannot be fingerprinted (default 24). Every field is optional ({@code null} = the shipped default).
+     * {@code keepVersions} - published versions kept per index (default 2); {@code maxAgeHours} - the oldest an index may be and still serve a Dataset whose input files cannot be fingerprinted (default 24). Every field is optional ({@code null} = the shipped default).
+     * The build workers, waiting line, memory and bucket sizing are install-wide ({@code LA-CONFIG-LIMITS-1}: {@code index.threads},
+     * {@code index.queue}, {@code index.build_memory_pct}, {@code index.*_bucket*} in {@code la-limits.toon}), not a Space knob.
      */
-    public record Index(Boolean enabled, Long maxDiskBytes, Integer keepVersions, Integer threads, Integer queue,
-                        Integer maxAgeHours) {
-        public static final Index NONE = new Index(null, null, null, null, null, null);
+    public record Index(Boolean enabled, Long maxDiskBytes, Integer keepVersions, Integer maxAgeHours) {
+        public static final Index NONE = new Index(null, null, null, null);
         public static final int DEFAULT_MAX_AGE_HOURS = 24;
         public static final int DEFAULT_KEEP_VERSIONS = 2;
-        public static final int DEFAULT_THREADS = 1;
-        public static final int DEFAULT_QUEUE = 4;
 
         boolean isNone() {
-            return enabled == null && maxDiskBytes == null && keepVersions == null && threads == null && queue == null && maxAgeHours == null;
+            return enabled == null && maxDiskBytes == null && keepVersions == null && maxAgeHours == null;
         }
 
         /** Whether reads may use an index: ON unless explicitly {@code false} (operator 2026-10-10; a read still needs a fresh published index). */
@@ -218,14 +207,6 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
 
         public int keepVersionsInForce() {
             return (int) LaLimit.INDEX_KEEP_VERSIONS.resolve(keepVersions);
-        }
-
-        public int threadsInForce() {
-            return threads != null ? threads : DEFAULT_THREADS;
-        }
-
-        public int queueInForce() {
-            return queue != null ? queue : DEFAULT_QUEUE;
         }
 
         /** How old (hours since the build) an index may be and still answer a read of a Dataset whose input files cannot be fingerprinted (LA-INDEX-MAX-AGE-1). */
@@ -392,11 +373,9 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (graphRun.maxNodes() != null) g.put("max_nodes", graphRun.maxNodes());
             if (graphRun.maxEdges() != null) g.put("max_edges", graphRun.maxEdges());
             if (graphRun.timeoutMs() != null) g.put("timeout_ms", graphRun.timeoutMs());
-            if (graphRun.threads() != null) g.put("threads", graphRun.threads());
-            if (graphRun.queue() != null) g.put("queue", graphRun.queue());
             if (graphRun.maxResultItems() != null) g.put("max_result_items", graphRun.maxResultItems());
             if (graphRun.propagatedRiskWeights() != null) g.put("propagated_risk_weights", graphRun.propagatedRiskWeights());
-            block(m, existing, "graph_run", g, "max_nodes", "max_edges", "timeout_ms", "threads", "queue", "max_result_items",
+            block(m, existing, "graph_run", g, "max_nodes", "max_edges", "timeout_ms", "max_result_items",
                     "propagated_risk_weights");
         }
         {
@@ -405,10 +384,8 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (index.enabled() != null) x.put("enabled", index.enabled());
             if (index.maxDiskBytes() != null) x.put("max_disk_bytes", index.maxDiskBytes());
             if (index.keepVersions() != null) x.put("keep_versions", index.keepVersions());
-            if (index.threads() != null) x.put("threads", index.threads());
-            if (index.queue() != null) x.put("queue", index.queue());
             if (index.maxAgeHours() != null) x.put("max_age_hours", index.maxAgeHours());
-            block(m, existing, "index", x, "enabled", "max_disk_bytes", "keep_versions", "threads", "queue", "max_age_hours");
+            block(m, existing, "index", x, "enabled", "max_disk_bytes", "keep_versions", "max_age_hours");
         }
         {
             Map<String, Object> x = new LinkedHashMap<>();
@@ -498,8 +475,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     private static GraphRun graphRun(Object raw) {
         if (!(raw instanceof Map<?, ?>)) return null;
         Map<String, Object> g = (Map<String, Object>) raw;
-        GraphRun r = new GraphRun(optInt(g, "max_nodes"), optInt(g, "max_edges"), optInt(g, "timeout_ms"),
-                optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_result_items"),
+        GraphRun r = new GraphRun(optInt(g, "max_nodes"), optInt(g, "max_edges"), optInt(g, "timeout_ms"), optInt(g, "max_result_items"),
                 weights(g.get("propagated_risk_weights")));
         return r.isNone() ? null : r;
     }
@@ -547,7 +523,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                 // unparseable = inherit
             }
         }
-        Index r = new Index(enabled, maxDisk, optInt(g, "keep_versions"), optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_age_hours"));
+        Index r = new Index(enabled, maxDisk, optInt(g, "keep_versions"), optInt(g, "max_age_hours"));
         return r.isNone() ? null : r;
     }
 

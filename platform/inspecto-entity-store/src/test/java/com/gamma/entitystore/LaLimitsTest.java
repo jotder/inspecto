@@ -55,7 +55,7 @@ class LaLimitsTest {
         assertTrue(bad.isEmpty(), bad.toString());
         Set<LaLimit> nullable = new HashSet<>();
         for (LaLimit l : LaLimit.values()) if (l.nullable()) nullable.add(l);
-        assertEquals(Set.of(LaLimit.FOUR_EYES_BUDGET_ABOVE, LaLimit.FOUR_EYES_FAN_OUT_ABOVE, LaLimit.INDEX_BUILD_MEMORY_PCT), nullable);
+        assertEquals(Set.of(LaLimit.FOUR_EYES_BUDGET_ABOVE, LaLimit.FOUR_EYES_FAN_OUT_ABOVE), nullable);
         assertEquals(29, java.util.Arrays.stream(LaLimit.values()).filter(l -> l.path().startsWith("browser_algorithms.")).count());
     }
 
@@ -79,12 +79,8 @@ class LaLimitsTest {
         today.put(LaLimit.MAX_INVESTIGATION_BYTES, LinkAnalysisSettings.DEFAULT_MAX_INVESTIGATION_BYTES);
         today.put(LaLimit.HUB_THRESHOLD, (long) LinkAnalysisSettings.DEFAULT_HUB_THRESHOLD);
         today.put(LaLimit.GRAPH_RUN_MAX_RESULT_ITEMS, (long) LinkAnalysisSettings.GraphRun.DEFAULT_MAX_RESULT_ITEMS);
-        today.put(LaLimit.GRAPH_RUN_THREADS, (long) LinkAnalysisSettings.GraphRun.DEFAULT_THREADS);
-        today.put(LaLimit.GRAPH_RUN_QUEUE, (long) LinkAnalysisSettings.GraphRun.DEFAULT_QUEUE);
         today.put(LaLimit.INDEX_KEEP_VERSIONS, (long) LinkAnalysisSettings.Index.DEFAULT_KEEP_VERSIONS);
         today.put(LaLimit.INDEX_MAX_AGE_HOURS, (long) LinkAnalysisSettings.Index.DEFAULT_MAX_AGE_HOURS);
-        today.put(LaLimit.INDEX_THREADS, (long) LinkAnalysisSettings.Index.DEFAULT_THREADS);
-        today.put(LaLimit.INDEX_QUEUE, (long) LinkAnalysisSettings.Index.DEFAULT_QUEUE);
         today.put(LaLimit.DRAFTS_MAX_OPEN, (long) LinkAnalysisSettings.Drafts.DEFAULT_MAX_OPEN);
         today.put(LaLimit.DRAFTS_HIBERNATE_AFTER_MINUTES, (long) LinkAnalysisSettings.Drafts.DEFAULT_HIBERNATE_AFTER_MINUTES);
         today.put(LaLimit.DRAFTS_EXPIRE_AFTER_DAYS, (long) LinkAnalysisSettings.Drafts.DEFAULT_EXPIRE_AFTER_DAYS);
@@ -97,6 +93,7 @@ class LaLimitsTest {
         assertEquals(100_000L, LaLimit.PROJECTION_NODE_CAP.max());
         assertEquals(10_000_000L, LaLimit.GRAPH_RUN_MAX_NODES.max());
         assertEquals(0.5, LaLimit.RATE_LINK_ANALYSIS_PER_S.defaultValue());
+        assertEquals(80L, LaLimit.INDEX_BUILD_MEMORY_PCT.defaultValue(), "CL-8: an index build's own memory share, 80 % of RAM");
     }
 
     @Test
@@ -179,7 +176,7 @@ class LaLimitsTest {
         c.put(LaLimit.INDEX_FRONTIER_CAP, 40L);
         LaLimits.writeSpace(root, new EnumMap<>(c));
         new LinkAnalysisSettings(900, null, null, "all", null, null, null, null, null, null,
-                new LinkAnalysisSettings.Index(null, null, 3, null, null, null), null, null, null, null)
+                new LinkAnalysisSettings.Index(null, null, 3, null), null, null, null, null)
                 .write(root.resolve(LinkAnalysisSettings.FILE));
         LaLimitValues v = LaLimits.forSpace(root);
         assertEquals(7, v.get(LaLimit.TRAVERSAL_TIMEOUT_S), "a key the settings record does not model survives its write");

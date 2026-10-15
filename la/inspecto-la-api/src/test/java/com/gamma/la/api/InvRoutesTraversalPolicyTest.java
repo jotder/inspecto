@@ -1,8 +1,15 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.sql.SqlSandboxPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+import java.util.EnumMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -19,6 +26,28 @@ class InvRoutesTraversalPolicyTest {
     void clear() {
         System.clearProperty(THREADS);
         System.clearProperty(TRAVERSAL);
+        System.clearProperty("assist.sql.memory_limit");
+        LaLimits.installDocPath(null);
+    }
+
+    /** LA-CONFIG-LIMITS-1: the install-wide traversal.threads / traversal.memory_limit_mb win over the properties, read per call. */
+    @Test
+    void theInstallWideValuesWinOverThePropertiesAndApplyAtTheNextCall(@TempDir Path dir) throws Exception {
+        System.setProperty(TRAVERSAL, "7");
+        System.setProperty("assist.sql.memory_limit", "3GB");
+        Path doc = dir.resolve(LaLimits.INSTALL_FILE);
+        LaLimits.installDocPath(doc);
+        assertEquals(7, InvRoutes.traversalPolicy().maxThreads(), "no document value: the property");
+        assertEquals("3GB", InvRoutes.traversalPolicy().memoryLimit());
+        Map<LaLimit, Number> set = new EnumMap<>(LaLimit.class);
+        set.put(LaLimit.TRAVERSAL_THREADS, 2L);
+        set.put(LaLimit.TRAVERSAL_MEMORY_LIMIT_MB, 512L);
+        LaLimits.writeInstall(doc, set);
+        assertEquals(2, InvRoutes.traversalPolicy().maxThreads(), "the document value wins");
+        assertEquals("512MiB", InvRoutes.traversalPolicy().memoryLimit());
+        set.put(LaLimit.TRAVERSAL_THREADS, null);
+        LaLimits.writeInstall(doc, set);
+        assertEquals(7, InvRoutes.traversalPolicy().maxThreads(), "cleared: back to the property");
     }
 
     @Test

@@ -70,15 +70,14 @@ export interface LinkAnalysisLimits {
     /** D7-6: the Draft settings actually in force - server-computed, read-only. */
     draftsInForce?: DraftSettings;
     /**
-     * D-4: the server-side graph-run knobs stated (default budget, workers, waiting line); `null` = every one inherits.
-     * The form edits `maxNodes`, `maxEdges` and `timeoutMs`; the rest is round-tripped by a save (the PUT replaces).
+     * D-4: the server-side graph-run knobs stated (default budget); `null` = every one inherits. The workers and waiting line
+     * are install-wide (`GET /settings/link-analysis/limits`). The form edits `maxNodes`, `maxEdges` and `timeoutMs`; the rest
+     * is round-tripped by a save (the PUT replaces).
      */
     graphRun?: {
         maxNodes: number | null;
         maxEdges: number | null;
         timeoutMs: number | null;
-        threads: number | null;
-        queue: number | null;
         /** Items per list a run's result may carry (absent/null = 10 000). */
         maxResultItems?: number | null;
         /** `propagatedRisk`'s default per-hop weights (1..6 numbers in [0,1]); absent/null = [1.0, 0.6, 0.35, 0.15]. */
@@ -86,24 +85,22 @@ export interface LinkAnalysisLimits {
     } | null;
     /** The `propagatedRisk` weights a run without `weights` takes - server-computed, read-only. */
     propagatedRiskWeightsInForce?: number[];
-    /** The graph-run worker / waiting-line / result-list values in force - server-computed, read-only. */
-    graphRunInForce?: { threads: number; queue: number; maxResultItems: number };
+    /** The graph-run result-list value in force - server-computed, read-only. */
+    graphRunInForce?: { maxResultItems: number };
     /**
-     * D-3: the edge/node index knobs stated (`enabled` default false, `maxDiskBytes` 0 = no limit, versions kept, build
-     * workers, waiting line, maxAgeHours); `null` = every one inherits. The form edits `enabled`, `threads`, `queue` and
-     * `maxDiskBytes`; `keepVersions` is round-tripped by a save (the PUT replaces).
+     * D-3: the edge/node index knobs stated (`enabled` default false, `maxDiskBytes` 0 = no limit, versions kept,
+     * maxAgeHours); `null` = every one inherits. The build workers and waiting line are install-wide
+     * (`GET /settings/link-analysis/limits`). The PUT replaces, so a save round-trips what the form does not edit.
      */
     index?: {
         enabled: boolean | null;
         maxDiskBytes: number | null;
         keepVersions: number | null;
-        threads: number | null;
-        queue: number | null;
         /** Hours an index may age and still serve a Dataset whose input files cannot be fingerprinted (LA-INDEX-MAX-AGE-1). */
         maxAgeHours?: number | null;
     } | null;
     /** The index knobs actually in force (shipped default or stated) - server-computed, read-only. `maxDiskBytes` 0 = no limit. */
-    indexInForce?: { enabled: boolean; maxDiskBytes: number; keepVersions: number; threads: number; queue: number; maxAgeHours: number };
+    indexInForce?: { enabled: boolean; maxDiskBytes: number; keepVersions: number; maxAgeHours: number };
     /** LA-EMBED-VIEW-1: the embed-link knobs stated (lifetimes in hours, classifications minting is refused for); `null` = every one inherits. */
     embed?: { defaultTtlHours?: number | null; maxTtlHours?: number | null; refuseClassifications?: string[] | null; frameAncestors?: string[] | null } | null;
     /** The embed knobs a mint applies now - server-computed, read-only. */

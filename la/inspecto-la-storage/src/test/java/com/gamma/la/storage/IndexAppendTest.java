@@ -333,32 +333,42 @@ class IndexAppendTest {
         IndexManifest base = manifest(m, covered, List.of(), "sqlhash", "hashfn", "1.0");
         List<IndexManifest.InputFile> plus = List.of(covered.get(0), covered.get(1), new IndexManifest.InputFile("c", 3, 30));
 
-        IndexPlan.Plan append = IndexPlan.classify(base, plus, "sqlhash", "hashfn", "1.0");
+        IndexPlan.Plan append = IndexPlan.classify(base, plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0");
         assertEquals(IndexPlan.Action.APPEND, append.recommended());
         assertTrue(append.appendable());
         assertEquals(List.of("c"), append.added());
 
-        IndexPlan.Plan none = IndexPlan.classify(base, covered, "sqlhash", "hashfn", "1.0");
+        IndexPlan.Plan none = IndexPlan.classify(base, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0");
         assertEquals(IndexPlan.Action.NONE, none.recommended());
         assertFalse(none.appendable());
 
-        assertFull(IndexPlan.classify(base, List.of(covered.get(0), new IndexManifest.InputFile("c", 3, 30)), "sqlhash", "hashfn", "1.0"), "input_files_removed");
-        assertFull(IndexPlan.classify(base, List.of(covered.get(0), new IndexManifest.InputFile("b", 2, 21), new IndexManifest.InputFile("c", 3, 30)), "sqlhash", "hashfn", "1.0"), "input_files_changed");
-        assertFull(IndexPlan.classify(base, plus, "other", "hashfn", "1.0"), "relation_sql_changed");
-        assertFull(IndexPlan.classify(base, plus, null, "hashfn", "1.0"), "relation_unresolvable");
-        assertFull(IndexPlan.classify(base, plus, "sqlhash", "md5_number_lower", "1.0"), "bucket_function_changed");     // a foreign bucket function
-        assertFull(IndexPlan.classify(base, plus, "sqlhash", "hashfn", "2.0"), "duckdb_version_changed");
-        assertFull(IndexPlan.classify(base, null, "sqlhash", "hashfn", "1.0"), "input_files_unknown");
-        assertFull(IndexPlan.classify(manifest(m, null, List.of(), "sqlhash", "hashfn", "1.0"), plus, "sqlhash", "hashfn", "1.0"), "input_files_unknown");
+        assertFull(IndexPlan.classify(base, List.of(covered.get(0), new IndexManifest.InputFile("c", 3, 30)), "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0"), "input_files_removed");
+        assertFull(IndexPlan.classify(base, List.of(covered.get(0), new IndexManifest.InputFile("b", 2, 21), new IndexManifest.InputFile("c", 3, 30)), "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0"), "input_files_changed");
+        assertFull(IndexPlan.classify(base, plus, "other", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0"), "relation_sql_changed");
+        assertFull(IndexPlan.classify(base, plus, null, "hashfn", BucketFunction.Sizing.DEFAULT, "1.0"), "relation_unresolvable");
+        assertFull(IndexPlan.classify(base, plus, "sqlhash", "md5_number_lower", BucketFunction.Sizing.DEFAULT, "1.0"), "bucket_function_changed");     // a foreign bucket function
+        assertFull(IndexPlan.classify(base, plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "2.0"), "duckdb_version_changed");
+        assertFull(IndexPlan.classify(base, null, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0"), "input_files_unknown");
+        assertFull(IndexPlan.classify(manifest(m, null, List.of(), "sqlhash", "hashfn", "1.0"), plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0"), "input_files_unknown");
+
+        // LA-CONFIG-LIMITS-1 CL-9: a changed bucket sizing needs a FULL re-bucket (an append keeps its parent's bucket count);
+        // a manifest written before the sizing was recorded reads as the shipped default (the APPEND above), one that records
+        // the sizing in force appends as before
+        BucketFunction.Sizing wider = new BucketFunction.Sizing(8_000_000L, 16, 1_024);
+        assertFull(IndexPlan.classify(base, plus, "sqlhash", "hashfn", wider, "1.0"), "bucket_sizing_changed");
+        IndexManifest recorded = new IndexManifest(1, "t", IndexManifest.Builder.FULL, "1.0", "hashfn", 4, 100, m, m.hash(), DS, "sqlhash",
+                "fp", null, Map.of(), 0, List.of(), null, covered, wider.signature());
+        assertEquals(IndexPlan.Action.APPEND, IndexPlan.classify(recorded, plus, "sqlhash", "hashfn", wider, "1.0").recommended());
+        assertFull(IndexPlan.classify(recorded, plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0"), "bucket_sizing_changed");
 
         List<IndexManifest.Delta> eight = new ArrayList<>();
         for (int i = 1; i <= IndexPlan.MAX_DELTAS; i++) eight.add(new IndexManifest.Delta("d" + i, 1, 1));
         IndexManifest capped = manifest(m, covered, eight, "sqlhash", "hashfn", "1.0");
-        IndexPlan.Plan atCap = IndexPlan.classify(capped, plus, "sqlhash", "hashfn", "1.0");
+        IndexPlan.Plan atCap = IndexPlan.classify(capped, plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0");
         assertEquals(IndexPlan.Action.COMPACT, atCap.recommended());
         assertFalse(atCap.appendable());
         assertEquals(List.of("delta_cap_reached"), atCap.reasons());
-        assertEquals(IndexPlan.Action.COMPACT, IndexPlan.classify(capped, covered, "sqlhash", "hashfn", "1.0").recommended());
+        assertEquals(IndexPlan.Action.COMPACT, IndexPlan.classify(capped, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0").recommended());
     }
 
     private static void assertFull(IndexPlan.Plan p, String reason) {

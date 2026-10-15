@@ -96,8 +96,20 @@ public final class IndexBuilder {
      * @param threads     DuckDB {@code threads}; null = default
      * @param cancel      null = not cancellable
      * @param progress    null = none; called on the builder thread
+     * @param sizing      the bucket sizing a FULL build applies and records (an append or compact keeps its parent's); null =
+     *                    {@link BucketFunction.Sizing#DEFAULT}
      */
-    public record Options(Integer buckets, String memoryLimit, Integer threads, CancelToken cancel, Consumer<Progress> progress) {
+    public record Options(Integer buckets, String memoryLimit, Integer threads, CancelToken cancel, Consumer<Progress> progress,
+                          BucketFunction.Sizing sizing) {
+        public Options {
+            if (sizing == null) sizing = BucketFunction.Sizing.DEFAULT;
+        }
+
+        /** The shipped bucket sizing. */
+        public Options(Integer buckets, String memoryLimit, Integer threads, CancelToken cancel, Consumer<Progress> progress) {
+            this(buckets, memoryLimit, threads, cancel, progress, null);
+        }
+
         public static Options defaults() { return new Options(null, null, null, null, null); }
     }
 
@@ -425,7 +437,7 @@ public final class IndexBuilder {
             long kept = counts[1];
             long dropped = total - kept;
             if (kept == 0) throw new IndexBuildException("the relation has no edge with both endpoints set (" + total + " rows, " + dropped + " with a NULL endpoint)");
-            int n = opt.buckets() != null ? opt.buckets() : BucketFunction.bucketsFor(total);
+            int n = opt.buckets() != null ? opt.buckets() : opt.sizing().bucketsFor(total);
             timings.put("estimate", ms(t));
 
             // -- out / in / nodes ---------------------------------------------------------------------------------
@@ -446,7 +458,8 @@ public final class IndexBuilder {
             long number = Long.parseLong(stage.getFileName().toString().replaceAll("\\D", ""));
             String zone = effectiveZone(m, types);
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.FULL, duck, BucketFunction.NAME, n,
-                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), relationSqlHash(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles());
+                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), relationSqlHash(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles(),
+                    opt.sizing().signature());
             return publish(man, spill, number, total, kept, dropped, stats, n, t0);
         }
 
@@ -492,7 +505,7 @@ public final class IndexBuilder {
             IndexManifest parent = parentManifest(pd);
             Path parentDir = pd[0];
             String duck = duckdbVersion();
-            IndexPlan.Plan plan = IndexPlan.classify(parent, req.inputFiles(), relationSqlHash(req.relationSql()), BucketFunction.NAME, duck);
+            IndexPlan.Plan plan = IndexPlan.classify(parent, req.inputFiles(), relationSqlHash(req.relationSql()), BucketFunction.NAME, opt.sizing(), duck);
             if (!plan.appendable())
                 throw new NotApplicableException("an append is not possible now (" + (plan.reasons().isEmpty() ? "no input file was added" : String.join(", ", plan.reasons()))
                         + ") - " + (plan.recommended() == IndexPlan.Action.COMPACT ? "compact first" : "run a full build"));
@@ -539,7 +552,7 @@ public final class IndexBuilder {
             deltas.add(new IndexManifest.Delta(prefix, kept, deltaBytes));
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.APPEND, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), req.baseFingerprint(), parent.timeColZone(), stats,
-                    parent.droppedNull() + dropped, deltas, parentDir.getFileName().toString(), req.inputFiles());
+                    parent.droppedNull() + dropped, deltas, parentDir.getFileName().toString(), req.inputFiles(), parent.bucketSizing());
             return publish(man, spill, number, total, kept, dropped, stats, n, t0);
         }
 
@@ -582,7 +595,7 @@ public final class IndexBuilder {
             long number = Long.parseLong(stage.getFileName().toString().replaceAll("\\D", ""));
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.COMPACT, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), parent.baseFingerprint(), parent.timeColZone(), stats,
-                    parent.droppedNull(), null, parentDir.getFileName().toString(), parent.inputFiles());
+                    parent.droppedNull(), null, parentDir.getFileName().toString(), parent.inputFiles(), parent.bucketSizing());
             return publish(man, spill, number, kept, kept, 0, stats, n, t0);
         }
 

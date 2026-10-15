@@ -61,7 +61,7 @@ class ControlApiIndexAppendTest {
 
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String OWNER = "Bearer owner", NOCAP = "Bearer nocap";
+    private static final String OWNER = "Bearer owner", NOCAP = "Bearer nocap", ADMIN = "Bearer admin";
     private static final String ENABLED = "index:\n  enabled: true\n";
     private static final String DISABLED = "index:\n  enabled: false\n";
     private static final String BUILD = "{\"dataset\":\"f_ds\",\"sourceCol\":\"s\",\"targetCol\":\"t\",\"kindCol\":\"kind\",\"timeCol\":\"ts\",\"attrCols\":[\"c\"]";
@@ -79,6 +79,7 @@ class ControlApiIndexAppendTest {
     void reset() {
         Authenticators.forTest(null);
         InputFingerprintCache.forTest(null, 0);
+        com.gamma.entitystore.LaLimits.installDocPath(null);
     }
 
     private static void subjects() {
@@ -88,6 +89,7 @@ class ControlApiIndexAppendTest {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case OWNER -> Optional.of(new Subject("analyst-1", Set.of("canBuildLinkIndex", "canManageIncidents")));
             case NOCAP -> Optional.of(new Subject("analyst-1", Set.of()));
+            case ADMIN -> Optional.of(new Subject("admin-1", Set.of("canAdminister")));
             default -> Optional.empty();
         });
     }
@@ -361,6 +363,41 @@ class ControlApiIndexAppendTest {
             assertEquals(2, full.at("/result/version").asInt());
             assertEquals("none", indexOf(c, "f_ds").at("/plan/recommended").asText());
             assertEquals("index", neighbors(c, "A", "").at("/source/kind").asText());
+        } finally {
+            rmTree(dir);
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    /**
+     * LA-CONFIG-LIMITS-1 CL-9: the bucket sizing is install-wide, and a change forces a FULL rebuild - an append keeps its
+     * parent's bucket count, so only a full build can re-bucket. The probe says so, the route refuses an append, and after the
+     * full build (which records the new sizing) the index is current again.
+     */
+    @Test
+    void aChangedBucketSizingForcesAFullBuildAndTheRouteRefusesAnAppend(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        String store = "idx_app_" + System.nanoTime();
+        Path dir = Path.of("database").resolve(store);
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        try (Ctx c = open(cfg, root, store)) {
+            plant(dir.resolve("p1.parquet"), P1, 1_700_000_000_000L);
+            build(c, "f_ds", null);
+            assertEquals("none", indexOf(c, "f_ds").at("/plan/recommended").asText());
+
+            HttpResponse<String> put = send(c, "PUT", "/system/link-analysis/limits", "{\"index.edges_per_bucket\":2000}", ADMIN);
+            assertEquals(200, put.statusCode(), put.body());
+            JsonNode resized = indexOf(c, "f_ds");
+            assertEquals("full", resized.at("/plan/recommended").asText());
+            assertEquals("[\"bucket_sizing_changed\"]", resized.at("/plan/reasons").toString());
+
+            plant(dir.resolve("p2.parquet"), P2, 1_700_000_001_000L);                               // a new file: an append would otherwise do
+            HttpResponse<String> refused = tryBuild(c, "f_ds", "append", OWNER);
+            assertEquals(409, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("bucket_sizing_changed") && refused.body().contains("run a full build"), refused.body());
+
+            assertEquals(2, build(c, "f_ds", "full").at("/result/version").asInt());
+            assertEquals("none", indexOf(c, "f_ds").at("/plan/recommended").asText(), "the full build recorded the sizing in force");
         } finally {
             rmTree(dir);
             if (!hadDatabase) Path.of("database").toFile().delete();

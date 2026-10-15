@@ -1226,10 +1226,16 @@ public final class InvRoutes implements RouteModule {
      * own statement timeout. It used to be {@code withCaps(null, 0, timeout)}, which silently replaced the
      * operator's memory and thread caps with the hard-coded 1 GB / 2 threads (G-R4 profiling, 2026-09-30).
      * Threads come from the traversal-only {@code assist.sql.traversal_threads} (default 4, operator 2026-09-30).
+     * {@code LA-CONFIG-LIMITS-1}: the install-wide {@code traversal.memory_limit_mb} / {@code traversal.threads} win over both
+     * properties when the server-wide document states them; read per call, so a change applies to the next traversal.
      */
     static SqlSandboxPolicy traversalPolicy() {
         SqlSandboxPolicy configured = SqlSandboxPolicy.defaultPolicy();
-        return SqlSandboxPolicy.withCaps(configured.memoryLimit(), SqlSandboxPolicy.traversalThreads(), TRAVERSAL_TIMEOUT_SECONDS);
+        com.gamma.entitystore.LaLimitValues install = com.gamma.entitystore.LaLimits.forSpace(null);
+        Number mb = install.stated(com.gamma.entitystore.LaLimit.TRAVERSAL_MEMORY_LIMIT_MB);
+        Number threads = install.stated(com.gamma.entitystore.LaLimit.TRAVERSAL_THREADS);
+        return SqlSandboxPolicy.withCaps(mb != null ? mb.longValue() + "MiB" : configured.memoryLimit(),
+                threads != null ? threads.intValue() : SqlSandboxPolicy.traversalThreads(), TRAVERSAL_TIMEOUT_SECONDS);
     }
 
     /** An optional positive integer body field, defaulted when absent and clamped to {@code max}. */

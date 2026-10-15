@@ -76,6 +76,8 @@ final class LinkAnalysisLimitsRoutes implements RouteModule {
         Map<LaLimit, Number> changes = changes(body, LaLimit.Layer.INSTALL);
         load(doc);   // a document that does not parse is refused before anything is written
         if (!changes.isEmpty()) LaLimits.writeInstall(doc, changes);
+        // CL-13: the rate.* buckets are rebuilt now; every other install item is read where it is used, at its next use
+        if (api instanceof ControlApi host) host.applyInstallRateLimits();
         ApiContext.podScoped(ex);
         return shape(api, ex);
     }

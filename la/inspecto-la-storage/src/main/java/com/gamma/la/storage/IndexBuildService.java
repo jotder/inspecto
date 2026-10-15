@@ -1,5 +1,7 @@
 package com.gamma.la.storage;
 
+import com.gamma.util.IngestActivity;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -10,15 +12,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /**
  * The index-build lifecycle (LA separation D-3 step 4, design 3.1): submit, progress, cancel, result, over
@@ -42,6 +46,16 @@ import java.util.function.LongSupplier;
  * The duplicate check runs FIRST (no I/O); the count is bounded by {@link #ESTIMATE_TIMEOUT_MS} (a timeout refuses,
  * {@link Refused.Kind#ESTIMATE_TIMEOUT} - the budget is never silently skipped) and at most {@link #MAX_CONCURRENT_ESTIMATES}
  * run at once ({@link Refused.Kind#ESTIMATE_BUSY}), so parallel submits cannot pin every request thread.
+ *
+ * <p><b>Host resources</b> ({@code LA-CONFIG-LIMITS-1}, install-wide). The memory limit and bucket sizing ({@link Host}) are
+ * read when a build STARTS, so a changed setting applies to the next build; the worker / waiting-line sizes are applied by
+ * {@link #retune} (a shrink drains: running and waiting builds finish, the new size gates the next submit).
+ *
+ * <p><b>A build waits while ingest runs</b> (CL-12): a build stays {@code QUEUED}, its progress phase
+ * {@value #WAITING_FOR_INGEST}, while the ingest signal is up, re-checking with a doubling backoff; it starts once ingest is
+ * idle, is cancellable while it waits, and ends {@code FAILED} ({@link IngestStillActiveException}) if ingest is still running
+ * after {@link #MAX_INGEST_WAIT_MS}. A manual and a scheduled build wait alike - neither is refused for it. The gate is
+ * one-way: ingest that starts after a build has started is not held back.
  */
 public final class IndexBuildService implements AutoCloseable {
 
@@ -134,8 +148,54 @@ public final class IndexBuildService implements AutoCloseable {
         }
     }
 
-    /** Where a RUNNING build is (the builder's own callback): {@code phase} is "" until it reports one. */
+    /** Where a RUNNING build is (the builder's own callback): {@code phase} is "" until it reports one; a QUEUED build waiting for ingest reports {@value #WAITING_FOR_INGEST}. */
     public record Progress(String phase, int step, int steps) { }
+
+    /**
+     * The install-wide resources a build takes ({@code LA-CONFIG-LIMITS-1}), read when it starts.
+     *
+     * @param memoryLimit the DuckDB {@code memory_limit} of the build's connection; null = the shared DuckDB cap
+     * @param sizing      the bucket sizing a FULL build applies (an APPEND / COMPACT keeps its parent's)
+     */
+    public record Host(String memoryLimit, BucketFunction.Sizing sizing) {
+        /** The shared DuckDB cap and the shipped sizing. */
+        public static final Host DEFAULT = new Host(null, BucketFunction.Sizing.DEFAULT);
+
+        public Host {
+            if (sizing == null) sizing = BucketFunction.Sizing.DEFAULT;
+        }
+    }
+
+    /**
+     * {@code pct} percent of {@code ramBytes} as a whole-MiB DuckDB {@code memory_limit} ({@code index.build_memory_pct}); null
+     * when the RAM is unknown ({@code ramBytes <= 0}), so the build falls back to the shared DuckDB cap rather than guessing.
+     */
+    public static String memoryLimit(int pct, long ramBytes) {
+        if (ramBytes <= 0 || pct <= 0) return null;
+        long mib = (long) (ramBytes / (1024.0 * 1024.0) * Math.min(pct, 100) / 100.0);
+        return Math.max(1L, mib) + "MiB";
+    }
+
+    /** The progress phase of a QUEUED build waiting for ingest to finish. */
+    public static final String WAITING_FOR_INGEST = "waiting_for_ingest";
+    /** The longest a build waits for ingest before it ends {@code FAILED}: generous, since a daily load can run for hours. */
+    public static final long MAX_INGEST_WAIT_MS = 6 * 3_600_000L;
+    private static final long FIRST_INGEST_BACKOFF_MS = 500L, MAX_INGEST_BACKOFF_MS = 5_000L;
+    private volatile long firstIngestBackoffMs = FIRST_INGEST_BACKOFF_MS;
+    private volatile long maxIngestWaitMs = MAX_INGEST_WAIT_MS;
+
+    /** Test seam: the first ingest re-check delay and the wait bound, in ms. */
+    void ingestWaitForTest(long firstBackoffMs, long maxWaitMs) {
+        this.firstIngestBackoffMs = firstBackoffMs;
+        this.maxIngestWaitMs = maxWaitMs;
+    }
+
+    /** A build that waited {@link #MAX_INGEST_WAIT_MS} for ingest to finish and gave up (its class name is the {@code FAILED} reason). */
+    public static final class IngestStillActiveException extends RuntimeException {
+        IngestStillActiveException() {
+            super("ingest was still running when the index build's wait ran out");
+        }
+    }
 
     /**
      * An immutable view of one build. {@code result} is non-null only for {@code COMPLETED}; {@code failure} (an exception
@@ -185,7 +245,9 @@ public final class IndexBuildService implements AutoCloseable {
 
     private final Path indexRoot;
     private final Function<IndexBuilder.Request, IndexBuilder.Result> builder;
-    private final Limits limits;
+    private final Supplier<Host> host;
+    private final BooleanSupplier ingestActive;
+    private volatile Limits limits;
     private final LongSupplier clock;
     private final Consumer<RunView> onTerminal;
     private final ThreadPoolExecutor pool;
@@ -212,14 +274,26 @@ public final class IndexBuildService implements AutoCloseable {
     /** {@code builder} is a test seam: tests drive the state machine with a controllable fake; production is {@link IndexBuilder#build}. */
     public IndexBuildService(Path indexRoot, Limits limits, LongSupplier clock, Consumer<RunView> onTerminal, long workerKeepAliveMs,
                       Function<IndexBuilder.Request, IndexBuilder.Result> builder) {
+        this(indexRoot, limits, clock, onTerminal, workerKeepAliveMs, builder, () -> Host.DEFAULT, IngestActivity::active);
+    }
+
+    /**
+     * @param host         the install-wide build resources, read when each build starts
+     * @param ingestActive whether ingest is running now (production: {@link IngestActivity#active}); a build waits while it is
+     */
+    public IndexBuildService(Path indexRoot, Limits limits, LongSupplier clock, Consumer<RunView> onTerminal, long workerKeepAliveMs,
+                      Function<IndexBuilder.Request, IndexBuilder.Result> builder, Supplier<Host> host, BooleanSupplier ingestActive) {
         this.builder = builder;
+        this.host = Objects.requireNonNull(host, "host");
+        this.ingestActive = Objects.requireNonNull(ingestActive, "ingestActive");
         this.indexRoot = Objects.requireNonNull(indexRoot, "indexRoot");
         this.limits = limits;
         this.clock = clock;
         this.onTerminal = onTerminal;
         AtomicInteger n = new AtomicInteger();
+        // The waiting line is bounded by submit (limits.queue()), not by the queue's capacity, so retune can resize it.
         this.pool = new ThreadPoolExecutor(limits.threads(), limits.threads(), workerKeepAliveMs, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(limits.queue()), r -> {
+                new LinkedBlockingQueue<>(), r -> {
             Thread t = new Thread(r, "la-index-build-" + n.incrementAndGet());
             t.setDaemon(true);
             return t;
@@ -229,6 +303,25 @@ public final class IndexBuildService implements AutoCloseable {
 
     public Limits limits() {
         return limits;
+    }
+
+    /**
+     * Applies new worker / waiting-line sizes and retention ({@code index.threads} / {@code index.queue}, install-wide) to
+     * this live service. A shrink drains: running builds finish and builds already waiting stay; the new sizes gate the next
+     * submit. A no-op when nothing changed.
+     */
+    public void retune(Limits next) {
+        synchronized (pool) {
+            if (next.equals(limits)) return;
+            if (next.threads() > pool.getMaximumPoolSize()) {
+                pool.setMaximumPoolSize(next.threads());
+                pool.setCorePoolSize(next.threads());
+            } else {
+                pool.setCorePoolSize(next.threads());
+                pool.setMaximumPoolSize(next.threads());
+            }
+            limits = next;
+        }
     }
 
     public Path indexRoot() {
@@ -306,14 +399,18 @@ public final class IndexBuildService implements AutoCloseable {
             if (dup != null) throw duplicate(dup, req.owner());
             runs.put(run.id, run);
         }
-        try {
-            pool.execute(() -> execute(run));
-        } catch (RejectedExecutionException e) {
-            synchronized (runs) {
-                runs.remove(run.id);
+        synchronized (pool) {                                           // the waiting-line check and the hand-off are one step
+            Limits l = limits;
+            try {
+                if (pool.getQueue().size() >= l.queue()) throw new RejectedExecutionException("the waiting line is full");
+                pool.execute(() -> execute(run));
+            } catch (RejectedExecutionException e) {
+                synchronized (runs) {
+                    runs.remove(run.id);
+                }
+                throw new Refused(Refused.Kind.REJECTED, "the index build queue is full (" + l.threads() + " running, "
+                        + l.queue() + " waiting) - try again shortly");
             }
-            throw new Refused(Refused.Kind.REJECTED, "the index build queue is full (" + limits.threads() + " running, "
-                    + limits.queue() + " waiting) - try again shortly");
         }
         return run.view();
     }
@@ -344,7 +441,8 @@ public final class IndexBuildService implements AutoCloseable {
         } catch (RuntimeException unknown) {
             duck = null;
         }
-        IndexPlan.Plan plan = IndexPlan.classify(live, rel.inputFiles(), IndexBuilder.relationSqlHash(rel.relationSql()), BucketFunction.NAME, duck);
+        IndexPlan.Plan plan = IndexPlan.classify(live, rel.inputFiles(), IndexBuilder.relationSqlHash(rel.relationSql()), BucketFunction.NAME,
+                host.get().sizing(), duck);
         if (!plan.appendable())
             throw new Refused(Refused.Kind.NOT_APPLICABLE, "an append is not possible now ("
                     + (plan.reasons().isEmpty() ? "no input file was added since the live version" : String.join(", ", plan.reasons())) + ") - "
@@ -424,12 +522,14 @@ public final class IndexBuildService implements AutoCloseable {
     // -- execution ------------------------------------------------------------------------------------------------
 
     private void execute(Run r) {
+        if (!awaitIngest(r)) return;                                  // ended while waiting for ingest
         if (!r.start()) return;                                       // cancelled while queued
         long t0 = System.nanoTime();
         try {
             IndexStore store = new IndexStore(indexRoot, r.datasetId, r.mappingHash, r.keepVersions, java.time.Clock.systemUTC());
-            IndexBuilder.Options opt = new IndexBuilder.Options(null, null, null, r.token,
-                    p -> r.progress = new Progress(p.phase(), p.step(), p.steps()));
+            Host h = host.get();
+            IndexBuilder.Options opt = new IndexBuilder.Options(null, h.memoryLimit(), null, r.token,
+                    p -> r.progress = new Progress(p.phase(), p.step(), p.steps()), h.sizing());
             IndexBuilder.Result result = builder.apply(new IndexBuilder.Request(r.datasetId, r.mapping, r.relation.relationSql(),
                     store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql(), r.relation.readRoots()));
             try {
@@ -445,6 +545,35 @@ public final class IndexBuildService implements AutoCloseable {
             if (r.cancelRequested) end(r, Status.CANCELLED, null, null, (System.nanoTime() - t0) / 1_000_000L);
             else end(r, Status.FAILED, e.getClass().getSimpleName(), null, (System.nanoTime() - t0) / 1_000_000L);
         }
+    }
+
+    /**
+     * CL-12: holds a QUEUED build while ingest runs. True = it may start now; false = it ended while waiting (cancelled, the
+     * service closed, or the wait ran out - then {@code FAILED} with {@link IngestStillActiveException}).
+     */
+    private boolean awaitIngest(Run r) {
+        if (!ingestActive.getAsBoolean()) return true;
+        long deadline = System.nanoTime() + maxIngestWaitMs * 1_000_000L;
+        long backoff = Math.max(1L, firstIngestBackoffMs);
+        r.progress = new Progress(WAITING_FOR_INGEST, 0, 0);
+        while (ingestActive.getAsBoolean()) {
+            if (r.status() != Status.QUEUED) return false;            // cancelled while it waited
+            long leftMs = (deadline - System.nanoTime()) / 1_000_000L;
+            if (leftMs <= 0) {
+                end(r, Status.FAILED, IngestStillActiveException.class.getSimpleName(), null, 0);
+                return false;
+            }
+            try {
+                Thread.sleep(Math.min(backoff, leftMs));
+            } catch (InterruptedException closing) {                   // close() cancels every live build before it interrupts
+                Thread.currentThread().interrupt();
+                if (r.status() == Status.QUEUED) end(r, Status.CANCELLED, null, null, 0);
+                return false;
+            }
+            backoff = Math.min(backoff * 2, MAX_INGEST_BACKOFF_MS);
+        }
+        r.progress = new Progress("", 0, 0);
+        return true;
     }
 
     private void end(Run r, Status s, String failure, IndexBuilder.Result res, long elapsed) {

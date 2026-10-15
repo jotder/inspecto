@@ -391,7 +391,7 @@ public final class DuckDbUtil {
      * failed (found on the telco demo build, 2026-09-26). A {@link LinkageError} here means "unknown", never
      * a failed ingest; {@code package.ps1} now also ships {@code jdk.management} so the real size is read.
      */
-    static long physicalMemoryBytes() {
+    public static long physicalMemoryBytes() {
         try {
             return java.lang.management.ManagementFactory.getOperatingSystemMXBean()
                     instanceof com.sun.management.OperatingSystemMXBean os ? os.getTotalMemorySize() : 0L;

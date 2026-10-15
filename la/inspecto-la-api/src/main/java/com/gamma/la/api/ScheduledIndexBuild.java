@@ -195,7 +195,7 @@ public final class ScheduledIndexBuild {
                 List<IndexManifest.InputFile> now = input != null && input.known()
                         ? input.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList() : null;
                 IndexPlan.Plan plan = IndexPlan.classify(live, now, hashOrNull(provider, content, dataRoot, writeRoot),
-                        BucketFunction.NAME, duckdbOrNull());
+                        BucketFunction.NAME, IndexRoutes.installSizing(), duckdbOrNull());
                 switch (plan.recommended()) {
                     case NONE -> {
                         return last != null ? last : done("UP_TO_DATE", "none", "the index already covers the Dataset", live);
