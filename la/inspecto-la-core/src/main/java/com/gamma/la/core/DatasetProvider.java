@@ -75,6 +75,14 @@ public interface DatasetProvider {
     /** Every registered Dataset. */
     List<Entry> datasets(Path writeRoot);
 
+    /**
+     * Every saved Link Analysis view ({@code link-analysis-view} registry entries; their {@code query} names the Dataset columns
+     * a view links), for the Entity profile's binding roles. Empty by default, so a test double keeps compiling.
+     */
+    default List<Entry> linkAnalysisViews(Path writeRoot) {
+        return List.of();
+    }
+
     /** The trusted relation SQL of a Dataset's configuration. */
     String relationSql(Map<String, Object> dataset, Path dataRoot, Path writeRoot);
 

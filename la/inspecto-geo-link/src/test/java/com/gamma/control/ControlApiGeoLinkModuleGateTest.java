@@ -50,6 +50,7 @@ class ControlApiGeoLinkModuleGateTest {
             new String[]{"GET", "/inv/graph/algorithms"},                     // GraphRunRoutes
             new String[]{"GET", "/inv/index"},                                // IndexRoutes
             new String[]{"GET", "/inv/datasets/x/files"},                     // DatasetFilesRoutes
+            new String[]{"GET", "/inv/entity-types"},                         // EntityProfileRoutes
             new String[]{"GET", "/inv/investigations/x/case"},                // InvestigationCaseRoutes
             new String[]{"GET", "/inv/investigations/x/compare"},             // InvestigationComparisonRoutes
             new String[]{"GET", "/inv/investigations/x/coverage"},            // InvestigationCoverageRoutes

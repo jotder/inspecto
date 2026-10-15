@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LaLimitsTest {
 
     private static final Set<String> UNITS = Set.of("count", "nodes", "edges", "rows", "bytes", "ms", "s", "min", "h", "days",
-            "chars", "hops", "per_s", "pct_ram", "mb");
+            "chars", "hops", "per_s", "pct_ram", "pct", "mb");
 
     @AfterEach
     void uninstall() {

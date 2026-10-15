@@ -58,6 +58,18 @@ public final class LinkEventTypes {
      *  carry the reach; the key is never recorded (raw or alias). */
     public static final String LINK_CASE_HISTORY_READ = "LINK_CASE_HISTORY_READ";
 
+    /** The Entity Types in force were listed with their bindings and cached headlines ({@code GET /inv/entity-types}). Reads
+     *  configuration only; {@code types}/{@code bindings} carry the reach. */
+    public static final String LINK_ENTITY_TYPES_LISTED = "LINK_ENTITY_TYPES_LISTED";
+
+    /** An Entity Type profile was read ({@code GET /inv/entity-types/{id}/profile}): aggregates over every bound column.
+     *  {@code entityType}/{@code sections}/{@code datasets}/{@code cached}/{@code truncated} carry the reach. */
+    public static final String LINK_ENTITY_TYPE_PROFILED = "LINK_ENTITY_TYPE_PROFILED";
+
+    /** One Entity's profile was read ({@code GET /inv/entities/{type}/{key}/profile}). {@code entityType}/{@code found}/
+     *  {@code datasets}/{@code assessed} carry the reach; the key is never recorded (raw or alias). */
+    public static final String LINK_ENTITY_PROFILED = "LINK_ENTITY_PROFILED";
+
     /** A Link Analysis evidence snapshot was SEALED ({@code POST /inv/snapshots}, LA-03).
      *  {@code snapshotId}, {@code nodes} and {@code edges} carry what was frozen. A distinct act from
      *  {@link #LINK_PROJECTED}: that one records what an analyst LOOKED AT, this one records what they

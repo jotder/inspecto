@@ -1219,6 +1219,89 @@
         "x-optional-module" : true
       }
     },
+    "/inv/entity-types" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "List the Entity Types in force with their bindings and cached headline",
+        "operationId" : "getInvEntityTypes",
+        "description" : "la-entity-profile-plan section 4.5. {items: [{id, label, normaliser, masked, classifications, bindings: [{dataset, column, role}], headline: {distinct, approximate, rows, dataAsOf, computedAt, assessed, reason}}]}. A binding is every Dataset column whose classification the type claims; role is source / target when the column is a link end of a saved Link Analysis view or a published index mapping, else attribute. The headline is the last computed type profile (cached, never a query on this request): assessed:false with reason 'not computed yet' until the type's profile has been read once. Only Datasets the caller may view are walked. Gated by the geoLink feature and a write root; no capability. Audited as LINK_ENTITY_TYPES_LISTED.",
+        "responses" : {
+          "200" : {
+            "description" : "{items}."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/entity-types/{entityTypeId}/profile" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "Read the Entity Type profile: aggregates over every column bound to the type",
+        "operationId" : "getInvEntityTypeProfile",
+        "description" : "la-entity-profile-plan section 4.5. Query: sections (comma list of bindings, volume, shapes, time, lineage, links, relationships; all when absent). {entityType, computedAt, cached, truncated, masking {mode, masked}} plus each requested section: bindings [{dataset, column, role, timeColumn, rows, nonNull, fillRate, distinct, approximate, failNormaliser, assessed, reason}], volume {distinct, approximate, rows, sentinels [{dataset, column, kind: builtin|dominant, value (null for dominant), rows, share}], assessed, reason}, shapes {length [{length, rows}], prefix [{prefix, rows}], prefixLength (e164 3, else 0), charClass {digits, letters, mixed}, sampled, assessed, reason}, time {earliest, latest, perDay [{day, rows, distinct}], missingDays, dataAsOf [{dataset, dataAsOf}], assessed, reason}, lineage [{dataset, pipelines, collectors, files, rows, latestIngestedAt, waitingForIndex, problemFiles, assessed, reason}], links {from (dataset; index once the manifest carries link statistics), kinds [{kind, edges}], degree {p50, p90, p99, max}, hubThreshold, hubs, singleLink, assessed, reason}, relationships [{otherType, dataset, oneToOneShare, maxPerEntity, threshold, entitiesAtOrAboveThreshold, assessed, reason}]. Aggregates only: never a raw identifier (a dominant value is reported without its value; hubs are counted, not named). Distinct counts are over the normalised Entity key and approximate. A section that could not be read says assessed:false with the reason; a read cut by an entity_profile.* limit says truncated:true. Cached by the bound Datasets' input-file fingerprint (a new File invalidates it). Gated like POST /inv/projection: geoLink, a write root, R3 view access per Dataset. Audited as LINK_ENTITY_TYPE_PROFILED.",
+        "parameters" : [ {
+          "name" : "entityTypeId",
+          "in" : "path",
+          "required" : true,
+          "description" : "The Entity Type id.",
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The profile."
+          },
+          "404" : {
+            "description" : "No such Entity Type in force."
+          },
+          "422" : {
+            "description" : "An unknown section name."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/entities/{entityType}/{entityKey}/profile" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "Read one Entity's profile by raw value or exploration alias",
+        "operationId" : "getInvEntityProfile",
+        "description" : "la-entity-profile-plan section 4.5. The key is the raw value or the exploration alias (masked:<16 hex>), resolved through the same masking as the exploration reads, then normalised by the type's normaliser. {entity {type, key (the alias when the type is masked under the Space's maskingMode), masked}, firstSeen, lastSeen, activeDays, coveredDays, perDay [{day, rows}], where [{dataset, column, rows}], links {degree, kinds [{kind, count}], percentile, from, assessed, reason}, related [{type, count, keys (aliases when either type is masked)}], dataAsOf [{dataset, dataAsOf}], truncated, assessed, reason}. An Entity seen nowhere answers 200 with an empty where. Gated like POST /inv/projection. Audited as LINK_ENTITY_PROFILED (the key is never recorded).",
+        "parameters" : [ {
+          "name" : "entityType",
+          "in" : "path",
+          "required" : true,
+          "description" : "The Entity Type id.",
+          "schema" : { "type" : "string" }
+        }, {
+          "name" : "entityKey",
+          "in" : "path",
+          "required" : true,
+          "description" : "The raw value or the exploration alias (URL-encoded).",
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The Entity profile."
+          },
+          "404" : {
+            "description" : "No such Entity Type in force."
+          },
+          "422" : {
+            "description" : "An alias this server never minted, or a key that normalises to nothing."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/index/builds" : {
       "post" : {
         "tags" : [ "inv" ],

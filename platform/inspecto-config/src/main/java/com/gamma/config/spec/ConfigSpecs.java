@@ -1280,7 +1280,7 @@ public final class ConfigSpecs {
     /** The top-level blocks of {@code link-analysis.toon} that hold only {@code LaLimit} catalogue items (LA-CONFIG-LIMITS-1). */
     public static final List<String> LINK_ANALYSIS_LIMIT_GROUPS = List.of("browser_algorithms", "display", "investigation",
             "connect", "traversal", "neighbours", "snapshots", "files", "working_set", "pattern", "measures", "comparison",
-            "reference", "case_history", "dossier", "identity", "input");
+            "reference", "case_history", "dossier", "identity", "input", "entity_profile");
 
     public static ConfigSpec linkAnalysisSettings() {
         List<FieldSpec> fields = List.of(
