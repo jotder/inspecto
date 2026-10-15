@@ -48,12 +48,24 @@ import java.util.Objects;
  *                        compact keeps its parent's), or null when not recorded (a manifest written before the sizing was
  *                        configurable: it was {@link BucketFunction.Sizing#DEFAULT}, see {@link #bucketSizingInForce()}).
  *                        Optional and additive like {@code inputFiles}
+ * @param kindEdges       link statistics (Entity profile D-EP4, all four optional and additive like {@code inputFiles}; null =
+ *                        not recorded, an older manifest): edges per link kind, in descending count order. Edges with a NULL
+ *                        kind are not counted (no kind column = an empty map), so the values may sum to less than the edges
+ * @param typeNodes       distinct nodes per Entity Type the mapping's endpoint columns are typed as (an empty map when
+ *                        neither endpoint column is typed): a node is of the source column's type when it is ever a
+ *                        source, of the target column's type when it is ever a target - one count when both are the same
+ *                        type; null = not recorded
+ * @param degree          quantiles of node degree, where degree = the edges a node takes part in ({@code out_edges +
+ *                        in_edges}, a self-loop counts twice); null = not recorded
+ * @param timeSpan        earliest and latest edge time (the mapped time column as UTC instants); null when there is no time
+ *                        column, every time is NULL, or it was not recorded
  */
 public record IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn,
                             int buckets, int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset,
                             String relationSqlHash, String baseFingerprint, String timeColZone,
                             Map<String, TableStats> tables, long droppedNull, List<Delta> deltas, String parent,
-                            List<InputFile> inputFiles, String bucketSizing) {
+                            List<InputFile> inputFiles, String bucketSizing, Map<String, Long> kindEdges,
+                            Map<String, Long> typeNodes, Degree degree, TimeSpan timeSpan) {
 
     public static final int FORMAT_VERSION = 1;
     public static final String FILE_NAME = "manifest.json";
@@ -70,6 +82,22 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
 
     /** One input file the build read: path relative to the data root, size in bytes, mtime in epoch millis. */
     public record InputFile(String path, long size, long mtimeMillis) { }
+
+    /** Degree quantiles over every node (nearest-rank, {@code quantile_disc}). */
+    public record Degree(long p50, long p90, long p99, long max) { }
+
+    /** Earliest and latest edge time, ISO-8601 instant text. */
+    public record TimeSpan(String min, String max) { }
+
+    /** A manifest with no recorded link statistics (what every manifest written before they existed reads as). */
+    public IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn, int buckets,
+                         int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset, String relationSqlHash,
+                         String baseFingerprint, String timeColZone, Map<String, TableStats> tables, long droppedNull,
+                         List<Delta> deltas, String parent, List<InputFile> inputFiles, String bucketSizing) {
+        this(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash, dataset,
+                relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles, bucketSizing,
+                null, null, null, null);
+    }
 
     /** A manifest with no recorded bucket sizing (what every manifest written before the sizing was configurable reads as). */
     public IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn, int buckets,
@@ -97,6 +125,15 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         tables = tables == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(tables));
         deltas = deltas == null ? List.of() : List.copyOf(deltas);
         inputFiles = inputFiles == null ? null : List.copyOf(inputFiles);
+        kindEdges = kindEdges == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(kindEdges));
+        typeNodes = typeNodes == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(typeNodes));
+    }
+
+    /** This manifest with the given link statistics (the four optional fields) in place of its own. */
+    public IndexManifest withLinkStats(Map<String, Long> kindEdges, Map<String, Long> typeNodes, Degree degree, TimeSpan timeSpan) {
+        return new IndexManifest(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash,
+                dataset, relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles,
+                bucketSizing, kindEdges, typeNodes, degree, timeSpan);
     }
 
     /** The sizing signature that chose {@code buckets}: the recorded one, else the shipped {@link BucketFunction.Sizing#DEFAULT}. */
@@ -139,6 +176,11 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
             ArrayNode f = n.putArray("inputFiles");
             inputFiles.forEach(x -> f.addObject().put("path", x.path()).put("size", x.size()).put("mtime", x.mtimeMillis()));
         }
+        if (kindEdges != null) kindEdges.forEach(n.putObject("kindEdges")::put);
+        if (typeNodes != null) typeNodes.forEach(n.putObject("typeNodes")::put);
+        if (degree != null)
+            n.putObject("degree").put("p50", degree.p50()).put("p90", degree.p90()).put("p99", degree.p99()).put("max", degree.max());
+        if (timeSpan != null) n.putObject("timeSpan").put("min", timeSpan.min()).put("max", timeSpan.max());
         try {
             return JSON.writeValueAsString(n);
         } catch (IOException e) {
@@ -173,6 +215,10 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
             for (JsonNode x : n.get("inputFiles"))
                 inputFiles.add(new InputFile(x.path("path").asText(), x.path("size").asLong(), x.path("mtime").asLong()));
         }
+        JsonNode d = n.path("degree"), ts = n.path("timeSpan");        // the link statistics: absent in an older manifest
+        Degree degree = d.isObject() ? new Degree(d.path("p50").asLong(), d.path("p90").asLong(), d.path("p99").asLong(),
+                d.path("max").asLong()) : null;
+        TimeSpan timeSpan = ts.isObject() ? new TimeSpan(text(ts, "min"), text(ts, "max")) : null;
         Builder b;
         try {
             b = Builder.valueOf(req(n, "builder").asText().toUpperCase(Locale.ROOT));
@@ -183,7 +229,8 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                 text(n, "bucketFn"), n.path("buckets").asInt(), n.path("rowGroupSize").asInt(), mapping,
                 req(n, "mappingHash").asText(), req(n, "dataset").asText(), text(n, "relationSqlHash"),
                 text(n, "baseFingerprint"), text(n, "timeColZone"), tables, n.path("droppedNull").asLong(), deltas,
-                text(n, "parent"), inputFiles, text(n, "bucketSizing"));
+                text(n, "parent"), inputFiles, text(n, "bucketSizing"), counts(n, "kindEdges"), counts(n, "typeNodes"),
+                degree, timeSpan);
     }
 
     public void write(Path dir) throws IOException {
@@ -192,6 +239,15 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
 
     public static IndexManifest read(Path dir) throws IOException {
         return fromJson(Files.readString(dir.resolve(FILE_NAME), StandardCharsets.UTF_8));
+    }
+
+    /** A {@code {name: count}} object in its written order, or null when absent. */
+    private static Map<String, Long> counts(JsonNode n, String f) {
+        JsonNode v = n.get(f);
+        if (v == null || !v.isObject()) return null;
+        Map<String, Long> out = new LinkedHashMap<>();
+        v.fields().forEachRemaining(e -> out.put(e.getKey(), e.getValue().asLong()));
+        return out;
     }
 
     private static void putNullable(ObjectNode n, String f, String v) {
