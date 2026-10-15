@@ -116,7 +116,9 @@ const COVERAGE: InvestigationCoverage = {
 const refused = (message: string) =>
     throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } }));
 
-function create(opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: () => Promise<boolean> } = {}) {
+function create(
+    opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: () => Promise<boolean> } = {},
+) {
     const inv = {
         createInvestigation: vi.fn(() => of(LOG.header)),
         investigationLog: vi.fn(() => of(LOG)),
@@ -130,8 +132,22 @@ function create(opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: Wor
             of({ head: { step: 2, workingSetHash: 'sha256:h2' }, rows: [], total: 0, truncated: false, cached: false }),
         ),
         investigationCoverage: vi.fn(() => of(COVERAGE)),
-        investigationDataChanges: vi.fn(() => of({ id: 'inv-1', dataset: 'calls', window: null, lastLookAt: 'x', assessed: true, changes: [], changedDays: [], capped: false, readAt: 'x' })),
-        datasetFiles: vi.fn(() => of({ dataset: 'calls', assessed: false, total: 0, offset: 0, limit: 25, items: [], readAt: 'x' })),
+        investigationDataChanges: vi.fn(() =>
+            of({
+                id: 'inv-1',
+                dataset: 'calls',
+                window: null,
+                lastLookAt: 'x',
+                assessed: true,
+                changes: [],
+                changedDays: [],
+                capped: false,
+                readAt: 'x',
+            }),
+        ),
+        datasetFiles: vi.fn(() =>
+            of({ dataset: 'calls', assessed: false, total: 0, offset: 0, limit: 25, items: [], readAt: 'x' }),
+        ),
         listInvestigations: vi.fn(() =>
             of({
                 items: [
@@ -179,7 +195,10 @@ function create(opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: Wor
                       },
                   ]
                 : []),
-            { provide: LensService, useValue: { canManageIncidents: signal(opts.canManage ?? true), canShareInvestigation: signal(false) } },
+            {
+                provide: LensService,
+                useValue: { canManageIncidents: signal(opts.canManage ?? true), canShareInvestigation: signal(false) },
+            },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
@@ -202,8 +221,10 @@ async function openInv(store: InvestigationSessionStore) {
     await store.open('inv-1');
 }
 
-// Full-component renders run 5-7s on the CI runner, past vitest's 5s default.
-describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () => {
+// Full-component renders run 5-7s on the CI runner, past vitest's 5s default. 45 s since 2026-10-15 (was 20 s, the
+// Neighbours block the 15 s default): under `test:coverage` (v8 instrumentation, what ui.yml runs) these specs took
+// over 20 s on a 12-thread dev box and timed out.
+describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () => {
     it('prefills the time column from the default (DR-D7) and starts with it', async () => {
         const { fixture, el, inv, button } = create();
         const host = fixture.componentInstance as unknown as { timeCol: { set(v: string): void } };
@@ -574,7 +595,9 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
         expect(section.textContent).toContain('2 of 3 days in the window have zero rows in calls (UTC)');
         expect(section.textContent).toContain('2026-09-02, 2026-09-03');
         expect(section.textContent).not.toContain('2026-09-01');
-        expect(section.textContent?.match(/Per-Collector coverage is not assessed for this Dataset\./g)).toHaveLength(1);
+        expect(section.textContent?.match(/Per-Collector coverage is not assessed for this Dataset\./g)).toHaveLength(
+            1,
+        );
         expect(section.textContent).toContain('a Dataset row carries no Collector attribution');
         expect(section.textContent).not.toMatch(/no collectors delivered/i);
         expect(section.querySelector('inspecto-alert[variant="error"]')).toBeNull();
@@ -621,7 +644,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 20_000 }, () =
     });
 });
 
-describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 2026-10-10)', { timeout: 20_000 }, () => {
+describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 2026-10-10)', { timeout: 45_000 }, () => {
     const SEEDS = [
         { id: 'a', label: 'A', ids: ['acct-a'] },
         { id: 'b', label: 'B', ids: ['acct-b', 'ACCT B'] },
@@ -686,7 +709,7 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
     });
 });
 
-describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (DR-D3)', { timeout: 20_000 }, () => {
+describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (DR-D3)', { timeout: 45_000 }, () => {
     it('a successful Seed of a picked query-graph node draws the Working Set again; a failed one does not', async () => {
         const { fixture, store, inv, button } = create();
         await openInv(store);
@@ -795,7 +818,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
     });
 });
 
-describe('LinkAnalysisInvestigationComponent - hub visibility and override (telecom S3)', { timeout: 20_000 }, () => {
+describe('LinkAnalysisInvestigationComponent - hub visibility and override (telecom S3)', { timeout: 45_000 }, () => {
     const HUB_WS: WorkingSet = {
         entities: [
             { id: 'a', type: null, hop: 0, seed: 'a', admittedBy: 1, hidden: false, kept: false },
@@ -996,7 +1019,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
     });
 });
 
-describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
+describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', { timeout: 45_000 }, () => {
     const stepResult = (step: number) =>
         of({
             step,

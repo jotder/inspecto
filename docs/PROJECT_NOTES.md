@@ -868,7 +868,8 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
   ⚠ **A FOURTH joined 2026-09-08: `node tools/check-coverage.mjs`** (GUARD-SWEEP-1g), enforcing
   **repo-wide** coverage floors — backend instructions ≥78% / branches ≥64%, UI statements ≥70% /
-  branches ≥66%, against measured baselines of 81.01%/67.19% and 73.82%/70.04%. Like the dependency
+  branches ≥66%, against measured baselines of 81.01%/67.19% and 73.82%/70.04% (2026-09-08); re-measured
+  2026-10-15 at 86.08%/73.59% (48 backend modules) and 81.51%/76.64% (553 UI spec files). Like the dependency
   guard it is **not** pre-push: it needs `mvn … -Pcoverage` (≈6 min) or a UI `test:coverage` run first,
   so it lives in `ci.yml` (`--backend`) and `ui.yml` (`--ui`). ⚠ Those scope flags are load-bearing —
   `ci.yml` never builds the UI and `ui.yml` never builds Java, so one "all inputs must exist" rule would

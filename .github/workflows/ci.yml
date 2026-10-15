@@ -428,8 +428,9 @@ jobs:
       # gate anywhere" gap. It is REPORTING only: the profile binds prepare-agent + report and no `check`
       # goal, so this cannot fail a build. ⛔ A threshold is deliberately NOT set here — choosing what
       # number blocks whom is a policy decision, and the point of this step is to produce the data that
-      # decision needs. Measured baseline 2026-09-08: instructions 81.01%, branches 67.19%, lines 80.88%
-      # across 26 reporting modules (239572/295731 instructions).
+      # decision needs. Measured 2026-10-15 (master 1ad331c50, -Pedition-enterprise -Pcoverage): instructions
+      # 86.08%, branches 73.59%, lines 86.14% across 48 reporting modules (621762 instructions). First baseline
+      # 2026-09-08: 81.01% / 67.19% / 80.88% across 26 modules.
       # ⚠ That is the HONEST figure. The first measurement said 82.92% across 21 modules, because the
       # asn-parser tree was never instrumented — a separate root POM, and a Maven profile is inherited
       # through <parent>, never through aggregation. Adding the profile there pulled the number DOWN by

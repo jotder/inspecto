@@ -21,12 +21,7 @@ import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
-import {
-    CANVAS_MIN_PX,
-    LinkAnalysisComponent,
-    defaultLayoutFor,
-    snapshotTitle,
-} from './link-analysis.component';
+import { CANVAS_MIN_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
@@ -172,7 +167,7 @@ describe('LinkAnalysisComponent', () => {
         expect(fixture.componentInstance.loadError()).toMatch(/source and target/);
         expect(queried).toHaveLength(0);
         await expectNoA11yViolations(fixture.nativeElement);
-    });
+    }, 45_000); // the axe pass under `test:coverage` (v8 instrumentation, what ui.yml runs) took over 15 s (2026-10-15)
 
     it('runs the query, shows the graph counts, and search/kind filters drive emphasis + display', async () => {
         const { fixture } = create();
@@ -501,7 +496,11 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         expect(c.unexpandedDrawn()).toBe(0);
         await c.expandNode('c', 'C', ['C']);
-        const dotted = c.canvasData()!.nodes.filter((n) => n.data.unexpanded).map((n) => n.id).sort();
+        const dotted = c
+            .canvasData()!
+            .nodes.filter((n) => n.data.unexpanded)
+            .map((n) => n.id)
+            .sort();
         expect(dotted).toEqual(['a', 'b', 'd', 'e', 'f']);
         expect(c.unexpandedDrawn()).toBe(5);
         c.selectNextUnexpanded();
@@ -1225,7 +1224,10 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
         c.investigation.activeId.set('inv-9');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         const ent = (id: string) => ({ id, type: 'x', hop: 0, seed: 's', admittedBy: 1, expanded: true });
         c.investigation.workingSet.set({
             entities: [ent('ws-a'), ent('ws-b'), ent('ws-c')],
@@ -2358,7 +2360,9 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         expect(stub.selection).toEqual(['a', 'b']);
         expect(el.querySelector('[data-testid="la-selection-count"]')?.textContent).toContain('2 selected');
         expect(el.querySelector('[data-testid="la-status-selected"]')?.textContent).toContain('2 selected');
-        expect(el.querySelector('[data-testid="la-selection-announcement"]')?.textContent).toContain('3 nodes selected');
+        expect(el.querySelector('[data-testid="la-selection-announcement"]')?.textContent).toContain(
+            '3 nodes selected',
+        );
     });
 
     it('every selection action is a named button; Exclude appears only inside an Investigation', async () => {
@@ -2389,7 +2393,9 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         fixture.detectChanges();
         expect(c.selectedOnCanvas()).toEqual([]);
         expect(el.querySelector('[data-testid="la-selection-bar"]')).toBeNull();
-        expect(el.querySelector('[data-testid="la-selection-announcement"]')?.textContent).toContain('Selection cleared');
+        expect(el.querySelector('[data-testid="la-selection-announcement"]')?.textContent).toContain(
+            'Selection cleared',
+        );
     });
 
     it('a selection a hide takes off the canvas is dropped with it', async () => {

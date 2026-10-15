@@ -473,6 +473,15 @@ failures; instructions 84.66% against a 78% floor, branches 71.51% against 64%. 
 guard's input off, switch the guard off in the same change, or it fails every run and a failure earlier in
 CI hides it.
 
+**Re-measured 2026-10-15** (master `1ad331c50`, full `-Pedition-enterprise -Pcoverage` reactor, 0 failures):
+backend instructions 86.08% / branches 73.59% / lines 86.14% over 48 reports; UI statements 81.51% /
+branches 76.64% / lines 85.18% over 553 spec files. ⚠ Two traps seen that day: (1) `la-api` reports 8.6% and
+`la-store-pg` 1.8% per module — la-api's routes are tested from `inspecto-geo-link` and the Postgres tests skip
+without a database, so a per-module figure is not a test gap there; (2) under `test:coverage` the heaviest
+Link Analysis specs exceeded their 15–20 s timeouts (raised to 45 s), and a failing vitest run writes NO
+`coverage-summary.json`, so `check-coverage.mjs --ui` reports CANNOT RUN rather than a number. ⚠ The UI
+workflow itself had been red since before 2026-10-13 on `format:check`, before any test ran.
+
 ## Instance, 2026-10-04: two shipped-grammar guards that were skipped forever
 `FixedWidthTest.shippedSubscriberPipelineResolvesFixedWidthGrammar` and
 `DelimitedGrammarTest.shippedVoucherPipelineResolvesGrammar` each opened a pipeline by a module-relative path

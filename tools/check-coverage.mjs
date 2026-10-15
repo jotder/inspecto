@@ -15,6 +15,7 @@
 // ⚠ FLOORS ARE DELIBERATELY BELOW THE MEASURED BASELINE, not equal to it. Coverage moves a little with
 // any change; a floor set at the current number fires on noise and teaches people to ignore it.
 // Baseline measured 2026-09-08 — backend instr 81.01% / branch 67.19%, UI stmt 73.82% / branch 70.04%.
+// Re-measured 2026-10-15 — backend instr 86.08% / branch 73.59% (48 modules), UI stmt 81.51% / branch 76.64%.
 //
 // ⛔ These numbers are a POLICY choice, not a measurement. Raise them deliberately when coverage
 // improves; do not lower one to make a red build green.

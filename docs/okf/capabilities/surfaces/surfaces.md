@@ -610,9 +610,9 @@ of the component-suite refusal and which the consolidation plan assigns to this 
 * **The pipeline is the gate**, in order: the colour-token check, formatting, three type-check
   configurations, the test suite with coverage, a coverage floor, then the production build. The colour
   check runs **first** deliberately — it is the cheapest and the most often tripped.
-* **Test suite** — 334 spec files, of which 29 are shell or design-system scoped, run through the
-  framework's own test builder. No skipped or excluded tests exist anywhere in the suite. The recorded
-  coverage baseline is statements 73.82%, branches 70.04%, functions 62.41%, lines 77.77%.
+* **Test suite** — 553 spec files (5,820 tests, 5 skipped, 2026-10-15), run through the framework's own
+  test builder. Coverage measured 2026-10-15: statements 81.51%, branches 76.64%, functions 71.25%, lines
+  85.18% (first baseline 2026-09-08: 73.82% / 70.04% / 62.41% / 77.77%).
 * **Falsify, don't read** — three claims worth probing directly. Serve a bundle with no UI directory and
   confirm an unknown path is a JSON 404 rather than a shell. Start a Personal bundle with single sign-on
   configured and confirm `bootstrap.edition` says `standard` while the feature flags still say what is
