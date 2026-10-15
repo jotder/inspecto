@@ -2255,10 +2255,12 @@ export class LinkAnalysisComponent implements OnInit {
         const ids = this.serverIds();
         const invId = this.graphRunInvestigationId();
         const ws = this.investigation.workingSet();
+        const key = rawIdsOf(node)[0] ?? node.data.label;
         const insight: NodeInsightContext = {
             nodeId: id,
             label: node.data.label,
-            key: rawIdsOf(node)[0] ?? node.data.label,
+            key,
+            listKey: ws?.exploreAliases?.[key],
             profileId: this.profileId() ?? 'generic',
             entityType: this.profile().investigate?.entityType,
             investigationId: invId,

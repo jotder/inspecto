@@ -29,6 +29,9 @@ export interface NodeInsightContext {
     label: string;
     /** The RAW key reference Datasets and Entity Lists are keyed by (the node's first raw spelling). */
     key: string;
+    /** The key Entity List membership is asked with: the Space's exploration alias when `key` is an Investigation's own
+     *  alias (each Investigation masks under its own key, which no list can match); absent = `key`. */
+    listKey?: string;
     profileId: DomainProfileId;
     /** The Entity Type Entity Lists are filtered by (`msisdn` on the telecom profile); absent = every list. */
     entityType?: string;
@@ -565,7 +568,7 @@ export class NodeInsightComponent implements OnInit {
                 (l) => !l.retired && (!c.entityType || l.entityType.toLowerCase() === c.entityType.toLowerCase()),
             );
             const checks = lists.map((l) =>
-                this.svc.match(l.id, [c.key]).pipe(
+                this.svc.match(l.id, [c.listKey ?? c.key]).pipe(
                     map((r) => ({ list: l, matched: !!r.matches[0]?.matched || this.addedHere.has(l.id) })),
                     catchError(() => of({ list: l, matched: this.addedHere.has(l.id) })),
                 ),
