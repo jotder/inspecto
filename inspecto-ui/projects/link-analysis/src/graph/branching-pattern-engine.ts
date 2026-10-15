@@ -158,7 +158,7 @@ export function matchBranchingPattern(
         return refuse(`Branching patterns are capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
     if (branchingNeedsTime(stages) && !timeAttr) {
-        return refuse('This pattern has a time window or ordering — choose a time column in the Query panel first.');
+        return refuse('This pattern has a time window or ordering — add the time column under Attribute columns in the Query panel and run it again, then pick it as the Time column under Filter edges by time first.');
     }
 
     const last = stages.length - 1;

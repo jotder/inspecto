@@ -31,6 +31,7 @@ import {
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
+import { SessionService } from 'app/inspecto/auth/session.service';
 
 const DS: Dataset = {
     id: 'links-ds',
@@ -681,6 +682,28 @@ describe('LinkAnalysisComponent', () => {
         c.toolboxTab.set('view');
         fixture.detectChanges();
         expect(view()!.classList.contains('hidden')).toBe(false);
+    });
+
+    it('Save this analysis is disabled, with the reason, for a user without Incident management', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const btn = (): HTMLButtonElement =>
+            [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((b) =>
+                (b.getAttribute('aria-label') ?? '').startsWith('Save this analysis'),
+            )!;
+        fixture.detectChanges();
+        expect(btn().disabled).toBe(false); // honor-system mode grants everything
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set([]);
+        fixture.detectChanges();
+        expect(btn().disabled).toBe(true);
+        expect(btn().getAttribute('aria-label')).toContain('needs the Incident management capability');
+        session.capabilities.set(['canManageIncidents']);
+        fixture.detectChanges();
+        expect(btn().disabled).toBe(false);
+        fixture.destroy();
     });
 
     it('a toolbox tab opens at its top: the three tabs share one scroll container', async () => {

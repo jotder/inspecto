@@ -56,6 +56,18 @@ export function caseMemberCandidates(graph: G6GraphData, originDataset: string |
     return out;
 }
 
+/**
+ * Why no node of `graph` can become a Case member, in the words the analyst can act on. Masking is the usual cause
+ * (every Entity is a pseudonym the server refuses as a Case key), and naming the Dataset instead would send them
+ * looking in the wrong place.
+ */
+export function noCaseMemberReason(graph: G6GraphData): string {
+    const masked = graph.nodes.some((n) => n.data.kind === 'entity' && MASKED_NODE_ID.test(n.id));
+    return masked
+        ? 'No node on this graph can become a Case member: its entities are masked, and a masked pseudonym is refused as a Case key. Ask for Reveal rights, or link an Investigation to a Case instead.'
+        : 'No node on this graph can become a Case member: each must be an Entity with a known source Dataset.';
+}
+
 /** An Entity node id: untyped `entity:<key>` or typed `<type>:<key>` (D-M6) — the server's `EntityMember` rule. */
 const ENTITY_NODE_ID = /^[a-z][a-z0-9_]{0,31}:./;
 

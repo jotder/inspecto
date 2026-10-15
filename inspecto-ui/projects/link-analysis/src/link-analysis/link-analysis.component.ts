@@ -31,6 +31,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
+import { FormMenuDirective } from './form-menu.directive';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -311,6 +312,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        FormMenuDirective,
         LinkAnalysisModulesComponent,
         AiExplainComponent,
         ChipComponent,
@@ -1673,6 +1675,11 @@ export class LinkAnalysisComponent implements OnInit {
             this.serverPatternBusy.set(false);
         }
     }
+
+    /** Why "Save this analysis" is unavailable to this user — empty when it is available. Sealing a snapshot needs `canManageIncidents`. */
+    readonly snapshotUnavailable = computed(() =>
+        this.lens.canManageIncidents() ? '' : 'Saving an analysis needs the Incident management capability.',
+    );
 
     /** Why "Attach to Case" is unavailable to this user — empty when it is available. Attaching needs `canManageIncidents`. */
     readonly attachUnavailable = computed(() =>

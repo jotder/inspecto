@@ -12,7 +12,7 @@
                 <!-- search nodes (icon → popover) -->
                 <button
                     mat-icon-button
-                    [matMenuTriggerFor]="searchMenu"
+                    [matMenuTriggerFor]="searchMenu" laFormMenu
                     [color]="search() ? 'primary' : undefined"
                     matTooltip="Search nodes"
                     aria-label="Search nodes"
@@ -47,18 +47,19 @@
                     <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
                 </button>
                 <mat-menu #kindMenu="matMenu">
-                    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
-                    <div
-                        class="flex flex-col gap-1 px-4 py-2"
-                        (click)="$event.stopPropagation()"
-                        aria-label="Node types"
-                    >
-                        @for (k of nodeKinds(); track k) {
-                            <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">{{
-                                k
-                            }}</mat-checkbox>
-                        }
-                    </div>
+                    @for (k of nodeKinds(); track k) {
+                        <!-- menuitemcheckbox: a role="menu" panel may hold only menu items (axe aria-required-children);
+                             the click stops propagation so the menu stays open while several kinds are toggled. -->
+                        <button
+                            mat-menu-item
+                            role="menuitemcheckbox"
+                            [attr.aria-checked]="kindOn(k)"
+                            (click)="$event.stopPropagation(); toggleKind(k, !kindOn(k))"
+                        >
+                            <mat-icon [svgIcon]="kindOn(k) ? 'heroicons_outline:check' : ''" aria-hidden="true"></mat-icon>
+                            <span>{{ k }}</span>
+                        </button>
+                    }
                 </mat-menu>
 
                 <!-- layout toolbox -->
@@ -95,7 +96,7 @@
                 @if (attrColumns().length) {
                     <button
                         mat-icon-button
-                        [matMenuTriggerFor]="timelineMenu"
+                        [matMenuTriggerFor]="timelineMenu" laFormMenu
                         [color]="timeColumn() ? 'primary' : undefined"
                         [disabled]="workingSetCanvas()"
                         [matTooltip]="workingSetCanvas() ? queryGraphOnlyReason : 'Timeline'"
@@ -140,14 +141,16 @@
                 }
 
                 <!-- evidence: snapshot the answer, attach it to a Case (spec §3.6) -->
-                <button
-                    mat-icon-button
-                    (click)="openSnapshot()"
-                    matTooltip="Save this analysis (optionally attaching it to a Case)"
-                    aria-label="Save this analysis"
-                >
-                    <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
-                </button>
+                <span class="inline-flex" [matTooltip]="snapshotUnavailable() || 'Save this analysis (optionally attaching it to a Case)'">
+                    <button
+                        mat-icon-button
+                        (click)="openSnapshot()"
+                        [disabled]="snapshotUnavailable() !== ''"
+                        [attr.aria-label]="snapshotUnavailable() ? 'Save this analysis — ' + snapshotUnavailable() : 'Save this analysis'"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
+                    </button>
+                </span>
                 <span
                     class="my-1 h-px w-6 max-md:mx-1 max-md:my-0 max-md:h-5 max-md:w-px"
                     style="background: var(--gamma-border)"
@@ -315,7 +318,7 @@
             <button
                 mat-icon-button
                 #saveTrigger="matMenuTrigger"
-                [matMenuTriggerFor]="saveMenu"
+                [matMenuTriggerFor]="saveMenu" laFormMenu
                 [disabled]="!graph()"
                 matTooltip="Save view"
                 aria-label="Save the current view"
@@ -356,7 +359,7 @@
                 <!-- display options -->
                 <button
                     mat-icon-button
-                    [matMenuTriggerFor]="displayMenu"
+                    [matMenuTriggerFor]="displayMenu" laFormMenu
                     [color]="displayCustomized() ? 'primary' : undefined"
                     matTooltip="Display options"
                     aria-label="Display options (labels, colors, shapes and line styles)"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { G6GraphData } from '@inspecto/core/graph';
-import { caseMemberCandidates } from './case-members';
+import { caseMemberCandidates, noCaseMemberReason } from './case-members';
 
 const G: G6GraphData = {
     nodes: [
@@ -55,5 +55,16 @@ describe('caseMemberCandidates', () => {
             edges: [],
         };
         expect(caseMemberCandidates(masked, 'calls')).toEqual([]);
+    });
+
+    it('says masking, not a missing Dataset, when masked Entities are why nothing can become a member', () => {
+        const masked: G6GraphData = {
+            nodes: [{ id: 'masked:0123456789abcdef', data: { label: 'masked', kind: 'entity' } }],
+            edges: [],
+        };
+        expect(noCaseMemberReason(masked)).toContain('masked');
+        expect(noCaseMemberReason(masked)).not.toContain('known source Dataset');
+        const other: G6GraphData = { nodes: [{ id: 'a', data: { label: 'a', kind: 'other' } }], edges: [] };
+        expect(noCaseMemberReason(other)).toContain('known source Dataset');
     });
 });
