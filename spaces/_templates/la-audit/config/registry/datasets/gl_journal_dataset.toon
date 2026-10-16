@@ -1,0 +1,20 @@
+physicalRef: gl_journal/database
+description: "Link Analysis audit showcase - General-ledger intercompany journal lines (journal, line, posting time, from and to legal entity, GL account, amount). Synthetic."
+eventDate: posted_date
+columns[9]{name,type,classification}:
+  journal_id,string,
+  line_no,string,
+  posted_date,date,
+  posted_at,timestamp,
+  from_entity,string,LEGAL_ENTITY
+  to_entity,string,LEGAL_ENTITY
+  gl_account,string,
+  amount,number,
+  description,string,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

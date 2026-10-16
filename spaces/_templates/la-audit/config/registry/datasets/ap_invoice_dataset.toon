@@ -1,0 +1,20 @@
+physicalRef: ap_invoice/database
+description: "Link Analysis audit showcase - Accounts-payable invoices, one row per supplier invoice (vendor, vendor's invoice number, legal entity, dates, amount, the bank account paid). Landed as one 12-month extract; the next month waits in data/staged. Synthetic."
+eventDate: invoice_date
+columns[9]{name,type,classification}:
+  invoice_id,string,
+  vendor_id,string,PARTY
+  invoice_no,string,
+  legal_entity,string,
+  invoice_date,date,
+  payment_date,date,
+  amount,number,
+  currency,string,
+  payment_account,string,PARTY
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

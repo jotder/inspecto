@@ -1,0 +1,18 @@
+physicalRef: ap_identity_links
+description: "Link Analysis audit showcase - The paid_to, shares_account and shares_address links of ap_links - the vendor identity graph: shell clusters, conflicts of interest, link prediction. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,PARTY
+  dst,string,PARTY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

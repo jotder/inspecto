@@ -1,0 +1,40 @@
+name: ap_approval
+active: true
+description: "Link Analysis audit showcase feed - Invoice approvals, one row per invoice (who approved, when, at which level). Landed as one 12-month extract; the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-audit-data.py."
+
+dirs:
+  poll:       data/inbox/ap_approval
+  database:   data/ap_approval/database
+  backup:     data/ap_approval/backup
+  temp:       data/ap_approval/temp
+  errors:     data/ap_approval/errors
+  quarantine: data/ap_approval/quarantine
+  markers:    data/ap_approval/markers
+  status_dir: data/ap_approval/status
+  log_dir:    data/ap_approval/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: ap_approval_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

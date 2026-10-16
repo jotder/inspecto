@@ -1,0 +1,18 @@
+physicalRef: ap_org_links
+description: "Link Analysis audit showcase - The reports_to links of ap_links alone (manager to report) - the org chart, a tree: Is forest is true, Descendants of the CFO is everyone. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,PARTY
+  dst,string,PARTY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

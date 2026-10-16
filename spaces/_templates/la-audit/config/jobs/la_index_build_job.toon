@@ -1,0 +1,15 @@
+job:
+  name: la_index_build
+  type: la.index.build
+  description: "Builds or appends the Link Analysis Index of ap_links each time the ap_links Job produces its Dataset (job.dataset.produced is emitted only by a sql.template Job, so the trigger is the Job, not a Pipeline commit). The first build is a full build (allow_full), every later one the append the server advises. The owner is stamped with whoever creates the Space."
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == ap_links"
+  dataset: ap_links_dataset
+  source_col: src
+  target_col: dst
+  kind_col: kind
+  time_col: ts
+  owner: audit.admin
+  allow_full: "true"
+  timeout_seconds: "600"
+  wait_seconds: "300"

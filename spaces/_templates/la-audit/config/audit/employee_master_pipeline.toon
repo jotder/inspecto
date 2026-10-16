@@ -1,0 +1,40 @@
+name: employee_master
+active: true
+description: "Link Analysis audit showcase feed - Employee master: manager (the org chart), department, own bank account and address key, approval limit. Synthetic; regenerate with tools/gen-la-audit-data.py."
+
+dirs:
+  poll:       data/inbox/employee_master
+  database:   data/employee_master/database
+  backup:     data/employee_master/backup
+  temp:       data/employee_master/temp
+  errors:     data/employee_master/errors
+  quarantine: data/employee_master/quarantine
+  markers:    data/employee_master/markers
+  status_dir: data/employee_master/status
+  log_dir:    data/employee_master/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: employee_master_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

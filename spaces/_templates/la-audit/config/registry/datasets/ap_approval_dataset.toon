@@ -1,0 +1,17 @@
+physicalRef: ap_approval/database
+description: "Link Analysis audit showcase - Invoice approvals, one row per invoice (who approved, when, at which level). Landed as one 12-month extract; the next month waits in data/staged. Synthetic."
+eventDate: approved_date
+columns[6]{name,type,classification}:
+  approval_id,string,
+  invoice_id,string,
+  approver_id,string,PARTY
+  approved_at,timestamp,
+  approved_date,date,
+  level,string,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

@@ -1,0 +1,40 @@
+name: ap_invoice
+active: true
+description: "Link Analysis audit showcase feed - Accounts-payable invoices, one row per supplier invoice (vendor, vendor's invoice number, legal entity, dates, amount, the bank account paid). Landed as one 12-month extract; the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-audit-data.py."
+
+dirs:
+  poll:       data/inbox/ap_invoice
+  database:   data/ap_invoice/database
+  backup:     data/ap_invoice/backup
+  temp:       data/ap_invoice/temp
+  errors:     data/ap_invoice/errors
+  quarantine: data/ap_invoice/quarantine
+  markers:    data/ap_invoice/markers
+  status_dir: data/ap_invoice/status
+  log_dir:    data/ap_invoice/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: ap_invoice_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

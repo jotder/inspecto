@@ -1,0 +1,18 @@
+physicalRef: gl_links
+description: "Link Analysis audit showcase - Intercompany journal flows built by the gl_links Job from gl_journal: src and dst are legal entities (classified LEGAL_ENTITY, not masked), one row per journal line, via = journal id and GL account. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,LEGAL_ENTITY
+  dst,string,LEGAL_ENTITY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

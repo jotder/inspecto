@@ -1,0 +1,19 @@
+masking_mode: typed
+four_eyes_fan_out_above: 30
+index:
+  enabled: true
+drafts:
+  max_open: 10
+  hibernate_after_minutes: 60
+  expire_after_days: 14
+entity_types[2]:
+  - id: party
+    label: Party (vendor, employee, bank account, address)
+    normaliser: upper-trim
+    masked: true
+    classifications[1]: PARTY
+  - id: legal_entity
+    label: Legal entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: LEGAL_ENTITY

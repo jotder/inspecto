@@ -1,0 +1,19 @@
+physicalRef: ap_duplicate_payments
+description: "Link Analysis audit showcase - possible duplicate payments built by the ap_duplicate_payments Job: two invoices of one vendor with the same amount in the same ISO week under different invoice numbers (13 planted pairs). Synthetic."
+eventDate: date_a
+columns[8]{name,type,classification}:
+  vendor_id,string,PARTY
+  invoice_a,string,
+  invoice_b,string,
+  invoice_no_a,string,
+  invoice_no_b,string,
+  amount,number,
+  date_a,date,
+  date_b,date,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

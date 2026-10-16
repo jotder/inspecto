@@ -1,0 +1,44 @@
+raw:
+  name: GL_JOURNAL
+  format: CSV
+  fields[9]{name,selector,type,description,unit,classification}:
+    journal_id,"0",VARCHAR,"journal_id","","INTERNAL"
+    line_no,"1",VARCHAR,"line_no","","INTERNAL"
+    posted_date,"2",DATE,"posted_date","","INTERNAL"
+    posted_at,"3",TIMESTAMP,"posted_at","","INTERNAL"
+    from_entity,"4",VARCHAR,"from_entity","","LEGAL_ENTITY"
+    to_entity,"5",VARCHAR,"to_entity","","LEGAL_ENTITY"
+    gl_account,"6",VARCHAR,"gl_account","","INTERNAL"
+    amount,"7",DOUBLE,"amount","","INTERNAL"
+    description,"8",VARCHAR,"description","","INTERNAL"
+mapping:
+  canonicalName: gl_journal
+  rawName: GL_JOURNAL
+  fields[9]:
+    - name: journal_id
+      from: journal_id
+      fn: keep
+    - name: line_no
+      from: line_no
+      fn: keep
+    - name: posted_date
+      from: posted_date
+      fn: keep
+    - name: posted_at
+      from: posted_at
+      fn: keep
+    - name: from_entity
+      from: from_entity
+      fn: keep
+    - name: to_entity
+      from: to_entity
+      fn: keep
+    - name: gl_account
+      from: gl_account
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: description
+      from: description
+      fn: keep

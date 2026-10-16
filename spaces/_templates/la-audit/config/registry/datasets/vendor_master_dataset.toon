@@ -1,0 +1,18 @@
+physicalRef: vendor_master/database
+description: "Link Analysis audit showcase - Vendor master: bank account, address key and phone per vendor. A placeholder account (PENDING) or a blank address is not evidence of sharing. Synthetic."
+eventDate: onboarded_date
+columns[7]{name,type,classification}:
+  vendor_id,string,PARTY
+  vendor_name,string,
+  bank_account,string,PARTY
+  address_key,string,PARTY
+  phone,string,PII
+  category,string,
+  onboarded_date,date,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

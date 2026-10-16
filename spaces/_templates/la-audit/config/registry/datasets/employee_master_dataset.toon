@@ -1,0 +1,19 @@
+physicalRef: employee_master/database
+description: "Link Analysis audit showcase - Employee master: manager (the org chart), department, own bank account and address key, approval limit. Synthetic."
+eventDate: hire_date
+columns[8]{name,type,classification}:
+  employee_id,string,PARTY
+  full_name,string,PII
+  manager_id,string,PARTY
+  department,string,
+  bank_account,string,PARTY
+  address_key,string,PARTY
+  approval_limit,number,
+  hire_date,date,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

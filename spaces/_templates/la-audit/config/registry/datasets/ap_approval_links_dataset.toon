@@ -1,0 +1,18 @@
+physicalRef: ap_approval_links
+description: "Link Analysis audit showcase - The approved links of ap_links alone (approver to vendor, one row per invoice) - the approval graph: k-core, bridges, articulation points, betweenness. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,PARTY
+  dst,string,PARTY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view
