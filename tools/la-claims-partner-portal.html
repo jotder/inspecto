@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referral portal - demo</title>
+<!-- A ~40-line static stand-in for a police or partner-insurer referral portal. Serve it from the origin the la-claims Space allows
+     (link-analysis.toon embed.frame_ancestors = http://127.0.0.1:8099):  python -m http.server 8099 --directory tools
+     then open http://127.0.0.1:8099/la-claims-partner-portal.html?host=http://127.0.0.1:8096&link=<grantId>.<secret>
+     The page holds NO credential: the minted link is the whole grant, read-only, masked, revocable. Synthetic data only. -->
+<style>
+  :root { --bg: #f6f7f9; --fg: #1d2330; --card: #fff; --line: #d5d9e0; --accent: #1f5fbf; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14171d; --fg: #e6e9ef; --card: #1c2029; --line: #333a46; --accent: #7aa8f0; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+  main { padding: 16px; max-width: 1100px; margin: 0 auto; }
+  form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  input { flex: 1 1 260px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  iframe { width: 100%; height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  p.note { color: var(--accent); margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<header><strong>Referral portal</strong> - partner insurer / police view of one referred Investigation (read-only, masked)</header>
+<main>
+  <form id="f"><input id="host" placeholder="Inspecto host, e.g. http://127.0.0.1:8096" aria-label="Host"><input id="link" placeholder="embed link: grantId.secret" aria-label="Embed link"><button>Open referral</button></form>
+  <p class="note" id="msg">Paste the link a lead minted (Share panel, or POST .../embeds). A revoked, expired or mangled link shows nothing: one uniform answer.</p>
+  <iframe id="v" title="Referred Investigation" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
+</main>
+<script>
+  const q = new URLSearchParams(location.search), $ = (id) => document.getElementById(id);
+  $('host').value = q.get('host') || ''; $('link').value = q.get('link') || '';
+  function open() {
+    const host = $('host').value.trim().replace(/\/$/, ''), link = $('link').value.trim();
+    if (!/^https?:\/\/[\w.:-]+$/.test(host) || !/^[\w-]+\.[\w-]+$/.test(link)) { $('msg').textContent = 'Enter a host (http://host:port) and a link (grantId.secret).'; return; }
+    $('v').src = host + '/embed/inv/' + encodeURIComponent(link);
+    $('msg').textContent = 'Showing the referred Investigation. The link, not this page, is the grant.';
+  }
+  $('f').addEventListener('submit', (e) => { e.preventDefault(); open(); });
+  if ($('host').value && $('link').value) open();
+</script>
+</body>
+</html>
