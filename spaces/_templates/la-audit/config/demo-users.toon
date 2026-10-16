@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  audit.admin,Demo Audit Admin,Platform administrator,admin;audit-lead;audit-settings
+  audit.lead,Demo Lead Auditor,Lead auditor,audit-lead
+  audit.manager,Demo Audit Manager,Audit manager (second approver),audit-manager
+  audit.committee,Demo Audit Committee,Audit committee member (read-only),audit-committee
+  audit.outsider,Demo Outsider,Not a member of the Investigation,audit-committee

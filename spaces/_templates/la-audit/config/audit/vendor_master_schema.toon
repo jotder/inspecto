@@ -1,0 +1,36 @@
+raw:
+  name: VENDOR_MASTER
+  format: CSV
+  fields[7]{name,selector,type,description,unit,classification}:
+    vendor_id,"0",VARCHAR,"vendor_id","","PARTY"
+    vendor_name,"1",VARCHAR,"vendor_name","","INTERNAL"
+    bank_account,"2",VARCHAR,"bank_account","","PARTY"
+    address_key,"3",VARCHAR,"address_key","","PARTY"
+    phone,"4",VARCHAR,"phone","","PII"
+    category,"5",VARCHAR,"category","","INTERNAL"
+    onboarded_date,"6",DATE,"onboarded_date","","INTERNAL"
+mapping:
+  canonicalName: vendor_master
+  rawName: VENDOR_MASTER
+  fields[7]:
+    - name: vendor_id
+      from: vendor_id
+      fn: keep
+    - name: vendor_name
+      from: vendor_name
+      fn: keep
+    - name: bank_account
+      from: bank_account
+      fn: keep
+    - name: address_key
+      from: address_key
+      fn: keep
+    - name: phone
+      from: phone
+      fn: keep
+    - name: category
+      from: category
+      fn: keep
+    - name: onboarded_date
+      from: onboarded_date
+      fn: keep

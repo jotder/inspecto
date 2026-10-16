@@ -1,0 +1,32 @@
+raw:
+  name: AP_APPROVAL
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    approval_id,"0",VARCHAR,"approval_id","","INTERNAL"
+    invoice_id,"1",VARCHAR,"invoice_id","","INTERNAL"
+    approver_id,"2",VARCHAR,"approver_id","","PARTY"
+    approved_at,"3",TIMESTAMP,"approved_at","","INTERNAL"
+    approved_date,"4",DATE,"approved_date","","INTERNAL"
+    level,"5",VARCHAR,"level","","INTERNAL"
+mapping:
+  canonicalName: ap_approval
+  rawName: AP_APPROVAL
+  fields[6]:
+    - name: approval_id
+      from: approval_id
+      fn: keep
+    - name: invoice_id
+      from: invoice_id
+      fn: keep
+    - name: approver_id
+      from: approver_id
+      fn: keep
+    - name: approved_at
+      from: approved_at
+      fn: keep
+    - name: approved_date
+      from: approved_date
+      fn: keep
+    - name: level
+      from: level
+      fn: keep

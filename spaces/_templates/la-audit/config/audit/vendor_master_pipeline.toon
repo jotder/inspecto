@@ -1,0 +1,40 @@
+name: vendor_master
+active: true
+description: "Link Analysis audit showcase feed - Vendor master: bank account, address key and phone per vendor. A placeholder account (PENDING) or a blank address is not evidence of sharing. Synthetic; regenerate with tools/gen-la-audit-data.py."
+
+dirs:
+  poll:       data/inbox/vendor_master
+  database:   data/vendor_master/database
+  backup:     data/vendor_master/backup
+  temp:       data/vendor_master/temp
+  errors:     data/vendor_master/errors
+  quarantine: data/vendor_master/quarantine
+  markers:    data/vendor_master/markers
+  status_dir: data/vendor_master/status
+  log_dir:    data/vendor_master/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: vendor_master_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

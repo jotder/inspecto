@@ -1,0 +1,10 @@
+job:
+  name: ap_approval_links
+  type: sql.template
+  description: "Runs each time the ap_links Job produces its Dataset (never on a timer, so it never reads an older snapshot): the rows of ap_links that make up the approval graph (approver to vendor, one row per invoice)."
+  sql: "SELECT * FROM ap_links WHERE kind = 'approved' ORDER BY kind, src, dst, via"
+  sources: ap_links
+  sink_dataset: ap_approval_links
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == ap_links"
+  enabled: true

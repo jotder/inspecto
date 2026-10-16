@@ -1,0 +1,9 @@
+job:
+  name: gl_links
+  type: sql.template
+  description: "Folds the intercompany journal into a link Dataset: one row per journal line, src and dst are the legal entities, kind journal_flow, via = journal id and GL account. Snapshot rebuild."
+  sql: "SELECT from_entity AS src, to_entity AS dst, 'journal_flow' AS kind, posted_at AS ts, CAST(amount AS DOUBLE) AS amount, posted_date AS event_date, journal_id || '/' || gl_account AS via FROM gl_journal WHERE from_entity <> to_entity ORDER BY posted_at, journal_id, line_no"
+  sources: gl_journal
+  sink_dataset: gl_links
+  cron: "*/10 * * * *"
+  enabled: true

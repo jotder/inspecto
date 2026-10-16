@@ -1,0 +1,18 @@
+name: ap_approval_graph
+description: "AUDIT 1 - The approval graph: approvers linked to the vendors whose invoices they approved (one link per invoice, TS and AMOUNT on the links). Run Articulation points and Bridges (E-07 and V-041 are the only cut vertices at a vendor with more than one approver), k-core (E-07, E-08 and E-09 form the densest core with their 20 vendors), Betweenness (the utilities vendor V-001 and the CFO E-01 lead: busy, not guilty) and Is forest (false here, true on the org chart in ap_org_links_dataset)."
+sourceId: entity-projection
+layout: force
+profile: finance
+query:
+  projection:
+    datasetId: ap_approval_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[2]: ts,amount
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    behaviors[1]: hover-activate

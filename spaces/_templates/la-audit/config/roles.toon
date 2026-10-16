@@ -1,0 +1,9 @@
+roles[4]:
+  - name: audit-lead
+    capabilities[6]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules,canRevealLinkEntities
+  - name: audit-manager
+    capabilities[4]: canManageIncidents,canWorkIncidents,canApproveLinkExpansions,canOperateRuns
+  - name: audit-committee
+    capabilities[0]:
+  - name: audit-settings
+    capabilities[1]: canAuthorWorkbench

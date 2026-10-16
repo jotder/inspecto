@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit committee portal (demo)</title>
+<!-- Static demo portal for the la-audit showcase: frames ONE minted embed link of an Investigation, read-only and masked.
+     Open from disk. Paste the viewer link (http://<host>/embed/inv/<grantId>.<secret>) - it is kept in memory only, never in this
+     page's address bar or storage. The host must allow this page as a frame ancestor (Settings > Link Analysis > embed allow-list,
+     or the Space's embed.frame_ancestors; a file:// page needs the "null" origin the host documents). Revoke the link and the frame
+     goes blank. Synthetic data only. See docs/ops/la-showcase-audit-runbook.md, scene "Embed". -->
+<style>
+  :root { --bg: #f6f7f9; --fg: #1d2330; --muted: #5b6577; --card: #fff; --line: #d6dae2; --accent: #1f5fbf; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14171d; --fg: #e6e9ef; --muted: #98a2b3; --card: #1c2029; --line: #333a47; --accent: #6aa2ff; } }
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header, main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } p { margin: 0; color: var(--muted); }
+  form { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+  input { flex: 1 1 320px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  iframe { width: 100%; height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  #msg { margin-top: 8px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Audit committee: vendor V-117 workpaper</h1>
+  <p>A read-only, masked view of the lead auditor's Investigation, shared by a link the host can revoke at any time.</p>
+</header>
+<main>
+  <form id="f"><input id="u" type="url" required placeholder="Paste the embed viewer link (/embed/inv/...)" aria-label="Embed viewer link"><button>Open</button></form>
+  <iframe id="v" title="Shared Investigation" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin" hidden></iframe>
+  <div id="msg" role="status"></div>
+</main>
+<script>
+  const f = document.getElementById('f'), u = document.getElementById('u'), v = document.getElementById('v'), msg = document.getElementById('msg');
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    let url; try { url = new URL(u.value.trim()); } catch { msg.textContent = 'That is not a link.'; return; }
+    if (!/^\/embed\/inv\//.test(url.pathname)) { msg.textContent = 'Expected a viewer link containing /embed/inv/.'; return; }
+    v.src = url.href; v.hidden = false; u.value = ''; msg.textContent = 'Read-only. If the frame stays blank the link was revoked, expired, or this page is not an allowed frame ancestor.';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+job:
+  name: ap_duplicate_payments
+  type: sql.template
+  description: "Possible duplicate payments: two invoices of one vendor with the same amount in the same ISO week under different invoice numbers. Snapshot rebuild."
+  sql: "SELECT a.vendor_id, a.invoice_id AS invoice_a, b.invoice_id AS invoice_b, a.invoice_no AS invoice_no_a, b.invoice_no AS invoice_no_b, CAST(a.amount AS DOUBLE) AS amount, a.invoice_date AS date_a, b.invoice_date AS date_b FROM ap_invoice a JOIN ap_invoice b ON a.vendor_id = b.vendor_id AND a.amount = b.amount AND a.invoice_id < b.invoice_id AND a.invoice_no <> b.invoice_no AND date_trunc('week', a.invoice_date) = date_trunc('week', b.invoice_date) ORDER BY a.vendor_id, a.invoice_date"
+  sources: ap_invoice
+  sink_dataset: ap_duplicate_payments
+  cron: "*/10 * * * *"
+  enabled: true

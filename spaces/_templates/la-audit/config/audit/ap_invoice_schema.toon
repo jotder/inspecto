@@ -1,0 +1,44 @@
+raw:
+  name: AP_INVOICE
+  format: CSV
+  fields[9]{name,selector,type,description,unit,classification}:
+    invoice_id,"0",VARCHAR,"invoice_id","","INTERNAL"
+    vendor_id,"1",VARCHAR,"vendor_id","","PARTY"
+    invoice_no,"2",VARCHAR,"invoice_no","","INTERNAL"
+    legal_entity,"3",VARCHAR,"legal_entity","","INTERNAL"
+    invoice_date,"4",DATE,"invoice_date","","INTERNAL"
+    payment_date,"5",DATE,"payment_date","","INTERNAL"
+    amount,"6",DOUBLE,"amount","","INTERNAL"
+    currency,"7",VARCHAR,"currency","","INTERNAL"
+    payment_account,"8",VARCHAR,"payment_account","","PARTY"
+mapping:
+  canonicalName: ap_invoice
+  rawName: AP_INVOICE
+  fields[9]:
+    - name: invoice_id
+      from: invoice_id
+      fn: keep
+    - name: vendor_id
+      from: vendor_id
+      fn: keep
+    - name: invoice_no
+      from: invoice_no
+      fn: keep
+    - name: legal_entity
+      from: legal_entity
+      fn: keep
+    - name: invoice_date
+      from: invoice_date
+      fn: keep
+    - name: payment_date
+      from: payment_date
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: currency
+      from: currency
+      fn: keep
+    - name: payment_account
+      from: payment_account
+      fn: keep

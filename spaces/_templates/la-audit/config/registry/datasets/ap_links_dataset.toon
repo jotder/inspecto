@@ -1,0 +1,18 @@
+physicalRef: ap_links
+description: "Link Analysis audit showcase - ONE link Dataset of the whole procure-to-pay graph built by the ap_links Job: kind approved (approver to vendor, via the invoice), paid_to (vendor to the bank account paid, via the invoice), shares_account and shares_address (a vendor or employee pair holding the same bank account or address, once per pair, via the shared value), reports_to (manager to report: parent to child, the orientation Is forest reads). Placeholder accounts and blank addresses make no link; a value held by more than 10 parties is common, not evidence. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,PARTY
+  dst,string,PARTY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+owner: audit.lead
+shares[5]{subjectType,subjectId,access}:
+  user,audit.admin,view
+  user,audit.lead,view
+  user,audit.manager,view
+  user,audit.committee,view
+  user,audit.outsider,view

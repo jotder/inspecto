@@ -1,0 +1,40 @@
+name: gl_journal
+active: true
+description: "Link Analysis audit showcase feed - General-ledger intercompany journal lines (journal, line, posting time, from and to legal entity, GL account, amount). Synthetic; regenerate with tools/gen-la-audit-data.py."
+
+dirs:
+  poll:       data/inbox/gl_journal
+  database:   data/gl_journal/database
+  backup:     data/gl_journal/backup
+  temp:       data/gl_journal/temp
+  errors:     data/gl_journal/errors
+  quarantine: data/gl_journal/quarantine
+  markers:    data/gl_journal/markers
+  status_dir: data/gl_journal/status
+  log_dir:    data/gl_journal/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: gl_journal_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess
