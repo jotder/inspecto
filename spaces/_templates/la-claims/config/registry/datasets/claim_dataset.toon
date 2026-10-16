@@ -1,0 +1,22 @@
+physicalRef: claim/database
+description: "Insurance-claims Link Analysis showcase - One row per insurance claim: policy, accident, loss and report dates, claim amount and the garage, clinic and lawyer on it (blank when none), plus the lawyer who referred the clinic. Landed by the claim Pipeline. Synthetic."
+eventDate: loss_date
+columns[11]{name,type,classification}:
+  claim_id,string,
+  policy_id,string,
+  accident_id,string,
+  loss_date,date,
+  reported_date,date,
+  claim_amount,number,
+  garage_id,string,
+  clinic_id,string,
+  lawyer_id,string,
+  referred_by,string,
+  status,string,
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view

@@ -1,0 +1,17 @@
+physicalRef: claim_party/database
+description: "Insurance-claims Link Analysis showcase - One row per person on a claim (role driver, passenger or claimant) with the person details as written on that claim: name, date of birth, phone, address. Placeholders (blank, 0000000000, UNKNOWN) are real data-quality noise. Landed by the claim_party Pipeline. Synthetic."
+columns[7]{name,type,classification}:
+  claim_id,string,
+  party_id,string,PARTY
+  role,string,
+  full_name,string,PII
+  dob,date,PII
+  phone,string,PII
+  address,string,PII
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view

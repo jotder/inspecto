@@ -1,0 +1,15 @@
+name: claims_junction_cluster_map
+description: "GEO scene 1 - accidents at 02:00-03:59 with no police report: eleven of them stack on one invented junction in Derby (nine are the staged-accident ring), the rest are scattered strays. Zoom to the stack. Synthetic."
+sourceId: dataset
+display: markers
+query:
+  projection:
+    datasetId: claims_night_unreported_dataset
+    latCol: lat
+    lonCol: lon
+    entityCol: accident_id
+    entityIdCol: accident_id
+    kindCol: city
+camera:
+  center[2]: -1.52,52.95
+  zoom: 10.5

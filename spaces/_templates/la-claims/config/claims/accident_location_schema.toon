@@ -1,0 +1,32 @@
+raw:
+  name: ACCIDENT_LOCATION
+  format: CSV
+  fields[6]{name,selector,type}:
+    accident_id,"0",VARCHAR
+    city,"1",VARCHAR
+    lat,"2",DOUBLE
+    lon,"3",DOUBLE
+    accident_at,"4",TIMESTAMP
+    police_report_ref,"5",VARCHAR
+mapping:
+  canonicalName: accident_location
+  rawName: ACCIDENT_LOCATION
+  fields[6]:
+    - name: accident_id
+      from: accident_id
+      fn: keep
+    - name: city
+      from: city
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep
+    - name: accident_at
+      from: accident_at
+      fn: keep
+    - name: police_report_ref
+      from: police_report_ref
+      fn: keep

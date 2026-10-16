@@ -1,0 +1,36 @@
+name: provider_bill
+active: true
+description: "Insurance-claims Link Analysis showcase - One row per bill a provider raised against a claim. One extract (PROVIDER_BILL_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
+
+dirs:
+  poll:       data/inbox/provider_bill
+  database:   data/provider_bill/database
+  backup:     data/provider_bill/backup
+  temp:       data/provider_bill/temp
+  errors:     data/provider_bill/errors
+  quarantine: data/provider_bill/quarantine
+  markers:    data/provider_bill/markers
+  status_dir: data/provider_bill/status
+  log_dir:    data/provider_bill/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: provider_bill_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

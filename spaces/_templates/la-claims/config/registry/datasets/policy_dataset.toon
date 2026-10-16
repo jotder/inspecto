@@ -1,0 +1,16 @@
+physicalRef: policy/database
+description: "Insurance-claims Link Analysis showcase - One row per policy: holder, broker, inception day and premium. The early-claim story reads inception against the claim loss date. Landed by the policy Pipeline. Synthetic."
+eventDate: inception_date
+columns[5]{name,type,classification}:
+  policy_id,string,
+  holder_id,string,PARTY
+  broker_id,string,
+  inception_date,date,
+  premium,number,
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view

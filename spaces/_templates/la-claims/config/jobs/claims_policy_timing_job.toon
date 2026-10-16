@@ -1,0 +1,9 @@
+job:
+  name: claims_policy_timing
+  type: sql.template
+  description: "One row per claim joined to its policy: broker, inception day, loss day and days_to_claim. Seven policies are claimed on within 20 days of inception and every one was bought through broker BRK-05 (the early-claim story). Snapshot rebuild."
+  sql: "SELECT p.policy_id, p.broker_id, p.inception_date, c.claim_id, c.loss_date, CAST(date_diff('day', p.inception_date, c.loss_date) AS BIGINT) AS days_to_claim FROM policy p JOIN claim c ON c.policy_id = p.policy_id ORDER BY p.policy_id, c.claim_id"
+  sources: policy,claim
+  sink_dataset: claims_policy_timing
+  cron: "*/10 * * * *"
+  enabled: true

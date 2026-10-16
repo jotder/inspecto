@@ -1,0 +1,17 @@
+physicalRef: claims_policy_timing
+description: "Insurance-claims Link Analysis showcase - every claim with its policy, broker, inception day and days_to_claim, built by the claims_policy_timing Job. Synthetic."
+eventDate: loss_date
+columns[6]{name,type,classification}:
+  policy_id,string,
+  broker_id,string,
+  inception_date,date,
+  claim_id,string,
+  loss_date,date,
+  days_to_claim,number,
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view

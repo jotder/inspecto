@@ -1,0 +1,32 @@
+raw:
+  name: PROVIDER_DIRECTORY
+  format: CSV
+  fields[6]{name,selector,type}:
+    provider_id,"0",VARCHAR
+    provider_name,"1",VARCHAR
+    provider_type,"2",VARCHAR
+    city,"3",VARCHAR
+    lat,"4",DOUBLE
+    lon,"5",DOUBLE
+mapping:
+  canonicalName: provider_directory
+  rawName: PROVIDER_DIRECTORY
+  fields[6]:
+    - name: provider_id
+      from: provider_id
+      fn: keep
+    - name: provider_name
+      from: provider_name
+      fn: keep
+    - name: provider_type
+      from: provider_type
+      fn: keep
+    - name: city
+      from: city
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep

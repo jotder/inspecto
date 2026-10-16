@@ -1,0 +1,6 @@
+job:
+  name: la_detect
+  type: la.detect
+  description: "Standing detection: every few minutes evaluates the Alert Rules bound to an Investigation. Reads nothing unless the rule owner has enabled standing detection on that rule."
+  cron: "*/5 * * * *"
+  enabled: true

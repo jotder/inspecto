@@ -1,0 +1,23 @@
+name: claims_provider_money
+description: "Claims money trail - only links that carry value (amount of 1500 or more): provider bills against claims, and the lawyer to clinic referral. Compare clinic bills per claim: CLI-04 is about three times its peers. Run HITS or PageRank on the working set."
+sourceId: entity-projection
+layout: dagre
+query:
+  projection:
+    datasetId: claims_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[2]: ts,amount
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,amount,">=","1500"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

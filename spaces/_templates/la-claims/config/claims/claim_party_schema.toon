@@ -1,0 +1,36 @@
+raw:
+  name: CLAIM_PARTY
+  format: CSV
+  fields[7]{name,selector,type}:
+    claim_id,"0",VARCHAR
+    party_id,"1",VARCHAR
+    role,"2",VARCHAR
+    full_name,"3",VARCHAR
+    dob,"4",DATE
+    phone,"5",VARCHAR
+    address,"6",VARCHAR
+mapping:
+  canonicalName: claim_party
+  rawName: CLAIM_PARTY
+  fields[7]:
+    - name: claim_id
+      from: claim_id
+      fn: keep
+    - name: party_id
+      from: party_id
+      fn: keep
+    - name: role
+      from: role
+      fn: keep
+    - name: full_name
+      from: full_name
+      fn: keep
+    - name: dob
+      from: dob
+      fn: keep
+    - name: phone
+      from: phone
+      fn: keep
+    - name: address
+      from: address
+      fn: keep

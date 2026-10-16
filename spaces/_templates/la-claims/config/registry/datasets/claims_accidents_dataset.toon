@@ -1,0 +1,19 @@
+kind: virtual
+sourceName: accident_location
+sql: "SELECT accident_id, city, lat, lon, accident_at, CASE WHEN police_report_ref IS NULL OR police_report_ref = '' THEN 'no_police_report' ELSE 'police_report' END AS report_status, CAST(hour(accident_at) AS BIGINT) AS accident_hour FROM accident_location"
+description: "Insurance-claims Link Analysis showcase GEO scene - every accident with a report_status (police_report or no_police_report) and its hour. SYNTHETIC: invented coordinates around city centroids."
+columns[7]{name,type,classification}:
+  accident_id,string,
+  city,string,
+  lat,number,
+  lon,number,
+  accident_at,timestamp,
+  report_status,string,
+  accident_hour,number,
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view

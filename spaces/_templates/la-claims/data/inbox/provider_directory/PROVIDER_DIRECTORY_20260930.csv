@@ -1,0 +1,26 @@
+provider_id,provider_name,provider_type,city,lat,lon
+GAR-01,Kessler Autobody,garage,Exeter,50.72526,-3.55792
+GAR-02,Zielinski Autobody,garage,Hull,53.77460,-0.35740
+GAR-03,Marlowe Autobody,garage,Derby,52.92908,-1.46119
+GAR-04,Dalby Autobody,garage,Norwich,52.60194,1.29503
+GAR-05,Galloway Autobody,garage,Norwich,52.66049,1.29663
+GAR-06,Thackeray Autobody,garage,Derby,52.93751,-1.44940
+GAR-07,Pemberton Autobody,garage,Derby,52.95107,-1.48792
+GAR-08,Zielinski Autobody,garage,Leeds,53.82848,-1.57512
+GAR-09,Sandoval Autobody,garage,Bristol,51.43216,-2.57658
+CLI-01,Marlowe Clinic,clinic,Norwich,52.60453,1.32307
+CLI-02,Quayle Clinic,clinic,Hull,53.72460,-0.34888
+CLI-03,Ivanek Clinic,clinic,Norwich,52.64428,1.27572
+CLI-04,Underhill Clinic,clinic,Derby,52.93770,-1.49711
+CLI-05,Kessler Clinic,clinic,Norwich,52.61403,1.29989
+CLI-06,Pemberton Clinic,clinic,Bristol,51.48144,-2.56267
+CLI-07,Jarrow Clinic,clinic,Leeds,53.78633,-1.57236
+CLI-08,Thackeray Clinic,clinic,Bristol,51.48049,-2.59838
+CLI-09,Okafor Clinic,clinic,Bristol,51.47171,-2.58602
+LAW-01,Yardley Solicitors,lawyer,Exeter,50.73224,-3.53684
+LAW-02,Redmayne Solicitors,lawyer,Derby,52.89944,-1.46720
+LAW-03,Sandoval Solicitors,lawyer,Norwich,52.63589,1.29357
+LAW-04,Yardley Solicitors,lawyer,Leeds,53.78508,-1.56763
+LAW-05,Whitlock Solicitors,lawyer,Bristol,51.46789,-2.61439
+LAW-06,Cardew Solicitors,lawyer,Hull,53.71580,-0.34525
+LAW-07,Underhill Solicitors,lawyer,Leeds,53.78633,-1.57017

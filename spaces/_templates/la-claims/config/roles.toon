@@ -1,0 +1,9 @@
+roles[4]:
+  - name: siu-analyst
+    capabilities[6]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules,canRevealLinkEntities
+  - name: siu-manager
+    capabilities[4]: canManageIncidents,canWorkIncidents,canApproveLinkExpansions,canOperateRuns
+  - name: la-viewer
+    capabilities[0]:
+  - name: la-settings
+    capabilities[1]: canAuthorWorkbench
