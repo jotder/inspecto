@@ -92,6 +92,13 @@ class ControlApiLaClaimsGeoSceneTest {
                     views.write(new ViewDefinition(ds + "_view", "flow-x", List.of(), datasetSql(ds), "2026-10-16T00:00:00Z"));
                     store.write("dataset", ds, Map.of("view", ds + "_view"));
                 }
+                Path directory;
+                try (var f = Files.list(TPL.resolve("data/inbox/provider_directory"))) {
+                    directory = f.filter(p -> p.toString().endsWith(".csv")).findFirst().orElseThrow();
+                }
+                views.write(new ViewDefinition("provider_directory_view", "flow-x", List.of(),
+                        ControlApiLaShowcaseGeoSceneTest.valuesSql(directory, Set.of("lat", "lon"), m -> true), "2026-10-16T00:00:00Z"));
+                store.write("dataset", "provider_directory_dataset", Map.of("view", "provider_directory_view"));
                 long accidents;
                 try (var lines = Files.lines(Files.list(TPL.resolve("data/inbox/accident_location")).findFirst().orElseThrow())) {
                     accidents = lines.count() - 1;
@@ -108,6 +115,9 @@ class ControlApiLaClaimsGeoSceneTest {
                 int nightStacked = 0;
                 for (JsonNode p : night.get("points")) if (metres(p.get("lat").asDouble(), p.get("lon").asDouble()) <= 400) nightStacked++;
                 assertEquals(11, nightStacked, "all eleven are in the 02:00-03:59 no-police-report subset");
+                JsonNode providers = project(api.port(), projection("claims_providers_map", "provider_directory_dataset"));
+                assertEquals(25, providers.get("points").size(), "all 25 providers are placed");
+                assertEquals(0, providers.get("skipped").asInt());
                 assertTrue(night.get("points").size() >= 11 && night.get("points").size() < accidents / 4, "the subset is small: " + night.get("points").size());
             } finally {
                 api.close();
