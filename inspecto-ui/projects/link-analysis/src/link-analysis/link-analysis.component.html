@@ -889,15 +889,12 @@
                             [open]="legendOpen()"
                             (openChange)="legendOpen.set($event)"
                         ></inspecto-link-analysis-legend>
-                        <!-- render footer: what is drawn, the level-of-detail state and the STATED caps -->
+                        <!-- render strip: what the render left out and the level-of-detail state; the counts, the caps and the modules live in the footer status bar -->
                         <div
                             class="text-secondary absolute bottom-1 left-2 right-2 z-10 flex flex-wrap items-center gap-x-3 text-[11px]"
+                            role="group"
                             aria-label="Render status"
                         >
-                            <span
-                                >{{ canvasData()?.nodes?.length ?? 0 }} nodes ·
-                                {{ canvasData()?.edges?.length ?? 0 }} links drawn</span
-                            >
                             @if (omittedLinks(); as omitted) {
                                 <span class="text-warn" role="status"
                                     >Showing {{ (canvasData()?.edges?.length ?? 0).toLocaleString() }} of
@@ -911,14 +908,6 @@
                             @if (lodLabelsOff()) {
                                 <span>labels off above {{ lodLabelCap() }} nodes (level of detail)</span>
                             }
-                            <inspecto-link-analysis-modules class="ml-auto" />
-                            <span>
-                                caps: projection {{ caps.projection }} nodes (server) · analysis
-                                {{ caps.analysis }} nodes (browser)
-                                @if (serverRunCeiling(); as ceiling) {
-                                    · graph run {{ ceiling }} nodes (server)
-                                }
-                            </span>
                         </div>
                         <inspecto-link-analysis-working-set
                             class="absolute right-2 top-2 z-10"
@@ -1368,6 +1357,13 @@
             aria-label="Active query"
             data-testid="la-status"
         >
+            <!-- the stated node caps: the left-most item of the footer, a popover opening upward (operator 2026-10-16) -->
+            <inspecto-link-analysis-caps
+                class="shrink-0"
+                [projection]="caps.projection"
+                [analysis]="caps.analysis"
+                [graphRun]="serverRunCeiling()"
+            />
             <!-- the page title and its info (moved down from the header, operator 2026-10-15): the page's one h1 -->
             <h1 class="shrink-0 text-sm font-semibold leading-6" data-testid="la-title">Link Analysis</h1>
             <inspecto-ai-explain screen="Link Analysis" [terms]="['Entity', 'Link', 'Dataset', 'Pipeline']" />
@@ -1405,6 +1401,8 @@
                     {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
                 </span>
             }
+            <!-- Installed Link Analysis modules: the right-most item of the footer; its list opens upward over the canvas -->
+            <inspecto-link-analysis-modules class="ml-auto shrink-0" />
         </div>
         </div>
     </div>

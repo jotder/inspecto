@@ -207,6 +207,7 @@ import {
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
 import { idsInWorkingSet, rawIdsOf } from './investigation-state';
@@ -309,6 +310,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         FormMenuDirective,
+        LinkAnalysisCapsComponent,
         LinkAnalysisModulesComponent,
         AiExplainComponent,
         ChipComponent,
@@ -987,7 +989,7 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     /** D-4 step 7: the server's hard ceiling on a graph run (null until `GET /inv/graph/algorithms` answers). */
-    readonly serverRunCeiling = computed(() => this.graphRuns.catalogue()?.ceilings.maxNodes ?? null);
+    readonly serverRunCeiling = computed(() => this.graphRuns.catalogue()?.ceilings?.maxNodes ?? null);
     /** The server's per-algorithm `inlineNodeCeiling`, by algorithm id - what lowers the selection algorithms' browser threshold. */
     readonly serverAlgorithmCeilings = computed(() => {
         const algorithms = this.graphRuns.catalogue()?.algorithms;

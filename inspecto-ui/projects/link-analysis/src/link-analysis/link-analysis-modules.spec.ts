@@ -62,9 +62,11 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
     it('draws the list as an opaque card above the canvas, so graph labels do not bleed through it', () => {
         const { el, open } = make(() => of({ hostBuildId: 'h', modules: [m('geo-link')] }));
         open();
-        const list = el.querySelector<HTMLElement>('[data-testid=modules-list]')!;
-        expect(list.getAttribute('style')).toContain('--gamma-bg-card');
-        expect(list.classList.contains('z-30')).toBe(true);
+        const card = el.querySelector<HTMLElement>('[data-testid=modules-list]')!.parentElement!; // the popover card
+        expect(card.getAttribute('style')).toContain('--gamma-bg-card');
+        expect(card.classList.contains('z-30')).toBe(true);
+        expect(card.className).toContain('bottom-full'); // opens upward from the footer
+        expect(card.className).toContain('right-0');
     });
 
     it('states a failed read instead of an empty list', () => {

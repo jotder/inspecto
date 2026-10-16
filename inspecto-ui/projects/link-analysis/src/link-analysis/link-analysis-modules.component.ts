@@ -17,40 +17,46 @@ export function isLinkAnalysisModule(id: string): boolean {
     selector: 'inspecto-link-analysis-modules',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
+    // The footer hosts it at the right edge; the list is a popover anchored above its button, never in the footer's flow.
+    host: { class: 'relative inline-block' },
     imports: [MatButtonModule, ChipComponent],
     template: `
         <button mat-button data-testid="modules-toggle" (click)="toggle()" [attr.aria-expanded]="open()">
             Installed modules
         </button>
         @if (open()) {
-            @if (error()) {
-                <p class="text-secondary text-sm" role="status" data-testid="modules-error">{{ error() }}</p>
-            } @else if (!modules()) {
-                <p class="text-secondary text-sm" role="status">Loading...</p>
-            } @else {
-                <!-- Opens upward over the canvas: an opaque card above the minimap, or the graph labels bleed through. -->
-                <ul
-                    class="relative z-30 flex flex-col gap-1 rounded border p-2 text-sm"
-                    style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-                    data-testid="modules-list"
-                    aria-label="Link Analysis modules"
-                >
-                    @for (m of modules(); track m.id) {
-                        <li class="flex flex-wrap items-center gap-2">
-                            <span class="font-medium">{{ m.title || m.id }}</span>
-                            <span class="text-secondary">{{ m.id }}</span>
-                            <inspecto-chip variant="soft" [tone]="tone(m)" [attr.data-testid]="'module-' + m.id">
-                                {{ label(m) }}
-                            </inspecto-chip>
-                            @if (m.reasons?.length) {
-                                <span class="text-secondary">{{ m.reasons![0] }}</span>
-                            }
-                        </li>
-                    } @empty {
-                        <li class="text-secondary">No Link Analysis modules are listed.</li>
-                    }
-                </ul>
-            }
+            <!-- Opens upward over the canvas: an opaque card above the footer, or the graph labels bleed through. -->
+            <div
+                class="absolute bottom-full right-0 z-30 mb-1 w-max max-w-[90vw] rounded border p-2 text-sm"
+                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+            >
+                @if (error()) {
+                    <p class="text-secondary text-sm" role="status" data-testid="modules-error">{{ error() }}</p>
+                } @else if (!modules()) {
+                    <p class="text-secondary text-sm" role="status">Loading...</p>
+                } @else {
+                    <ul
+                        class="flex flex-col gap-1 text-sm"
+                        data-testid="modules-list"
+                        aria-label="Link Analysis modules"
+                    >
+                        @for (m of modules(); track m.id) {
+                            <li class="flex flex-wrap items-center gap-2">
+                                <span class="font-medium">{{ m.title || m.id }}</span>
+                                <span class="text-secondary">{{ m.id }}</span>
+                                <inspecto-chip variant="soft" [tone]="tone(m)" [attr.data-testid]="'module-' + m.id">
+                                    {{ label(m) }}
+                                </inspecto-chip>
+                                @if (m.reasons?.length) {
+                                    <span class="text-secondary">{{ m.reasons![0] }}</span>
+                                }
+                            </li>
+                        } @empty {
+                            <li class="text-secondary">No Link Analysis modules are listed.</li>
+                        }
+                    </ul>
+                }
+            </div>
         }
     `,
 })

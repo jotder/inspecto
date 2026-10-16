@@ -1415,7 +1415,8 @@ describe('LinkAnalysisComponent', () => {
         c.investigation.workingSet.set(ws(40) as never);
         fixture.detectChanges();
         expect(footer.textContent).not.toContain('render limit');
-        expect(footer.textContent).toContain('40 links drawn');
+        // the node and link counts live in the footer status bar now, not on the canvas strip
+        expect(footer.textContent).not.toContain('links drawn');
         fixture.destroy();
         // Builds and renders a 5,003-link Working Set; the CI runner under coverage took more than the default 5 s (run 36952537914).
     }, 30_000);
@@ -2322,6 +2323,25 @@ describe('LinkAnalysisComponent - header is the toolbar, the footer carries the 
         expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
         expect(status.textContent).toContain('5 nodes');
         expect(status.textContent).not.toContain('Project a Dataset');
+    });
+
+    it('states the counts once in the footer, with Caps at its left edge and Installed modules at its right (operator 2026-10-16)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
+        const modules = status.querySelector('inspecto-link-analysis-modules') as HTMLElement;
+        expect(modules).toBeTruthy();
+        expect(status.lastElementChild).toBe(modules); // the right-most item
+        expect(status.firstElementChild?.tagName.toLowerCase()).toBe('inspecto-link-analysis-caps'); // the left-most item
+        expect(el.querySelectorAll('inspecto-link-analysis-modules')).toHaveLength(1); // no longer on the canvas strip
+        const strip = el.querySelector('[aria-label="Render status"]') as HTMLElement;
+        expect(strip.textContent).not.toContain('links drawn');
+        expect(strip.querySelector('inspecto-link-analysis-modules')).toBeNull();
+        expect(strip.textContent).not.toContain('caps:'); // the caps are a popover in the footer now
+        expect(strip.querySelector('inspecto-link-analysis-caps')).toBeNull();
     });
 });
 
