@@ -306,12 +306,16 @@ final class EntityProfiles {
     static String reason(Exception e) {
         String m = DatasetReadFault.scrub(com.gamma.util.DuckDbUtil.withoutPendingQueryPreamble(String.valueOf(e.getMessage())));
         if (m == null) return null;
-        String low = m.toLowerCase(java.util.Locale.ROOT);
-        if (low.contains("interrupt")) return "the read ran past entity_profile.timeout_s";
+        if (isTimeout(m)) return "the read ran past entity_profile.timeout_s";
         if (isOutOfMemory(m))
             return "the read ran out of its memory budget (" + memoryLimitMb() + " MiB) on this Dataset; a system admin can "
                     + "raise entity_profile.memory_limit_mb";
         return m;
+    }
+
+    /** The statement timeout interrupts the query; DuckDB reports it as an interrupt. */
+    static boolean isTimeout(String message) {
+        return message != null && message.toLowerCase(java.util.Locale.ROOT).contains("interrupt");
     }
 
     static boolean isOutOfMemory(String message) {
@@ -622,15 +626,16 @@ final class EntityProfiles {
                                     + EntityKeySql.key(other.normaliser(), q(c)) + ", '') AS o FROM (" + f.relationSql.get(ds) + ") AS __r");
                     int thr = f.lim.relationshipThreshold();
                     String pairs = String.join(" UNION ALL ", parts);
-                    // Exact first. A per-Entity distinct count over a production day can outgrow the memory budget; then
-                    // it is read over a hash sample of the Entities (1 in SAMPLE_EVERY): each sampled Entity's count stays
-                    // exact, the share is an estimate, and the counts are scaled up and marked approximate.
+                    // Exact first. A per-Entity distinct count over a production day can outgrow the memory budget or the
+                    // statement timeout (MSISDN to IMSI over 132 M rows ran past the 600 s ceiling); then it is read over a
+                    // hash sample of the Entities (1 in SAMPLE_EVERY): each sampled Entity's count stays exact, the share is
+                    // an estimate, and the counts are scaled up and marked approximate.
                     long every = 1;
                     Map<String, Object> r;
                     try {
                         r = relationshipRow(f, pairs, thr, 1);
                     } catch (Exception oom) {
-                        if (!isOutOfMemory(oom.getMessage())) throw oom;
+                        if (!isOutOfMemory(oom.getMessage()) && !isTimeout(oom.getMessage())) throw oom;
                         every = SAMPLE_EVERY;
                         r = relationshipRow(f, pairs, thr, every);
                     }

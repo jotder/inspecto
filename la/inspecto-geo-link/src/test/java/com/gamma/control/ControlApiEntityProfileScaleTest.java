@@ -64,13 +64,14 @@ class ControlApiEntityProfileScaleTest {
     static final class Faulty implements DatasetProvider {
         final DatasetProvider real = DatasetProviders.require();
         volatile Predicate<String> fail = s -> false;
+        volatile String error = OOM;
         final List<String> memoryLimits = new ArrayList<>();
         final AtomicLong failures = new AtomicLong();
 
         private void maybeFail(Request req) throws SQLException {
             if (fail.test(req.sql())) {
                 failures.incrementAndGet();
-                throw new SQLException(OOM);
+                throw new SQLException(error);
             }
         }
 
@@ -191,6 +192,26 @@ class ControlApiEntityProfileScaleTest {
             assertFalse(both.get("assessed").asBoolean(), "the sample failing too is a not-assessed section, never a zero");
             assertTrue(both.get("retryable").asBoolean());
             assertFalse(both.has("entities"));
+        }
+    }
+
+    @Test
+    void aRelationshipReadThatRunsPastTheTimeoutIsAlsoRetriedOverAnEntitySample(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            Faulty f = install();
+            f.error = "INTERRUPT Error: Interrupted!";   // what the statement timeout surfaces as
+            f.fail = sql -> sql.contains("COUNT(DISTINCT o)") && !sql.contains("hash(e)");
+            JsonNode r = noRaw(get(c, "/inv/entity-types/msisdn/profile?sections=relationships", OWNER)).at("/relationships/0");
+            assertTrue(r.get("assessed").asBoolean(), "a timeout no longer leaves the section unread: " + r);
+            assertTrue(r.get("sampled").asBoolean());
+            assertEquals(64, r.get("sampleEvery").asInt());
+
+            f.fail = sql -> sql.contains("COUNT(DISTINCT o)");
+            JsonNode both = data(get(c, "/inv/entity-types/msisdn/profile?sections=relationships", OWNER)).at("/relationships/0");
+            assertFalse(both.get("assessed").asBoolean());
+            assertEquals("the read ran past entity_profile.timeout_s", both.get("reason").asText());
+            assertTrue(both.get("retryable").asBoolean(), "a timed-out read is retried next time, never cached");
         }
     }
 
