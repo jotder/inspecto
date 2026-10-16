@@ -1,0 +1,10 @@
+job:
+  name: mm_links
+  type: sql.template
+  description: "Folds wallet_txn and wallet_master into ONE wallet-to-wallet link Dataset for Link Analysis: every transaction is a link (src, dst, kind, ts, amount, event_date); shared_device and shared_id are pairs from a self-join on the handset or national id in wallet_master, ONE direction (lower id to higher id), named in via. A blank or placeholder value (empty, UNKNOWN, N/A, 000000000000000, PENDING) is never a link, and a key held by more than max_key_wallets distinct wallets is common, not evidence. Snapshot rebuild."
+  sql: "WITH as_of AS (SELECT max(txn_ts) AS t FROM wallet_txn), money AS (SELECT src_id AS src, dst_id AS dst, txn_type AS kind, txn_ts AS ts, amount, txn_date AS event_date, CAST(NULL AS VARCHAR) AS via FROM wallet_txn WHERE src_id IS NOT NULL AND dst_id IS NOT NULL AND src_id <> dst_id), keyed AS (SELECT 'shared_device' AS kind, 'device:' || device_id AS k, wallet_id FROM wallet_master WHERE device_id IS NOT NULL AND trim(device_id) <> '' AND upper(device_id) NOT IN ('UNKNOWN', 'N/A') AND device_id <> '000000000000000' UNION ALL SELECT 'shared_id', 'id:' || national_id, wallet_id FROM wallet_master WHERE national_id IS NOT NULL AND trim(national_id) <> '' AND upper(national_id) NOT IN ('PENDING', 'UNKNOWN')), usable AS (SELECT kind, k FROM keyed GROUP BY kind, k HAVING count(DISTINCT wallet_id) BETWEEN 2 AND CAST($max_key_wallets AS INTEGER)), shared AS (SELECT DISTINCT x.wallet_id AS src, y.wallet_id AS dst, x.kind AS kind, (SELECT t FROM as_of) AS ts, CAST(NULL AS DOUBLE) AS amount, CAST((SELECT t FROM as_of) AS DATE) AS event_date, x.k AS via FROM keyed x JOIN usable u ON u.kind = x.kind AND u.k = x.k JOIN keyed y ON y.kind = x.kind AND y.k = x.k AND x.wallet_id < y.wallet_id) SELECT * FROM money UNION ALL SELECT * FROM shared ORDER BY ts, src, dst, kind"
+  sources: wallet_txn,wallet_master
+  sink_dataset: mm_links
+  cron: "*/10 * * * *"
+  max_key_wallets: "12"
+  enabled: true

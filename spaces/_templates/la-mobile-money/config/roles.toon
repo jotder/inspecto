@@ -1,0 +1,11 @@
+roles[5]:
+  - name: fraud-analyst
+    capabilities[6]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules,canRevealLinkEntities
+  - name: mm-analyst
+    capabilities[5]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules
+  - name: mm-manager
+    capabilities[4]: canManageIncidents,canWorkIncidents,canApproveLinkExpansions,canOperateRuns
+  - name: mm-viewer
+    capabilities[0]:
+  - name: la-settings
+    capabilities[1]: canAuthorWorkbench

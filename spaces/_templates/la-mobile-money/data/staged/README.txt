@@ -1,0 +1,1 @@
+STAGED files - NOT ingested. Copy WALLET_TXN_20261015.csv (the clean next day) OR WALLET_TXN_20261017.csv (a gap day: 20261016 is missing) from data/staged/wallet_txn into data/inbox/wallet_txn; the next poll ingests it, then the next mm_links run (every 10 minutes) and index build (five minutes later) pick it up. Trigger the Jobs by hand as mm.manager to skip the wait.

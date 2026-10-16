@@ -1,0 +1,36 @@
+name: wallet_master
+active: true
+description: "Link Analysis mobile-money showcase - the wallet register (KYC): msisdn, national id, handset, tier, prior lifetime volume. One snapshot. Synthetic."
+
+dirs:
+  poll:       data/inbox/wallet_master
+  database:   data/wallet_master/database
+  backup:     data/wallet_master/backup
+  temp:       data/wallet_master/temp
+  errors:     data/wallet_master/errors
+  quarantine: data/wallet_master/quarantine
+  markers:    data/wallet_master/markers
+  status_dir: data/wallet_master/status
+  log_dir:    data/wallet_master/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: wallet_master_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

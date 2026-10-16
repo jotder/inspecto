@@ -1,0 +1,41 @@
+partitionKey: txn_date
+raw:
+  name: WALLET_TXN
+  format: CSV
+  fields[8]{name,selector,type}:
+    txn_id,"0",VARCHAR
+    src_id,"1",VARCHAR
+    dst_id,"2",VARCHAR
+    txn_type,"3",VARCHAR
+    amount,"4",DOUBLE
+    currency,"5",VARCHAR
+    txn_date,"6",DATE
+    txn_ts,"7",TIMESTAMP
+mapping:
+  canonicalName: wallet_txn
+  rawName: WALLET_TXN
+  fields[8]:
+    - name: txn_id
+      from: txn_id
+      fn: keep
+    - name: src_id
+      from: src_id
+      fn: keep
+    - name: dst_id
+      from: dst_id
+      fn: keep
+    - name: txn_type
+      from: txn_type
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: currency
+      from: currency
+      fn: keep
+    - name: txn_date
+      from: txn_date
+      fn: keep
+    - name: txn_ts
+      from: txn_ts
+      fn: keep

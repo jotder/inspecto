@@ -1,0 +1,41 @@
+partitionKey: opened_date
+raw:
+  name: WALLET_MASTER
+  format: CSV
+  fields[8]{name,selector,type}:
+    wallet_id,"0",VARCHAR
+    msisdn,"1",VARCHAR
+    national_id,"2",VARCHAR
+    device_id,"3",VARCHAR
+    tier,"4",VARCHAR
+    opened_date,"5",DATE
+    last_active_date,"6",DATE
+    prior_lifetime_volume,"7",DOUBLE
+mapping:
+  canonicalName: wallet_master
+  rawName: WALLET_MASTER
+  fields[8]:
+    - name: wallet_id
+      from: wallet_id
+      fn: keep
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: national_id
+      from: national_id
+      fn: keep
+    - name: device_id
+      from: device_id
+      fn: keep
+    - name: tier
+      from: tier
+      fn: keep
+    - name: opened_date
+      from: opened_date
+      fn: keep
+    - name: last_active_date
+      from: last_active_date
+      fn: keep
+    - name: prior_lifetime_volume
+      from: prior_lifetime_volume
+      fn: keep

@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  mm.analyst,Demo MM Analyst,Financial-intelligence analyst (lead),mm-analyst
+  mm.manager,Demo MM Manager,Compliance manager (second approver),mm-manager
+  mm.reviewer,Demo MM Reviewer,Regulator liaison (reviewer),mm-viewer
+  mm.outsider,Demo MM Outsider,Manager (not a member of the Investigation),mm-viewer

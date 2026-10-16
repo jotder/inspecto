@@ -1,0 +1,19 @@
+physicalRef: wallet_master/database
+description: "Mobile-money Link Analysis showcase - the masked KYC reference over the wallet register, keyed on wallet_id (msisdn, national id, handset, tier, opened, prior lifetime volume). The node panel's Enrichment section reads it. Synthetic."
+eventDate: opened_date
+columns[8]{name,type,classification}:
+  wallet_id,string,ACCOUNT
+  msisdn,string,MSISDN
+  national_id,string,PII
+  device_id,string,PII
+  tier,string,
+  opened_date,date,
+  last_active_date,date,
+  prior_lifetime_volume,number,
+owner: mm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,mm.analyst,view
+  user,mm.manager,view
+  user,mm.reviewer,view
+  user,mm.outsider,view

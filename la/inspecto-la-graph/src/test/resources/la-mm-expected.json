@@ -1,0 +1,14 @@
+{
+  "_note": "Expectations over the SHIPPED la-mobile-money corpus (spaces/_templates/la-mobile-money/data). Regenerate the corpus with tools/gen-la-mm-data.py; change these only when the demo story changes.",
+  "landedRows": 5732,
+  "wallets": 420,
+  "tierLimit": 5000,
+  "structuring": { "agent": "AG-18", "wallets": 25, "maxSpanHours": 36, "hub": "HUB-01" },
+  "chain": { "from": "HUB-01", "to": "AG-39", "hops": 3, "passThrough": 0.98, "maxForwardMinutes": 10 },
+  "farm": { "wallets": 9, "device": "DEV-FARM-01", "sharedDevicePairs": 36, "jaccardMin": 0.6 },
+  "loop": ["LOOP-1", "LOOP-2", "LOOP-3", "LOOP-4"],
+  "dormant": { "wallet": "DORMANT-1", "priorLifetimeVolume": 150.0, "multiple": 40, "firstDay": "2026-10-11", "lastDay": "2026-10-12" },
+  "biller": { "id": "MER-ELECTRIC", "payers": 300 },
+  "household": { "sharedIdPairs": 3, "familyPhonePairs": 6 },
+  "placeholders": { "UNKNOWN": 8, "": 6, "000000000000000": 5 }
+}

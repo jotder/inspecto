@@ -1,0 +1,29 @@
+partitionKey: opened_date
+raw:
+  name: AGENT_MASTER
+  format: CSV
+  fields[5]{name,selector,type}:
+    agent_id,"0",VARCHAR
+    agent_name,"1",VARCHAR
+    region,"2",VARCHAR
+    opened_date,"3",DATE
+    float_limit,"4",DOUBLE
+mapping:
+  canonicalName: agent_master
+  rawName: AGENT_MASTER
+  fields[5]:
+    - name: agent_id
+      from: agent_id
+      fn: keep
+    - name: agent_name
+      from: agent_name
+      fn: keep
+    - name: region
+      from: region
+      fn: keep
+    - name: opened_date
+      from: opened_date
+      fn: keep
+    - name: float_limit
+      from: float_limit
+      fn: keep
