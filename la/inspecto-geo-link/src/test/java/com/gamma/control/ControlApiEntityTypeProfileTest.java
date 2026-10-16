@@ -22,12 +22,15 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
+import static com.gamma.control.EntityProfileFixture.A;
 import static com.gamma.control.EntityProfileFixture.OWNER;
 import static com.gamma.control.EntityProfileFixture.STRANGER;
 import static com.gamma.control.EntityProfileFixture.data;
+import static com.gamma.control.EntityProfileFixture.enc;
 import static com.gamma.control.EntityProfileFixture.get;
 import static com.gamma.control.EntityProfileFixture.noRaw;
 import static com.gamma.control.EntityProfileFixture.open;
+import static com.gamma.control.EntityProfileFixture.send;
 import static com.gamma.control.EntityProfileFixture.settings;
 import static com.gamma.control.EntityProfileFixture.subjects;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -175,6 +178,36 @@ class ControlApiEntityTypeProfileTest {
             assertEquals("calls_ds", lineage.get("dataset").asText());
             assertFalse(lineage.get("assessed").asBoolean(), "no audit trail attributes the Dataset: not assessed, never zero Files");
             assertFalse(lineage.has("files"));
+        }
+    }
+
+    @Test
+    void relationshipsPairOnlyColumnsOfTheSamePartyOfTheRow(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            String rel = "/inv/entity-types/msisdn/profile?sections=relationships,bindings";
+            JsonNode before = noRaw(get(c, rel, OWNER));
+            assertEquals(5, before.at("/relationships/0/entities").asLong(), "no party named: both numbers pair with the IMEI (A-D and the -99 placeholder)");
+            assertEquals(3, before.at("/relationships/0/maxPerEntity").asLong(), "B is seen with I1, I2 and I3");
+            assertFalse(binding(before.get("bindings"), "a_msisdn").has("party"));
+
+            // a_msisdn and imei describe one party of the row (the caller and the handset), b_msisdn the other
+            Map<String, Object> ds = new java.util.LinkedHashMap<>(EntityProfileFixture.callsDataset());
+            ds.put("columns", List.of(Map.of("name", "a_msisdn", "classification", "MSISDN", "party", "A-side"),
+                    Map.of("name", "b_msisdn", "classification", "MSISDN", "party", "b-side"),
+                    Map.of("name", "imei", "classification", "IMEI", "party", " a-side ")));
+            new ComponentStore(root.resolve("registry")).write("dataset", "calls_ds", ds);
+            JsonNode after = noRaw(get(c, rel, OWNER));
+            assertEquals("a-side", binding(after.get("bindings"), "a_msisdn").get("party").asText(), "trimmed, lower-case");
+            assertEquals(3, after.at("/relationships/0/entities").asLong(), "only a_msisdn pairs with the IMEI: A, B and the placeholder");
+            assertEquals(1, after.at("/relationships/0/maxPerEntity").asLong());
+            assertEquals(1.0, after.at("/relationships/0/oneToOneShare").asDouble());
+
+            String key = data(send(c, "POST", "/inv/entities/msisdn/resolve", "{\"key\":\"" + A + "\"}", OWNER)).get("key").asText();
+            JsonNode related = data(get(c, "/inv/entities/msisdn/" + enc(key) + "/profile", OWNER)).get("related");
+            for (JsonNode r : related)
+                if ("imei".equals(r.get("type").asText()))
+                    assertEquals(1, r.get("count").asLong(), "the Entity page pairs by party too: A's own handset, not B's (I3)");
         }
     }
 

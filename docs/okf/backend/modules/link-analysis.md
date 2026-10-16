@@ -570,6 +570,10 @@ Plan archived: [`la-entity-profile-plan`](../../../archived-documents/plans-arch
   `kind:"dominant"`, `value:null`; only the built-in sentinels (`''`, `-99`, `0`, `NULL`, `null`, `unknown`, `n/a`) are shown by value.
 * **Bindings** (`EntityTypeBindings`): every Dataset column the caller can view whose classification an Entity Type claims; `role` is `source` /
   `target` when a saved view or index mapping names it as a link end, else `attribute`. One Entity is the normalised typed key (`EntityKeySql`, D-EP5).
+  **Parties (2026-10-16):** a Dataset column may carry `party` (free text, trimmed, lower-case; the binding shows it). Relationships
+  and an Entity's related identifiers pair two columns of a row only when their parties match or either has none, so a served IMSI
+  pairs with the served MSISDN and not with the other party's number (that pairing counts contacts, and on a 132 M-row day it ran
+  past the 600 s timeout even sampled). A Dataset that names no party pairs every column as before.
 * **Statistics** come from one `ColumnProfile` aggregate per Dataset; every approximate distinct is capped at its row count (the sketch overshoots
   on small counts: 109 distinct over 104 rows before the cap). Links read the index first (`IndexLinkStats` over the manifest's `kindEdges`,
   `typeNodes`, `degree`, `timeSpan`), else a Dataset query under the budget, else `assessed:false` (D-EP4). Every section carries `assessed` /

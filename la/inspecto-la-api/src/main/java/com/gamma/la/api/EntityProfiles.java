@@ -606,24 +606,28 @@ final class EntityProfiles {
         List<Map<String, Object>> out = new ArrayList<>();
         for (String ds : f.datasets()) {
             if (f.relationSql.get(ds) == null) continue;
-            List<String> mine = new ArrayList<>();
-            for (EntityTypeBindings.Binding b : f.usable) if (b.dataset().equals(ds)) mine.add(f.column(ds, b.column()));
+            List<EntityTypeBindings.Binding> mine = new ArrayList<>();
+            for (EntityTypeBindings.Binding b : f.usable) if (b.dataset().equals(ds)) mine.add(b);
             if (mine.isEmpty()) continue;
             for (EntityTypes.EntityType other : f.resolved.types()) {
                 if (other.id().equals(f.type.id())) continue;
-                List<String> theirs = new ArrayList<>();
+                List<EntityTypeBindings.Binding> theirs = new ArrayList<>();
                 for (EntityTypeBindings.Binding b : f.resolved.of(other.id()))
-                    if (b.dataset().equals(ds) && f.column(ds, b.column()) != null) theirs.add(f.column(ds, b.column()));
-                if (theirs.isEmpty()) continue;
+                    if (b.dataset().equals(ds) && f.column(ds, b.column()) != null) theirs.add(b);
+                // Only columns of the same party of the row are paired (columns[].party): a served IMSI with the served
+                // MSISDN, never with the other party's number - that pairing counts contacts, not numbers on the SIM.
+                List<String> parts = new ArrayList<>();
+                for (EntityTypeBindings.Binding a : mine)
+                    for (EntityTypeBindings.Binding c : theirs)
+                        if (EntityTypeBindings.sameParty(a, c))
+                            parts.add("SELECT NULLIF(" + EntityKeySql.key(f.type.normaliser(), q(f.column(ds, a.column()))) + ", '') AS e, NULLIF("
+                                    + EntityKeySql.key(other.normaliser(), q(f.column(ds, c.column()))) + ", '') AS o FROM ("
+                                    + f.relationSql.get(ds) + ") AS __r");
+                if (parts.isEmpty()) continue;
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("otherType", other.id());
                 m.put("dataset", ds);
                 try {
-                    List<String> parts = new ArrayList<>();
-                    for (String a : mine)
-                        for (String c : theirs)
-                            parts.add("SELECT NULLIF(" + EntityKeySql.key(f.type.normaliser(), q(a)) + ", '') AS e, NULLIF("
-                                    + EntityKeySql.key(other.normaliser(), q(c)) + ", '') AS o FROM (" + f.relationSql.get(ds) + ") AS __r");
                     int thr = f.lim.relationshipThreshold();
                     String pairs = String.join(" UNION ALL ", parts);
                     // Exact first. A per-Entity distinct count over a production day can outgrow the memory budget or the
@@ -887,7 +891,7 @@ final class EntityProfiles {
                     if (!a.dataset().equals(ds)) continue;
                     for (EntityTypeBindings.Binding c : f.resolved.of(other.id())) {
                         String cc = c.dataset().equals(ds) ? f.column(ds, c.column()) : null;
-                        if (cc == null) continue;
+                        if (cc == null || !EntityTypeBindings.sameParty(a, c)) continue;   // the same party of the row only
                         parts.add("SELECT " + EntityKeySql.key(f.type.normaliser(), q(f.column(ds, a.column()))) + " AS e, NULLIF("
                                 + EntityKeySql.key(other.normaliser(), q(cc)) + ", '') AS o, CAST(" + q(cc) + " AS VARCHAR) AS raw FROM ("
                                 + f.relationSql.get(ds) + ") AS __r");

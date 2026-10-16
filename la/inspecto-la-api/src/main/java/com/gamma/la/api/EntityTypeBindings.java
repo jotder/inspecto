@@ -32,15 +32,35 @@ final class EntityTypeBindings {
 
     private EntityTypeBindings() {}
 
-    /** One Dataset column bound to an Entity Type. */
-    record Binding(String type, String dataset, String column, String role, String timeColumn) {
+    /**
+     * One Dataset column bound to an Entity Type. {@code party} is the column's optional {@code columns[].party} (trimmed,
+     * lower-case, null when absent): which party of the row the column describes, so a relationship pairs a served IMSI
+     * with the served MSISDN and not with the other party's number. See {@link #sameParty}.
+     */
+    record Binding(String type, String dataset, String column, String role, String timeColumn, String party) {
         Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("dataset", dataset);
             m.put("column", column);
             m.put("role", role);
+            if (party != null) m.put("party", party);
             return m;
         }
+    }
+
+    /**
+     * Whether two columns of ONE row describe the same party, so pairing them states something about one Entity. A column
+     * with no {@code party} pairs with every column (a Dataset that names no parties behaves as before); two named parties
+     * pair only when equal.
+     */
+    static boolean sameParty(Binding a, Binding b) {
+        return a.party() == null || b.party() == null || a.party().equals(b.party());
+    }
+
+    private static String party(Map<?, ?> column) {
+        Object p = column.get("party");
+        String s = p == null ? "" : String.valueOf(p).trim().toLowerCase(java.util.Locale.ROOT);
+        return s.isEmpty() ? null : s;
     }
 
     /** A link mapping over one Dataset: its two link ends, and its kind and time columns when it names them. */
@@ -88,7 +108,7 @@ final class EntityTypeBindings {
                 String col = String.valueOf(c.get("name")), cls = String.valueOf(c.get("classification")).trim();
                 types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls))).findFirst()
                         .ifPresent(t -> byType.get(t.id()).add(new Binding(t.id(), d.getKey(), col,
-                                role(d.getKey(), col, mappings), timeColumn(d.getKey(), d.getValue(), mappings))));
+                                role(d.getKey(), col, mappings), timeColumn(d.getKey(), d.getValue(), mappings), party(c))));
             }
         }
         for (List<Binding> l : byType.values())
