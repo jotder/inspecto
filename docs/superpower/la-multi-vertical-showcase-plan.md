@@ -1,6 +1,6 @@
 # Link Analysis showcases across three verticals (plan, synthetic data only)
 
-**Status: PLAN 2026-10-16, nothing built.** Goal: one small, believable, fully synthetic showcase per vertical, together exercising **every** Link Analysis
+**Status: BUILT 2026-10-16 - the three lanes are merged to master (A booted and smoked 10 of 10; B and C pass unit and golden tests, live rehearsal still to do). The shared kit (S1) was dropped: each lane owns its generator, seed script, smoke runner, runbook and embed portal (under the template `portal` folder).** Goal: one small, believable, fully synthetic showcase per vertical, together exercising **every** Link Analysis
 capability (the 29 algorithms in the SPA and on the server, Dossier, embed links, masking, four-eyes, Drafts, standing detection, Geo Views). Verticals:
 **Mobile money**, **Finance and audit**, and a third chosen here, **Insurance claims (Special Investigations Unit, SIU)**.
 Reuses, does not replace: the [demo runbook](../ops/la-demo-runbook.md) (mule transfers + telecom, scenes S1 to S15), the `la-showcase` Space Template,

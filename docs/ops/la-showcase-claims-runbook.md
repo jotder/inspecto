@@ -77,12 +77,12 @@ curl -s -X POST -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/
 # serve the static portal from the origin the Space allows (link-analysis.toon embed.frame_ancestors = http://127.0.0.1:8099 and http://localhost:8099)
 python -m http.server 8099 --directory tools
 # then open (the link is the token before the url's last slash)
-http://127.0.0.1:8099/la-claims-partner-portal.html?host=http://127.0.0.1:8096&link=<grantId>.<secret>
+http://127.0.0.1:8099/partner-portal.html?host=http://127.0.0.1:8096&link=<grantId>.<secret>
 # revoke
 curl -s -X POST -H "Authorization: Bearer $ADMIN" http://127.0.0.1:8096/api/v1/spaces/la-claims/inv/investigations/ring-case/embeds/<grantId>/revoke
 ```
 
-The page [`tools/la-claims-partner-portal.html`](../../tools/la-claims-partner-portal.html) holds no credential: the link is the whole grant, read-only,
+The page [`spaces/_templates/la-claims/portal/partner-portal.html`](../../spaces/_templates/la-claims/portal/partner-portal.html) holds no credential: the link is the whole grant, read-only,
 masked and revocable. **UNVERIFIED**: the viewer path `/embed/inv/<token>` is the one the embed test frames; whether the la-app bundle serves the viewer shell is to be confirmed on the first rehearsal.
 
 ## 3. Algorithm scenes (the nine assigned to this vertical)

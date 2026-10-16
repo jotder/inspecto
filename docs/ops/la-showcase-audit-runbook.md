@@ -113,7 +113,7 @@ Also useful here, from the plan's coverage matrix: **Recursive paths** (approval
 Members: `audit.lead` lead, `audit.admin` lead, `audit.manager` and `audit.committee` reviewers, `audit.outsider` absent. Settings > Link Analysis: masking `typed`, four-eyes above 30, index ON, Draft limits, the embed allow-list, Max fan-out. Entity types: `party` (masked) and `legal_entity` (not masked).
 
 ### G. Embed, optional (1 min) [audit.admin]
-Mint an embed link on the Investigation (Share panel; needs `-Dla.embed.enabled=true`; the mint needs a lead member, hence `audit.admin`). Open `tools/la-audit-committee-portal.html` from disk,
+Mint an embed link on the Investigation (Share panel; needs `-Dla.embed.enabled=true`; the mint needs a lead member, hence `audit.admin`). Open `spaces/_templates/la-audit/portal/committee-portal.html` from disk,
 paste the `/embed/inv/...` viewer link: the committee sees the read-only masked Investigation inside their own page. Revoke the link: the frame goes blank (the public read answers a uniform 404).
 The host must allow the portal as a frame ancestor (Settings embed allow-list; a page opened from disk presents the `null` origin, so the first rehearsal may need the host's frame-ancestors setting, see the [demo runbook](la-demo-runbook.md) §S14).
 
