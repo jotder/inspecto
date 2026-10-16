@@ -28,7 +28,15 @@ function values(g: G6GraphData, col: string): string[] {
 /** A column is numeric when it has values and every one of them parses as a finite number. */
 export function isNumericColumn(g: G6GraphData, col: string): boolean {
     const vs = values(g, col);
-    return vs.length > 0 && vs.every((v) => Number.isFinite(Number(v.replace(/,/g, ''))));
+    return vs.length > 0 && vs.every((v) => Number.isFinite(Number(v.replace(/,/g, '')))) && !isIdentifierColumn(vs);
+}
+
+/**
+ * Digits that name something rather than measure it: every value a run of 10+ digits (IMEI, IMSI, MSISDN, account
+ * number), or any value with a leading zero. Summing them gave a figure like "Σ via 38,468T".
+ */
+function isIdentifierColumn(vs: string[]): boolean {
+    return vs.every((v) => /^\+?\d{10,}$/.test(v)) || vs.some((v) => /^0\d/.test(v));
 }
 
 /** A column is temporal when it has values, none are plain numbers, and every one parses as a date. */

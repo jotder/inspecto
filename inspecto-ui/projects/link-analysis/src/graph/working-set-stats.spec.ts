@@ -53,6 +53,30 @@ describe('workingSetStats', () => {
         expect(stats.find((s) => s.label === 'booked_at')?.value).toBe('2026-01-04 → 2026-03-31');
     });
 
+    it('never sums identifiers: long digit strings (IMEI, MSISDN) or leading-zero codes are not measures', () => {
+        const ids: G6GraphData = {
+            nodes: FULL.nodes,
+            edges: [
+                {
+                    id: 'x',
+                    source: 'a',
+                    target: 'b',
+                    data: { kind: 'sms', attrs: { via: '356938035643809', events: '4', code: '0042' } },
+                },
+                {
+                    id: 'y',
+                    source: 'b',
+                    target: 'c',
+                    data: { kind: 'sms', attrs: { via: '249912345678', events: '2', code: '17' } },
+                },
+            ] as unknown as G6GraphData['edges'],
+        };
+        expect(isNumericColumn(ids, 'via')).toBe(false);
+        expect(isNumericColumn(ids, 'code')).toBe(false);
+        expect(isNumericColumn(ids, 'events')).toBe(true);
+        expect(workingSetStats(ids, ids).map((s) => s.label)).toEqual(['Nodes', 'Links', 'Σ events']);
+    });
+
     it('is empty without a loaded graph', () => {
         expect(workingSetStats(null, null)).toEqual([]);
     });

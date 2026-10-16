@@ -151,6 +151,19 @@ Findings from this pass (the open ones first):
 4. **The data-trust strip still reads "Data as-of date not known, days not assessed"**, and the Dossier "Data state at export time" says "not assessed" for as-of, files waiting and days with no rows: the strip reads input-file stamps and `ims_links` is built by a Job, not landed by a Collector. Drop T12 for this Space, or point a view at `ims_cdr` itself.
 5. The stale `file_problem` Alert (from the rejected row, fixed) is still OPEN in the Space: acknowledge it before the demo or it shows as a fourth Alert.
 
+**Follow-up 2026-10-16 (the Space now runs on the Preview bundle at :8080, WSO2 sign-in with the same six user names):**
+
+- Finding 1 **FIXED** (Entity profile lane C, `dc12afd24`): the burst target resolves to `masked:6d98e84b76714ef2` and the
+  `ims-sms-burst` list matches that same alias (`match: key`); every list matches its members' aliases and refuses an
+  unknown one. No raw identifier in any list answer.
+- Finding 2 **handled in the script**: the 12-14 beat now uses "Expand the whole Working Set".
+- Finding 3 **FIXED in code**: the Working Set tiles no longer sum an identifier column (every value 10+ digits, or any
+  value with a leading zero), so `Σ via` is gone; `working-set-stats.spec.ts`. Shows on :8080 after that bundle is rebuilt.
+- Finding 4 **FIXED in the Space**: `ims_links_dataset` declares `eventDate: last_seen`; its freshness read answers data as
+  of 2026-10-09 10:36 UTC (it was "not known").
+- Finding 5 **DONE**: the stale `file_problem` Alert is resolved (cause fixed, note recorded); the Space shows the three
+  detection Alerts only.
+
 **Not done in this pass:** the tamper check by file upload on screen (the API tamper check passes), the embed beat (API only by design), a spoken run with a second person, and the Alerts-page drill into the Investigation.
 
 ### 4.2 Demo run (20 minutes, technical audience; full runbook scenes in brackets)
@@ -161,7 +174,7 @@ Findings from this pass (the open ones first):
 | 2-6 | **Burst star**: seed the target; 8 SIMs appear; Suspicion score ranks the target; failed-ratio edge colour; Pass-through not relevant [S1] | the headline finding |
 | 6-9 | **Expand a SIM**: its 7 `co_target` links to the other 7 SIMs (a complete clique, 28 pairs); no shared-device link, because the IMEIs differ [S5 pattern match] | the cluster is mutually linked by one target |
 | 9-12 | **Multi-SIM device**: 15 MSISDNs on one IMEI; Entity List of the 15; per-type masking `typed` [S3, S10] | device-share Pattern Pack |
-| 12-14 | **Bankak restricted expand**: a service hub, expand waits for a second person [S8] | four-eyes on a hub |
+| 12-14 | **Bankak restricted expand**: seed the service-hub sender name; a plain "Expand next degree" is bounded (500 admitted, the rest capped, no wait), so use **"Expand the whole Working Set"**: it waits for a second person, `fm.manager` approves [S8] | four-eyes on a hub |
 | 14-16 | Open the Investigation, Replay, build and verify the Dossier [S2, S11] | sealed, tamper-checked |
 | 16-18 | Alert -> Incident: the burst Alert Rule fires, aggregate only, links to the Investigation [S12] | closed loop |
 | 18-20 | Claims we do NOT make (below) and questions | honesty |
