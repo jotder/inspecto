@@ -48,6 +48,12 @@ export function buildPlan() {
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'siu.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['partner.reviewer', 'reviewer'], ['siu.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
       { id: `member-${subject}`, as: 'siu.analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
+    // police-report PDFs (invented URLs on the reserved example domain) as EXTERNAL REFERENCES: never fetched, never trusted, never in the Dossier manifest
+    ...[['PR-REQ-0001', 'Request to the police records office: reports for the nine ring accidents (none on file, by design)'],
+        ['PR-REQ-0002', 'Request: reports for the eleven accidents at the Derby junction, 02:00-03:59'],
+        ['PR-NOTE-0003', 'Identity note: CL-0332 and CL-0141 share a date of birth and phone (E.164 versus national spelling)']].map(([id, label]) => (
+      { id: `reference-${id}`, as: 'siu.analyst', method: 'POST', path: `${base}/references`, body: {
+        system: 'police-records', type: id.startsWith('PR-REQ') ? 'report-request' : 'note', id, url: `https://records.example/la-claims/${id}.pdf`, label } })),
     { id: 'list-ring', as: 'siu.analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'ring-claimants', title: 'Ring claimants', purpose: 'watch', entityType: 'party', reason: 'showcase staged-accident ring' } },
     { id: 'list-ring-members', as: 'siu.analyst', method: 'POST', path: '/entity-lists/ring-claimants/members', body: { add: RING, reason: 'showcase staged-accident ring' } },
