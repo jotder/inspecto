@@ -136,6 +136,6 @@ Open `gl_intercompany` (journal flows; `LEGAL_ENTITY` ids are not masked). **Fin
 ## 6. Known limits and what was not verified
 
 * **Not run on a booted Space** in the build session (the Demo Auth build was not at hand): the generator, the folded link rows (the Job SQL was executed in DuckDB 1.5.5 against the shipped CSVs: 3 650 `ap_links` rows, 13 duplicate pairs, 72 `gl_links` rows) and the algorithm facts (`LaAuditGoldenTest`) are verified; the Pipeline ingest of the five feeds, the seeded Investigation, the Dossier tamper through the HTTP routes and the browser scenes are **not**. First rehearsal: run steps 0.2 to 0.6, then each scene, and file any defect.
-* The Alert and Case beats are secondary here (plan matrix, "o"): the seed binds an Alert Rule `ap-approved-value` and opens a Case for V-117; the primary Alert scene is vertical A.
+* The Alert and Case beats are secondary here (plan matrix, "o"): the seed binds an Alert Rule `ap-split-invoices` (the closed value-Measure set has `structuring`) and opens a Case for V-117; the primary Alert scene is vertical A.
 * The `la-showcase-off` template's `roles.toon` differs from `la-showcase`'s (Reveal on the analyst), so `LaShowcaseTemplateTest` fails on master as of this build: a pre-existing defect of the sibling template, not touched here.
 * Recorded precision claims: none. The plants are planted, the counts are the corpus, and no detection rate is implied.

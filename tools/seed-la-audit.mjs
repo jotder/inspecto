@@ -22,7 +22,7 @@ export const DATASET = 'ap_links_dataset';
 const CASE_TITLE = 'Vendor V-117 conflict of interest';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
-export const DRAFT_STEP = { op: 'annotate', ids: ['V-099'], note: 'what-if: an approval limit of 9 000 would have stopped all 30 invoices' };
+export const DRAFT_STEP = { op: 'annotate', ids: ['V-117'], note: 'what-if: an approval limit of 9 000 and a second approver outside the reporting line of E-31' };
 
 /** The seeded state as an ordered list of steps. */
 export function buildPlan() {
@@ -51,8 +51,8 @@ export function buildPlan() {
     { id: 'case-assign', as: 'audit.lead', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'audit.manager' } },
     { id: 'case-link', as: 'audit.lead', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
     { id: 'alert-rule', as: 'audit.lead', method: 'POST', path: `${base}/alert-rules`, body: {
-      name: 'ap-approved-value', severity: 'HIGH',
-      valueMeasure: { name: 'approvedValue', valueCol: 'amount', timeCol: 'ts', from: '2025-10-01', to: '2026-10-01' } } },
+      name: 'ap-split-invoices', severity: 'WARNING',
+      valueMeasure: { name: 'structuring', valueCol: 'amount', timeCol: 'ts', from: '2026-03-02', to: '2026-04-02' } } },
   ];
 }
 
@@ -83,6 +83,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   }
   if (listed.status !== 200) throw new Error(`cannot list Investigations as audit.lead (${listed.status}): is the Space '${space}' created from the la-audit template?`);
   const existing = items(listed.data).find((i) => i.id === INV);
+  if (!existing) await prime(call, log, sleep, readyTries);
   const headStep = existing ? existing.headStep || 0 : 0;
   const state = { case: existing && existing.caseRef ? existing.caseRef : null, caseExisted: !!(existing && existing.caseRef) };
   for (const s of plan) {
@@ -105,6 +106,16 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (want.pending) try { await stagePending(call, out, log); } catch (e) { warn('pending', e); }
   if (want.draft) try { await stageDraft(call, out, log); } catch (e) { warn('draft', e); }
   return out;
+}
+
+/** The link Datasets are Job outputs, so a fresh Space has none until the 10-minute cron: press Run on the link Jobs (as audit.manager, who
+ *  holds canOperateRuns) and wait for ap_links_dataset to have rows. The derived Datasets and the index build follow by signal. */
+async function prime(call, log, sleep, tries) {
+  const has = async () => { const r = await call('audit.admin', 'GET', '/datasets/ap_links_dataset/rows?limit=1'); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
+  if (await has()) return;
+  for (const job of ['ap_links', 'gl_links', 'ap_duplicate_payments']) { const t = await call('audit.manager', 'POST', `/jobs/${job}/trigger`, {}); log(`  prime ${job}: ${t.status}`); }
+  for (let i = 0; i < tries; i++) { if (await has()) return; await sleep(2000); }
+  log('  WARNING ap_links_dataset still has no rows; the Investigation create will be refused');
 }
 
 const must = (r, what) => { if (![200, 201, 202].includes(r.status)) throw new Error(`${what} answered HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`); return r.data; };
