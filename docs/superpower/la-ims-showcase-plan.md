@@ -1,6 +1,6 @@
 # Link Analysis showcase on real IMS records (analysis and plan)
 
-**Status: BUILT and rehearsed on screen 2026-10-15 (steps B1-B5 and the dry run below); the Space and data stay outside the repo.** Input: 20 Huawei IMS CDR extracts (`fct_huawei_ims`) at `C:\sandbox\data\IMS` (outside the repo, **never committed**:
+**Status: BUILT and rehearsed on screen 2026-10-15 (steps B1-B5 and the dry run below) on the 2026-10-09 CSV extract; switched 2026-10-16 to one full production day in Parquet (section 6: 132 M records, links, index, thresholds recalibrated); the Space and data stay outside the repo.** Input: 20 Huawei IMS CDR extracts (`fct_huawei_ims`) at `C:\sandbox\data\IMS` (outside the repo, **never committed**:
 no data or client files in commits). This page records what the data holds, what graph a Link Analysis user can draw from it, and the build steps.
 Numbers in this page were measured on 2026-10-15 over the 19 distinct files; subscriber numbers are masked here on purpose.
 Existing showcase assets this reuses: [demo runbook](../ops/la-demo-runbook.md), the `la-showcase` Space Template, `tools/gen-la-telecom-data.py` (the synthetic telecom feeds).
@@ -193,6 +193,80 @@ Findings from this pass (the open ones first):
 2. Is the burst a **known** event (a test, an incident)? It changes the story from "detected" to "reproduced".
 3. Are more days or the voice/SMS peers (the other feeds: CRM, HLR/EIR, recharge) available? CRM/HLR would unlock identity resolution and the SIM-swap typology; today the demo cannot claim them.
 4. Does Link Analysis see `ims` alongside the synthetic `la-showcase`, or is `ims` a separate bundle to avoid mixing real and invented data? Recommended: separate Space.
+
+## 6. Production day 2026-10-01 (Parquet, switched 2026-10-16)
+
+The Space now holds one **full production day** instead of the 2026-10-09 CSV extract. Same table (`fct_huawei_ims`),
+same codes; about 4,500 times the volume. The Space and the data stay outside the repo; numbers here are aggregates.
+
+**What the data is.** 100 Parquet files, 12.25 GB, **132,165,497 records**, 2026-10-01 00:00:00 to 23:59:59, one
+schema of 83 columns (native types: `event_start_date_time` TIMESTAMP, `original_dur` DOUBLE, `event_date` DATE), Hive
+folder `event_date=2026-10-01`, one row group per file.
+
+| Column | Shape |
+|---|---|
+| `sip_message_type` | MESSAGE 68.66 M, BYE 56.08 M, INVITE 7.42 M (the same three codes as the extract) |
+| `event_direction_key` | 2 (received) 97.95 M, 1 (originated) 34.21 M, 0 1,701 |
+| `smsresult` | blank 63.50 M, SUCCESS 58.28 M, FAILED 10.38 M |
+| `served_msisdn` | 12 digits in 99.96 %, home prefix 249 in 99.8 %, about 9.1 M distinct |
+| `other_msisdn` | 59.4 M non-numeric (sender names and short codes, about 165 k distinct), 7.3 M with a `;phone-context` suffix, 58.3 M twelve-digit |
+| `served_imsi` / `served_imei` | 15 digits; about 7.4 M / 9.5 M distinct; 636 k rows with a blank IMEI |
+| volume by hour | 0.4 M (03:00) to 9.9 M (18:00-19:00) |
+
+**How it is placed.** The Parquet files were MOVED into the Pipeline's store (`data/ims_cdr/database/event_date=2026-10-01/`),
+not ingested: a Dataset can only read inside the Space data root (an outside path, a `read_parquet` literal and a
+junction are all refused), and a Parquet ingest would rewrite the 13 GB as VARCHAR. The CSV landing of the extract is set
+aside outside the Space; the CSV Pipeline `ims_cdr` is **paused** (its CSV landing types would clash with the native ones in
+the same store). `ims_cdr_dataset` reads the files directly.
+
+**Links (the `ims_links` Job, unchanged SQL apart from the caps).** 39,411,289 links in 572 s on the server (10 GB DuckDB
+cap; the dry run took 335 s at 12 GB): voice 21.65 M, sms_service 16.87 M, shared_device 490,689, sms 328,890, co_target
+71,957. The pair caps were raised so the recalibrated hits stay drawable: shared_device 2 to 200 MSISDNs per IMEI (was 2 to
+20), co_target 3 to 100 senders (was 3 to 20). The giant outliers stay out of the pair links: one IMEI carries 12,039
+MSISDNs and one number has 7,809 senders.
+
+**Index.** Full build in 316 s, version 70, 838 MB: 12,349,996 nodes; edges by kind voice 21.61 M, sms_service 4.05 M,
+shared_device 483,586, sms 328,890, co_target 69,600; degree p50 2, p90 9, p99 22, max 1,067,398. **Sender-name edges are
+not in the index:** the index keys each end through its Entity Type's normaliser (`e164`), and a sender name normalises to
+nothing, so about 12.8 M sms_service edges (and about 45 k voice) are dropped as NULL ends. They remain in `ims_links`.
+
+**Thresholds (recalibrated on the full day).**
+
+| Alert Rule | Before | Hits on 2026-10-01 before | Now | Hits now |
+|---|---|---|---|---|
+| SMS burst target | 5+ senders, 90 %+ FAILED | 236 | **20+ person-to-person senders, 95 %+ FAILED** | 29 |
+| Multi-SIM device | "15" counted PAIR links (about 6 MSISDNs) | 1,826 | **50+ distinct MSISDNs** (the count is now of MSISDNs) | 58 (76 in the data; the 18 above 200 MSISDNs are outside the pair cap) |
+| Call fan-in hub | 10+ callers, any callee | 248,836 | **100+ callers, subscriber numbers (11-13 digits) only** | 13 |
+
+The three Alerts fired with those counts (CRITICAL burst, WARNING fan-in and multi-SIM); the 2026-10-09 Alerts are resolved
+as superseded. ⚠ A Dataset Measure rule is **edge-triggered**: it fires once per open breach and only a heal re-arms it.
+Resolving its Alert by hand does not re-arm a rule whose measure is still breached; the open-breach state is rebuilt from
+OPEN Alerts at boot, so a restart after resolving re-armed them.
+
+**Entity Lists.** `ims-sms-burst` (its title named the 2026-10-09 event) is retired; `ims-sms-burst-targets` holds the 29
+burst targets; `ims-multi-sim-imei` holds the 178 MSISDNs of the largest device within the cap; `ims-fanin-hubs` the 13
+hubs (both 2026-10-09 hubs are hubs again); `ims-intl-failed-sms` the 20 international numbers receiving only FAILED SMS
+from 5+ senders. The saved views' descriptions are day-neutral and point at the new lists.
+
+**Schedules and limits.** `ims_links` daily 01:00, `la_index_build` daily 02:00 with a one-hour timeout (they ran every
+10 minutes); `entity_profile.timeout_s` 300 (was 30). The 10 GB DuckDB cap was a launch option of one run only: the
+server's default (about 3.2 GB on this 32 GB host) makes the nightly links Job slower than measured here.
+
+**Entity profile at this scale (measured 2026-10-16, IMSI).** The cold Entity Type Profile took 568 s; the cached read
+0.4 s. It came back **partial**: Identity, Where it appears, Value shapes, Time and Lineage are assessed, but **Volume
+and Relationships are `not assessed: Out of Memory`**. The profile reads run under the sandboxed Dataset query budget of
+about 953 MiB, far below the server's DuckDB default, and a distinct count or a per-Entity group over 132 M rows does not
+fit it. The page stays honest (each section says why), but the partial result is CACHED, so the warm read keeps
+returning it until the data changes, and the reason shown is a raw DuckDB message. Needs a fix before this Space
+demonstrates the Entity pages: a profile memory budget (or spill) of its own, sampling for distinct counts and
+relationships above a row limit, and no caching of a section that failed. P4 of the Entity profile plan (a scheduled
+profile Job) would also take the cold read off the request path.
+
+**What this changes in the demo.** The story of section 2 (one 8-SIM burst, one 15-SIM device) is the 2026-10-09 extract;
+on the production day the same rules find 29 burst targets, 58 large devices and 13 call hubs, so the beats seed from the
+new lists. The service-hub beat (12-14) seeds a sender name, which the index does not hold: it reads the Dataset instead,
+under the projection limits. To re-check on screen: the burst and device views at this scale, and the four-eyes beat
+(fan-out threshold 2,000 against a maximum degree of about 1.07 M).
 
 ## References
 
