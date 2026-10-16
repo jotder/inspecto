@@ -58,10 +58,12 @@ export function buildPlan() {
       add: farmIds, reason: 'one handset, nine national ids (showcase)' } },
     { id: 'identity', as: 'mm.analyst', method: 'POST', path: '/inv/entity-identities', body: {
       a: 'account:FARM-1', b: 'account:FARM-2', reason: 'same handset DEV-FARM-01 (showcase)' } },
-    { id: 'case', as: 'mm.analyst', method: 'POST', path: '/cases/from-entities', body: {
+    // A Case opened from an entity of a classified Dataset needs canRevealLinkEntities, which only `admin` holds in this Space
+    // (mm.analyst deliberately does not: the masking beat). admin is also the Investigation's lead, so it may link the Case.
+    { id: 'case', as: 'admin', method: 'POST', path: '/cases/from-entities', body: {
       title: CASE_TITLE, entities: [{ id: 'entity:account:HUB-01', dataset: DATASET }] } },
-    { id: 'case-assign', as: 'mm.analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'mm.manager' } },
-    { id: 'case-link', as: 'mm.analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
+    { id: 'case-assign', as: 'admin', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'mm.manager' } },
+    { id: 'case-link', as: 'admin', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
     { id: 'template', as: 'mm.analyst', method: 'POST', path: `${base}/template`, body: { id: 'mm-mule-chain-template', title: 'Mule chain (hub + relays + cash-out agent)' } },
     { id: 'alert-rule', as: 'mm.analyst', method: 'POST', path: `${base}/alert-rules`, body: {
       name: RULE, severity: 'CRITICAL',

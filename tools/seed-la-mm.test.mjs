@@ -35,7 +35,7 @@ test('apply signs in once per persona and acts as the right persona', async () =
   const m = mock();
   const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF });
   assert.deepEqual(r.failed, []);
-  assert.equal(m.calls.filter((c) => c.u === '/auth/exchange').length, 1);
+  assert.equal(m.calls.filter((c) => c.u === '/auth/exchange').length, 2);   // mm.analyst, and admin for the Case (needs reveal)
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'exclude', 'annotate', 'threshold', 'window', 'resolve', 'snapshot']);
   assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:mm.analyst'));
@@ -44,7 +44,9 @@ test('apply signs in once per persona and acts as the right persona', async () =
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
   assert.deepEqual(members.map((c) => c.body), [{ subject: 'mm.reviewer', role: 'reviewer' }, { subject: 'mm.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
   assert.ok(!members.some((c) => c.body.subject === 'mm.outsider'), 'the outsider is not a member');
-  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'mm.manager' });
+  const assign = m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign');
+  assert.deepEqual(assign.body, { assignee: 'mm.manager' });
+  assert.equal(assign.auth, 'Bearer tok-demo:admin');
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   assert.ok(Date.parse(m.calls.find((c) => c.body && c.body.expiresAt).body.expiresAt) > Date.now());
   assert.ok(m.calls.find((c) => c.u.endsWith('/standing-detection')));
