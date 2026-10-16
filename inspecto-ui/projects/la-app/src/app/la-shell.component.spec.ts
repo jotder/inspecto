@@ -19,13 +19,13 @@ describe('la-app shell and landing page', () => {
 
     let harness: RouterTestingHarness;
 
-    async function render(canAuthor = false) {
+    async function render() {
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(),
                 provideHttpClientTesting(),
                 provideNoopAnimations(),
-                { provide: LensService, useValue: { canAuthorWorkbench: signal(canAuthor), canManageIncidents: signal(false) } },
+                { provide: LensService, useValue: { canAuthorWorkbench: signal(false), canManageIncidents: signal(false) } },
                 {
                     provide: SessionService,
                     useValue: { authMode: signal('none'), actorName: signal(''), loginRequired: signal(false) },
@@ -45,7 +45,7 @@ describe('la-app shell and landing page', () => {
         const hrefs = (sel: string) =>
             [...el.querySelectorAll<HTMLAnchorElement>(sel)].map((a) => a.getAttribute('href'));
         const expected = LA_APP_NAV.map((n) => '/' + n.path);
-        expect(hrefs('nav[aria-label="Areas"] a')).toEqual(expected);
+        expect(hrefs('nav[aria-label="Areas"] a')).toEqual([...expected, '/settings']);
         expect(hrefs('ul a')).toEqual(expected);
         expect(el.querySelector('h1')?.textContent).toContain('Link Analysis');
         expect(el.querySelector('main')).toBeTruthy();
@@ -57,21 +57,19 @@ describe('la-app shell and landing page', () => {
         expect(el.querySelector('ul a[href="/alerts"]')).toBeTruthy();
     });
 
-    it('offers the Settings link only to a user who may change the Link Analysis settings', async () => {
-        const plain = await render(false);
-        expect(plain.querySelector('nav[aria-label="Areas"] a[href="/settings"]')).toBeNull();
-        TestBed.resetTestingModule();
-        const author = await render(true);
-        const links = [...author.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Areas"] a')];
-        expect(links.map((a) => a.getAttribute('href'))).toEqual([...LA_APP_NAV.map((n) => '/' + n.path), '/settings']);
+    it('offers the Settings link to every user, last in the rail and not on the landing page', async () => {
+        const el = await render();
+        const links = [...el.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Areas"] a')];
+        expect(links.at(-1)?.getAttribute('href')).toBe('/' + LA_APP_SETTINGS_NAV.path);
         expect(links.at(-1)?.textContent?.trim()).toBe(LA_APP_SETTINGS_NAV.label);
+        expect(el.querySelector('ul a[href="/settings"]')).toBeNull();
     });
 
     it('is a left rail: three areas, Space switcher and user menu inside it, no header or footer', async () => {
         const el = await render();
         const rail = el.querySelector('aside') as HTMLElement;
         expect(rail.querySelector('nav[aria-label="Areas"]')).toBeTruthy();
-        expect(rail.querySelectorAll('nav[aria-label="Areas"] a').length).toBe(LA_APP_NAV.length);
+        expect(rail.querySelectorAll('nav[aria-label="Areas"] a').length).toBe(LA_APP_NAV.length + 1);
         expect(rail.querySelector('inspecto-space-switcher')).toBeTruthy();
         expect(rail.querySelector('user')).toBeTruthy();
         expect([...el.querySelectorAll('header')].filter((h) => !h.closest('main'))).toEqual([]);
@@ -91,7 +89,7 @@ describe('la-app shell and landing page', () => {
         const links = [...el.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Areas"] a')];
         // Landing is "/", so no area is current yet; every link still has a text name (visually hidden when slim).
         expect(links.every((a) => a.getAttribute('aria-current') === null)).toBe(true);
-        expect(links.map((a) => a.textContent?.trim())).toEqual(LA_APP_NAV.map((n) => n.label));
+        expect(links.map((a) => a.textContent?.trim())).toEqual([...LA_APP_NAV.map((n) => n.label), LA_APP_SETTINGS_NAV.label]);
     });
 
     it('is slim by default, expands on the toggle, and remembers the choice', async () => {

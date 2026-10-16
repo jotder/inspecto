@@ -1,10 +1,12 @@
-import { Route } from '@angular/router';
+import { Route, UrlSegment } from '@angular/router';
 import { describe, expect, it } from 'vitest';
 import { laAppRoutes } from './app.routes';
 import { LA_APP_NAV } from './la-nav';
 
 const shell = laAppRoutes.find((r) => r.path === '' && r.children) as Route;
 const child = (path: string): Route => shell.children!.find((r) => r.path === path) as Route;
+/** Settings is matched, not pathed: one config for /settings and /settings/<section>. */
+const settings = shell.children!.find((r) => r.matcher) as Route;
 
 describe('la-app routes', () => {
     it('has the two OIDC guest routes outside the guarded shell, and one guarded shell', () => {
@@ -52,6 +54,14 @@ describe('la-app routes', () => {
     }, 60_000);
 
     it('resolves the Settings page', async () => {
-        expect(await child('settings').loadComponent!()).toBeTruthy();
+        expect(await settings.loadComponent!()).toBeTruthy();
     }, 60_000);
+
+    it('matches /settings and /settings/<section> with one route, and nothing deeper', () => {
+        const seg = (...p: string[]) => p.map((x) => new UrlSegment(x, {}));
+        expect(settings.matcher!(seg('settings'), {} as never, settings)?.consumed.length).toBe(1);
+        expect(settings.matcher!(seg('settings', 'access'), {} as never, settings)?.posParams?.['section'].path).toBe('access');
+        expect(settings.matcher!(seg('settings', 'a', 'b'), {} as never, settings)).toBeNull();
+        expect(settings.matcher!(seg('alerts'), {} as never, settings)).toBeNull();
+    });
 });

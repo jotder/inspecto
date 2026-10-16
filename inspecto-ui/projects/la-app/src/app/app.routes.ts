@@ -1,4 +1,4 @@
-import { Route } from '@angular/router';
+import { Route, UrlSegment } from '@angular/router';
 import { authGuard } from '@inspecto/core/auth/auth.guard';
 import { ALERTS_INVESTIGATION_ROUTE } from 'app/modules/admin/alerts/alerts.component';
 import { LaShellComponent } from './la-shell.component';
@@ -45,7 +45,14 @@ export const laAppRoutes: Route[] = [
                 providers: [{ provide: ALERTS_INVESTIGATION_ROUTE, useValue: '/link-analysis' }],
             },
             {
-                path: 'settings',
+                // One config matches BOTH /settings and /settings/<section>, as the console's Settings does: the same
+                // route config means the page is reused across a section switch (deep-linkable, Back works).
+                matcher: (segments: UrlSegment[]) =>
+                    segments[0]?.path !== 'settings' || segments.length > 2
+                        ? null
+                        : segments.length === 1
+                          ? { consumed: segments }
+                          : { consumed: segments, posParams: { section: segments[1] } },
                 loadComponent: () => import('./settings.page').then((m) => m.SettingsPageComponent),
             },
             { path: '**', redirectTo: '' },

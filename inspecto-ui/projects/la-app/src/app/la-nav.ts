@@ -33,8 +33,8 @@ export const LA_APP_NAV = [
 ] as const;
 
 /**
- * The rail link to the Link Analysis settings: shown only to a user who may change them (`canAuthorWorkbench`, the
- * capability `PUT /settings/link-analysis` is gated on). Not on the landing page, which offers the three areas.
+ * The rail link to Settings: shown to every signed-in user, because the page always has a section for them (their own
+ * limits) and shows the others read-only unless they may change them. Not on the landing page, which offers the areas.
  */
 export const LA_APP_SETTINGS_NAV = {
     path: 'settings',

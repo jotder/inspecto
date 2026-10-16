@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -6,7 +6,6 @@ import { SpaceSwitcherComponent } from 'app/layout/common/space-switcher/space-s
 import { UserComponent } from 'app/layout/common/user/user.component';
 import { ConnectivityBannerComponent } from '@inspecto/core/components/connectivity-banner.component';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
-import { LensService } from 'app/inspecto/api';
 import { LA_APP_NAV, LA_APP_SETTINGS_NAV } from './la-nav';
 
 /** localStorage key remembering whether the navigation rail is expanded ('1') or slim (anything else). */
@@ -65,7 +64,7 @@ function readExpanded(): boolean {
                 }
             </a>
             <nav class="flex flex-1 flex-row items-center gap-1 md:mt-2 md:flex-col md:items-stretch" aria-label="Areas">
-                @for (item of nav(); track item.path) {
+                @for (item of nav; track item.path) {
                     <a
                         [routerLink]="'/' + item.path"
                         routerLinkActive="bg-hover text-primary font-semibold"
@@ -129,11 +128,8 @@ function readExpanded(): boolean {
 })
 export class LaShellComponent {
     private readonly env = inject(APP_ENVIRONMENT);
-    private readonly lens = inject(LensService);
-    /** The three areas, plus Settings for a user who may change the Link Analysis settings. */
-    protected readonly nav = computed(() =>
-        this.lens.canAuthorWorkbench() ? [...LA_APP_NAV, LA_APP_SETTINGS_NAV] : LA_APP_NAV,
-    );
+    /** The areas, plus Settings: it always has a section for the signed-in user. */
+    protected readonly nav = [...LA_APP_NAV, LA_APP_SETTINGS_NAV];
     protected readonly logo = this.env.appLogo;
     protected readonly footer = this.env.footerText;
     protected readonly expanded = signal(readExpanded());

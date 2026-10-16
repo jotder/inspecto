@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -84,6 +84,10 @@ function groupsOf(items: LaLimitItem[]): { group: string; items: LaLimitItem[] }
     return out;
 }
 
+/** The three limits sections, by the heading each is drawn under. */
+export type LimitsSection = 'analysis' | 'host' | 'browser';
+const ALL_LIMITS_SECTIONS: readonly LimitsSection[] = ['analysis', 'host', 'browser'];
+
 /** A FormGroup key may not contain `.`, which every grouped wire key does. */
 const name = (key: string): string => key.replaceAll('.', '__');
 
@@ -143,6 +147,7 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
             } @else if (limits.loadError()) {
                 <inspecto-alert variant="warning" title="Limits unavailable">{{ limits.loadError() }}</inspecto-alert>
             } @else {
+                @if (shows('analysis')) {
                 <section class="flex flex-col gap-3" aria-labelledby="la-limits-analysis">
                     <h2 id="la-limits-analysis" class="text-lg font-semibold">Analysis</h2>
                     <p class="text-secondary text-sm">
@@ -207,7 +212,9 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                         <p class="text-secondary text-sm">None reported.</p>
                     }
                 </section>
+                }
 
+                @if (shows('host')) {
                 <section class="flex flex-col gap-3" aria-labelledby="la-limits-host">
                     <h2 id="la-limits-host" class="text-lg font-semibold">Host resources</h2>
                     <p class="text-secondary text-sm">
@@ -275,7 +282,9 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                         <p class="text-secondary text-sm">None reported.</p>
                     }
                 </section>
+                }
 
+                @if (shows('browser')) {
                 <section class="flex flex-col gap-3" aria-labelledby="la-limits-browser">
                     <h2 id="la-limits-browser" class="text-lg font-semibold">My browser</h2>
                     <p class="text-secondary text-sm">
@@ -338,11 +347,14 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                         <p class="text-secondary text-sm">None reported.</p>
                     }
                 </section>
+                }
             }
         </div>
     `,
 })
 export class LinkAnalysisLimitsComponent {
+    /** Which of the three sections to draw. All three by default (the console's Settings); the Link Analysis app shows one per page. */
+    readonly sections = input<readonly LimitsSection[]>(ALL_LIMITS_SECTIONS);
     readonly limits = inject(LaLimitsService);
     private readonly toastr = inject(ToastrService);
 
@@ -373,6 +385,10 @@ export class LinkAnalysisLimitsComponent {
     });
 
     /** "Expand budget (default, rows)", "Betweenness centrality (nodes)", "Hub threshold": derived from the key, never hand-written. */
+    shows(section: LimitsSection): boolean {
+        return this.sections().includes(section);
+    }
+
     label(i: LaLimitItem): string {
         const { name, qualifier } = limitWords(i.key);
         const note = [qualifier, UNITS[i.unit] ?? i.unit].filter((x) => !!x).join(', ');

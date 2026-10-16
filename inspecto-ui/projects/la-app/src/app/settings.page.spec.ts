@@ -3,35 +3,104 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it } from 'vitest';
 import { LensService } from 'app/inspecto/api';
+import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { SettingsPageComponent } from './settings.page';
+import { laAppRoutes } from './app.routes';
 
-describe('SettingsPageComponent (axe, LA-A11Y-AUDIT-1)', () => {
-    function render(canAuthor: boolean) {
+/** The app's own Settings route (one matcher for /settings and /settings/<section>), without the guarded shell around it. */
+const settingsRoute = laAppRoutes.find((r) => r.path === '' && r.children)!.children!.find((r) => r.matcher)!;
+
+describe('SettingsPageComponent (compact master-detail, split by audience)', () => {
+    async function render(opts: { author?: boolean; access?: boolean; items?: unknown[]; url?: string } = {}) {
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(),
                 provideHttpClientTesting(),
                 provideNoopAnimations(),
                 { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
-                { provide: LensService, useValue: { canAuthorWorkbench: signal(canAuthor) } },
+                {
+                    provide: LensService,
+                    useValue: {
+                        canAuthorWorkbench: signal(opts.author ?? false),
+                        canConfigureAccess: signal(opts.access ?? false),
+                    },
+                },
+                {
+                    provide: LaLimitsService,
+                    useValue: {
+                        items: signal(opts.items ?? []),
+                        loading: signal(false),
+                        loadError: signal(null),
+                        podScoped: signal(false),
+                        personal: () => null,
+                        setPersonal: () => undefined,
+                    },
+                },
+                provideRouter([settingsRoute]),
             ],
         });
-        const fixture = TestBed.createComponent(SettingsPageComponent);
-        fixture.detectChanges();
-        return fixture.nativeElement as HTMLElement;
+        const harness = await RouterTestingHarness.create(opts.url ?? '/settings');
+        harness.detectChanges();
+        return harness.routeNativeElement as HTMLElement;
     }
 
-    it('names its region and has no axe violations while the settings are loading', async () => {
-        const el = render(true);
-        expect(el.querySelector('section')?.getAttribute('aria-label')).toBe('Link Analysis settings');
-        await expectNoA11yViolations(el);
+    const names = (el: HTMLElement) =>
+        [...el.querySelectorAll<HTMLButtonElement>('nav button')].map((b) => b.dataset['section']);
+    const readOnly = (el: HTMLElement, id: string) =>
+        !!el.querySelector(`nav button[data-section="${id}"] inspecto-chip`);
+
+    it('groups the sections by who they are for: my settings, this Space, this server', async () => {
+        const el = await render();
+        const groups = [...el.querySelectorAll('nav [role="group"]')].map((g) => ({
+            label: g.firstElementChild?.textContent?.trim(),
+            sections: [...g.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.dataset['section']),
+        }));
+        expect(groups).toEqual([
+            { label: 'My settings', sections: ['my-browser'] },
+            { label: 'This Space', sections: ['link-analysis', 'analysis-limits', 'access'] },
+            { label: 'This server', sections: ['host-resources'] },
+        ]);
     });
 
-    it('has no axe violations without the authoring capability (read-only)', async () => {
-        await expectNoA11yViolations(render(false));
+    it('opens the first section when none is named, and marks it current', async () => {
+        const el = await render();
+        expect(el.querySelector('nav button[aria-current="true"]')?.getAttribute('data-section')).toBe('my-browser');
     });
+
+    it('opens the section the URL names', async () => {
+        const el = await render({ url: '/settings/access' });
+        expect(el.querySelector('nav button[aria-current="true"]')?.getAttribute('data-section')).toBe('access');
+    });
+
+    it('lists every section for every user but marks the ones they may not change read-only', async () => {
+        const plain = await render();
+        expect(names(plain)).toHaveLength(5);
+        expect(readOnly(plain, 'my-browser')).toBe(false);
+        for (const id of ['link-analysis', 'analysis-limits', 'access', 'host-resources'])
+            expect(readOnly(plain, id), id).toBe(true);
+    });
+
+    it('drops the read-only mark where the user holds the privilege (the server marks each limit editable)', async () => {
+        const el = await render({
+            author: true,
+            access: true,
+            items: [
+                { key: 'a', layer: 'space', editable: true },
+                { key: 'b', layer: 'install', editable: false },
+            ],
+        });
+        expect(readOnly(el, 'link-analysis')).toBe(false);
+        expect(readOnly(el, 'access')).toBe(false);
+        expect(readOnly(el, 'analysis-limits')).toBe(false);
+        expect(readOnly(el, 'host-resources')).toBe(true);
+    });
+
+    it('has no axe violations', async () => {
+        await expectNoA11yViolations(await render());
+    }, 30_000);
 });

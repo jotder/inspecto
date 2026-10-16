@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -279,11 +279,16 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
                     }
                 </form>
             }
-            <inspecto-link-analysis-limits />
+            @if (withLimits()) {
+                <inspecto-link-analysis-limits />
+            }
         </div>
     `,
 })
 export class LinkAnalysisSettingsComponent implements OnInit {
+    /** Draw the three limits sections under the form. True in the console's Settings; the Link Analysis app lists them as sections of their own. */
+    readonly withLimits = input(true);
+
     private api = inject(LinkAnalysisSettingsService);
     private lens = inject(LensService);
     private toastr = inject(ToastrService);
