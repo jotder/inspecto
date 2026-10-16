@@ -30,7 +30,7 @@ const farmIds = Array.from({ length: 9 }, (_, i) => `FARM-${i + 1}`);
 export function buildPlan() {
   const base = `/inv/investigations/${INV}`;
   const ops = [
-    { op: 'seed', ids: ['HUB-01', 'RELAY-1', 'RELAY-2', 'STRUCT-01'], entityType: 'account' },
+    { op: 'seed', ids: ['HUB-01', 'RELAY-1', 'RELAY-2', 'STRUCT-01'], entityType: 'wallet' },
     { op: 'expand', direction: 'either', maxFanOut: 5 },   // bounded, under four_eyes_fan_out_above (100): runs now; an UNBOUNDED expand always goes pending
     { op: 'exclude', ids: ['RELAY-2'], reason: 'second relay repeats the RELAY-1 route' },
     { op: 'annotate', ids: ['HUB-01'], note: 'hub: 25 wallets just under the 5 000 tier limit in, 98% out within minutes' },
@@ -47,21 +47,21 @@ export function buildPlan() {
     ...[['mm.reviewer', 'reviewer'], ['mm.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
       { id: `member-${subject}`, as: 'mm.analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
     { id: 'list-struct', as: 'mm.analyst', method: 'POST', path: '/entity-lists', body: {
-      id: 'struct-wallets', title: 'STRUCT wallets', purpose: 'watch', entityType: 'account', reason: 'showcase structuring story' } },
+      id: 'struct-wallets', title: 'STRUCT wallets', purpose: 'watch', entityType: 'wallet', reason: 'showcase structuring story' } },
     { id: 'list-struct-members', as: 'mm.analyst', method: 'POST', path: '/entity-lists/struct-wallets/members', body: {
       add: structIds, addRanges: [{ prefix: 'STRUCT-' }], reason: 'showcase structuring story' } },
     { id: 'list-struct-expiring', as: 'mm.analyst', method: 'POST', path: '/entity-lists/struct-wallets/members', body: {
       add: ['HUB-01'], expiresAt: '@+30d', reason: '30 day hold on the mule hub' } },
     { id: 'list-farm', as: 'mm.analyst', method: 'POST', path: '/entity-lists', body: {
-      id: 'farm-wallets', title: 'Device farm wallets', purpose: 'watch', entityType: 'account', reason: 'showcase device farm' } },
+      id: 'farm-wallets', title: 'Device farm wallets', purpose: 'watch', entityType: 'wallet', reason: 'showcase device farm' } },
     { id: 'list-farm-members', as: 'mm.analyst', method: 'POST', path: '/entity-lists/farm-wallets/members', body: {
       add: farmIds, reason: 'one handset, nine national ids (showcase)' } },
     { id: 'identity', as: 'mm.analyst', method: 'POST', path: '/inv/entity-identities', body: {
-      a: 'account:FARM-1', b: 'account:FARM-2', reason: 'same handset DEV-FARM-01 (showcase)' } },
+      a: 'wallet:FARM-1', b: 'wallet:FARM-2', reason: 'same handset DEV-FARM-01 (showcase)' } },
     // A Case opened from an entity of a classified Dataset needs canRevealLinkEntities, which only `admin` holds in this Space
     // (mm.analyst deliberately does not: the masking beat). admin is also the Investigation's lead, so it may link the Case.
     { id: 'case', as: 'admin', method: 'POST', path: '/cases/from-entities', body: {
-      title: CASE_TITLE, entities: [{ id: 'entity:account:HUB-01', dataset: DATASET }] } },
+      title: CASE_TITLE, entities: [{ id: 'entity:wallet:HUB-01', dataset: DATASET }] } },
     { id: 'case-assign', as: 'admin', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'mm.manager' } },
     { id: 'case-link', as: 'admin', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
     { id: 'template', as: 'mm.analyst', method: 'POST', path: `${base}/template`, body: { id: 'mm-mule-chain-template', title: 'Mule chain (hub + relays + cash-out agent)' } },

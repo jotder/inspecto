@@ -2,8 +2,8 @@ physicalRef: mm_links
 description: "Mobile-money Link Analysis showcase - ONE link Dataset built by the mm_links Job from wallet_txn and wallet_master. kind is p2p, cash_in, cash_out, merchant_pay (one row per transaction, amount set) or shared_device, shared_id (one row per wallet pair, lower id to higher id, amount empty; via names the shared key). Placeholder handsets and ids are never a link. Synthetic."
 eventDate: event_date
 columns[7]{name,type,classification}:
-  src,string,ACCOUNT
-  dst,string,ACCOUNT
+  src,string,WALLET
+  dst,string,WALLET
   kind,string,
   ts,timestamp,
   amount,number,

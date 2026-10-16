@@ -104,8 +104,8 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   let hub, agent;
   await step('setup: seed HUB-01 and AG-39 and expand three times (a bounded expand runs, under the four-eyes threshold)', async () => {
     await create(chain);
-    hub = (await op(chain, { op: 'seed', ids: ['HUB-01'], entityType: 'account' })).delta.admitted[0];
-    agent = (await op(chain, { op: 'seed', ids: ['AG-39'], entityType: 'account' })).delta.admitted[0];
+    hub = (await op(chain, { op: 'seed', ids: ['HUB-01'], entityType: 'wallet' })).delta.admitted[0];
+    agent = (await op(chain, { op: 'seed', ids: ['AG-39'], entityType: 'wallet' })).delta.admitted[0];
     await expand3(chain);
     return null;
   });
@@ -118,7 +118,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const loop = `smoke-mm-loop-${ts}`;
   await step('4 Find cycles around LOOP-1: exactly one cycle of 4 nodes', async () => {
     await create(loop);
-    await op(loop, { op: 'seed', ids: ['LOOP-1'], entityType: 'account' });
+    await op(loop, { op: 'seed', ids: ['LOOP-1'], entityType: 'wallet' });
     await expand3(loop);
     return cycleVerdict(await graph(loop, 'findCycles', { limit: 50, maxLen: 8 }));
   });

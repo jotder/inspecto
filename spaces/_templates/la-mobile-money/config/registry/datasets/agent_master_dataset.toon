@@ -2,7 +2,7 @@ physicalRef: agent_master/database
 description: "Mobile-money Link Analysis showcase - the agent register (name, region, float limit), keyed on agent_id. Synthetic."
 eventDate: opened_date
 columns[5]{name,type,classification}:
-  agent_id,string,ACCOUNT
+  agent_id,string,AGENT
   agent_name,string,
   region,string,
   opened_date,date,
