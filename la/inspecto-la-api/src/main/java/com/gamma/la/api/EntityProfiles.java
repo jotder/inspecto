@@ -3,6 +3,7 @@ package com.gamma.la.api;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
+import com.gamma.entitystore.LaLimits;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
@@ -114,7 +115,7 @@ final class EntityProfiles {
             this.resolved = resolved;
             this.lim = Limits.of(writeRoot);
             SqlSandboxPolicy d = SqlSandboxPolicy.defaultPolicy();
-            this.policy = SqlSandboxPolicy.withCaps(d.memoryLimit(), d.maxThreads(), lim.timeoutS());
+            this.policy = SqlSandboxPolicy.withCaps(memoryLimitMb() + "MiB", d.maxThreads(), lim.timeoutS());
             this.maskMode = LinkAnalysisSettings.forRoot(writeRoot).effectiveMaskingMode();
 
             Set<String> datasets = new LinkedHashSet<>();
@@ -215,8 +216,12 @@ final class EntityProfiles {
         boolean cached = !sections.isEmpty() && have.keySet().containsAll(sections);
         Map<String, Section> computed = new LinkedHashMap<>();
         for (String s : sections) computed.put(s, have.containsKey(s) ? have.get(s) : new Section(compute(f, s), Instant.now()));
-        if (stamp != null) Cache.put(key, stamp, computed);
-        Section volume = computed.get("volume"), time = computed.get("time");
+        // A section whose read FAILED is answered but never cached, so the next read retries it (a cached failure would
+        // answer "not assessed" until the input files change).
+        Map<String, Section> keep = new LinkedHashMap<>(computed);
+        keep.values().removeIf(s -> failed(s.value()));
+        if (stamp != null) Cache.put(key, stamp, keep);
+        Section volume = keep.get("volume"), time = keep.get("time");
         if (volume != null) Cache.headline(key, headline(volume, time == null ? null : time.value(), f));
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -270,7 +275,7 @@ final class EntityProfiles {
         try {
             return r.get();
         } catch (Exception e) {
-            return notAssessed(reason(e));
+            return failed(e);
         }
     }
 
@@ -281,9 +286,41 @@ final class EntityProfiles {
         return m;
     }
 
+    /**
+     * Not assessed because a read FAILED (as opposed to a section that does not apply): {@code retryable}, so the cache
+     * never keeps it and the next read tries again.
+     */
+    static Map<String, Object> failed(Exception e) {
+        Map<String, Object> m = notAssessed(reason(e));
+        m.put("retryable", true);
+        return m;
+    }
+
+    /** True when {@code section} (a section map, or a list of them) holds a {@link #failed} read. */
+    static boolean failed(Object section) {
+        if (section instanceof Map<?, ?> m) return Boolean.TRUE.equals(m.get("retryable"));
+        if (section instanceof List<?> l) for (Object o : l) if (failed(o)) return true;
+        return false;
+    }
+
     static String reason(Exception e) {
         String m = DatasetReadFault.scrub(com.gamma.util.DuckDbUtil.withoutPendingQueryPreamble(String.valueOf(e.getMessage())));
-        return m != null && m.toLowerCase(java.util.Locale.ROOT).contains("interrupt") ? "the read ran past entity_profile.timeout_s" : m;
+        if (m == null) return null;
+        String low = m.toLowerCase(java.util.Locale.ROOT);
+        if (low.contains("interrupt")) return "the read ran past entity_profile.timeout_s";
+        if (isOutOfMemory(m))
+            return "the read ran out of its memory budget (" + memoryLimitMb() + " MiB) on this Dataset; a system admin can "
+                    + "raise entity_profile.memory_limit_mb";
+        return m;
+    }
+
+    static boolean isOutOfMemory(String message) {
+        return message != null && message.contains("Out of Memory");
+    }
+
+    /** {@code entity_profile.memory_limit_mb}: an install-wide item, read per profile so a change applies to the next one. */
+    static long memoryLimitMb() {
+        return LaLimits.forSpace(null).get(LaLimit.ENTITY_PROFILE_MEMORY_LIMIT_MB);
     }
 
     private static void assessed(Map<String, Object> m) {
@@ -325,7 +362,7 @@ final class EntityProfiles {
             } catch (Exception ex) {
                 for (EntityTypeBindings.Binding b : e.getValue()) {
                     Map<String, Object> m = binding(f, b);
-                    m.putAll(notAssessed(reason(ex)));
+                    m.putAll(failed(ex));
                     rows.put(b, m);
                 }
             }
@@ -363,16 +400,25 @@ final class EntityProfiles {
             int b = (int) ColumnProfile.num(r.get("b"));
             sentinels.add(sentinel(f.usable.get(b), "builtin", String.valueOf(r.get("v")), ColumnProfile.num(r.get("n")), nonNull.get(b)));
         }
-        DatasetProvider.Result dominant = f.keys("SELECT b, MAX(n) AS n FROM (SELECT b, k, COUNT(*) AS n FROM " + KEYS
-                + " WHERE k <> '' AND NOT " + SENTINEL_SQL + " GROUP BY b, k) AS g GROUP BY b ORDER BY b", f.usable.size(), List.of());
+        // A dominant value groups every distinct key: above shape_sample_rows that group-by does not fit a profile's memory
+        // budget (7.4 M distinct IMSIs over 132 M rows ran out of 1 GB), so it is read from a row reservoir instead. A row
+        // sample, not an Entity sample: a value holding a fifth of a column is certain to be in it.
+        boolean sampled = ColumnProfile.num(total.get("n")) > f.lim.sampleRows();
+        String from = sampled ? "(SELECT b, k, raw FROM " + KEYS + " USING SAMPLE reservoir(" + f.lim.sampleRows() + " ROWS) REPEATABLE (42)) AS s" : KEYS;
+        DatasetProvider.Result dominant = f.keys("SELECT b, MAX(n) FILTER (WHERE ok) AS n, SUM(n) AS of FROM (SELECT b, k, (k <> '' AND NOT "
+                + SENTINEL_SQL + ") AS ok, COUNT(*) AS n FROM " + from + " GROUP BY b, k, ok) AS g GROUP BY b ORDER BY b", f.usable.size(), List.of());
         for (Map<String, Object> r : dominant.rows()) {
             int b = (int) ColumnProfile.num(r.get("b"));
-            long n = ColumnProfile.num(r.get("n")), of = nonNull.getOrDefault(b, 0L);
-            if (of > 0 && n * 100.0 / of > f.lim.sentinelSharePct())
-                sentinels.add(sentinel(f.usable.get(b), "dominant", null, n, of));   // D-EP3: never the value itself
+            long n = ColumnProfile.num(r.get("n")), seen = ColumnProfile.num(r.get("of")), of = nonNull.getOrDefault(b, 0L);
+            if (of > 0 && seen > 0 && n * 100.0 / seen > f.lim.sentinelSharePct())   // D-EP3: never the value itself
+                sentinels.add(sentinel(f.usable.get(b), "dominant", null, sampled ? Math.round((double) n / seen * of) : n, of));
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
+        if (sampled) {
+            out.put("dominantSampled", true);
+            out.put("sampleRows", f.lim.sampleRows());
+        }
         out.put("distinct", ColumnProfile.num(total.get("d")));
         out.put("approximate", true);
         out.put("rows", ColumnProfile.num(total.get("n")));
@@ -541,7 +587,7 @@ final class EntityProfiles {
                 Map<String, Object> m = s.typeLinks(f);
                 if (m != null) return m;
             } catch (Exception e) {
-                Map<String, Object> m = notAssessed(reason(e));
+                Map<String, Object> m = failed(e);
                 m.put("from", null);
                 return m;
             }
@@ -575,23 +621,49 @@ final class EntityProfiles {
                             parts.add("SELECT NULLIF(" + EntityKeySql.key(f.type.normaliser(), q(a)) + ", '') AS e, NULLIF("
                                     + EntityKeySql.key(other.normaliser(), q(c)) + ", '') AS o FROM (" + f.relationSql.get(ds) + ") AS __r");
                     int thr = f.lim.relationshipThreshold();
-                    Map<String, Object> r = f.run(PAIRS, String.join(" UNION ALL ", parts), "SELECT COUNT(*) FILTER (WHERE n = 1) AS one, "
-                            + "COUNT(*) AS total, MAX(n) AS mx, COUNT(*) FILTER (WHERE n >= " + thr + ") AS hi FROM (SELECT e, COUNT(DISTINCT o) AS n FROM "
-                            + PAIRS + " WHERE e IS NOT NULL AND o IS NOT NULL GROUP BY e) AS g", 1, List.of()).rows().get(0);
+                    String pairs = String.join(" UNION ALL ", parts);
+                    // Exact first. A per-Entity distinct count over a production day can outgrow the memory budget; then
+                    // it is read over a hash sample of the Entities (1 in SAMPLE_EVERY): each sampled Entity's count stays
+                    // exact, the share is an estimate, and the counts are scaled up and marked approximate.
+                    long every = 1;
+                    Map<String, Object> r;
+                    try {
+                        r = relationshipRow(f, pairs, thr, 1);
+                    } catch (Exception oom) {
+                        if (!isOutOfMemory(oom.getMessage())) throw oom;
+                        every = SAMPLE_EVERY;
+                        r = relationshipRow(f, pairs, thr, every);
+                    }
                     long total = ColumnProfile.num(r.get("total"));
                     m.put("oneToOneShare", total == 0 ? null : round((double) ColumnProfile.num(r.get("one")) / total));
                     m.put("maxPerEntity", total == 0 ? null : ColumnProfile.num(r.get("mx")));
                     m.put("threshold", thr);
-                    m.put("entitiesAtOrAboveThreshold", ColumnProfile.num(r.get("hi")));
-                    m.put("entities", total);
+                    m.put("entitiesAtOrAboveThreshold", ColumnProfile.num(r.get("hi")) * every);
+                    m.put("entities", total * every);
+                    if (every > 1) {
+                        m.put("sampled", true);
+                        m.put("sampleEvery", every);
+                        m.put("approximate", true);
+                    }
                     assessed(m);
                 } catch (Exception e) {
-                    m.putAll(notAssessed(reason(e)));
+                    m.putAll(failed(e));
                 }
                 out.add(m);
             }
         }
         return out;
+    }
+
+    /** The Entity sample of a relationship read that outgrew its memory budget: 1 Entity in this many (by key hash). */
+    static final long SAMPLE_EVERY = 64;
+
+    /** One relationship read over {@code pairs}; {@code every > 1} keeps only the Entities whose key hash falls in 1 of {@code every}. */
+    private static Map<String, Object> relationshipRow(Frame f, String pairs, int thr, long every) throws Exception {
+        String sample = every > 1 ? " AND hash(e) % " + every + " = 0" : "";
+        return f.run(PAIRS, pairs, "SELECT COUNT(*) FILTER (WHERE n = 1) AS one, COUNT(*) AS total, MAX(n) AS mx, COUNT(*) FILTER (WHERE n >= "
+                + thr + ") AS hi FROM (SELECT e, COUNT(DISTINCT o) AS n FROM " + PAIRS + " WHERE e IS NOT NULL AND o IS NOT NULL" + sample
+                + " GROUP BY e) AS g", 1, List.of()).rows().get(0);
     }
 
     // ── headline + cache ─────────────────────────────────────────────────────────────────────────────────────────
@@ -773,7 +845,7 @@ final class EntityProfiles {
             out.put("truncated", truncated);
             assessed(out);
         } catch (Exception e) {
-            out.putAll(notAssessed(reason(e)));
+            out.putAll(failed(e));
         }
         return out;
     }
@@ -784,7 +856,7 @@ final class EntityProfiles {
                 Map<String, Object> m = s.entityLinks(f, key);
                 if (m != null) return m;
             } catch (Exception e) {
-                Map<String, Object> m = notAssessed(reason(e));
+                Map<String, Object> m = failed(e);
                 m.put("from", null);
                 return m;
             }

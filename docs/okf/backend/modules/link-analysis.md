@@ -575,9 +575,20 @@ Plan archived: [`la-entity-profile-plan`](../../../archived-documents/plans-arch
   `typeNodes`, `degree`, `timeSpan`), else a Dataset query under the budget, else `assessed:false` (D-EP4). Every section carries `assessed` /
   `reason`; nothing unmeasured is reported as zero.
 * **Cache** keyed by the input-file fingerprint (D-EP2); a view-backed Dataset has none and is read each time under `entity_profile.timeout_s`.
-  Cold read 2.2-5.4 s on the IMS Space (29,650 rows), cached about 200 ms.
+  Cold read 2.2-5.4 s on the IMS Space (29,650 rows), cached about 200 ms. **A section whose read FAILED is answered but never cached**
+  (`assessed:false` plus `retryable:true`; a section that does not apply has no `retryable`), so the next read retries it.
+* **Production scale (2026-10-16, a 132 M-row day).** The profile used to run under the 1 GB sandbox default and its dominant-value and
+  relationship reads ran out of memory, then the failure was cached. Now: (1) profile SQL is trusted, so it runs under its own install-wide
+  budget `entity_profile.memory_limit_mb` (default 4,096); (2) above `shape_sample_rows` the dominant value is read from a ROW reservoir
+  (`dominantSampled`, `sampleRows`; a row sample, not an Entity sample, because a value holding a fifth of a column is certain to be in it);
+  (3) a relationship read that still runs out of memory is retried over an Entity HASH sample, 1 in 64 (`sampled`, `sampleEvery`,
+  `approximate`: each sampled Entity's count is exact, the counts are scaled up); (4) an out-of-memory reason reads "ran out of its memory
+  budget (N MiB) ... raise entity_profile.memory_limit_mb", never the engine's text. Measured on the IMS day with the sandbox settings: at
+  1 GB the dominant-value and relationship reads fail; at 4 GB they take 58 s and 149 s; hash-sampled at 1 GB 41 s and 123 s.
+  Pinned by `ControlApiEntityProfileScaleTest`.
 * **Limits** (Space layer, server-gated): `entity_profile.timeout_s` 30, `.max_datasets` 20, `.shape_sample_rows` 1,000,000, `.top_n` 20,
-  `.sentinel_share` 20 (%), `.timeline_days` 400, `.relationship_threshold` 6.
+  `.sentinel_share` 20 (%), `.timeline_days` 400, `.relationship_threshold` 6; install layer (system admin, `la-limits.toon`):
+  `entity_profile.memory_limit_mb` 4,096.
 * **Data as of** reads `GET /datasets/{id}/freshness`, a read gate only (D-EP7).
 * **Residuals:** `LA-ENTITY-PROFILE-RESIDUALS-1` in `BACKLOG.md`.
 

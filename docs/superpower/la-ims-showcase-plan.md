@@ -261,6 +261,11 @@ returning it until the data changes, and the reason shown is a raw DuckDB messag
 demonstrates the Entity pages: a profile memory budget (or spill) of its own, sampling for distinct counts and
 relationships above a row limit, and no caching of a section that failed. P4 of the Entity profile plan (a scheduled
 profile Job) would also take the cold read off the request path.
+The cold IMEI profile took 728 s; the MSISDN profile (four bindings plus the links) did not answer within 25 minutes.
+**Fixed in code the same day** (OKF LA backend §6.3): its own memory budget `entity_profile.memory_limit_mb` (4,096 MiB),
+the dominant value from a row sample, relationships retried over an Entity sample, failed sections never cached, a
+readable reason. Measured with the sandbox settings on this day: at 4 GB the two reads that failed take 58 s and 149 s.
+Not yet on the :8080 bundle: it shows there after the bundle is rebuilt.
 
 **What this changes in the demo.** The story of section 2 (one 8-SIM burst, one 15-SIM device) is the 2026-10-09 extract;
 on the production day the same rules find 29 burst targets, 58 large devices and 13 call hubs, so the beats seed from the
