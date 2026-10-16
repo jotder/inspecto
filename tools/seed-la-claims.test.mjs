@@ -68,6 +68,15 @@ test('re-run skips an Investigation that already has its steps and its Case', as
   assert.ok(r.skipped.includes('investigation') && r.skipped.includes('case'));
 });
 
+test('an existing identity group (ids come back masked) means the identity is not asserted twice', async () => {
+  const m = mock();
+  const f = async (url, init = {}) => (url.endsWith('/inv/entity-identities') && (init.method || 'GET') === 'GET'
+    ? { ok: true, status: 200, json: async () => ({ data: { groups: [{ id: 'masked:1', members: ['masked:1', 'masked:2'] }] } }) } : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF });
+  assert.ok(r.skipped.includes('identity'));
+  assert.ok(!m.calls.some((c) => c.u.endsWith('/inv/entity-identities') && c.method === 'POST'));
+});
+
 test('a 409 on create counts as already there, not a failure', async () => {
   const m = mock();
   const f = async (url, init) => (url.endsWith('/entity-lists') ? { ok: false, status: 409, json: async () => ({ data: {} }) } : m.fetchFn(url, init));

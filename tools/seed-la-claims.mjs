@@ -119,7 +119,8 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     if (p.includes('@case')) { out.failed.push(`${s.id}: no Case id`); continue; }
     if (s.id === 'identity') {
       const have = await call(s.as, 'GET', '/inv/entity-identities');
-      if (have.status === 200 && JSON.stringify(have.data).includes(TWINS[1])) { out.skipped.push(s.id); continue; }
+      // ids come back MASKED (typed masking), so the raw twin id is never in the answer: any existing group means the assertion is made
+      if (have.status === 200 && ((have.data && have.data.groups) || []).length) { out.skipped.push(s.id); continue; }
     }
     if (s.id === 'case' && !state.case) {   // an UNLINKED Case a half-finished earlier run made: reuse it instead of opening a second
       const c = await call(s.as, 'GET', '/objects?limit=200');
