@@ -1,8 +1,8 @@
 # Link Analysis claims showcase runbook (insurance, Special Investigations Unit)
 
-*Status: written 2026-10-16 with the build of the `la-claims` Space Template. Everything the data and the graph promise is pinned by tests
-(section 5). **Nothing here has been driven live in a browser or against a booted server yet**: every scene that touches the screen is marked
-**UNVERIFIED (rehearse first)** until `tools/la-claims-smoke.mjs` and a browser pass have run on a fresh bake (section 6).*
+*Status: written 2026-10-16 with the build of the `la-claims` Space Template and **rehearsed live the same day** on an Enterprise Demo Auth bundle
+(port 8142, `-Dla.embed.enabled=true`): `tools/la-claims-smoke.mjs --embed` passed 29 of 29 and the scenes marked **verified** below were driven in the
+browser pane or against the live API as the real Demo Users (section 6). Data and graph promises are pinned by tests (section 5).*
 
 What this is: the script for presenting vertical C of the [multi-vertical showcase plan](../superpower/la-multi-vertical-showcase-plan.md),
 "one garage, one lawyer, twelve strangers". The graph here is built from **shared attributes** (one phone, one address, one garage), not from
@@ -59,13 +59,13 @@ Start as `siu.analyst`. Always **seed first**: an all-nodes canvas is a dust clo
 
 | Min | Scene | Click | Say | Expect |
 |---|---|---|---|---|
-| 0-2 | **Seed and the busy clinic** | Open the saved view `claims_network`; seed `CL-0134`, **Expand** twice. Then seed `CLI-01` | "One repeat passenger. Her neighbourhood is twelve strangers." The GP clinic arrives with a high-connectivity marker and **holds** | ~21 entities after two expands. `CLI-01` is held: high connectivity is not guilt |
+| 0-2 | **Seed and the busy clinic** (UNVERIFIED on the canvas) | Open the saved view `claims_network` (an all-nodes canvas is a dust cloud: open `claims_shared_identity` for a small first picture); seed `CL-0134`, **Expand** twice. Then seed `CLI-01` | "One repeat passenger. Her neighbourhood is twelve strangers." The GP clinic arrives with a high-connectivity marker and **holds** | ~21 entities after two expands. `CLI-01` is held: high connectivity is not guilt |
 | 2-4 | **Communities** | Toolbox > **Communities** > Louvain (client run), then **Run on server** | "The ring is one community, and it includes the garage, the clinic and the lawyer." | one community of the 12 claimants + `GAR-03`, `CLI-04`, `LAW-02` |
 | 4-5 | **Cliques and triangles** | **Cliques** (minimum 4), **Triangle count** | "Shared phones make cliques; the family is a clique too, so sharing is not guilt." | largest clique 7; `CL-0134` 67 triangles; the family clique of 5 is in a different community |
 | 5-6 | **Providers** | **HITS**, **PageRank** on the working set, then open `claims_provider_money` | "The lawyer is the hub, the clinic the authority; the clinic bills three times its peers." | authorities `GAR-03`, `LAW-02`, `CLI-04` on top |
-| 6-7 | **Geo** | Open Geo View `claims_junction_cluster_map`, zoom on Derby | "Eleven accidents on one junction between two and four in the morning, none with a police report." | a stack of 11 markers (2 stray ones elsewhere) |
-| 7-8.5 | **Identity resolution** | Entities > identity groups: `CL-0332` = `CL-0141` (seeded); re-run **Resolve** | "Two records, one person: same birth date, same phone, one letter apart." | the ring gains its 13th claimant (`CL-0197`). **UNVERIFIED on the canvas**: server Graph Runs keep one node per id, the contraction is pinned on the graph only |
-| 8.5-10 | **Entity profile and masking** | Open the **Entities** page > type Party > `CL-0134`; then the canvas | profile: first and last seen, where it appears, degree and its percentile. Under typed masking the ids on the canvas read as `masked:<hex>`; as `admin`, **Reveal** one (audited) | no raw `CL-nnnn` until Reveal |
+| 6-7 | **Geo** (verified) | Geo page > folder icon > `claims_junction_cluster_map` > Load view | "Eleven accidents on one junction between two and four in the morning, none with a police report." | "Map showing 14 points": the stack of 11 plus 3 strays elsewhere |
+| 7-8.5 | **Identity resolution** (live-verified through the API) | In an Investigation seed **both** records, `CL-0332` and `CL-0141`, **Expand**, then **Resolve**. The identity assertion (`CL-0332` = `CL-0141`) is already made by the seed | "Two records, one person: same birth date, same phone, one letter apart." | 12 entities: the ring's neighbourhood plus `CL-0141` and its only co-party `CL-0197`, the two records marked as one group. **Expand does not follow an identity group** (seeding only `CL-0332` never reaches `CL-0197`) and the Working Set does not merge the two rows; the "ring is 13" figure is the golden test's contracted graph |
+| 8.5-10 | **Entity profile and masking** (verified) | The **Entities** page shows type Party (4 bound Datasets, masked; "Not assessed" until computed). The Entity profile of a masked type takes the alias: `POST /inv/entities/party/resolve {"key":"CL-0134"}`, then `GET /inv/entities/party/<alias>/profile`. On the canvas ids read as `masked:<hex>`; as `admin`, **Reveal** (audited) | `CL-0134`: first seen 2025-08-09, last 2026-05-02, 7 active days, degree 14 (11 `claimed_with`, 3 `shares_phone`, 3 `shares_address`, 2 `serviced_by`, 1 `represented_by`), percentile 75, served from the index. No raw `CL-nnnn` until Reveal (an Investigation title that names an id is masked too) |
 | 10-11 | **Dossier** | Investigation > **Dossier** > build, **Verify**; show the 3 external references (police-report requests) | "The reports are requested, never fetched, never trusted: a reference is a pointer." | verified; references listed with `trusted:false` |
 | 11-12 | **Partner embed** | as `admin`: mint an embed link (curl below), open the portal page | "Your partner sees the read-only masked view and nothing else." | the masked Investigation inside the portal page; revoke makes it a 404 |
 
@@ -83,7 +83,7 @@ curl -s -X POST -H "Authorization: Bearer $ADMIN" http://127.0.0.1:8096/api/v1/s
 ```
 
 The page [`spaces/_templates/la-claims/portal/partner-portal.html`](../../spaces/_templates/la-claims/portal/partner-portal.html) holds no credential: the link is the whole grant, read-only,
-masked and revocable. **UNVERIFIED**: the viewer path `/embed/inv/<token>` is the one the embed test frames; whether the la-app bundle serves the viewer shell is to be confirmed on the first rehearsal.
+masked and revocable. **Verified live**: the portal on `http://127.0.0.1:8099` frames `/embed/inv/<token>` of the la-app bundle (the frame-ancestors allow-list works) and shows the read-only masked Investigation as a graph; revoke makes the link a 404 (smoke).
 
 ## 3. Algorithm scenes (the nine assigned to this vertical)
 
@@ -130,8 +130,18 @@ presenter shows that **centrality alone is not guilt** and the ring is found by 
 | Seed requests and scaffold | `node --test tools/seed-la-claims.test.mjs` |
 | Smoke verdicts and dry run | `node --test tools/la-claims-smoke.test.mjs` |
 
-## 6. Still to do (rehearsal)
+## 6. Rehearsal record, 2026-10-16 (Enterprise Demo Auth bundle, port 8142)
 
-* Boot a Demo Auth bundle, run the seed and `tools/la-claims-smoke.mjs --embed`; record the output here.
-* Drive the scenes in a browser (they are marked **UNVERIFIED** above) and file defects as BACKLOG rows; run the 29-algorithm walk-through timings for this vertical.
-* Confirm the embed viewer shell and the identity-resolution canvas beat (section 2).
+**Verified.** `tools/seed-la-claims.mjs --apply` (Investigation `ring-case`, 7 ops, 3 members, 3 police-report-request references, 2 Entity Lists, the identity, a Case assigned to
+`siu.manager` and linked, an Investigation Template, one pending four-eyes expand, one open Draft); `tools/la-claims-smoke.mjs --embed` **29 of 29**: five sign-ins, outsider 404, partner reviewer
+read 200 and write 403, link columns, both Jobs fill their Datasets, the ring grows to at least 15 entities, no raw id under typed masking, admin Reveal, all nine server Graph Runs finish,
+Dossier verifies and a tampered manifest fails, embed mint / link-only headers / revoke / uniform 404. Browser: sign-in picker with the five personas; the saved view `claims_shared_identity`
+drew 227 nodes and 343 links (masking banner "typed, ids shown as aliases") and the client community run found 51 communities, the largest 16 nodes; Geo View (14 points); the partner portal
+framed the masked embed. API: the Entity type profile (473 distinct parties, 6 624 rows) and an Entity profile through the alias; the index served the profile.
+
+**Defects found and fixed in this lane.** (1) The seed's Investigation create answered a spurious 409 right after boot and every op then 404'd: the seed now waits until the Investigation is listed and re-sends the create (the pattern of the mule seed). (2) The Alert Rule step failed 422: the value Measures an Alert Rule may watch are money-flow tests (`passThrough`, `velocity`, `timeToCashOut`, `cashOutConcentration`, `structuring`, `benefitTransfer`) and none fits claims, so the claims seed makes no Alert Rule (the plan marks Alerts secondary for this vertical). (3) The seed re-asserted the identity on every run (ids come back masked, so its "already there" check never matched) and opened a second Case after a half-finished run: both fixed.
+`claims_shared_identity` also draws 8 `claimed_with` links, claims with no bills (claim amount 0): "no money" is true of the amount column, not of the kind.
+
+**Not yet driven in the browser** (verified only through the API or the smoke): the nine algorithms by clicking **Run on server** (the smoke starts the same runs over HTTP and they finish; run times were not recorded), the saved views `claims_network` and `claims_provider_money`, the Dossier panel and the Reveal dialog, the Investigation tab. Not recorded: client-versus-server parity per algorithm and run times.
+
+**Open findings.** The generic domain profile greets this Space with "Investigate a number / MSISDN"; an insurance profile is the SPA follow-up already listed in section 4. The Entities page shows "Not assessed" until the Entity type profile is computed; the type profile itself answers. Identity groups annotate the Working Set but expand does not follow them.

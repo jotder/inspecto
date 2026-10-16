@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, buildPlan, scaffold, INV, RING, TWINS } from './seed-la-claims.mjs';
 
-const OFF = { pending: false, alert: false, draft: false };
+const OFF = { pending: false, draft: false };
 function mock(listItems = []) {
   const calls = []; let created = false;
   const fetchFn = async (url, init = {}) => {
@@ -54,7 +54,7 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.deepEqual([identity.body.a, identity.body.b], TWINS.map((t) => `party:${t}`));
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'siu.manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
-  assert.ok(m.calls.find((c) => c.u.endsWith('/standing-detection')));
+  assert.ok(!m.calls.find((c) => c.u.endsWith('/alert-rules')), 'no Alert Rule: no value Measure fits claims');
   const refs = m.calls.filter((c) => c.u.endsWith('/references'));
   assert.equal(refs.length, 3);
   assert.ok(refs.every((c) => c.body.system === 'police-records' && /^https:\/\/records\.example\//.test(c.body.url) && c.auth === 'Bearer tok-demo:siu.analyst'));
@@ -66,6 +66,15 @@ test('re-run skips an Investigation that already has its steps and its Case', as
   assert.equal(m.calls.filter((c) => c.u.endsWith('/ops')).length, 0);
   assert.equal(m.calls.filter((c) => c.u.includes('/cases/') || c.u.includes('/objects/')).length, 0);
   assert.ok(r.skipped.includes('investigation') && r.skipped.includes('case'));
+});
+
+test('an existing identity group (ids come back masked) means the identity is not asserted twice', async () => {
+  const m = mock();
+  const f = async (url, init = {}) => (url.endsWith('/inv/entity-identities') && (init.method || 'GET') === 'GET'
+    ? { ok: true, status: 200, json: async () => ({ data: { groups: [{ id: 'masked:1', members: ['masked:1', 'masked:2'] }] } }) } : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF });
+  assert.ok(r.skipped.includes('identity'));
+  assert.ok(!m.calls.some((c) => c.u.endsWith('/inv/entity-identities') && c.method === 'POST'));
 });
 
 test('a 409 on create counts as already there, not a failure', async () => {
