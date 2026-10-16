@@ -21,6 +21,7 @@ export const PERSONAS = ['admin', 'siu.analyst', 'siu.manager', 'partner.reviewe
 export const LINK_COLUMNS = ['src', 'dst', 'kind', 'ts', 'amount', 'event_date', 'via'];
 export const JOBS = [['claims_links', 'claims_links_dataset'], ['claims_policy_timing', 'claims_policy_timing_dataset']];
 /** The nine Algorithms the plan assigns to the claims showcase (ids as the server catalogue names them). */
+export const GEO_VIEWS = ['claims_accidents_map', 'claims_junction_cluster_map', 'claims_providers_map'];
 export const ALGORITHMS = ['louvainCommunities', 'detectCommunities', 'cliques', 'triangleCount', 'pageRank', 'hits', 'eigenvectorCentrality',
   'katzCentrality', 'closenessCentrality'];
 const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
@@ -48,6 +49,13 @@ export function maskedVerdict(ws) {
   if (!ws || ws.status !== 200) return `working set ${ws ? excerpt(ws) : 'missing'}`;
   const raw = JSON.stringify(ws.data).match(/CL-\d{4}/);
   return raw ? `a raw claimant id (${raw[0]}) leaked through typed masking` : null;
+}
+
+/** A Geo View's projection answered with at least one placed point (an empty or erroring map is the failure the operator saw as "nothing showing"). */
+export function geoVerdict(res) {
+  if (res.status !== 200) return excerpt(res);
+  const n = ((res.data && res.data.points) || []).length;
+  return n >= 1 ? null : `the projection returned no points: ${excerpt(res)}`;
 }
 
 /** A Graph Run answer: accepted (200 or 202) and, once terminal, not failed. */
@@ -158,6 +166,18 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
         record(`Graph Run ${algorithm} finishes`, runVerdict(r));
       }
     }
+  }
+
+  // every saved Geo View must project to at least one point (the same request the Geo page sends: the saved projection, datasetId sent as 'dataset')
+  const views = await call('siu.analyst', 'GET', '/components/geo-map-view');
+  const listed = views.status === 200 ? (Array.isArray(views.data) ? views.data : (views.data && views.data.items) || []) : [];
+  for (const name of GEO_VIEWS) {
+    const v = listed.find((x) => (x.name || x.id) === name);
+    const content = v && (v.content || v);
+    const projection = content && content.query && content.query.projection;
+    if (!projection) { record(`Geo View ${name} projects to points`, v ? 'the view has no projection' : `not listed (HTTP ${views.status})`); continue; }
+    const { datasetId, ...rest } = projection;
+    record(`Geo View ${name} projects to points`, geoVerdict(await call('siu.analyst', 'POST', '/geo/projection', { ...rest, dataset: datasetId })));
   }
 
   const dossier = await call('siu.analyst', 'GET', `${inv}/dossier`);

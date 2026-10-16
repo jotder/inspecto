@@ -146,6 +146,9 @@ interface PointRow {
         GeoAnalysisToolboxComponent,
     ],
     templateUrl: './geo-map.component.html',
+    // The routed host is display:block and content-sized inside the shell's flex column, so the map's h-full / flex-auto chain collapsed
+    // to 0px and a loaded Geo View rendered NOTHING (live-found 2026-10-16, la-claims rehearsal): the host itself must fill the column.
+    host: { class: 'flex min-h-0 flex-auto flex-col' },
 })
 export class GeoMapComponent implements OnInit, OnDestroy {
     private fb = inject(FormBuilder);

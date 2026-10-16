@@ -121,6 +121,13 @@ describe('GeoMapComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('the routed host fills the shell column, so the map container has a height (a block host collapsed it to 0px)', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const host = fixture.nativeElement as HTMLElement;
+        expect(['flex', 'min-h-0', 'flex-auto', 'flex-col'].every((c) => host.classList.contains(c))).toBe(true);
+    });
+
     it('offers the picked Dataset‘s columns from the rows seam and guesses the coordinate ones', async () => {
         // `DS` declares no columns and its store has no offline sample, so the old
         // `Object.keys(datasetRows(ds)[0] ?? {})` offered NOTHING and the lat/lon guesses stayed blank.
