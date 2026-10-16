@@ -1,5 +1,5 @@
 users[5]{id,displayName,title,roles}:
-  admin,Demo Admin,Platform administrator,admin;siu-analyst;la-settings
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
   siu.analyst,Demo SIU Analyst,SIU analyst (lead),siu-analyst
   siu.manager,Demo SIU Manager,SIU manager (second approver),siu-manager
   partner.reviewer,Demo Partner Reviewer,Partner insurer reviewer (read-only),la-viewer
