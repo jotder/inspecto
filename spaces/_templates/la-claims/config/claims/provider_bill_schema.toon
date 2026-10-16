@@ -1,0 +1,32 @@
+raw:
+  name: PROVIDER_BILL
+  format: CSV
+  fields[6]{name,selector,type}:
+    bill_id,"0",VARCHAR
+    claim_id,"1",VARCHAR
+    provider_id,"2",VARCHAR
+    bill_date,"3",DATE
+    amount,"4",DOUBLE
+    service,"5",VARCHAR
+mapping:
+  canonicalName: provider_bill
+  rawName: PROVIDER_BILL
+  fields[6]:
+    - name: bill_id
+      from: bill_id
+      fn: keep
+    - name: claim_id
+      from: claim_id
+      fn: keep
+    - name: provider_id
+      from: provider_id
+      fn: keep
+    - name: bill_date
+      from: bill_date
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: service
+      from: service
+      fn: keep

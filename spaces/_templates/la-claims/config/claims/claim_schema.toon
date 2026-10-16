@@ -1,0 +1,52 @@
+raw:
+  name: CLAIM
+  format: CSV
+  fields[11]{name,selector,type}:
+    claim_id,"0",VARCHAR
+    policy_id,"1",VARCHAR
+    accident_id,"2",VARCHAR
+    loss_date,"3",DATE
+    reported_date,"4",DATE
+    claim_amount,"5",DOUBLE
+    garage_id,"6",VARCHAR
+    clinic_id,"7",VARCHAR
+    lawyer_id,"8",VARCHAR
+    referred_by,"9",VARCHAR
+    status,"10",VARCHAR
+mapping:
+  canonicalName: claim
+  rawName: CLAIM
+  fields[11]:
+    - name: claim_id
+      from: claim_id
+      fn: keep
+    - name: policy_id
+      from: policy_id
+      fn: keep
+    - name: accident_id
+      from: accident_id
+      fn: keep
+    - name: loss_date
+      from: loss_date
+      fn: keep
+    - name: reported_date
+      from: reported_date
+      fn: keep
+    - name: claim_amount
+      from: claim_amount
+      fn: keep
+    - name: garage_id
+      from: garage_id
+      fn: keep
+    - name: clinic_id
+      from: clinic_id
+      fn: keep
+    - name: lawyer_id
+      from: lawyer_id
+      fn: keep
+    - name: referred_by
+      from: referred_by
+      fn: keep
+    - name: status
+      from: status
+      fn: keep

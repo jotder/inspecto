@@ -1,0 +1,36 @@
+name: policy
+active: true
+description: "Insurance-claims Link Analysis showcase - One row per policy: holder, broker, inception day and premium. The early-claim story reads inception against the claim loss date. One extract (POLICY_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
+
+dirs:
+  poll:       data/inbox/policy
+  database:   data/policy/database
+  backup:     data/policy/backup
+  temp:       data/policy/temp
+  errors:     data/policy/errors
+  quarantine: data/policy/quarantine
+  markers:    data/policy/markers
+  status_dir: data/policy/status
+  log_dir:    data/policy/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: policy_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

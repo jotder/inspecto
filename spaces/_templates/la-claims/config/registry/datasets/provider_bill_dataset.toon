@@ -1,0 +1,17 @@
+physicalRef: provider_bill/database
+description: "Insurance-claims Link Analysis showcase - One row per bill a provider raised against a claim. Landed by the provider_bill Pipeline. Synthetic."
+eventDate: bill_date
+columns[6]{name,type,classification}:
+  bill_id,string,
+  claim_id,string,
+  provider_id,string,
+  bill_date,date,
+  amount,number,
+  service,string,
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view

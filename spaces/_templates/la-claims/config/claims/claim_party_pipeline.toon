@@ -1,0 +1,36 @@
+name: claim_party
+active: true
+description: "Insurance-claims Link Analysis showcase - One row per person on a claim (role driver, passenger or claimant) with the person details as written on that claim: name, date of birth, phone, address. Placeholders (blank, 0000000000, UNKNOWN) are real data-quality noise. One extract (CLAIM_PARTY_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
+
+dirs:
+  poll:       data/inbox/claim_party
+  database:   data/claim_party/database
+  backup:     data/claim_party/backup
+  temp:       data/claim_party/temp
+  errors:     data/claim_party/errors
+  quarantine: data/claim_party/quarantine
+  markers:    data/claim_party/markers
+  status_dir: data/claim_party/status
+  log_dir:    data/claim_party/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: claim_party_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

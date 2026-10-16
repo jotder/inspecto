@@ -1,0 +1,14 @@
+masking_mode: typed
+four_eyes_fan_out_above: 2000
+entity_types[1]:
+  - id: party
+    label: Party
+    normaliser: upper-trim
+    masked: true
+    classifications[1]: PARTY
+index:
+  enabled: true
+drafts:
+  max_open: 10
+  hibernate_after_minutes: 60
+  expire_after_days: 14

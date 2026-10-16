@@ -1,0 +1,36 @@
+name: provider_directory
+active: true
+description: "Insurance-claims Link Analysis showcase - The 25 providers (garages, clinics, lawyers) with an invented name and city-level coordinates. One extract (PROVIDER_DIRECTORY_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
+
+dirs:
+  poll:       data/inbox/provider_directory
+  database:   data/provider_directory/database
+  backup:     data/provider_directory/backup
+  temp:       data/provider_directory/temp
+  errors:     data/provider_directory/errors
+  quarantine: data/provider_directory/quarantine
+  markers:    data/provider_directory/markers
+  status_dir: data/provider_directory/status
+  log_dir:    data/provider_directory/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: provider_directory_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

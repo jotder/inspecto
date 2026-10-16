@@ -1,0 +1,18 @@
+name: claims_network
+description: "Claims network - claimants linked by shared claims, accidents, phones and addresses, and to the garage, clinic and lawyer on their claims (claims_links_dataset). Seed the repeat passenger (see the runbook) and expand: the staged-accident ring is one community of 12 claimants and three providers; the busy GP clinic CLI-01 is held on expand and is not the ring."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: claims_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[1]: via
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

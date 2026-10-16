@@ -1,0 +1,36 @@
+name: accident_location
+active: true
+description: "Insurance-claims Link Analysis showcase - One row per accident: city, invented coordinates, the accident instant and the police report reference (blank when none). One extract (ACCIDENT_LOCATION_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
+
+dirs:
+  poll:       data/inbox/accident_location
+  database:   data/accident_location/database
+  backup:     data/accident_location/backup
+  temp:       data/accident_location/temp
+  errors:     data/accident_location/errors
+  quarantine: data/accident_location/quarantine
+  markers:    data/accident_location/markers
+  status_dir: data/accident_location/status
+  log_dir:    data/accident_location/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: accident_location_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

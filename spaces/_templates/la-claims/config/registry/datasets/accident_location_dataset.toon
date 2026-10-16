@@ -1,0 +1,16 @@
+physicalRef: accident_location/database
+description: "Insurance-claims Link Analysis showcase - One row per accident: city, invented coordinates, the accident instant and the police report reference (blank when none). Landed by the accident_location Pipeline. Synthetic."
+columns[6]{name,type,classification}:
+  accident_id,string,
+  city,string,
+  lat,number,
+  lon,number,
+  accident_at,timestamp,
+  police_report_ref,string,
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view
