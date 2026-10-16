@@ -181,7 +181,7 @@ for v in BULK:
         if v in cfo_vendors:
             who = sec if k == 1 else prim
         elif v == BRIDGE_VENDOR:
-            who = "E-07" if k < 2 else prim if rng.random() < 0.7 else sec   # E-07's ONE edge into the ordinary graph
+            who = "E-07" if k == 0 else prim if rng.random() < 0.7 else sec   # E-07's ONE invoice (one link, so a true bridge) into the ordinary graph
         else:
             who = prim if k == 0 else sec if k == 1 else prim if rng.random() < 0.7 else sec
         emit(inv_rows, appr_rows, v, any_day(), amount(), who)

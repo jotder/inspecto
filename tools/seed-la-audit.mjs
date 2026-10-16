@@ -9,6 +9,7 @@
 //
 // Optional stages, each on by default, skipped with its flag, idempotent and SOFT (a refusal prints a warning, exit code stays 0):
 //   --no-pending   one PENDING four-eyes expand (the CFO's 40 vendors, unbounded, over four_eyes_fan_out_above) left for audit.manager
+//   --no-review    one second Investigation (approval-control-review) over the approval graph, seeded E-07 + V-001 and expanded twice, so Run on server has a Working Set
 //   --no-draft     one open Draft of the workpaper Investigation: the auditor's what-if over the approval limit
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Never sends a credential: the Demo User exchange takes a
 // `demo:<id>` code and no password.
@@ -19,10 +20,12 @@ import { makeClient } from './lib/la-client.mjs';
 
 export const INV = 'vendor-v117-workpaper';
 export const DATASET = 'ap_links_dataset';
+export const REVIEW_INV = 'approval-control-review';   // the algorithm scenes' Investigation: a Working Set big enough for Run on server
+export const REVIEW_DATASET = 'ap_approval_links_dataset';
 const CASE_TITLE = 'Vendor V-117 conflict of interest';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
-export const DRAFT_STEP = { op: 'annotate', ids: ['V-099'], note: 'what-if: an approval limit of 9 000 would have stopped all 30 invoices' };
+export const DRAFT_STEP = { op: 'annotate', ids: ['V-117'], note: 'what-if: an approval limit of 9 000 and a second approver outside the reporting line of E-31' };
 
 /** The seeded state as an ordered list of steps. */
 export function buildPlan() {
@@ -51,8 +54,8 @@ export function buildPlan() {
     { id: 'case-assign', as: 'audit.lead', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'audit.manager' } },
     { id: 'case-link', as: 'audit.lead', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
     { id: 'alert-rule', as: 'audit.lead', method: 'POST', path: `${base}/alert-rules`, body: {
-      name: 'ap-approved-value', severity: 'HIGH',
-      valueMeasure: { name: 'approvedValue', valueCol: 'amount', timeCol: 'ts', from: '2025-10-01', to: '2026-10-01' } } },
+      name: 'ap-split-invoices', severity: 'WARNING',
+      valueMeasure: { name: 'structuring', valueCol: 'amount', timeCol: 'ts', from: '2026-03-02', to: '2026-04-02' } } },
   ];
 }
 
@@ -61,7 +64,7 @@ const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = 'la-audit', apply = false, log = () => {},
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)), readyTries = 60, stages = {} } = {}) {
-  const want = { pending: true, draft: true, ...stages };
+  const want = { pending: true, draft: true, review: true, ...stages };
   const plan = buildPlan();
   const out = { done: [], skipped: [], failed: [], warnings: [], summary: {} };
   if (!apply) {
@@ -83,6 +86,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   }
   if (listed.status !== 200) throw new Error(`cannot list Investigations as audit.lead (${listed.status}): is the Space '${space}' created from the la-audit template?`);
   const existing = items(listed.data).find((i) => i.id === INV);
+  if (!existing) await prime(call, log, sleep, readyTries);
   const headStep = existing ? existing.headStep || 0 : 0;
   const state = { case: existing && existing.caseRef ? existing.caseRef : null, caseExisted: !!(existing && existing.caseRef) };
   for (const s of plan) {
@@ -104,7 +108,18 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const warn = (stage, e) => { const m = `${stage}: ${e.message || e}; the stage was skipped and left no half-made state`; out.warnings.push(m); log(`  WARNING ${m}`); };
   if (want.pending) try { await stagePending(call, out, log); } catch (e) { warn('pending', e); }
   if (want.draft) try { await stageDraft(call, out, log); } catch (e) { warn('draft', e); }
+  if (want.review) try { await stageReview(call, out, log, items); } catch (e) { warn('review', e); }
   return out;
+}
+
+/** The link Datasets are Job outputs, so a fresh Space has none until the 10-minute cron: press Run on the link Jobs (as audit.manager, who
+ *  holds canOperateRuns) and wait for ap_links_dataset to have rows. The derived Datasets and the index build follow by signal. */
+async function prime(call, log, sleep, tries) {
+  const has = async () => { const r = await call('audit.admin', 'GET', '/datasets/ap_links_dataset/rows?limit=1'); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
+  if (await has()) return;
+  for (const job of ['ap_links', 'gl_links', 'ap_duplicate_payments']) { const t = await call('audit.manager', 'POST', `/jobs/${job}/trigger`, {}); log(`  prime ${job}: ${t.status}`); }
+  for (let i = 0; i < tries; i++) { if (await has()) return; await sleep(2000); }
+  log('  WARNING ap_links_dataset still has no rows; the Investigation create will be refused');
 }
 
 const must = (r, what) => { if (![200, 201, 202].includes(r.status)) throw new Error(`${what} answered HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`); return r.data; };
@@ -117,6 +132,22 @@ async function stagePending(call, out, log) {
   const d = must(await call('audit.lead', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND), 'the unbounded expand');
   if (d.status !== 'pending') throw new Error('the unbounded expand RAN instead of being held (is four_eyes_fan_out_above set in link-analysis.toon?)');
   out.done.push('pending-expand'); out.summary.pendingRequestId = d.pending.id; log(`  pending-expand: ${d.pending.id}`);
+}
+
+/** The algorithm scenes' Investigation, over the approval graph: seed E-07 (the bridge approver) and V-001 (the utilities hub), expand twice, add the
+ *  lead as owner and the others as members. Idempotent: an existing id is left alone. */
+async function stageReview(call, out, log, items) {
+  const listed = items(must(await call('audit.lead', 'GET', '/inv/investigations?limit=200'), 'Investigation list'));
+  if (listed.some((i) => i.id === REVIEW_INV)) { out.skipped.push('review'); return; }
+  const base = `/inv/investigations/${REVIEW_INV}`;
+  must(await call('audit.lead', 'POST', '/inv/investigations', { id: REVIEW_INV, title: 'Approval control review', purpose: 'Showcase: algorithms on the approval graph',
+    dataset: REVIEW_DATASET, sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts' }), 'the review Investigation');
+  for (const body of [{ op: 'seed', ids: ['E-07', 'V-001'], entityType: 'party' }, { op: 'expand', direction: 'either', maxFanOut: 30 },
+    { op: 'expand', direction: 'either', maxFanOut: 30 }, { op: 'snapshot', label: 'review baseline' }])
+    must(await call('audit.lead', 'POST', `${base}/ops`, body), `review op ${body.op}`);
+  for (const [subject, role] of [['audit.committee', 'reviewer'], ['audit.manager', 'reviewer'], ['audit.admin', 'lead']])
+    must(await call('audit.lead', 'POST', `${base}/members`, { subject, role }), `review member ${subject}`);
+  out.done.push('review'); log(`  review: ${REVIEW_INV}`);
 }
 
 /** ONE open Draft with one step; idempotent (audit.lead's live Draft is reused and only topped up when empty). */
@@ -177,7 +208,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const made = scaffold(root);
     console.log(made.length ? `scaffolded: ${made.join(', ')}` : 'nothing to do: the Space already exists');
   } else {
-    const stages = { pending: !args.includes('--no-pending'), draft: !args.includes('--no-draft') };
+    const stages = { pending: !args.includes('--no-pending'), review: !args.includes('--no-review'), draft: !args.includes('--no-draft') };
     run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-audit'), apply: args.includes('--apply'), log: console.log, stages })
       .then((r) => {
         if (args.includes('--apply')) {

@@ -1,6 +1,6 @@
 # Link Analysis showcase B: Finance and audit (runbook, synthetic data only)
 
-**Status: BUILT 2026-10-16 (data, Jobs, personas, golden test, seed and smoke scripts); NOT yet rehearsed live in a browser.** Vertical B of the
+**Status: BUILT and LIVE-REHEARSED 2026-10-16 on a booted Space (Enterprise Demo Auth bundle, port 8141): smoke 30/30, the HTTP routes and the headline browser scenes driven; what was not driven is listed in section 6.** Vertical B of the
 [multi-vertical showcase plan](../superpower/la-multi-vertical-showcase-plan.md): "procure-to-pay and the journal". The analyst's questions: is this vendor real, who approved,
 is the control chain sound? The headline is the **Dossier as an audit workpaper**: seal it, verify it, change one byte, watch Verify fail.
 Everything is invented (names, bank accounts, addresses, ids). The plants are labelled as planted; nothing here is a detection-rate claim.
@@ -10,11 +10,11 @@ The stakeholder-facing sibling script is the [demo runbook](la-demo-runbook.md) 
 
 | # | Step | Command / expectation |
 |---|---|---|
-| 1 | Bundle: the Demo Auth build with the la-app UI (default edition PROFESSIONAL; the Preview edition bundles everything) | same bundle as the demo runbook, §0 |
+| 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Enterprise -DemoAuth -Ui la-app -NoBakeDemo` (`-DemoAuth` refuses every edition but Enterprise, Preview included); unzip it inside the checkout, not under `%TEMP%` |
 | 2 | Lay the Space down (offline, before the server starts) | `node tools/seed-la-audit.mjs --scaffold <spacesRoot>` creates `la-audit` and the template gallery |
 | 3 | Start the server with `-Dla.embed.enabled=true` (only for the Embed scene) | without it the mint answers 503 |
 | 4 | Wait for the Jobs: `ap_links` runs on a 10-minute cron; its three derived Jobs and `la_index_build` follow it by signal | or press Run on each as `audit.manager` |
-| 5 | Seed the runtime state | `node tools/seed-la-audit.mjs --apply` (dry run without `--apply`; safe to re-run) |
+| 5 | Seed the runtime state | `node tools/seed-la-audit.mjs --apply` (dry run without `--apply`; safe to re-run). It first presses Run on the link Jobs (a fresh Space has no link rows until the 10-minute cron), then creates two Investigations: `vendor-v117-workpaper` (the workpaper) and `approval-control-review` (the algorithm scenes: E-07 and V-001 expanded twice, 163 nodes and 281 links, so Run on server has a Working Set) |
 | 6 | Smoke | `node tools/la-audit-smoke.mjs` (pins every planted fact against the live Datasets, then builds, verifies and tampers the Dossier) |
 
 Regenerate the corpus any time with `python tools/gen-la-audit-data.py` (byte-identical each run; `LaAuditGoldenTest` pins every plant, `node --test tools/gen-la-audit-data.test.mjs`
@@ -85,14 +85,14 @@ Plan section 3.1 assigns eight algorithms to this vertical. Always seed first; a
 
 | # | Algorithm | View and seed | Expect | Server run |
 |---|---|---|---|---|
-| S1 | **k-core** | `ap_approval_graph`, seed E-07 (expand to degree 2) | E-07, E-08, E-09 and V-021..V-040 are the only 3-core (core number 3); everything else is core 2 or less | client only |
-| S2 | **Articulation points** | `ap_approval_graph`, whole component of E-07 | E-07 and V-041 are cut vertices (the two ends of the one bridge between the V-021..V-040 portfolio and the rest); the other cut vertex is the shell approver E-45 (removing it strands six vendors) | client |
-| S3 | **Bridges** | same | the edge E-07 to V-041 is the only bridge at a vendor with more than one approver; the rest are the single-approver vendors' pendant edges (V-117, V-099, V-131..V-136). Say: single approver is the finding, not the count | client |
-| S4 | **Betweenness centrality** | `ap_approval_graph`, seed E-07, E-01, V-001 | V-001 then E-01 lead (benign: busy), then E-07 and V-041 in the top 5. Say: high betweenness alone is not guilt; it is the cut vertex that is the finding | **Run on server** (Job class) |
-| S5 | **Is forest** | `ap_approval_graph` then `ap_org_links_dataset` | false on the approval graph (cycles), **true** on the org chart (59 `reports_to` links, manager to report: parent to child, the orientation Is forest reads). The clean positive | client |
+| S1 | **k-core** | `ap_approval_graph`, seed E-07 (expand to degree 2) | E-07, E-08, E-09 and V-021..V-040 are the only 3-core (core number 3); everything else is core 2 or less | client; Run on server: inline, core 3 |
+| S2 | **Articulation points** | `ap_approval_graph`, whole component of E-07 | E-07 and V-041 are cut vertices (the two ends of the one bridge between the V-021..V-040 portfolio and the rest); the other cut vertex is the shell approver E-45 (removing it strands six vendors). Measured in the app: **3 nodes, 1 bridge** | client; server inline |
+| S3 | **Bridges** | same | the edge E-07 to V-041 is the only bridge at a vendor with more than one approver; the rest are the single-approver vendors' pendant edges (V-117, V-099, V-131..V-136). Say: single approver is the finding, not the count. The app draws one link per invoice, so a vendor with several invoices from one approver is no bridge: V-041 has exactly one E-07 invoice on purpose | client; server inline |
+| S4 | **Betweenness centrality** | `ap_approval_graph`, seed E-07, E-01, V-001 | V-001 leads (7 255 in the app, benign: busy), then the two cut vertices E-07 and V-041 (about 3 200 each); the CFO E-01 is busy by degree but not a cut vertex. Say: high betweenness alone is not guilt; it is the cut vertex that is the finding | **Run on server** (Job class, `betweennessCentrality`): 47 ms on 163 nodes, the same scores as the client |
+| S5 | **Is forest** | `ap_approval_graph` then `ap_org_links_dataset` | false on the approval graph (cycles), **true** on the org chart (59 `reports_to` links, manager to report: parent to child, the orientation Is forest reads). The clean positive. Server run on the review Investigation: `false` | client; server inline |
 | S6 | **Jaccard similarity** | `ap_vendor_identity`, seed V-131, but run on the approved plus paid_to graph | V-132, V-133, V-134, V-135 at **1.0** (same approver E-45, same account BA-7701); V-136 at **0.33** (same approver, different account) | client |
-| S7 | **Link prediction** (common neighbours) | `ap_vendor_identity` shares links only | the top three predicted links are V-136 with V-133, V-134, V-135: the unlinked sixth shell vendor is proposed. Ground truth is planted | **Run on server** |
-| S8 | **Maximum spanning forest** | `ap_approval_graph`, weight = AMOUNT | one tree per connected component: the approval graph has **4** components (the main one of 164 nodes, E-15 with V-117, E-45 with the six shell vendors, E-23 with V-099). Single-approver islands are visible as their own trees | client |
+| S7 | **Link prediction** (common neighbours) | `ap_vendor_identity` shares links only | the top three predicted links are V-136 with V-133, V-134, V-135: the unlinked sixth shell vendor is proposed. Ground truth is planted | **Run on server** (Job class, `linkPrediction`): 4 ms on 163 nodes |
+| S8 | **Maximum spanning forest** | `ap_approval_graph`, weight = AMOUNT | one tree per connected component: the approval graph has **4** components (the main one of 164 nodes, E-15 with V-117, E-45 with the six shell vendors, E-23 with V-099). Single-approver islands are visible as their own trees | client; server inline |
 
 Recording parity (plan S6): note seed, top result and run time in the table above after each rehearsal; the TypeScript and Java implementations are expected to agree.
 Also useful here, from the plan's coverage matrix: **Recursive paths** (approval chain depth through `ap_org_links_dataset`: E-31's chain to the CFO is E-15, E-07, E-03, E-01), the temporal and branching **pattern packs** on the 30 split invoices (branching: one approver to one vendor, TS ascending; band 9 700 to 10 000), and **Find cycles** with **Maximum flow** on `gl_intercompany` (S9 below).
@@ -113,9 +113,12 @@ Also useful here, from the plan's coverage matrix: **Recursive paths** (approval
 Members: `audit.lead` lead, `audit.admin` lead, `audit.manager` and `audit.committee` reviewers, `audit.outsider` absent. Settings > Link Analysis: masking `typed`, four-eyes above 30, index ON, Draft limits, the embed allow-list, Max fan-out. Entity types: `party` (masked) and `legal_entity` (not masked).
 
 ### G. Embed, optional (1 min) [audit.admin]
-Mint an embed link on the Investigation (Share panel; needs `-Dla.embed.enabled=true`; the mint needs a lead member, hence `audit.admin`). Open `spaces/_templates/la-audit/portal/committee-portal.html` from disk,
-paste the `/embed/inv/...` viewer link: the committee sees the read-only masked Investigation inside their own page. Revoke the link: the frame goes blank (the public read answers a uniform 404).
-The host must allow the portal as a frame ancestor (Settings embed allow-list; a page opened from disk presents the `null` origin, so the first rehearsal may need the host's frame-ancestors setting, see the [demo runbook](la-demo-runbook.md) §S14).
+Mint an embed link on the Investigation (`POST .../embeds` or the Share panel; needs `-Dla.embed.enabled=true` and a lead member, hence `audit.admin`). Serve the portal from the allowed origin and open it:
+```
+python -m http.server 8100 --bind 127.0.0.1 --directory spaces/_templates/la-audit/portal
+# open http://127.0.0.1:8100/committee-portal.html and paste the viewer link http://<host>/embed/inv/<grantId>.<secret>
+```
+`link-analysis.toon` allows `http://127.0.0.1:8100` and `http://localhost:8100` as frame ancestors (`embed.frame_ancestors`); a page opened from disk presents the `null` origin and is refused, and the viewer answers `frame-ancestors 'none'` to any other page. **Expect:** the committee sees the read-only masked Investigation (aliases, graph, step 6) inside their own page. Revoke it (`POST .../embeds/<grantId>/revoke`): the public read answers a uniform 404 and the frame stays blank. A mangled token answers 404 too.
 
 ### S9. Intercompany round trip (extra 1.5 min)
 Open `gl_intercompany` (journal flows; `LEGAL_ENTITY` ids are not masked). **Find cycles** (server run): exactly one cycle LE-05, LE-06, LE-07, LE-08. **Maximum flow** LE-05 to LE-07: **7 200 000** (three quarter ends of 2 400 000). Hover a link: `via` names the journal and GL account (`JNL-RT-.../1900-IC-RECEIVABLE`).
@@ -133,9 +136,28 @@ Open `gl_intercompany` (journal flows; `LEGAL_ENTITY` ids are not masked). **Fin
 6. **Derived link Datasets are Jobs** (`ap_approval_links`, `ap_identity_links`, `ap_org_links`), not virtual Datasets, so each algorithm scene has a clean single-kind graph.
 7. **Betweenness leads with the benign hubs**, by design (plan ground rule 4): the cut vertex, not the score, is the finding.
 
-## 6. Known limits and what was not verified
+## 6. What was verified live, what was not
 
-* **Not run on a booted Space** in the build session (the Demo Auth build was not at hand): the generator, the folded link rows (the Job SQL was executed in DuckDB 1.5.5 against the shipped CSVs: 3 650 `ap_links` rows, 13 duplicate pairs, 72 `gl_links` rows) and the algorithm facts (`LaAuditGoldenTest`) are verified; the Pipeline ingest of the five feeds, the seeded Investigation, the Dossier tamper through the HTTP routes and the browser scenes are **not**. First rehearsal: run steps 0.2 to 0.6, then each scene, and file any defect.
-* The Alert and Case beats are secondary here (plan matrix, "o"): the seed binds an Alert Rule `ap-approved-value` and opens a Case for V-117; the primary Alert scene is vertical A.
+Rehearsal 2026-10-16 on an Enterprise Demo Auth bundle built from this branch (port 8141, `-Dla.embed.enabled=true`), Space created with `seed-la-audit.mjs --scaffold`, all five feeds ingested on boot (1 804 invoices and approvals, 150, 60 and 72 rows, no rejects).
+
+**Verified:**
+* `la-audit-smoke.mjs`: **30/30** (Job outputs carry every plant; the Dossier verifies and one altered hash fails; committee read-only 403 and 200; outsider 404; pending request in the manager's inbox; a server Graph Run is accepted).
+* The five link Jobs ran and every derived Dataset has rows; a replaced feed file re-ingests in place (counts did not double).
+* Browser as `audit.lead`: the saved view `ap_approval_graph` (175 nodes, 1 804 links, ids masked as aliases, the E-07 portfolio visibly joined to the rest by one link), **Cut points: 3 nodes and 1 bridge**, **Betweenness** ranking (V-001 first at 7 255), the Investigation list, the workpaper Investigation opened, **Build dossier** and **Verify this manifest** ("All 6 recorded hashes still agree with the sealed log"), the four-eyes warning ("above 30, four_eyes_fan_out_above").
+* HTTP: server Graph Runs `articulationPoints`, `bridges`, `kCore` (core 3), `isForest` (false), `betweennessCentrality` (47 ms, 163 nodes and 281 links), `maximumSpanningForest`, `linkPrediction` (4 ms), all COMPLETED with masked ids. Four-eyes: `audit.lead` and `audit.committee` get 403 on approve, `audit.manager` approves and the expand runs as step 7. Draft: conflicts (behind 1, none), rebase, promote. Entity profile of V-117 (resolve the alias first: the type is masked). Embed: mint, public read (200, `frame-ancestors 'none'`), the portal on :8100 framing the masked read-only view, revoke gives 404.
+
+**Not driven:** the in-browser clicks for Jaccard, Link prediction, Maximum spanning forest and Is forest on the client (their server twins ran and the golden test pins the results); the Draft, Members and Settings panels and the Entity profile page in the browser (their routes were driven); tamper through the Dossier file upload (the smoke runs it through the route); `gl_intercompany` Find cycles and Maximum flow in the browser (pinned by the golden test).
+
+**Defects found and fixed by this rehearsal:**
+1. The seed treated "ap_links_dataset has no data yet" (a 409 on create) as "the Investigation already exists", so a first seed silently built nothing; it now presses Run on the link Jobs and waits.
+2. The seeded Alert Rule used a Measure name, a severity and a window the server refuses (closed Measure set; INFO, WARNING, CRITICAL; at most 31 days).
+3. The Draft step named an entity that was not in the Working Set.
+4. V-041 had two E-07 invoices, so the app (one link per invoice) found no bridge; it now has one, and the golden test builds the graph the way the app draws it.
+5. The committee portal could not frame the viewer: the template now allows the `:8100` origin and the page is served from `portal/`.
+
+**Observations, not fixed (outside this lane):** the Domain profile "Financial crime" labels the Working Set tiles Accounts, Transfers and Transactions for an approvals graph, and the placeholders in the expand settings are telecom values (call, sms); an Investigation title carries the id it was made for (V-117), which is masked inside it, so the title reads "Vendor masked:... workpaper"; the Centrality picker is labelled Metric (the glossary says Measure).
+
+**Known limits:**
+* The Alert and Case beats are secondary here (plan matrix, "o"): the seed binds an Alert Rule `ap-split-invoices` (the closed value-Measure set has `structuring`, window 2026-03-02 to 2026-04-02) and opens a Case for V-117; the primary Alert scene is vertical A.
 * The `la-showcase-off` template's `roles.toon` differs from `la-showcase`'s (Reveal on the analyst), so `LaShowcaseTemplateTest` fails on master as of this build: a pre-existing defect of the sibling template, not touched here.
 * Recorded precision claims: none. The plants are planted, the counts are the corpus, and no detection rate is implied.

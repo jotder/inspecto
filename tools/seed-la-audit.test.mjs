@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, buildPlan, scaffold, stampIndexBuildOwner, INV } from './seed-la-audit.mjs';
 
-const OFF = { pending: false, draft: false };
+const OFF = { pending: false, draft: false, review: false };
 function mock() {
   const calls = []; let created = false;
   const fetchFn = async (url, init = {}) => {
@@ -32,7 +32,7 @@ test('dry run sends nothing and lists every step', async () => {
 
 test('apply acts as the audit personas, in order, and never as a reviewer', async () => {
   const m = mock();
-  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF });
+  const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {}, readyTries: 2 });
   assert.deepEqual(r.failed, []);
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'annotate', 'window', 'resolve', 'snapshot']);

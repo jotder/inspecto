@@ -69,6 +69,20 @@ class LaAuditGoldenTest {
         return out;
     }
 
+    /** The approval graph as the app draws it: ONE edge per invoice (parallel edges kept), so a pair with two invoices is no bridge. */
+    private static Graph approvalMultigraph() {
+        Map<String, String> vendorOf = INVOICES.stream().collect(Collectors.toMap(i -> i[0], i -> i[1]));
+        Map<String, Node> nodes = new LinkedHashMap<>();
+        List<Edge> edges = new ArrayList<>();
+        for (String[] a : APPROVALS) {
+            String v = vendorOf.get(a[1]);
+            nodes.putIfAbsent(a[2], new Node(a[2], a[2]));
+            nodes.putIfAbsent(v, new Node(v, v));
+            edges.add(new Edge(a[2] + "|" + v + "|" + a[1], a[2], v));
+        }
+        return new Graph(new ArrayList<>(nodes.values()), edges);
+    }
+
     private static List<String[]> paidTo() {
         List<String[]> out = new ArrayList<>();
         for (String[] i : INVOICES) if (!PLACEHOLDER.contains(i[8])) out.add(new String[]{i[1], i[8], "paid_to"});
@@ -155,28 +169,27 @@ class LaAuditGoldenTest {
 
     @Test
     void oneApproverIsTheArticulationPointAndTheOnlyBridgeIntoTheRestOfTheApprovalGraphAndTheOrgChartIsATree() {
-        Graph g = graph(approved());
+        Graph g = approvalMultigraph();   // as the app draws it: one link per invoice
         assertFalse(GraphStructure.isForest(g), "the approval graph has cycles");
         List<String> art = GraphStructure.articulationPoints(g);
         assertTrue(art.contains("E-07") && art.contains("V-041"), art.toString());
-        List<String> bridges = GraphStructure.bridges(g);
-        assertTrue(bridges.contains("E-07|V-041|approved"), bridges.toString());
+        List<String> bridges = GraphStructure.bridges(approvalMultigraph());
+        assertEquals(1, bridges.size(), "the one bridge of the approval graph as drawn (one link per invoice): " + bridges);
+        assertTrue(bridges.get(0).startsWith("E-07|V-041|"), bridges.toString());
         Map<String, Set<String>> approversOf = new HashMap<>();
         for (String[] l : approved()) approversOf.computeIfAbsent(l[1], k -> new HashSet<>()).add(l[0]);
         Set<String> single = approversOf.entrySet().stream().filter(e -> e.getValue().size() == 1).map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
         assertEquals(Set.of("V-117", "V-131", "V-132", "V-133", "V-134", "V-135", "V-136", "V-099"), single,
                 "only the planted vendors have a single approver");
-        List<String> others = bridges.stream().filter(b -> !single.contains(b.split("\\|")[1])).toList();
-        assertEquals(List.of("E-07|V-041|approved"), others, "no other bridge");
 
         List<Score> btw = GraphCentrality.betweennessCentrality(g).stream()
                 .sorted(Comparator.comparingDouble(Score::score).reversed()).toList();
-        // betweenness ranks the two BENIGN hubs first (the utilities vendor, the CFO), then the bridge pair E-07 / V-041:
-        // high betweenness is not guilt, the cut vertex is the finding (runbook scene).
+        // betweenness: the utilities vendor leads (busy, benign), then the bridge pair E-07 / V-041 (the cut vertices the app lists);
+        // the CFO E-01 is a busy hub by degree (40 vendors) but not a cut vertex. High betweenness alone is not guilt; the cut vertex is the finding (runbook scene).
         List<String> top5 = btw.subList(0, 5).stream().map(Score::id).toList();
-        assertEquals(List.of("V-001", "E-01"), top5.subList(0, 2), "benign hubs lead: " + top5);
-        assertTrue(top5.containsAll(List.of("E-07", "V-041")), "the bridge pair is in the top 5: " + top5);
+        assertEquals("V-001", top5.get(0), "the benign utilities hub leads: " + top5);
+        assertTrue(top5.subList(1, 3).containsAll(List.of("E-07", "V-041")), "the bridge pair follows: " + top5);
         Map<String, Double> core = GraphAlgorithms.kCore(g).stream().collect(Collectors.toMap(Score::id, Score::score));
         double max = Collections.max(core.values());
         assertEquals(3.0, max);
