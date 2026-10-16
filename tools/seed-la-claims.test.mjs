@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { run, buildPlan, scaffold, INV, RING, TWINS } from './seed-la-claims.mjs';
 
-const OFF = { pending: false, alert: false, draft: false };
+const OFF = { pending: false, draft: false };
 function mock(listItems = []) {
   const calls = []; let created = false;
   const fetchFn = async (url, init = {}) => {
@@ -54,7 +54,7 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.deepEqual([identity.body.a, identity.body.b], TWINS.map((t) => `party:${t}`));
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'siu.manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
-  assert.ok(m.calls.find((c) => c.u.endsWith('/standing-detection')));
+  assert.ok(!m.calls.find((c) => c.u.endsWith('/alert-rules')), 'no Alert Rule: no value Measure fits claims');
   const refs = m.calls.filter((c) => c.u.endsWith('/references'));
   assert.equal(refs.length, 3);
   assert.ok(refs.every((c) => c.body.system === 'police-records' && /^https:\/\/records\.example\//.test(c.body.url) && c.auth === 'Bearer tok-demo:siu.analyst'));

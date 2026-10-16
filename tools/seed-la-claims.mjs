@@ -9,7 +9,7 @@
 //
 // Stages after the plan (each on by default, skipped with its flag, idempotent, SOFT: a refusal prints a warning, exit code stays 0):
 //   --no-pending   one PENDING four-eyes expand on ring-case (an unbounded expand by siu.analyst; left undecided for siu.manager)
-//   --no-alert     one run of the la_detect Job (as siu.manager, who holds canOperateRuns) until the ring-billing Alert exists
+// (no Alert Rule: the Alert Rule value Measures are money-flow tests - passThrough, velocity, structuring ... - and none fits a claims graph)
 //   --no-draft     one open Draft of ring-case forked by siu.analyst, carrying one annotate step, left unpromoted
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Sends only `demo:<id>` codes, never a credential.
 import fs from 'node:fs';
@@ -24,7 +24,6 @@ export const RING = ['CL-0029', 'CL-0061', 'CL-0111', 'CL-0134', 'CL-0173', 'CL-
 export const REPEAT_PASSENGER = 'CL-0134';
 export const TWINS = ['CL-0332', 'CL-0141'];                 // one person under two records (name one letter apart, same date of birth and phone)
 export const PROVIDERS = ['GAR-03', 'CLI-04', 'LAW-02'];     // the ring's garage, clinic and lawyer
-export const RULE = 'ring-billing';
 const CASE_TITLE = 'Staged-accident ring around LAW-02';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
@@ -67,9 +66,6 @@ export function buildPlan() {
     { id: 'case-assign', as: 'siu.analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'siu.manager' } },
     { id: 'case-link', as: 'siu.analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
     { id: 'template', as: 'siu.analyst', method: 'POST', path: `${base}/template`, body: { id: 'claims-ring-template', title: 'Staged-accident ring (lawyer + clinic + garage)' } },
-    { id: 'alert-rule', as: 'siu.analyst', method: 'POST', path: `${base}/alert-rules`, body: {
-      name: RULE, severity: 'HIGH', valueMeasure: { name: 'ringBilling', valueCol: 'amount', timeCol: 'ts', from: '2025-04-01', to: '2026-10-01' } } },
-    { id: 'standing', as: 'siu.analyst', method: 'POST', path: `${base}/standing-detection`, body: { rule: RULE } },
   ];
 }
 
@@ -78,15 +74,14 @@ export const DRAFT_STEP = { op: 'annotate', ids: ['CLI-04'], note: 'widen the ri
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},
-  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 40, alertWaitTries = 20, readyTries = 60, stages = {} } = {}) {
-  const want = { pending: true, alert: true, draft: true, ...stages };
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 40, readyTries = 60, stages = {} } = {}) {
+  const want = { pending: true, draft: true, ...stages };
   const plan = buildPlan();
   const out = { done: [], skipped: [], failed: [], warnings: [], summary: {} };
   if (!apply) {
     log(`DRY RUN (no request is sent; add --apply). Space '${space}' at ${base}`);
     for (const s of plan) log(`  ${s.as.padEnd(16)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
     if (want.pending) log(`  siu.analyst      POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held for siu.manager; skipped if one is pending)`);
-    if (want.alert) log(`  siu.manager      POST /jobs/la_detect/trigger  (skipped if an Alert for ${RULE} already exists)`);
     if (want.draft) log(`  siu.analyst      POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}`);
     return out;
   }
@@ -126,12 +121,32 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
       const have = await call(s.as, 'GET', '/inv/entity-identities');
       if (have.status === 200 && JSON.stringify(have.data).includes(TWINS[1])) { out.skipped.push(s.id); continue; }
     }
+    if (s.id === 'case' && !state.case) {   // an UNLINKED Case a half-finished earlier run made: reuse it instead of opening a second
+      const c = await call(s.as, 'GET', '/objects?limit=200');
+      const hit = c.status === 200 ? items(c.data).find((o) => o && o.title === CASE_TITLE) : null;
+      if (hit) { state.case = hit.id; out.skipped.push('case'); log(`  case: reusing ${hit.id}`); continue; }
+    }
     let r = await call(s.as, s.method, p, body);
     // right after boot the link Dataset's first build may not have landed: the create answers 422 "cannot read the columns"
     for (let i = 1; s.id === 'investigation' && r.status === 422 && i < ingestWaitTries; i++) {
       log(`  ${s.id}: 422, waiting for the first build of ${DATASET} (${i}/${ingestWaitTries - 1})`);
       await sleep(3000);
       r = await call(s.as, s.method, p, body);
+    }
+    if (s.id === 'investigation' && (r.status < 300 || r.status === 409)) {
+      // READABLE before any op: the LIST must show the id. A create answered 409 can be spurious for a few seconds after /health (nothing on
+      // disk, nothing listed), so while the id is not listed the create is RE-SENT every third try; a 2xx there is a real create.
+      let found = null;
+      for (let i = 0; i < readyTries && !found; i++) {
+        const l = await call(s.as, 'GET', '/inv/investigations?limit=200').catch(() => ({ status: 0 }));
+        found = l.status === 200 ? items(l.data).find((x) => x.id === INV) : null;
+        if (found) break;
+        if (i % 3 === 2) await call(s.as, s.method, p, body).catch(() => null);
+        await sleep(1000);
+      }
+      if (!found) { out.failed.push(`investigation: answered ${r.status} but never listed after ${readyTries} tries`); log('  investigation: not listed'); break; }
+      headStep = found.headStep || 0;
+      if (r.status === 409) { out.skipped.push(s.id); log('  investigation: 409, now readable'); continue; }
     }
     if (s.id === 'case' && r.status < 300) state.case = r.data.case.id;
     if (r.status === 409) out.skipped.push(s.id);
@@ -153,19 +168,6 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
       out.done.push('pending-expand'); out.summary.pendingRequestId = d.pending.id;
     }
   } catch (e) { warn('pending', e); }
-  if (want.alert) try {
-    const read = async () => items(must(await call('siu.analyst', 'GET', '/alerts?limit=200'), 'Alerts list')).find((a) => a.rule === RULE || String(a.rule).endsWith(`/${RULE}`));
-    let a = await read();
-    if (a) out.skipped.push('alert');
-    else {
-      const t = await call('siu.manager', 'POST', '/jobs/la_detect/trigger');
-      if (t.status !== 409) must(t, 'la_detect trigger');
-      for (let i = 0; i < alertWaitTries && !a; i++) { await sleep(3000); a = await read(); }
-      if (!a) throw new Error(`no Alert for ${RULE} appeared after ${alertWaitTries} polls (is standing detection enabled on the rule?)`);
-      out.done.push('alert');
-    }
-    out.summary.alertId = `${a.rule}@${a.epochMillis}`;
-  } catch (e) { warn('alert', e); }
   if (want.draft) try {
     const dbase = `/inv/investigations/${INV}/drafts`;
     const live = items(must(await call('siu.analyst', 'GET', dbase), 'Draft list')).find((d) => d.state === 'open' || d.state === 'hibernated');
@@ -213,12 +215,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const made = scaffold(root);
     console.log(made.length ? `scaffolded: ${made.join(', ')}` : 'nothing to do: the Space already exists');
   } else {
-    const stages = { pending: !args.includes('--no-pending'), alert: !args.includes('--no-alert'), draft: !args.includes('--no-draft') };
+    const stages = { pending: !args.includes('--no-pending'), draft: !args.includes('--no-draft') };
     run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', SPACE), apply: args.includes('--apply'), log: console.log, stages })
       .then((r) => {
         if (args.includes('--apply')) {
           console.log(`created: ${r.done.join(', ') || '-'}\nalready there: ${r.skipped.join(', ') || '-'}\nfailed: ${r.failed.join('; ') || '-'}`);
-          console.log(`warnings: ${r.warnings.join('; ') || '-'}\nstaged: pending request ${r.summary.pendingRequestId || '-'} | Alert ${r.summary.alertId || '-'} | Draft ${r.summary.draftId || '-'}`);
+          console.log(`warnings: ${r.warnings.join('; ') || '-'}\nstaged: pending request ${r.summary.pendingRequestId || '-'} | Draft ${r.summary.draftId || '-'}`);
         }
         process.exit(r.failed.length ? 1 : 0);
       })
