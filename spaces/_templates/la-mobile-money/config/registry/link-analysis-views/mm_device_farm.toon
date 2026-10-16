@@ -1,0 +1,24 @@
+name: mm_device_farm
+description: "Wallet identity: only the shared_device and shared_id links. The nine FARM wallets sit on one handset with nine different national ids, so the handset links them and the ids do not; the household of three (one national id) and the family phone (four wallets) are the benign look-alikes."
+sourceId: entity-projection
+layout: force
+profile: finance
+query:
+  projection:
+    datasetId: mm_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[3]: ts,amount,via
+  filter:
+    kind: group
+    op: OR
+    items[2]{kind,field,operator,value}:
+      condition,kind,"=","shared_device"
+      condition,kind,"=","shared_id"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    behaviors[1]: hover-activate

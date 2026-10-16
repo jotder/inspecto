@@ -1,0 +1,16 @@
+physicalRef: wallet_txn/database
+description: "Mobile-money Link Analysis showcase - wallet transactions landed by the wallet_txn Pipeline, one row per transaction (txn_type p2p, cash_in, cash_out, merchant_pay). Planted stories: docs/ops/la-showcase-mm-runbook.md. Synthetic."
+eventDate: txn_date
+columns[5]{name,type,classification}:
+  src_id,string,WALLET
+  dst_id,string,WALLET
+  txn_date,date,
+  txn_ts,timestamp,
+  amount,number,
+owner: mm.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,mm.analyst,view
+  user,mm.manager,view
+  user,mm.reviewer,view
+  user,mm.outsider,view

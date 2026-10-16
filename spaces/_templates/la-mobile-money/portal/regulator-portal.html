@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Financial-intelligence portal (demo)</title>
+<!-- Static stand-in for a regulator's own portal: it frames ONE read-only, masked Investigation through an embed link.
+     Serve it from an origin the Space allow-lists, e.g. `python -m http.server 8140` in this folder, with embed.frame_ancestors
+     = http://localhost:8140 (Settings > Link Analysis). Mint the link as admin (Share panel or POST .../embeds); paste it below.
+     Synthetic demo only; see docs/ops/la-showcase-mm-runbook.md (scene M-12). -->
+<style>
+  :root { --bg: #f6f7f9; --fg: #1d2330; --card: #fff; --line: #d5d9e0; --accent: #1b5fa8; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14171d; --fg: #e6e9ef; --card: #1d222b; --line: #353c49; --accent: #6aa7e8; } }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+  main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+  form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  input { flex: 1 1 320px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  iframe { width: 100%; height: 70vh; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
+  p { margin: 4px 0 12px; }
+</style>
+</head>
+<body>
+<header><strong>Financial-intelligence unit</strong> - referral from the operator (read-only, masked)</header>
+<main>
+  <p>Paste the embed link the operator sent you, e.g. <code>http://127.0.0.1:8096/embed/inv/&lt;token&gt;</code>.</p>
+  <form id="f"><input id="u" placeholder="http://127.0.0.1:8096/embed/inv/..." aria-label="Embed link" required><button>Open</button></form>
+  <iframe id="v" title="Embedded Investigation" sandbox="allow-scripts allow-same-origin"></iframe>
+  <p id="m">Nothing is shown until a link is opened. A revoked or expired link is blocked by the browser and the frame stays empty.</p>
+</main>
+<script>
+  document.getElementById('f').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = document.getElementById('u').value.trim();
+    if (!/^https?:\/\/[^/]+\/embed\/inv\/[A-Za-z0-9_.-]+$/.test(u)) { document.getElementById('m').textContent = 'That is not an embed link.'; return; }
+    document.getElementById('v').src = u;
+    document.getElementById('m').textContent = 'Showing the shared Investigation, read-only.';
+  });
+</script>
+</body>
+</html>

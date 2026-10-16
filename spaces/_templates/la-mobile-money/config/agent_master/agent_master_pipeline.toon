@@ -1,0 +1,36 @@
+name: agent_master
+active: true
+description: "Link Analysis mobile-money showcase - the agent register. One snapshot. Synthetic."
+
+dirs:
+  poll:       data/inbox/agent_master
+  database:   data/agent_master/database
+  backup:     data/agent_master/backup
+  temp:       data/agent_master/temp
+  errors:     data/agent_master/errors
+  quarantine: data/agent_master/quarantine
+  markers:    data/agent_master/markers
+  status_dir: data/agent_master/status
+  log_dir:    data/agent_master/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: agent_master_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
