@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Audit committee portal (demo)</title>
 <!-- Static demo portal for the la-audit showcase: frames ONE minted embed link of an Investigation, read-only and masked.
-     Open from disk. Paste the viewer link (http://<host>/embed/inv/<grantId>.<secret>) - it is kept in memory only, never in this
-     page's address bar or storage. The host must allow this page as a frame ancestor (Settings > Link Analysis > embed allow-list,
-     or the Space's embed.frame_ancestors; a file:// page needs the "null" origin the host documents). Revoke the link and the frame
-     goes blank. Synthetic data only. See docs/ops/la-showcase-audit-runbook.md, scene "Embed". -->
+     Serve it from the origin the Space allows (link-analysis.toon embed.frame_ancestors = http://127.0.0.1:8100):
+       python -m http.server 8100 --bind 127.0.0.1 --directory spaces/_templates/la-audit/portal
+     then paste the viewer link (http://<host>/embed/inv/<grantId>.<secret>) - kept in memory only, never in this page's address bar or
+     storage. A page opened from disk presents the null origin and is refused. Revoke the link and the frame goes blank. Synthetic data only.
+     See docs/ops/la-showcase-audit-runbook.md, scene G. -->
 <style>
   :root { --bg: #f6f7f9; --fg: #1d2330; --muted: #5b6577; --card: #fff; --line: #d6dae2; --accent: #1f5fbf; }
   @media (prefers-color-scheme: dark) { :root { --bg: #14171d; --fg: #e6e9ef; --muted: #98a2b3; --card: #1c2029; --line: #333a47; --accent: #6aa2ff; } }

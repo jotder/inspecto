@@ -44,6 +44,13 @@ class LaAuditTemplateTest {
     }
 
     @Test
+    void theCommitteePortalOriginMayFrameTheEmbedViewer() throws Exception {
+        String toon = Files.readString(CFG.resolve("link-analysis.toon"));
+        assertTrue(toon.contains("frame_ancestors[2]: http://127.0.0.1:8100,http://localhost:8100"), toon);
+        assertTrue(Files.exists(CFG.getParent().resolve("portal").resolve("committee-portal.html")));
+    }
+
+    @Test
     void theIndexBuildFollowsTheApLinksJobAndReadsTheLinkColumns() throws Exception {
         JobConfig c = JobConfig.load(CFG.resolve("jobs").resolve("la_index_build_job.toon").toString());
         assertEquals("la.index.build", c.type());
