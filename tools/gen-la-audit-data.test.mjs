@@ -18,7 +18,7 @@ function snapshot(dir = DATA, out = {}) {
         const p = join(dir, e);
         if (statSync(p).isDirectory()) snapshot(p, out);
         else if (p.endsWith('.csv'))
-            out[p.slice(DATA.length + 1).replaceAll('\', '/')] = createHash('sha256').update(readFileSync(p, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
+            out[p.slice(DATA.length + 1).replaceAll('\\', '/')] = createHash('sha256').update(readFileSync(p, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
     }
     return out;
 }
