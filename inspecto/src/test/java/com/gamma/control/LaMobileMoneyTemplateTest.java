@@ -106,7 +106,7 @@ class LaMobileMoneyTemplateTest {
     @Test
     @SuppressWarnings("unchecked")
     void theSavedViewsProjectTheLinkDataset() throws Exception {
-        for (String v : List.of("mm_money_flow", "mm_structuring_band", "mm_device_farm")) {
+        for (String v : List.of("mm_money_trail", "mm_structuring_band", "mm_device_farm")) {
             Map<String, Object> view = ToonHelper.load(CFG.resolve("registry/link-analysis-views").resolve(v + ".toon").toString());
             Map<String, Object> proj = (Map<String, Object>) ((Map<String, Object>) view.get("query")).get("projection");
             assertEquals("mm_links_dataset", proj.get("datasetId"), v);
