@@ -36,6 +36,7 @@ class LaClaimsTemplateTest {
         assertEquals(2000, s.fourEyesFanOutAbove());
         assertEquals(Boolean.TRUE, s.index().enabled());
         assertEquals(10, s.drafts().maxOpen());
+        assertEquals(List.of("http://127.0.0.1:8099", "http://localhost:8099"), s.embed().frameAncestorsInForce(), "the partner portal origin may frame the embed link");
         List<EntityTypes.EntityType> types = s.effectiveEntityTypes();
         assertEquals(1, types.size());
         assertEquals("party", types.get(0).id());
