@@ -205,7 +205,7 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 - **Studio ▸ Anomaly Models** (`/anomaly-models`, `modules/admin/anomaly-models/`, nav beside Risk Scores,
   `navFeature: anomaly`): list / detail / create / edit (`PUT` + `If-Match`) / delete / History over the generic
   component routes, gated `canAuthorWorkbench`; the 202 hold reads as held. Schema-form for the scalars + a Feature
-  row editor (Dataset picker over readable Schemas, key/time pickers, time DATE/TIMESTAMP only, shared
+  row editor (Dataset picker over every Dataset; a Schema is read only for a Dataset a Feature references or the user picks, and one with none is flagged on the row; key/time pickers, time DATE/TIMESTAMP only, shared
   `count | agg(column)` grammar). A 422 lands on the field or Feature row it names (`mapAnomalyRefusal`).
   Since 2026-10-11 (`a8c4c14f7`, residual (h)) the Feature row also edits `filters` (operators = the
   `MeasureCompiler.filterTerm` set: `=` `!=` `>` `>=` `<` `<=` `in` `like` `isNull` `notNull`;
@@ -270,7 +270,7 @@ cramped Feature row layout) are tracked in `ANOMALY-UI-FINDINGS-1`. Its backend 
 Polished 2026-10-14 (SPA side of `ANOMALY-UI-FINDINGS-1`): the panel (and the Risk Score panel) word `period_start` / `scored_at` in the app's
 date-time spelling with the raw value in a `title`; the sparkline draws one point per `period_start` (the latest run wins);
 a constant day series gets a padded y axis (value ± max(1, 10 %)) instead of -200..200; counts read "1 feature" / "1 factor";
-the edit dialog reads each Dataset's columns once per open from the list it already holds (no per-Dataset GET; a 404 probe
+the edit dialog lists every Dataset without probing and reads columns only for the Datasets the model's Features reference (or a user picks), once per open, from the list it already holds (no per-Dataset GET, so a one-Dataset model opens with 1 list + 1 probe; a 404 probe
 still shows in the browser console, which a page cannot suppress) and lays Feature fields out two per row.
 
 What remains of `ANOMALY-UI-FINDINGS-1` is the live visual check of the layout and the sign-in return path.

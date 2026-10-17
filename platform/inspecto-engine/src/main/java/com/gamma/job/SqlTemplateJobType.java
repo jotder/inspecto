@@ -18,10 +18,13 @@ final class SqlTemplateJobType implements JobTypeProvider {
             // parameter contract, scanned below), so it is exempt from Expression evaluation
             // (job-parameter-contract §6.1, scoped evaluation). Runtime Expressions reach the SQL through
             // the *values* of those template parameters: `WHERE dt = $from` with `params: {from: $yesterday}`.
-            List.of(ParameterDecl.of("sql", ParamType.TEXT).required().noExpressions()
+            // sql / sink_dataset / sources are read from the SAVED config (SqlTemplateJob: cfg.require/opt), never the trigger,
+            // so they are config-only: authoring-form fields the "Run with parameters" dialog does not offer.
+            ParameterDecl.configOnly(List.of(ParameterDecl.of("sql", ParamType.TEXT).required().noExpressions()
                             .description("SQL SELECT template; its $name tokens are the runtime parameters").build(),
                     ParameterDecl.required("sink_dataset", ParamType.STRING, "Output Dataset (store dir under the data root)"),
-                    ParameterDecl.optional("sources", ParamType.STRING, null, "CSV of source store names to register as views")),
+                    ParameterDecl.of("sources", ParamType.STRING).label("Input Datasets")
+                            .description("CSV of store names (Datasets) to register as views").build())),
             List.of(com.gamma.signal.SignalType.JOB_DATASET_PRODUCED),
             List.of(ArtifactDecl.dataset("output")));
 

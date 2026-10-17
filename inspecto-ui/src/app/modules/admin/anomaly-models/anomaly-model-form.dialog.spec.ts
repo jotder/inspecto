@@ -71,6 +71,7 @@ const flush = async () => {
     for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
 };
 
+const columnsCalls: string[] = [];
 const datasetGet = vi.fn((id: string) => of({ id, sourceName: id }));
 
 function setup(existing?: ComponentDef, write?: () => unknown, opts: { work?: boolean } = {}) {
@@ -112,7 +113,7 @@ function setup(existing?: ComponentDef, write?: () => unknown, opts: { work?: bo
                 provide: DatasetRowsService,
                 useValue: {
                     columns: async (ds: { id: string }) =>
-                        ds.id === 'cdr'
+                        (columnsCalls.push(ds.id), ds.id === 'cdr')
                             ? [
                                   { name: 'msisdn', type: 'string' },
                                   { name: 'event_time', type: 'timestamp' },
@@ -140,13 +141,31 @@ const savedFeature = (update: ReturnType<typeof vi.fn>, call = 0): Record<string
     ((update.mock.calls[call][1] as Record<string, unknown>)['features'] as Record<string, unknown>[])[0];
 
 describe('AnomalyModelFormDialog', () => {
-    it('offers only Datasets with a readable Schema, and only time columns for Time', async () => {
+    it('lists every Dataset, reads only the referenced Schema, and offers only time columns for Time', async () => {
         const { fixture, cmp } = setup(EXISTING);
         await flush();
         fixture.detectChanges();
-        expect(cmp.datasets().map((o) => o.value)).toEqual(['cdr']);
+        expect(cmp.datasets().map((o) => o.value)).toEqual(['cdr', 'no_schema']);
         expect(cmp.featureEditor!.timeOptions(0).map((o) => o.value)).toEqual(['event_time']);
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('opens a model referencing one Dataset with at most 4 requests and flags a Dataset with no Schema', async () => {
+        datasetGet.mockClear();
+        columnsCalls.length = 0;
+        const { fixture, cmp } = setup(EXISTING);
+        await flush();
+        fixture.detectChanges();
+        // 1 model read + 1 Dataset list + Schema probes: only the referenced Dataset (the list is the sole GET).
+        expect(columnsCalls).toEqual(['cdr']);
+        expect(datasetGet).not.toHaveBeenCalled();
+        expect(1 + 1 + columnsCalls.length + datasetGet.mock.calls.length).toBeLessThanOrEqual(4);
+        // Picking a Dataset with no readable Schema probes it once and warns on the row.
+        cmp.featureEditor!.rows.at(0).controls['dataset'].setValue('no_schema');
+        await flush();
+        fixture.detectChanges();
+        expect(columnsCalls).toEqual(['cdr', 'no_schema']);
+        expect(fixture.nativeElement.querySelector('[data-testid="no-schema"]')).toBeTruthy();
     });
 
     it('probes each Dataset from the list it already holds, without a GET per Dataset', async () => {

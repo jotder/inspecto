@@ -29,14 +29,31 @@ full-page header, which no route reaches. A future full-page detail needs the fl
 
 ## Run with parameters (TELCO-FRAUD-DEMO-DATE-1, 2026-10-14)
 
-Row action and detail-pane button **Run with parameters…** open `JobRunParamsDialog`
+Row action and detail-pane button **Run with parameters…** (2026-10-17: the embedded side panel's compact header now
+carries it beside the close X, gated on `LensService.canOperateRuns()`; the full-page header keeps its button under the
+same gate. The panel has no Run-now button, so this is its only run verb. ⚠ the list row action is still ungated by
+lens, so a Business-lens subject sees it on the row but not in the panel) open `JobRunParamsDialog`
 (`job-run-params.dialog.ts`). It reads the type's declarations (`GET /jobs/types/{id}`) plus the Job's configured
 values (`GET /jobs/{name}`), renders them through the same `paramDeclsToSpecs` → `<inspecto-schema-form>` path as
 the authoring form, and posts `POST /jobs/{name}/trigger {"params":{…}}` with **only the dirty fields** (a `multi`
-value is joined to CSV, the resolver's wire form). A refusal (422) shows inline and the dialog stays open; success
+value is joined to CSV, the resolver's wire form). A refusal (422) shows inline and the dialog stays open; **The trigger route never 422s on a bad typed value** (as built: `JobRoutes.triggerJob` only parses `params` to strings; `ParameterResolver` type/required/expression failures are raised inside the async Run and recorded as a `REJECTED` run with the reason, after the 202 — so a bad `as_of` shows in the run history, not inline). The inline 422 is therefore reachable only for other refusals (module disabled, malformed body); the dialog spec pins the inline display with a field-naming message. success
 reuses the Run-now toast + reload. Same gate as Run now (the route's `canOperateRuns`; the UI adds none).
 Deliberately **no free-form key=value rows**: a Job's contract is its declaration, and a type with none shows
-"declares no runtime parameters". Needed no backend change — the declarations were already exposed.
+"declares no runtime parameters".
+
+**Config-only declarations are not offered (2026-10-17).** The dialog lists only `!configOnly` declarations. A
+`ParameterDecl` is `configOnly` when its Job reads the key from the saved config (`cfg.opt/require/params()`), never
+from `ctx.params()`, so a trigger arg would be silently ignored (live drive: `fraud_irsf` Sink dataset, a `report`
+Job's `format`/`out_dir`). The flag is served on `GET /jobs/types/{id}` (`configOnly`) and the authoring form still
+renders those fields. As built: `enrich`, `report`, `maintenance`, `pipeline`, `kpi.completeness`,
+`space.comparison`, `la.index.build`, `caserule.evaluate`, `risk.score`, `screening.run`, `objects.analytics` are
+wholly config-only; `sql.template` has `sql`/`sink_dataset`/`sources` config-only (its scanned `$name` tokens and
+incremental `day` stay runtime); `anomaly.score` `model` and `recon.run` `reconciliation` are config-only while
+`as_of` / `day` are runtime. Runtime (honoured via `ctx.params()`): `alert.evaluate`, `incident.open`,
+`expectation.evaluate`, `mail.send`, `sample.hello`, `consignment.process`, `publish.postgres`,
+`objectstore.export`. A new Job Type's declaration must set `configOnly` for any key its Job does not read from
+`ctx.params()` (pinned for the built-ins by `ConfigOnlyParametersTest`). `sources` is labelled **Input Datasets**.
+`alert.evaluate`'s `rule` evaluates ONLY that rule (`AlertAccess.evaluateRule`; unknown name fails the Run).
 
 ## The authoring form is descriptor-driven (job-parameter-contract steps 10–16, 2026-08-10)
 

@@ -125,6 +125,13 @@ export class AnomalyModelFormDialog implements OnInit {
     /** The Datasets the list already returned in full, so a column probe does not GET each one again. */
     private readonly known = new Map<string, Dataset>();
 
+    private readonly listed: Promise<void> = firstValueFrom(this.datasetsApi.list()).then(
+        (all) => {
+            for (const d of all) this.known.set(d.id, d);
+        },
+        () => undefined,
+    );
+
     readonly requestClose = guardDirtyClose(
         this.ref,
         () => !!this.schemaForm?.isDirty() || !!this.featureEditor?.isDirty(),
@@ -134,8 +141,9 @@ export class AnomalyModelFormDialog implements OnInit {
     readonly columnMetaFor = (id: string): Promise<ColumnMeta[]> => {
         let p = this.columnCache.get(id);
         if (!p) {
-            const have = this.known.get(id);
-            p = (have ? Promise.resolve(have) : firstValueFrom(this.datasetsApi.get(id)))
+            // Wait for the list first, so a referenced Dataset is taken from it instead of read again.
+            p = this.listed
+                .then(() => this.known.get(id) ?? firstValueFrom(this.datasetsApi.get(id)))
                 .then((ds) => this.rowsApi.columns(ds))
                 .catch(() => [] as ColumnMeta[]);
             this.columnCache.set(id, p);
@@ -143,17 +151,15 @@ export class AnomalyModelFormDialog implements OnInit {
         return p;
     };
 
+    /**
+     * Lists every Dataset WITHOUT probing any Schema (one 1-row `/db/table` read per Dataset was ~20 GETs per open).
+     * A Schema is read only for a Dataset a Feature references or the user picks, once per open; one with no
+     * readable Schema is flagged on the Feature row.
+     */
     async ngOnInit(): Promise<void> {
-        let ids: string[];
-        try {
-            const all = await firstValueFrom(this.datasetsApi.list());
-            for (const d of all) this.known.set(d.id, d);
-            ids = all.map((d) => d.id);
-        } catch {
-            ids = [];
-        }
-        const readable = await Promise.all(ids.map(async (id) => ((await this.columnMetaFor(id)).length ? id : null)));
-        this.datasets.set(readable.filter((x): x is string => !!x).map((id) => ({ value: id, label: id })));
+        await this.listed;
+        const ids = [...this.known.keys()];
+        this.datasets.set(ids.map((id) => ({ value: id, label: id })));
     }
 
     /** The content the form would save now, or `null` (errors shown) while it is invalid — save and draft preview. */

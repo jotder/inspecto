@@ -48,9 +48,9 @@ public final class ScreeningJobType implements JobTypeProvider {
     static final JobTypeDescriptor DESCRIPTOR = new JobTypeDescriptor(ID, "Screening",
             "Screens a Dataset's names and identifiers against Entity Lists (sanctions, PEP, deny lists) and raises "
                     + "a Screening Hit for review for every new match at or above the threshold.",
-            List.of(ParameterDecl.required("dataset", ParamType.STRING, "Dataset to screen"),
+            ParameterDecl.configOnly(List.of(ParameterDecl.required("dataset", ParamType.STRING, "Dataset to screen"),
                     ParameterDecl.required("keyField", ParamType.STRING, "Column that identifies the subject"),
-                    ParameterDecl.required("lists", ParamType.STRING, "Entity List ids, comma separated")),
+                    ParameterDecl.required("lists", ParamType.STRING, "Entity List ids, comma separated"))),
             List.of(ScreeningSignals.SCREENING_HITS_RAISED),
             List.of());
 

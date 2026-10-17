@@ -26,7 +26,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { ToastrService } from 'ngx-toastr';
-import { interval } from 'rxjs';
+import { catchError, forkJoin, interval, of } from 'rxjs';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One row of the "Needs attention" list — the three sources normalised onto one shape. */
@@ -257,7 +257,9 @@ export class HomeComponent implements OnInit {
         this.loadCounts();
         // The page stays open while work lands: a count read once at init showed 0 beside 17 fresh Dataset writes
         // (TELCO-FRAUD-STORY-GAPS-1 d). Re-read both on a slow tick — two cheap counts, never a client-side sweep.
-        interval(COUNT_REFRESH_MS).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.loadCounts());
+        interval(COUNT_REFRESH_MS)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.loadCounts());
     }
 
     private loadCounts(): void {
@@ -265,10 +267,22 @@ export class HomeComponent implements OnInit {
             next: (r) => this.breached.set(r.count),
             error: () => this.breached.set(null),
         });
-        this.events.signalCount('dataset.write', Date.now() - 24 * 3_600_000).subscribe({
-            next: (r) => this.datasetsWritten.set(r),
-            error: () => this.datasetsWritten.set(null),
-        });
+        // Two signal types name a Dataset write: `dataset.write` (Consignment/Materialize) and
+        // `job.dataset.produced` (sql.template Jobs — a polled Collector emits neither). `/signals/count` takes one
+        // type and returns no names, so sum the two; a Dataset written both ways counts once per type (an upper bound).
+        const since = Date.now() - 24 * 3_600_000;
+        const read = (type: string) => this.events.signalCount(type, since).pipe(catchError(() => of(null)));
+        forkJoin([read('dataset.write'), read('job.dataset.produced')]).subscribe(([a, b]) =>
+            this.datasetsWritten.set(
+                a || b
+                    ? {
+                          count: (a?.count ?? 0) + (b?.count ?? 0),
+                          datasets: (a?.datasets ?? 0) + (b?.datasets ?? 0),
+                          capped: !!(a?.capped || b?.capped),
+                      }
+                    : null,
+            ),
+        );
     }
 
     openLensHome(): void {

@@ -92,34 +92,36 @@
                 </dl>
 
                 <h3 class="mt-6 text-sm font-semibold">Factors</h3>
-                <table class="mt-2 w-full text-left text-sm">
-                    <thead>
-                        <tr class="border-b">
-                            <th scope="col">Factor</th>
-                            <th scope="col">Dataset</th>
-                            <th scope="col">Key</th>
-                            <th scope="col">Measure</th>
-                            <th scope="col">Filters</th>
-                            <th scope="col">Weight</th>
-                            <th scope="col">Cap</th>
-                            <th scope="col">Evidence</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (f of m.factors; track f.id) {
+                <div class="mt-2 overflow-x-auto">
+                    <table class="w-full text-left text-sm [&_td]:py-1 [&_td]:pr-4 [&_th]:pr-4">
+                        <thead>
                             <tr class="border-b">
-                                <td>{{ f.label }}</td>
-                                <td>{{ f.dataset }}</td>
-                                <td>{{ f.key }}</td>
-                                <td class="font-mono">{{ f.measure }}</td>
-                                <td class="tabular-nums">{{ f.filterCount }}</td>
-                                <td class="tabular-nums">{{ f.weight ?? '—' }}</td>
-                                <td class="tabular-nums">{{ f.cap ?? '—' }}</td>
-                                <td>{{ f.evidence.join(', ') || '—' }}</td>
+                                <th scope="col">Factor</th>
+                                <th scope="col">Dataset</th>
+                                <th scope="col">Key</th>
+                                <th scope="col">Measure</th>
+                                <th scope="col">Filters</th>
+                                <th scope="col">Weight</th>
+                                <th scope="col">Cap</th>
+                                <th scope="col">Evidence</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @for (f of m.factors; track f.id) {
+                                <tr class="border-b">
+                                    <td>{{ f.label }}</td>
+                                    <td>{{ f.dataset }}</td>
+                                    <td>{{ f.key }}</td>
+                                    <td class="font-mono">{{ f.measure }}</td>
+                                    <td class="tabular-nums">{{ f.filterCount }}</td>
+                                    <td class="tabular-nums">{{ f.weight ?? '—' }}</td>
+                                    <td class="tabular-nums">{{ f.cap ?? '—' }}</td>
+                                    <td>{{ f.evidence.join(', ') || '—' }}</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
 
                 <h3 class="mt-6 text-sm font-semibold">Derived Datasets</h3>
                 <p class="text-secondary text-sm">

@@ -101,7 +101,7 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
                                     <th scope="col">Peer z</th>
                                     <th scope="col">Cohort shift</th>
                                     <th scope="col">Baseline</th>
-                                    <th scope="col">Reason</th>
+                                    <th scope="col" class="min-w-64">Reason</th>
                                 </tr>
                             </thead>
                             <tbody>

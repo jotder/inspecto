@@ -451,17 +451,17 @@ public final class JobService implements AutoCloseable {
     private void registerBuiltins() {
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("enrich", "Enrichment",
                 "Runs a Stage-2 enrichment once (full recompute) and publishes a chain commit.",
-                List.of(ParameterDecl.required("config", ParamType.STRING, "Path to the enrichment .toon")),
+                ParameterDecl.configOnly(List.of(ParameterDecl.required("config", ParamType.STRING, "Path to the enrichment .toon"))),
                 List.of("pipeline.commit"), List.of()),
                 c -> new EnrichJob(c, bus)));
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("report", "Report",
                 "Computes a report (status / batch / dataset export) and optionally delivers it.",
-                List.of(ParameterDecl.optional("scope", ParamType.STRING, "status", "status | batch | dataset"),
+                ParameterDecl.configOnly(List.of(ParameterDecl.optional("scope", ParamType.STRING, "status", "status | batch | dataset"),
                         ParameterDecl.optional("out_dir", ParamType.STRING, null, "Delivery directory (enables artifact + REPORT_READY)"),
                         ParameterDecl.optional("format", ParamType.STRING, null, "json | csv | xlsx | png | pdf"),
                         ParameterDecl.optional("dataset", ParamType.DATASET_REF, null, "Dataset id (scope=dataset)"),
                         ParameterDecl.optional("recipients", ParamType.STRING, null, "Comma-separated addresses mailed when the report is delivered"),
-                        ParameterDecl.optional("attach", ParamType.STRING, "false", "true attaches the delivered report to that mail")),
+                        ParameterDecl.optional("attach", ParamType.STRING, "false", "true attaches the delivered report to that mail"))),
                 List.of(EventType.REPORT_READY), List.of(ArtifactDecl.report("report")), List.of("mail")),
                 c -> new ReportJob(c, reports, dataDir)));
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("maintenance", "Maintenance",
@@ -474,7 +474,7 @@ public final class JobService implements AutoCloseable {
                 // this classpath contributed, so the form offers exactly what will not throw.
                 "Housekeeping task. Available in this bundle: "
                         + String.join(" / ", MaintenanceJob.availableTasks()) + ".",
-                List.of(ParameterDecl.optional("task", ParamType.STRING, "cleanup", "Which maintenance task"),
+                ParameterDecl.configOnly(List.of(ParameterDecl.optional("task", ParamType.STRING, "cleanup", "Which maintenance task"),
                         ParameterDecl.optional("dir", ParamType.STRING, null, "Target directory (cleanup / compact / storage_report / backup source)"),
                         ParameterDecl.optional("retention_days", ParamType.INTEGER, "7", "Age threshold in days (required for the *_prune tasks and incident_purge; alert_purge defaults to 90)"),
                         ParameterDecl.optional("glob", ParamType.STRING, "*", "Filename filter (cleanup)"),
@@ -532,7 +532,7 @@ public final class JobService implements AutoCloseable {
                                 .build(),
                         ParameterDecl.of("backoff_minutes", ParamType.INTEGER).min(0).defaultValue("60")
                                 .description("soft_bounce_retry: wait this long after the last attempt before retrying")
-                                .build()),
+                                .build())),
                 List.of("maintenance.storage.threshold", "maintenance.storage.trend",
                         "maintenance.scheduler.findings", "maintenance.backup.completed",
                         "maintenance.backup.verify_failed", "maintenance.restore.completed",
@@ -547,7 +547,7 @@ public final class JobService implements AutoCloseable {
                 "Runs a Pipeline over data at rest; emits a commit downstream jobs can chain on. Name EITHER "
                         + "an authored Pipeline (pipeline:) OR a flat *_pipeline.toon whose Stage-2 chain is "
                         + "lifted at run time (pipeline_config:) — exactly one, never both.",
-                List.of(ParameterDecl.optional("pipeline", ParamType.STRING, null,
+                ParameterDecl.configOnly(List.of(ParameterDecl.optional("pipeline", ParamType.STRING, null,
                                 "Authored Pipeline id to run. Mutually exclusive with pipeline_config."),
                         ParameterDecl.optional("pipeline_config", ParamType.STRING, null,
                                 "Path to a flat *_pipeline.toon. Its at-rest chain (steps:/summarize/dedup/join, "
@@ -564,7 +564,7 @@ public final class JobService implements AutoCloseable {
                         ParameterDecl.optional("data_dir", ParamType.STRING, null,
                                 "Data root this run reads and writes under. Default: the Space's own data directory."),
                         ParameterDecl.optional("batch_id", ParamType.STRING, null,
-                                "Batch id to commit under. Default: derived per run from the job name and the fire time.")),
+                                "Batch id to commit under. Default: derived per run from the job name and the fire time."))),
                 List.of("pipeline.commit"), List.of()),
                 this::buildPipelineJob));
         // sql.template (P3b, §15.1): the first Run Artifact producer. Config-aware parameters — the
@@ -688,7 +688,7 @@ public final class JobService implements AutoCloseable {
                         + "server recommends (append | compact; full only when allow_full). Acts as a delegated "
                         + "service principal standing in for the recorded owner, re-checked every run. A refusal "
                         + "fails the Run with its reason. Aggregate output only.",
-                List.of(ParameterDecl.of("dataset", ParamType.DATASET_REF).label("Dataset").required().build(),
+                ParameterDecl.configOnly(List.of(ParameterDecl.of("dataset", ParamType.DATASET_REF).label("Dataset").required().build(),
                         ParameterDecl.of("source_col", ParamType.STRING).label("Source column").required().build(),
                         ParameterDecl.of("target_col", ParamType.STRING).label("Target column").required().build(),
                         ParameterDecl.of("owner", ParamType.STRING).label("Owner (user id)").required()
@@ -711,7 +711,7 @@ public final class JobService implements AutoCloseable {
                                         + "running before giving up (BUILD_IN_PROGRESS). Unset = the built-in bound "
                                         + "(six waits, about two minutes); 0 = never wait; capped by 'Wait at most'. "
                                         + "Set this above a full build's duration when the index is large.")
-                                .min(0).build()),
+                                .min(0).build())),
                 List.of("la.index.build.completed"), List.of(), List.of("link-index")),
                 c -> new LaIndexBuildJob(c)));
         // space.comparison (space-comparison design, decided 2026-09-24): compare the storage growth of two or
@@ -725,14 +725,14 @@ public final class JobService implements AutoCloseable {
                         + "⚠ Reading another Space needs canAdminister, so it runs through POST /space-comparisons "
                         + "only; an authored or scheduled job of this type may read just its own Space and is "
                         + "refused.",
-                List.of(ParameterDecl.of("spaces", ParamType.STRING).required().multi().label("Spaces")
+                ParameterDecl.configOnly(List.of(ParameterDecl.of("spaces", ParamType.STRING).required().multi().label("Spaces")
                                 .description("The Space ids to compare (at least two, comma-separated)").build(),
                         ParameterDecl.of("window_days", ParamType.INTEGER).min(1).defaultValue("30")
                                 .description("Trend window, as storage_trend").build(),
                         ParameterDecl.of("axes", ParamType.STRING).multi()
                                 .description("Only these storage axes (comma-separated); every axis when unset").build(),
                         ParameterDecl.of("top", ParamType.INTEGER).min(1).defaultValue("5")
-                                .description("Report the N axes with the widest spread").build()),
+                                .description("Report the N axes with the widest spread").build())),
                 List.of(SpaceComparisonJob.SIGNAL), List.of()),
                 c -> new SpaceComparisonJob(c, id -> SpaceStorageAccess.ownSpaceOnly(spaceId, dataDir).dataRoot(id))));
         // Classpath providers (optional Maven modules — the "classpath way", §12.4). ServiceLoader finds

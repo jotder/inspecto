@@ -57,10 +57,10 @@ public final class OpsJobTypes {
         public JobTypeDescriptor descriptor() {
             return new JobTypeDescriptor("objects.analytics", "Object Analytics Sample",
                     "Samples Incident/Case/Task analytics into the ops_analytics Dataset for Studio/BI.",
-                    List.of(ParameterDecl.optional("types", ParamType.STRING, null,
+                    ParameterDecl.configOnly(List.of(ParameterDecl.optional("types", ParamType.STRING, null,
                                     "CSV of INCIDENT | CASE | TASK (default: all three)"),
                             ParameterDecl.optional("retention_days", ParamType.INTEGER, "0",
-                                    "Forget samples older than N days (0 = keep forever)")),
+                                    "Forget samples older than N days (0 = keep forever)"))),
                     List.of(OpsSignals.OBJECTS_ANALYTICS_COMPLETED), List.of(), OBJECTS);
         }
 

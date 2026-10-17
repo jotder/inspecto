@@ -78,8 +78,13 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                             label="Dataset"
                             formControlName="dataset"
                             [options]="datasetOptions()"
-                            help="Only Datasets with a readable Schema."
+                            help="Pick a Dataset with a readable Schema."
                         ></inspecto-option-picker>
+                        @if (unreadable(i)) {
+                            <p class="text-warn text-xs sm:col-span-2" role="alert" data-testid="no-schema">
+                                This Dataset has no readable Schema — choose another.
+                            </p>
+                        }
                         <inspecto-option-picker
                             label="Entity key column"
                             formControlName="key"
@@ -104,6 +109,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                             label="Direction"
                             formControlName="direction"
                             [options]="directions"
+                            help="Up: higher than usual is unusual. Down: lower than usual is unusual."
                         ></inspecto-option-picker>
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Weight</mat-label>
@@ -128,7 +134,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                         <p class="text-secondary text-xs">Only rows matching every filter are measured.</p>
                         @for (fg of filtersOf(g).controls; track fg; let j = $index) {
                             <div
-                                class="mt-2 grid grid-cols-1 items-start gap-x-4 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto]"
+                                class="mt-2 grid grid-cols-1 items-start gap-x-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                                 role="group"
                                 [formGroupName]="j"
                                 [attr.aria-label]="'Feature ' + (i + 1) + ' filter ' + (j + 1)"
@@ -301,6 +307,12 @@ export class AnomalyModelFeaturesComponent implements OnInit {
     private loadColumns(dataset: string): void {
         if (!dataset || this.columns()[dataset]) return;
         this.columnMetaFor(dataset).then((cols) => this.columns.update((m) => ({ ...m, [dataset]: cols })));
+    }
+
+    /** True once the row's Dataset was probed and offered no column. */
+    unreadable(i: number): boolean {
+        const ds = String(this.rows.at(i).value['dataset'] ?? '');
+        return !!ds && this.columns()[ds]?.length === 0;
     }
 
     columnOptions(i: number): PickerOption[] {
