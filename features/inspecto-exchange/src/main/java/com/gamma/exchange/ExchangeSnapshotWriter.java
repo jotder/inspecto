@@ -7,6 +7,8 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.ResultSetDescriptor;
+import com.gamma.sql.SqlViews;
+import com.gamma.util.SqlIdent;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,12 +83,12 @@ public final class ExchangeSnapshotWriter {
         try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null, roots);
              Statement st = conn.createStatement()) {
             st.execute("CREATE VIEW __src AS " + relationSql);
-            st.execute("COPY (SELECT * FROM __src) TO " + sqlStr(unix(tmp)) + " (FORMAT PARQUET)");
-            try (ResultSet rs = st.executeQuery("SELECT count(*) FROM read_parquet(" + sqlStr(unix(tmp)) + ")")) {
+            st.execute("COPY (SELECT * FROM __src) TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
+            try (ResultSet rs = st.executeQuery("SELECT count(*) FROM " + SqlViews.parquetFile(tmp))) {
                 rs.next();
                 rows = rs.getLong(1);
             }
-            columns = describe(st, unix(tmp));
+            columns = describe(st, tmp);
         }
         classify(columns, dataset, item, ownerRegistry, ownerViews);
         Files.move(tmp, finalFile, StandardCopyOption.ATOMIC_MOVE);
@@ -149,10 +151,10 @@ public final class ExchangeSnapshotWriter {
     }
 
     /** Result Set columns (name, coarse type, analytic role) read from the just-written snapshot's schema. */
-    private static List<Map<String, Object>> describe(Statement st, String parquetGlob) throws Exception {
+    private static List<Map<String, Object>> describe(Statement st, Path parquet) throws Exception {
         List<String> names = new ArrayList<>();
         List<Integer> types = new ArrayList<>();
-        try (ResultSet rs = st.executeQuery("SELECT * FROM read_parquet(" + sqlStr(parquetGlob) + ") LIMIT 0")) {
+        try (ResultSet rs = st.executeQuery("SELECT * FROM " + SqlViews.parquetFile(parquet) + " LIMIT 0")) {
             ResultSetMetaData md = rs.getMetaData();
             for (int i = 1; i <= md.getColumnCount(); i++) {
                 names.add(md.getColumnLabel(i));
@@ -168,13 +170,5 @@ public final class ExchangeSnapshotWriter {
             cols.add(m);
         }
         return cols;
-    }
-
-    private static String unix(Path p) {
-        return p.toString().replace('\\', '/');
-    }
-
-    private static String sqlStr(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 }
