@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.config.safety.PathJail;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.sql.SqlViews;
@@ -200,9 +201,9 @@ public final class ReferenceCompactor {
             long rows;
             try (Statement st = conn.createStatement()) {
                 st.execute("COPY (SELECT * EXCLUDE (" + exclude + ") FROM __retained WHERE " + where
-                        + ") TO '" + sqlPath(tmp) + "' (FORMAT PARQUET)");
+                        + ") TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
                 try (ResultSet rs = st.executeQuery(
-                        "SELECT count(*) FROM read_parquet('" + sqlPath(tmp) + "')")) {
+                        "SELECT count(*) FROM " + SqlViews.parquetFile(tmp))) {
                     rs.next();
                     rows = rs.getLong(1);
                 }
@@ -322,10 +323,6 @@ public final class ReferenceCompactor {
      */
     private static String storeReader(Path root) {
         return SqlViews.reader("PARQUET", root.toAbsolutePath() + "/**/*.parquet", true);
-    }
-
-    private static String sqlPath(Path p) {
-        return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
     }
 
 }

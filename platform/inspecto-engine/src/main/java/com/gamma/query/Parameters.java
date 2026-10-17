@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.gamma.util.SqlIdent.sqlStr;
+
 /**
  * Server-side resolver for the R3 <b>{@code $}-parameter</b> namespace (W4; design §6.2) — the Java
  * mirror of the UI's {@code inspecto/query/parameters.ts}. A query's SQL text may reference
@@ -67,17 +69,17 @@ public final class Parameters {
         Instant now = ctx != null && ctx.now() != null ? ctx.now() : Instant.now();
         switch (name) {
             case "today":
-                return sqlString(isoDate(now));
+                return sqlStr(isoDate(now));
             case "now":
-                return sqlString(now.toString());
+                return sqlStr(now.toString());
             case "day": {
                 long offset = arg == null ? 0 : Long.parseLong(arg);
-                return sqlString(LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(offset).toString());
+                return sqlStr(LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(offset).toString());
             }
             case "current_user":
-                return ctx != null && ctx.user() != null ? sqlString(ctx.user()) : whole;
+                return ctx != null && ctx.user() != null ? sqlStr(ctx.user()) : whole;
             case "role":
-                return ctx != null && ctx.role() != null ? sqlString(ctx.role()) : whole;
+                return ctx != null && ctx.role() != null ? sqlStr(ctx.role()) : whole;
             default: {
                 Def def = byName.get(name);
                 if (def == null) return whole;                       // undeclared → leave visible
@@ -92,7 +94,7 @@ public final class Parameters {
                     }
                     return value.trim();
                 }
-                return sqlString(value);
+                return sqlStr(value);
             }
         }
     }
@@ -100,10 +102,5 @@ public final class Parameters {
     /** A {@code YYYY-MM-DD} UTC calendar date. */
     private static String isoDate(Instant now) {
         return LocalDate.ofInstant(now, ZoneOffset.UTC).toString();
-    }
-
-    /** A single-quoted SQL string literal (embedded quotes doubled). */
-    private static String sqlString(String v) {
-        return "'" + v.replace("'", "''") + "'";
     }
 }

@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import static com.gamma.util.SqlIdent.q;
+import static com.gamma.util.SqlIdent.sqlStr;
+
 /**
  * The SQL {@code publish.postgres} sends to its target (ASSURE-BI-PUBLICATION-1). Pure string building, no I/O, so
  * every statement is testable on its own. ⛔ Nothing is concatenated unquoted: every schema / table / column name is
@@ -22,24 +25,25 @@ final class PostgresPublishSql {
     /** The per-schema ledger of published partitions and their fingerprints (partition-incremental). */
     static final String STATE_TABLE = "_inspecto_publication";
 
-    /** {@code name}, validated and double-quoted; {@link IllegalArgumentException} naming {@code what} otherwise. */
-    static String ident(String name, String what) {
+    /** {@code name}, validated and returned unquoted ({@code SqlIdent.q} quotes it); {@link IllegalArgumentException}
+     *  naming {@code what} otherwise. */
+    static String safeId(String name, String what) {
         if (name == null || !SAFE_ID.matcher(name).matches())
             throw new IllegalArgumentException(what + " '" + name + "' is not a safe identifier (" + SAFE_ID.pattern()
                     + ") — refused rather than quoted around");
-        return "\"" + name + "\"";
+        return name;
     }
 
-    /** A single-quoted SQL literal; a NUL is refused. */
-    static String literal(String s) {
+    /** {@code s} for a comment literal ({@code SqlIdent.sqlStr} quotes it); a NUL is refused. */
+    static String noNul(String s) {
         if (s.indexOf('\0') >= 0) throw new IllegalArgumentException("a comment carries a NUL byte");
-        return "'" + s.replace("'", "''") + "'";
+        return s;
     }
 
     /** The target table a Dataset id publishes to: lower-cased, every other character → {@code _}, then validated. */
     static String tableFor(String datasetId) {
         String t = datasetId.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
-        ident(t, "target table for dataset '" + datasetId + "'");
+        safeId(t, "target table for dataset '" + datasetId + "'");
         return t;
     }
 
@@ -76,18 +80,18 @@ final class PostgresPublishSql {
     record Col(String name, String duckType, String pgType, String description) {}
 
     static String qualified(String schema, String table) {
-        return ident(schema, "schema") + "." + ident(table, "table");
+        return q(safeId(schema, "schema")) + "." + q(safeId(table, "table"));
     }
 
     static String createTable(String schema, String table, List<Col> cols) {
         List<String> defs = new ArrayList<>();
-        for (Col c : cols) defs.add(ident(c.name(), "column") + " " + c.pgType());
+        for (Col c : cols) defs.add(q(safeId(c.name(), "column")) + " " + c.pgType());
         return "CREATE TABLE " + qualified(schema, table) + " (" + String.join(", ", defs) + ")";
     }
 
     static String insert(String schema, String table, List<Col> cols) {
         List<String> names = new ArrayList<>();
-        for (Col c : cols) names.add(ident(c.name(), "column"));
+        for (Col c : cols) names.add(q(safeId(c.name(), "column")));
         return "INSERT INTO " + qualified(schema, table) + " (" + String.join(", ", names) + ") VALUES ("
                 + String.join(", ", java.util.Collections.nCopies(cols.size(), "?")) + ")";
     }
@@ -96,18 +100,18 @@ final class PostgresPublishSql {
     static List<String> comments(String schema, String table, String tableDescription, List<Col> cols) {
         List<String> out = new ArrayList<>();
         if (tableDescription != null && !tableDescription.isBlank())
-            out.add("COMMENT ON TABLE " + qualified(schema, table) + " IS " + literal(tableDescription));
+            out.add("COMMENT ON TABLE " + qualified(schema, table) + " IS " + sqlStr(noNul(tableDescription)));
         for (Col c : cols)
             if (c.description() != null && !c.description().isBlank())
-                out.add("COMMENT ON COLUMN " + qualified(schema, table) + "." + ident(c.name(), "column") + " IS "
-                        + literal(c.description()));
+                out.add("COMMENT ON COLUMN " + qualified(schema, table) + "." + q(safeId(c.name(), "column")) + " IS "
+                        + sqlStr(noNul(c.description())));
         return out;
     }
 
     /** The full-refresh swap, run inside the caller's transaction after the stage is filled. */
     static List<String> swap(String schema, String table) {
         return List.of("DROP TABLE IF EXISTS " + qualified(schema, table),
-                "ALTER TABLE " + qualified(schema, table + STAGE_SUFFIX) + " RENAME TO " + ident(table, "table"));
+                "ALTER TABLE " + qualified(schema, table + STAGE_SUFFIX) + " RENAME TO " + q(safeId(table, "table")));
     }
 
     static String createState(String schema) {
@@ -118,7 +122,7 @@ final class PostgresPublishSql {
 
     /** Delete one partition's rows; {@code null} value ⇒ the NULL partition. One {@code ?} unless null. */
     static String deletePartition(String schema, String table, String column, boolean isNull) {
-        String c = ident(column, "partition column");
+        String c = q(safeId(column, "partition column"));
         return "DELETE FROM " + qualified(schema, table) + " WHERE "
                 + (isNull ? c + " IS NULL" : "CAST(" + c + " AS text) = ?");
     }
@@ -126,8 +130,8 @@ final class PostgresPublishSql {
     /** DuckDB: per-partition row count + order-independent row hash sum over the published columns. */
     static String fingerprints(String relation, String partitionColumn, List<Col> cols) {
         List<String> names = new ArrayList<>();
-        for (Col c : cols) names.add(ident(c.name(), "column"));
-        String p = ident(partitionColumn, "partition column");
+        for (Col c : cols) names.add(q(safeId(c.name(), "column")));
+        String p = q(safeId(partitionColumn, "partition column"));
         return "SELECT CAST(" + p + " AS VARCHAR) AS p, CAST(count(*) AS VARCHAR) || ':' || "
                 + "CAST(sum(CAST(hash(" + String.join(", ", names) + ") AS HUGEINT)) AS VARCHAR) AS fp FROM ("
                 + relation + ") t GROUP BY 1";
@@ -135,7 +139,7 @@ final class PostgresPublishSql {
 
     static String select(String relation, List<Col> cols) {
         List<String> names = new ArrayList<>();
-        for (Col c : cols) names.add(ident(c.name(), "column"));
+        for (Col c : cols) names.add(q(safeId(c.name(), "column")));
         return "SELECT " + String.join(", ", names) + " FROM (" + relation + ") t";
     }
 }

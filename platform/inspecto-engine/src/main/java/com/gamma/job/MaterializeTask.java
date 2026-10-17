@@ -7,6 +7,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.query.MeasureCompiler;
+import com.gamma.sql.SqlViews;
 import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * The {@code materialize} maintenance task (DAT-4 — Matrix materialization): persist a summary Derived
@@ -94,9 +97,9 @@ final class MaterializeTask {
                      DatasetRelation.readRoots(dataset, dataRoot));
              Statement st = conn.createStatement()) {
             st.execute("CREATE VIEW " + q(source) + " AS " + relationSql);
-            st.execute("COPY (" + sql + ") TO " + sqlStr(tmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");
+            st.execute("COPY (" + sql + ") TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
             try (ResultSet rs = st.executeQuery(
-                    "SELECT count(*) FROM read_parquet(" + sqlStr(tmp.toString().replace('\\', '/')) + ")")) {
+                    "SELECT count(*) FROM " + SqlViews.parquetFile(tmp))) {
                 rs.next();
                 rows = rs.getLong(1);
             }
@@ -199,16 +202,11 @@ final class MaterializeTask {
         return out;
     }
 
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
-    }
-
     /** The written snapshot's columns, from {@code DESCRIBE} over the Parquet itself. */
     private static List<ResultSetDescriptor.Column> describeWritten(Statement st, Path parquet) throws Exception {
         List<String> names = new ArrayList<>();
         List<String> types = new ArrayList<>();
-        try (ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM read_parquet("
-                + sqlStr(parquet.toString().replace('\\', '/')) + ")")) {
+        try (ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM " + SqlViews.parquetFile(parquet))) {
             while (rs.next()) {
                 names.add(rs.getString("column_name"));
                 types.add(rs.getString("column_type"));
@@ -264,9 +262,5 @@ final class MaterializeTask {
             out.add(col);
         }
         return out;
-    }
-
-    private static String sqlStr(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 }

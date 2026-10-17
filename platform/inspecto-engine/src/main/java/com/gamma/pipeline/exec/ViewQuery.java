@@ -1,5 +1,6 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.api.PublicApi;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.query.ViewReaderSql;
@@ -59,7 +60,7 @@ public final class ViewQuery {
             // Intentionally NOT sealed — the derived SQL reads the source store's parquet by absolute path.
             Connection conn = sandbox.connection();
             try (Statement st = conn.createStatement()) {
-                st.execute("CREATE VIEW " + ScratchTables.q(VIEW) + " AS " + sql);
+                st.execute("CREATE VIEW " + SqlIdent.q(VIEW) + " AS " + sql);
             }
             List<String> columns = ScratchTables.columnNames(conn, VIEW);
             // Read one past the cap to report whether the result was truncated.

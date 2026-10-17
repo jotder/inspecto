@@ -291,12 +291,12 @@ class PostgresPublishJobTest {
     @Test
     void sqlBuildingQuotesEveryIdentifierAndEscapesComments() {
         assertEquals("\"bi\".\"subs\"", PostgresPublishSql.qualified("bi", "subs"));
-        assertThrows(IllegalArgumentException.class, () -> PostgresPublishSql.ident("a\"b", "column"));
-        assertThrows(IllegalArgumentException.class, () -> PostgresPublishSql.ident("a b", "column"));
-        assertThrows(IllegalArgumentException.class, () -> PostgresPublishSql.ident("x".repeat(41), "column"));
+        assertThrows(IllegalArgumentException.class, () -> PostgresPublishSql.safeId("a\"b", "column"));
+        assertThrows(IllegalArgumentException.class, () -> PostgresPublishSql.safeId("a b", "column"));
+        assertThrows(IllegalArgumentException.class, () -> PostgresPublishSql.safeId("x".repeat(41), "column"));
         assertEquals("subs_daily_v2", PostgresPublishSql.tableFor("Subs.daily-v2"));
-        assertEquals("'it''s \\ ok'", PostgresPublishSql.literal("it's \\ ok"));
-        assertEquals(List.of("DROP TABLE IF EXISTS \"bi\".\"t\"",
+        assertEquals("'it''s \\ ok'", com.gamma.util.SqlIdent.sqlStr(PostgresPublishSql.noNul("it's \\ ok")));
+        assertThrows(IllegalArgumentException.class, () -> PostgresPublishSql.noNul("a\0b"));        assertEquals(List.of("DROP TABLE IF EXISTS \"bi\".\"t\"",
                 "ALTER TABLE \"bi\".\"t__inspecto_stage\" RENAME TO \"t\""), PostgresPublishSql.swap("bi", "t"));
         assertEquals("numeric(18,2)", PostgresPublishSql.pgType("DECIMAL(18,2)"));
         assertNull(PostgresPublishSql.pgType("STRUCT(a INTEGER)"));

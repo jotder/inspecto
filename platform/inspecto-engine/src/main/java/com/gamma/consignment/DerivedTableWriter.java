@@ -1,5 +1,6 @@
 package com.gamma.consignment;
 
+import com.gamma.util.SqlIdent;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -125,7 +126,7 @@ public final class DerivedTableWriter {
     private static Written copyTo(Connection conn, String select, Path dir, String fileName) throws Exception {
         Path staged = dir.resolve(fileName + "." + UUID.randomUUID().toString().substring(0, 8) + ".tmp");
         try (Statement st = conn.createStatement()) {
-            st.execute("COPY (" + select + ") TO '" + sqlPath(staged) + "' (FORMAT PARQUET)");
+            st.execute("COPY (" + select + ") TO " + SqlIdent.pathStr(staged) + " (FORMAT PARQUET)");
         }
         Path finalPath = dir.resolve(fileName);
         Files.move(staged, finalPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -167,10 +168,6 @@ public final class DerivedTableWriter {
         return new ConsignmentOutput(consignmentId, runId, table.name() + DERIVED_SUFFIX, partition,
                 null, w.path(), rows, w.bytes(), writtenAt, ConsignmentOutput.State.LIVE,
                 fingerprint, null, producer);
-    }
-
-    private static String sqlPath(Path p) {
-        return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
     }
 
     private record Written(String path, long bytes) {}

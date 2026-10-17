@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.gamma.util.SqlIdent.q;
+
 /**
  * <b>T18 — per-component dry-run / preview (validate + bounded sample, scratch-only).</b> Runs a
  * {@code transform.*} node over a handful of sample rows and returns the produced named relations, so the
@@ -176,25 +178,25 @@ public final class ComponentPreview {
             String path = sample.toAbsolutePath().toString().replace("\\", "/");
 
             StringBuilder opts = new StringBuilder();
-            opts.append("delim=").append(ScratchTables.sqlStr(strOr(content, "delimiter", ",")));
+            opts.append("delim=").append(SqlIdent.sqlStr(strOr(content, "delimiter", ",")));
             opts.append(", header=").append(boolOr(content, "has_header", false));
             opts.append(", skip=").append(intOr(content, "skip_header_lines", 0));
             String quote = strOrNull(content, "quote");
-            if (quote != null) opts.append(", quote=").append(ScratchTables.sqlStr(quote));
+            if (quote != null) opts.append(", quote=").append(SqlIdent.sqlStr(quote));
             // Same escape-defaults-to-quote rule as the ingest path (DuckDbCsvIngester.dialectOptions).
             String escape = strOrNull(content, "escape");
             if (escape == null) escape = quote;
-            if (escape != null) opts.append(", escape=").append(ScratchTables.sqlStr(escape));
+            if (escape != null) opts.append(", escape=").append(SqlIdent.sqlStr(escape));
             String comment = strOrNull(content, "comment");
-            if (comment != null) opts.append(", comment=").append(ScratchTables.sqlStr(comment));
+            if (comment != null) opts.append(", comment=").append(SqlIdent.sqlStr(comment));
             String enc = strOrNull(content, "encoding");
-            if (enc != null) opts.append(", encoding=").append(ScratchTables.sqlStr(enc));
+            if (enc != null) opts.append(", encoding=").append(SqlIdent.sqlStr(enc));
             opts.append(", auto_detect=true, ignore_errors=true, store_rejects=true");
 
             try (Connection conn = DuckDbUtil.openConnection(db)) {
                 try (java.sql.Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE preview_parsed AS SELECT * FROM read_csv("
-                            + ScratchTables.sqlStr(path) + ", " + opts + ")");
+                            + SqlIdent.sqlStr(path) + ", " + opts + ")");
                 }
                 return new GrammarResult(
                         ScratchTables.columnNames(conn, "preview_parsed"),
@@ -423,7 +425,7 @@ public final class ComponentPreview {
             if (!first) proj.append(", ");
             first = false;
             proj.append("json_extract_string(\"line\", '$.\"").append(k.replace("'", "''"))
-                .append("\"') AS ").append(quoteIdent(k));
+                .append("\"') AS ").append(q(k));
         }
         try (java.sql.Statement st = conn.createStatement()) {
             st.execute("CREATE TABLE preview_parsed AS SELECT " + proj + " FROM js_lines");
@@ -439,7 +441,7 @@ public final class ComponentPreview {
         // all_varchar mirrors production raw ingest (100% VARCHAR columns) AND keeps the preview
         // rows JSON-serializable — auto-detect would otherwise type a date column as a DuckDB
         // DATE, which the parsed→typed hop is precisely meant to make explicit, not implicit.
-        return "SELECT * FROM read_csv(" + ScratchTables.sqlStr(path)
+        return "SELECT * FROM read_csv(" + SqlIdent.sqlStr(path)
                 + delimitedReadOptions(cfg)
                 + ", auto_detect=true, all_varchar=true, ignore_errors=true, store_rejects=true)";
     }
@@ -449,18 +451,18 @@ public final class ComponentPreview {
         String delim = (cfg.csv().delimiter() == null || cfg.csv().delimiter().isEmpty())
                 ? "," : cfg.csv().delimiter();
         StringBuilder opts = new StringBuilder();
-        opts.append(", delim=").append(ScratchTables.sqlStr(delim));
+        opts.append(", delim=").append(SqlIdent.sqlStr(delim));
         opts.append(", header=").append(cfg.csv().hasHeader());
         opts.append(", skip=").append(cfg.csv().skipHeaderLines());
         if (cfg.csv().quote() != null)
-            opts.append(", quote=").append(ScratchTables.sqlStr(cfg.csv().quote()));
+            opts.append(", quote=").append(SqlIdent.sqlStr(cfg.csv().quote()));
         // Escape defaults to the quote char (RFC doubling) when a custom quote is set — the same
         // rule DuckDbCsvIngester.dialectOptions applies, so the preview mirrors production.
         String parseEscape = cfg.csv().escape() != null ? cfg.csv().escape() : cfg.csv().quote();
         if (parseEscape != null)
-            opts.append(", escape=").append(ScratchTables.sqlStr(parseEscape));
+            opts.append(", escape=").append(SqlIdent.sqlStr(parseEscape));
         if (cfg.csv().comment() != null)
-            opts.append(", comment=").append(ScratchTables.sqlStr(cfg.csv().comment()));
+            opts.append(", comment=").append(SqlIdent.sqlStr(cfg.csv().comment()));
         return opts.toString();
     }
 
@@ -495,7 +497,7 @@ public final class ComponentPreview {
     private static Map<String, String> sniffDialect(Connection conn, String path) {
         Map<String, String> out = new java.util.LinkedHashMap<>();
         try (java.sql.Statement st = conn.createStatement();
-             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM sniff_csv(" + ScratchTables.sqlStr(path) + ")")) {
+             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM sniff_csv(" + SqlIdent.sqlStr(path) + ")")) {
             if (!rs.next()) return Map.of();
             java.sql.ResultSetMetaData md = rs.getMetaData();
             for (int i = 1; i <= md.getColumnCount(); i++) {
@@ -511,7 +513,7 @@ public final class ComponentPreview {
 
     private static List<Map<String, String>> sniffColumnTypes(Connection conn, PipelineConfig cfg, String path) {
         try (java.sql.Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE preview_sniff AS SELECT * FROM read_csv(" + ScratchTables.sqlStr(path)
+            st.execute("CREATE TABLE preview_sniff AS SELECT * FROM read_csv(" + SqlIdent.sqlStr(path)
                     + delimitedReadOptions(cfg)
                     + ", auto_detect=true, ignore_errors=true)");
             List<Map<String, String>> out = new java.util.ArrayList<>();
@@ -533,7 +535,7 @@ public final class ComponentPreview {
     /** The engine's single-column line reader: each physical line intact as VARCHAR {@code line}. */
     private static String lineReader(PipelineConfig cfg, String path) {
         int skip = cfg.csv().skipHeaderLines() + (cfg.csv().hasHeader() ? 1 : 0);
-        return "read_csv(" + ScratchTables.sqlStr(path)
+        return "read_csv(" + SqlIdent.sqlStr(path)
                 + ", columns={'line':'VARCHAR'}, delim='', quote='', escape=''"
                 + ", header=false, skip=" + skip
                 + ", ignore_errors=true, null_padding=true, auto_detect=false, store_rejects=true)";
@@ -548,7 +550,7 @@ public final class ComponentPreview {
             String name = (s.name() == null || s.name().isBlank()) ? "field_" + i : s.name();
             if (i > 0) proj.append(", ");
             proj.append(trimmed(fw.trim(), "substring(\"line\", " + (s.start() + 1) + ", " + s.length() + ")"))
-                .append(" AS ").append(quoteIdent(name));
+                .append(" AS ").append(q(name));
         }
         return "SELECT " + proj + " FROM (SELECT \"line\" FROM " + lineReader(cfg, path)
                 + " WHERE length(\"line\") >= " + fw.minRecordLength() + ") AS fw";
@@ -561,29 +563,29 @@ public final class ComponentPreview {
         for (int i = 0; i < tr.groupNames().size(); i++) {
             String g = tr.groupNames().get(i);
             if (i > 0) { names.append(", "); proj.append(", "); }
-            names.append(ScratchTables.sqlStr(g));
-            proj.append("rec[").append(ScratchTables.sqlStr(g)).append("] AS ").append(quoteIdent(g));
+            names.append(SqlIdent.sqlStr(g));
+            proj.append("rec[").append(SqlIdent.sqlStr(g)).append("] AS ").append(q(g));
         }
         names.append(']');
 
         if (!"\n".equals(tr.recordSplit())) {
             // Block mode: match the (?s)-prefixed pattern against whole (trimmed) records split on
             // the literal delimiter, mirroring DuckDbCsvIngester.buildTextRegexBlockReadSpec.
-            String blockPattern = ScratchTables.sqlStr("(?s)" + tr.pattern());
+            String blockPattern = SqlIdent.sqlStr("(?s)" + tr.pattern());
             int skip = cfg.csv().skipHeaderLines() + (cfg.csv().hasHeader() ? 1 : 0);
             return "SELECT " + proj + " FROM (SELECT regexp_extract(trim(blk), "
                     + blockPattern + ", " + names + ") AS rec"
                     + " FROM (SELECT unnest(list_slice(str_split(content, "
-                    + ScratchTables.sqlStr(tr.recordSplit()) + "), " + (skip + 1) + ", 2147483647)) AS blk"
-                    + " FROM read_text(" + ScratchTables.sqlStr(path) + "))"
+                    + SqlIdent.sqlStr(tr.recordSplit()) + "), " + (skip + 1) + ", 2147483647)) AS blk"
+                    + " FROM read_text(" + SqlIdent.sqlStr(path) + "))"
                     + " WHERE trim(blk) != '' AND regexp_matches(trim(blk), " + blockPattern
                     + ")) AS tr";
         }
 
         return "SELECT " + proj + " FROM (SELECT regexp_extract(\"line\", "
-                + ScratchTables.sqlStr(tr.pattern()) + ", " + names + ") AS rec FROM "
+                + SqlIdent.sqlStr(tr.pattern()) + ", " + names + ") AS rec FROM "
                 + lineReader(cfg, path)
-                + " WHERE regexp_matches(\"line\", " + ScratchTables.sqlStr(tr.pattern()) + ")) AS tr";
+                + " WHERE regexp_matches(\"line\", " + SqlIdent.sqlStr(tr.pattern()) + ")) AS tr";
     }
 
     /** {@code format: array | auto} only ({@code newline} goes through {@link #ndjsonPreview}).
@@ -595,13 +597,8 @@ public final class ComponentPreview {
         // keeping this preview byte-consistent with every other format. read_json has no all_varchar option,
         // so COLUMNS(*)::VARCHAR does the blanket cast without needing to know the column names. The
         // parsed→typed hop downstream is where typing becomes explicit, not this raw preview.
-        return "SELECT COLUMNS(*)::VARCHAR FROM read_json(" + ScratchTables.sqlStr(path)
+        return "SELECT COLUMNS(*)::VARCHAR FROM read_json(" + SqlIdent.sqlStr(path)
                 + ", format='" + format + "')";
-    }
-
-    /** Quote a projection identifier, escaping embedded quotes. */
-    private static String quoteIdent(String name) {
-        return SqlIdent.q(name);
     }
 
     /** Wrap an expression in the configured fixed-width trim function (mirrors the ingester). */
@@ -646,7 +643,7 @@ public final class ComponentPreview {
             if (name == null || name.isBlank() || !columns.contains(name) || type == null) continue;
             String castOk = castExpr(name, type, f.get("format"));
             if (castOk == null) continue;   // VARCHAR / unknown → never rejects
-            conds.add("((" + ScratchTables.q(name) + " IS NULL OR " + ScratchTables.q(name) + " = '') OR (" + castOk + "))");
+            conds.add("((" + SqlIdent.q(name) + " IS NULL OR " + SqlIdent.q(name) + " = '') OR (" + castOk + "))");
         }
         String allOk = conds.isEmpty() ? "TRUE" : String.join(" AND ", conds);
 
@@ -656,9 +653,9 @@ public final class ComponentPreview {
             String data = "preview_schema__data";
             String rejected = "preview_schema__rejected";
             try (java.sql.Statement st = conn.createStatement()) {
-                st.execute("CREATE TABLE " + ScratchTables.q(data) + " AS SELECT * FROM " + ScratchTables.q(INPUT)
+                st.execute("CREATE TABLE " + SqlIdent.q(data) + " AS SELECT * FROM " + SqlIdent.q(INPUT)
                         + " WHERE COALESCE((" + allOk + "), FALSE)");
-                st.execute("CREATE TABLE " + ScratchTables.q(rejected) + " AS SELECT * FROM " + ScratchTables.q(INPUT)
+                st.execute("CREATE TABLE " + SqlIdent.q(rejected) + " AS SELECT * FROM " + SqlIdent.q(INPUT)
                         + " WHERE NOT COALESCE((" + allOk + "), FALSE)");
             }
             List<RelationPreview> out = new ArrayList<>();
@@ -674,11 +671,11 @@ public final class ComponentPreview {
                 for (Map<String, Object> col : projection) {
                     if (!sel.isEmpty()) sel.append(", ");
                     sel.append(col.get("expr")).append(" AS ")
-                       .append(ScratchTables.q(String.valueOf(col.get("name"))));
+                       .append(SqlIdent.q(String.valueOf(col.get("name"))));
                 }
                 try (java.sql.Statement st = conn.createStatement()) {
-                    st.execute("CREATE TABLE " + ScratchTables.q(mapped) + " AS SELECT " + sel
-                            + " FROM " + ScratchTables.q(data));
+                    st.execute("CREATE TABLE " + SqlIdent.q(mapped) + " AS SELECT " + sel
+                            + " FROM " + SqlIdent.q(data));
                 }
                 out.add(new RelationPreview("mapped", ScratchTables.count(conn, mapped),
                         ScratchTables.readRows(conn, mapped, MAX_ROWS)));
@@ -829,7 +826,7 @@ public final class ComponentPreview {
      * string/unknown types (which never reject). Date/timestamp with a {@code format} use {@code TRY_STRPTIME}.
      */
     private static String castExpr(String name, String type, Object format) {
-        String col = ScratchTables.q(name);
+        String col = SqlIdent.q(name);
         String t = type.trim().toLowerCase();
         String fmt = format == null ? null : format.toString();
         return switch (t) {
@@ -838,9 +835,9 @@ public final class ComponentPreview {
             case "short", "smallint"                  -> tryCast(col, "SMALLINT");
             case "double", "float", "real", "decimal", "numeric" -> tryCast(col, "DOUBLE");
             case "bool", "boolean"                    -> tryCast(col, "BOOLEAN");
-            case "date"      -> fmt != null ? "TRY_STRPTIME(" + col + ", " + ScratchTables.sqlStr(fmt) + ") IS NOT NULL"
+            case "date"      -> fmt != null ? "TRY_STRPTIME(" + col + ", " + SqlIdent.sqlStr(fmt) + ") IS NOT NULL"
                                             : tryCast(col, "DATE");
-            case "timestamp", "datetime" -> fmt != null ? "TRY_STRPTIME(" + col + ", " + ScratchTables.sqlStr(fmt) + ") IS NOT NULL"
+            case "timestamp", "datetime" -> fmt != null ? "TRY_STRPTIME(" + col + ", " + SqlIdent.sqlStr(fmt) + ") IS NOT NULL"
                                             : tryCast(col, "TIMESTAMP");
             default -> null;   // varchar / string / text / unknown — always valid
         };

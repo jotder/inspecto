@@ -23,6 +23,8 @@ import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
+import static com.gamma.util.SqlIdent.sqlStr;
+
 /**
  * The per-day partition replace behind an incremental {@code sql.template} Job (operator, 2026-10-10).
  *
@@ -178,7 +180,7 @@ final class IncrementalSink {
                         tmp = dir.resolve(part + ".tmp");
                         try (Statement st = conn.createStatement()) {
                             st.execute("COPY (SELECT * EXCLUDE (" + col + ")" + pick + ") TO "
-                                    + lit(tmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");
+                                    + sqlStr(tmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");
                         }
                     } else if (!Files.isDirectory(dir)) {
                         continue;
@@ -253,10 +255,6 @@ final class IncrementalSink {
             if (ds.iterator().hasNext()) return;
         }
         Files.delete(dir);
-    }
-
-    private static String lit(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 
     private static String safeRun(String runId) {

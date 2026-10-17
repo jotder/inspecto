@@ -15,6 +15,7 @@ import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.exec.BranchCommitCoordinator;
 import com.gamma.pipeline.exec.BranchCommitLog;
+import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -166,8 +167,8 @@ public final class DrainCommand {
             try (Statement st = conn.createStatement()) {
                 for (Map.Entry<String, Path> e : parkTables.entrySet()) {
                     String table = "parked_" + e.getKey().replaceAll("[^A-Za-z0-9_]", "_");
-                    st.execute("CREATE TABLE \"" + table + "\" AS SELECT * FROM read_parquet('"
-                            + e.getValue().toString().replace('\\', '/').replace("'", "''") + "')");
+                    st.execute("CREATE TABLE \"" + table + "\" AS SELECT * FROM "
+                            + SqlViews.parquetFile(e.getValue()));
                     seeded.put(e.getKey(), table);
                 }
             }
