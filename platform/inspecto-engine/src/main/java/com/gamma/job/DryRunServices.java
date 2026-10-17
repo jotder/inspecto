@@ -79,6 +79,13 @@ final class DryRunServices implements PlatformServices {
                         "dry run: nothing was built", 0L, 0L, 0);
             });
         }
+        // S3-1: a pack-contributed mutating service substitutes through its own mandatory stand-in, and that
+        // stand-in wins over the built-in ones below: a pack that binds `mail` or `objects` supplies its own
+        // dry-run behaviour (PLATFORM-SERVICES-DRYRUN-GAP-1 added the built-in stand-ins AFTER this rule).
+        if (granted instanceof PlatformServiceRegistry.StandIns s) {
+            Optional<Object> standIn = s.standIn(type, log);
+            if (standIn.isPresent()) return Optional.of((T) standIn.get());
+        }
         if (type == MailAccess.class) {
             // Recipients by COUNT, never by address, and never the body: a Run Log is widely readable (the same
             // convention mail.send follows for a real send). false = nothing was sent, so no consumer can
@@ -91,11 +98,6 @@ final class DryRunServices implements PlatformServices {
         }
         if (type == ObjectAccess.class) {
             return Optional.of((T) new DryRunObjects((ObjectAccess) real.get(), log));
-        }
-        // S3-1: a pack-contributed mutating service substitutes through its own mandatory stand-in.
-        if (granted instanceof PlatformServiceRegistry.StandIns s) {
-            Optional<Object> standIn = s.standIn(type, log);
-            if (standIn.isPresent()) return Optional.of((T) standIn.get());
         }
         return real;   // read-only services are unaffected by a dry run
     }
