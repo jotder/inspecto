@@ -1580,6 +1580,86 @@ class PipelineJobRunnerTest {
                 "SELECT id, similarity, similarity_candidate FROM %s ORDER BY id"));
     }
 
+    /**
+     * Stored {@code rank}, {@code sample} and {@code pivot} steps execute at rest (ANALYTICS-CORE-1 S4): the lift maps each
+     * plain kind to its node type; rank keeps the top 2 by amount, the sample is the same on a second run, and the pivot
+     * writes one column per declared value.
+     */
+    @Test
+    void runsAFlatConfigsRankSampleAndPivotSteps() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquet(dataDir, "rsp_etl", "('a',10),('b',30),('c',20),('d',30),('e',5)");
+        Path rank = tmp.resolve("rank_pipeline.toon");
+        Files.writeString(rank, """
+                name: rsp_etl
+                active: false
+                output_store: ranked
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - rank:
+                      order_by[1]: amt desc
+                      top: 2
+                """);
+        assertTrue(new PipelineJobRunner(new JobConfig("rank", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", rank.toString(), "data_dir", dataDir)), new ConsignmentEventBus(), null,
+                dataDir, auditDir).run().success());
+        assertEquals(List.of("b|30|1", "d|30|2"), queryStore(dataDir, "ranked", "SELECT id, amt, rank FROM %s ORDER BY rank"));
+
+        Path sample = tmp.resolve("sample_pipeline.toon");
+        Files.writeString(sample, """
+                name: rsp_etl
+                active: false
+                output_store: sampled
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - sample:
+                      size: 2
+                      seed: 7
+                      key[1]: id
+                """);
+        JobConfig sc = new JobConfig("sample", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", sample.toString(), "data_dir", dataDir));
+        assertTrue(new PipelineJobRunner(sc, new ConsignmentEventBus(), null, dataDir, auditDir).run().success());
+        List<String> first = queryStore(dataDir, "sampled", "SELECT id FROM %s ORDER BY id");
+        List<List<String>> groups = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
+        List<String> ids = List.of("a", "b", "c", "d", "e");
+        for (String id : ids) { groups.add(List.of()); keys.add(com.gamma.analytics.sample.Sampler.keyText(List.of(id))); }
+        assertEquals(com.gamma.analytics.sample.Sampler.select(com.gamma.analytics.sample.Sampler.Spec.ofSize(7, 2), groups, keys)
+                .stream().map(ids::get).toList(), first, "the kernel's JVM selection");
+
+        Path pivot = tmp.resolve("pivot_pipeline.toon");
+        Files.writeString(pivot, """
+                name: rsp_etl
+                active: false
+                output_store: pivoted
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - pivot:
+                      pivot_column: id
+                      values[3]: a, b, z
+                      measure: sum(amt)
+                      prefix: id_
+                """);
+        assertTrue(new PipelineJobRunner(new JobConfig("pivot", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", pivot.toString(), "data_dir", dataDir)), new ConsignmentEventBus(), null,
+                dataDir, auditDir).run().success());
+        assertEquals(List.of("10.0|30.0|null"), queryStore(dataDir, "pivoted", "SELECT id_a, id_b, id_z FROM %s"));
+    }
+
     private static List<String> queryStore(String dataDir, String store, String selectFmt) throws Exception {
         String glob = dataDir.replace("\\", "/") + "/" + store + "/**/*.parquet";
         File db = DuckDbUtil.tempDbFile("qs_");

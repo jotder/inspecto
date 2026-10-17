@@ -178,6 +178,9 @@ public final class RecipeConverter {
                     case PipelineConfig.Step.SHIFT -> steps.add(step("shift", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.FORECAST -> steps.add(step("forecast", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.SIMILARITY -> steps.add(step("similarity", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.RANK -> steps.add(step("rank", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.SAMPLE -> steps.add(step("sample", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.PIVOT -> steps.add(step("pivot", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.ROUTE -> {
                         steps.add(step("route", routeStep(cfg, sink, extraSinks, dirs)));
                         routed = true;
@@ -310,6 +313,9 @@ public final class RecipeConverter {
                             case PipelineConfig.Step.SHIFT -> branchSteps.add(step("shift", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.FORECAST -> branchSteps.add(step("forecast", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.SIMILARITY -> branchSteps.add(step("similarity", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.RANK -> branchSteps.add(step("rank", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.SAMPLE -> branchSteps.add(step("sample", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.PIVOT -> branchSteps.add(step("pivot", new LinkedHashMap<>(cfg)));
                             default -> branchSteps.add(step(kind, cfg));
                         }
                     }

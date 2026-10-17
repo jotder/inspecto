@@ -378,7 +378,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-DQ-07 | 🔍 Cluster & edit value normalizer (`quality.cluster.edit`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-08 | 🔍 Fuzzy string (Jaro-Winkler) matcher (`quality.match.fuzzy`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.similarity` | `transform.similarity` — a 0..1 score of two columns (Jaro-Winkler, Jaro, Levenshtein, token Jaccard; normalized first by default) on the Analytics Kernel, plus an optional candidate flag at a threshold; proposes candidates, never asserts identity (D-M1) (2026-10-17) |
 | SP-DQ-09 | 🧮 Inline stream profiler & statistics (`quality.profiler.inline`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.profile` | per-column row/null/distinct counts and min/max, as a Step (2026-09-15) |
-| SP-DQ-10 | 📊 Statistical & reservoir sampler (`quality.sample.reservoir`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-10 | 📊 Statistical & reservoir sampler (`quality.sample.reservoir`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.sample` | `transform.sample` — a fixed size or a fraction per group, chosen by an MD5 hash of a seed and a row key on the Analytics Kernel (`Sampler`): the same rows every run and in the JVM twin; never `USING SAMPLE` / `random()` (2026-10-17) |
 | SP-DQ-11 | 🔤 Character map & code page transcoder (`quality.cleanse.transcode`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-12 | 🔒 PII masking & tokenization (`quality.pii.mask`) | Data Quality, Validation & Cleansing | — | — | ✅ | `transform.mask` | board SEC-08 — Enterprise only; by classification (strictest-wins) or name, full / partial / hash, no reversible vault (2026-10-06) |
 | SP-DQ-13 | 🔑 One-way salted cryptographic hasher (`quality.crypto.hash`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.hash` | Space-keyed HMAC-SHA-256 token per value, joinable within the Space; the key never leaves the Space's secrets (2026-10-06) |
@@ -389,9 +389,9 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-XFM-04 | ∑ Group-by summarizer (measures grammar) (`transform.summarize`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.summarize` |  |
 | SP-XFM-05 | 🤝 Reference-store join (versioned references) (`transform.join`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.join` | at rest only — refused mid-branch (no reference resolver on the ingest lane) |
 | SP-XFM-06 | 🗺️ Lookup & static map transcoder (`transform.lookup`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.lookup` | inline key=value map over one column (2026-09-06); a versioned reference is transform.join |
-| SP-XFM-07 | 🔀 Dynamic pivot / transpose (`transform.matrix.pivot`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-07 | 🔀 Dynamic pivot / transpose (`transform.matrix.pivot`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.matrix.pivot` | rows to columns over DECLARED values only (at most 200; a dynamic pivot is refused), one Measure-grammar aggregate per value (2026-10-17) |
 | SP-XFM-08 | 🔄 Unpivot / column flattener (`transform.matrix.unpivot`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.matrix.unpivot` | wide columns to (name, value) rows by list or name pattern, cast to one value type (2026-10-06) |
-| SP-XFM-09 | 🏆 Rank & Top-N pruner (`transform.analytics.rank`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-09 | 🏆 Rank & Top-N pruner (`transform.analytics.rank`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.analytics.rank` | row_number / rank / dense_rank per group by a stated order, ties broken deterministically; keeps the top N or adds the rank (2026-10-17) |
 | SP-XFM-10 | 💥 Array / object exploder & flattener (`transform.explode`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.explode` | one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor |
 | SP-XFM-11 | 🤝 Presorted stream merge joiner (`transform.join.merge`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.merge` node type is the read-only ancestor |
 | SP-XFM-12 | 🏛️ Slowly changing dimension (SCD Type 2) (`transform.dim.scd2`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
@@ -452,7 +452,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `sink.webhook` | top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Professional+ |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 119 processors — 44 delivered, 17 partial, 58 planned.
+**Count:** 119 processors — 47 delivered, 17 partial, 55 planned.
 
 **SP-CTL-07 behaviour change 2026-10-07 (operator, MODULE-REORG-P7-INCIDENTS slice 2): Alert records are durable on EVERY edition, Personal included.** Fired Alerts live in an Alert-owned store (`ALERTS` family, the Space's own `duckdb/inspecto-alerts.db`, `-Dalerts.backend=db` default), not in operational objects: wherever an Alert does fire on Personal (rule authoring is Professional+, so this is the rules a Personal Space was handed), it now remembers its Alerts across a restart — `GET /alerts` history survives and an open Alert is not re-fired. Personal still has NO Incidents, Cases or operational objects (CP-11 unchanged); only the Incident escalation is skipped there. A Personal operator works a stored Alert with `POST /alerts/{id}/ack|resolve` (`canWorkIncidents`, a no-op without a Subject). (Narrative kept here, outside the generated rows: the catalog `note` stays short.)
 

@@ -543,6 +543,66 @@ public final class NodeAttributes {
                     .help("Off keeps only the candidate flag (needs a threshold)."));
 
     /**
+     * {@code transform.analytics.rank} (ANALYTICS-CORE-1 S4): a rank per group by a stated order, ties broken
+     * deterministically; the top N kept or the rank added. Grammar in {@code RankStep}; keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_RANK = List.of(
+            NodeAttribute.of("order_by", "Order by", "list", "required").placeholder("AMOUNT desc")
+                    .help("The columns that decide the rank, each optionally followed by asc or desc. Empty values sort last."),
+            NodeAttribute.of("group_by", "Rank within", "list", "optional").placeholder("REGION")
+                    .help("The rank restarts for each key (top N per region). Leave blank for one ranking of all rows."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("row_number")
+                    .options("row_number", "Row number (1, 2, 3 - ties split)", "rank", "Rank (1, 1, 3 - ties share)",
+                            "dense_rank", "Dense rank (1, 1, 2 - ties share)")
+                    .help("Row number gives every row its own place; rank and dense rank give tied rows the same one."),
+            NodeAttribute.of("top", "Keep top N", "number", "optional").min(1).max(com.gamma.pipeline.exec.RankStep.MAX_TOP)
+                    .help("Keep only rows ranked N or better in each group. With rank or dense rank, ties can keep more than N."),
+            NodeAttribute.of("rank_column", "Rank column", "string", "optional").defaultValue("rank")
+                    .help("Receives the rank, starting at 1."),
+            NodeAttribute.of("tie_break", "Tie-break", "list", "advanced").placeholder("CUSTOMER_ID")
+                    .help("Ordered after the order-by columns. Row number then breaks any remaining tie by every column, so "
+                            + "the same input always gives the same ranks."),
+            NodeAttribute.of("keep_rank", "Keep the rank", "boolean", "advanced").defaultValue(true)
+                    .help("Off drops the rank column and keeps only the top rows (needs Keep top N)."));
+
+    /**
+     * {@code transform.sample} (ANALYTICS-CORE-1 S4, catalog {@code quality.sample.reservoir}): a seeded, reproducible
+     * sample per group. Grammar in {@code SampleStep}; the order is the Analytics Kernel's {@code Sampler}; keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_SAMPLE = List.of(
+            NodeAttribute.of("size", "Rows per group", "number", "optional").min(1)
+                    .max(com.gamma.analytics.sample.Sampler.MAX_SIZE)
+                    .help("Keep this many rows of each group (all of a smaller group). Set this or Fraction."),
+            NodeAttribute.of("fraction", "Fraction", "number", "optional").min(0).max(1)
+                    .help("Keep this share of each group, rounded to the nearest row (0.1 = 10%). Set this or Rows per group."),
+            NodeAttribute.of("seed", "Seed", "number", "optional").defaultValue(0)
+                    .help("The same seed always picks the same rows; another seed picks another sample."),
+            NodeAttribute.of("group_by", "Sample within", "list", "optional").placeholder("REGION")
+                    .help("Sample each key separately (stratified). Leave blank for one sample of all rows."),
+            NodeAttribute.of("key", "Row key", "list", "advanced").placeholder("CALL_ID")
+                    .help("The columns that identify a row; the pick hashes them with the seed. Blank: every column."));
+
+    /**
+     * {@code transform.matrix.pivot} (ANALYTICS-CORE-1 S4): rows to columns over declared values, one Measure-grammar
+     * aggregate per value. Grammar in {@code PivotStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_PIVOT = List.of(
+            NodeAttribute.of("group_by", "Row keys", "list", "optional").placeholder("CUSTOMER_ID")
+                    .help("One output row per key. Leave blank for one row."),
+            NodeAttribute.of("pivot_column", "Pivot column", "string", "required").placeholder("CALL_TYPE")
+                    .help("The column whose values become columns. Values are matched as text."),
+            NodeAttribute.of("values", "Values", "list", "required").placeholder("voice, sms, data")
+                    .help("Each listed value becomes a column (at most 200). Values not listed are left out; there is no "
+                            + "pivot over whatever values the data holds."),
+            NodeAttribute.of("measure", "Measure", "string", "required").placeholder("sum(AMOUNT)")
+                    .help("count or agg(field) - sum, avg, min, max, countDistinct, median, stddev, p90... A value with "
+                            + "no rows gets 0 for count, empty otherwise."),
+            NodeAttribute.of("prefix", "Column prefix", "string", "optional").placeholder("v_")
+                    .help("Put before each value to make its column name (needed when a value starts with a digit)."));
+
+    /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
      * {@code list} type is {@code string[]} and these are MAPS.
@@ -725,7 +785,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, TRANSFORM_RANK, TRANSFORM_SAMPLE, TRANSFORM_PIVOT, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -748,6 +808,9 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_SHIFT.type(), TRANSFORM_SHIFT);
         m.put(BuiltinNodeType.TRANSFORM_FORECAST.type(), TRANSFORM_FORECAST);
         m.put(BuiltinNodeType.TRANSFORM_SIMILARITY.type(), TRANSFORM_SIMILARITY);
+        m.put(BuiltinNodeType.TRANSFORM_RANK.type(), TRANSFORM_RANK);
+        m.put(BuiltinNodeType.TRANSFORM_SAMPLE.type(), TRANSFORM_SAMPLE);
+        m.put(BuiltinNodeType.TRANSFORM_PIVOT.type(), TRANSFORM_PIVOT);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

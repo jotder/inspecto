@@ -131,6 +131,9 @@ public final class RecipeCompiler {
                 case "shift" -> nodes.add(shift(id, cfg, refusals));
                 case "forecast" -> nodes.add(forecast(id, cfg, refusals));
                 case "similarity" -> nodes.add(similarity(id, cfg, refusals));
+                case "rank" -> nodes.add(rank(id, cfg, refusals));
+                case "sample" -> nodes.add(sample(id, cfg, refusals));
+                case "pivot" -> nodes.add(pivot(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -460,6 +463,36 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SIMILARITY.type(), new LinkedHashMap<>(cfg));
     }
 
+    /** {@code rank:} -> a {@code transform.analytics.rank} node, config verbatim (ANALYTICS-CORE-1 S4); refused as the run would. */
+    private static PipelineNode rank(String id, Map<String, Object> cfg, List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.pipeline.exec.RankStep.parse(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_RANK.type(), new LinkedHashMap<>(cfg));
+    }
+
+    /** {@code sample:} -> a {@code transform.sample} node, config verbatim (ANALYTICS-CORE-1 S4); refused as the run would. */
+    private static PipelineNode sample(String id, Map<String, Object> cfg, List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.pipeline.exec.SampleStep.parse(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SAMPLE.type(), new LinkedHashMap<>(cfg));
+    }
+
+    /** {@code pivot:} -> a {@code transform.matrix.pivot} node, config verbatim (ANALYTICS-CORE-1 S4); refused as the run would. */
+    private static PipelineNode pivot(String id, Map<String, Object> cfg, List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.pipeline.exec.PivotStep.parse(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_PIVOT.type(), new LinkedHashMap<>(cfg));
+    }
+
     /** {@code unpivot: {columns[] | columns_pattern, name_column?, value_column?, value_type?, include_nulls?}} ->
      *  a transform.matrix.unpivot node, config verbatim. Exactly one column selector; the rest is judged at run. */
     private static PipelineNode unpivot(String id, Map<String, Object> cfg,
@@ -694,6 +727,9 @@ public final class RecipeCompiler {
                     case "shift" -> stepNode = shift(stepId, stepCfg, refusals);
                     case "forecast" -> stepNode = forecast(stepId, stepCfg, refusals);
                     case "similarity" -> stepNode = similarity(stepId, stepCfg, refusals);
+                    case "rank" -> stepNode = rank(stepId, stepCfg, refusals);
+                    case "sample" -> stepNode = sample(stepId, stepCfg, refusals);
+                    case "pivot" -> stepNode = pivot(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);

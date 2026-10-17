@@ -870,6 +870,64 @@ class NodeConfigNameContractTest {
         assertFalse(s.normalize());
     }
 
+    /**
+     * The rank node's contract (ANALYTICS-CORE-1 S4): {@code steps: - rank:} lifts to ONE {@code transform.analytics.rank}
+     * node, an edit of every declared key survives the lower and still parses as the run reads it.
+     */
+    @Test
+    void rankAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("order_by", List.of("QTY desc"));
+        r.put("group_by", List.of("REGION"));
+        r.put("method", "dense_rank");
+        r.put("top", 5);
+        r.put("rank_column", "place");
+        r.put("tie_break", List.of("ID"));
+        r.put("keep_rank", false);
+        Map<String, Object> got = timeSeriesSavedAs(dir, "rank", "transform.analytics.rank", r);
+        com.gamma.pipeline.exec.RankStep.Spec s = com.gamma.pipeline.exec.RankStep.parse(got);
+        assertEquals(com.gamma.pipeline.exec.RankStep.Method.DENSE_RANK, s.method());
+        assertEquals(5, s.top());
+        assertTrue(s.orderBy().get(0).descending());
+        assertEquals(List.of(), s.addedColumns());
+    }
+
+    /** The sample node's contract (ANALYTICS-CORE-1 S4); size and fraction are exclusive, so each half is re-parsed. */
+    @Test
+    void sampleAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> s = new LinkedHashMap<>();
+        s.put("size", 25);
+        s.put("fraction", 0.2);
+        s.put("seed", 42);
+        s.put("group_by", List.of("REGION"));
+        s.put("key", List.of("ID"));
+        Map<String, Object> got = timeSeriesSavedAs(dir, "sample", "transform.sample", s);
+        Map<String, Object> sized = new LinkedHashMap<>(got);
+        sized.remove("fraction");
+        Map<String, Object> shared = new LinkedHashMap<>(got);
+        shared.remove("size");
+        assertEquals(25, com.gamma.pipeline.exec.SampleStep.parse(sized).sample().size());
+        com.gamma.pipeline.exec.SampleStep.Spec f = com.gamma.pipeline.exec.SampleStep.parse(shared);
+        assertEquals(2000, f.sample().fractionBp());
+        assertEquals(42, f.sample().seed());
+        assertEquals(List.of("ID"), f.key());
+    }
+
+    /** The pivot node's contract (ANALYTICS-CORE-1 S4). */
+    @Test
+    void pivotAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("group_by", List.of("REGION"));
+        p.put("pivot_column", "KIND");
+        p.put("values", List.of("voice", "sms"));
+        p.put("measure", "sum(QTY)");
+        p.put("prefix", "k_");
+        Map<String, Object> got = timeSeriesSavedAs(dir, "pivot", "transform.matrix.pivot", p);
+        com.gamma.pipeline.exec.PivotStep.Spec s = com.gamma.pipeline.exec.PivotStep.parse(got);
+        assertEquals(List.of("REGION", "k_voice", "k_sms"), s.outputColumns());
+        assertEquals("sum", s.measure().agg());
+    }
+
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
             throws Exception {
         java.nio.file.Files.createDirectories(dir);

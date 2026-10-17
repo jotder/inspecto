@@ -370,10 +370,28 @@ public final class PipelineConfig {
          * identity (D-M1). No legacy spelling - always {@code steps:}.
          */
         public static final String SIMILARITY = "similarity";
+        /**
+         * Rank per group by a stated order, top N kept or a rank column added ({@code transform.analytics.rank},
+         * ANALYTICS-CORE-1 S4). Keys: {@code order_by}, optional {@code group_by}, {@code tie_break}, {@code method},
+         * {@code top}, {@code rank_column}, {@code keep_rank}. No legacy spelling - always {@code steps:}.
+         */
+        public static final String RANK = "rank";
+        /**
+         * Deterministic seeded sample per group ({@code transform.sample}, catalog {@code quality.sample.reservoir},
+         * ANALYTICS-CORE-1 S4). Keys: {@code size} or {@code fraction}, optional {@code seed}, {@code group_by},
+         * {@code key}. No legacy spelling - always {@code steps:}.
+         */
+        public static final String SAMPLE = "sample";
+        /**
+         * Rows to columns over declared values ({@code transform.matrix.pivot}, ANALYTICS-CORE-1 S4). Keys:
+         * {@code pivot_column}, {@code values}, {@code measure}, optional {@code group_by}, {@code prefix}. No legacy
+         * spelling - always {@code steps:}.
+         */
+        public static final String PIVOT = "pivot";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
          *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST} and {@link #SIMILARITY} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY);
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY, RANK, SAMPLE, PIVOT);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

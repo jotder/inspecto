@@ -559,6 +559,36 @@ class StepConfigSaveFindingsTest {
                 Map.of("left", "ID", "right", "QTY", "threshold", 0.9))))));
     }
 
+    // ── rank, sample, pivot (ANALYTICS-CORE-1 S4) ─────────────────────────────────────
+
+    @Test
+    void aRankOrderColumnTheSchemaDoesNotDeclareIsRefusedAndTheRankColumnFlowsOn(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("rank",
+                Map.of("order_by", List.of("NOPE desc")))))), "steps[0].rank", "NOPE");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("rank", Map.of("order_by", List.of("QTY desc"), "top", 3)),
+                Map.of("filter", Map.of("where", "rank <= 2"))))));
+    }
+
+    @Test
+    void aSampleWithBothSizeAndFractionIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("sample",
+                Map.of("size", 5, "fraction", 0.5))))), "steps[0].sample", "exactly one");
+    }
+
+    @Test
+    void aDynamicPivotIsRefusedAndOnlyTheKeysFlowOn(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("pivot",
+                Map.of("pivot_column", "ID", "measure", "count"))))), "steps[0].pivot", "explicit 'values'");
+        // a VARCHAR field fails OPEN (a mapping-derived column is typed VARCHAR here whatever it computes); the run refuses it
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("pivot",
+                Map.of("pivot_column", "QTY", "values", List.of("a"), "measure", "sum(ID)"))))));
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("pivot", Map.of("group_by", List.of("ID"), "pivot_column", "QTY", "values", List.of("1", "2"),
+                        "measure", "count", "prefix", "q")),
+                Map.of("dedup", Map.of("keys", List.of("QTY")))))), "steps[1].dedup", "QTY");
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

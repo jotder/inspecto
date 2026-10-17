@@ -1,0 +1,18 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: sample (transform.sample, catalog quality.sample.reservoir, ANALYTICS-CORE-1 S4) - 3 calls per region,
+# chosen by a seeded hash of the call id:
+#   steps[1]: - sample: { size: 3, seed: 42, group_by: [REGION], key: [CALL_ID] }
+# Each call's place is md5_number_lower('42:' || <key text>) (the Analytics Kernel's Sampler, the holdout split's
+# MD5 reading); the lowest 3 per region are kept. Not DuckDB's USING SAMPLE or random(): the same seed gives the
+# same rows on every run, and the kernel's JVM twin gives them too. Another seed gives another sample.
+# At rest, like every steps: kind: the ingest lands out/calls/, the commit fires call_sample, and the result
+# lands in out/call_sample/.
+#
+# Expected evidence after the run:
+#   /jobs shows call_sample type PIPELINE with lastStatus SUCCESS. On disk, out/call_sample/*.parquet holds 9 of
+#   the 24 rows, 3 per region, columns unchanged - CALL_ID E03, E06, E08, N02, N05, N06, S02, S06, S08.
+#   The job can also be fired by hand: POST /jobs/call_sample/trigger.
+/jobs
+/jobs/call_sample/runs

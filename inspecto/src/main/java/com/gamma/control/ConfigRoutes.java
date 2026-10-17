@@ -586,6 +586,32 @@ final class ConfigRoutes {
                         columns = null;   // already refused above; what follows cannot be judged
                     }
                 }
+            } else if (PipelineConfig.Step.RANK.equals(kind)) {
+                // every inbound column survives; the rank (BIGINT) is added unless keep_rank: false
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.RankStep.parse(cfg);
+                        for (String c : spec.addedColumns()) columns.add(new TypeFlow.Column(c, "BIGINT"));
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;   // already refused above; what follows cannot be judged
+                    }
+                }
+            } else if (PipelineConfig.Step.SAMPLE.equals(kind)) {
+                // a subset of the rows; the columns are unchanged
+            } else if (PipelineConfig.Step.PIVOT.equals(kind)) {
+                // the keys keep their types; each pivoted column's type depends on the aggregate - VARCHAR, which every
+                // later check treats as unknown and fails open on
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.PivotStep.parse(cfg);
+                        List<TypeFlow.Column> out = new ArrayList<>();
+                        for (String g : spec.groupBy()) out.add(new TypeFlow.Column(g, declaredType(columns, g)));
+                        for (String c : spec.pivotedColumns()) out.add(new TypeFlow.Column(c, "VARCHAR"));
+                        columns = out;
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;
+                    }
+                }
             } else if (PipelineConfig.Step.HASH.equals(kind)) {
                 // names survive a hash; with keep_original each column gains a <col>_hash beside it
                 if (columns != null && "true".equalsIgnoreCase(String.valueOf(cfg.get("keep_original")))
@@ -788,6 +814,44 @@ final class ConfigRoutes {
                 return columns == null ? null
                         : com.gamma.pipeline.exec.SimilarityStep.columnRefusal(spec,
                                 columns.stream().map(TypeFlow.Column::name).toList());
+            }
+            case PipelineConfig.Step.RANK -> {
+                com.gamma.pipeline.exec.RankStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.RankStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                return columns == null ? null
+                        : com.gamma.pipeline.exec.RankStep.columnRefusal(spec,
+                                columns.stream().map(TypeFlow.Column::name).toList());
+            }
+            case PipelineConfig.Step.SAMPLE -> {
+                com.gamma.pipeline.exec.SampleStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.SampleStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                return columns == null ? null
+                        : com.gamma.pipeline.exec.SampleStep.columnRefusal(spec,
+                                columns.stream().map(TypeFlow.Column::name).toList());
+            }
+            case PipelineConfig.Step.PIVOT -> {
+                com.gamma.pipeline.exec.PivotStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.PivotStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.PivotStep.columnRefusal(spec,
+                        columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null || spec.measure().field() == null) return refusal;
+                String type = declaredType(columns, spec.measure().field());
+                // VARCHAR fails OPEN, as for resample: a mapping-derived column is typed VARCHAR here whatever it computes.
+                return type.isEmpty() || "VARCHAR".equalsIgnoreCase(type) ? null
+                        : com.gamma.pipeline.exec.PivotStep.typeRefusal(spec, type);
             }
             case PipelineConfig.Step.MASK -> {
                 List<String> problems = com.gamma.pipeline.exec.MaskSpec.problems(cfg);

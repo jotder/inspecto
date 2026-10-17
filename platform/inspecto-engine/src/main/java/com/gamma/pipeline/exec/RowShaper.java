@@ -213,6 +213,9 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_SHIFT.type().equals(type))    return shift(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_FORECAST.type().equals(type)) return forecast(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SIMILARITY.type().equals(type)) return similarity(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_RANK.type().equals(type))     return rank(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_SAMPLE.type().equals(type))   return sample(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_PIVOT.type().equals(type))    return pivot(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -823,6 +826,68 @@ public final class RowShaper {
             throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
         }
         String refusal = SimilarityStep.columnRefusal(spec, columnsOf(conn, input));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.analytics.rank} (ANALYTICS-CORE-1 S4) — a rank per group by a stated order, ties broken
+     * deterministically ({@link RankStep}); every row with its rank, or the top N of each group.
+     */
+    private static List<Relation> rank(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        RankStep.Spec spec;
+        try {
+            spec = RankStep.parse(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        List<String> inbound = columnsOf(conn, input);
+        String refusal = RankStep.columnRefusal(spec, inbound);
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input, inbound));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.sample} (ANALYTICS-CORE-1 S4, catalog {@code quality.sample.reservoir}) — the rows the Analytics
+     * Kernel's {@code Sampler} keeps: a seeded MD5 order of a row key per group, the same rows on every run.
+     */
+    private static List<Relation> sample(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        SampleStep.Spec spec;
+        try {
+            spec = SampleStep.parse(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        List<String> inbound = columnsOf(conn, input);
+        String refusal = SampleStep.columnRefusal(spec, inbound);
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input, inbound));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.matrix.pivot} (ANALYTICS-CORE-1 S4) — one row per key, one column per declared value
+     * ({@link PivotStep}); the aggregate is the Measure grammar's.
+     */
+    private static List<Relation> pivot(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        PivotStep.Spec spec;
+        try {
+            spec = PivotStep.parse(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = PivotStep.columnRefusal(spec, List.copyOf(types.keySet()));
+        if (refusal == null && spec.measure().field() != null)
+            refusal = PivotStep.typeRefusal(spec, typeOf(types, spec.measure().field()));
         if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));

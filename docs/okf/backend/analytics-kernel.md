@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6).
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6), and ranking, sampling and pivot (S4: the deterministic seeded sampler with DuckDB parity, Steps transform.analytics.rank, transform.sample, transform.matrix.pivot).
 resource: docs/superpower/analytics-core-plan.md
 tags: [analytics, statistics, baseline, time-series, scores, similarity, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
@@ -24,6 +24,8 @@ timestamp: 2026-10-17T00:00:00Z
 > [Seasonality detection](#seasonality-detection), [Holdout split](#holdout-split)). No caller uses them yet.
 > **S1, the similarity kit, is built (2026-10-17):** Jaro, Jaro-Winkler, Levenshtein, Jaccard and normalization with their
 > DuckDB forms; Screening's and Triage recall's copies retired; Step `transform.similarity` (§ [Similarity kit](#similarity-kit)).
+> **S4, ranking, sampling and pivot, is built (2026-10-17):** the deterministic seeded sampler (`Sampler`, JVM = DuckDB)
+> and Steps `transform.analytics.rank`, `transform.sample`, `transform.matrix.pivot` (§ [Ranking, sampling and pivot](#ranking-sampling-and-pivot)).
 
 ## The module
 
@@ -42,6 +44,7 @@ Packages:
 * `com.gamma.analytics.score` — the score output contract (M7, below).
 * `com.gamma.analytics.accuracy` — `Accuracy`, `AccuracySql`, `Backtest` (S5b, § [Accuracy and backtest](#accuracy-and-backtest)).
 * `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
+* `com.gamma.analytics.sample` — `Sampler` (S4, § [Ranking, sampling and pivot](#ranking-sampling-and-pivot)).
 * `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)).
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
 * `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
@@ -502,6 +505,68 @@ a fixed algorithm the JVM computes exactly, the same reading LA's index `BucketF
 * `HoldoutSplitTest`, `HoldoutSplitDuckDbParityTest` — golden MD5 buckets computed outside Java; shares within 2 % of
   the fractions; SQL bucket, role and predicates = JVM over 3,000+ keys (quotes, accents, CJK, emoji, mixed case, an
   integer key, NULL); the time split in both modes against `TimeSplit.role`, and its no-train failure in both forms.
+
+## Ranking, sampling and pivot
+
+*ANALYTICS-CORE-1 S4, built 2026-10-17.* Three Steps for BI, investigations and testing large Datasets. Only the sampler
+needs kernel code — its order must be reproducible outside DuckDB; ranking is one window function and the pivot's
+aggregates are the Measure grammar's, so both live in the engine's Step grammar (`RankStep`, `PivotStep`). Every Step:
+[step-catalog](pipeline-graph/step-catalog.md) (`rank`, `sample`, `pivot`).
+
+### The sampler — `com.gamma.analytics.sample.Sampler`
+
+Deterministic, seeded and stratified, as a JVM function and DuckDB SQL that keep the same rows.
+
+**Key text.** A row's key values, in key order, each as `<UTF-8 byte length>:<text>` (the text as DuckDB reads the
+value as `VARCHAR`), a NULL as `-`, concatenated. A present value starts with a digit and a NULL with `-`, and the
+length fixes where each value ends, so **two different keys never share a key text** (`ab`,`c` ≠ `a`,`bc`; NULL ≠ `''`
+≠ `'-'`). SQL: `keyTextSql` — `CASE WHEN c IS NULL THEN '-' ELSE strlen(c::VARCHAR)::VARCHAR || ':' || c::VARCHAR END`
+per column, joined with `||`.
+
+**Hash.** `md5_number_lower('<seed>:' || key text)` — the holdout split's MD5 reading (§ [Holdout split](#holdout-split);
+`HoldoutSplit.md5NumberLower`, now the one JVM implementation both use), an **unsigned** 64-bit number.
+
+**Order and quota.** Within each group (`group_by`; NULLs form a group of their own), rows are ordered by hash
+(unsigned), then key text (UTF-8 bytes — DuckDB's `VARCHAR` order), then the tie columns the caller passes (the Step
+passes every inbound column, so rows still tied are identical). The first `quota(n)` rows of a group of `n` are kept:
+
+| Mode | `quota(n)` |
+|---|---|
+| Fixed size `k` (1 … 1,000,000) | `min(k, n)` — exactly `k`, or the whole of a smaller group (reservoir semantics) |
+| Fraction `f` → `bp` basis points (rounded to the nearest, ≥ 1) | `⌊(n · bp + 5000) / 10000⌋` — the group's share, half up: 0.4 → 0, 0.5 → 1, 1.5 → 2 |
+
+**Why not `USING SAMPLE` / `random()`.** Neither is reproducible across runs, threads or DuckDB versions, and neither has
+a JVM twin; and a reservoir in the textbook sense (one pass, a random replacement) depends on arrival order. Ordering by
+a keyed hash gives the reservoir's *result* — `k` rows per group, each equally likely across seeds — with none of that.
+Properties that follow: the sample does not depend on input order; a row keeps its place as long as its key does, so
+adding rows can only push a sampled row out (fixed size), never reshuffle the rest; another seed gives another sample.
+
+**SQL.** `Sampler.sql(spec, relation, groupBy, keyColumns, tieColumns, scratch)` — `row_number()` and `count(*)` over the
+group, `WHERE rn <= quota`; the four working columns (`<scratch>k`, `h`, `rn`, `n`) are excluded, so the columns are
+unchanged. The Step uses scratch `__sample_` and refuses an inbound column with that prefix.
+
+### Rank and pivot — the rules the Steps state
+
+* **Rank** (`RankStep`): `row_number` / `rank` / `dense_rank` over `order_by` then `tie_break`, each direction stated and
+  **NULLs last in both directions**. The tie-break is mandatory: `row_number` then orders by every remaining inbound
+  column ascending, NULLs last — two rows still tied are identical, so the output is the same in any arrival order.
+  `rank` / `dense_rank` give tied rows one rank by definition; `top: N` then keeps every row at place N.
+* **Pivot** (`PivotStep`): `MeasureCompiler.aggregateSql(measure) FILTER (WHERE CAST(pivot AS VARCHAR) = 'value')` per
+  declared value, `GROUP BY` the keys. Values are matched as text, required, at most 200 — a dynamic pivot (columns
+  decided by the data) is refused. No aggregate of its own: the grammar's (count, countDistinct, sum, avg, min, max,
+  median, stddev, variance, p05 … p99).
+
+### Tests
+
+* `SamplerTest` — key text (injectivity cases, UTF-8 length), golden hashes computed with Python's `hashlib`, quotas
+  (half up), refusals, lowest-hash selection per group, independence from input order, a new seed, stability when rows
+  are added, a NULL group.
+* `SamplerDuckDbParityTest` — 2,500 seeded rows (accents, CJK, emoji, quotes, `:` and `-` in values, NULLs in key parts
+  and groups, an integer column): 6 specs × 3 keys (unique and not) × stratified or not, **SQL rows = JVM rows**, on a
+  second run and over a shuffled copy of the table; key text SQL = JVM for every row; the working columns do not leak.
+* Engine: `RowShaperRankTest`, `RowShaperSampleTest` (written rows = `Sampler.select`), `RowShaperPivotTest`,
+  `PipelineJobRunnerTest#runsAFlatConfigsRankSampleAndPivotSteps`. The demo `07-steps/sample`'s expected rows were
+  computed by a third implementation of the definition (Python) and matched the run.
 
 ## Temporal motif matcher
 
