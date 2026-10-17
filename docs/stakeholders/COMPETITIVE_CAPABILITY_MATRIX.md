@@ -1,6 +1,6 @@
 # Inspecto — Competitive Capability Matrix
 
-> Audience: product owner and market/sales · Status date: **2026-10-07** · Companion to
+> Audience: product owner and market/sales · Status date: **2026-10-07**, Inspecto column refreshed **2026-10-17** · Companion to
 > [`COMPETITIVE_LANDSCAPE.md`](COMPETITIVE_LANDSCAPE.md) (the living two-sided landscape) and to the offering map
 > in [`../okf/backend/module-reorganisation-decisions.md`](../okf/backend/module-reorganisation-decisions.md) (offering map)
 > (where every Inspecto gap below is filed as a module or pack).
@@ -32,7 +32,7 @@ backlog row that would.
 |---|---|---|---|---|---|---|---|---|---|
 | A | Revenue assurance (billing, usage, interconnect controls) | Y | Y | Y | Y | Y | Y | **Y** | `telco-ra` Space Template |
 | B | Generic reconciliation engine | Y | P | P | Y | Y | P | **Y** | Reconciliation add-on |
-| C | Re-rating / tariff validation | Y | P | Y | Y | P | Y | **P** | SQL controls in `telco-ra` only |
+| C | Re-rating / tariff validation | Y | P | Y | Y | P | Y | **P** | SQL controls in `telco-ra` only · `PACK-PARTNER-SETTLEMENT-1` (re-rating) |
 | D | Fraud management (rules over CDRs / events) | Y | Y | Y | Y | P | N | **Y** | Alerts + `telco-fraud` Space Template |
 | E | Bypass / SIM-box detection | Y | Y | Y | Y | N | Y | **P** | CDR-based only |
 | F | Signalling detection (SS7 / Diameter / SIP, probes, firewalls) | Y | P | Y | P | P | N | **N** | out of scope (network probes) |
@@ -41,22 +41,22 @@ backlog row that would.
 | I | Real-time / pre-call blocking | Y | P | Y | Y | N | N | **N** | `REALTIME-DECISIONING-1` |
 | J | Entity risk scoring | Y | P | Y | Y | N | N | **Y** | Scoring & Lists add-on |
 | K | Watch / deny lists | Y | P | P | Y | N | N | **Y** | Scoring & Lists (Entity Lists) |
-| L | Explainable ML anomaly detection | Y | Y | Y | Y | P | P | **P** | Expectation baselines and forecast bands only · `ANOMALY-DETECTION-1` |
+| L | Explainable ML anomaly detection | Y | Y | Y | Y | P | P | **Y** | Anomaly Detection add-on (shipped 2026-10-10): per-entity robust baselines with seasonality and peer groups, 0–100 score with a per-feature explanation — statistical, not ML (isolation forest is Could C4 of `ANALYTICS-CORE-1`) |
 | M | Link analysis / graph investigation | Y | P | P | P | N | N | **Y** | Link Analysis & Geo add-on |
 | N | Case management / investigation | P | Y | Y | Y | P | P | **Y** | Incidents + Case Management add-ons |
 | O | Workflow and SLA | N | P | P | P | P | N | **Y** | Workflow & SLA add-on |
 | P | Business assurance (margin, forecast, KPI drift) | Y | Y | Y | Y | Y | P | **Y** | `business-assurance` Space Template |
-| Q | Partner / settlement / wholesale | P | Y | P | P | Y | P | **P** | partner-statement reconciliation in `telco-ra` |
+| Q | Partner / settlement / wholesale | P | Y | P | P | Y | P | **P** | partner-statement reconciliation in `telco-ra` · `PACK-PARTNER-SETTLEMENT-1` |
 | R | Mobile money / fintech assurance | Y | Y | Y | Y | N | Y | **Y** | `mobile-money` Space Template (wallet / bank / partner Reconciliation, agent fraud, KYC, provisioning) · `payment-fraud` (card-centric) |
-| S | AML typologies, sanctions / PEP screening | Y | N | N/P | P | N | N | **N** | `PACK-AML-1` + `SCREENING-1` |
-| T | Regulatory reporting (SAR / STR) | Y | N | P | N | N | N | **N** | `REGULATORY-REPORTING-1` |
+| S | AML typologies, sanctions / PEP screening | Y | N | N/P | P | N | N | **Y** | `aml` Space Template (structuring, threshold crossing, smurfing fan-in, watch-list traffic; shipped 2026-10-10) + Screening add-on (fuzzy name matching against Entity Lists, signed hits, four-eyes on `confirmed`; shipped 2026-10-09) |
+| T | Regulatory reporting (SAR / STR) | Y | N | P | N | N | N | **P** | Regulatory Reporting add-on MVP (shipped 2026-10-09): Report Templates rendered to XML / CSV / JSON from a Case or Incident, four-eyes approval, file-drop submission, audit log; regulator-specific SAR / STR formats are templates to author, not shipped |
 | U | 5G / IoT / cloud / digital service assurance | Y | P | Y | P | Y | P | **N** | candidate industry pack (cable / IPDR, digital) |
-| V | Sales, commissions, marketing, churn | Y | P | Y | N | N | N | **N** | `PREDICTIVE-ANALYTICS-1`, `PACK-SALES-MARKETING-1` |
+| V | Sales, commissions, marketing, churn | Y | P | Y | N | N | N | **N** | `PREDICTIVE-ANALYTICS-1` (design-only), `PACK-SALES-MARKETING-1`; base: `ANALYTICS-CORE-1` S5 Forecasting & Prediction |
 | W | Identity / digital trust (caller ID, device, ID checks) | N | P | P | P | N | N | **N** | not planned |
 | X | Network analytics / capacity / inventory | P | P | P | N | Y | N | **N** | not planned (different buyer) |
 | Y | Cybersecurity (network / IoT security) | P | P | Y | P | N | N | **N** | not planned (firewall territory) |
 | Z | Managed services / RAFM as a service | Y | Y | Y | P | Y | Y | **N** | a delivery model, not a module |
-| AA | Generative AI / agentic investigation | P | Y | Y | P | P | N | **P** | AI assist + intelligence agents; no agent that works an Incident |
+| AA | Generative AI / agentic investigation | P | Y | Y | P | P | N | **P** | AI assist + intelligence agents; no agent that works an Incident · `AGENTIC-INVESTIGATION-1` |
 
 ## 3. Reading the matrix
 
@@ -70,16 +70,20 @@ full ingest-and-pipeline platform (rather than an assurance tool over someone el
 group-regulator model; air-gapped on-prem editions; installable Space Templates; publication to an external BI
 tool.
 
-**Where Inspecto trails — gaps worth closing (filed in `docs/BACKLOG.md`):**
+**Where Inspecto trails — gaps worth closing (filed in `docs/BACKLOG.md`; refreshed 2026-10-17):**
 
 | Gap | Who has it | Row |
 |---|---|---|
-| Agentic investigation (an agent that explains and works an alert) | Mobileum RAID Agentic, Subex AI Agent Squads | to file: `AGENTIC-INVESTIGATION-1` |
-| AML typologies, sanctions / PEP screening, SAR / STR reporting | LATRO (full), Neural (partial) | `PACK-AML-1`, `SCREENING-1`, `REGULATORY-REPORTING-1` |
-| Explainable ML anomaly detection | all but TEOCO and Araxxe | `ANOMALY-DETECTION-1` |
+| Agentic investigation (an agent that explains and works an alert) | Mobileum RAID Agentic, Subex AI Agent Squads | `AGENTIC-INVESTIGATION-1` |
 | Real-time / pre-call decisioning | LATRO, Mobileum, Neural | `REALTIME-DECISIONING-1` |
-| Partner settlement | Subex, TEOCO | to file: `PACK-PARTNER-SETTLEMENT-1` |
-| Sales / marketing / churn analytics | LATRO, Mobileum | `PREDICTIVE-ANALYTICS-1` |
+| Partner settlement and re-rating | Subex, TEOCO (settlement); LATRO, Mobileum, Neural, Araxxe (re-rating) | `PACK-PARTNER-SETTLEMENT-1` |
+| Sales / marketing / churn analytics | LATRO, Mobileum | `PREDICTIVE-ANALYTICS-1` on the `ANALYTICS-CORE-1` S5 base |
+| Regulator-specific SAR / STR formats | LATRO | Report Templates on `REGULATORY-REPORTING-1` (engine shipped) |
+| 5G / IoT / cloud service assurance | LATRO, Mobileum, TEOCO | candidate industry pack, not filed |
+
+**Closed since 2026-10-07:** AML typologies and screening (S), explainable anomaly scoring (L), the regulatory
+reporting engine (T, partial), mobile-money assurance (R), the telecom fraud content gaps (H, recharge / data bypass /
+internal fraud).
 
 **Out of reach unless the product changes direction:** signalling firewalls and probes (F), test call generation
 (G), cybersecurity (Y), identity / digital trust (W) and network inventory (X) — they need network equipment,
