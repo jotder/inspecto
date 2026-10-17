@@ -13,10 +13,11 @@
 
     <!-- ANALYTICS-CORE-1 M1 + M6 (docs/superpower/analytics-core-plan.md, D-AN1): the Analytics Kernel - one written
          definition per statistic (Stats: mean, variance / stddev, median modes, quantile modes, MAD, robust z, IQR,
-         Tukey fences) and the baseline contract promoted from inspecto-anomaly (com.gamma.analytics.baseline). Pure
-         functions, no routes, no state. BASE in every edition. Main code depends on NO inspecto-* module and NO
-         third-party library (D-AN8); the policy below allows only the foundation layer (api, config, sql, util) for the
-         SQL builders to come. inspecto-util is test scope only: the JVM/DuckDB parity test opens DuckDB through it. -->
+         Tukey fences), the baseline contract promoted from inspecto-anomaly (com.gamma.analytics.baseline) and the one
+         column profiler (ColumnProfiler, M4). Pure functions and SQL builders, no routes, no state. BASE in every
+         edition. No third-party library of its own (D-AN8); the policy below allows only the foundation layer (api,
+         config, sql, util). Main code uses inspecto-util for SqlIdent - the one SQL quoting implementation - so the
+         profiler never carries a private quoting helper; the tests open DuckDB through it too. -->
     <artifactId>inspecto-analytics</artifactId>
     <name>Inspecto Analytics Kernel</name>
 
@@ -24,7 +25,6 @@
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-util</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

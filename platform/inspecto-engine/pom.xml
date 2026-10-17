@@ -42,6 +42,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-sql</artifactId>
         </dependency>
+        <!-- ANALYTICS-CORE-1 M4: transform.profile builds its SQL with the Analytics Kernel's ColumnProfiler. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>

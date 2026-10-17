@@ -2,10 +2,11 @@ package com.gamma.expectation;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.analytics.ColumnProfiler;
+import com.gamma.analytics.MedianMode;
+import com.gamma.analytics.Stats;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
-
-import static com.gamma.util.SqlBuilder.quoteIdent;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,6 +31,9 @@ import java.util.TreeSet;
  * group's values) of cell → value: {@code row_count}, and per profiled column
  * {@code <col>.null_count|null_rate|distinct_count|min|max|mean}. {@code min}/{@code max}/{@code mean} are
  * numeric ({@code TRY_CAST … AS DOUBLE}), so they are {@code null} — and never compared — on a text column.
+ * The profile SQL is the Analytics Kernel's {@link ColumnProfiler} (row per group, numeric bounds, exact distinct) and
+ * the median is {@link Stats#median} {@link MedianMode#STANDARD} (ANALYTICS-CORE-1 M4 / M2);
+ * {@code BaselineEvaluatorGoldenTest} pins both.
  *
  * <p>No baseline yet (zero accepted profiles, or a cell no accepted profile has) ⇒ nothing to compare ⇒ that
  * cell passes. That is the cold start: the first successful run's profile becomes the baseline.
@@ -103,23 +107,14 @@ public final class BaselineEvaluator {
         return groups;
     }
 
+    /** One row per group: the group values, the row count, then per column null count, distinct count, min, max, mean. */
     static String profileSql(Expectation.Baseline b, String relation) {
-        List<String> groupExprs = b.groupBy().stream()
-                .map(g -> "CAST(" + quoteIdent(g) + " AS VARCHAR)").toList();
-        List<String> select = new ArrayList<>(groupExprs);
-        select.add("count(*)");
-        for (String c : b.columns()) {
-            String q = quoteIdent(c);
-            String num = "TRY_CAST(" + q + " AS DOUBLE)";
-            select.add("count(*) - count(" + q + ")");
-            select.add("count(DISTINCT " + q + ")");
-            select.add("min(" + num + ")");
-            select.add("max(" + num + ")");
-            select.add("avg(" + num + ")");
-        }
-        return "SELECT " + String.join(", ", select) + " FROM " + relation + " AS __t"
-                + (groupExprs.isEmpty() ? "" : " GROUP BY " + String.join(", ", groupExprs))
-                + " LIMIT " + (MAX_GROUPS + 1);
+        ColumnProfiler.Spec spec = ColumnProfiler.Spec.of(b.columns()).withGroupBy(b.groupBy())
+                .withStatistics(ColumnProfiler.Statistic.ROW_COUNT, ColumnProfiler.Statistic.NULL_COUNT,
+                        ColumnProfiler.Statistic.DISTINCT_COUNT, ColumnProfiler.Statistic.MIN, ColumnProfiler.Statistic.MAX,
+                        ColumnProfiler.Statistic.MEAN)
+                .withBounds(ColumnProfiler.Bounds.NUMERIC);
+        return ColumnProfiler.rowPerGroup(relation + " AS __t", spec) + " LIMIT " + (MAX_GROUPS + 1);
     }
 
     private static Double doubleOrNull(ResultSet rs, int i) throws SQLException {
@@ -162,7 +157,7 @@ public final class BaselineEvaluator {
                         if (h.get(g.getKey()) instanceof Map<?, ?> cells && cells.get(cell) instanceof Number n)
                             past.add(n.doubleValue());
                     if (past.isEmpty()) continue;   // no baseline for this cell yet
-                    double median = median(past);
+                    double median = Stats.median(array(past), MedianMode.STANDARD);
                     String dir = breach(median, now, b.maxIncrease(), b.maxDecrease(), b.limitUnit());
                     if (dir == null) continue;
                     violations++;
@@ -183,7 +178,7 @@ public final class BaselineEvaluator {
                 for (Map<String, Object> h : history)
                     rows.add(h.get(group) instanceof Map<?, ?> cells && cells.get("row_count") instanceof Number n
                             ? n.doubleValue() : 0.0);
-                double median = median(rows);
+                double median = Stats.median(array(rows), MedianMode.STANDARD);
                 if (median <= 0) continue;
                 violations++;
                 if (findings.size() < MAX_FINDINGS)
@@ -213,7 +208,7 @@ public final class BaselineEvaluator {
             }
             Double now = days.get(i).getValue().get("row_count");
             if (now == null || prior.size() < b.minPriorDays()) continue;
-            double median = median(prior);
+            double median = Stats.median(array(prior), MedianMode.STANDARD);
             String dir = breach(median, now, b.maxIncrease(), b.maxDecrease(), b.limitUnit());
             if (dir == null) continue;
             violations++;
@@ -223,12 +218,8 @@ public final class BaselineEvaluator {
         return new Comparison(violations, List.copyOf(findings), days.size());
     }
 
-    /** The median; an even count averages the two middle values. {@code values} is non-empty. */
-    static double median(List<Double> values) {
-        List<Double> s = new ArrayList<>(values);
-        s.sort(null);
-        int mid = s.size() / 2;
-        return s.size() % 2 == 1 ? s.get(mid) : (s.get(mid - 1) + s.get(mid)) / 2.0;
+    private static double[] array(List<Double> values) {
+        return values.stream().mapToDouble(Double::doubleValue).toArray();
     }
 
     /**

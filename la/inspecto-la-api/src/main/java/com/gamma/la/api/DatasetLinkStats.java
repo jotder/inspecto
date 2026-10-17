@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.analytics.ColumnProfiler;
+import com.gamma.analytics.QuantileMode;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.la.core.DatasetProvider;
 
@@ -59,9 +61,7 @@ final class DatasetLinkStats implements LinkStatsSource {
         DatasetProvider.Result kinds = f.run(L, rel, "SELECT kind, COUNT(*) AS edges FROM " + FOLDED + " AS e WHERE a_typed OR b_typed GROUP BY kind "
                 + "ORDER BY edges DESC, kind", f.lim.topN(), List.of());
         int hub = f.lim.hubThreshold();
-        Map<String, Object> d = f.run(L, rel, "SELECT quantile_disc(d, 0.5) AS p50, quantile_disc(d, 0.9) AS p90, quantile_disc(d, 0.99) AS p99, "
-                + "MAX(d) AS mx, COUNT(*) FILTER (WHERE d > " + hub + ") AS hubs, COUNT(*) FILTER (WHERE d = 1) AS single, COUNT(*) AS n FROM "
-                + DEGREE + " AS g", 1, List.of()).rows().get(0);
+        Map<String, Object> d = f.run(L, rel, degreeSummarySql(hub), 1, List.of()).rows().get(0);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("from", "dataset");
         out.put("kinds", kinds(kinds, "edges"));
@@ -80,6 +80,18 @@ final class DatasetLinkStats implements LinkStatsSource {
         out.put("assessed", true);
         out.put("reason", null);
         return out;
+    }
+
+    /**
+     * The type's degree distribution: p50 / p90 / p99, the maximum, hubs above {@code hub}, single-link Entities, the count.
+     * The quantiles are the kernel's explicit {@link QuantileMode#DISCRETE} mode (D-AN3): a degree is always one an Entity has.
+     */
+    static String degreeSummarySql(int hub) {
+        return "SELECT " + ColumnProfiler.quantile("d", 0.5, QuantileMode.DISCRETE) + " AS p50, "
+                + ColumnProfiler.quantile("d", 0.9, QuantileMode.DISCRETE) + " AS p90, "
+                + ColumnProfiler.quantile("d", 0.99, QuantileMode.DISCRETE) + " AS p99, "
+                + "MAX(d) AS mx, COUNT(*) FILTER (WHERE d > " + hub + ") AS hubs, COUNT(*) FILTER (WHERE d = 1) AS single, COUNT(*) AS n FROM "
+                + DEGREE + " AS g";
     }
 
     @Override

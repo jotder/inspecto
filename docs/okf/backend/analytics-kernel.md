@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics and the baseline contract
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1 + the M6 contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences), the empty/NaN input rules, which DuckDB function each matches, and the baseline package moved from Anomaly Detection.
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M4 and the M6 contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences), the empty/NaN input rules, which DuckDB function each matches, the one column profiler and its callers, and the baseline package moved from Anomaly Detection.
 resource: docs/superpower/analytics-core-plan.md
 tags: [analytics, statistics, baseline, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
@@ -9,23 +9,27 @@ timestamp: 2026-10-17T00:00:00Z
 
 # Analytics Kernel
 
-> 🟡 **Status (2026-10-17): M1 and the M6 contract are built; nothing else calls the kernel yet.** Plan:
-> [`analytics-core-plan.md`](../../superpower/analytics-core-plan.md) (row `ANALYTICS-CORE-1`). The other medians,
-> percentiles and z-scores (`BaselineEvaluator`, `VolumeBaseline`, `ReportService`, the Assistant outlier tool, LA link
-> statistics) still compute their own figures — moving them behind the kernel, each with a golden test first, is M2.
+> 🟡 **Status (2026-10-17): M1, the M6 contract and the M4 column profiler are built.** Plan:
+> [`analytics-core-plan.md`](../../superpower/analytics-core-plan.md) (row `ANALYTICS-CORE-1`). The column profiler
+> serves `transform.profile`, the Expectation `baseline` (profile and median) and Link Analysis' column profile and
+> degree quantiles (§ Column profiler). The other medians, percentiles and z-scores (`VolumeBaseline`, `ReportService`,
+> the Assistant outlier tool) still compute their own figures — moving them behind the kernel, each with a golden test
+> first, is M2.
 
 ## The module
 
 `platform/inspecto-analytics` — artifactId `inspecto-analytics`, manifest id `analytics`, `buildRole: platform`,
-`offeringRole: base` (every edition, D-AN1). Pure functions, no routes, no state, **no third-party dependency** (D-AN8).
-Main code depends on no `inspecto-*` module; `tools/check-module-deps.mjs` and the pom's enforcer rule allow only the
-foundation layer (`inspecto-api`, `-config`, `-sql`, `-util`), so a feature module can depend on the kernel but the
-kernel can never reach the engine or a feature. It ships as its own thin jar beside `inspecto.jar`
+`offeringRole: base` (every edition, D-AN1). Pure functions and SQL builders, no routes, no state, **no third-party dependency of its own** (D-AN8).
+Main code depends on `inspecto-util` only, for `SqlIdent` (the one SQL quoting implementation the profiler quotes
+through); `tools/check-module-deps.mjs` and the pom's enforcer rule allow only the foundation layer (`inspecto-api`,
+`-config`, `-sql`, `-util`), so a feature module can depend on the kernel but the kernel can never reach the engine or a
+feature. It ships as its own thin jar beside `inspecto.jar`
 (`tools/bundle-modules.mjs` `CORE_MODULES`, the shade exclude in `inspecto/pom.xml`).
 
 Packages:
 
-* `com.gamma.analytics` — `Stats` (the definitions below), `MedianMode`, `QuantileMode`.
+* `com.gamma.analytics` — `Stats` (the definitions below), `MedianMode`, `QuantileMode`, `ColumnProfiler`
+  (§ Column profiler).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -59,6 +63,57 @@ and `ReportService` can each keep their exact arithmetic when M2 moves them (the
 ⚠ The robust-z floor exists so a near-constant history (scaled MAD ≈ 0) cannot turn a one-unit change into an
 enormous z. It is Anomaly Detection's rule (design §4.2), kept exactly.
 
+## Column profiler
+
+`ColumnProfiler` (M4) is the one place that writes column-profile SQL. It **builds DuckDB SQL only**: the caller runs it
+on its own connection, sandbox or Dataset port. Every identifier is quoted and every literal escaped through `SqlIdent`;
+the relation is the caller's already-safe SQL (a quoted table name, or a subquery with its alias). A `Spec` names the
+columns, optional group columns, the statistics in output order, and the modes below.
+
+| Statistic | Output column | Definition |
+|---|---|---|
+| `ROW_COUNT` | `row_count` | `count(*)` — every row, NULLs included |
+| `NULL_COUNT` | `null_count` | `count(*) − count(c)` |
+| `NULL_RATE` | `null_rate` | null count / row count as DOUBLE; NULL for an empty relation |
+| `DISTINCT_COUNT` | `distinct_count` | distinct non-NULL values of `distinctOf(c)` (identity by default); an all-NULL column has 0. `EXACT` = `count(DISTINCT …)`; `APPROXIMATE` = `least(approx_count_distinct(…), count(c))`, a HyperLogLog sketch clamped to the non-NULL rows |
+| `MIN`, `MAX` | `min_value`, `max_value` | bounds `TEXT`: compared in the column's own type, reported as VARCHAR (text order for text, date order for dates); bounds `NUMERIC`: over the numeric reading, so a text or date column has none |
+| `MEAN` | `mean` | `avg` of the numeric reading = `Stats.mean` of the values that read as numbers |
+| `STDDEV` | `stddev` | `stddev_samp` of the numeric reading = `Stats.stddevSample`; NULL below two numbers |
+| quantile q | `p<percent>` (`p50`, `p99_5`) | over the numeric reading: `CONTINUOUS` (default, D-AN3) = `quantile_cont`; `DISCRETE` and `NEAREST_RANK` = `quantile_disc` (the same rank) |
+
+The **numeric reading** is `TRY_CAST(c AS DOUBLE)`: a number keeps its value, a boolean reads as 1/0, a text that parses
+as a number reads as that number, and anything else (other text, dates, timestamps) is NULL and is not counted.
+
+**Layouts.** `rowPerColumn` — one row per (group, column): `group_<j>…`, `column_name` (as the caller spelled it), the
+statistics, the quantiles; one `SELECT` per column joined by `UNION ALL`. `rowPerGroup` — one row per group:
+`group_<j>…`, `row_count` once, then per column `i` each statistic as `<output column>_<i>` (`null_count_0`, `p50_1`);
+with no column it is the row count per group. Group values are VARCHAR so groups of any type share one shape.
+
+**One column's distribution.** `topValues(relation, column, k)` — `value` (VARCHAR) and `frequency` of the `k` most
+frequent non-NULL values, ties by value ascending in the column's own type. `histogram(relation, column, bins)` —
+equal-width bins over the numeric reading: `bin`, `lower_bound`, `upper_bound`, `frequency`, empty bins included; bin
+`i` covers `[min + i·w, min + (i+1)·w)` with `w = (max − min) / bins`, the last bin closed so the maximum is counted;
+equal values all fall in bin 0; no numeric value, no rows. `quantile(expr, q, mode)` is the single-quantile SQL form for
+a caller that writes the rest of its statement itself.
+
+**Callers** — each pinned by a golden test written before the switch and green before and after:
+
+| Caller | Uses | Golden test |
+|---|---|---|
+| `transform.profile` Step (`RowShaper.profile`, engine) | `rowPerColumn`; statistics `ROW_COUNT, NULL_COUNT, DISTINCT_COUNT, MIN, MAX`, bounds `TEXT`, exact distinct — the Step's output columns are unchanged and no statistic is added | `RowShaperProfileGoldenTest` |
+| Expectation `baseline` (`BaselineEvaluator.profileSql`, processor) | `rowPerGroup` grouped by `groupBy`; statistics `ROW_COUNT, NULL_COUNT, DISTINCT_COUNT, MIN, MAX, MEAN`, bounds `NUMERIC`; `null_rate` stays computed in Java from the counts. Its median is `Stats.median(…, STANDARD)` | `BaselineEvaluatorGoldenTest` |
+| LA `ColumnProfile.stats` (overlap profile, Entity Type profile) | `rowPerGroup`; statistics `ROW_COUNT, NULL_COUNT, DISTINCT_COUNT`, `APPROXIMATE` distinct over the caller's `distinctOf` (the value as VARCHAR, or the normalised Entity key) | `ColumnProfileGoldenTest` |
+| LA `DatasetLinkStats.degreeSummarySql` (Links section, Dataset fallback) | `quantile("d", q, DISCRETE)` for p50 / p90 / p99 — LA keeps `quantile_disc` as the explicit mode (D-AN3) | `ColumnProfileGoldenTest` |
+
+Left in place because they are not column profiles: the rest of `EntityProfiles` (key shapes — lengths, prefixes,
+character classes, sentinels, per-day spread over the union of normalised keys), the `IndexLinkStats` index read and
+the `ValueMeasures` median.
+
+⚠ The Expectation `baseline` does **not** implement `BaselineStatistic`. That contract takes one entity's time-bucketed
+history and returns a robust median plus scaled MAD under a minimum-points rule; the Expectation judges each cell against
+the plain median of the accepted profiles (ordered, not time-keyed) or of the prior day groups. Fitting it would mean
+inventing bucket timestamps, so it shares the kernel's median definition instead.
+
 ## Input rules
 
 | Input | Behaviour | Why |
@@ -81,6 +136,8 @@ The input array is never modified.
   `stddev_samp`, `median`, `mad`, `quantile_cont`, `quantile_disc` at 13 fractions, and the IQR). Agreement within
   1e-9 × max(1, |value|); `quantile_disc` and the odd-count median agree exactly.
 * `RobustStatsTest`, `BaselineStatisticsTest` — the moved baseline package.
+* `ColumnProfilerTest` — the profiler against DuckDB on numbers, text, dates, NULLs, an all-NULL column and an empty
+  relation; both layouts, groups, approximate distinct, quantile modes against `Stats`, top values, the histogram.
 
 ## References
 
