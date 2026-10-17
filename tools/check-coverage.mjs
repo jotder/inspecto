@@ -34,7 +34,7 @@ const FLOORS = {
 // 1 report / 427 instructions, printed as "every floor met". That is the same shape the header warns
 // about, only harder to see: a guard that accepts a FRACTION of its input rather than none of it.
 //
-// 29 reactor modules carry a `src/test` directory as of 2026-09-09, and a full `-Pedition-enterprise
+// 29 reactor modules carry a `src/test` directory as of 2026-09-09, and a full `-Pedition-advanced
 // -Pcoverage` pass emits one report each. 20 is deliberately well below that, so adding or retiring a
 // module never breaks the guard, and far above 1, so a partial run cannot pass as repo-wide.
 //
@@ -119,7 +119,7 @@ const csvs = wantBackend ? findJacocoCsvs(repoRoot) : [];
 // Java. ui.yml's "Coverage floors (UI)" step was red from b4bdc6d6 until this fix.
 if (wantBackend && csvs.length === 0 && explicit) {
     console.error('\n✖ Coverage guard: CANNOT RUN — --backend was requested but no jacoco.csv exists.');
-    console.error('  Run `mvn -o clean test -Pcoverage -Pedition-enterprise` first.');
+    console.error('  Run `mvn -o clean test -Pcoverage -Pedition-advanced` first.');
     console.error('  ⚠ Failing rather than passing on purpose: a guard that no-ops when its input is');
     console.error('    missing would pass on every build that forgot the profile.');
     process.exit(1);
@@ -197,7 +197,7 @@ if (csvs.length > 0 && csvs.length < MIN_BACKEND_MODULE_REPORTS) {
         + `below the ${MIN_BACKEND_MODULE_REPORTS} needed for a repo-wide number.`);
     console.error('  The floors are repo-wide percentages; over a fraction of the reactor they mean nothing,');
     console.error('  and this guard used to report "every floor met" over a single module.');
-    console.error('  Run the full reactor:  mvn -o clean install -Pedition-enterprise -Pcoverage');
+    console.error('  Run the full reactor:  mvn -o clean install -Pedition-advanced -Pcoverage');
     console.error(`  Found: ${csvs.map((c) => c.replace(repoRoot + sep, '').split(sep + 'target')[0]).join(', ')}`);
     process.exit(1);
 }
@@ -225,7 +225,7 @@ if (backend) {
     // ⚠ Not a failure: ui.yml runs `--ui` in a job that never builds Java, and ci.yml runs its own
     // `--backend`. Saying so beats silently reporting half the picture as if it were all of it — the
     // same reasoning as the UI arm below.
-    console.log('\nBackend — no jacoco.csv (run `mvn -o clean test -Pcoverage -Pedition-enterprise`). Skipped.');
+    console.log('\nBackend — no jacoco.csv (run `mvn -o clean test -Pcoverage -Pedition-advanced`). Skipped.');
 }
 
 if (ui) {

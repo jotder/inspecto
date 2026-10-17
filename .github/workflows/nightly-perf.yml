@@ -73,7 +73,7 @@ jobs:
 
       - name: MixedLoadBenchmark at 1M rows, 4 readers, floor 30,000 rows/s, p95 ceiling 5,000 ms
         run: >-
-          mvn --batch-mode --no-transfer-progress -pl :inspecto-processor -am test -Pedition-enterprise
+          mvn --batch-mode --no-transfer-progress -pl :inspecto-processor -am test -Pedition-advanced
           -Dtest=MixedLoadBenchmark -Dsurefire.failIfNoSpecifiedTests=false
           -Dbench.run=true -Dbench.rows=1000000 -Dbench.readers=4
           -Dbench.mixedFloorRowsPerSec=30000 -Dbench.readerP95CeilingMs=5000

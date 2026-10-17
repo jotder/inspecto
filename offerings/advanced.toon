@@ -1,12 +1,12 @@
-id: enterprise
-title: Enterprise
-tier: enterprise
+id: advanced
+title: Advanced
+tier: advanced
 posture:
   authMode: oidc
   eventsBackend: parquet
   objectsBackend: postgres
   postgresSidecar: bundled
-includes[1]: professional
+includes[1]: standard
 modules[3]: policy,la-store-pg,intelligence
 addons:
   linkAnalysis:

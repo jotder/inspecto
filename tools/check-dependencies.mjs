@@ -61,11 +61,11 @@ function mvn() {
 }
 
 function resolve() {
-    // `-Pedition-enterprise` (2026-09-07): the profile is MODULES-ONLY, so it adds inspecto-oidc, inspecto-secrets, inspecto-geo-country and
+    // `-Pedition-advanced` (2026-09-07): the profile is MODULES-ONLY, so it adds inspecto-oidc, inspecto-secrets, inspecto-geo-country and
     // inspecto-policy to the resolve. Without it the lock covered only the DEFAULT reactor, which meant
     // the one dependency tree a security reviewer most wants under review — inspecto-oidc's Nimbus
     // JOSE+JWT — was the one the guard never saw, while compliance/controls-matrix.md marked G7 CLOSED.
-    // Enterprise is the superset, so this single flag covers Standard too.
+    // Advanced is the superset, so this single flag covers Standard too.
     // ⚠ `package -DskipTests` runs BEFORE dependency:list on purpose (EDG-01 cell 7, 2026-09-08).
     // `dependency:list` alone does not build, so an inter-module dependency on a module that has never
     // been `install`ed cannot resolve and the guard reports CANNOT RUN — which reads like drift but is
@@ -82,7 +82,7 @@ function resolve() {
     // tree is left untouched (measured: 291 classes throughout). The guard needs the artifacts, not a
     // fresh compile.
     const args = ['-B', '-DskipTests', '-Dmaven.compiler.useIncrementalCompilation=false',
-                  'package', 'dependency:list', '-DincludeScope=runtime', '-Pedition-enterprise'];
+                  'package', 'dependency:list', '-DincludeScope=runtime', '-Pedition-advanced'];
     if (process.env.MVN_OFFLINE === '1') args.unshift('-o');
     let out;
     try {

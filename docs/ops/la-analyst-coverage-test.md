@@ -28,7 +28,7 @@ and, when fixed, the commit.
 
 ## 3. Results
 
-Run 2026-10-15 on a bundle rebuilt from the working tree (`package.ps1 -Edition Enterprise -DemoAuth -Ui la-app`, 11m51s) after the first
+Run 2026-10-15 on a bundle rebuilt from the working tree (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app`, 11m51s) after the first
 bundle turned out to be from 2026-10-11 and lacked the Link expansions screen: **check a bundle's jar and `ui\index.html` dates before
 testing from it.** Driven through the browser as Demo Users; the pane was 875-1430 px wide during the run.
 

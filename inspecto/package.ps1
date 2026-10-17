@@ -1,27 +1,32 @@
 # package.ps1 — Build and bundle inspecto for remote server deployment.
 #
 # Usage (run from inside inspecto/ or from the sandbox root):
-#   pwsh -File inspecto\package.ps1 [-NoBuild] [-Edition Professional|Enterprise]
+#   pwsh -File inspecto\package.ps1 [-NoBuild] [-Edition Basic|Standard|Advanced|Preview]
+#
+# Editions (LA-EDITIONS-1 ED-2, 2026-10-17): Basic / Standard / Advanced replaced Personal / Professional / Enterprise; Preview
+# stays. Basic (the default build) carries the Link Analysis EXPLORER - inspecto-entity-list, inspecto-la-core, inspecto-la-storage,
+# inspecto-la-api and inspecto-geo-link are staged in EVERY edition; the Investigation surface inside them is gated off in Basic by
+# the `investigations` edition feature, which only inspecto-ops (Standard and up) declares.
 #
 # Run under pwsh 7: this file is BOM-less UTF-8 and Windows PowerShell 5.1 garbles its non-ASCII
 # characters (see .claude/skills/build-verify/SKILL.md).
 #
-# -Edition Enterprise is Professional + inspecto-policy (the ABAC AccessDecider SPI implementation),
+# -Edition Advanced is Standard + inspecto-policy (the ABAC AccessDecider SPI implementation),
 # bundled as inspecto-policy.jar. It needs NO extra flag: the module is discovered purely
 # through META-INF/services/com.gamma.spi.auth.AccessDecider, so being on the classpath is what
 # turns policy evaluation on. (P3d: the classpath is the bundle's modules.list, written by tools/offering-classpath.mjs from the
 # Offering, and the edition is its edition.properties - the launchers READ both; they no longer sniff which jars are present.)
 #
-# -Edition Professional (default: Personal; 'Standard' accepted as legacy alias) additionally builds
+# -Edition Standard (default: Basic) additionally builds
 # inspecto-oidc (W6, the OIDC Authenticator SPI implementation; split out of inspecto-security by D-MR6, together with inspecto-secrets and inspecto-geo-country) and bundles it as
 # inspecto-oidc.jar; modules.list puts it on the classpath and edition.properties makes serve.sh/serve.bat
-# turn on -Dauth.mode=oidc. Professional/Enterprise also bundle the PostgreSQL JDBC driver as
+# turn on -Dauth.mode=oidc. Standard/Advanced also bundle the PostgreSQL JDBC driver as
 # postgresql.jar (PG-1) — listed in modules.list, inert until -Dinspecto.db=postgres; the fat
 # JAR stays driver-free. (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle).
 # The embedded jlink runtime's module set (below) is VERIFIED sufficient for inspecto-oidc too
 # (PKG-4, 2026-07-07): jdeps on inspecto-oidc.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
 # java.base/java.sql/java.net.http/jdk.httpserver, and RS256/ES256 resolve via SunRsaSign/SunEC
-# (jdk.crypto.ec) on a jlink image built from exactly this list — Professional bundles may embed the
+# (jdk.crypto.ec) on a jlink image built from exactly this list — Standard bundles may embed the
 # runtime. jlink can target either platform from a Windows host by pointing --module-path at the
 # target JDK's jmods; -NoRuntime skips both. ⚠ The invoked tool is the HOST's (`jlink.exe` on Windows,
 # `jlink` elsewhere) — hardcoding the `.exe` is what kept CI from ever embedding a runtime (OPS-07).
@@ -68,25 +73,25 @@ param(
     # launches the bundle it just built and waits for /health. -SkipBootCheck opts out for a fast local
     # package; CI and releases must never pass it.
     [switch]$SkipBootCheck,
-    # Editions are build flavors (docs/EDITIONS.md), never branches. 'Professional' additionally builds
+    # Editions are build flavors (docs/EDITIONS.md), never branches. 'Standard' additionally builds
     # and bundles inspecto-oidc (W6, the Authenticator SPI's OIDC implementation) alongside the
     # core jar; serve.sh/serve.bat auto-detect its presence and wire -Dauth.mode=oidc from env vars.
-    # 'Enterprise' is Professional PLUS inspecto-policy (the ABAC AccessDecider SPI impl) — the same
-    # superset relation the -Pedition-enterprise Maven profile encodes, so it bundles BOTH extra jars.
-    # 'Preview' is NOT a customer-facing tier (operator decision 2026-09-21): it is Enterprise's exact
+    # 'Advanced' is Standard PLUS inspecto-policy (the ABAC AccessDecider SPI impl) — the same
+    # superset relation the -Pedition-advanced Maven profile encodes, so it bundles BOTH extra jars.
+    # 'Preview' is NOT a customer-facing tier (operator decision 2026-09-21): it is Advanced's exact
     # staging path internally (byte-identical bundle today), but is labeled 'Preview' in the SBOM and
     # is meant for testing/incubation — a module still in incubation ships here first via
     # -Pedition-preview (pom.xml) / tools/bundle-modules.mjs, without an edition decision being made
     # for it yet.
-    [ValidateSet('Personal', 'Professional', 'Standard', 'Enterprise', 'Preview')]
-    [string]$Edition = 'Personal',
-    # DEMO-AUTH-1: an OFFLINE DEMO BUILD, never an edition. Requires -Edition Enterprise; swaps
+    [ValidateSet('Basic', 'Standard', 'Advanced', 'Preview')]
+    [string]$Edition = 'Basic',
+    # DEMO-AUTH-1: an OFFLINE DEMO BUILD, never an edition. Requires -Edition Advanced; swaps
     # inspecto-oidc.jar for inspecto-demo-auth.jar (the Demo User sign-in), assembles into
     # inspecto-demo/ (NOT inspecto-deploy/, which other launch configs run from), writes serve-demo.bat /
     # serve-demo.sh bound to 127.0.0.1, removes serve.* and the service installers (without the security
     # jar they would boot an auth-free server on every interface), and zips as inspecto-demo-<platform>.zip.
     # The demo jar is deliberately outside the three jar enumerations tools/check-sbom-modules.mjs parses,
-    # because no edition ships it; the SBOM therefore still describes the Enterprise module set.
+    # because no edition ships it; the SBOM therefore still describes the Advanced module set.
     # tools/check-demo-auth-isolation.mjs (CI) fails if the demo jar is named anywhere here outside an
     # `if ($DemoAuth)` block, or if the demo branch stops removing inspecto-oidc.jar. The demo bundle's modules.list comes from
     # tools/offering-classpath.mjs --demo (the OIDC trio replaced by the demo jar), which serve-demo.* read like any launcher.
@@ -226,7 +231,8 @@ if ($duckdbExtCacheDir) {
 }
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 if ($DemoAuth) {
-    if ($Edition -ne 'Enterprise') { throw "-DemoAuth builds an Enterprise-capability demo; pass -Edition Enterprise (got '$Edition')." }
+    # LA-EDITIONS-1 ED-3: Preview is "everything with demo sign-in", so it takes -DemoAuth as Advanced does.
+    if ($Edition -ne 'Advanced' -and $Edition -ne 'Preview') { throw "-DemoAuth builds an Advanced-capability demo; pass -Edition Advanced or -Edition Preview (got '$Edition')." }
     $bundleDir = Join-Path $sandboxRoot 'inspecto-demo'
 }
 
@@ -268,7 +274,9 @@ if (-not $NoBuild) {
     # CONNECTORS-BUNDLE-1: `inspecto-connectors` is NOT upstream of `inspecto`, so `-am` (which walks
     # upstream only) never reaches it - it has to be named explicitly or the sidecar is silently absent.
     # D-AN2: the core thin jar `inspecto-graph` is named explicitly too, so it is always built and staged as its own jar.
-    & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,:inspecto-connectors,:inspecto-graph -am -DskipTests -q
+    # LA-EDITIONS-1 phase 3: the Link Analysis explorer modules ship in EVERY edition (Basic included), and none is upstream of
+    # inspecto, so they are named here too.
+    & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,:inspecto-connectors,:inspecto-graph,:inspecto-entity-list,:inspecto-la-core,:inspecto-la-storage,:inspecto-la-api,:inspecto-geo-link -am -DskipTests -q
     if ($LASTEXITCODE -ne 0) { throw "mvn build failed" }
     Pop-Location
     Write-Host "Build complete." -ForegroundColor Green
@@ -320,17 +328,17 @@ if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
     throw "Connector sidecar not found matching $connectorsTargetDir\inspecto-connectors-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl :inspecto-connectors -am -DskipTests"
 }
 
-# ── step 1c: Professional/Enterprise editions — build the optional edition modules ─────────────────
+# ── step 1c: Standard/Advanced editions — build the optional edition modules ─────────────────
 # Separate optional modules (docs/EDITIONS.md), NOT in the default reactor <modules> — only built
 # when the profile is requested, from the repo root (they are siblings of inspecto/, not submodules).
-# Enterprise is a SUPERSET of Professional (the -Pedition-enterprise profile = edition-professional + policy),
-# so it bundles the OIDC jar too — an Enterprise deployment authenticates AND authorizes.
+# Advanced is a SUPERSET of Standard (the -Pedition-advanced profile = edition-standard + policy),
+# so it bundles the OIDC jar too — an Advanced deployment authenticates AND authorizes.
 $demoFlags=$null   # set only in the Demo Auth branch; the bake call reads it behind the same switch
 $oidcJarSrc = $null
 $secretsJarSrc = $null
 $geoCountryJarSrc = $null
 $policyJarSrc   = $null
-$laStorePgJarSrc = $null  # Enterprise/Preview only (set below); strict mode throws on the read at the bundling step for Professional
+$laStorePgJarSrc = $null  # Advanced/Preview only (set below); strict mode throws on the read at the bundling step for Standard
 $channelsJarSrc = $null
 $backupJarSrc   = $null
 $geoLinkJarSrc  = $null
@@ -352,26 +360,24 @@ $actionReqJarSrc = $null
 $regReportJarSrc = $null
 $screeningJarSrc = $null
 $anomalyJarSrc = $null
-if ($Edition -eq 'Standard') { $Edition = 'Professional' }
-if ($Edition -ne 'Personal') {
+if ($Edition -ne 'Basic') {
     # NB: not $profile — that is a PowerShell automatic variable.
-    $editionProfile = if ($Edition -eq 'Preview') { 'edition-preview' } elseif ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-professional' }
-    # EDG-01 cell 1: inspecto-notify-channels rides with the OIDC provider in BOTH non-Personal editions — CP-15
-    # is "Professional and above", and Enterprise is a superset of Professional.
-    # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Professional and above.
-    # SEP-08: inspecto-entity-list (Entity Lists + the shared fact log; inspecto-geo-link depends on it) rides
-    # alongside, Professional and above.
-    # EDG-01 cell 3b: inspecto-geo-link (CP-09) rides alongside, Professional and above.
-    # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Professional and above.
-    # EDG-01 cells 5+6 / MODULE-REORG-1 P7: inspecto-observability (CP-13: the /metrics exposition + the /events* feed), Professional and above.
-    # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Professional and above.
-    # PKG-5 (operator decision 2026-09-12): the assistant is PROFESSIONAL AND ABOVE. Taken first as
+    $editionProfile = if ($Edition -eq 'Preview') { 'edition-preview' } elseif ($Edition -eq 'Advanced') { 'edition-advanced' } else { 'edition-standard' }
+    # EDG-01 cell 1: inspecto-notify-channels rides with the OIDC provider in BOTH non-Basic editions — CP-15
+    # is "Standard and above", and Advanced is a superset of Standard.
+    # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Standard and above.
+    # SEP-08 / EDG-01 cell 3b: inspecto-entity-list and the Link Analysis modules (geo-link, la-core, la-storage, la-api) ship
+    # in EVERY edition since LA-EDITIONS-1 phase 3 - they are located after this branch, not in it.
+    # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Standard and above.
+    # EDG-01 cells 5+6 / MODULE-REORG-1 P7: inspecto-observability (CP-13: the /metrics exposition + the /events* feed), Standard and above.
+    # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Standard and above.
+    # PKG-5 (operator decision 2026-09-12): the assistant is STANDARD AND ABOVE. Taken first as
     # "all editions, optional" and narrowed the same day once the sidecar's weight was measured -
-    # Personal already carries the ~32 MB connector sidecar. NB inspecto-agent is in the DEFAULT
+    # Basic already carries the ~32 MB connector sidecar. NB inspecto-agent is in the DEFAULT
     # reactor (not profile-scoped like the modules beside it); it is listed here only so this pass
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
-    # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
+    # is ADVANCED only - also a default-reactor module, listed so this pass builds its `sidecar`.
     # MODULE-REORG-P3d stage 1: the `-pl` list comes from the Offering (tools/offering-classpath.mjs resolves offerings/<edition>.toon,
     # asserts it equals tools/bundle-modules.mjs's set, and prints every module the edition adds beyond the default reactor) - it is
     # no longer a second hand-kept list beside the staging steps and the launchers.
@@ -386,7 +392,7 @@ if ($Edition -ne 'Personal') {
     }
     $oidcTargetDir = Join-Path $sandboxRoot 'providers\inspecto-oidc\target'
     # SEC-SIDECAR-BOOT-1 (2026-09-07): the SHADED jar, not the thin one. Until now this copied the plain
-    # 16 KB artifact, which carries no com/nimbusds classes at all - so every Professional/Enterprise bundle
+    # 16 KB artifact, which carries no com/nimbusds classes at all - so every Standard/Advanced bundle
     # died at boot, because ControlApi resolves the Authenticator SPI during startup through an unguarded
     # ServiceLoader and OidcAuthenticator needs Nimbus. The glob is '-sidecar' on purpose: a bare
     # 'inspecto-oidc-*.jar' now matches BOTH artifacts and would pick one by luck.
@@ -410,14 +416,14 @@ if ($Edition -ne 'Personal') {
     }
     # MODULE-REORG-1 P7: the Kafka stream connector is its own premium module (kafka-clients is the one
     # connector footprint that is distinct). SHADED ('-sidecar'): the thin jar carries no kafka-clients.
-    # Professional and above ONLY - Personal's inspecto-connectors.jar no longer registers a Kafka factory.
+    # Standard and above ONLY - Basic's inspecto-connectors.jar no longer registers a Kafka factory.
     $kafkaJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-connectors-kafka\target') -Filter 'inspecto-connectors-kafka-*-sidecar.jar' -ErrorAction SilentlyContinue |
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $kafkaJarSrc -or -not (Test-Path $kafkaJarSrc)) {
         throw "$Edition edition requested but no SHADED JAR found matching providers\inspecto-connectors-kafka\target\inspecto-connectors-kafka-*-sidecar.jar. The thin jar carries no kafka-clients classes."
     }
     # MODULE-REORG-1 P7: the ASN.1 BER decoder is the Telecom industry pack (inspecto-telecom-asn1). SHADED
-    # ('-sidecar'): the thin jar carries no asn-facade/asn-core classes. Professional and above ONLY - Personal's
+    # ('-sidecar'): the thin jar carries no asn-facade/asn-core classes. Standard and above ONLY - Basic's
     # inspecto.jar no longer registers an asn1 parser, and the Step Processor catalog reports it not installed.
     $asn1JarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-telecom-asn1\target') -Filter 'inspecto-telecom-asn1-*-sidecar.jar' -ErrorAction SilentlyContinue |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -442,46 +448,6 @@ if ($Edition -ne 'Personal') {
                      Select-Object -First 1 -ExpandProperty FullName
     if (-not $backupJarSrc -or -not (Test-Path $backupJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $backupTargetDir\inspecto-backup-*.jar."
-    }
-    # The Entity List module (SEP-08). THIN like inspecto-geo-link, which depends on it.
-    $entityListTargetDir = Join-Path $sandboxRoot 'features\inspecto-entity-list\target'
-    $entityListJarSrc = Get-ChildItem -Path $entityListTargetDir -Filter 'inspecto-entity-list-*.jar' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $entityListJarSrc -or -not (Test-Path $entityListJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $entityListTargetDir\inspecto-entity-list-*.jar."
-    }
-    # LA separation D-1 step 5b: inspecto-la-core (host-free model + the Dataset/Case ports) and inspecto-la-api (the Link
-    # Analysis routes) ride beside inspecto-geo-link (the bridge that implements the ports). THIN, optional jars.
-    # D-3 step 2: inspecto-la-storage (the index store skeleton); la-api depends on it from a later step.
-    $laStorageTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-storage\target'
-    $laStorageJarSrc = Get-ChildItem -Path $laStorageTargetDir -Filter 'inspecto-la-storage-*.jar' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $laStorageJarSrc -or -not (Test-Path $laStorageJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $laStorageTargetDir\inspecto-la-storage-*.jar."
-    }
-    $laCoreTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-core\target'
-    $laCoreJarSrc = Get-ChildItem -Path $laCoreTargetDir -Filter 'inspecto-la-core-*.jar' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $laCoreJarSrc -or -not (Test-Path $laCoreJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $laCoreTargetDir\inspecto-la-core-*.jar."
-    }
-    $laApiTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-api\target'
-    $laApiJarSrc = Get-ChildItem -Path $laApiTargetDir -Filter 'inspecto-la-api-*.jar' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $laApiJarSrc -or -not (Test-Path $laApiJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $laApiTargetDir\inspecto-la-api-*.jar."
-    }
-    # The geo/link module (EDG-01 cell 3b). THIN like inspecto-policy and inspecto-backup.
-    $geoLinkTargetDir = Join-Path $sandboxRoot 'la\inspecto-geo-link\target'
-    $geoLinkJarSrc = Get-ChildItem -Path $geoLinkTargetDir -Filter 'inspecto-geo-link-*.jar' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $geoLinkJarSrc -or -not (Test-Path $geoLinkJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $geoLinkTargetDir\inspecto-geo-link-*.jar."
     }
     # The exchange module (EDG-01 cell 4). THIN like policy/backup/geo-link.
     $exchangeTargetDir = Join-Path $sandboxRoot 'features\inspecto-exchange\target'
@@ -515,7 +481,7 @@ if ($Edition -ne 'Personal') {
     if (-not $opsJarSrc -or -not (Test-Path $opsJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $opsTargetDir\inspecto-ops-*.jar."
     }
-    # MODULE-REORG-1 P7: the Reconciliation add-on. THIN like inspecto-ops / inspecto-entity-list; Professional and above.
+    # MODULE-REORG-1 P7: the Reconciliation add-on. THIN like inspecto-ops / inspecto-entity-list; Standard and above.
     $reconTargetDir = Join-Path $sandboxRoot 'features\inspecto-reconciliation\target'
     $reconJarSrc = Get-ChildItem -Path $reconTargetDir -Filter 'inspecto-reconciliation-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -523,7 +489,7 @@ if ($Edition -ne 'Personal') {
     if (-not $reconJarSrc -or -not (Test-Path $reconJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $reconTargetDir\inspecto-reconciliation-*.jar."
     }
-    # MODULE-REORG-1 P7: the Scoring add-on (Risk Scores). THIN like inspecto-ops / inspecto-entity-list; Professional and above.
+    # MODULE-REORG-1 P7: the Scoring add-on (Risk Scores). THIN like inspecto-ops / inspecto-entity-list; Standard and above.
     $scoringTargetDir = Join-Path $sandboxRoot 'features\inspecto-scoring\target'
     $scoringJarSrc = Get-ChildItem -Path $scoringTargetDir -Filter 'inspecto-scoring-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -531,7 +497,7 @@ if ($Edition -ne 'Personal') {
     if (-not $scoringJarSrc -or -not (Test-Path $scoringJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $scoringTargetDir\inspecto-scoring-*.jar."
     }
-    # SCREENING-1: the Screening add-on (/screening* + screening.run). THIN like inspecto-scoring; Professional and above.
+    # SCREENING-1: the Screening add-on (/screening* + screening.run). THIN like inspecto-scoring; Standard and above.
     $screeningTargetDir = Join-Path $sandboxRoot 'features\inspecto-screening\target'
     $screeningJarSrc = Get-ChildItem -Path $screeningTargetDir -Filter 'inspecto-screening-*.jar' -ErrorAction SilentlyContinue |
                        Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -539,7 +505,7 @@ if ($Edition -ne 'Personal') {
     if (-not $screeningJarSrc -or -not (Test-Path $screeningJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $screeningTargetDir\inspecto-screening-*.jar."
     }
-    # ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind + anomaly.score). THIN like inspecto-scoring; Professional and above (D-AD4).
+    # ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind + anomaly.score). THIN like inspecto-scoring; Standard and above (D-AD4).
     $anomalyTargetDir = Join-Path $sandboxRoot 'features\inspecto-anomaly\target'
     $anomalyJarSrc = Get-ChildItem -Path $anomalyTargetDir -Filter 'inspecto-anomaly-*.jar' -ErrorAction SilentlyContinue |
                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -547,7 +513,7 @@ if ($Edition -ne 'Personal') {
     if (-not $anomalyJarSrc -or -not (Test-Path $anomalyJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $anomalyTargetDir\inspecto-anomaly-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-anomaly -am -DskipTests"
     }
-    # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Professional and above.
+    # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Standard and above.
     $caseMgmtTargetDir = Join-Path $sandboxRoot 'features\inspecto-case-management\target'
     $caseMgmtJarSrc = Get-ChildItem -Path $caseMgmtTargetDir -Filter 'inspecto-case-management-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -555,7 +521,7 @@ if ($Edition -ne 'Personal') {
     if (-not $caseMgmtJarSrc -or -not (Test-Path $caseMgmtJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $caseMgmtTargetDir\inspecto-case-management-*.jar."
     }
-    # MODULE-REORG-P7: the Action Requests add-on (four-eyes approved outbound calls, invoke-api). THIN like inspecto-ops; Professional and above.
+    # MODULE-REORG-P7: the Action Requests add-on (four-eyes approved outbound calls, invoke-api). THIN like inspecto-ops; Standard and above.
     $actionReqTargetDir = Join-Path $sandboxRoot 'features\inspecto-action-requests\target'
     $actionReqJarSrc = Get-ChildItem -Path $actionReqTargetDir -Filter 'inspecto-action-requests-*.jar' -ErrorAction SilentlyContinue |
                        Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -563,7 +529,7 @@ if ($Edition -ne 'Personal') {
     if (-not $actionReqJarSrc -or -not (Test-Path $actionReqJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $actionReqTargetDir\inspecto-action-requests-*.jar."
     }
-    # REGULATORY-REPORTING-1: the Regulatory Reporting add-on (regulator-format reports, four-eyes, file drop). THIN; requires ops; Professional and above.
+    # REGULATORY-REPORTING-1: the Regulatory Reporting add-on (regulator-format reports, four-eyes, file drop). THIN; requires ops; Standard and above.
     $regReportTargetDir = Join-Path $sandboxRoot 'features\inspecto-regulatory-reporting\target'
     $regReportJarSrc = Get-ChildItem -Path $regReportTargetDir -Filter 'inspecto-regulatory-reporting-*.jar' -ErrorAction SilentlyContinue |
                        Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -571,7 +537,7 @@ if ($Edition -ne 'Personal') {
     if (-not $regReportJarSrc -or -not (Test-Path $regReportJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $regReportTargetDir\inspecto-regulatory-reporting-*.jar."
     }
-    if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') {
+    if ($Edition -eq 'Advanced' -or $Edition -eq 'Preview') {
         $policyTargetDir = Join-Path $sandboxRoot 'providers\inspecto-policy\target'
         $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'inspecto-policy-*.jar' -ErrorAction SilentlyContinue |
                          Select-Object -First 1 -ExpandProperty FullName
@@ -579,7 +545,7 @@ if ($Edition -ne 'Personal') {
             throw "$Edition edition requested but no JAR found matching $policyTargetDir\inspecto-policy-*.jar."
         }
         # LA-INVESTIGATION-STORE-DESIGN-1 S6 (D-IS7): the optional PostgreSQL Investigation store - a THIN jar (plain JDBC, the
-        # driver is postgresql.jar). Enterprise and Preview only; `investigations.backend=db` selects it, the default stays the filesystem.
+        # driver is postgresql.jar). Advanced and Preview only; `investigations.backend=db` selects it, the default stays the filesystem.
         $laStorePgTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-store-pg\target'
         $laStorePgJarSrc = Get-ChildItem -Path $laStorePgTargetDir -Filter 'inspecto-la-store-pg-*.jar' -ErrorAction SilentlyContinue |
                            Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -593,6 +559,49 @@ if ($Edition -ne 'Personal') {
             Select-Object -First 1 -ExpandProperty FullName
         if (-not $intelligenceJarSrc) { throw "Intelligence sidecar not found matching $intelligenceTargetDir\inspecto-intelligence-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl :inspecto-intelligence -am -DskipTests" }
     }
+}
+
+# LA-EDITIONS-1 phase 3 (2026-10-17): the Link Analysis EXPLORER ships in EVERY edition, Basic included - so these five thin jars
+# are located outside the Standard-and-up branch above. They are built by step 1 (default reactor modules).
+# The Entity List module (SEP-08). THIN like inspecto-geo-link, which depends on it.
+$entityListTargetDir = Join-Path $sandboxRoot 'features\inspecto-entity-list\target'
+$entityListJarSrc = Get-ChildItem -Path $entityListTargetDir -Filter 'inspecto-entity-list-*.jar' -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                  Select-Object -First 1 -ExpandProperty FullName
+if (-not $entityListJarSrc -or -not (Test-Path $entityListJarSrc)) {
+    throw "No JAR found matching $entityListTargetDir\inspecto-entity-list-*.jar."
+}
+# LA separation D-1 step 5b: inspecto-la-core (host-free model + the Dataset/Case ports) and inspecto-la-api (the Link
+# Analysis routes) ride beside inspecto-geo-link (the bridge that implements the ports). THIN, optional jars.
+# D-3 step 2: inspecto-la-storage (the index store skeleton); la-api depends on it from a later step.
+$laStorageTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-storage\target'
+$laStorageJarSrc = Get-ChildItem -Path $laStorageTargetDir -Filter 'inspecto-la-storage-*.jar' -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                  Select-Object -First 1 -ExpandProperty FullName
+if (-not $laStorageJarSrc -or -not (Test-Path $laStorageJarSrc)) {
+    throw "No JAR found matching $laStorageTargetDir\inspecto-la-storage-*.jar."
+}
+$laCoreTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-core\target'
+$laCoreJarSrc = Get-ChildItem -Path $laCoreTargetDir -Filter 'inspecto-la-core-*.jar' -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                  Select-Object -First 1 -ExpandProperty FullName
+if (-not $laCoreJarSrc -or -not (Test-Path $laCoreJarSrc)) {
+    throw "No JAR found matching $laCoreTargetDir\inspecto-la-core-*.jar."
+}
+$laApiTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-api\target'
+$laApiJarSrc = Get-ChildItem -Path $laApiTargetDir -Filter 'inspecto-la-api-*.jar' -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                  Select-Object -First 1 -ExpandProperty FullName
+if (-not $laApiJarSrc -or -not (Test-Path $laApiJarSrc)) {
+    throw "No JAR found matching $laApiTargetDir\inspecto-la-api-*.jar."
+}
+# The geo/link module (EDG-01 cell 3b). THIN like inspecto-policy and inspecto-backup.
+$geoLinkTargetDir = Join-Path $sandboxRoot 'la\inspecto-geo-link\target'
+$geoLinkJarSrc = Get-ChildItem -Path $geoLinkTargetDir -Filter 'inspecto-geo-link-*.jar' -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                  Select-Object -First 1 -ExpandProperty FullName
+if (-not $geoLinkJarSrc -or -not (Test-Path $geoLinkJarSrc)) {
+    throw "No JAR found matching $geoLinkTargetDir\inspecto-geo-link-*.jar."
 }
 
 # ── step 2: create bundle directory ───────────────────────────────────────────
@@ -673,7 +682,7 @@ try {
 Write-Host "Bundled $($coreLines.Count) core thin jars (no third-party classes, own module.toon, own services; none of their classes inside inspecto.jar)" -ForegroundColor Green
 if ($oidcJarSrc) {
     Copy-Item $oidcJarSrc "$bundleDir\inspecto-oidc.jar"
-    Write-Host "Bundled Professional-edition OIDC authenticator module → inspecto-oidc.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition OIDC authenticator module → inspecto-oidc.jar" -ForegroundColor Green
 
     # Verify the STAGED artifact, the same way the connector sidecar is verified. This is the check that
     # would have caught SEC-SIDECAR-BOOT-1: the module's own tests pass with Nimbus on the compile
@@ -694,7 +703,7 @@ if ($oidcJarSrc) {
 }
 if ($secretsJarSrc) {
     Copy-Item $secretsJarSrc "$bundleDir\inspecto-secrets.jar"
-    Write-Host "Bundled Professional-edition secrets provider → inspecto-secrets.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition secrets provider → inspecto-secrets.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $secretsZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-secrets.jar")
     try {
@@ -705,7 +714,7 @@ if ($secretsJarSrc) {
 }
 if ($geoCountryJarSrc) {
     Copy-Item $geoCountryJarSrc "$bundleDir\inspecto-geo-country.jar"
-    Write-Host "Bundled Professional-edition geo-country resolver → inspecto-geo-country.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition geo-country resolver → inspecto-geo-country.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $geoZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-geo-country.jar")
     try {
@@ -719,7 +728,7 @@ if ($geoCountryJarSrc) {
 }
 if ($kafkaJarSrc) {
     Copy-Item $kafkaJarSrc "$bundleDir\inspecto-connectors-kafka.jar"
-    Write-Host "Bundled Professional-edition Kafka stream connector -> inspecto-connectors-kafka.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition Kafka stream connector -> inspecto-connectors-kafka.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $kafkaZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-connectors-kafka.jar")
     try {
@@ -740,7 +749,7 @@ if ($kafkaJarSrc) {
 }
 if ($asn1JarSrc) {
     Copy-Item $asn1JarSrc "$bundleDir\inspecto-telecom-asn1.jar"
-    Write-Host "Bundled Professional-edition Telecom ASN.1 decoder -> inspecto-telecom-asn1.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition Telecom ASN.1 decoder -> inspecto-telecom-asn1.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $asn1Zip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-telecom-asn1.jar")
     try {
@@ -761,12 +770,12 @@ if ($asn1JarSrc) {
 }
 if ($channelsJarSrc) {
     Copy-Item $channelsJarSrc "$bundleDir\inspecto-notify-channels.jar"
-    Write-Host "Bundled Professional-edition delivery channels -> inspecto-notify-channels.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition delivery channels -> inspecto-notify-channels.jar" -ForegroundColor Green
 
     # Verify the STAGED artifact, exactly as the security and connector sidecars are. Both halves matter:
     # javax.mail missing means SmtpEmailChannel throws NoClassDefFoundError the moment NotificationService
     # enumerates channels, and a dropped ServicesResourceTransformer means the jar ships but registers
-    # NOTHING - which looks identical to Personal, i.e. the bug this module exists to fix.
+    # NOTHING - which looks identical to Basic, i.e. the bug this module exists to fix.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $chZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-notify-channels.jar")
     try {
@@ -775,7 +784,7 @@ if ($channelsJarSrc) {
         }
         $spiEntry = $chZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.notify.NotificationChannel' }
         if (-not $spiEntry) {
-            throw "inspecto-notify-channels.jar has no META-INF/services/com.gamma.notify.NotificationChannel - the shade dropped the ServicesResourceTransformer, so the bundle would ship with NO external delivery and look exactly like Personal."
+            throw "inspecto-notify-channels.jar has no META-INF/services/com.gamma.notify.NotificationChannel - the shade dropped the ServicesResourceTransformer, so the bundle would ship with NO external delivery and look exactly like Basic."
         }
         $reader = New-Object System.IO.StreamReader($spiEntry.Open())
         try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
@@ -785,19 +794,19 @@ if ($channelsJarSrc) {
             }
         }
         # sink.webhook's wire (WebhookSinkTransport) rides the same jar; without its SPI entry the node refuses
-        # with "ships no outbound HTTP transport" on a Professional bundle - Personal's answer, on the wrong edition.
+        # with "ships no outbound HTTP transport" on a Standard bundle - Basic's answer, on the wrong edition.
         $sinkSpi = $chZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.pipeline.exec.WebhookSinkTransport' }
         if (-not $sinkSpi) {
-            throw "inspecto-notify-channels.jar has no META-INF/services/com.gamma.pipeline.exec.WebhookSinkTransport - sink.webhook would refuse as if this were Personal."
+            throw "inspecto-notify-channels.jar has no META-INF/services/com.gamma.pipeline.exec.WebhookSinkTransport - sink.webhook would refuse as if this were Basic."
         }
         Write-Host "  verified: javax.mail classes + both NotificationChannel registrations + the WebhookSinkTransport registration present" -ForegroundColor DarkGray
     } finally { $chZip.Dispose() }
 }
 if ($backupJarSrc) {
     Copy-Item $backupJarSrc "$bundleDir\inspecto-backup.jar"
-    Write-Host "Bundled Professional-edition backup module -> inspecto-backup.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition backup module -> inspecto-backup.jar" -ForegroundColor Green
     # A thin jar cannot lose classes to a shade, so the only way it ships INERT is a missing
-    # META-INF/services entry - and inert here looks exactly like Personal, i.e. the bug this fixes.
+    # META-INF/services entry - and inert here looks exactly like Basic, i.e. the bug this fixes.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $bkZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-backup.jar")
     try {
@@ -813,76 +822,66 @@ if ($backupJarSrc) {
         Write-Host "  verified: MaintenanceTaskProvider registration present in the backup module" -ForegroundColor DarkGray
     } finally { $bkZip.Dispose() }
 }
-if ($entityListJarSrc) {
-    Copy-Item $entityListJarSrc "$bundleDir\inspecto-entity-list.jar"
-    Write-Host "Bundled Entity List module -> inspecto-entity-list.jar" -ForegroundColor Green
-    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the six /entity-lists paths would 503
-    # on a bundle supposed to have them, and the risk-score WatchListFeed would never be installed.
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $elZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-entity-list.jar")
-    try {
-        $spiEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.spi.http.RouteModule - EntityListRoutes would never be discovered." }
+Copy-Item $entityListJarSrc "$bundleDir\inspecto-entity-list.jar"
+Write-Host "Bundled Entity List module -> inspecto-entity-list.jar" -ForegroundColor Green
+# Thin jar: the only way it ships INERT is a missing META-INF/services entry - the six /entity-lists paths would 503
+# on a bundle supposed to have them, and the risk-score WatchListFeed would never be installed.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$elZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-entity-list.jar")
+try {
+    $spiEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+    if (-not $spiEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.spi.http.RouteModule - EntityListRoutes would never be discovered." }
+    $reader = New-Object System.IO.StreamReader($spiEntry.Open())
+    try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    if ($spiBody -notmatch [regex]::Escape('com.gamma.entitylist.EntityListRoutes')) { throw "inspecto-entity-list.jar registers no com.gamma.entitylist.EntityListRoutes - the SPI file lists only: $spiBody" }
+    $feedEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.entitylist.WatchListFeed' }
+    if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.entitylist.WatchListFeed - watch lists would never feed the risk score." }
+    Write-Host "  verified: RouteModule and WatchListFeed registrations present in the Entity List module" -ForegroundColor DarkGray
+} finally { $elZip.Dispose() }
+Copy-Item $laStorageJarSrc "$bundleDir\inspecto-la-storage.jar"
+Write-Host "Bundled Link Analysis index store -> inspecto-la-storage.jar" -ForegroundColor Green
+Copy-Item $laCoreJarSrc "$bundleDir\inspecto-la-core.jar"
+Write-Host "Bundled Link Analysis core module -> inspecto-la-core.jar" -ForegroundColor Green
+Copy-Item $laApiJarSrc "$bundleDir\inspecto-la-api.jar"
+Write-Host "Bundled Link Analysis routes module -> inspecto-la-api.jar" -ForegroundColor Green
+# Thin jar: the only way it ships INERT is a missing META-INF/services entry - the Link Analysis paths would 503 on a
+# bundle supposed to have them.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$laZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-la-api.jar")
+try {
+    $spiEntry = $laZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+    if (-not $spiEntry) { throw "inspecto-la-api.jar has no META-INF/services/com.gamma.spi.http.RouteModule - GeoRoutes/InvRoutes would never be discovered." }
+    $reader = New-Object System.IO.StreamReader($spiEntry.Open())
+    try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    foreach ($impl in @('com.gamma.la.api.GeoRoutes', 'com.gamma.la.api.InvRoutes')) {
+        if ($spiBody -notmatch [regex]::Escape($impl)) { throw "inspecto-la-api.jar registers no $impl - the SPI file lists only: $spiBody" }
+    }
+    Write-Host "  verified: both RouteModule registrations present in the Link Analysis routes module" -ForegroundColor DarkGray
+} finally { $laZip.Dispose() }
+Copy-Item $geoLinkJarSrc "$bundleDir\inspecto-geo-link.jar"
+Write-Host "Bundled Link Analysis bridge -> inspecto-geo-link.jar" -ForegroundColor Green
+# The bridge implements the two Link Analysis ports. A thin jar cannot lose classes to a shade, so the only way it
+# ships INERT is a missing or incomplete META-INF/services entry - and inert here means every Dataset-reading
+# Link Analysis route answers 503 "no Dataset provider" on a bundle supposed to have them.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$glZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-geo-link.jar")
+try {
+    foreach ($svc in @(
+            @('com.gamma.spi.http.RouteModule', 'com.gamma.geolink.InvestigationMeasureRoutes'),
+            @('com.gamma.la.core.DatasetProvider', 'com.gamma.geolink.EngineDatasetProvider'),
+            @('com.gamma.la.core.CasePort', 'com.gamma.geolink.HostCasePort'),
+            @('com.gamma.alert.InvestigationMeasureProbe', 'com.gamma.geolink.WorkingSetMeasures'))) {
+        $spiEntry = $glZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
+        if (-not $spiEntry) { throw "inspecto-geo-link.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
         $reader = New-Object System.IO.StreamReader($spiEntry.Open())
         try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
-        if ($spiBody -notmatch [regex]::Escape('com.gamma.entitylist.EntityListRoutes')) { throw "inspecto-entity-list.jar registers no com.gamma.entitylist.EntityListRoutes - the SPI file lists only: $spiBody" }
-        $feedEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.entitylist.WatchListFeed' }
-        if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.entitylist.WatchListFeed - watch lists would never feed the risk score." }
-        Write-Host "  verified: RouteModule and WatchListFeed registrations present in the Entity List module" -ForegroundColor DarkGray
-    } finally { $elZip.Dispose() }
-}
-if ($laStorageJarSrc) {
-    Copy-Item $laStorageJarSrc "$bundleDir\inspecto-la-storage.jar"
-    Write-Host "Bundled Link Analysis index store -> inspecto-la-storage.jar" -ForegroundColor Green
-}
-if ($laCoreJarSrc) {
-    Copy-Item $laCoreJarSrc "$bundleDir\inspecto-la-core.jar"
-    Write-Host "Bundled Link Analysis core module -> inspecto-la-core.jar" -ForegroundColor Green
-}
-if ($laApiJarSrc) {
-    Copy-Item $laApiJarSrc "$bundleDir\inspecto-la-api.jar"
-    Write-Host "Bundled Link Analysis routes module -> inspecto-la-api.jar" -ForegroundColor Green
-    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the Link Analysis paths would 503 on a
-    # bundle supposed to have them.
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $laZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-la-api.jar")
-    try {
-        $spiEntry = $laZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-la-api.jar has no META-INF/services/com.gamma.spi.http.RouteModule - GeoRoutes/InvRoutes would never be discovered." }
-        $reader = New-Object System.IO.StreamReader($spiEntry.Open())
-        try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
-        foreach ($impl in @('com.gamma.la.api.GeoRoutes', 'com.gamma.la.api.InvRoutes')) {
-            if ($spiBody -notmatch [regex]::Escape($impl)) { throw "inspecto-la-api.jar registers no $impl - the SPI file lists only: $spiBody" }
-        }
-        Write-Host "  verified: both RouteModule registrations present in the Link Analysis routes module" -ForegroundColor DarkGray
-    } finally { $laZip.Dispose() }
-}
-if ($geoLinkJarSrc) {
-    Copy-Item $geoLinkJarSrc "$bundleDir\inspecto-geo-link.jar"
-    Write-Host "Bundled Professional-edition Link Analysis bridge -> inspecto-geo-link.jar" -ForegroundColor Green
-    # The bridge implements the two Link Analysis ports. A thin jar cannot lose classes to a shade, so the only way it
-    # ships INERT is a missing or incomplete META-INF/services entry - and inert here means every Dataset-reading
-    # Link Analysis route answers 503 "no Dataset provider" on a bundle supposed to have them.
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $glZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-geo-link.jar")
-    try {
-        foreach ($svc in @(
-                @('com.gamma.spi.http.RouteModule', 'com.gamma.geolink.InvestigationMeasureRoutes'),
-                @('com.gamma.la.core.DatasetProvider', 'com.gamma.geolink.EngineDatasetProvider'),
-                @('com.gamma.la.core.CasePort', 'com.gamma.geolink.HostCasePort'),
-                @('com.gamma.alert.InvestigationMeasureProbe', 'com.gamma.geolink.WorkingSetMeasures'))) {
-            $spiEntry = $glZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
-            if (-not $spiEntry) { throw "inspecto-geo-link.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
-            $reader = New-Object System.IO.StreamReader($spiEntry.Open())
-            try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
-            if ($spiBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-geo-link.jar registers no $($svc[1]) for $($svc[0]) - the SPI file lists only: $spiBody" }
-        }
-        Write-Host "  verified: RouteModule, DatasetProvider, CasePort and InvestigationMeasureProbe registrations present in the bridge" -ForegroundColor DarkGray
-    } finally { $glZip.Dispose() }
-}
+        if ($spiBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-geo-link.jar registers no $($svc[1]) for $($svc[0]) - the SPI file lists only: $spiBody" }
+    }
+    Write-Host "  verified: RouteModule, DatasetProvider, CasePort and InvestigationMeasureProbe registrations present in the bridge" -ForegroundColor DarkGray
+} finally { $glZip.Dispose() }
 if ($exchangeJarSrc) {
     Copy-Item $exchangeJarSrc "$bundleDir\inspecto-exchange.jar"
-    Write-Host "Bundled Professional-edition exchange module -> inspecto-exchange.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition exchange module -> inspecto-exchange.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $exZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-exchange.jar")
     try {
@@ -896,7 +895,7 @@ if ($exchangeJarSrc) {
 }
 if ($obsJarSrc) {
     Copy-Item $obsJarSrc "$bundleDir\inspecto-observability.jar"
-    Write-Host "Bundled Professional-edition observability module -> inspecto-observability.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition observability module -> inspecto-observability.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $obsZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-observability.jar")
     try {
@@ -907,7 +906,7 @@ if ($obsJarSrc) {
 }
 if ($opsJarSrc) {
     Copy-Item $opsJarSrc "$bundleDir\inspecto-ops.jar"
-    Write-Host "Bundled Professional-edition operational-objects module -> inspecto-ops.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition operational-objects module -> inspecto-ops.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $opZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-ops.jar")
     try {
@@ -1045,7 +1044,7 @@ if ($regReportJarSrc) {
 }
 if ($agentJarSrc) {
     Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"
-    Write-Host "Bundled Professional-edition assist agent -> inspecto-agent.jar" -ForegroundColor Green
+    Write-Host "Bundled Standard-edition assist agent -> inspecto-agent.jar" -ForegroundColor Green
 
     # Verify the sidecar is USABLE, not merely present - the lesson CONNECTORS-BUNDLE-1 taught (a
     # module's own tests can never fail for a packaging gap). This runs on the STAGED ARTIFACT.
@@ -1069,25 +1068,25 @@ if ($agentJarSrc) {
 }
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
-    Write-Host "Bundled Enterprise-edition policy module → inspecto-policy.jar" -ForegroundColor Green
+    Write-Host "Bundled Advanced-edition policy module → inspecto-policy.jar" -ForegroundColor Green
 }
 if ($laStorePgJarSrc) {
     Copy-Item $laStorePgJarSrc "$bundleDir\inspecto-la-store-pg.jar"
-    Write-Host "Bundled Enterprise-edition PostgreSQL Investigation store -> inspecto-la-store-pg.jar" -ForegroundColor Green
+    Write-Host "Bundled Advanced-edition PostgreSQL Investigation store -> inspecto-la-store-pg.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $laPgZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-la-store-pg.jar")
     try {
-        if (-not ($laPgZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.la.core.InvestigationStoreProvider' })) { throw "inspecto-la-store-pg.jar has no InvestigationStoreProvider service file - investigations.backend=db would answer 503 on an Enterprise bundle." }
+        if (-not ($laPgZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.la.core.InvestigationStoreProvider' })) { throw "inspecto-la-store-pg.jar has no InvestigationStoreProvider service file - investigations.backend=db would answer 503 on an Advanced bundle." }
     } finally { $laPgZip.Dispose() }
 }
 if ($intelligenceJarSrc) {
     Copy-Item $intelligenceJarSrc "$bundleDir\inspecto-intelligence.jar"
-    Write-Host "Bundled Enterprise-edition intelligence agent -> inspecto-intelligence.jar" -ForegroundColor Green
+    Write-Host "Bundled Advanced-edition intelligence agent -> inspecto-intelligence.jar" -ForegroundColor Green
     # Same staged-artifact checks as the assist sidecar: registered, shaded, core-free, one SLF4J binding.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $intelZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-intelligence.jar")
     try {
-        if (-not ($intelZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.intelligence.spi.IntelligenceAgent' })) { throw "inspecto-intelligence.jar has no IntelligenceAgent service file - every /agent/* path would 503 on an Enterprise bundle." }
+        if (-not ($intelZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.intelligence.spi.IntelligenceAgent' })) { throw "inspecto-intelligence.jar has no IntelligenceAgent service file - every /agent/* path would 503 on an Advanced bundle." }
         if (-not ($intelZip.Entries | Where-Object { $_.FullName.StartsWith('ai/onnxruntime/native/') } | Select-Object -First 1)) { throw "inspecto-intelligence.jar carries no onnxruntime native libraries - it is a THIN jar." }
         if ($intelZip.Entries | Where-Object { $_.FullName.StartsWith('com/gamma/etl/') } | Select-Object -First 1) { throw "inspecto-intelligence.jar contains core classes (com/gamma/etl/*) - inspecto-processor lost its provided scope." }
         if ($intelZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/org.slf4j.spi.SLF4JServiceProvider' }) { throw "inspecto-intelligence.jar registers a second SLF4J binding - the shade excludes were dropped." }
@@ -1104,8 +1103,8 @@ if ($intelligenceJarSrc) {
 }
 # Every edition: remote acquisition is a core product capability (EDITIONS SP-ACQ-02 marks SFTP shipped in
 # all three), so the sidecar is NOT edition-gated. It is inert until a pipeline names a non-local
-# `collector.connector`. NOTE it adds ~32 MB, dominated by BouncyCastle (sshj) - kafka-clients left for inspecto-connectors-kafka (Professional+) in P7 - if
-# Personal must stay leaner, gate this copy on $Edition and correct the SP-ACQ rows to match.
+# `collector.connector`. NOTE it adds ~32 MB, dominated by BouncyCastle (sshj) - kafka-clients left for inspecto-connectors-kafka (Standard+) in P7 - if
+# Basic must stay leaner, gate this copy on $Edition and correct the SP-ACQ rows to match.
 Copy-Item $connectorsJarSrc "$bundleDir\inspecto-connectors.jar"
 Write-Host "Bundled remote connector sidecar -> inspecto-connectors.jar" -ForegroundColor Green
 
@@ -1170,12 +1169,12 @@ if ($SignJars) {
     Write-Host "  signed + verified: $($toSign.Count) jars" -ForegroundColor DarkGray
 }
 
-# ── step 3a: Professional/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
+# ── step 3a: Standard/Advanced — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
 # The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, platform/inspecto-engine/pom.xml);
 # the driver rides the bundle as postgresql.jar, auto-detected by serve.sh/serve.bat exactly like
-# inspecto-oidc.jar. Personal ships DuckDB only — OperationalDb.verifySelectable fails a
+# inspecto-oidc.jar. Basic ships DuckDB only — OperationalDb.verifySelectable fails a
 # -Dinspecto.db=postgres boot there, naming this sidecar as the thing to drop in.
-if ($Edition -ne 'Personal') {
+if ($Edition -ne 'Basic') {
     $pgVersion = ([xml](Get-Content (Join-Path $sandboxRoot 'pom.xml'))).project.properties.'postgresql.version'
     if (-not $pgVersion) { throw "postgresql.version not found in the parent pom — cannot bundle the driver" }
     $pgJar = Join-Path $env:USERPROFILE ".m2\repository\org\postgresql\postgresql\$pgVersion\postgresql-$pgVersion.jar"
@@ -1189,7 +1188,7 @@ if ($Edition -ne 'Personal') {
 # ── step 3a-bis: SBOM per PACKAGED BUNDLE — CycloneDX + SPDX from ONE resolution (COMPLY-1, matrix G1) ──
 # Generated here, after the jars are staged and BEFORE the zip, so the SBOM ships inside the bundle
 # (bundle/sbom/) and is covered by the zip's checksum + signature. Per bundle, never per reactor: the
-# reactor resolves the optional AI stack a Personal bundle does not carry (controls-matrix CC9). Both
+# reactor resolves the optional AI stack a Basic bundle does not carry (controls-matrix CC9). Both
 # documents are two serialisations of one component list — they cannot drift (tools/sbom.mjs). Node is
 # already a packaging prerequisite (the UI build); a missing SBOM is a packaging FAILURE, not a warning —
 # a bundle without one is a bundle an auditor cannot accept.
@@ -1201,8 +1200,8 @@ $sbomExit = $LASTEXITCODE
 Pop-Location
 if ($sbomExit -ne 0) { throw "SBOM generation failed (exit $sbomExit) — a bundle ships with its SBOM or not at all" }
 
-# DEMO-AUTH-1 (runs AFTER the SBOM step: sbom.mjs requires every Enterprise jar to be staged, so the SBOM
-# describes the Enterprise module set, as DEMO-BUILD.txt says). A demo build signs Demo Users in with no IAM, so the OIDC module must NOT be on its classpath
+# DEMO-AUTH-1 (runs AFTER the SBOM step: sbom.mjs requires every Advanced jar to be staged, so the SBOM
+# describes the Advanced module set, as DEMO-BUILD.txt says). A demo build signs Demo Users in with no IAM, so the OIDC module must NOT be on its classpath
 # (two Authenticators is unsupported, and the OIDC one would refuse to construct without an issuer).
 if ($DemoAuth) {
     if (-not $NoBuild) {
@@ -1217,7 +1216,7 @@ if ($DemoAuth) {
     Remove-Item (Join-Path $bundleDir 'inspecto-oidc.jar') -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $bundleDir 'inspecto-secrets.jar') -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $bundleDir 'inspecto-geo-country.jar') -ErrorAction SilentlyContinue
-    # P3f: the per-module SBOMs of the removed trio go with them (the combined SBOM keeps describing the Enterprise set)
+    # P3f: the per-module SBOMs of the removed trio go with them (the combined SBOM keeps describing the Advanced set)
     foreach ($gone in 'inspecto-oidc','inspecto-secrets','inspecto-geo-country') { Remove-Item (Join-Path $bundleDir "sbom\$gone.sbom.cdx.json") -ErrorAction SilentlyContinue }
     Copy-Item -Path $demoJar.FullName -Destination (Join-Path $bundleDir 'inspecto-demo-auth.jar')
     if ($SignJars) { Invoke-JarSign -Jar (Join-Path $bundleDir 'inspecto-demo-auth.jar') }
@@ -1580,11 +1579,11 @@ Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
 # have had ZERO Java readers since the token plane left the core on 2026-06-16 -- so the scripts
 # emitted them inertly while telling the operator CONTROL_TOKEN was "required to use the control
 # plane". Someone following that instruction would think they had secured an auth-free service.
-# Real authentication is the inspecto-oidc module (Professional+, OIDC); see docs/EDITIONS.md.
+# Real authentication is the inspecto-oidc module (Standard+, OIDC); see docs/EDITIONS.md.
 $serveShContent = @'
 #!/usr/bin/env bash
 # Usage: [PORT=8080] [SPACES_ROOT=spaces] ./serve.sh
-# The core is AUTH-FREE by design. Real authentication is the `inspecto-oidc` module (Professional+, OIDC) — see docs/EDITIONS.md.
+# The core is AUTH-FREE by design. Real authentication is the `inspecto-oidc` module (Standard+, OIDC) — see docs/EDITIONS.md.
 # Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" ./serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
 # The bundle ships NO Spaces: drop your Space folder(s) into spaces/ (or set SPACES_ROOT) and restart.
@@ -1604,10 +1603,10 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 [ -n "${HTTPS_KEYSTORE_PASSWORD:-}" ] && JAVA_OPTS+=("-Dhttps.keystore.password=${HTTPS_KEYSTORE_PASSWORD}")
 # MODULE-REORG-P3d stage 1: the classpath and the edition are READ, not sniffed. Package time writes two files from the bundle's
 # Offering (tools/offering-classpath.mjs): `modules.list` - every jar on the classpath, one per line, in classpath order - and
-# `edition.properties` - `edition=Personal|Professional|Enterprise|Preview`. Nothing here names a jar or guesses the edition from
+# `edition.properties` - `edition=Basic|Standard|Advanced|Preview`. Nothing here names a jar or guesses the edition from
 # which jars happen to be present, so a jar dropped into the directory is NOT on the classpath until the list says so.
 # FALLBACKS for a hand-assembled directory: no modules.list => inspecto.jar first, then every *.jar beside it; no
-# edition.properties => the old heuristic (inspecto-oidc.jar present => Professional, + inspecto-policy.jar => Enterprise).
+# edition.properties => the old heuristic (inspecto-oidc.jar present => Standard, + inspecto-policy.jar => Advanced).
 if [ -f modules.list ]; then
     CP="$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="${CP%:}"
 else
@@ -1616,22 +1615,22 @@ else
 fi
 if [ -f edition.properties ]; then
     EDITION="$(sed -n 's/^edition=//p' edition.properties | tr -d '\r')"
-elif [ -f inspecto-oidc.jar ] && [ -f inspecto-policy.jar ]; then EDITION="Enterprise"
-elif [ -f inspecto-oidc.jar ]; then EDITION="Professional"
-else EDITION="Personal"
+elif [ -f inspecto-oidc.jar ] && [ -f inspecto-policy.jar ]; then EDITION="Advanced"
+elif [ -f inspecto-oidc.jar ]; then EDITION="Standard"
+else EDITION="Basic"
 fi
 case "${EDITION}" in
-    Personal|Professional|Enterprise|Preview) ;;
-    *) echo "[serve.sh] edition.properties names an unknown edition '${EDITION}' (expected Personal, Professional, Enterprise or Preview)" >&2; exit 1 ;;
+    Basic|Standard|Advanced|Preview) ;;
+    *) echo "[serve.sh] edition.properties names an unknown edition '${EDITION}' (expected Basic, Standard, Advanced or Preview)" >&2; exit 1 ;;
 esac
-# Every edition above Personal authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
-# those editions because the Offering puts it there. Personal stays byte-for-byte the historic auth-free flag set.
-if [ "${EDITION}" != "Personal" ]; then
+# Every edition above Basic authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
+# those editions because the Offering puts it there. Basic stays byte-for-byte the historic auth-free flag set.
+if [ "${EDITION}" != "Basic" ]; then
     JAVA_OPTS+=("-Dauth.mode=oidc")
-    # EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts. The engine
+    # EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts. The engine
     # default is the bounded in-memory ring (ServiceStores.openEventStore), which forgets every audited
-    # mutation on restart -- correct for Personal's zero-file promise, false for the tamper-evident,
-    # append-only audit story Professional+ sells. -Devents.dir is deliberately NOT set: it defaults to
+    # mutation on restart -- correct for Basic's zero-file promise, false for the tamper-evident,
+    # append-only audit story Standard+ sells. -Devents.dir is deliberately NOT set: it defaults to
     # SpaceRoot.eventsDir(), so discover mode keeps one trail per space instead of one shared pile.
     JAVA_OPTS+=("-Devents.backend=parquet")
     [ -n "${AUTH_OIDC_ISSUER:-}" ]    && JAVA_OPTS+=("-Dauth.oidc.issuer=${AUTH_OIDC_ISSUER}")
@@ -1645,14 +1644,14 @@ if [ "${EDITION}" != "Personal" ]; then
     # Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value —
     # the backend expands ${ENV:...} at use, so the secret never appears on the process command line.
     [ -n "${AUTH_OIDC_CLIENT_SECRET:-}" ] && JAVA_OPTS+=('-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}')
-    # Enterprise (Professional + ABAC): no flag. inspecto-policy.jar is on the classpath list, and the module is found via
+    # Advanced (Standard + ABAC): no flag. inspecto-policy.jar is on the classpath list, and the module is found via
     # META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath entry IS the switch.
 fi
 # OBJECTS-BACKEND-DEFAULT-MEMORY-1 (operator decision 2026-09-25): Incidents, Cases, notes, links and tags
-# survive a restart on every edition. Personal/Professional/Preview keep them in each Space's duckdb/ (the
-# engine default, -Dobjects.backend=db). Enterprise REQUIRES PostgreSQL: -Dobjects.backend=postgres refuses
+# survive a restart on every edition. Basic/Standard/Preview keep them in each Space's duckdb/ (the
+# engine default, -Dobjects.backend=db). Advanced REQUIRES PostgreSQL: -Dobjects.backend=postgres refuses
 # to boot until INSPECTO_DB_URL (below) points them at one -- there is no fallback to DuckDB or memory.
-[ "${EDITION}" = "Enterprise" ] && JAVA_OPTS+=("-Dobjects.backend=postgres")
+[ "${EDITION}" = "Advanced" ] && JAVA_OPTS+=("-Dobjects.backend=postgres")
 # The PostgreSQL JDBC driver (PG-1), the remote connector sidecar, the delivery channels, backup, the Link Analysis modules, the
 # assistant and the rest are all on the classpath because modules.list names them - see the top of this section. Each is inert
 # until its config asks for it (inspecto.db=postgres, a non-local `collector.connector`, ...).
@@ -1666,11 +1665,11 @@ if [ -f inspecto-intelligence.jar ]; then
     JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=${NATIVES}/tmp" "-Djna.tmpdir=${NATIVES}/tmp" "-DDJL_CACHE_DIR=${NATIVES}/djl" "-DENGINE_CACHE_DIR=${NATIVES}/djl")
 fi
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
-# SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
-# and Professional/Enterprise move to PostgreSQL here — the edition seam, per the codebase's rule that
+# SERVED from a database by default; Basic stays on the bundled DuckDB with zero configuration,
+# and Standard/Advanced move to PostgreSQL here — the edition seam, per the codebase's rule that
 # editions differ by what the BUNDLE carries, never by a default baked into the engine.
 # ⚠ Driver PRESENCE alone must not select PostgreSQL: OperationalDb.verifySelectable() fails the boot
-# when postgres is chosen without a URL, so auto-enabling on the sidecar would break every Professional
+# when postgres is chosen without a URL, so auto-enabling on the sidecar would break every Standard
 # deployment that has not configured one yet. The URL is the signal.
 if [ -f postgresql.jar ] && [ -n "${INSPECTO_DB_URL:-}" ]; then
     JAVA_OPTS+=("-Dinspecto.db=postgres" "-Dinspecto.db.url=${INSPECTO_DB_URL}")
@@ -1691,8 +1690,8 @@ JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})${EXTRA_OPTS:+  extra JVM opts: ${EXTRA_OPTS}}"
 exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
 '@
-# OBJECTS-BACKEND-DEFAULT-MEMORY-1: a Preview bundle carries Enterprise's exact jars, which the old jar-sniffing launcher
-# would have called Enterprise (and demanded PostgreSQL). Preview keeps the objects on DuckDB (operator decision 2026-09-25);
+# OBJECTS-BACKEND-DEFAULT-MEMORY-1: a Preview bundle carries Advanced's exact jars, which the old jar-sniffing launcher
+# would have called Advanced (and demanded PostgreSQL). Preview keeps the objects on DuckDB (operator decision 2026-09-25);
 # since P3d the launcher reads `edition=Preview` from edition.properties, so no text substitution is needed any more.
 Write-LfScript -Path "$bundleDir\serve.sh" -Content $serveShContent
 
@@ -1700,7 +1699,7 @@ $serveBatContent = @'
 @echo off
 rem Usage: serve.bat
 rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces).
-rem The core is AUTH-FREE by design; real auth is the inspecto-oidc module (Professional+, OIDC).
+rem The core is AUTH-FREE by design; real auth is the inspecto-oidc module (Standard+, OIDC).
 rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
 rem Starts the control plane + operator UI over every space under .\spaces (serves bundled .\ui).
 rem The bundle ships NO Spaces: drop your Space folder(s) into spaces\ (or set SPACES_ROOT) and restart.
@@ -1723,53 +1722,53 @@ if not "%HTTPS_KEYSTORE%"=="" set "OPTS=%OPTS% -Dhttps.keystore=%HTTPS_KEYSTORE%
 if not "%HTTPS_KEYSTORE_PASSWORD%"=="" set "OPTS=%OPTS% -Dhttps.keystore.password=%HTTPS_KEYSTORE_PASSWORD%"
 rem MODULE-REORG-P3d stage 1: the classpath and the edition are READ, not sniffed. Package time writes two files from the
 rem bundle's Offering (tools/offering-classpath.mjs): modules.list - every jar on the classpath, one per line, in classpath
-rem order - and edition.properties - edition=Personal/Professional/Enterprise/Preview. Nothing here names a jar or guesses
+rem order - and edition.properties - edition=Basic/Standard/Advanced/Preview. Nothing here names a jar or guesses
 rem the edition from which jars are present. The list is accumulated as ;a;b;c with `call set` (a second expansion of %CP%
 rem per jar - NO delayed expansion, for the reason given below) and the leading ; is stripped.
 rem FALLBACKS for a hand-assembled directory: no modules.list => inspecto.jar first, then every *.jar beside it; no
-rem edition.properties => the old heuristic (inspecto-oidc.jar => Professional, + inspecto-policy.jar => Enterprise).
+rem edition.properties => the old heuristic (inspecto-oidc.jar => Standard, + inspecto-policy.jar => Advanced).
 set "CP="
 if exist modules.list for /f "usebackq delims=" %%J in ("modules.list") do call set "CP=%%CP%%;%%J"
 if not exist modules.list echo [serve.bat] modules.list not found - falling back to every *.jar in this directory
 if not exist modules.list set "CP=;inspecto.jar"
 if not exist modules.list for %%J in (*.jar) do if /i not "%%J"=="inspecto.jar" call set "CP=%%CP%%;%%J"
 set "CP=%CP:~1%"
-set "EDITION=Personal"
-if not exist edition.properties if exist inspecto-oidc.jar set "EDITION=Professional"
-if not exist edition.properties if exist inspecto-oidc.jar if exist inspecto-policy.jar set "EDITION=Enterprise"
+set "EDITION=Basic"
+if not exist edition.properties if exist inspecto-oidc.jar set "EDITION=Standard"
+if not exist edition.properties if exist inspecto-oidc.jar if exist inspecto-policy.jar set "EDITION=Advanced"
 if exist edition.properties for /f "usebackq tokens=1,* delims==" %%A in ("edition.properties") do if /i "%%A"=="edition" set "EDITION=%%B"
 set "EDITION_OK="
-for %%E in (Personal Professional Enterprise Preview) do if "%EDITION%"=="%%E" set "EDITION_OK=1"
-if not defined EDITION_OK echo [serve.bat] edition.properties names an unknown edition "%EDITION%" - expected Personal, Professional, Enterprise or Preview & exit /b 1
-rem Every edition above Personal authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
-rem those editions because the Offering puts it there. Personal stays byte-for-byte the historic auth-free flag set.
+for %%E in (Basic Standard Advanced Preview) do if "%EDITION%"=="%%E" set "EDITION_OK=1"
+if not defined EDITION_OK echo [serve.bat] edition.properties names an unknown edition "%EDITION%" - expected Basic, Standard, Advanced or Preview & exit /b 1
+rem Every edition above Basic authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
+rem those editions because the Offering puts it there. Basic stays byte-for-byte the historic auth-free flag set.
 rem 🔴 SERVEBAT-OPTS-1 (2026-09-11): these are single-line `if`s, NOT a parenthesized block, and that
 rem is load-bearing. cmd.exe expands every %OPTS% in a parenthesized block ONCE, when the block is
 rem PARSED, so N `set "OPTS=%OPTS% ..."` statements inside one block all expand to the value OPTS had
 rem BEFORE the block and only the last one executed survives. This branch used to be such a block, so
-rem a Professional/Enterprise Windows bundle dropped -Dauth.mode=oidc (and every OIDC flag but the last)
-rem and booted AUTH-FREE while printing "edition: Professional" -- the BUNDLE-1 inert-flag trap again.
+rem a Standard/Advanced Windows bundle dropped -Dauth.mode=oidc (and every OIDC flag but the last)
+rem and booted AUTH-FREE while printing "edition: Standard" -- the BUNDLE-1 inert-flag trap again.
 rem ⛔ Do NOT "tidy" these back into an if-block, and do NOT reach for `setlocal EnableDelayedExpansion`
 rem instead: these values carry operator secrets and keystore passwords, and delayed expansion eats `!`
 rem inside them. One statement per line is the only form that is correct for both. serve.sh has no
 rem such hazard -- bash expands at execution -- which is why only this half is written out flat.
-if not "%EDITION%"=="Personal" set "OPTS=%OPTS% -Dauth.mode=oidc"
-rem EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts; see serve.sh.
-if not "%EDITION%"=="Personal" set "OPTS=%OPTS% -Devents.backend=parquet"
-if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
-if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
-if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"
-if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
-if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_PROVIDER%"=="" set "OPTS=%OPTS% -Dauth.oidc.provider=%AUTH_OIDC_PROVIDER%"
-if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_DISCOVERY_URL%"=="" set "OPTS=%OPTS% -Dauth.oidc.discoveryUrl=%AUTH_OIDC_DISCOVERY_URL%"
+if not "%EDITION%"=="Basic" set "OPTS=%OPTS% -Dauth.mode=oidc"
+rem EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts; see serve.sh.
+if not "%EDITION%"=="Basic" set "OPTS=%OPTS% -Devents.backend=parquet"
+if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
+if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
+if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"
+if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
+if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_PROVIDER%"=="" set "OPTS=%OPTS% -Dauth.oidc.provider=%AUTH_OIDC_PROVIDER%"
+if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_DISCOVERY_URL%"=="" set "OPTS=%OPTS% -Dauth.oidc.discoveryUrl=%AUTH_OIDC_DISCOVERY_URL%"
 rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
-if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
-rem Enterprise (Professional + ABAC) needs no flag: inspecto-policy.jar is on the classpath list, and the module is found via
+if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
+rem Advanced (Standard + ABAC) needs no flag: inspecto-policy.jar is on the classpath list, and the module is found via
 rem META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath IS the switch.
-rem OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): Enterprise REQUIRES PostgreSQL for Incidents, Cases,
+rem OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): Advanced REQUIRES PostgreSQL for Incidents, Cases,
 rem notes, links and tags - it refuses to boot until INSPECTO_DB_URL is set; see serve.sh. Every other
 rem edition keeps them in each Space's duckdb/ (the engine default, -Dobjects.backend=db).
-if "%EDITION%"=="Enterprise" set "OPTS=%OPTS% -Dobjects.backend=postgres"
+if "%EDITION%"=="Advanced" set "OPTS=%OPTS% -Dobjects.backend=postgres"
 rem Every other jar (the PostgreSQL driver, the connector sidecar, delivery channels, backup, Link Analysis, the assistant ...) is
 rem on the classpath because modules.list names it - see the top of this section. See serve.sh for what each does.
 rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
@@ -2204,9 +2203,9 @@ if (-not $NoRuntime) {
 #   -Dcontrol.bind=127.0.0.1  demo sign-in is unauthenticated; the module refuses to load otherwise
 #   -Dauth.mode=demo          the SPA's sign-in page shows the Demo User picker
 #   -Dobjects.backend=db      Incidents/Cases/notes persist in the Space's duckdb/ -- stated explicitly: this is an
-#                             Enterprise-capability build, and Enterprise's serve.* would demand PostgreSQL
+#                             Advanced-capability build, and Advanced's serve.* would demand PostgreSQL
 #                             (OBJECTS-BACKEND-DEFAULT-MEMORY-1); a one-folder hand-over has none
-#   -Devents.backend=parquet  the audit trail survives a restart, as on Professional+
+#   -Devents.backend=parquet  the audit trail survives a restart, as on Standard+
 #   -Djobs.backend=duckdb     run history (Home's Recent Runs, /jobs/runs|metrics) in the Space's duckdb/ (R2-08).
 #                             serve.* leaves it unset (default none) -- job reporting is opt-in there; a demo
 #                             whose Home says "Run history needs the DuckDB jobs backend" is not a demo
@@ -2309,7 +2308,7 @@ It is not secure and must never be given to a customer, exposed on a network, or
 
 Demo Users are defined per Space in config/demo-users.toon; their roles come from that Space's role table. If two attached Spaces list the same user id, the rows must be identical, otherwise sign-in answers a DEMO_ROSTER_CONFLICT error naming the user and both Spaces.
 The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
-The bundled SBOM describes the Enterprise module set: it lists inspecto-oidc (not shipped here) and
+The bundled SBOM describes the Advanced module set: it lists inspecto-oidc (not shipped here) and
 omits inspecto-demo-auth (shipped here).
 "@
     if ($Ui -eq 'la-app' -and -not $NoBakeDemo) {
@@ -2336,7 +2335,7 @@ RESET THE DEMO: stop the server, delete .\spaces\la-showcase, and restore that f
 Anything done during a session (new steps, Drafts, Alert Rules) lives in that folder, so a reset discards it.
 
 The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
-The bundled SBOM describes the Enterprise module set: it lists inspecto-oidc (not shipped here) and
+The bundled SBOM describes the Advanced module set: it lists inspecto-oidc (not shipped here) and
 omits inspecto-demo-auth (shipped here).
 "@
     }
@@ -2370,7 +2369,7 @@ $bundledAnyExt = $false
 #       the old `postgresql://` example was the broken part, not the feature), and
 #   (b) `ATTACH 'ducklake:postgres:...'` AUTO-LOADS postgres_scanner -- observed going loaded=false ->
 #       loaded=true across the attach, with no explicit LOAD anywhere in this repo.
-# ⛔ So without this name an air-gapped Enterprise pod fails EVERY batch: `ducklake` loads from its staged
+# ⛔ So without this name an air-gapped Advanced pod fails EVERY batch: `ducklake` loads from its staged
 # file, the attach then reaches for postgres_scanner, finds no cache, and tries a network INSTALL -- and
 # D10 makes that failure FATAL in a partitioned topology. The air-gap hole AIRGAP-EXTENSIONS-1 closed for
 # `ducklake` reopened one layer down the moment D4 chose a Postgres catalog.
@@ -2435,7 +2434,7 @@ if ($duckdbExtCacheDir) {
 # what it tests is worse than none -- it trains you to read its failure as noise.
 # Since 2026-09-25 the bundle ships NO Spaces (only spaces/_templates, never booted), so this smoke also
 # proves the zero-Space boot: ControlApi.main must start on an empty spaces root and answer /health.
-# Professional/Enterprise matter most (they load inspecto-oidc), but Personal is
+# Standard/Advanced matter most (they load inspecto-oidc), but Basic is
 # smoked too: a broken core is the same class of failure.
 if (-not $SkipBootCheck) {
     $java = if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" }
@@ -2522,7 +2521,7 @@ if (-not $SkipBootCheck) {
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
     $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
-    # A Professional/Enterprise bundle CANNOT CONSTRUCT ITS AUTHENTICATOR WITHOUT OIDC CONFIG -- the boot
+    # A Standard/Advanced bundle CANNOT CONSTRUCT ITS AUTHENTICATOR WITHOUT OIDC CONFIG -- the boot
     # smoke discovered this, which is precisely what it is for. ControlApi calls Authenticators.active()
     # at startup and SpiSlot runs ServiceLoader regardless of -Dauth.mode, so the mere PRESENCE of
     # inspecto-oidc.jar makes OidcAuthenticator's constructor mandatory -- and it requires
@@ -2540,7 +2539,7 @@ if (-not $SkipBootCheck) {
     # Build the argument list by CONCATENATION, not by nesting $oidcArgs inside an array literal:
     # PowerShell does not flatten a nested array there, so -ArgumentList (which wants string[]) receives
     # an Object[] element and Start-Process throws before Java is ever launched. `+` does flatten, and an
-    # empty @() contributes nothing, so the Personal path stays clean.
+    # empty @() contributes nothing, so the Basic path stays clean.
     $demoArgs = if ($DemoAuth) { @('-Dcontrol.bind=127.0.0.1', '-Dauth.mode=demo', '-Dobjects.backend=db') } else { @() }
     $argList = @('--enable-native-access=ALL-UNNAMED', "-Dcontrol.port=$port", '-Dspaces.root=spaces') +
                $oidcArgs + $demoArgs +

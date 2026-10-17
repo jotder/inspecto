@@ -23,7 +23,7 @@ test('every optional module bundle-modules.mjs ships appears as a staged cell in
         assert.equal(row.split('|')[5 + EDITIONS.indexOf(e)].trim(), '✅', `${id} in ${e}`);
     }
 });
-test('a module an edition does not stage renders as absent (kafka connector is not in Personal)', () => {
+test('a module an edition does not stage renders as absent (kafka connector is not in Basic)', () => {
     const row = body.split('\n').find((l) => l.startsWith('| `connectors-kafka` - '));
     assert.equal(row.split('|')[5].trim(), '—');
 });

@@ -244,7 +244,7 @@ were violated by shipped code until 2026-08-18:
 *Verified: `RecipeConverterTest` — the every-repo-fixture round trip (which is what caught it, once a
 shift authored the repo's first `steps:` fixture in `ae2c0909`) plus 3 explicit guards: authored order
 preserved, round trip in the authored spelling, and an unmodelled kind refusing rather than vanishing.
-Full `-Pedition-enterprise -fae` reactor 3458/0/0/5 at `f72f7fc8`.*
+Full `-Pedition-advanced -fae` reactor 3458/0/0/5 at `f72f7fc8`.*
 
 ### Derived companion edge — display-only, never saved (2026-09-24)
 
@@ -419,7 +419,7 @@ last remaining driver. It does not survive grounding, for two independent reason
 
 ⛔ The map-list `AttributeSpec` type now has **no driver at all**. Do not open it again without one.
 
-*Verified: `mvn -o clean test -Pedition-enterprise` → 3692/0/0/5, exit 0, all 25 modules SUCCESS, none
+*Verified: `mvn -o clean test -Pedition-advanced` → 3692/0/0/5, exit 0, all 25 modules SUCCESS, none
 skipped (+5 tests). Rule falsified in both directions — stubbing the check to `if (false)` turns all four
 new tests red. UI: `npm run test:ci` 2769 passed/5 skipped exit 0, `lint:tokens` + `build` green, prettier
 clean.*

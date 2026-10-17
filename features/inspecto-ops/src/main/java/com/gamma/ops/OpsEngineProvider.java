@@ -105,7 +105,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
      */
     private static IllegalStateException refuseFallback(String what, String url, Exception cause) {
         return new IllegalStateException("-Dobjects.backend=postgres: could not open the " + what + " store at " + url
-                + " — Enterprise keeps it in PostgreSQL and never falls back to memory: " + cause.getMessage(), cause);
+                + " — Advanced keeps it in PostgreSQL and never falls back to memory: " + cause.getMessage(), cause);
     }
 
     private static ObjectStore openObjectStore(SpaceRoot root) {

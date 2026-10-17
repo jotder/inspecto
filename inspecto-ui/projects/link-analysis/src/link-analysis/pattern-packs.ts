@@ -1,6 +1,6 @@
 import { BranchStage, LegThreshold } from '@inspecto/link-analysis/graph/branching-pattern-engine';
 import { PatternStep } from '@inspecto/link-analysis/graph/graph-analysis';
-import { DomainProfileId, domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
+import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 
 /**
  * **Link Analysis — pattern packs** (V2). A pattern pack is a named, parameterized investigation
@@ -196,10 +196,10 @@ export const PATTERN_PACKS: PatternPack[] = [
     },
     {
         id: 'forwarding-relay',
-        label: 'Call-forwarding relay (any link kind)',
+        label: 'Relay chain (any link kind)',
         category: 'telecom',
         description:
-            'A generic relay hop A → B → C over ANY link kind, matched in the browser on the loaded graph — the building block of call-forwarding abuse and SIM-box relaying. Set the link kinds to narrow it; a Space pack such as Call-forwarding chain pins them for you.',
+            'A generic relay hop A → B → C over ANY link kind, matched in the browser on the loaded graph — the building block of relaying that hides where contact ends up. Set the link kinds to narrow it; a Space pattern pack pins them for you.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
     },
     {
@@ -207,7 +207,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Circular flow',
         category: 'money',
         description:
-            'Value or calls returning to their origin (A → … → A). Use the Cycles tool — a closed loop is not a simple path motif.',
+            'Value or contacts returning to their origin (A → … → A). Use the Cycles tool — a closed loop is not a simple path motif.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
         tool: 'cycles',
     },
@@ -268,7 +268,7 @@ export const PATTERN_PACKS: PatternPack[] = [
 
 /** The pack category a domain profile foregrounds; a profile not listed keeps the catalog's first pack. */
 const PROFILE_PACK_CATEGORY: Partial<Record<DomainProfileId, PatternPack['category']>> = {
-    finance: 'money',
+    'mobile-money': 'money',
     telecom: 'telecom',
 };
 
@@ -307,7 +307,7 @@ export function defaultPatternPack(
  */
 export const PATTERN_PACK_COLUMNS: Partial<Record<DomainProfileId, { kindCol?: string; timeCol?: string }>> = {
     telecom: {
-        kindCol: domainProfile('telecom').investigate?.mapping.linkKindCol ?? 'link_kind',
+        kindCol: 'link_kind',
         timeCol: 'first_seen',
     },
 };

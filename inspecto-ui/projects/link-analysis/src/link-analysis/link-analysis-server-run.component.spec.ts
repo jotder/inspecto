@@ -1,3 +1,4 @@
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -13,6 +14,14 @@ import {
 } from '@inspecto/link-analysis/api/graph-runs.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
+
+/** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
+const STANDARD_EDITION_FEATURES = {
+    ops: signal(false),
+    exchange: signal(false),
+    geoLink: signal(true),
+    investigations: signal(true),
+};
 
 function view(status: GraphRunStatus, over: Partial<GraphRunView> = {}): GraphRunView {
     return {
@@ -56,7 +65,11 @@ function make(opts: { allowed?: boolean; investigationId?: string | null; ceilin
     };
     TestBed.configureTestingModule({
         imports: [LinkAnalysisServerRunComponent],
-        providers: [provideNoopAnimations(), { provide: GraphRunsService, useValue: runs }],
+        providers: [
+            { provide: LA_FEATURES, useValue: STANDARD_EDITION_FEATURES },
+            provideNoopAnimations(),
+            { provide: GraphRunsService, useValue: runs },
+        ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisServerRunComponent);
     fixture.componentRef.setInput('algorithm', 'betweennessCentrality');

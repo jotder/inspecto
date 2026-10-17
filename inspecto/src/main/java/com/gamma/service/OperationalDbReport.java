@@ -103,7 +103,7 @@ public final class OperationalDbReport {
         out.put("url", stripUserInfo(url));
         if (url.startsWith("jdbc:postgresql:") && !OperationalDb.driverAvailable()) {
             return outcome(out, "DRIVER_MISSING",
-                    "the PostgreSQL JDBC driver is not on the classpath — the Standard/Enterprise bundle"
+                    "the PostgreSQL JDBC driver is not on the classpath — the Standard/Advanced bundle"
                             + " ships it as the postgresql.jar sidecar; drop it beside inspecto.jar");
         }
         try (Connection c = DriverManager.getConnection(url, user, password);

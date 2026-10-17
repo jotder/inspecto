@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <p>🔴 <b>Lives HERE, in an always-built module, deliberately.</b> This sweep sat in
  * {@code inspecto-ops} until 2026-09-17, and that module is <em>not</em> in the root POM's default
- * {@code <modules>} — it is added only by {@code -Pedition-standard} / {@code -Pedition-enterprise}. So the
+ * {@code <modules>} — it is added only by {@code -Pedition-standard} / {@code -Pedition-advanced}. So the
  * repo's only sweep over every committed Space config <b>never ran in a plain {@code mvn -o clean test}</b>:
  * measured on {@code 819e597b}, a verified-green 23-module default reactor (4373 tests) produced <b>no</b>
  * surefire report for this class, while the sibling corpus guard {@code ShippedCatalogSamplesTest} produced

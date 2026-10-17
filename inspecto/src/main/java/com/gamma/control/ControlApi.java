@@ -489,8 +489,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
             log.info("ControlApi started on port {} (authentication enforced via {})",
                     port(), Authenticators.active().get().getClass().getName());
         else
-            log.info("ControlApi started on port {} (no authentication — Personal/core edition). "
-                    + "Authorization is added by the Professional/Enterprise security module.", port());
+            log.info("ControlApi started on port {} (no authentication — Basic/core edition). "
+                    + "Authorization is added by the Standard/Advanced security module.", port());
     }
 
     private static boolean blank(String s) { return s == null || s.isBlank(); }
@@ -642,7 +642,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
-                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new LinkAnalysisLimitsRoutes(), new PendingChangeRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
+                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new LinkAnalysisLimitsRoutes(), new DomainProfileRoutes(), new PendingChangeRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes(),
                 new ModulesRoutes(), new ModuleSettingsRoutes()))   // MODULE-REORG-1 P2a/P2b: GET /modules, /settings/modules — appended LAST (order is load-bearing)
@@ -1706,6 +1706,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
      */
     private void requireModuleEnabled(Route r) {
         if (r.features().isEmpty()) return;
+        // LA-EDITIONS-1 phase 3 (ED-4): an EDITION feature that owns routes (EditionFeatures.gatesRoutes - the Link Analysis
+        // Investigation surface) and that no installed module declares answers 503 CAPABILITY_UNAVAILABLE: the module is
+        // installed (Basic ships the Link Analysis explorer), but this edition does not include that part of it.
+        for (String f : r.features())
+            if (com.gamma.etl.EditionFeatures.gatesRoutes(f) && !com.gamma.etl.EditionFeatures.present(f))
+                throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, com.gamma.etl.EditionFeatures.refusal(f));
         java.util.Set<String> off = disabledFeatures();
         if (off.isEmpty()) return;
         for (String f : r.features())

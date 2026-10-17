@@ -16,6 +16,7 @@ import { v1Interceptor } from '@inspecto/core/api/v1.interceptor';
 import { environment } from 'environments/environment';
 import { provideToastr } from 'ngx-toastr';
 import { laAppRoutes } from './app.routes';
+import { LA_PRODUCT_NAME } from './la-brand';
 import { provideLaAppHostServices } from './la-host.providers';
 
 /**
@@ -26,7 +27,7 @@ import { provideLaAppHostServices } from './la-host.providers';
  */
 export const appConfig: ApplicationConfig = {
     providers: [
-        provideAppEnvironment(environment),
+        provideAppEnvironment({ ...environment, productName: LA_PRODUCT_NAME }),
         provideZoneChangeDetection({ eventCoalescing: true }),
         // Same order as the host: v1 envelope unwrap, Space scope rewrite, auth bearer / refresh, error tracker.
         provideHttpClient(

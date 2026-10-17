@@ -1,7 +1,7 @@
 # Anti-money-laundering (AML)
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `aml`
-> (`spaces/_templates/aml/template.toon`). Offering: Professional and above (`offerings/professional.toon`,
+> (`spaces/_templates/aml/template.toon`). Offering: Professional and above (`offerings/standard.toon`,
 > `contentPacks`). Checked against the template on 2026-10-17.
 
 ## Business problem
@@ -82,5 +82,5 @@ The corpus ships in `data/samples`; copy each feed into `data/inbox/<feed>` to i
 - The STR template follows no real regulator's schema; replace its fields and delivery directory.
 - Entity Lists are not shipped; screening does nothing until they exist and the Job is enabled.
 - Detection is daily batch over the previous day.
-- The Link Analysis view needs the Link Analysis add-on modules (`offerings/professional.toon`,
+- The Link Analysis view needs the Link Analysis add-on modules (`offerings/standard.toon`,
   `addons.linkAnalysis`).

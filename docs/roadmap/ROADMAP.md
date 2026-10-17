@@ -27,7 +27,7 @@ These are built and integrated on the development line; the work remaining is ve
 | N1 | **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-source merge, incremental Pipelines, materialized views, visual editor | L | Built & tested | A representative `type: pipeline` job runs end-to-end against seeded data; visual editor verified live; design doc §14 closed |
 | N2 | **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, Sankey overlay | M | Built & tested (off by default) | Provenance verified against a real Pipeline-job run (not just synthetic injection); overlay confirmed against recorded data |
 | N3 | **`sink.view` consumer** — REST query of a Pipeline's logical views | S | Shipped in mainline | Done — `/views`, `/views/{name}`, `/views/{name}/data` live with tests |
-| N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED — corrected 2026-09-09.** "uncommitted/ungated" is stale: `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-professional` / `edition-enterprise` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
+| N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED — corrected 2026-09-09.** "uncommitted/ungated" is stale: `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-standard` / `edition-advanced` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
 
 **Now-horizon focus:** finish live end-to-end verification of N1/N2 with real job configs (current verification used synthetic data on a config-less dev backend), then make the release call on N4.
 
@@ -47,11 +47,11 @@ queue order; this page records direction.
 
 > **Delivered.** `inspecto-security/` implements the core `Authenticator` / `Subject` / `TokenRelay` SPIs —
 > `OidcAuthenticator` (Nimbus JOSE+JWT, JWKS-validated), `RoleMapper`, `OidcTokenRelay` (renamed 2026-07-25, D15: no vendor of record) — joining the
-> reactor only under the `edition-professional` Maven profile (with `edition-standard` retained as an alias). The browser never holds tokens (BFF exchange +
+> reactor only under the `edition-standard` Maven profile. The browser never holds tokens (BFF exchange +
 > httpOnly `inspecto_rt` cookie with an `Origin` CSRF check); HTTPS is served by the pure-JDK `HttpsServer`.
 > **RBAC/ABAC completed 2026-07-24:** data-driven roles + a capability manifest, Access-Profile enforcement,
 > component sharing, WSO2 gateway trust, and the Enterprise **`inspecto-policy`** module
-> (`-Pedition-enterprise`) for authored Access Policies, seeded space isolation, and decision audit.
+> (`-Pedition-advanced`) for authored Access Policies, seeded space isolation, and decision audit.
 > Personal remains genuinely auth-free. As-built:
 > [`../okf/backend/editions/auth-security.md`](../okf/backend/editions/auth-security.md); residual
 > non-blocking opens in [`../BACKLOG.md`](../BACKLOG.md) §6.
@@ -187,7 +187,7 @@ restated, because each needs a status call rather than a doc edit:
   N1's live end-to-end verification is recorded as **RESOLVED 2026-07-07** in
   [`../REQUIREMENTS.md`](../REQUIREMENTS.md) §R1 (seeded `type: pipeline` run,
   `examples/06-serve/pipeline-job`), and N4's edition model shipped as real Maven build flavors
-  (`-Pedition-professional` / `-Pedition-enterprise`). N2 provenance is genuinely still open — it needs a live
+  (`-Pedition-standard` / `-Pedition-advanced`). N2 provenance is genuinely still open — it needs a live
   feed (**OPS-5** in [`../BACKLOG.md`](../BACKLOG.md) §2).
 - **Residual banned vocabulary** — *(re-grounded 2026-09-08, when `docs/roadmap/` finally entered the
   vocabulary guard's scope — it had been outside every pass since the guard was written.)* Both halves of

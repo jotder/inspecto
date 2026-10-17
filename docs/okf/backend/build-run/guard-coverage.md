@@ -119,7 +119,7 @@ A guard's SCOPE exempts more than its allowlist does, and nothing announces it:
 can hardcode colours freely. ✅ `check-dependencies.mjs` resolved without an edition profile until
 2026-09-07, so `inspecto-oidc`'s Nimbus tree — the one dependency tree a security reviewer most wants
 under review — was the only one the lock never saw, while `compliance/controls-matrix.md` marked G7
-CLOSED. It now resolves `-Pedition-enterprise` (25 modules, not 23). Audit a guard's scope apart from its
+CLOSED. It now resolves `-Pedition-advanced` (25 modules, not 23). Audit a guard's scope apart from its
 rules: the scope is where the silent exemptions live.
 
 ✅ **A third instance, 2026-09-08 — and a MEASUREMENT is the same shape as a guard.** The first
@@ -473,7 +473,7 @@ failures; instructions 84.66% against a 78% floor, branches 71.51% against 64%. 
 guard's input off, switch the guard off in the same change, or it fails every run and a failure earlier in
 CI hides it.
 
-**Re-measured 2026-10-15** (master `1ad331c50`, full `-Pedition-enterprise -Pcoverage` reactor, 0 failures):
+**Re-measured 2026-10-15** (master `1ad331c50`, full `-Pedition-advanced -Pcoverage` reactor, 0 failures):
 backend instructions 86.08% / branches 73.59% / lines 86.14% over 48 reports; UI statements 81.51% /
 branches 76.64% / lines 85.18% over 553 spec files. ⚠ Two traps seen that day: (1) `la-api` reports 8.6% and
 `la-store-pg` 1.8% per module — la-api's routes are tested from `inspecto-geo-link` and the Postgres tests skip

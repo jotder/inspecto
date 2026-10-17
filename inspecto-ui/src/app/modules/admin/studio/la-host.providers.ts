@@ -115,6 +115,7 @@ export function provideLaHostServices(): Provider[] {
                     ops: session.opsEnabled,
                     exchange: session.exchangeEnabled,
                     geoLink: session.geoLinkEnabled,
+                    investigations: session.investigationsEnabled,
                 };
             },
         },

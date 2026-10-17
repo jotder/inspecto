@@ -46,7 +46,7 @@ class QueryExecutorSharedCatalogTest {
     @Test
     void noCatalogConfiguredMeansNoAttach() {
         assertNull(QueryExecutor.attachSql(),
-                "Personal and single-node Standard have no shared lakehouse; reads must behave exactly as "
+                "Basic and single-node Standard have no shared lakehouse; reads must behave exactly as "
                         + "they did before this existed");
     }
 

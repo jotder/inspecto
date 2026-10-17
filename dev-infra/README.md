@@ -18,7 +18,7 @@ Credentials here are dev-only and deliberately trivial.
 ```bash
 MAVEN_OPTS="-Duser.timezone=Asia/Kolkata" \
 INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres' \
-mvn -o -B test -Pedition-enterprise -pl :inspecto-ops -am \
+mvn -o -B test -Pedition-advanced -pl :inspecto-ops -am \
     -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
 ```
 
@@ -85,7 +85,7 @@ keytool -importcert -noprompt -alias wso2is -file wso2is.crt -keystore ts.jks -s
 
 ```bash
 MAVEN_OPTS="-Djavax.net.ssl.trustStore=$PWD/ts.jks -Djavax.net.ssl.trustStorePassword=changeit" \
-mvn -o -B test -Pedition-enterprise -pl :inspecto-oidc -am -DforkCount=0 \
+mvn -o -B test -Pedition-advanced -pl :inspecto-oidc -am -DforkCount=0 \
     -Dtest=OidcAgainstRealProviderTest -Dsurefire.failIfNoSpecifiedTests=false \
     -Dinspecto.test.oidc.issuer=https://localhost:9443/oauth2/token \
     -Dinspecto.test.oidc.clientId=inspecto_spa_client \
@@ -151,7 +151,7 @@ file on purpose, the console admin is `admin` / `admin` (bootstrap variables in 
 is a deployment shape.
 
 ```bash
-mvn -o test -Pedition-professional -pl providers/inspecto-oidc -am -Dsurefire.failIfNoSpecifiedTests=false \
+mvn -o test -Pedition-standard -pl providers/inspecto-oidc -am -Dsurefire.failIfNoSpecifiedTests=false \
     -Dtest=OidcKeycloakAgainstRealProviderTest -Dkeycloak.issuer=http://localhost:8180/realms/inspecto
 ```
 

@@ -2,7 +2,7 @@
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `mobile-money`
 > (`spaces/_templates/mobile-money/template.toon`). Offering: Professional and above
-> (`offerings/professional.toon`, `contentPacks`). Checked against the template on 2026-10-17.
+> (`offerings/standard.toon`, `contentPacks`). Checked against the template on 2026-10-17.
 
 ## Business problem
 

@@ -3,7 +3,7 @@ title: Reconciliation
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
-absentMessage: "Reconciliation is not installed in this bundle - it is provided by the optional inspecto-reconciliation module (Professional edition and above)."
+absentMessage: "Reconciliation is not installed in this bundle - it is provided by the optional inspecto-reconciliation module (Standard edition and above)."
 provides:
   features[1]: reconciliation
   configKinds[1]: reconciliation

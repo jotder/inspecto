@@ -180,7 +180,8 @@ final class SettingsRoutes implements RouteModule {
                 nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body),
                 setBytes(body), investigationBytes(body), nodeCap(body, "hubThreshold"), embed(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
-        return linkAnalysisShape(s);
+        // re-read: the write keeps keys this route does not own (domain_profile), and they shape what is in force
+        return linkAnalysisShape(LinkAnalysisSettings.read(root.resolve(LinkAnalysisSettings.FILE)));
     }
 
     /**

@@ -1,3 +1,4 @@
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -28,6 +29,14 @@ import {
     indexBuildErrorMessage,
 } from './link-analysis-index-build.component';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
+
+/** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
+const STANDARD_EDITION_FEATURES = {
+    ops: signal(false),
+    exchange: signal(false),
+    geoLink: signal(true),
+    investigations: signal(true),
+};
 
 /** LA-INDEX-SPA-SURFACES-1: the toolbox hosts for `egoNetwork` and seeds-only `degreeCentrality`, and the build `mode` control. */
 const CATALOGUE = {
@@ -123,6 +132,7 @@ function makeToolbox(runs = runsMock()) {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisToolboxComponent],
         providers: [
+            { provide: LA_FEATURES, useValue: STANDARD_EDITION_FEATURES },
             provideNoopAnimations(),
             provideRouter([]),
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
@@ -227,7 +237,12 @@ function makeBuild(
     const runs = opts.runs ?? runsMock({ indexes: signal(opts.list === undefined ? LIST : opts.list) });
     TestBed.configureTestingModule({
         imports: [LinkAnalysisIndexBuildComponent],
-        providers: [provideNoopAnimations(), provideRouter([]), { provide: GraphRunsService, useValue: runs }],
+        providers: [
+            { provide: LA_FEATURES, useValue: STANDARD_EDITION_FEATURES },
+            provideNoopAnimations(),
+            provideRouter([]),
+            { provide: GraphRunsService, useValue: runs },
+        ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisIndexBuildComponent);
     if (opts.allowed === false) fixture.componentRef.setInput('allowed', false);
@@ -497,8 +512,8 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
         });
         const mappings = [m('calls', 'A', 'B'), m('calls', 'x', 'y'), m('other', 'a', 'b')];
         const texts = (list: LinkIndexList) =>
-            Array.from(makeBuild({ list, mappings }).el.querySelectorAll('[data-testid="index-vs-flat"]')).map(
-                (e) => e.textContent!.replace(/\s+/g, ' ').trim(),
+            Array.from(makeBuild({ list, mappings }).el.querySelectorAll('[data-testid="index-vs-flat"]')).map((e) =>
+                e.textContent!.replace(/\s+/g, ' ').trim(),
             );
         const on = texts({ enabled: true, indexes: [index()] } as unknown as LinkIndexList);
         expect(on[0]).toContain('Index');
@@ -515,7 +530,10 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
 
     it('shows the Index stale chip for a stale listed index', () => {
         const { q, el } = makeBuild({
-            list: { enabled: true, indexes: [index({ stale: true, reason: 'files added' })] } as unknown as LinkIndexList,
+            list: {
+                enabled: true,
+                indexes: [index({ stale: true, reason: 'files added' })],
+            } as unknown as LinkIndexList,
         });
         expect(el.textContent).toContain('Index stale');
         expect(q('index-serving')!.textContent).toContain('Link index serving is on');

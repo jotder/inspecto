@@ -71,7 +71,7 @@ Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from 
 2. **Give every lane the same preamble** (paste it; do not paraphrase): *first `git merge --ff-only <sha>`; do not push; do not
    touch other lanes' files, `docs/INDEX.md` or `.claude/launch.json`; no `node_modules` junction/symlink (cleaning the worktree
    wiped the main checkout's once); use uniquely named scratch scripts — the session scratchpad is SHARED and a lane's `mut.sh`
-   was overwritten mid-run; `git add` only the files you changed; run `-Pedition-enterprise -pl <module> -am -Dtest=A,B` (commas,
+   was overwritten mid-run; `git add` only the files you changed; run `-Pedition-advanced -pl <module> -am -Dtest=A,B` (commas,
    never `+`; `-am` or a stale sibling jar is tested) and count the `Tests run:` lines; report SHA, files, counts, surprises.*
 3. **Integrate in the main tree by `git cherry-pick`** (lanes touch new files, so conflicts are only the shared `pom.xml` /
    bundle lists), then run the **independent** verifier once on the combined result — a lane's own green is not the gate.
@@ -90,7 +90,7 @@ Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from 
    (`no-explicit-any` went red on master once from an integration).
 9. **`JAVA_HOME` may be 26 while PATH `java` is 27** — Maven then dies "release version 27 not supported". Export
    `JAVA_HOME` to the PATH JDK (`java -XshowSettings:properties -version` prints `java.home`) before any `mvn`. The extracted LA
-   modules are only in the reactor with `-Pedition-enterprise`.
+   modules are only in the reactor with `-Pedition-advanced`.
 10. **Check GitHub Actions after a push, not just the local gate.** CI was red on every master commit from 2026-09-30 and nobody
     saw it: the Linux-only failure in `inspecto-config` halts the reactor, so 28 of 41 modules were SKIPPED. `gh run list --limit 3`
     after every push; "BUILD FAILURE" early in the reactor hides everything after it.
@@ -132,7 +132,7 @@ Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from 
 - **Theming plugin doesn't hot-reload** — editing the gamma Tailwind theming plugin
   (`@gamma/tailwind/plugins/theming.js`) or tokens requires a **dev-server restart**; verify via
   `getComputedStyle(body).getPropertyValue('--gamma-…')`. (See the `angular-ui` skill §5.)
-- **Security/edition direction**: no Spring/Quarkus migration — harden in place as Personal/Standard
+- **Security/edition direction**: no Spring/Quarkus migration — harden in place as Basic/Standard
   editions with IAM-delegated (Keycloak/WSO2) OIDC resource-server auth. (See `docs/EDITIONS.md`.)
 
 ---

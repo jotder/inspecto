@@ -57,7 +57,7 @@ describe('SessionService (W6d edition switch)', () => {
 
     it('Personal/offline bootstrap ⇒ authMode none, no login, no /auth/refresh', async () => {
         const done = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'basic', features: { authMode: 'none' } });
         await done;
         expect(svc.authMode()).toBe('none');
         expect(svc.loginRequired()).toBe(false);
@@ -105,34 +105,54 @@ describe('SessionService (W6d edition switch)', () => {
         expect(navigate).toHaveBeenCalledWith(['/sign-in']);
     });
 
-    it('reads features.geoLink, and treats an absent flag as NOT enabled (Personal ships no geo/link module)', async () => {
+    it('reads features.geoLink, and treats an absent flag as NOT enabled (a bundle without the geo/link module)', async () => {
         const init = svc.init();
         httpMock
             .expectOne(`${base}/bootstrap`)
-            .flush({ edition: 'professional', features: { authMode: 'none', geoLink: true } });
+            .flush({ edition: 'standard', features: { authMode: 'none', geoLink: true } });
         await init;
         expect(svc.geoLinkEnabled()).toBe(true);
     });
 
     it('geoLink defaults to false when /bootstrap does not mention it — never assumed present', async () => {
         const init = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'basic', features: { authMode: 'none' } });
         await init;
         expect(svc.geoLinkEnabled()).toBe(false);
+    });
+
+    it('reads features.investigations: Basic is the Link Analysis explorer (geoLink on, Investigations off) - LA-EDITIONS-1', async () => {
+        const init = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ edition: 'basic', features: { authMode: 'none', geoLink: true, investigations: false } });
+        await init;
+        expect(svc.edition()).toBe('basic');
+        expect(svc.geoLinkEnabled()).toBe(true);
+        expect(svc.investigationsEnabled()).toBe(false);
+    });
+
+    it('reads features.investigations true on Standard and above', async () => {
+        const init = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ edition: 'standard', features: { authMode: 'none', geoLink: true, investigations: true } });
+        await init;
+        expect(svc.investigationsEnabled()).toBe(true);
     });
 
     it('reads features.events (EDG-01 cell 6 — the optional events feed module)', async () => {
         const init = svc.init();
         httpMock
             .expectOne(`${base}/bootstrap`)
-            .flush({ edition: 'professional', features: { authMode: 'none', events: true } });
+            .flush({ edition: 'standard', features: { authMode: 'none', events: true } });
         await init;
         expect(svc.eventsEnabled()).toBe(true);
     });
 
     it('events defaults to false when /bootstrap does not mention it — never assumed present', async () => {
         const init = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'basic', features: { authMode: 'none' } });
         await init;
         expect(svc.eventsEnabled()).toBe(false);
     });
@@ -141,21 +161,21 @@ describe('SessionService (W6d edition switch)', () => {
         const init = svc.init();
         httpMock
             .expectOne(`${base}/bootstrap`)
-            .flush({ edition: 'professional', features: { authMode: 'none', ops: true } });
+            .flush({ edition: 'standard', features: { authMode: 'none', ops: true } });
         await init;
         expect(svc.opsEnabled()).toBe(true);
     });
 
     it('ops defaults to false when /bootstrap does not mention it — never assumed present', async () => {
         const init = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'basic', features: { authMode: 'none' } });
         await init;
         expect(svc.opsEnabled()).toBe(false);
     });
 
     it('OIDC bootstrap + refresh 401 ⇒ authenticated false, loginRequired true', async () => {
         const done = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'professional', features: { authMode: 'oidc' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'standard', features: { authMode: 'oidc' } });
         await tick();
         httpMock
             .expectOne(`${base}/auth/refresh`)
@@ -168,7 +188,7 @@ describe('SessionService (W6d edition switch)', () => {
 
     it('OIDC bootstrap + refresh 200 ⇒ resumes the session (token + authenticated + effective grants)', async () => {
         const done = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'professional', features: { authMode: 'oidc' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'standard', features: { authMode: 'oidc' } });
         await tick();
         httpMock.expectOne(`${base}/auth/refresh`).flush({ accessToken: 'at-resumed', expiresIn: 300 });
         await tick();

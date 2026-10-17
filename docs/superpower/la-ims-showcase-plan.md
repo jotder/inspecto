@@ -129,7 +129,7 @@ Findings from the dry run: (1) the burst saved view hits the 500-node cap becaus
 
 **On-screen rehearsal, 2026-10-15 (current `master` `1ad331c50`, Enterprise demo bundle, `la-app` UI; the Space served by it on port 8101).**
 
-*Which bundle.* A bundle built with the default (full SPA) UI has **no Link Analysis page** (`/link-analysis` is "Page not found"; the SPA offers Home, Business, Operations); it does show Home "Needs attention", Incidents and Cases. For this demo build **`package.ps1 -Edition Enterprise -DemoAuth -Ui la-app -NoBakeDemo`** (about 10 minutes; the Angular font inlining fetches Google Fonts and failed once on a transient network error: retry). The `la-app` UI has Link Analysis, Geo, Entity Lists and Alerts, but no Incidents or Cases page: show the Incident and Case through the full SPA or by API.
+*Which bundle.* A bundle built with the default (full SPA) UI has **no Link Analysis page** (`/link-analysis` is "Page not found"; the SPA offers Home, Business, Operations); it does show Home "Needs attention", Incidents and Cases. For this demo build **`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`** (about 10 minutes; the Angular font inlining fetches Google Fonts and failed once on a transient network error: retry). The `la-app` UI has Link Analysis, Geo, Entity Lists and Alerts, but no Incidents or Cases page: show the Incident and Case through the full SPA or by API.
 
 | Beat | On screen | Result |
 |---|---|---|

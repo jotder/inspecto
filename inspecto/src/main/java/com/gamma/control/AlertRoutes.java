@@ -225,7 +225,7 @@ final class AlertRoutes implements RouteModule {
     static boolean editionRefused(HttpExchange e) throws IOException {
         if (EditionFeatures.present(EditionFeatures.ALERT_DISPATCH)) return false;
         Finding f = new Finding(Severity.ERROR, "alert-rule", EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH),
-                FindingCodes.ERR_EDITION_FEATURE, "run the Professional or Enterprise edition");
+                FindingCodes.ERR_EDITION_FEATURE, "run the Standard or Advanced edition");
         ApiContext.respondJson(e, 422, Map.of("written", false, "error", f.message(), "findings", List.of(f)));
         return true;
     }

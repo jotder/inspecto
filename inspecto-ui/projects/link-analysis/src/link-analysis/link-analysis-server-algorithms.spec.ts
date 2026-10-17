@@ -1,3 +1,4 @@
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -17,6 +18,14 @@ import { propagatedRiskRows, summarizeGraphRun } from './graph-run-summary';
 import { LinkAnalysisServerAlgorithmsComponent } from './link-analysis-server-algorithms.component';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { NodeRiskService } from './node-risk.service';
+
+/** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
+const STANDARD_EDITION_FEATURES = {
+    ops: signal(false),
+    exchange: signal(false),
+    geoLink: signal(true),
+    investigations: signal(true),
+};
 
 /** DR-U11: every catalogue algorithm is reachable from one catalogue-driven panel; the answer is read by its result kind. */
 const MAP: ServerIdMap = {
@@ -119,6 +128,7 @@ function makeWith(run: ReturnType<typeof vi.fn>) {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisServerAlgorithmsComponent],
         providers: [
+            { provide: LA_FEATURES, useValue: STANDARD_EDITION_FEATURES },
             provideNoopAnimations(),
             {
                 provide: GraphRunsService,

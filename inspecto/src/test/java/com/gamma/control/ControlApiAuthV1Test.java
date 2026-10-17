@@ -218,7 +218,7 @@ class ControlApiAuthV1Test {
     void anUngatedWriteOnPersonalCarriesNoCapability(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             assertEquals(200, post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}").statusCode(),
-                    "Personal: the route is open, no capability check runs");
+                    "Basic: the route is open, no capability check runs");
             JsonNode audited = auditEvent(c, "/components/widget", 200);
             assertNotNull(audited, "the write is still audited");
             assertFalse(audited.path("attributes").has("capability"),

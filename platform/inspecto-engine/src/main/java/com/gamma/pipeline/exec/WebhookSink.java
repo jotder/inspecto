@@ -101,7 +101,7 @@ public final class WebhookSink {
         }
         if (transport == null)
             throw new IllegalStateException("sink '" + sink.id() + "' is a webhook, and this bundle ships no "
-                    + "outbound HTTP transport — webhook delivery is a Professional/Enterprise edition capability "
+                    + "outbound HTTP transport — webhook delivery is a Standard/Advanced edition capability "
                     + "(inspecto-notify-channels). Nothing was sent.");
         Endpoint e = endpoint(w.connection(), "sink '" + sink.id() + "'");
         return new Target(e.url(), e.bearerToken(), e.timeout(), w, transport);

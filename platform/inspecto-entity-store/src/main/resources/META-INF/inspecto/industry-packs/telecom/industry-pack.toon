@@ -1,0 +1,22 @@
+id: telecom
+name: Telecom
+description: "Mobile network vocabulary for Link Analysis: lines, identities and handsets linked by calls, messages, forwarding and shared devices."
+space_templates[2]: telco-fraud,la-showcase
+pattern_packs[4]: forwarding-relay,telecom-forwarding-chain,telecom-payment-ring,telecom-subscription-ring
+profile:
+  measure_hints[3]: duration,seconds,minutes
+  time_hints[4]: start,_at$,time,date
+  suggested_tools[3]: communities,explain,cohesion
+  investigate:
+    entity_type: msisdn
+    dataset: telecom_links_dataset
+    source_col: a_msisdn
+    target_col: b_msisdn
+    link_kind_col: link_kind
+    time_col: last_seen
+    events_col: events
+    window_days: 30
+    min_events: 1
+    max_fan_out: 500
+    budget: 10000
+    max_degree: 4

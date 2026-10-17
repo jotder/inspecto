@@ -18,32 +18,32 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACT = join(root, 'inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json');
 const BOARD = join(root, 'docs/EDITIONS.md');
 
-// Operator decisions 2026-09-02 (EDITIONS.md §Feature × edition matrix): not for Personal / Enterprise-only.
+// Operator decisions 2026-09-02 (EDITIONS.md §Feature × edition matrix): not for Basic / Advanced-only.
 const NOT_FOR_PERSONAL = new Set([
     'control.alert.dispatch', 'sink.notify.email', 'sink.api.webhook', 'quality.pii.mask',
     'quality.compliance.redact', 'transform.geo.h3', 'transform.geo.spatial_join',
     'enrichment.graph.cluster', 'sink.archive',
-    // G9 (455f9822b, operator 2026-09-24): gated to Professional+ through EditionFeatureProvider.
+    // G9 (455f9822b, operator 2026-09-24): gated to Standard+ through EditionFeatureProvider.
     'sink.ducklake',
-    // MODULE-REORG-1 P7 (2026-10-07): the ASN.1 decoder is the Telecom industry pack (inspecto-telecom-asn1), staged from Professional up.
+    // MODULE-REORG-1 P7 (2026-10-07): the ASN.1 decoder is the Telecom industry pack (inspecto-telecom-asn1), staged from Standard up.
     'parser.asn1.ber',
-    // MODULE-REORG-1 P7 (2026-10-07): the Kafka connector is inspecto-connectors-kafka, staged from Professional up.
+    // MODULE-REORG-1 P7 (2026-10-07): the Kafka connector is inspecto-connectors-kafka, staged from Standard up.
     'acquisition.stream.kafka',
 ]);
 const ENTERPRISE_ONLY = new Set(['quality.pii.mask', 'quality.compliance.redact']);
 
-// Rows whose PERSONAL cell is PARTIAL even though the processor is delivered platform-wide: the capability
-// still runs on Personal, but a named part of it left with an optional module.
+// Rows whose BASIC cell is PARTIAL even though the processor is delivered platform-wide: the capability
+// still runs on Basic, but a named part of it left with an optional module.
 //
-// WHY THIS EXISTS. Until 2026-09-08 the Personal cell could only be `—` (excluded) or the SAME glyph as the
-// global status — there was no way to express "delivered, but degraded on Personal". EDG-01 cell 7 produced
-// exactly that: `SP-CTL-02`'s gap watchdog still raises the EVENT on Personal, but promoting it to an ALERT
+// WHY THIS EXISTS. Until 2026-09-08 the Basic cell could only be `—` (excluded) or the SAME glyph as the
+// global status — there was no way to express "delivered, but degraded on Basic". EDG-01 cell 7 produced
+// exactly that: `SP-CTL-02`'s gap watchdog still raises the EVENT on Basic, but promoting it to an ALERT
 // object is `EventObjectBridge`, which moved into `inspecto-ops`. The operator approved 🟡, and it was
 // hand-edited into the generated table — so `--check` went RED on master, and regenerating SILENTLY REVERTED
 // an approved product decision back to ✅. A generator that cannot express a decision the board must state
 // turns the guard into pressure to undo the decision. Add the row here instead of hand-editing the table.
 // EMPTY since 2026-10-08 (P7 ALERT residue retirement): `EventAlertBridge` moved into the core and raises the gap as a
-// stored Alert on every edition, so `SP-CTL-02` is no longer degraded on Personal. The mechanism stays for the next row.
+// stored Alert on every edition, so `SP-CTL-02` is no longer degraded on Basic. The mechanism stays for the next row.
 const PARTIAL_ON_PERSONAL = new Set([]);
 
 const GLYPH = { delivered: '✅', partial: '🟡', planned: '🔲' };

@@ -63,7 +63,7 @@ own gates and audit.
   `model.medium`, `model.large`, `timeout.seconds`. A key posted through the API is held in memory only.
 - **Autonomy policy**: `<assist.write.root>/agent/policy.json`, edited through `/agent/policy`; survives restart.
 - **Egress**: the intelligence gateway refuses a `base.url` outside the Space's model endpoint allowlist.
-- **Enablement**: `agent` in `offerings/professional.toon`, `intelligence` in `offerings/enterprise.toon`.
+- **Enablement**: `agent` in `offerings/standard.toon`, `intelligence` in `offerings/advanced.toon`.
 
 ## 6. Screens
 

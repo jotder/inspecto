@@ -475,7 +475,7 @@ planted offenders (5/4/4/5/4/4/3/3/4/4 = 40 breached keys, counted in each rule'
 Alert change), then runs the next window (nothing raised or dropped); a second case runs 16 retained days of
 fresh offenders at the corpus rate — each rule's one Alert counts every retained offender (640 keys in all, each its own digest), no storm. Each defence was mutation-checked red.
 
-**Demo rehearsal 2026-10-14 (`TELCO-FRAUD-DEMO-REHEARSAL-1`, no code row).** A fresh `package.ps1 -Edition Enterprise -DemoAuth` bundle (main `gamma` UI),
+**Demo rehearsal 2026-10-14 (`TELCO-FRAUD-DEMO-REHEARSAL-1`, no code row).** A fresh `package.ps1 -Edition Advanced -DemoAuth` bundle (main `gamma` UI),
 a Space made from this template through *Settings > Spaces > New from template*, the three sample files copied into `data/inbox/<feed>`, driven in the
 browser as `admin` (`admin;super`), `fm.analyst` (`operations`), `fm.manager` (`power`) and a non-privileged `business` viewer. **GO for a presenter who
 follows the checklist below, NO-GO for a cold start** (the three P2 rows). Beat list (this is the checklist):
@@ -807,7 +807,7 @@ Configuration only (no platform edit, no new Step Processor). Five synthetic fee
 `fee` and agent `commission`), `bank_statement` (the trust-account statement, `bank_ref` = the platform's
 `txn_id`), `partner_settlement` (biller / aggregator files, `txn_ref`), and the daily snapshots `wallets` (KYC tier,
 status, `last_activity_date`) and `core_subscribers`. Money is `DECIMAL(18,2)`. Needs Professional or Enterprise; the
-requirement is declared by Offering placement (`offerings/professional.toon` `contentPacks`), not a template key.
+requirement is declared by Offering placement (`offerings/standard.toon` `contentPacks`), not a template key.
 
 - **Two Reconciliations** (`recon.run`, 04:00): `mm_bank_float` (ledger `BANK_*` rows vs the statement) and
   `mm_partner_settlement` (ledger `BILL_PAY` rows vs settlement lines). Both select their ledger side with the
@@ -845,7 +845,7 @@ requirement is declared by Offering placement (`offerings/professional.toon` `co
 
 Configuration only (no platform or add-on source edit; the one build change is two TEST-scope dependencies in
 `inspecto-scoring`'s pom so its golden test can run Screening and load a Report Template). Needs Professional or
-Enterprise; listed in `offerings/professional.toon` `contentPacks`. Two synthetic feeds: `aml_txn` (account ledger:
+Enterprise; listed in `offerings/standard.toon` `contentPacks`. Two synthetic feeds: `aml_txn` (account ledger:
 `CASH_DEPOSIT`, `CASH_WITHDRAWAL`, `TRANSFER`, `WIRE`; `account_id` pays `counterparty_id`; `DECIMAL(18,2)`) and
 `aml_parties` (party-register snapshot). Country codes XA-XF are placeholders.
 
@@ -902,7 +902,7 @@ window, `seasonality: weekday`, `minBaselinePoints: 3` and `highThreshold: 80`.
 
 Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty companion whose `modules.toon` disables `geoLink`, so
 `/inv/*` there answers 404 `MODULE_DISABLED` while its other routes work; DR-S7). Needs the Enterprise **Demo Auth** build (`package.ps1
--Edition Enterprise -DemoAuth`, add `-Ui la-app` for the la-app shell); the Link Analysis modules and `canAdminister` to create it.
+-Edition Advanced -DemoAuth`, add `-Ui la-app` for the la-app shell); the Link Analysis modules and `canAdminister` to create it.
 
 - **Content.** One Collector + Pipeline + Dataset (`mule_transfers`, partition `BOOKED_DATE`, one file per UTC day, `file_template` so a missing
   day is a delivery gap). `data/inbox` carries the three landed days (ingested within one poll after boot); `data/staged` carries
@@ -925,7 +925,7 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   *Add to watch list* has a list of its Entity Type), one identity assertion, a Case assigned to `fm.manager` and linked, an Investigation Template, and the bound pass-through Alert Rule
   with standing detection. **Owner is `fm.analyst`, not `admin`**: binding and enabling need the Investigation's owner-and-lead holding Author Alert
   Rules, and the Dataset share must name that owner. Dry run by default; `--apply` writes; re-runs skip what exists.
-- **Operator steps.** (1) `pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth [-Ui la-app]`; (2) launch `inspecto-la-app` (it scaffolds
+- **Operator steps.** (1) `pwsh -File inspecto/package.ps1 -Edition Advanced -DemoAuth [-Ui la-app]`; (2) launch `inspecto-la-app` (it scaffolds
   `inspecto-demo/spaces-la-showcase` with both Spaces, then serves on 8097); (3) `node tools/seed-la-showcase.mjs --base http://127.0.0.1:8097` (dry run), then
   `--apply`. On a fresh spaces root the sign-in picker is empty until a Space with `demo-users.toon` exists - that is why step 2 scaffolds first.
   A Space created later from the gallery (`POST /spaces {"id":"la-showcase","template":"la-showcase"}`) is equivalent.

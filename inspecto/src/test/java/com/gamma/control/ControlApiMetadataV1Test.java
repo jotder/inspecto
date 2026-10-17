@@ -121,7 +121,7 @@ class ControlApiMetadataV1Test {
                     BodyHandlers.ofString());
             assertEquals(200, r.statusCode(), r.body());
             JsonNode data = V1Body.of(r.body());
-            assertEquals("personal", data.get("edition").asText(), "auth-free core reports Personal");
+            assertEquals("basic", data.get("edition").asText(), "auth-free core reports Basic");
             assertTrue(data.get("features").get("authoring").asBoolean(), "write root set ⇒ authoring on");
             // every config spec folded into one call
             JsonNode specs = data.get("configSpecs");

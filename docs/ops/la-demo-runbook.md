@@ -1,10 +1,10 @@
-# Link Analysis demo runbook (rehearsable, stakeholder presentation)
+# Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)
 
 *Status: written 2026-10-12 from the code, the seed script and the tests on `origin/master`. A scene marked
 **UNVERIFIED (rehearse first)** has no test or smoke probe behind one of its claims. Rehearse the whole script once
 on the exact bundle you will present, then again the evening before.*
 
-What this is: the step-by-step script for presenting the Link Analysis (LA) demo on the **standalone Link Analysis app
+What this is: the step-by-step script for presenting the Inspecto LA demo on the **standalone Inspecto LA app
 bundle**. It defends the architecture page ([`okf/backend/modules/link-analysis.md`](../okf/backend/modules/link-analysis.md),
 cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
 [`superpower/la-demo-readiness-plan.md`](../superpower/la-demo-readiness-plan.md); every control label below is the
@@ -17,7 +17,7 @@ store) are in the [showcase variants runbook](la-showcase-variants-runbook.md).
 
 | # | Step | Command / action | Expect |
 |---|---|---|---|
-| 1 | Build the bundle | `inspecto\package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` | A demo bundle folder with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-DemoAuth` refuses any edition but Enterprise. |
+| 1 | Build the bundle | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app` | A demo bundle folder with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-DemoAuth` refuses any edition but Enterprise. |
 | 2 | Attach the Spaces | From a repo checkout: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces` | `scaffolded: _templates, la-showcase, la-showcase-off`. **Bundles ship NO Spaces**; this lays down `la-showcase` (the demo) and `la-showcase-off` (LA switched off, used by the smoke runner's `MODULE_DISABLED` probe). To also show the tracked `demo` Space, copy `spaces\demo` beside them. Do it BEFORE the server starts. |
 | 3 | Start | `serve-demo.bat` (Windows) or `./serve-demo.sh`; port is 8080, override with the `PORT` env var (`set PORT=8096`). Optional extra JVM flags: `INSPECTO_JAVA_OPTS`. | Banner `[serve-demo] DEMO BUILD on http://127.0.0.1:<PORT>`. Bound to 127.0.0.1 only. |
 | 4 | Wait for the first ingest | The Space ingests `TRANSFERS_20260901..03.csv` from its inbox on boot. | The seed in step 5 retries a 422 "cannot read the columns" up to 30 times (2 s apart) until `mule_transfers_dataset` has rows. |
@@ -311,7 +311,7 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 
 ## 6. Rehearsal record: fresh full bake, 2026-10-13
 
-Bundle: `package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` WITH the built-in bake, built from `origin/master` (`79212c613` plus later docs); served with `serve-demo.bat PORT=8107` and `-Dla.embed.enabled=true`; driven in the built-in browser as the Demo Users. Scripted smoke: `15/16` plain and `29/30` with `--telecom --embed`; the single FAIL is the `la-showcase-off` probe, because a baked bundle ships no `la-showcase-off` Space (expected, see §0 step 2).
+Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` WITH the built-in bake, built from `origin/master` (`79212c613` plus later docs); served with `serve-demo.bat PORT=8107` and `-Dla.embed.enabled=true`; driven in the built-in browser as the Demo Users. Scripted smoke: `15/16` plain and `29/30` with `--telecom --embed`; the single FAIL is the `la-showcase-off` probe, because a baked bundle ships no `la-showcase-off` Space (expected, see §0 step 2).
 
 | # | Beat | Result | Evidence |
 |---|---|---|---|
@@ -337,7 +337,7 @@ Not rehearsed this pass: Drafts cycle, Compare and seal, Settings editing, embed
 
 ## 7. Final go/no-go rehearsal: fresh full bake, 2026-10-14
 
-Bundle: `package.ps1 -Edition Enterprise -DemoAuth -Ui la-app` with the built-in bake, from `origin/master` `66f63ef73`, unzipped to a fresh folder and served with `serve-demo.bat` (`PORT=8119`, `-Dla.embed.enabled=true`); driven in the built-in browser as the five Demo Users. Scripted smoke `la-demo-smoke.mjs --embed --telecom`: **29/30**, the single FAIL is the expected `la-showcase-off` probe (a baked bundle ships no such Space).
+Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` with the built-in bake, from `origin/master` `66f63ef73`, unzipped to a fresh folder and served with `serve-demo.bat` (`PORT=8119`, `-Dla.embed.enabled=true`); driven in the built-in browser as the five Demo Users. Scripted smoke `la-demo-smoke.mjs --embed --telecom`: **29/30**, the single FAIL is the expected `la-showcase-off` probe (a baked bundle ships no such Space).
 
 > **Build trap (new):** the bake's graceful stop sends Ctrl+C by attaching to the server's console, so `package.ps1` run from a console-less host (an agent shell, a CI step without a console) fails with "the server did not stop gracefully ... within 45 s" **every time**. Run the build from a real interactive terminal.
 

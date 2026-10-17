@@ -3,7 +3,7 @@ title: Case Management
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
-absentMessage: "Case Management is not installed in this bundle - Case Rules, merge and split, and opening a Case from Link Analysis Entities are provided by the optional inspecto-case-management module (Professional edition and above)."
+absentMessage: "Case Management is not installed in this bundle - Case Rules, merge and split, and opening a Case from Link Analysis Entities are provided by the optional inspecto-case-management module (Standard edition and above)."
 provides:
   features[1]: cases
   contracts[2]: JobTypeProvider,ObjectEngineExtension

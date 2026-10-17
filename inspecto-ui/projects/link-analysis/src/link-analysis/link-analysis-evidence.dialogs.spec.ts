@@ -370,7 +370,7 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
 
     it('says why a new Case cannot be offered when operational objects are not installed', () => {
         const { fixture, el } = create({ opsEnabled: false });
-        expect(fixture.componentInstance.createUnavailable()).toContain('Professional edition');
+        expect(fixture.componentInstance.createUnavailable()).toContain('Standard edition');
         expect(el.textContent).toContain('does not include');
         const radios = Array.from(el.querySelectorAll<HTMLInputElement>('mat-radio-button input[type="radio"]'));
         expect(radios.map((r) => r.disabled)).toEqual([false, true]);

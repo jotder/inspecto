@@ -45,10 +45,13 @@ section: nothing is in production after 3.x.)*
 | Axis | Mechanism | Example |
 |---|---|---|
 | **Versions / releases** | **git branches** | `master` (today the only one — §0-A) |
-| **Editions** (Personal / Professional / Enterprise) | **build flavors** — Maven profiles + `ServiceLoader` modules + `-D` flags | `mvn -Pedition-professional package` |
+| **Editions** (Basic / Standard / Advanced) | **build flavors** — Maven profiles + `ServiceLoader` modules + `-D` flags | `mvn -Pedition-standard package` |
 
-**Editions are NEVER branches.** There is no `personal` or `professional` branch. An edition is *which
-modules get assembled* from the same commit. See the editions plan for the assembly detail.
+**Editions are NEVER branches.** There is no `basic`, `standard` or `advanced` branch. An edition is *which
+modules get assembled* from the same commit, plus the capability gates those modules bring; Preview is a fourth,
+never-sold build flavour carrying everything. The names Basic / Standard / Advanced replaced Personal / Professional /
+Enterprise on 2026-10-17 (`LA-EDITIONS-1` ED-2) as a rename of flavours — no branch was created or retired. See
+[`EDITIONS.md`](EDITIONS.md) for the assembly detail.
 
 ---
 
@@ -75,7 +78,7 @@ modules get assembled* from the same commit. See the editions plan for the assem
 ## 2. Versioning — SemVer + Conventional Commits
 
 Releases are SemVer, tagged `vMAJOR.MINOR.PATCH` (e.g. `v4.0.0`). One version spans all editions;
-artifacts are differentiated by classifier (`-personal`, `-professional`, `-enterprise` — all three released since 2026-09-10), **not** by version.
+artifacts are differentiated by classifier (`-basic`, `-standard`, `-advanced` — all three released since 2026-09-10), **not** by version.
 
 Commit messages use **Conventional Commits** (already the repo convention):
 
@@ -157,7 +160,7 @@ git checkout master && git merge --no-ff 4.x && git push origin master
 ```
 
 CI (`.github/workflows/ci.yml`) must build **every edition** and run tests on each PR, so a change that
-breaks the Personal build or the Professional auth path fails before merge.
+breaks the Basic build or the Standard auth path fails before merge.
 
 ---
 
@@ -176,23 +179,23 @@ git push origin <branch> --tags
 # the GitHub release. The manual block below is the pre-pipeline procedure, kept for an air-gapped
 # emergency only — and note it cannot produce a pipeline-signed release (the key is not held locally).
 # Build + publish both edition artifacts from the tagged commit:
-#   mvn package                      → the PERSONAL artifact (no profile — Personal IS the default;
-#                                      corrected 2026-09-07: `-Pedition-personal` does not exist, and
+#   mvn package                      → the BASIC artifact (no profile — Basic IS the default;
+#                                      corrected 2026-09-07: `-Pedition-basic` does not exist, and
 #                                      Maven only warns on an unknown profile, so the old line here
 #                                      built the right jar while teaching the wrong mechanism)
-#   mvn -Pedition-professional package   → inspecto-processor-X.Y.Z-professional.jar
-#   mvn -Pedition-enterprise package → the Enterprise artifact (= professional + inspecto-policy)
+#   mvn -Pedition-standard package   → inspecto-processor-X.Y.Z-standard.jar
+#   mvn -Pedition-advanced package → the Advanced artifact (= standard + inspecto-policy)
 # Release integrity (SOC 2 CC8-04): publish a SHA-256 checksum + a GPG detached signature for EVERY
 # artifact so customers can verify integrity AND authenticity. package.ps1 emits .sha256/.asc for the
 # deploy zips; for the raw edition JARs, generate them here (INSPECTO_SIGNING_KEY = the release key id;
 # never commit the key). Customer verification steps: compliance/soc2/CC8-04-release-verification.md.
-for f in '<personal.jar>' '<professional.jar>'; do
+for f in '<basic.jar>' '<standard.jar>'; do
     sha256sum "$f" > "$f.sha256"
     gpg --local-user "$INSPECTO_SIGNING_KEY" --armor --detach-sign --output "$f.asc" "$f"
 done
 gh release create vX.Y.Z --target <branch> --notes-file <notes> \
-    '<personal.jar>' '<personal.jar>.sha256' '<personal.jar>.asc' \
-    '<professional.jar>' '<professional.jar>.sha256' '<professional.jar>.asc'
+    '<basic.jar>' '<basic.jar>.sha256' '<basic.jar>.asc' \
+    '<standard.jar>' '<standard.jar>.sha256' '<standard.jar>.asc'
 
 # Bump the line back to the next -SNAPSHOT:
 mvn ...:set -DnewVersion=<next>-SNAPSHOT ... && git commit -am "chore: begin <next> development"

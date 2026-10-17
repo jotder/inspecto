@@ -2,6 +2,7 @@ import { convertToParamMap } from '@angular/router';
 import { describe, expect, it } from 'vitest';
 import type { InvestigationStepResult, WorkingSet, WorkingSetEntity } from '@inspecto/link-analysis/api/inv.service';
 import { domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
+import { installTelecomFixture } from '@inspecto/link-analysis/graph/domain-profile.testing';
 import {
     expandApproval,
     thresholdWords,
@@ -51,6 +52,10 @@ const entity = (id: string, hop: number, hidden = false): WorkingSetEntity => ({
     kept: false,
 });
 const ws = (...entities: WorkingSetEntity[]): WorkingSet => ({ entities, links: [], excluded: [], hash: '' });
+
+
+// The SPA holds no industry profile of its own (LA-EDITIONS-1): the telecom pack arrives from the server.
+installTelecomFixture();
 
 describe('investigate-number - deep link parameters', () => {
     it('reads seed, entityType and dataset; entityType defaults to msisdn', () => {

@@ -33,7 +33,7 @@
         validation on Personal. Dead vocabulary is not a hole — there is no route behind it.
 
         THIN, like inspecto-policy: nothing beyond what the core already supplies. Built only under the
-        "edition-professional"/"edition-enterprise" profiles, so a routine "mvn -o clean test" (= Personal, the
+        "edition-standard"/"edition-advanced" profiles, so a routine "mvn -o clean test" (= Personal, the
         DEFAULT build) never compiles or tests it.
     </description>
 

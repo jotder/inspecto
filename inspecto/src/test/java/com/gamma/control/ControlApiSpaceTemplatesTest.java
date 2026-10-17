@@ -123,7 +123,7 @@ class ControlApiSpaceTemplatesTest {
                 JsonNode t = json(send(c.port, "GET", "/spaces/templates", null)).get(0);
                 assertFalse(t.get("creatable").asBoolean(), t.toString());
                 assertEquals("alert.dispatch", t.get("missingFeatures").get(0).get("feature").asText(), t.toString());
-                assertTrue(t.get("missingFeatures").get(0).get("message").asText().contains("Professional+"));
+                assertTrue(t.get("missingFeatures").get(0).get("message").asText().contains("Standard+"));
                 HttpResponse<String> refused = send(c.port, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"starter\"}");
                 assertEquals(422, refused.statusCode(), "the create the gallery marked uncreatable is refused: " + refused.body());
             }

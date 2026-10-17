@@ -20,11 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>🔴 <b>Why this is a separate class from {@code RepoSpacesConfigValidationTest}.</b> That sweep covers
  * all ~142 authored TOONs and used to live here, in {@code inspecto-ops} — a module the root POM gates
- * behind {@code -Pedition-standard}/{@code -Pedition-enterprise}, so it never ran in a plain
+ * behind {@code -Pedition-standard}/{@code -Pedition-advanced}, so it never ran in a plain
  * {@code mvn -o clean test}. It moved to {@code inspecto} (always built) on 2026-09-17. These three kinds
  * could not follow it: their loaders are edition-module classes the core cannot reference. The core sweep
  * still decodes these files at the syntax layer; this class is the only place their real {@code load()}s
- * run, and it runs wherever {@code inspecto-ops} is built (CI builds {@code -Pedition-enterprise}).
+ * run, and it runs wherever {@code inspecto-ops} is built (CI builds {@code -Pedition-advanced}).
  *
  * <p>⛔ The empty sweep is an ASSERTION, not an assumption — same rule as the core sweep. The corpus is
  * committed, so finding nothing means the walk broke, not that there is nothing to gate.

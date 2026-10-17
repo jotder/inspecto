@@ -16,7 +16,7 @@ AML function pack (`PACK-AML-1`) builds on it. Vocabulary: `docs/GLOSSARY.md` §
 
 ## Module and gates
 - Optional module `features/inspecto-screening` (artifactId `inspecto-screening`, manifest id and feature id `screening`,
-  package `com.gamma.screening`), add-on `screening` in `offerings/professional.toon`: Professional, Enterprise and Preview;
+  package `com.gamma.screening`), add-on `screening` in `offerings/standard.toon`: Professional, Enterprise and Preview;
   absent on Personal, where its four routes answer 503 from the manifest's `absentMessage`. `requires.modules: entity-list`.
 - It reads the Entity List fact log directly through `inspecto-entity-store` (`EntityFactLog`, `EntityRegistry`,
   `EntityListFacts`); it never writes to it. A confirmed hit writes no Identity Fact (`D-M1`: never by similarity).

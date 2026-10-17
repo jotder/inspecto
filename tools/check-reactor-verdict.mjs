@@ -31,7 +31,7 @@
 // by construction; that hole is the SKILL's subject, not this guard's, and is documented there.
 //
 // Usage:
-//   mvn -o clean test -Pedition-enterprise -B > build.log 2>&1   # -B, NOT -q (see check 1)
+//   mvn -o clean test -Pedition-advanced -B > build.log 2>&1   # -B, NOT -q (see check 1)
 //   node tools/check-reactor-verdict.mjs build.log [--root .] [--expect-modules N]
 //
 // Exit 0 = VERIFIED PASS.  Exit 1 = NON-VERDICT or real failure.  Exit 2 = could not run.

@@ -101,7 +101,7 @@ class MaintenanceTaskContractTest {
         assertEquals(MaintenanceJob.BUILT_IN_TASKS, MaintenanceJob.availableTasks(),
                 "with no provider installed, the advertised set must be exactly the built-ins — the old "
                         + "description named backup / backup_verify / restore / incident_purge here, all of "
-                        + "which a Personal bundle refuses");
+                        + "which a Basic bundle refuses");
     }
 
     /** The built-ins must lead, so the served string reads the same way the switch does. */

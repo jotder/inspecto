@@ -4,7 +4,7 @@ title: Screening
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
-absentMessage: "Screening is not installed in this bundle - it is provided by the optional inspecto-screening module (Professional edition and above)."
+absentMessage: "Screening is not installed in this bundle - it is provided by the optional inspecto-screening module (Standard edition and above)."
 provides:
   features[1]: screening
   contracts[1]: JobTypeProvider

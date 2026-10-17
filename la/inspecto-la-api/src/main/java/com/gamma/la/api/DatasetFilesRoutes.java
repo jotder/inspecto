@@ -49,7 +49,7 @@ public final class DatasetFilesRoutes implements RouteModule {
 
     @Override
     public Set<String> featureIds() {
-        return Set.of("geoLink");
+        return Set.of("geoLink", "investigations");
     }
 
     @Override

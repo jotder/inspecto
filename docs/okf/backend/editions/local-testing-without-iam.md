@@ -1,14 +1,14 @@
 ---
 type: Concept
 title: Local feature testing without a real IAM or Postgres
-description: Two build/run paths — Demo User sign-in (the offline demo build, no IAM, no Postgres) for local evaluation and feature testing, and the real Professional/Enterprise release path with a genuine OIDC provider and Postgres.
+description: Two build/run paths — Demo User sign-in (the offline demo build, no IAM, no Postgres) for local evaluation and feature testing, and the real Standard/Advanced release path with a genuine OIDC provider and Postgres.
 ---
 
 # Local feature testing without a real IAM or Postgres
 
 Two separate goals, two separate procedures. Never conflate them. Path A exists so a developer or an
-internal evaluator can exercise Professional/Enterprise route modules (geo-link, exchange, metrics,
-events, ops, notify-channels, backup, the Enterprise ABAC engine) without standing up an IdP or a
+internal evaluator can exercise Standard/Advanced route modules (geo-link, exchange, metrics,
+events, ops, notify-channels, backup, the Advanced ABAC engine) without standing up an IdP or a
 Postgres instance; it must never reach a real deployment.
 
 > **One mock path, not two (decision D-3, 2026-09-25).** Path A used to be a hand-built permit-all
@@ -17,23 +17,23 @@ Postgres instance; it must never reach a real deployment.
 > it signs in named users with **real roles**, so role-based access, owner-only views and the
 > audit actor behave as they would under OIDC.
 
-## Default: build/run defaults to Professional
+## Default: build/run defaults to Standard
 
-Per standing operator instruction, build and package the app on the **Professional** edition unless
-someone explicitly asks for Personal or Enterprise. (The Demo User build below is the exception: it is
-Enterprise-only by construction.)
+Per standing operator instruction, build and package the app on the **Standard** edition unless
+someone explicitly asks for Basic or Advanced. (The Demo User build below is the exception: it is
+Advanced-only by construction.)
 
 ## Preview edition
 
 **`Preview`** (added 2026-09-21, `-Pedition-preview` / `package.ps1 -Edition Preview`) bundles **every**
 optional module unconditionally — see [`EDITIONS.md` §Preview](../../../EDITIONS.md#preview--not-a-customer-facing-tier).
 It is not an auth bypass: it ships the real `inspecto-oidc.jar`/`inspecto-policy.jar` and fails
-closed exactly like Enterprise without a real IdP. `package.ps1 -DemoAuth` accepts only
-`-Edition Enterprise`, so there is no Preview demo build.
+closed exactly like Advanced without a real IdP. `package.ps1 -DemoAuth` accepts only
+`-Edition Advanced`, so there is no Preview demo build.
 
 ## Path A — Demo User sign-in, no IAM, no Postgres (offline demo build)
 
-**Goal:** evaluate or feature-test Enterprise capabilities on one machine with zero external
+**Goal:** evaluate or feature-test Advanced capabilities on one machine with zero external
 dependencies, signed in as named [**Demo Users**](../../../GLOSSARY.md#1-a-personas--surfaces) with
 real roles. As built by DEMO-AUTH-1 (`9d0eb5da3` module + SPA, `d9911b793` packaging).
 
@@ -92,7 +92,7 @@ users[2]{id,displayName,title,roles}:
   2026-10-09). When `/bootstrap` answers that 500, the SPA no longer draws a signed-in shell: `SessionService`
   records `bootstrapError`, `loginRequired()` turns true, and the sign-in page shows the server's message with
   no picker and a *Try again* button. A 401 the SPA did not expect (`authMode` none) routes to sign-in the same
-  way. An unreachable backend (status 0) still degrades to Personal — the connectivity banner owns that. Roles still resolve per request against the bound Space,
+  way. An unreachable backend (status 0) still degrades to Basic — the connectivity banner owns that. Roles still resolve per request against the bound Space,
   so one Demo User can hold different capabilities in different Spaces.
 - No committed Space ships a `demo-users.toon`; a Space intended for a demo must author one.
 
@@ -121,14 +121,14 @@ users[2]{id,displayName,title,roles}:
 
 ```powershell
 $env:JAVA_HOME = "C:\sandbox\.graalvm-cache\jdk-27-win"   # the JDK-27 toolchain
-pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth
+pwsh -File inspecto/package.ps1 -Edition Advanced -DemoAuth
 ```
 
-`-DemoAuth` (`inspecto/package.ps1`) requires `-Edition Enterprise` and:
+`-DemoAuth` (`inspecto/package.ps1`) requires `-Edition Advanced` and:
 
 - assembles into `inspecto-demo/` (never `inspecto-deploy/`) and zips as `inspecto-demo-<platform>.zip`;
 - builds `inspecto-demo-auth` (unless `-NoBuild`), then, **after** the SBOM step (the SBOM describes
-  the Enterprise set), deletes `inspecto-oidc.jar`, copies in `inspecto-demo-auth.jar`, and checks
+  the Advanced set), deletes `inspecto-oidc.jar`, copies in `inspecto-demo-auth.jar`, and checks
   the jar carries both SPI registrations;
 - deletes `serve.*`, `Dockerfile`, `.dockerignore` and the service installers (without the security
   jar they would boot an auth-free server on every interface);
@@ -143,7 +143,7 @@ Then drop a Space folder that has a `config/demo-users.toon` into `inspecto-demo
 inbox if needed (below), run `serve-demo.bat` (or `./serve-demo.sh`), open `http://127.0.0.1:8080`
 and pick a Demo User.
 
-> ✅ **The `-DemoAuth` package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Enterprise -DemoAuth`
+> ✅ **The `-DemoAuth` package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Advanced -DemoAuth`
 > built and the bundle booted (`authentication enforced via …DemoAuthenticator`); `/bootstrap` reported
 > `authMode: demo` with the Space's Demo Users; the SPA picker signed three users in with their real roles, and a
 > Link Analysis live check (identity resolution, value Measures, Case-team sharing, settings) ran 33/33 over it.
@@ -172,12 +172,12 @@ The already-running `CollectorService` polls every 60s and ingests automatically
 
 ### Verify
 
-The boot log names the active authenticator: `ControlApi started on port 8080 (Professional edition —
+The boot log names the active authenticator: `ControlApi started on port 8080 (Standard edition —
 authentication enforced via com.gamma.demoauth.DemoAuthenticator)`. `/bootstrap` carries
-`auth.mock: true` and the Demo User list. `/bootstrap` also reports `edition: professional` — its
+`auth.mock: true` and the Demo User list. `/bootstrap` also reports `edition: standard` — its
 edition label is "anything but `auth.mode=none`", not the jar set.
 
-## Path B — The real release: Professional/Enterprise with a genuine IAM and Postgres
+## Path B — The real release: Standard/Advanced with a genuine IAM and Postgres
 
 **Goal:** ship or run a bundle that actually enforces authentication.
 
@@ -185,12 +185,12 @@ edition label is "anything but `auth.mode=none`", not the jar set.
 
 ```powershell
 $env:JAVA_HOME = "C:\sandbox\.graalvm-cache\jdk-27-win"
-mvn -o clean package -DskipTests -Pedition-enterprise -B   # superset: builds security AND policy
-pwsh -File inspecto/package.ps1 -Edition Enterprise        # or -Edition Professional for Standard-equivalent
+mvn -o clean package -DskipTests -Pedition-advanced -B   # superset: builds security AND policy
+pwsh -File inspecto/package.ps1 -Edition Advanced        # or -Edition Standard (no policy engine)
 ```
 
 `serve.bat`/`serve.sh` auto-detect the edition from which jars are in the bundle
-(`inspecto-oidc.jar` present ⇒ Professional; `+ inspecto-policy.jar` ⇒ Enterprise) — no separate
+(`inspecto-oidc.jar` present ⇒ Standard; `+ inspecto-policy.jar` ⇒ Advanced) — no separate
 runtime flag exists for this.
 
 ### 2. Point it at a real OIDC provider

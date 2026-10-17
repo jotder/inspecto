@@ -167,7 +167,12 @@ export function provideLaAppHostServices(): Provider[] {
             provide: LA_FEATURES,
             useFactory: (): LaFeatures => {
                 const session = inject(SessionService);
-                return { ops: session.opsEnabled, exchange: session.exchangeEnabled, geoLink: session.geoLinkEnabled };
+                return {
+                    ops: session.opsEnabled,
+                    exchange: session.exchangeEnabled,
+                    geoLink: session.geoLinkEnabled,
+                    investigations: session.investigationsEnabled,
+                };
             },
         },
         {

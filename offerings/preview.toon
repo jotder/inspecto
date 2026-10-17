@@ -6,4 +6,4 @@ posture:
   eventsBackend: parquet
   objectsBackend: default
   postgresSidecar: bundled
-includes[1]: enterprise
+includes[1]: advanced

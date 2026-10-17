@@ -56,7 +56,7 @@ An add-on over the platform base. It reads Entity Lists (`entity-list` module), 
 
 - **Job**: a `screening.run` Job in the Space's Jobs config with the params above. No module-level TOON file.
 - **Lists**: authored through Entity Lists; Screening adds no list format.
-- **Enablement**: `screening` in the Offering (`offerings/professional.toon`), then per Space in the module switch.
+- **Enablement**: `screening` in the Offering (`offerings/standard.toon`), then per Space in the module switch.
 
 ## 6. Screens
 

@@ -128,7 +128,7 @@ addons:
 `modules` use manifest ids; modules with `offeringRole` base or internal are always present and never listed.
 `addons` status `built` names modules that exist today, `planned` names where the code lives until its P7 move.
 `contentPacks[N]` lists Space template ids under `spaces/_templates`; `defaultSpaceSettings:` is an empty
-placeholder. Includes union modules and add-ons. Same TOON rules as manifests (no `#` lines). `node tools/check-offerings.mjs` is the guard. The example above is abridged from `offerings/professional.toon` (the file also lists every other add-on).
+placeholder. Includes union modules and add-ons. Same TOON rules as manifests (no `#` lines). `node tools/check-offerings.mjs` is the guard. The example above is abridged from `offerings/standard.toon` (the file also lists every other add-on).
 
 **`posture:` (P6b, optional).** Four verifiable deployment facts per Offering, not inherited: `authMode` none|oidc, `eventsBackend`
 default|parquet, `objectsBackend` default|postgres, `postgresSidecar` absent|bundled. `check-offerings` holds them to that closed

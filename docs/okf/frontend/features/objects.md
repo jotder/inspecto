@@ -277,7 +277,7 @@ As-built designs (archived):
 > think-aloud session with a real Case-desk lead, which stays owed as BACKLOG P3 `D6-REAL-USER-SESSION-1`. A proxy
 > already knows what a Findings spec is, so it under-reports confusion. Treat the findings below as a floor.
 
-**Setup.** An `origin/master` `4dbe84d1a` worktree, built with `package.ps1 -Edition Enterprise -DemoAuth`. The
+**Setup.** An `origin/master` `4dbe84d1a` worktree, built with `package.ps1 -Edition Advanced -DemoAuth`. The
 committed `demo` Space was copied into the bundle, with a bundle-local `demo-users.toon`: *Demo Case Lead*
 (`operations`, which holds `canManageIncidents`) and *Demo Business Viewer* (`business`, which does not). The
 server ran on `:8097`, because `:8080` was held by a process this session did not start. The browser pane stayed

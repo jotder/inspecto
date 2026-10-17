@@ -10,6 +10,8 @@ export interface AppEnvironment {
     apiBaseUrl: string;
     appLogo: string;
     footerText: string;
+    /** The product name on the shared sign-in screen; unset means "Inspecto" (the console). `la-app` sets "Inspecto LA". */
+    productName?: string;
     /** Public PKCE-client OIDC config baked into the bundle (no secret); absent/blank means "use `/bootstrap`". */
     oidc?: { authorizeUrl?: string; clientId?: string; scopes?: string; endSessionUrl?: string; mock?: boolean };
 }

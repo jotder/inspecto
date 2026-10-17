@@ -1407,6 +1407,9 @@ public final class AlertService {
                 .attr("value", value)
                 .attr("severity", rule.severity())
                 .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule));
+        // LA-EDITIONS-1 phase 6: the Investigation an Investigation rule watches, so an event reader (the Link Analysis
+        // webhook tap) can tell an Investigation Alert from a pipeline one without parsing the display scope.
+        if (rule.investigation() != null) eb.attr("investigation", rule.investigation());
         evidence.forEach(eb::attr);
         Event firedEvent = eb.build();
         EventLog.current().emit(firedEvent);

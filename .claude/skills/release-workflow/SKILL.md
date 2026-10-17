@@ -43,7 +43,7 @@ wrong, it is **not yet in force**. See `docs/BRANCHING.md` §0-A.
 - **Versions = git branches.** Active: `master` (newest mainline) — **today the only one**; there is no
   current `N.x` (see CURRENT STATE).
   **Retired/EOL (FROZEN — no commits/pushes/tags, never a propagation target): `1.x`, `2.x`, `3.x`.`**
-- **Editions (Personal / Standard / Enterprise) = build flavors** (Maven profiles + `ServiceLoader`
+- **Editions (Basic / Standard / Advanced) = build flavors** (Maven profiles + `ServiceLoader`
   modules + `-D` flags). **Editions are NEVER branches.**
 
 ## Versioning
@@ -51,7 +51,7 @@ wrong, it is **not yet in force**. See `docs/BRANCHING.md` §0-A.
 SemVer `vMAJOR.MINOR.PATCH`. **Conventional Commits:** `fix:`→PATCH, `feat:`→MINOR,
 `feat!:`/`BREAKING CHANGE:`→MAJOR; `chore/docs/refactor/test/build/ci/perf/style/revert`→none.
 Scope encouraged (`fix(etl):`, `feat(ui):`). One version spans all editions; artifacts differ by
-classifier (`-personal` / `-standard`).
+classifier (`-basic` / `-standard`).
 
 ## Propagation = MERGE-FORWARD (oldest → master)
 
@@ -67,7 +67,7 @@ A `fix:` lands on the **oldest still-supported branch it affects**, then merges 
    merge-forward set**, then execute merges up to `master`.
 5. **Refuse** to commit/push/tag on retired `1.x` / `2.x` / `3.x`. A security backport to an EOL line
    needs a **human** to set `UCC_RELEASE_GUARD_DISABLE=1` and document it — agents ask, never self-authorize.
-6. **Editions** are build flavors — never create/push `personal`/`standard` branches.
+6. **Editions** are build flavors — never create/push `basic`/`standard` branches.
 7. **Tag** releases `vX.Y.Z` on the branch they ship from.
 
 ## Common commands

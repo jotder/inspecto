@@ -1,7 +1,7 @@
 # Business assurance
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `business-assurance`
-> (`spaces/_templates/business-assurance/template.toon`). Offering: listed in `offerings/personal.toon`
+> (`spaces/_templates/business-assurance/template.toon`). Offering: listed in `offerings/basic.toon`
 > `contentPacks`, so in every edition. Checked against the template on 2026-10-17.
 
 ## Business problem

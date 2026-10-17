@@ -20,3 +20,5 @@ com.gamma.la.api.PublicInvestigationRoutes
 com.gamma.la.api.DraftRoutes
 com.gamma.la.api.DatasetFilesRoutes
 com.gamma.la.api.EntityProfileRoutes
+com.gamma.la.api.InvestigationInboundRoutes
+com.gamma.la.api.IntegrationRoutes

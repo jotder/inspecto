@@ -94,7 +94,7 @@ class EventStoreDurabilityTest {
             List<Event> survived = auditsAfterRestart(root);
             assertEquals(1, survived.size(),
                     "a restart under -Devents.backend=parquet must not lose an audited mutation — this is "
-                            + "the whole reason the Standard/Enterprise launchers set it");
+                            + "the whole reason the Standard/Advanced launchers set it");
             assertEquals("pipeline.deleted", survived.get(0).attributes().get("action"));
             assertEquals("alice", survived.get(0).attributes().get("actor"),
                     "the actor must survive too: an audit row without its actor answers nothing");

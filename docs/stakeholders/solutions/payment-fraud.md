@@ -79,6 +79,6 @@ of being ingested. Gap detection watches the daily file sequence.
   the listed groupings (stated in `template.toon`).
 - The template's `contents` says "7 feature Datasets" while its description says "five"; the folder has
   seven feature Jobs (plus `pf_risk_score_job`) and ten Dataset records (the seven plus `payment_attempts`, `disputes`, `sim_changes`).
-- The Risk Score needs Scoring & Lists (Professional and above), but `offerings/personal.toon` lists
+- The Risk Score needs Scoring & Lists (Professional and above), but `offerings/basic.toon` lists
   `payment-fraud` as a Personal pack.
 - Features are hourly batch, not authorisation-time scoring.

@@ -1,4 +1,4 @@
-# Link Analysis — User Manual
+# Inspecto LA (Link Analysis) — User Manual
 
 *For analysts: fraud, revenue assurance, money-laundering and network investigators. Written 2026-09-30 against
 the shipped product; every control named here is a label you will see on screen. The developer-level mechanism
@@ -24,7 +24,7 @@ It answers questions such as:
 * Which agent till takes most of the cash-out, and from how many different payers?
 * Which subscribers share a device or partner and might be one person (**split identity**)?
 
-**Where:** *Studio → Link Analysis* (`/studio/link-analysis`), or the standalone **Link Analysis** application
+**Where:** *Studio → Link Analysis* (`/studio/link-analysis`), or the standalone **Inspecto LA** application
 (§2, *The standalone application*).
 **Editions:** Professional and Enterprise. In Personal the page says it is not installed.
 **You need:** to be signed in. Reading and exploring need nothing special; changing things needs the
@@ -78,13 +78,13 @@ chips hide or show each kind of link on the canvas.
 
 ### The standalone application
 
-Link Analysis also runs as its own application, without the rest of the studio. After sign-in its front page offers
+Link Analysis also runs as its own application, **Inspecto LA**, without the rest of the studio. After sign-in its front page offers
 three areas — **Link Analysis**, **Geo** and **Entity Lists** — and the same three sit in the slim menu down the
 left edge (with the Space switcher and your user menu). A user who may change Link Analysis settings also sees
 **Settings** there.
 
 * **Sign-in.** A secured installation shows *Sign in with SSO*. A demonstration installation instead shows
-  *Inspecto demonstration*, a warning *Demo sign-in — Not secure, local only*, and one button per **Demo User**
+  *Inspecto LA demonstration*, a warning *Demo sign-in — Not secure, local only*, and one button per **Demo User**
   (name and title). Pick one; there is no password. The `la-showcase` Space Template defines five: *Demo Admin*
   (also holds the settings role), *Demo FM Analyst* (fraud analyst, lead), *Demo FM Manager* (fraud manager, the
   second approver for four-eyes), *Demo RA Analyst* and *Demo Manager* (both view-only, §11).

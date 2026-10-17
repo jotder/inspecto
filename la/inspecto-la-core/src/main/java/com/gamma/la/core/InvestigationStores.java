@@ -103,7 +103,7 @@ public final class InvestigationStores {
             throw unavailable("the database Investigation store module is broken: " + broken.getMessage());
         }
         InvestigationStoreProvider provider = found.filter(p -> "db".equals(p.backend())).orElseThrow(() ->
-                unavailable("-D" + BACKEND_PROPERTY + "=db but this bundle carries no database Investigation store (inspecto-la-store-pg, Enterprise)"));
+                unavailable("-D" + BACKEND_PROPERTY + "=db but this bundle carries no database Investigation store (inspecto-la-store-pg, Advanced)"));
         String url = first(System.getProperty(URL_PROPERTY), System.getProperty("inspecto.db.url"));
         if (url == null)
             throw unavailable("-D" + BACKEND_PROPERTY + "=db needs a connection: set -D" + URL_PROPERTY + " (or -Dinspecto.db.url) to jdbc:postgresql://host:5432/db");

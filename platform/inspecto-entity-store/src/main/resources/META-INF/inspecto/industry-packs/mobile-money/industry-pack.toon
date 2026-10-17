@@ -1,0 +1,9 @@
+id: mobile-money
+name: Mobile Money
+description: "Mobile money vocabulary for Link Analysis: wallets and agents linked by transfers, cash-in, cash-out and merchant payments."
+space_templates[2]: la-mobile-money,mobile-money
+pattern_packs[5]: pass-through,layering-chain,inbound-collector,circular-flow,structuring
+profile:
+  measure_hints[3]: amount,value,total
+  time_hints[4]: booked,posted,_at$,time
+  suggested_tools[3]: scoring,pattern,flow

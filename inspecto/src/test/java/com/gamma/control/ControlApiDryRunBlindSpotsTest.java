@@ -128,7 +128,7 @@ class ControlApiDryRunBlindSpotsTest {
             HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/wh_flow/dry-run", candidate);
             assertEquals(422, r.statusCode(),
                     "a preview must not show a healthy branch the run would refuse: " + r.body());
-            assertTrue(r.body().contains("'hook'") && r.body().contains("Professional"),
+            assertTrue(r.body().contains("'hook'") && r.body().contains("Standard"),
                     "the refusal names the sink and the edition, in WebhookSink's own words: " + r.body());
         }
     }

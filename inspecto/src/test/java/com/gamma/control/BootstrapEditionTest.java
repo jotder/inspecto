@@ -21,19 +21,19 @@ class BootstrapEditionTest {
     @Test
     void authFreeCoreIsPersonalEvenWithADecider() {
         AccessDeciders.forTest(ABSTAINS);
-        assertEquals("personal", BootstrapRoutes.edition());
+        assertEquals("basic", BootstrapRoutes.edition());
     }
 
     @Test
     void authenticatedWithoutADeciderIsProfessional() {
         System.setProperty("auth.mode", "oidc");
-        assertEquals("professional", BootstrapRoutes.edition());
+        assertEquals("standard", BootstrapRoutes.edition());
     }
 
     @Test
     void authenticatedWithAPolicyDeciderIsEnterprise() {
         System.setProperty("auth.mode", "demo");
         AccessDeciders.forTest(ABSTAINS);
-        assertEquals("enterprise", BootstrapRoutes.edition());
+        assertEquals("advanced", BootstrapRoutes.edition());
     }
 }

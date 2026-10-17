@@ -1,7 +1,7 @@
 # Incidents
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: add-on `incidents` in `offerings/professional.toon` — `status: planned`, `hostedBy[2]: engine,ops`
+> Offering: add-on `incidents` in `offerings/standard.toon` — `status: planned`, `hostedBy[2]: engine,ops`
 > (no module of its own; the code ships in the engine and the `ops` module). Checked against the code on 2026-10-17.
 
 ## 1. What it is

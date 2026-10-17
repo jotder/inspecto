@@ -3,8 +3,8 @@
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content: the Space Templates `la-showcase`
 > (`spaces/_templates/la-showcase/template.toon`) and `la-mobile-money`
 > (`spaces/_templates/la-mobile-money/template.toon`). Offering: the `linkAnalysis` add-on in
-> `offerings/professional.toon` (modules `la-storage`, `la-core`, `la-api`, `geo-link`) and
-> `offerings/enterprise.toon` (`la-store-pg`). Checked against the templates on 2026-10-17.
+> `offerings/standard.toon` (modules `la-storage`, `la-core`, `la-api`, `geo-link`) and
+> `offerings/advanced.toon` (`la-store-pg`). Checked against the templates on 2026-10-17.
 
 ## Business problem
 
@@ -86,5 +86,5 @@ home; `tools/seed-la-showcase.mjs` and `tools/seed-la-mm.mjs` create them agains
   Users.
 - Investigations and Entity Lists are not part of the template; the seed scripts must be run.
 - `la-showcase` and `la-mobile-money` are not in any offering's `contentPacks` list; only
-  `la-daily-feed` is (`offerings/personal.toon`).
+  `la-daily-feed` is (`offerings/basic.toon`).
 - The AML pack ships its own Link Analysis starter view (see [AML](aml.md)).

@@ -49,10 +49,10 @@ import java.util.regex.Pattern;
  */
 public final class InvestigationCaseRoutes implements RouteModule {
 
-    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    /** Gated by the geoLink feature (404 MODULE_DISABLED where a Space switches it off) and the investigations edition feature (503 CAPABILITY_UNAVAILABLE on Basic, LA-EDITIONS-1). */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     private static final Pattern CASE_REF = Pattern.compile("[A-Za-z0-9._:-]{1,128}");

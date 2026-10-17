@@ -75,7 +75,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * <h2>Runbook — the command that actually works (proven 2026-09-12, PG 18.6 in Docker)</h2>
  *
  * <pre>{@code
- * MAVEN_OPTS="-Duser.timezone=Asia/Kolkata"  * INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'  * mvn -o -B test -Pedition-enterprise -pl :inspecto-ops -am  *     -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
+ * MAVEN_OPTS="-Duser.timezone=Asia/Kolkata"  * INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'  * mvn -o -B test -Pedition-advanced -pl :inspecto-ops -am  *     -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
  * }</pre>
  *
  * <p>That shape is not arbitrary. The obvious command fails three times over, and because this class

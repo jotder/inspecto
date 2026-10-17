@@ -55,9 +55,9 @@ class EditionFeaturesTest {
         IllegalStateException boom = assertThrows(IllegalStateException.class,
                 () -> EditionFeatures.requirePipeline(pipeline(dir, true, null)));
         assertTrue(boom.getMessage().startsWith(EditionFeatures.CODE + ": pipeline 'edition_etl'"), boom.getMessage());
-        assertTrue(boom.getMessage().contains("Professional+"), boom.getMessage());
+        assertTrue(boom.getMessage().contains("Standard+"), boom.getMessage());
         assertEquals(List.of(), EditionFeatures.pipelineRefusals(pipeline(dir, false, "DELETE")),
-                "the other post-actions and a lake-less pipeline stay Personal");
+                "the other post-actions and a lake-less pipeline stay Basic");
     }
 
     @Test
@@ -88,11 +88,11 @@ class EditionFeaturesTest {
         List<EditionFeatures.Refusal> r = EditionFeatures.pipelineRefusals(draft);
         assertEquals(List.of("steps[0].mask", "steps[1].route.branches[0].steps[0].mask"),
                 r.stream().map(EditionFeatures.Refusal::field).toList());
-        assertTrue(r.get(0).message().contains("Enterprise"), r.get(0).message());
+        assertTrue(r.get(0).message().contains("Advanced"), r.get(0).message());
         assertFalse(EditionFeatures.present(EditionFeatures.PII_MASK), "no provider in this module: absent");
         EditionFeatures.overrideForTest(Set.of(EditionFeatures.PII_MASK));
         assertEquals(List.of(), EditionFeatures.pipelineRefusals(draft), "a declared feature lifts the refusal");
         EditionFeatures.overrideForTest(Set.of(EditionFeatures.SINK_ARCHIVE, EditionFeatures.SINK_DUCKLAKE));
-        assertEquals(2, EditionFeatures.pipelineRefusals(draft).size(), "Professional features do not lift it");
+        assertEquals(2, EditionFeatures.pipelineRefusals(draft).size(), "Standard features do not lift it");
     }
 }

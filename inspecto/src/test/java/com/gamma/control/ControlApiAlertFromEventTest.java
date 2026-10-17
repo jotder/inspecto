@@ -48,7 +48,7 @@ class ControlApiAlertFromEventTest {
         ControlApi api = new ControlApi(svc, 0);
         api.start();
         try {
-            assertTrue(svc.objects().isEmpty(), "the Personal shape: no operational objects");
+            assertTrue(svc.objects().isEmpty(), "the Basic shape: no operational objects");
             String pipeline = "gap_src_http";
             svc.eventLog().emit(gap(pipeline, "cdr_2026061402.csv"));
             svc.eventLog().emit(gap(pipeline, "cdr_2026061402.csv"));   // re-reported: de-duplicated

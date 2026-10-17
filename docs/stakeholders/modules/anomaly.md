@@ -2,7 +2,7 @@
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
 > Offering: Professional and above — add-on `anomalyDetection` (status `built`, module `anomaly`) in
-> `offerings/professional.toon`. Checked against the code on 2026-10-17.
+> `offerings/standard.toon`. Checked against the code on 2026-10-17.
 
 ## 1. What it is
 

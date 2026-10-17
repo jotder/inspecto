@@ -91,7 +91,7 @@ export const appRoutes: Route[] = [
     // },
 
     // Inspecto inspector routes. Personal/core edition is auth-free (authGuard is a pass-through there);
-    // the Professional edition (authMode==='oidc') gates entry on a live OIDC session, redirecting to
+    // the Standard edition (authMode==='oidc') gates entry on a live OIDC session, redirecting to
     // /sign-in when absent (W6d). Session state is resolved by SessionService.init before routing.
     {
         path: '',

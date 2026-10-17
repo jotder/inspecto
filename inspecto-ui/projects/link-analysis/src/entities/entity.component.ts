@@ -18,6 +18,7 @@ import {
     EntityTypeSummary,
 } from '@inspecto/link-analysis/api/entity-profile.service';
 import { InvService } from '@inspecto/link-analysis/api/inv.service';
+import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile.service';
 import { profileForEntityType } from '@inspecto/link-analysis/graph/domain-profile';
 import { investigateQueryParams } from '@inspecto/link-analysis/link-analysis/investigate-number';
 import { NodeInsightComponent, NodeInsightContext } from '@inspecto/link-analysis/link-analysis/node-insight.component';
@@ -241,6 +242,8 @@ type Identity = { members: string[] | null; note: string } | null;
 })
 export class EntityComponent implements OnInit {
     private readonly svc = inject(EntityProfileService);
+    /** Installs the Space's Industry packs: `profileForEntityType` reads them (LA-EDITIONS-1). */
+    private readonly domainProfiles = inject(DomainProfileService);
     private readonly inv = inject(InvService);
     private readonly lens = inject(LensService);
     private readonly router = inject(Router);

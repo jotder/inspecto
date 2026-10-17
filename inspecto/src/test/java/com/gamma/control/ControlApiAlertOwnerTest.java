@@ -159,10 +159,10 @@ class ControlApiAlertOwnerTest {
     @Test
     void withoutASubjectTheRuleIsUnowned(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> created = send(c.port, "POST", "/alerts/rules", rule("personal-rate", ""), null);
+            HttpResponse<String> created = send(c.port, "POST", "/alerts/rules", rule("basic-rate", ""), null);
             assertEquals(200, created.statusCode(), created.body());
-            assertEquals(AlertRule.UNOWNED, storedOwner(root, "personal-rate"), "Personal: no Subject to capture");
-            assertFalse(new ComponentStore(root.resolve("registry")).get("alert-rule", "personal-rate")
+            assertEquals(AlertRule.UNOWNED, storedOwner(root, "basic-rate"), "Basic: no Subject to capture");
+            assertFalse(new ComponentStore(root.resolve("registry")).get("alert-rule", "basic-rate")
                     .orElseThrow().content().containsKey("owner"), "and the appUser placeholder is not stored");
         }
     }
@@ -176,7 +176,7 @@ class ControlApiAlertOwnerTest {
                     "Alert: shared-rate", "breached", "k-all"));
 
             assertEquals(List.of(alices.id(), everyone.id()), sorted(feed(c, null), alices, everyone),
-                    "Personal: no Subject, so everything stored is shown, as before");
+                    "Basic: no Subject, so everything stored is shown, as before");
 
             Authenticators.forTest(FAKE);
             assertEquals(List.of(alices.id(), everyone.id()), sorted(feed(c, "Bearer alice"), alices, everyone));

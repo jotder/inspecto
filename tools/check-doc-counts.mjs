@@ -144,17 +144,17 @@ const MANIFEST = {
     // ── SPEC-COUNTS-1's last hand-typed count, closed 2026-09-15: `tools/bundle-modules.mjs` is the one
     // module list sbom.mjs and check-sbom-modules.mjs both read (the dependency count was already derived —
     // `locked-dependencies` below). ⚠ Named for the SET: "staged jars" was stated eight ways because it
-    // silently meant different sets (first-party only vs + the PG sidecar; Professional vs Enterprise).
+    // silently meant different sets (first-party only vs + the PG sidecar; Standard vs Advanced).
     'optional-modules': {
         floor: 2,
-        what: 'first-party modules an edition can add beyond Personal (Professional + Enterprise floors)',
-        derive: () => editionOnlyModules('Enterprise').length,
+        what: 'first-party modules an edition can add beyond Basic (Standard + Advanced floors)',
+        derive: () => editionOnlyModules('Advanced').length,
         source: 'tools/bundle-modules.mjs',
     },
-    'enterprise-first-party-jars': {
+    'advanced-first-party-jars': {
         floor: 1,
-        what: 'first-party jars the Enterprise bundle stages (NOT counting the postgresql sidecar)',
-        derive: () => bundleModules('Enterprise').length,
+        what: 'first-party jars the Advanced bundle stages (NOT counting the postgresql sidecar)',
+        derive: () => bundleModules('Advanced').length,
         source: 'tools/bundle-modules.mjs',
     },
     'parsing-frontend-tokens': {
@@ -330,7 +330,7 @@ function javaSetOf(rel, field) {
 //   * Neither has a committed contract. Both are assembled from two sources — a built-in list plus
 //     whatever `ServiceLoader` finds — so a script would have to enumerate every
 //     `META-INF/services/…` file across modules and read each provider's returned Set.
-//   * ⛔ More decisively, both totals are EDITION-DEPENDENT: job types are 10 on Personal and 12 once
+//   * ⛔ More decisively, both totals are EDITION-DEPENDENT: job types are 10 on Basic and 12 once
 //     `inspecto-ops` is bundled; maintenance tasks are 20 built-in ids (across 19 switch arms) plus 4
 //     contributed by `inspecto-backup`/`inspecto-ops`. "The count" does not exist until you fix which
 //     modules are on the classpath, so a guard asserting ONE number would be asserting a falsehood —

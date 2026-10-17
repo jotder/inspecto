@@ -57,10 +57,10 @@ import static com.gamma.la.core.InvestigationEvaluator.sha256;
  */
 public final class DossierBundleRoutes implements RouteModule {
 
-    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    /** Gated by the geoLink feature (404 MODULE_DISABLED where a Space switches it off) and the investigations edition feature (503 CAPABILITY_UNAVAILABLE on Basic, LA-EDITIONS-1). */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     static final String FORMAT = "inspecto-dossier-bundle/1";
@@ -72,13 +72,22 @@ public final class DossierBundleRoutes implements RouteModule {
     }
 
     /** {@code GET …/dossier/bundle}. Gates: 503 → 422 id → 404 absent / not owner / R3 → 422 params. */
-    @SuppressWarnings("unchecked")
     private static Object export(ApiContext api, HttpExchange ex, String id) throws IOException {
-        DossierRoutes.Opened inv = DossierRoutes.open(api, ex, id);
+        return build(api, ex, DossierRoutes.open(api, ex, id), false);
+    }
+
+    /**
+     * Build (and audit as an export) the bundle of an opened Investigation at the request's {@code at} / {@code snapshots}.
+     * {@code reveal}: the caller lifted masking for a hand-off ({@code canRevealLinkEntities}, checked by the caller) - the
+     * bundle then carries raw ids and its {@code masking} says {@code revealed}. Shared with the hand-off route.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> build(ApiContext api, HttpExchange ex, DossierRoutes.Opened inv, boolean reveal) throws IOException {
+        String id = inv.id();
         List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
         int at = DossierRoutes.parseAt(ex, log, inv.writeRoot());
         List<String> snapshotIds = DossierRoutes.parseSnapshotIds(ex);
-        DossierRoutes.Masked built = DossierRoutes.maskedDossier(ex, inv, log, at, snapshotIds);
+        DossierRoutes.Masked built = DossierRoutes.maskedDossier(ex, inv, log, at, snapshotIds, reveal);
         Map<String, Object> dossier = built.dossier();
         Map<String, Object> manifest = (Map<String, Object>) dossier.get("manifest");
 

@@ -120,7 +120,7 @@
     "icon" : "heroicons_outline:queue-list",
     "status" : "partial",
     "nodeType" : "acquisition",
-    "note" : "**Premium connector, NOT in Personal (MODULE-REORG-1 P7, 2026-10-07): its own module `inspecto-connectors-kafka` (kafka-clients 3.9.x), staged from Professional up — a deliberate behaviour change; Personal's `inspecto-connectors.jar` registers seven factories.** Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker",
+    "note" : "**Premium connector, NOT in Basic (MODULE-REORG-1 P7, 2026-10-07): its own module `inspecto-connectors-kafka` (kafka-clients 3.9.x), staged from Standard up — a deliberate behaviour change; Basic's `inspecto-connectors.jar` registers seven factories.** Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker",
     "addable" : true
   }, {
     "id" : "acquisition.stream.pulsar",
@@ -267,7 +267,7 @@
     "status" : "delivered",
     "nodeType" : "parser.asn1",
     "requires" : "inspecto-telecom-asn1",
-    "note" : "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Professional and above",
+    "note" : "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Standard and above",
     "addable" : true
   }, {
     "id" : "parser.pattern.regex",
@@ -472,7 +472,7 @@
     "icon" : "heroicons_outline:eye-slash",
     "status" : "delivered",
     "nodeType" : "transform.mask",
-    "note" : "board SEC-08 — Enterprise only; by classification (strictest-wins) or name, full / partial / hash, no reversible vault (2026-10-06)",
+    "note" : "board SEC-08 — Advanced only; by classification (strictest-wins) or name, full / partial / hash, no reversible vault (2026-10-06)",
     "addable" : true
   }, {
     "id" : "quality.crypto.hash",
@@ -491,7 +491,7 @@
     "emoji" : "🛡️",
     "icon" : "heroicons_outline:shield-exclamation",
     "status" : "planned",
-    "note" : "board SEC-08 — Enterprise only",
+    "note" : "board SEC-08 — Advanced only",
     "addable" : false
   }, {
     "id" : "transform.record",
@@ -870,7 +870,7 @@
     "emoji" : "🤖",
     "icon" : "heroicons_outline:cpu-chip",
     "status" : "planned",
-    "note" : "onnxruntime ships in the Enterprise bundle inside `inspecto-intelligence` (its embeddings, ASSURE-INTELLIGENCE-BUNDLE-1); this Step Processor is not built",
+    "note" : "onnxruntime ships in the Advanced bundle inside `inspecto-intelligence` (its embeddings, ASSURE-INTELLIGENCE-BUNDLE-1); this Step Processor is not built",
     "addable" : false
   }, {
     "id" : "ml.llm.classify",
@@ -879,7 +879,7 @@
     "emoji" : "🏷️",
     "icon" : "heroicons_outline:sparkles",
     "status" : "planned",
-    "note" : "still unbuilt; the assist agent now ships Professional+ (CP-14, `PKG-5` 2026-09-12) but this step kind does not exist",
+    "note" : "still unbuilt; the assist agent now ships Standard+ (CP-14, `PKG-5` 2026-09-12) but this step kind does not exist",
     "addable" : false
   }, {
     "id" : "ml.embedding.vector",
@@ -907,7 +907,7 @@
     "icon" : "heroicons_outline:bell-alert",
     "status" : "delivered",
     "nodeType" : "gap",
-    "note" : "same detector; a gap raises the `SEQUENCE_GAP` event in EVERY edition, and `EventAlertBridge` raises it as a stored Alert on every edition, Personal included (P7 ALERT residue retirement 2026-10-08; it was an ALERT object only where the optional `inspecto-ops` module was present)",
+    "note" : "same detector; a gap raises the `SEQUENCE_GAP` event in EVERY edition, and `EventAlertBridge` raises it as a stored Alert on every edition, Basic included (P7 ALERT residue retirement 2026-10-08; it was an ALERT object only where the optional `inspecto-ops` module was present)",
     "addable" : true
   }, {
     "id" : "control.audit.stamp",
@@ -957,7 +957,7 @@
     "icon" : "heroicons_outline:megaphone",
     "status" : "partial",
     "capability" : "alert-rule",
-    "note" : "Alert Rules over the ledgers → Alerts → channels (board CP-11/CP-15), authored in the Alert Rules pane — not a Step: never on the canvas, so no workbench preview / lift / lower. Professional+ (G9): `inspecto-ops` declares it through `EditionFeatureProvider`; Personal refuses every authoring door with `ERR_EDITION_FEATURE` and arms no rule copied onto disk",
+    "note" : "Alert Rules over the ledgers → Alerts → channels (board CP-11/CP-15), authored in the Alert Rules pane — not a Step: never on the canvas, so no workbench preview / lift / lower. Standard+ (G9): `inspecto-ops` declares it through `EditionFeatureProvider`; Basic refuses every authoring door with `ERR_EDITION_FEATURE` and arms no rule copied onto disk",
     "addable" : false
   }, {
     "id" : "control.sla.monitor",
@@ -997,7 +997,7 @@
     "icon" : "heroicons_outline:server-stack",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
-    "note" : "`output.ducklake` / `sinks[].ducklake` — needs the postgresql sidecar. Professional+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Personal refuses `ducklake.enabled: true` at save (`ERR_EDITION_FEATURE`), at pipeline load and in `DuckLakeRegistrar`",
+    "note" : "`output.ducklake` / `sinks[].ducklake` — needs the postgresql sidecar. Standard+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Basic refuses `ducklake.enabled: true` at save (`ERR_EDITION_FEATURE`), at pipeline load and in `DuckLakeRegistrar`",
     "addable" : true
   }, {
     "id" : "sink.view",
@@ -1027,7 +1027,7 @@
     "icon" : "heroicons_outline:archive-box-arrow-down",
     "status" : "delivered",
     "nodeType" : "acquisition",
-    "note" : "Collector `post_action: MOVE archive_path` + the `backup` maintenance task. Professional+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Personal refuses `post_action.on_success: MOVE` (`ERR_EDITION_FEATURE`) at save, at pipeline load and before a remote acquisition — `RETAIN`/`DELETE`/`RENAME`/`TAG` and the local `dirs.backup` move stay in every edition",
+    "note" : "Collector `post_action: MOVE archive_path` + the `backup` maintenance task. Standard+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Basic refuses `post_action.on_success: MOVE` (`ERR_EDITION_FEATURE`) at save, at pipeline load and before a remote acquisition — `RETAIN`/`DELETE`/`RENAME`/`TAG` and the local `dirs.backup` move stay in every edition",
     "addable" : true
   }, {
     "id" : "sink.lake.delta",
@@ -1097,7 +1097,7 @@
     "icon" : "heroicons_outline:link",
     "status" : "delivered",
     "nodeType" : "sink.webhook",
-    "note" : "top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Professional+",
+    "note" : "top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Standard+",
     "addable" : true
   }, {
     "id" : "sink.dlq",

@@ -1,3 +1,5 @@
+import { installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
+import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profile.testing';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -293,6 +295,9 @@ describe('ObjectDetailComponent', () => {
     });
 
     it('offers "Investigate in Link Analysis" where a keyed Alert Rule left the MSISDN it breached on', () => {
+        // Since the Industry pack format (LA-EDITIONS-1 phase 4) the investigable entity types come from the installed
+        // Domain Profiles, so the Telecom pack is installed here rather than inherited from another spec's global state.
+        installDomainProfiles([profileFromPack(TELECOM_PACK_FIXTURE)]);
         const { fixture } = create({
             get: () => of({ ...CASE, objectType: 'INCIDENT', attributes: { rule: 'r', 'key.a_msisdn': '966501' } }),
         });

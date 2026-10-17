@@ -416,16 +416,16 @@ function printStats(title, stats, log = console.log) {
 export function verificationCommands() {
     return [
         'Phase C - verification (this script never runs Maven; run these by hand, one at a time):',
-        '  mvn -o -B -Pedition-enterprise -DskipTests clean package                  # the WHOLE reactor builds from the new layout',
-        '  mvn -o -B -Pedition-standard validate ; mvn -o -B -Pedition-professional validate ; mvn -o -B -Pedition-preview validate ; mvn -o -B validate   # every edition resolves',
+        '  mvn -o -B -Pedition-advanced -DskipTests clean package                  # the WHOLE reactor builds from the new layout',
+        '  mvn -o -B -Pedition-standard validate ; mvn -o -B -Pedition-advanced validate ; mvn -o -B -Pedition-preview validate ; mvn -o -B validate   # every edition resolves',
         '  node tools/route-gating-report.mjs                                       # regenerate compliance/evidence/route-gating.md (its source paths moved), then --check',
         '  every no-build guard of .github/workflows/ci.yml:  node tools/check-vocabulary.mjs ; check-doc-links ; check-doc-citations ; check-doc-counts ; check-bundle-doc-links ;',
         '      check-authgate-coverage ; check-module-deps (+ --test) ; check-module-architecture (+ --test) ; check-offerings (+ --test) ; check-sbom-modules ; check-demo-auth-isolation ;',
         '      check-launchers ; check-bundle-platform ; check-native-licences ; check-bundle-spaces ; check-seed-paths ; check-safety-roots-declared ; check-backlog-homes ; check-nul-bytes ; check-secrets',
         '  mvn -o -B -pl :inspecto -am -Dtest=CapabilityManifestTest,ModuleManifestGuardTest,ConfigWriteFunnelTest,ImportLoaderInventoryTest -Dsurefire.failIfNoSpecifiedTests=false test',
         '  (ReactorModules.java is exercised by those three; the path-relative tests run in their own modules: see the dry-run Java section)',
-        '  GAUNTLET: mvn -o clean test -Pedition-enterprise   # the full gate, ~10 min',
-        '  pwsh -File inspecto/package.ps1 -Edition Professional                    # the bundle still assembles (every Join-Path moved)',
+        '  GAUNTLET: mvn -o clean test -Pedition-advanced   # the full gate, ~10 min',
+        '  pwsh -File inspecto/package.ps1 -Edition Standard                    # the bundle still assembles (every Join-Path moved)',
     ];
 }
 

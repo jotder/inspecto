@@ -9,6 +9,9 @@ timestamp: 2026-10-17T00:00:00Z
 
 # Link Analysis backend architecture
 
+The backend of **Inspecto LA (Link Analysis)**, the product (`ED-1`); the capability, its routes, keys and modules keep
+the name Link Analysis.
+
 Grounded in a code read on 2026-10-09 (tip `957c554af`). This page is the **backend structure**; behaviour,
 decisions and measurements live in the feature concept
 [`okf/frontend/features/link-analysis.md`](../../frontend/features/link-analysis.md), open work in
@@ -130,7 +133,7 @@ Design rules visible in the dependency graph:
   never names an index class: `GraphInput.IndexRef` carries only primitives (version dir, seeds, estimates).
 * **The engine names no `la-*` class** (grep-true; LA route paths appear only as strings, and enforced by `tools/check-engine-names-no-la.mjs`). The host reaches LA only through ServiceLoader SPIs it owns
   (`RouteModule`, `LinkIndexBuilder`, `InvestigationMeasureProbe`); absent jars degrade to
-  `AbsentModuleRoutes` (503 `CAPABILITY_UNAVAILABLE`, "Professional edition and above").
+  `AbsentModuleRoutes` (503 `CAPABILITY_UNAVAILABLE`, "Standard edition and above").
 * **Entity Lists are not LA.** `/entity-lists/*` routes live in `features/inspecto-entity-list`; LA reads the same
   fact log through the host-free `EntityListFacts` helper so neither side depends on the other's routes.
 
@@ -245,7 +248,7 @@ Design rules visible in the dependency graph:
 | Layout | `<writeRoot>/audit/snapshots/investigations/<id>/` (header, log, sets, members, references, templates, pending, caselink, binding, `mask.key`, `drafts/`) | one schema per Space; tables `la_space`, `la_investigation`, `la_log`, `la_set`, `la_member`, `la_reference`, `la_alert_binding`, `la_pending`, `la_template`, `la_draft`; sealed bytes stored as `text`, immutability trigger |
 | Concurrency | JVM monitor per directory + OS `FileChannel.lock` on `.store.lock` (two-JVM safe); `expectedVersion` check → `InvestigationVersionConflictException` | `SELECT … FOR NO KEY UPDATE` on the Investigation/Draft row in one short transaction; Space-wide Draft cap = `FOR UPDATE` on the `la_space` row |
 | Promote atomicity | intent file → append → mark promoted; `recoverDrafts` finishes or undoes a half promote | one transaction; nothing to recover |
-| Editions | every LA edition | Preview and Enterprise only |
+| Editions | every LA edition | Preview and Advanced only |
 
 ⚠ The FS layout's Javadoc says `<audit root>/investigations/<id>`; the code writes `audit/snapshots/investigations/<id>`. Creates, forks,
 references, Case link and Alert Rule binding are last-writer-wins by design on FS.
@@ -370,13 +373,59 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
   (`BrokenChainException` → 500 `INTEGRITY_VIOLATION`); a truncated tail is caught only by a cited head hash.
 * **Fold** (`EntityRegistry.fold(facts, atSeq)`): list created / members added-removed (optional `expiresAt`) /
   ranges / retired; `identity.asserted`/`retracted` union-find into resolution groups (deterministic only, D-M1).
-* **Entity Types** (`EntityTypes`): nine defaults (subscriber, imsi, imei, msisdn, wallet, account, agent, handset,
-  cell), max 64, closed normaliser set `default | digits | e164 | upper-trim` that must match the SPA's
+* **Entity Types** (`EntityTypes`): nine defaults (ids subscriber, imsi, imei, msisdn, wallet, account, agent, handset,
+  cell; their labels are NEUTRAL since LA-EDITIONS-1, e.g. *Phone number*, and the Space's Industry pack relabels them, §3.6), max 64, closed normaliser set `default | digits | e164 | upper-trim` that must match the SPA's
   `entity-key.ts` character for character (shared parity fixture). Stored in `link-analysis.toon`.
 * **Sidecar** (`EntityListSidecar`): a Parquet projection per list for SQL (`physicalRef` Dataset); a failed write
   never undoes the fact.
 * `LinkAnalysisSettings` is the one reader of `link-analysis.toon` (caps, masking, four-eyes thresholds, entity
   types, distinct caps, `hub_threshold`, `index` and `drafts` records, graph-run knobs); null = inherit default, never unbounded.
+
+### 3.6 Domain Profile and Industry packs (LA-EDITIONS-1 phase 4, as built 2026-10-17; settles `LDP-D7`)
+
+* **What it is.** A Space's **Domain Profile** names the installed **Industry pack** whose vocabulary Link Analysis
+  uses: `domain_profile: <pack id>` in `link-analysis.toon`; absent, `generic` or a pack this build does not ship =
+  the neutral vocabulary. ⛔ A pack **relabels; it never adds a concept**: every term is keyed by a canonical concept
+  key (`concept.node|link|row|link_from|link_to`, `entity_type.<core type>`, `link_kind.<kind the pack lists>`,
+  `measure.<Value Measure>`, `pattern.<pattern pack the pack lists>`, or `term.<id>` for a glossary-only entry such as
+  a fraud typology), and a key that names nothing in the core refuses the whole pack.
+* **Format** (`IndustryPack`, `IndustryPacks`, in `inspecto-entity-store`, a base module, so every edition ships the
+  packs, Basic included, ED-5). Each jar may carry an index `META-INF/inspecto/industry-packs.toon`
+  (`packs[n]: a,b`); each pack is four files under `META-INF/inspecto/industry-packs/<id>/`: `industry-pack.toon`
+  (id, name, description, `space_templates`, `pattern_packs`, `profile` = measure / time column hints, suggested tool
+  groups and the optional "Investigate a number" binding), `industry-pack-terms.toon`
+  (`terms[n]{key,label,abbreviation,definition}`), `industry-pack-entity-types.toon` (core Entity Types restated:
+  normaliser from the closed set, masked, classifications; an id the core lacks is refused) and
+  `industry-pack-link-kinds.toon`. Normalisers stay the closed set: a pack picks one per type, it never ships code.
+* **Shipped packs.** `telecom` (lead Space Template `telco-fraud`, also `la-showcase`; pattern packs
+  `forwarding-relay` + the three `telecom-*` in `la-showcase`) and `mobile-money` (`la-mobile-money`, also
+  `mobile-money`; the built-in money pattern packs). Each lead template's `link-analysis.toon` selects its pack.
+* **Fail closed.** Discovery reads every index once (`IndustryPacks.bundled()`); a pack with a missing or unparseable
+  file, any rule broken, an id two indexes declare, or the reserved id `generic`, is **refused whole** and reported
+  (`refused[]`), never partly installed. `IndustryPacksTest` pins: the shipped packs load with nothing refused, each
+  referenced Space Template, pattern pack and investigate Dataset ships.
+* **Effective Entity Types.** `LinkAnalysisSettings.effectiveEntityTypes()` = the stated list, else
+  `EntityTypes.DEFAULTS` overlaid by the active pack (`IndustryPack.overlay`: same ids and order, the pack's
+  normaliser / masking / classifications and its `entity_type.*` labels). Every route that shows Entity Types
+  (`entityTypesInForce`, Entity profile pages, masking) therefore speaks the pack's words.
+* **Routes** (`DomainProfileRoutes`, core): `GET /settings/link-analysis/domain-profile` answers `{active, stated,
+  diagnostic?, profile, installed[], refused[]}` (the active pack in full, terms included);
+  `PUT /settings/link-analysis/domain-profile` `{domainProfile: id | "generic" | null}` under `canAuthorWorkbench`:
+  503 without a writable Space, 422 for a missing / non-string / uninstalled id (the message names the installed
+  ones), 409 when `link-analysis.toon` does not parse (left as it is). It writes ONLY `domain_profile`
+  (`LinkAnalysisSettings.writeDomainProfile`, read-modify-write under `LaLimits.WRITE_LOCK`); the record's own
+  `write` does not model the key, so `PUT /settings/link-analysis` keeps it. Real-HTTP test:
+  `ControlApiDomainProfileTest`.
+* **Neutrality (AC-09).** The banned words are DERIVED from the shipped term files (every label and abbreviation):
+  `IndustryPackNeutralityTest` checks the server's neutral labels (`EntityTypes.DEFAULTS`, `IndustryPack.CONCEPTS`);
+  `tools/check-vocabulary.mjs` rule `industry-pack-term` checks the text users read in core Link Analysis (the
+  `link-analysis` and `la-app` SPA projects, `la/*`, `inspecto-entity-store`). A single-token literal is matched as
+  written, so an id such as `msisdn` (a data contract) passes while a label `MSISDN` does not. The pack term files are
+  the only place the words may live. `IndustryPack.MEASURES` mirrors `ValueMeasures.ALERTABLE`
+  (`ValueMeasuresPackKeysTest`).
+* **Residuals.** The SPA renders the concept, Entity Type and Measure relabels and the term table; `link_kind.*`,
+  `pattern.*` and `term.*` relabels are published and listed but not yet drawn on the canvas legend or the pattern
+  picker. The node-risk mapping and the pattern-pack column defaults in the SPA are still keyed by the `telecom` id.
 
 ## 4. Link index (la-storage)
 
@@ -473,7 +522,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-21 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **88**<!--count:la-routes--> routes (**81**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **93**<!--count:la-routes--> routes (**86**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -508,10 +557,10 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
    `featureIds()` → `geoLink`; as of 2026-10-12 all 21 LA route modules (20 in `la-api` + geo-link's
    `InvestigationMeasureRoutes`, whose manifest now declares `features[1]: geoLink`) do — a new LA route module
    must too (pinned by `ControlApiGeoLinkModuleGateTest`).
-5. `ApiContext.withCapability` → 403. ⚠ A no-op when there is no Subject (Personal / tests without an armed
+5. `ApiContext.withCapability` → 403. ⚠ A no-op when there is no Subject (Basic / tests without an armed
    Authenticator).
 6. `InvestigationRoutes.open`: write root (503) → safe id (422) → header (404) → membership role (`Need`
-   READ / LEAD / APPROVE; a member of the linked Case also passes READ) → R3 Dataset visibility (`ComponentAccess.canView`, 404) → Enterprise PDP D-E7
+   READ / LEAD / APPROVE; a member of the linked Case also passes READ) → R3 Dataset visibility (`ComponentAccess.canView`, 404) → Advanced PDP D-E7
    (`RowScope.visible`, can only narrow, 404) → deferred role refusal 403. **Non-members get 404-as-absence; a
    member lacking the role gets 403 only after R3 and the PDP have spoken.**
 7. Handler → `EntityMasking` on output → audit (`LinkEventTypes` via `EventSink` + `AuditTrail`; ≥500 and 401/403
@@ -545,7 +594,7 @@ Code: `EmbedGrants` (token, hashing, resolve, revoke, counters), `InvestigationE
   above the Space's cap is 422, never clamped; a Space admin may set `max_ttl_hours` anywhere from 1 h up to the validation ceiling of 8760 h (365 d; 422 above in the Settings API), and `default_ttl_hours` may not exceed it. `embed.refuse_classifications` refuses a mint (422) when the
   strictest classification of the Investigation's bound columns is listed.
 * **Expiry sweep** (LA-EMBED-EXPIRY-SWEEP-1): `EmbedExpirySweepModule` (inspecto-geo-link, a route-less `RouteModule`) runs a daemon timer every 10 minutes over every Space whose `geoLink` module is on and calls `EmbedExpirySweep.sweep`, which drops the token hash of every expired grant (row and audit trail stay); `-Dla.embed.enabled` off = it does nothing; a failing Investigation or Space never stops the tick. Mint and list still purge on their own.
-* **Who** (D6/D11): `canShareInvestigation` AND a lead of the Investigation; the Enterprise PDP is asked the new ABAC action `embed`
+* **Who** (D6/D11): `canShareInvestigation` AND a lead of the Investigation; the Advanced PDP is asked the new ABAC action `embed`
   (`RowScope.allowed`, resource carries `classification`); `ControlApi.actionFor` maps both routes to `embed`. `-Dla.embed.enabled` (default
   off) is the kill switch: mint 503, every public request the uniform 404. At most 20 live links per Investigation.
 * **Auto-revoke** (S3): the minter's membership revoke flags their links at once; every public read re-checks that the minter is still a
@@ -571,7 +620,7 @@ Code: `EmbedGrants` (token, hashing, resolve, revoke, counters), `InvestigationE
 * **Gotchas.** The host refuses to start with a mutating handler on the public path (CapabilityManifest "undeclared mutating route"), so
   GET-only is structural. A grant id differing only by case aliases a file on a case-insensitive filesystem; the full token hash still decides.
   Audit events: `LINK_EMBED_MINTED | REVOKED | VIEWED | DENIED` (never the token, the label or an entity id).
-* **Audit rows, pinned and live-driven (2026-10-14).** Each successful read writes one `LINK_EMBED_VIEWED` (`actor` `embed:<grantId>`, `investigationId`, `grantId`, `issuedBy`, `step`, `uaHash`); each refusal one `LINK_EMBED_DENIED` (`reason`, `presentedHash`, and `grantId` / `investigationId` when the token names a known grant - revoked, expired, purged, minter-not-lead, masking loosened); an auto-revoke also writes `LINK_EMBED_REVOKED` (`revokedBy` `system`, the same `reason`). None carries the token, the label or an entity value. ⚠ The hash key is `presentedHash`, NOT `tokenHash`: the audit sink redacts any attribute whose key contains `token`, so the old name was always `***redacted***`. ⚠ The public path names no Space, so the host binds none; `PublicInvestigationRoutes` binds the grant's own Space (`ApiContext.spaceIdOf`) once the token resolves, or these rows reach only the in-memory global log and no Space's event store (refusals of an UNKNOWN or MALFORMED token have no Space and stay global). Pinned by `ControlApiInvestigationEmbedTest` (field by field, minter-not-lead and masking-loosened end REVOKED by `system`) and `ControlApiEmbedMultiSpaceTest` (rows land in the grant's Space only). Live (Enterprise demo bundle, two Spaces with different `embed.frame_ancestors`): the viewer page is framed by the token's OWN Space only (`frame-ancestors https://portal-a.example` vs `portal-b`, `none` for a revoked or forged token, no `X-Frame-Options` on a live viewer page), the console is clean with no third-party request, masking is as minted (`all`), loosening the Space to `none` revoked the `all`-minted link on its next read (`MASKING_LOOSENED`, `system`) and the token is in no host log line. A revoked link is a 404.
+* **Audit rows, pinned and live-driven (2026-10-14).** Each successful read writes one `LINK_EMBED_VIEWED` (`actor` `embed:<grantId>`, `investigationId`, `grantId`, `issuedBy`, `step`, `uaHash`); each refusal one `LINK_EMBED_DENIED` (`reason`, `presentedHash`, and `grantId` / `investigationId` when the token names a known grant - revoked, expired, purged, minter-not-lead, masking loosened); an auto-revoke also writes `LINK_EMBED_REVOKED` (`revokedBy` `system`, the same `reason`). None carries the token, the label or an entity value. ⚠ The hash key is `presentedHash`, NOT `tokenHash`: the audit sink redacts any attribute whose key contains `token`, so the old name was always `***redacted***`. ⚠ The public path names no Space, so the host binds none; `PublicInvestigationRoutes` binds the grant's own Space (`ApiContext.spaceIdOf`) once the token resolves, or these rows reach only the in-memory global log and no Space's event store (refusals of an UNKNOWN or MALFORMED token have no Space and stay global). Pinned by `ControlApiInvestigationEmbedTest` (field by field, minter-not-lead and masking-loosened end REVOKED by `system`) and `ControlApiEmbedMultiSpaceTest` (rows land in the grant's Space only). Live (Advanced demo bundle, two Spaces with different `embed.frame_ancestors`): the viewer page is framed by the token's OWN Space only (`frame-ancestors https://portal-a.example` vs `portal-b`, `none` for a revoked or forged token, no `X-Frame-Options` on a live viewer page), the console is clean with no third-party request, masking is as minted (`all`), loosening the Space to `none` revoked the `all`-minted link on its next read (`MASKING_LOOSENED`, `system`) and the token is in no host log line. A revoked link is a 404.
 
 ### 6.3 Entity profile routes (as built 2026-10-15)
 
@@ -612,6 +661,183 @@ Plan archived: [`la-entity-profile-plan`](../../../archived-documents/plans-arch
 * **Data as of** reads `GET /datasets/{id}/freshness`, a read gate only (D-EP7).
 * **Residuals:** `LA-ENTITY-PROFILE-RESIDUALS-1` in `BACKLOG.md`.
 
+### 6.4 Third-party integration (inbound) (as built 2026-10-17, LA-EDITIONS-1 phase 5)
+
+Plan: [`inspecto-la-editions-plan`](../../../archived-documents/plans-archive/inspecto-la-editions-plan.md) §4. Standard and above (the Investigation
+surface). Outbound (case hand-off, webhooks, client-credentials trust) is a separate lane.
+
+* **Routes** (`InvestigationInboundRoutes`, la-api, geoLink feature):
+  * `POST /inv/inbound/investigations` — gated on `canManageIncidents`. A fraud product or case manager hands over its own record
+    and the entities it is about; Inspecto LA opens an Investigation seeded with them and answers its id and a link.
+  * `POST /inv/deep-links/resolve` — read-shaped (CapabilityManifest exemption): validates an "Open in Inspecto LA" link for the
+    SPA's `/open` page.
+  * Both are rate-classed **expensive** (`LinkAnalysisRateClasses`): a flood from a calling product is throttled per Subject (429).
+    The inbound call is idempotent, so a retry is safe.
+* **Composition, not a new write path.** The inbound route calls the existing writes through their own gates:
+  `InvestigationRoutes.create` (purpose required, R3 Dataset gate, column checks), `appendOpOn` (one `seed` op per Entity Type,
+  then an optional `window` op) and `InvestigationReferenceRoutes.add` (the record becomes an external reference: `trusted:false`,
+  never fetched, grants nothing). Every audit event is the one those writes already emit.
+* **Entities are typed** `"<type>:<key>"` by an Entity Type in force. The key is a raw value (in the BODY) or an exploration alias,
+  normalised by the type's normaliser; the seed carries the normalised key, so the bound columns should hold normalised values.
+* **Binding.** `binding: {dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?}` when the caller knows it;
+  otherwise the first link mapping the Space knows (a saved Link Analysis view, then a published index, the order `EntityTypeBindings`
+  reads them) whose link end is bound to the FIRST entity's type, with its kind column, its time column (or the Dataset's `eventDate`)
+  and the endpoint types. None → 422 asking for a binding. A `window` needs a time column (422 otherwise).
+* **Idempotent on `(reference.system, reference.id)` without a lock.** The Investigation id is derived:
+  `ext-<first 32 hex of sha256(system + "\n" + id)>`. The store creates a header CREATE_NEW, so two racing calls cannot both create,
+  on any node or store backend; the loser reads as a repeat. A repeat answers the same id with `created:false`, never re-derives the
+  binding, and adds nothing; if the first call died between steps, the repeat seeds or labels what is missing. A repeat by a Subject
+  who cannot change that Investigation (not its lead, R3, PDP) is **409** without the id.
+* **Auth.** Any Subject the installed `Authenticator` yields: an OIDC service-account token works as-is, and that Subject becomes the
+  lead. Machine-to-machine client-credentials trust, token scope and replay belong to the outbound lane's security review.
+* **Wire contract (inbound).**
+
+  ```http
+  POST /api/v1/inv/inbound/investigations
+  Authorization: Bearer <token of a Subject holding canManageIncidents>
+
+  {"reference": {"system": "fraudpro", "type": "alert", "id": "AL-1001", "url": "https://fraud.example/alerts/AL-1001"},
+   "entities": ["msisdn:+249912000001", "imei:350000000000011"],
+   "purpose": "Fraud alert triage", "title": "Alert AL-1001",
+   "window": {"from": "2026-10-01T00:00:00Z", "to": "2026-10-04T00:00:00Z"}}
+
+  200 {"data": {"investigationId": "ext-<32 hex>", "created": true, "seeded": 2,
+                "reference": {"system": "fraudpro", "type": "alert", "id": "AL-1001"},
+                "link": "/open?investigation=ext-<32 hex>", "note": "opened"}}
+  ```
+
+  `reference.type` defaults to `alert` (the calling system's word; not an Inspecto **Alert**). The response never echoes an entity.
+* **Deep link "Open in Inspecto LA"** (roadmap I5). `<la-app>/open?entity=<type>:<key>[&from=<instant>&to=<instant>][&investigation=<id>]`;
+  the console serves the same page at `/studio/open`. At least one of `entity` / `investigation`; any other parameter is refused. For a
+  type masked under the Space's `maskingMode` the key must be the alias (`masked:<16 hex>`, from `POST /inv/entities/{type}/resolve`):
+  a raw value is refused 422 and never repeated. The page posts the parameters to `/inv/deep-links/resolve`, which answers
+  `{entity?: {type, key, masked}, investigation?: {id, title}, window?}`; an Investigation the caller cannot read is the 404 of absence.
+  `reveal:true` returns a masked entity's raw value only to a holder of `canRevealLinkEntities` (403 otherwise), audited as
+  `LINK_ENTITY_REVEALED` with `via: deep-link` naming the alias. ⚠ Aliases live in the in-memory book (§3.4): after a restart an old
+  alias answers 422 until it is minted again.
+* **Tests:** `ControlApiInvestigationInboundTest` (geo-link, armed Authenticator: seeding and window, idempotency incl. other system /
+  id, invalid entity / reference / window / binding 422 with nothing written, 403 / 401 / 409, 503, the deep-link masking and reveal
+  rules, Investigation 404), `InvestigationInboundRoutesContractTest` (TCK). SPA: `open-link.spec.ts`, `open-in-la.component.spec.ts` (axe).
+* **Residuals:** the `window` of a link to an Entity alone is validated and shown, but the Entity page does not apply a window yet;
+  a mixed-type alert binds through the first entity's type only.
+
+### 6.5 Third-party integration (outbound) (LA-EDITIONS-1 phase 6, built 2026-10-17)
+
+Standard and above (ED-6). The target products are unknown, so this is ONE generic connector: a case hand-off and
+signed event webhooks, configured per Space. No named adapter exists; one is built only on a customer's request.
+
+* **Settings** `la-integration.json` in the Space's config root, JSON (a field-mapping template must round-trip
+  exactly), written only by `PUT /inv/integration` and read by `GET /inv/integration` (both `canAdminister`: the
+  document decides where evidence leaves the installation). Reserved from every import (`ReservedConfigPaths`). A file
+  that is present but unreadable reads as not configured, so nothing leaves. Parsed and validated by `LaIntegration`
+  (la-api); a refused PUT writes nothing (422). Audited as `LINK_INTEGRATION_CHANGED` with before and after.
+* **No secret in configuration.** The endpoint is a registered `https` **Connection** (onboarded under the admin-only
+  `canOnboardConnections`); its token is the Connection's `password`, a `${ENV:…}` / `${SYS:…}` / `${FILE:…}` reference
+  that `SecretResolver` resolves at send time. A Connection holding a literal token is refused at send. The webhook
+  signing secret is itself a reference; a literal is a 422.
+* **The wire is the platform's.** la-api reaches the network only through the la-core port `OutboundPort`
+  (`OutboundPorts`, registered by the geo-link bridge's `HostOutboundPort`; this is the I3 "remote Case adapter" seam).
+  `HostOutboundPort` composes the same three pieces as the Action Request dispatcher: `WebhookSink.endpoint` (https
+  Connection, host, no tunnel or proxy), `EgressPolicy.resolve` against the Space's `EgressAllowlist` before every
+  attempt (a refusal sends nothing and is not retried), and the edition's `WebhookSinkTransport.exchange` (pinned
+  address, TLS verified against the name, redirects never followed; Basic ships none, so it refuses naming the
+  edition). Retries: the Collector `RetryPolicy` with the Space's `retry` block (default 2 retries, exponential from
+  1 s, capped 30 s, full jitter), on an I/O failure, a 5xx, 408 or 429, under ONE `Idempotency-Key`.
+* **Case hand-off** `POST /inv/investigations/{id}/handoff` (`canManageIncidents`, lead only, `?at=&snapshots=` as the
+  bundle export, body `{reveal?}`). Builds the Dossier bundle (`DossierBundleRoutes.build`, so the export is also
+  audited as `LINK_DOSSIER_EXPORTED`), renders the template and sends it. Gates: 403 capability, 503 write root, 422 id,
+  403/404 lead-only, 422 body, 403 `reveal` without `canRevealLinkEntities`, 409 nothing configured, 503 port absent,
+  then 422 refused (nothing sent), 502 failed after the retries, 502 answered without a usable case id, 409 the
+  reference list is full. The case id at `caseIdPointer` (and a URL at `caseUrlPointer`, kept only when it is an
+  absolute http(s) URL without credentials) is linked as an **external reference** `{system, type: case}`: append-only,
+  `trusted:false`, granting nothing (the D-6 model). Re-sending the same evidence answers `linked: already linked`.
+  Audited as `LINK_INVESTIGATION_HANDED_OFF` or `LINK_INVESTIGATION_HANDOFF_FAILED`. Rate class EXPENSIVE.
+* **Masking.** What leaves follows the Space's `maskingMode` exactly as the bundle export does. A holder of
+  `canRevealLinkEntities` may send `{"reveal": true}`: the bundle then carries raw ids and `masking.mode` reads
+  `revealed`, naming who lifted it. The payload always carries `masking {mode, masked, basis, note}`.
+* **Webhooks** (`IntegrationWebhooks`, geo-link): a process-wide `EventLog` tap (the event bridge the Exchange Signal
+  forwarder uses), so Alerts fired off a request thread are seen too. Events: `investigation.created`
+  (`LINK_INVESTIGATION_CREATED`), `draft.promoted` (`LINK_DRAFT_PROMOTED`), `alert.fired` (`ALERT_FIRED` carrying an
+  `investigation` attribute, which `AlertService` now stamps on an Investigation rule's event) and `approval.needed`
+  (`LINK_EXPANSION_REQUESTED`). The notification webhook channel did not fit (one JVM-wide URL, unsigned, no retry).
+  Delivery is asynchronous (a virtual thread) through the same `OutboundPort`; each delivery writes
+  `LINK_WEBHOOK_DELIVERED` or `LINK_WEBHOOK_FAILED` on the Space's ledger. A webhook carries no entity id, so masking
+  has nothing to act on; the payload says so. A signing secret that does not resolve sends nothing.
+* **Signature.** `X-Inspecto-Signature: sha256=<hex HMAC-SHA256(secret, X-Inspecto-Timestamp + "." + body)>`;
+  `X-Inspecto-Delivery-Id` and `Idempotency-Key` are the source event's id, identical on every retry; `X-Inspecto-Event`
+  names the event. A receiver recomputes the HMAC, compares in constant time and refuses a timestamp outside its
+  tolerance (replay).
+* **Tests:** `ControlApiLaIntegrationTest` (real HTTP, armed Authenticator, a local stub server, targets resolved to
+  private addresses by a test resolver and allowlisted): settings gates, a linked hand-off, a 5xx retried then failing
+  with nothing linked, an egress-denied target and a literal token refused with nothing sent, masking and reveal, a
+  verifying webhook signature, an unresolvable secret sending nothing. `IntegrationWebhooksTest`: event mapping and an
+  independent HMAC vector.
+
+Settings example:
+
+```json
+{
+  "handoff": {
+    "connection": "case-manager",
+    "system": "case-manager",
+    "authHeader": "X-Api-Key",
+    "template": {
+      "title": "Inspecto LA {{investigation.id}}",
+      "description": "{{investigation.purpose}}",
+      "evidence": "{{bundle}}",
+      "findings": "{{findings}}",
+      "masking": "{{masking}}",
+      "externalRef": "{{seal}}"
+    },
+    "caseIdPointer": "/case/id",
+    "caseUrlPointer": "/case/links/self"
+  },
+  "webhooks": {
+    "connection": "fraud-hub",
+    "signingSecret": "${ENV:LA_WEBHOOK_SECRET}",
+    "events": ["investigation.created", "draft.promoted", "alert.fired", "approval.needed"]
+  },
+  "retry": { "count": 2, "backoff": "EXPONENTIAL", "initialDelayMillis": 1000, "maxDelayMillis": 30000 }
+}
+```
+
+A template string that is exactly one placeholder takes the value as JSON (`{{bundle}}` stays an object); a placeholder
+inside other text is replaced by its text. Placeholders: `investigation.id`, `investigation.purpose`,
+`investigation.owner`, `investigation.dataset`, `bundle`, `findings` (`{summary, temporalFindings, comparisons}`),
+`masking`, `seal`, `manifestRoot`, `handedOffBy`, `handedOffAt`; any other is a 422. With no template the payload is
+`{source: "inspecto-la", kind: "investigation.handoff", investigation{id, purpose, owner, dataset}, findings, masking,
+seal, handedOffBy, handedOffAt, bundle}`.
+
+Webhook payload example:
+
+```json
+{
+  "id": "6f1c0d2e-…",
+  "event": "draft.promoted",
+  "occurredAt": "2026-10-17T09:12:03.114Z",
+  "space": "default",
+  "investigationId": "inv-a",
+  "actor": "analyst-1",
+  "data": { "investigationId": "inv-a", "draftId": "d-2", "fromStep": "4", "toStep": "7", "steps": "3" },
+  "masking": "no entity ids are carried; read the Investigation through the API, where the Space's masking mode applies"
+}
+```
+
+**Machine-to-machine trust (I1) is NOT enabled.** Outbound calls carry only the Connection's secret header; no inbound
+OIDC client-credentials trust exists. Owed before any is built, a formal security review covering:
+
+1. **SSRF**: every outbound target is a registered `https` Connection under the egress allowlist with a pinned address;
+   confirm no inbound route accepts a URL to call back, and that redirects stay unfollowed.
+2. **Token scope**: a client-credentials token grants one integration role only (open an Investigation from an alert,
+   read one Investigation), never a human capability; audience and issuer pinned; short lifetime; no refresh token.
+3. **Replay**: inbound requests carry a nonce or timestamp checked within a tolerance window; outbound webhooks already
+   sign the timestamp; idempotency keys are honoured on both sides.
+4. **Audit on both sides**: every machine call names the client id as actor; the remote side's case id and our
+   delivery id are cross-recorded so either party can reconcile.
+5. **Secret handling**: client secrets live only behind `SecretResolver` references; rotation without downtime;
+   nothing logged.
+6. **Masking**: a machine principal never holds `canRevealLinkEntities` by default.
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (21); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
@@ -633,14 +859,38 @@ Plan archived: [`la-entity-profile-plan`](../../../archived-documents/plans-arch
 
 ## 8. Editions and packaging
 
-| | Personal | Standard | Professional | Preview | Enterprise |
-|---|---|---|---|---|---|
-| la-core, la-storage, la-api, geo-link | — | ✓ | ✓ | ✓ | ✓ |
-| la-store-pg (Postgres Investigations) | — | — | — | ✓ | ✓ |
-| D-E7 PDP (`providers/inspecto-policy`) | — | — | — | ✓ | ✓ |
+Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professional / Enterprise). Feature placement:
+[`EDITIONS.md`](../../../EDITIONS.md) (*Inspecto LA feature placement*).
 
-Standard is a Professional alias in `tools/bundle-modules.mjs` (`offerings/standard.toon` does not exist). The Postgres store also needs
-`-Dinvestigations.backend=db` plus a `jdbc:postgresql:` URL; the jar alone keeps the filesystem store.
+| | Basic | Standard | Advanced | Preview |
+|---|---|---|---|---|
+| la-core, la-storage, la-api, geo-link, entity-list (the **explorer**) | ✓ | ✓ | ✓ | ✓ |
+| Investigation surface (`investigations` edition feature, declared by `inspecto-ops`) | — (503) | ✓ | ✓ | ✓ |
+| Sign-in (`inspecto-oidc`; Preview: demo sign-in) | — | ✓ | ✓ | ✓ |
+| la-store-pg (Postgres Investigations) | — | — | ✓ | ✓ |
+| D-E7 PDP (`providers/inspecto-policy`) | — | — | ✓ | ✓ |
+
+**Basic = the Link Analysis explorer (phase 3, 2026-10-17).** The five modules are default-reactor modules and ship in
+every bundle. The Investigation surface is the set of route modules whose `featureIds()` names `investigations`
+(beside `geoLink`): la-api's `InvestigationRoutes`, `DossierRoutes`, `DossierBundleRoutes`, `DraftRoutes`,
+`WorkingSetRoutes`, `InvestigationReferenceRoutes`, `InvestigationTemplateRoutes`, `InvestigationCoverageRoutes`,
+`InvestigationComparisonRoutes`, `InvestigationCaseRoutes`, `InvestigationMemberRoutes`, `InvestigationEmbedRoutes`,
+`PublicInvestigationRoutes`, `GraphRunRoutes`, `IndexRoutes`, `DatasetFilesRoutes`, and the integration surface
+(ED-6, `LD-EDITIONS-12`) `InvestigationInboundRoutes` and `IntegrationRoutes` (the geo-link webhook tap sends nothing without the feature); geo-link's
+`InvestigationMeasureRoutes` (measures, Alert Rules, standing detection) and `InvestigationDataChangesRoutes`. The host
+answers each of them `503 CAPABILITY_UNAVAILABLE` "… available in Standard and above" at dispatch
+(`ControlApi.requireModuleEnabled` → `EditionFeatures.gatesRoutes`) when no installed module declares
+`EditionFeatures.INVESTIGATIONS`; only `inspecto-ops` (`OpsEditionFeatures`) does. The explorer route modules
+(`InvRoutes`, `GeoRoutes`, `PatternRoutes`, `ValueMeasureRoutes`, `EntityIdentityRoutes`, `EntityProfileRoutes`) own
+`geoLink` only and answer with no sign-in. `/bootstrap` reports `features.investigations` (false on Basic); the SPA's
+`LA_FEATURES.investigations` hides the Investigation tab and buttons, the deep-link openers, Graph Run controls and the
+edge-index tool. Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
+⚠ **Masking on Basic is display-only:** with no sign-in there is no Subject, so the capability behind an audited reveal
+is never checked and anyone may reveal; masking stops a casual glance, not a user. Enforced masking starts in Standard.
+⚠ `POST /inv/case-history` (Case history beside a node, Standard in the placement matrix) stays in `InvRoutes`; on Basic it
+has no Case module to read. The scheduled link-index builder (`la.index.build` Job) is not edition-gated — its routes are.
+The Postgres store also needs `-Dinvestigations.backend=db` plus a `jdbc:postgresql:` URL; the jar alone keeps the
+filesystem store.
 
 Jars are staged by `inspecto/package.ps1`; `-Ui la-app` swaps the bundled SPA, not the edition. Enablement then runs
 Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Permitted (capability + gates above).

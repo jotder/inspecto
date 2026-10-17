@@ -5,8 +5,8 @@ description: >
   inspecto/, features/inspecto-agent/, providers/inspecto-agent-hosted/, providers/inspecto-connectors/). MUST be read and
   applied BEFORE generating or modifying ANY backend artifact — engine code, control API routes,
   SPI implementations, TOON config, edition wiring, or backend tests. Encodes the framework-free
-  design (JDK HttpServer, manual DI, ServiceLoader SPI), the edition model (Personal/Standard/
-  Enterprise = build flavors, never branches), TOON config + ConfigSafetyValidator rules, the
+  design (JDK HttpServer, manual DI, ServiceLoader SPI), the edition model (Basic/Standard/
+  Advanced = build flavors, never branches), TOON config + ConfigSafetyValidator rules, the
   DuckDB native-access launch flag, and the authoritative mvn -o test verify loop. Trigger on any
   change under inspecto*/src/main/java or backend config.
 ---
@@ -31,7 +31,7 @@ years. Do not reach for a framework; this design is intentional (see [docs/EDITI
 2. **Editions are build flavors, NEVER branches or `if (edition==…)` code.** The engine depends on
    SPIs (`Authenticator`, `SecretsProvider`, `SourceConnector`, …); the *build* (Maven profile +
    which `ServiceLoader` modules ship + `-D` flags) decides the implementation. One SemVer version
-   spans all editions; artifacts differ by classifier (`-personal` / `-standard`).
+   spans all editions; artifacts differ by classifier (`-basic` / `-standard`).
 3. **Fail-closed at the edge.** Security/secrets are cross-cutting SPIs injected only at the HTTP
    edge (`com.gamma.control`). The engine stays identity-agnostic.
 4. **Config safety is mandatory.** All runtime input flows through `ConfigSpec` +
@@ -63,8 +63,8 @@ Dir == artifactId for every module **except** `inspecto/` → `inspecto-processo
 | `inspecto-agent-hosted` | Hosted model providers (langchain4j). |
 | `inspecto-connectors` | **Optional** SFTP/FTP connectors, ServiceLoader-discovered. |
 | `inspecto-intelligence` | **Optional** embedded intelligence. |
-| `inspecto-oidc` | **Optional, `-Pedition-standard` / `-Pedition-enterprise` only**: `Authenticator` SPI impl (OIDC/Nimbus JWKS). |
-| `inspecto-policy` | **Optional, `-Pedition-enterprise` only**: ABAC policy engine. |
+| `inspecto-oidc` | **Optional, `-Pedition-standard` / `-Pedition-advanced` only**: `Authenticator` SPI impl (OIDC/Nimbus JWKS). |
+| `inspecto-policy` | **Optional, `-Pedition-advanced` only**: ABAC policy engine. |
 
 `providers/asn-parser/asn-decoders` is a **separate reactor** aggregated by the root pom only so
 `com.gamma.asn:asn-facade` resolves from the build; it inherits nothing from `inspecto-parent`.
@@ -103,7 +103,7 @@ Entry points: `com.gamma.inspector.CollectorProcessor` (one-shot ETL) · `com.ga
   exists>'`. `SpaceConfigRoot.current()` keys on the space MDC (set by both `JobService` submit paths);
   `forSpace(id)` is for a caller that already holds an id, and is preferred there because an explicit id
   cannot be wrong the way an unset MDC silently can. The **default** Space alone falls back to the
-  property, which is why single-Space deployments — Personal, and nearly every test — cannot expose a
+  property, which is why single-Space deployments — Basic, and nearly every test — cannot expose a
   mistake here. ⇒ **This class of bug is invisible to the whole test suite; only a multi-Space run shows
   it** (`MATERIALIZE-SPACE-ROOT-1` + `COLLECTOR-SPACE-ROOT-1`, 2026-09-15: nine readers found, all nine migrated).
   🔴 **Move the registry root and the DATA root together, or not at all.** They are a pair: a per-Space
@@ -119,12 +119,12 @@ Entry points: `com.gamma.inspector.CollectorProcessor` (one-shot ETL) · `com.ga
 
 ```bash
 mvn -o clean test          # default reactor, offline — misses the profile-gated modules
-mvn -o clean test -Pedition-enterprise   # + inspecto-oidc AND inspecto-policy
+mvn -o clean test -Pedition-advanced   # + inspecto-oidc AND inspecto-policy
 mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar
 ```
 ⚠ A **profile-scoped module is invisible** to a bare `mvn -o clean test`. Anything touching the parent
 pom, a shared artifactId, a managed dependency, or a shared record must be verified with
-`-Pedition-enterprise`. Read the reactor summary for **SKIPPED**, not only FAILURE — "25 modules"
+`-Pedition-advanced`. Read the reactor summary for **SKIPPED**, not only FAILURE — "25 modules"
 means listed, not built.
 Toolchain: JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. Always
 run **offline (`-o`)**. **Every JVM launch needs `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI),

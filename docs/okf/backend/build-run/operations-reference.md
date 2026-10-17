@@ -1107,7 +1107,7 @@ As-built decisions:
   🔴 **This bullet was ahead of the code until 2026-09-29:** `package.ps1` still emitted
   `eclipse-temurin:24-jre` and excluded `runtime/`; fixed then (`ASSURE-OPERABILITY-1`).
 - **Verified 2026-09-29 on the fixed Dockerfile** (Docker 29.5.3, Professional bundle packaged with
-  `package.ps1 -Edition Professional -NoUi`, `inspecto-deploy-linux_amd64.zip`, `docker build` exit 0):
+  `package.ps1 -Edition Standard -NoUi`, `inspecto-deploy-linux_amd64.zip`, `docker build` exit 0):
   `runtime/bin/java -version` in the image → `java version "27" 2026-09-15` (build 27+35-2325); `id` →
   `uid=10001(inspecto) gid=10001(inspecto)`; `docker top` on the running container shows the java process at
   UID/GID **10001**; `GET /health` → 200 `{"status":"UP"}`, `GET /ready` → 200, `HEALTHCHECK` → `healthy`.

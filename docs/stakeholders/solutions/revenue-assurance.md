@@ -86,7 +86,7 @@ Every tolerance and threshold is configuration in these files.
 - The corpus is synthetic and the Schemas are canonical; a real operator maps its own switch, mediation
   and billing extracts onto them.
 - The completeness tile is empty until `ra_switch_kpi_completeness` is enabled.
-- The template says it needs the Professional or Enterprise edition, yet `offerings/personal.toon` lists
+- The template says it needs the Professional or Enterprise edition, yet `offerings/basic.toon` lists
   `telco-ra` among Personal content packs — the two disagree; treat Professional as the safe requirement.
 - `contents` in `template.toon` says "4 control Jobs"; the folder holds eleven Jobs (including the two
   `recon.run`, the fold-up and recovery Jobs).

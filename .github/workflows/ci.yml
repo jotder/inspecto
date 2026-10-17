@@ -63,7 +63,7 @@ jobs:
         run: node tools/check-safety-roots-declared.mjs
 
       # Auth-gate test-coverage ratchet (CONTROL-AUTHGATE-TESTCOVERAGE-1, docs/BACKLOG.md). Most
-      # ControlApi route tests run Personal-shaped (no Authenticator armed), where
+      # ControlApi route tests run Basic-shaped (no Authenticator armed), where
       # ApiContext.requireCapability is a no-op — a withCapability gate can be added or removed there
       # without any test noticing. This doesn't backfill the existing gap (out of scope for one
       # change); it stops a NEWLY gated route from shipping with no armed-Authenticator test at all.
@@ -223,7 +223,7 @@ jobs:
 
       # SBOM module-set guard (2026-09-09). tools/sbom.mjs built its first-party table from FOUR artifacts
       # under a comment claiming it was "the SAME table package.ps1 stages from". It was not, and had not
-      # been since EDG-01: package.ps1 stages 11 jars for Standard and 12 for Enterprise, so every shipped
+      # been since EDG-01: package.ps1 stages 11 jars for Standard and 12 for Advanced, so every shipped
       # bill of materials under-declared its own bundle (4 first-party where Standard carries 10), and
       # javax.mail appeared in NO shipped SBOM at all after it moved to inspecto-notify-channels. The
       # documents ship INSIDE the signed, checksummed archive and the compliance matrix relies on them, yet
@@ -239,7 +239,7 @@ jobs:
 
       # package.ps1 strict-mode guard (2026-10-08). package.ps1 runs under Set-StrictMode -Version Latest, so a
       # bundling block that READS a *JarSrc variable assigned only in another edition's branch throws - `-Edition
-      # Personal` was broken that way. AST walk (pwsh is on the runner); no build.
+      # Basic` was broken that way. AST walk (pwsh is on the runner); no build.
       - name: Guard — package.ps1 reads no variable before it is assigned (strict mode)
         run: node tools/check-package-strict.mjs
 
@@ -289,9 +289,9 @@ jobs:
 
       # Launcher guard (LAUNCHER-GUARD-1, 2026-09-14). Third in the same family: package.ps1 emits the
       # deployment surface and nothing had ever EXECUTED any of it. serve.bat spent its life dropping
-      # -Dauth.mode=oidc on every Windows Standard/Enterprise bundle — a parenthesised `if` block, which
+      # -Dauth.mode=oidc on every Windows Standard/Advanced bundle — a parenthesised `if` block, which
       # cmd.exe expands ONCE at PARSE time, so five of six `set "OPTS=%OPTS% …"` statements were discarded
-      # and the service booted AUTH-FREE while printing `edition: Enterprise` (SERVEBAT-OPTS-1, fixed
+      # and the service booted AUTH-FREE while printing `edition: Advanced` (SERVEBAT-OPTS-1, fixed
       # 2026-09-11; the gap was not). security.md §8.7 has listed "authMode ↔ enforcement coupling has no
       # test" for months.
       # This extracts the $serveShContent / $serveBatContent here-strings, writes them into throwaway
@@ -423,20 +423,20 @@ jobs:
       # environment state rather than on the thing it checks. Installing here costs one shade pass and
       # makes the guard actually executable. See okf/backend/build-run/guard-coverage.md.
       #
-      # `-Pedition-enterprise` (GUARD-SWEEP-1a, 2026-09-07): the profile is MODULES-ONLY — it adds
+      # `-Pedition-advanced` (GUARD-SWEEP-1a, 2026-09-07): the profile is MODULES-ONLY — it adds
       # inspecto-oidc, inspecto-secrets, inspecto-geo-country and inspecto-policy, which are absent from the default <modules> and were
       # therefore never built or tested by ANY workflow. That left 54 test methods running nowhere
       # automated: all OIDC authentication, token relay, ABAC policy enforcement and keystore-secret
-      # resolution — the security-critical surface. `release.yml` does build Enterprise, but with
+      # resolution — the security-critical surface. `release.yml` does build Advanced, but with
       # -DskipTests, so a compile break was caught at tag time and a test regression never was.
-      # Enterprise is the superset, so this one flag covers Standard too, in the same reactor pass.
+      # Advanced is the superset, so this one flag covers Standard too, in the same reactor pass.
       #
       # `-Pcoverage` (GUARD-SWEEP-1g, 2026-09-08): jacoco had been configured for months behind this
       # profile and NO workflow activated it, so the repo had no coverage number at all — the "no coverage
       # gate anywhere" gap. It is REPORTING only: the profile binds prepare-agent + report and no `check`
       # goal, so this cannot fail a build. ⛔ A threshold is deliberately NOT set here — choosing what
       # number blocks whom is a policy decision, and the point of this step is to produce the data that
-      # decision needs. Measured 2026-10-15 (master 1ad331c50, -Pedition-enterprise -Pcoverage): instructions
+      # decision needs. Measured 2026-10-15 (master 1ad331c50, -Pedition-advanced -Pcoverage): instructions
       # 86.08%, branches 73.59%, lines 86.14% across 48 reporting modules (621762 instructions). First baseline
       # 2026-09-08: 81.01% / 67.19% / 80.88% across 26 modules.
       # ⚠ That is the HONEST figure. The first measurement said 82.92% across 21 modules, because the
@@ -469,7 +469,7 @@ jobs:
           DUCKDB_EXTENSION_CACHE: ${{ runner.temp }}/duckdb-extensions
         run: |
           set -o pipefail
-          mvn --batch-mode --no-transfer-progress install -Pedition-enterprise -Pcoverage \
+          mvn --batch-mode --no-transfer-progress install -Pedition-advanced -Pcoverage \
             '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres' \
             2>&1 | tee "$RUNNER_TEMP/reactor.log"
 

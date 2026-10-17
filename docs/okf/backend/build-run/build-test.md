@@ -92,7 +92,7 @@ reference, and nothing ran them.)*
 ## Packaging — `package.ps1`
 
 `inspecto/package.ps1` emits the deployment bundle. Switches: `-NoBuild` (reuse `target/`), `-NoUi` (skip the
-Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition Personal|Standard|Enterprise`** (⚠ this omitted `Enterprise` — the only non-Personal flavour CI actually releases — until 2026-09-09) (selects
+Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition Basic|Standard|Advanced`** (⚠ this omitted `Advanced` — the only non-Basic flavour CI actually releases — until 2026-09-09) (selects
 the Maven [edition](../editions/editions-model.md) profile + assembles the per-edition fat-JAR). Generated
 launch scripts embed the native-access flag and the key [`-D` flags](operations.md).
 
@@ -150,20 +150,20 @@ only from `$env:INSPECTO_JARSIGN_STOREPASS`. Without the switch the bundle is un
 
 ### What the bundle contains — and what it deliberately does not
 
-Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.3 MB, exit 0):
+Verified by building both flavors 2026-08-27 (Basic 169.3 MB, Advanced 170.3 MB, exit 0):
 
-| Jar | Personal | Standard / Enterprise |
+| Jar | Basic | Standard / Advanced |
 |---|---|---|
 | `inspecto.jar` (shaded core) | ✅ | ✅ |
-| `inspecto-oidc.jar` (OIDC `Authenticator` SPI) | — | ✅ Professional+ |
-| `inspecto-policy.jar` (ABAC `AccessDecider` SPI) | — | ✅ Enterprise only |
+| `inspecto-oidc.jar` (OIDC `Authenticator` SPI) | — | ✅ Standard+ |
+| `inspecto-policy.jar` (ABAC `AccessDecider` SPI) | — | ✅ Advanced only |
 | `inspecto-connectors.jar` (shaded sidecar — `CONNECTORS-BUNDLE-1`) | ✅ | ✅ |
-| the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Professional+ |
-| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Professional+ |
+| the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Standard+ |
+| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Standard+ |
 | **`inspecto-agent` / `inspecto-intelligence`** | **never** | **never** |
 
-> ⚠ **Staged-jar totals** (added 2026-09-09 — this table listed 3 of the 12): Personal stages **2**
-> jars, Standard **11**, Enterprise **12**. The complete enumerations in code are `package.ps1`'s
+> ⚠ **Staged-jar totals** (added 2026-09-09 — this table listed 3 of the 12): Basic stages **2**
+> jars, Standard **11**, Advanced **12**. The complete enumerations in code are `package.ps1`'s
 > staging block and its boot-smoke classpath. Owner: [`okf/capabilities/editions/editions.md`](../../capabilities/editions/editions.md) §3.3.
 
 **Bundles ship NO Spaces — the `spaces/` tree holds only `spaces/_templates`** (operator decision
@@ -176,7 +176,7 @@ and restart, or create one in Settings → Spaces (`POST /spaces`, no restart). 
 `git checkout-index` from a throwaway index, so .gitattributes eol rules apply as in a fresh checkout.
 Every other top-level entry (the committed `default`/`demo`/`ucc`, untracked or git-excluded dirs, `uat`,
 `_shared`) is named in the build log as not bundled.
-- ⚖ **Decision 2026-10-12 (operator): the Link Analysis demo bundle ships `la-showcase` PRE-SEEDED.** `package.ps1 -Edition Enterprise
+- ⚖ **Decision 2026-10-12 (operator): the Link Analysis demo bundle ships `la-showcase` PRE-SEEDED.** `package.ps1 -Edition Advanced
   -DemoAuth -Ui la-app` (and only that flavor) runs step 6f, `Invoke-DemoSpaceBake` (`inspecto/package-demo-bake.ps1`): it scaffolds
   `la-showcase` into a temp spaces root (`node tools/seed-la-showcase.mjs --scaffold`), boots the staged bundle on a loopback port
   with the `serve-demo` flags, runs the seed script `--apply`, stops the server gracefully (Ctrl+C, so DuckDB checkpoints; a leftover
@@ -223,8 +223,8 @@ the vendored kernel + eoiagent model transport.
 `inspecto-observability`, `inspecto-observability`, `inspecto-ops`) — see [editions model](../editions/editions-model.md). The agent modules build in an
 ordinary `mvn test` run; they are simply never *bundled*.
 
-⚠ **THREE reactor sizes, three baselines** (2026-09-08, EDG-01 complete): the default (Personal) build is
-**23 modules / 3777 tests**; `-Pedition-standard` is **31 modules / 4106**; `-Pedition-enterprise` is
+⚠ **THREE reactor sizes, three baselines** (2026-09-08, EDG-01 complete): the default (Basic) build is
+**23 modules / 3777 tests**; `-Pedition-standard` is **31 modules / 4106**; `-Pedition-advanced` is
 **32 modules / 4126** (`inspecto-ops` contributes 228, of which 11 skip — the environment-gated
 `PostgresStateStoreTest`). ⚠ Run `-Pedition-standard` too, not just the other two: it is the only profile
 that proves an optional module is **self-contained**. `inspecto-ops` ships in Standard while
@@ -247,7 +247,7 @@ node tools/java-closure.mjs --seeds ApiContext,Subject --stop CollectorService,S
 node tools/compile-clean.mjs                                                                # PROVE it: clean test-compile, whole reactor
 ```
 
-`compile-clean` always runs `mvn -o clean test-compile -DskipTests -B -fae -Pedition-enterprise` (pass `-P…` to change the profile),
+`compile-clean` always runs `mvn -o clean test-compile -DskipTests -B -fae -Pedition-advanced` (pass `-P…` to change the profile),
 reads the log rather than the exit code, and exits 0 only on BUILD SUCCESS with every reactor module SUCCESS, none SKIPPED, no
 `[ERROR] …java` line (de-duplicated — Maven prints each twice) and no "Nothing to compile". It prints errors grouped by module and
 file. JDK 27 on `JAVA_HOME`; about 2 min for 38 modules. `java-closure` strips comments with a tokenizer (a `/*` inside a string
@@ -262,7 +262,7 @@ day. The paragraph above ("a run that stops at a failing module reports a PARTIA
 doc since 2026-09-08 and **did not prevent either occurrence** — which is why there is now a guard:
 
 ```
-mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
+mvn -o clean test -Pedition-advanced -B > build.log 2>&1     # -B, NEVER -q
 node tools/check-reactor-verdict.mjs build.log --expect-modules 42   # 41 until inspecto-la-storage was added (D-3 step 2, 2026-10-02); 39 until D-1 step 5b added inspecto-la-core and inspecto-la-api; 38 until D-1 step 5a added inspecto-entity-store; 33 until D-1 (2026-10-01) added inspecto-audit-spi, -la-graph, -auth-spi, -http-spi; 37 until SEP-08 added inspecto-entity-list
 ```
 
@@ -315,11 +315,11 @@ looks identical to "done". Editing into that gap produces two distinct false fai
 mid-refactor compile error reported as a real defect, and then a Windows **file-lock** on a `target/*.jar`
 held by the competing JVM (`maven-clean-plugin ... Failed to delete ...asn-core-0.1.0-SNAPSHOT.jar`), which
 aborts the reactor in under two seconds before compiling anything. Only the completion notification means
-finished. Cost: one wasted Enterprise verification during EDG-01 cell 7.
+finished. Cost: one wasted Advanced verification during EDG-01 cell 7.
 
 🔴 **An optional module's tests can be absent from BOTH numbers while everything looks green.** An
 edition module is not in the default `<modules>`, so `mvn -o clean test` never compiles it: a broken one
-leaves the everyday build fully green. And if the Enterprise reactor dies in an earlier module, the later
+leaves the everyday build fully green. And if the Advanced reactor dies in an earlier module, the later
 one is merely SKIPPED, which a summary counting only failures reports as nothing wrong. During cell 6 two
 verifications passed (4004 and 4122 tests) while `inspecto-events` had never once compiled. **Ask whether
 the module CONTRIBUTED TESTS — by name, from its own `Results:` block — not whether the build passed.**
@@ -345,10 +345,10 @@ order before and now share it. `tools/check-launchers.mjs` runs `serve.sh`/`serv
 and compares the `-cp` IN ORDER. ⚠ `ura.sh`/`ura.bat` (the pre-ETL file utilities) are deliberately NOT among them: they run `-cp inspecto.jar` alone, with no sidecar of any kind (no connectors, exchange, ops or Link Analysis jars), because they never start the control plane; the Dockerfile, `inspecto.service` and `install-service.sh` all launch `serve.sh`, which carries the full list.
 
 ⚠ **`inspecto-oidc` ships SHADED too, for the same reason** (SEC-SIDECAR-BOOT-1, 2026-09-07). It is
-profile-gated (`-Pedition-standard` / `-Pedition-enterprise`), but until that date `package.ps1` staged its
+profile-gated (`-Pedition-standard` / `-Pedition-advanced`), but until that date `package.ps1` staged its
 plain 16 KB jar — which carries **no `com/nimbusds` classes**, while `OidcAuthenticator` has nine direct
 Nimbus imports and `ControlApi` resolves the `Authenticator` SPI *during startup* through an unguarded
-`ServiceLoader`. Every Standard and Enterprise bundle failed to boot. It now builds an
+`ServiceLoader`. Every Standard and Advanced bundle failed to boot. It now builds an
 `inspecto-oidc-*-sidecar.jar` (core and slf4j `provided`, so the shade carries Nimbus and nothing else),
 `package.ps1` stages that one, and verifies the STAGED artifact for `com/nimbusds` plus all three SPI
 registrations. `inspecto-policy` needs none of this — it has no third-party dependencies, so its thin jar
@@ -458,7 +458,7 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 - ~~**`OPENAPI-CONTRACT-RED-ON-MASTER-1`**~~ ✅ **CLOSED 2026-09-19 (`e5c4f17cd`)** — `GET /assist/skills`
   documented via `-Dopenapi.paths.write=true`. ⛔ It was far worse than filed: one failing module's
   dependents are BANNED by Maven even under `--fail-at-end`, so a red `OpenApiPathsContractTest` silently
-  left ~850 tests across twelve Professional/Enterprise modules unexercised (20 modules built vs 32).
+  left ~850 tests across twelve Standard/Advanced modules unexercised (20 modules built vs 32).
 
 - ~~**`REACTOR-VERDICT-CI-1`**~~ ✅ **CLOSED 2026-09-25** — `ci.yml`'s `test` job tees its reactor run
   to a log under pipefail and gates on `check-reactor-verdict.mjs` in an `if: always()` step; as-built in
@@ -477,7 +477,7 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 - ~~**`EDITION-GATED-TESTS-IN-WRONG-HOME-1`**~~ ✅ **CLOSED 2026-09-25 (this commit)** — test classes that
   guarded CORE behaviour from inside `inspecto-ops`, which the default reactor never builds
   (`mvn -o -pl :inspecto-ops -am test` does not even resolve without `-Pedition-standard`). Severity was LOW:
-  `ci.yml:364` runs `-Pedition-enterprise` with tests, so CI always ran them — the exposure was the local
+  `ci.yml:364` runs `-Pedition-advanced` with tests, so CI always ran them — the exposure was the local
   `mvn -o clean test` loop only. `RepoSpacesConfigValidationTest` moved to `inspecto`; `ControlApiDbBrowserTest`,
   `ControlApiDecisionRulesTest` and `PostgresStateStoreTest` SPLIT (ops siblings `ControlApiDbBrowserOpsTablesTest`,
   `ControlApiDecisionRuleApplyTest`, `PostgresOpsStoreTest`); `ControlApiReconPromoteTest` moved (`2f0b181f9`);

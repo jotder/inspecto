@@ -19,7 +19,7 @@
   ```
   MAVEN_OPTS="-Duser.timezone=Asia/Kolkata" \
   INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:55432/postgres?user=postgres&password=postgres' \
-  mvn -o -B test -Pedition-enterprise -pl inspecto -am \
+  mvn -o -B test -Pedition-advanced -pl inspecto -am \
       -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
   ```
 

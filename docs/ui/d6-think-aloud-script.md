@@ -13,7 +13,7 @@ acceptance session 2026-09-29*) found five defects; all five are closed. A real 
 Do these before the participant arrives (about 30 minutes):
 
 1. A build of current `master` with the `demo` Space and a bundle-local `demo-users.toon` holding a lead who has
-   `canManageIncidents` and a second user who has not (the proxy used `package.ps1 -Edition Enterprise -DemoAuth`;
+   `canManageIncidents` and a second user who has not (the proxy used `package.ps1 -Edition Advanced -DemoAuth`;
    use a clean port, 8080 may be held).
 2. **Seed one Incident and one Case in the Space** (a `create-incident` Decision Rule over the API, as the proxy did) so
    task 5 does not dead-end on an empty Space. State openly in the notes that this is seeded.

@@ -137,7 +137,7 @@ public final class ConfigSpecs {
                 // target is an https Connection an administrator onboarded, and the parser refuses both keys.
                 FieldSpec.of("webhook.connection", "Webhook Connection", FieldType.STRING,
                         "Name of the https Connection the at-rest chain's rows are POSTed to as JSON; it carries "
-                                + "the endpoint and the bearer-token reference. Professional/Enterprise only."),
+                                + "the endpoint and the bearer-token reference. Standard/Advanced only."),
                 FieldSpec.withDefault("webhook.batch_size", "Webhook rows per request", FieldType.INT, 500,
                         "Rows per JSON POST, 1-10000."),
                 // The Excel workbook sink's block (sink.excel, operator 2026-10-06).

@@ -123,7 +123,7 @@ Lanes marked ∥ touch disjoint files and can run in parallel; the timing lanes 
 - `SqlGuard` branch verified and merged in (§5.4); `current_setting` decided (§4.1).
 - SPA reader and `SqlAstContractTest` green together (§5.3); T3 / T4 re-assessed by the operator.
 - CI can resolve the driver (§4.4) and `tools/dependencies.lock` / `check-dependencies` are green.
-- Full reactor (`mvn -o clean test -Pedition-enterprise`) and the whole UI suite pass; the interleaved benchmark shows no
+- Full reactor (`mvn -o clean test -Pedition-advanced`) and the whole UI suite pass; the interleaved benchmark shows no
   regression on ingest and Link Analysis lookups beyond what the operator accepts.
 - At GA: pin the GA version, remove the staging repository, re-run the benchmark once.
 

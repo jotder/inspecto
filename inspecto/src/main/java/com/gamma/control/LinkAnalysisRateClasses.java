@@ -38,9 +38,15 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/entity-types/([^/]+)/profile"},
             {"GET", "/inv/entities/([^/]+)/([^/]+)/profile"},
             {"POST", "/inv/entities/([^/]+)/resolve"},           // rate-classed like the GET it serves (operator 2026-10-15)
+            // LA-EDITIONS-1 §4 inbound: a third-party product calls these machine to machine, so a flood is throttled per Subject
+            // (429; the inbound create is idempotent, so a retry is safe). The deep-link resolve is classed like the resolve above.
+            {"POST", "/inv/inbound/investigations"},
+            {"POST", "/inv/deep-links/resolve"},
             // LA-EMBED-VIEW-1: the public embed view is anonymous and re-evaluates an Investigation's sealed log per request
             // (ControlApi throttles it per TOKEN and per IP, on its own buckets).
             {"GET", "/public/investigations/([^/]+)"},
+            // LA-EDITIONS-1 phase 6: builds the Dossier bundle and holds the request through an outbound send and its retries
+            {"POST", "/inv/investigations/([^/]+)/handoff"},
     };
 
     /** Everything else: Investigation / draft / member / case / alert-rule / identity / Entity List CRUD and
@@ -117,6 +123,8 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/index"},
             {"GET", "/inv/datasets/([^/]+)/files"},
             {"GET", "/inv/entity-types"},
+            {"GET", "/inv/integration"},
+            {"PUT", "/inv/integration"},
             {"GET", "/inv/index/builds/([^/]+)"},
             {"POST", "/inv/index/builds/([^/]+)/cancel"},
             {"GET", "/entity-lists"},

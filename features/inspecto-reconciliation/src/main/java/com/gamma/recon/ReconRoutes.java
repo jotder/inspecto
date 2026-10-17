@@ -347,7 +347,7 @@ public final class ReconRoutes implements RouteModule {
 
         com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "operational objects are not installed — promoting a Break to an Incident needs the "
-                        + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
+                        + "inspecto-ops module, which ships in Standard and Advanced (EDITIONS CP-11)"));
 
         String type = orDefault(ApiContext.str(body, "type"), "break");
         String column = ApiContext.str(body, "column");
@@ -417,7 +417,7 @@ public final class ReconRoutes implements RouteModule {
 
         com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "operational objects are not installed — reading promoted Breaks needs the "
-                        + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
+                        + "inspecto-ops module, which ships in Standard and Advanced (EDITIONS CP-11)"));
 
         // ⚠ `scope` is the reconciliation id, exactly as promote() passes it to openIncident — that shared
         // spelling is what makes this index findable at all.

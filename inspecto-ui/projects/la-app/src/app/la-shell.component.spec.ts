@@ -10,6 +10,7 @@ import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LensService } from 'app/inspecto/api';
+import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_NAV, LA_APP_SETTINGS_NAV } from './la-nav';
 import { LA_RAIL_EXPANDED_KEY, LaShellComponent } from './la-shell.component';
 import { LandingComponent } from './landing.component';
@@ -47,8 +48,23 @@ describe('la-app shell and landing page', () => {
         const expected = LA_APP_NAV.map((n) => '/' + n.path);
         expect(hrefs('nav[aria-label="Areas"] a')).toEqual([...expected, '/settings']);
         expect(hrefs('ul a')).toEqual(expected);
-        expect(el.querySelector('h1')?.textContent).toContain('Link Analysis');
+        expect(el.querySelector('h1')?.textContent?.trim()).toBe('Inspecto LA');
         expect(el.querySelector('main')).toBeTruthy();
+    });
+
+    // ED-1 (LA-EDITIONS-1): the product is "Inspecto LA"; the capability area inside it keeps "Link Analysis".
+    it('brands the app Inspecto LA and keeps Link Analysis as the name of its area', async () => {
+        localStorage.setItem(LA_RAIL_EXPANDED_KEY, '1');
+        const el = await render();
+        expect(LA_PRODUCT_NAME).toBe('Inspecto LA');
+        const home = el.querySelector('aside a[href="/"]') as HTMLElement;
+        expect(home.getAttribute('aria-label')).toBe('Inspecto LA home');
+        expect(home.textContent?.trim()).toBe('Inspecto LA');
+        expect(el.querySelector('h1')?.textContent?.trim()).toBe('Inspecto LA');
+        expect(el.querySelector('nav[aria-label="Areas"] a[href="/link-analysis"]')?.textContent?.trim()).toBe(
+            'Link Analysis',
+        );
+        await expectNoA11yViolations(el);
     });
 
     it('offers Alerts in the rail and on the landing page (reading Alerts is ungated, as in the console)', async () => {

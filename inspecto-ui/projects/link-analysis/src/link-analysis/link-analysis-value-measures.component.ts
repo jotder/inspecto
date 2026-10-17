@@ -32,6 +32,7 @@ import { limitRefusalMessage } from './limit-refusal';
 import { laLimit } from './la-limits';
 import { LinkAnalysisBoundRulesComponent } from './link-analysis-bound-rules.component';
 import { LinkAnalysisStandingMonitorComponent } from './link-analysis-standing-monitor.component';
+import { activeDomainProfileId, domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     VALUE_MEASURES,
     VALUE_MEASURE_THRESHOLDS,
@@ -239,7 +240,8 @@ export class LinkAnalysisValueMeasuresComponent {
     /** The loaded Query's edge mapping (toolbox entry): seeds the Dataset and columns when no Investigation is open. */
     readonly mapping = input<{ dataset: string; sourceCol: string; targetCol: string; kindCol?: string } | null>(null);
 
-    readonly specs = valueMeasureAttributes();
+    /** Built once, under the Space's Domain Profile at the time the panel opens (a spec swap would drop typed values). */
+    readonly specs = valueMeasureAttributes(domainProfile(activeDomainProfileId()));
     readonly loaders = {
         dataset: datasetOptionLoader(),
         sourceCol: columnOptionLoader('dataset'),

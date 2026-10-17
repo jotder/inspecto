@@ -1,7 +1,7 @@
 # Workflow and SLA
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: add-on `workflowSla` in `offerings/professional.toon` — `status: planned`, `hostedBy[1]: engine`.
+> Offering: add-on `workflowSla` in `offerings/standard.toon` — `status: planned`, `hostedBy[1]: engine`.
 > The models are built (`ASSURE-WORKFLOW-SLA-1`, closed 2026-10-04); see §9. Checked against the code on 2026-10-17.
 
 ## 1. What it is

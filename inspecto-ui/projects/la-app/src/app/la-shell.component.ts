@@ -6,6 +6,7 @@ import { SpaceSwitcherComponent } from 'app/layout/common/space-switcher/space-s
 import { UserComponent } from 'app/layout/common/user/user.component';
 import { ConnectivityBannerComponent } from '@inspecto/core/components/connectivity-banner.component';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
+import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_NAV, LA_APP_SETTINGS_NAV } from './la-nav';
 
 /** localStorage key remembering whether the navigation rail is expanded ('1') or slim (anything else). */
@@ -54,13 +55,13 @@ function readExpanded(): boolean {
             <a
                 routerLink="/"
                 class="focus-visible:outline-primary flex h-10 items-center gap-2 rounded-md px-2 no-underline focus-visible:outline-2"
-                aria-label="Link Analysis home"
+                [attr.aria-label]="product + ' home'"
                 [matTooltip]="footer"
                 matTooltipPosition="right"
             >
                 <img class="h-6 w-6 flex-0 object-contain" [src]="logo" alt="" />
                 @if (expanded()) {
-                    <span class="truncate font-semibold max-md:hidden">Link Analysis</span>
+                    <span class="truncate font-semibold max-md:hidden">{{ product }}</span>
                 }
             </a>
             <nav class="flex flex-1 flex-row items-center gap-1 md:mt-2 md:flex-col md:items-stretch" aria-label="Areas">
@@ -130,6 +131,7 @@ export class LaShellComponent {
     private readonly env = inject(APP_ENVIRONMENT);
     /** The areas, plus Settings: it always has a section for the signed-in user. */
     protected readonly nav = [...LA_APP_NAV, LA_APP_SETTINGS_NAV];
+    protected readonly product = LA_PRODUCT_NAME;
     protected readonly logo = this.env.appLogo;
     protected readonly footer = this.env.footerText;
     protected readonly expanded = signal(readExpanded());

@@ -34,7 +34,7 @@ class LakehouseCatalogTest {
     @Test
     void nothingConfiguredMeansNoCatalog() {
         assertNull(LakehouseCatalog.configured(),
-                "an unconfigured deployment has no shared lakehouse; that is Personal and single-node "
+                "an unconfigured deployment has no shared lakehouse; that is Basic and single-node "
                         + "Standard, and it must not be an error");
         assertFalse(LakehouseCatalog.isConfigured());
     }

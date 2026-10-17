@@ -763,9 +763,9 @@ in use. Look there before picking a class — do not invent a token.
 - Service per resource in `inspecto/api/`, `@Injectable({providedIn:'root'})`, `private http = inject(HttpClient)`,
   return `Observable<T>`. Build URLs with `apiUrl('/path')`, query with `toParams({…})` (both `api-base.ts`).
   Declare interfaces inline. **Export from the `index.ts` barrel** (`import { X } from 'app/inspecto/api'`).
-- **Personal edition stays auth-free; the Standard edition adds an opt-in session layer (W6d, 2026-07-07).**
+- **Basic edition stays auth-free; the Standard edition adds an opt-in session layer (W6d, 2026-07-07).**
   The core is still auth-free by default — no per-screen auth, no `canControl`/`canAssist` gating, no bearer, no
-  route guard *effect* on Personal. **Do NOT hand-roll per-screen auth or bring back the old `/connect` token
+  route guard *effect* on Basic. **Do NOT hand-roll per-screen auth or bring back the old `/connect` token
   screen / vendored `modules/auth/` template.** What exists now is a single edition-switch driven by
   `GET /bootstrap` `features.authMode`: `SessionService` (`inspecto/api`, mirrors `SpacesService` — signals
   `authMode`/`authenticated`/`capabilities` + in-memory access token; `token()`; `loginRequired()`), the
@@ -818,7 +818,7 @@ in use. Look there before picking a class — do not invent a token.
   **never on `readOnly()`/lens identity**; add a new named capability per distinct authorization question.
   **Since RBAC R2 (2026-07-23)** each capability = the lens derivation **∧, under `authMode 'oidc'`, the
   matching grant in `SessionService.capabilities()`** (the effective set `/bootstrap` reports after
-  server-side role/Access-Profile enforcement); Personal stays pure honor-system. `currentLens` is now a
+  server-side role/Access-Profile enforcement); Basic stays pure honor-system. `currentLens` is now a
   computed: the persisted preference constrained to `lens.allowedLenses()` (Business always; Builder ⇐
   `canAuthorWorkbench`; Ops ⇐ `canOperateRuns`) — the switcher iterates `allowedLenses()`, and a spec
   that stubs `SessionService` must include `authMode: () => 'none'` (+ `capabilities: () => []`) or

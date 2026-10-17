@@ -19,3 +19,5 @@
 - [Mobile money](mobile-money.md)
 - [Business assurance](business-assurance.md)
 - [Link Analysis](link-analysis.md)
+
+> Open drift between offering files, template manifests and module messages and what is built: `OFFERING-DECLARATION-DRIFT-1` (docs/BACKLOG.md).

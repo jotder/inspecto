@@ -54,7 +54,7 @@ into the same path jail as the `report` Job's `out_dir`.
   `PUT /regulatory-reports/templates/{id}`.
 - **Drop directory**: `delivery.dir` per template; a relative directory resolves against the Space config root and
   must pass the path jail.
-- **Enablement**: `regulatory-reporting` in `offerings/professional.toon`, then per Space.
+- **Enablement**: `regulatory-reporting` in `offerings/standard.toon`, then per Space.
 
 ## 6. Screens
 

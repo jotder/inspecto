@@ -166,16 +166,18 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                 </button>
-                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab) -->
-                <button
-                    mat-icon-button
-                    (click)="openInvestigation()"
-                    [color]="investigation.active() ? 'primary' : undefined"
-                    matTooltip="Investigation — an ordered, replayable op log"
-                    aria-label="Open the Investigation"
-                >
-                    <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                </button>
+                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab); absent on Basic -->
+                @if (investigationsEnabled()) {
+                    <button
+                        mat-icon-button
+                        (click)="openInvestigation()"
+                        [color]="investigation.active() ? 'primary' : undefined"
+                        matTooltip="Investigation — an ordered, replayable op log"
+                        aria-label="Open the Investigation"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                    </button>
+                }
 
                 @if (search() || kindFilter().length || timeColumn()) {
                     <button
@@ -726,7 +728,7 @@
                             class="mb-3 block"
                             label="Domain profile"
                             [formControl]="profileControl"
-                            [options]="profileOptions"
+                            [options]="profileOptions()"
                             help="Names the statistics after the data and foregrounds the tools that matter for it."
                         ></inspecto-option-picker>
                         <!-- Query — the query-panel child owns the form + buildQuery; the host keeps sourceId and the
@@ -1076,7 +1078,7 @@
                         ></inspecto-link-analysis-temporal-findings>
 
                         <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse -->
-                        @if (toolboxTab() === 'investigation') {
+                        @if (toolboxTab() === 'investigation' && investigationsEnabled()) {
                             <inspecto-link-analysis-investigation
                                 role="tabpanel"
                                 id="la-toolbox-panel-investigation"
@@ -1268,14 +1270,16 @@
                     >
                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                     </button>
-                    <button
-                        mat-icon-button
-                        (click)="openInvestigation()"
-                        matTooltip="Investigation"
-                        aria-label="Open the Investigation"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                    </button>
+                    @if (investigationsEnabled()) {
+                        <button
+                            mat-icon-button
+                            (click)="openInvestigation()"
+                            matTooltip="Investigation"
+                            aria-label="Open the Investigation"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                        </button>
+                    }
                     <button
                         mat-icon-button
                         (click)="openViewTools()"

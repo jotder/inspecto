@@ -247,7 +247,7 @@ describe('defaultPatternPack', () => {
     it('follows the profile category, a Space pack before a built-in', () => {
         expect(defaultPatternPack(PATTERN_PACKS, 'telecom')?.id).toBe('forwarding-relay');
         expect(defaultPatternPack([...PATTERN_PACKS, space], 'telecom')?.id).toBe('call-forwarding-chain');
-        expect(defaultPatternPack([...PATTERN_PACKS, space], 'finance')?.id).toBe('layering-chain');
+        expect(defaultPatternPack([...PATTERN_PACKS, space], 'mobile-money')?.id).toBe('layering-chain');
     });
 
     it('telecom opens on the forwarding chain even when another Space pack comes first', () => {
@@ -270,7 +270,7 @@ describe('defaultPatternPack', () => {
 
     it('the built-in relay says it is the any-kind pack, not the Space chain', () => {
         const relay = PATTERN_PACKS.find((p) => p.id === 'forwarding-relay')!;
-        expect(relay.label).toBe('Call-forwarding relay (any link kind)');
+        expect(relay.label).toBe('Relay chain (any link kind)'); // neutral: the telecom pack relabels it (pattern.forwarding-relay)
         expect(relay.description).toContain('ANY link kind');
     });
 });

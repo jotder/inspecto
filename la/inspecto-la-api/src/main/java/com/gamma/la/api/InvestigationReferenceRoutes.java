@@ -50,10 +50,10 @@ import java.util.regex.Pattern;
  */
 public final class InvestigationReferenceRoutes implements RouteModule {
 
-    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    /** Gated by the geoLink feature (404 MODULE_DISABLED where a Space switches it off) and the investigations edition feature (503 CAPABILITY_UNAVAILABLE on Basic, LA-EDITIONS-1). */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     // The most references one Investigation may carry, and the id / URL / label lengths, are the Space's input.reference* limits.
@@ -77,7 +77,7 @@ public final class InvestigationReferenceRoutes implements RouteModule {
      * {@code POST …/references} — body {@code {system, type, id, url?, label?}}. Gates: {@code canManageIncidents} 403 →
      * write root 503 → 422 id → owner-only 404 → 422 field → 409 duplicate / full → append.
      */
-    private static Object add(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+    static Object add(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         String system = name(body, "system"), type = name(body, "type");
         LaLimitValues lim = SpaceLimits.of(inv.writeRoot());
@@ -86,7 +86,21 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         String url = text(body, "url", SpaceLimits.get(lim, LaLimit.INPUT_REFERENCE_URL_LENGTH), false);
         String label = text(body, "label", SpaceLimits.get(lim, LaLimit.INPUT_REFERENCE_LABEL_LENGTH), false);
         if (url != null) checkUrl(url);
+        InvestigationStore.Appended r = append(ex, inv, system, type, refId, url, label, max);
+        if (r == InvestigationStore.Appended.DUPLICATE)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "reference " + system + "/" + type + "/" + refId + " is already recorded");
+        if (r == InvestigationStore.Appended.FULL)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "an investigation holds at most " + max + " external references");
+        return describe(id, parse(inv.store().references(id)), max);
+    }
 
+    /**
+     * Append one validated reference and audit it (shared with the hand-off route, which links the external case id the
+     * case manager returned). A DUPLICATE or FULL append writes nothing and emits nothing.
+     */
+    static InvestigationStore.Appended append(HttpExchange ex, InvestigationRoutes.Inv inv, String system, String type, String refId,
+                                              String url, String label, int max) throws IOException {
+        String id = inv.id();
         Map<String, Object> rec = new LinkedHashMap<>();
         rec.put("key", InvestigationEvaluator.sha256(system + "\n" + type + "\n" + refId));   // FIRST: appendReference matches the line prefix
         rec.put("system", system);
@@ -98,17 +112,13 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         rec.put("addedAt", Instant.now().toString());
         InvestigationStore.Appended r = inv.store().appendReference(id, String.valueOf(rec.get("key")),
                 ApiContext.JSON.writeValueAsString(rec), max);
-        if (r == InvestigationStore.Appended.DUPLICATE)
-            throw new ApiException(409, ErrorCodes.CONFLICT, "reference " + system + "/" + type + "/" + refId + " is already recorded");
-        if (r == InvestigationStore.Appended.FULL)
-            throw new ApiException(409, ErrorCodes.CONFLICT, "an investigation holds at most " + max + " external references");
-        List<Map<String, Object>> all = parse(inv.store().references(id));
-        int seq = all.size();
+        if (r != InvestigationStore.Appended.ADDED) return r;
+        int seq = inv.store().references(id).size();
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_REFERENCE_ADDED, "link.investigation.reference.added",
                 "link.investigation.reference.added — " + id + " ← " + system + "/" + type,
                 b -> b.attr("investigationId", id).attr("system", system).attr("type", type).attr("id", refId)
                         .attr("seq", seq));
-        return describe(id, all, max);
+        return r;
     }
 
     // ── shared with the Dossier bundle ─────────────────────────────────────────────────────────────────
@@ -138,14 +148,14 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         return out;
     }
 
-    private static String name(Map<String, Object> body, String field) {
+    static String name(Map<String, Object> body, String field) {
         String v = text(body, field, 64, true);
         if (!NAME.matcher(v).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + field + "' must match " + NAME.pattern());
         return v;
     }
 
-    private static String text(Map<String, Object> body, String field, int max, boolean required) {
+    static String text(Map<String, Object> body, String field, int max, boolean required) {
         Object raw = body.get(field);
         if (raw == null || raw instanceof String s && s.isBlank()) {
             if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + field + "'");
@@ -162,7 +172,7 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         return v;
     }
 
-    private static void checkUrl(String url) {
+    static void checkUrl(String url) {
         try {
             URI u = new URI(url);
             String scheme = u.getScheme();

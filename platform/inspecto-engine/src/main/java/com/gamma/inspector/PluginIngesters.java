@@ -72,7 +72,7 @@ final class PluginIngesters {
     /** The ASN.1 ingester ships in an optional module, not the engine (MODULE-REORG-1 P7): name it when it is missing. */
     private static String moduleHint(String fqcn) {
         return "com.gamma.telecom.asn1.Asn1RecordIngester".equals(fqcn)
-                ? "; the ASN.1 decoder is the optional inspecto-telecom-asn1 module (Telecom industry pack, Professional and above - not in Personal)"
+                ? "; the ASN.1 decoder is the optional inspecto-telecom-asn1 module (Telecom industry pack, Standard and above - not in Basic)"
                 : "";
     }
 }

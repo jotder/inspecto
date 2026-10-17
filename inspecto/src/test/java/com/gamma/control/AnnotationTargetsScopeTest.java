@@ -107,7 +107,7 @@ class AnnotationTargetsScopeTest {
             assertEquals("corr", AnnotationTargets.gate(c.api(), as(UNSCOPED), AnnotationKinds.OBJECT, billing),
                     "dataScopes null = unscoped");
             assertEquals("corr", AnnotationTargets.gate(c.api(), as(null), AnnotationKinds.OBJECT, billing),
-                    "no Subject (Personal) = no data scoping");
+                    "no Subject (Basic) = no data scoping");
             assertNull(AnnotationTargets.gate(c.api(), as(FRAUD_ANALYST), AnnotationKinds.OBJECT, "INCIDENT-nope"),
                     "an absent object is null (the caller's 404), not a scope denial");
         }

@@ -285,7 +285,7 @@ public final class ActionRequestRoutes implements RouteModule {
 
         if (ActionDispatcher.transport.get() == null)
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "this bundle ships no outbound HTTP "
-                    + "transport — Action Requests are a Professional/Enterprise edition capability (inspecto-notify-channels)");
+                    + "transport — Action Requests are a Standard/Advanced edition capability (inspecto-notify-channels)");
         WebhookSink.Endpoint endpoint;
         try {
             endpoint = WebhookSink.endpoint(connection, "action request");

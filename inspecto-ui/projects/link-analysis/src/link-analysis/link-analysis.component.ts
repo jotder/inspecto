@@ -97,11 +97,14 @@ import {
 import { workingSetStats, attrColumns, isTemporalColumn } from '@inspecto/link-analysis/graph/working-set-stats';
 import {
     DEFAULT_MAX_DEGREE,
-    DOMAIN_PROFILES,
     DomainProfileId,
+    activeDomainProfileId,
     domainProfile,
+    domainProfiles,
+    profileForEntityType,
     workingSetOptionsFor,
 } from '@inspecto/link-analysis/graph/domain-profile';
+import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile.service';
 import {
     EndpointColumns,
     cloneGroup,
@@ -403,6 +406,8 @@ export class LinkAnalysisComponent implements OnInit {
     readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
     private datasetsService = inject(LA_DATASETS);
     private readonly limits = inject(LinkAnalysisSettingsService);
+    /** Installs the Space's Industry packs into the Domain Profile registry (LA-EDITIONS-1). */
+    private readonly domainProfiles = inject(DomainProfileService);
     /**
      * Injected for its side effect, not for a value: constructing it loads the active space's limits into the store
      * every limit is read from (`laLimit`). Without an injector asking for it, a `providedIn: 'root'` service is never
@@ -459,12 +464,23 @@ export class LinkAnalysisComponent implements OnInit {
             if (el) el.scrollTop = 0;
         });
     });
-    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). */
-    readonly toolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
+    /**
+     * LA-EDITIONS-1 ED-4: the Investigation surface is included in this edition. False on Basic (the Link Analysis
+     * explorer), whose Investigation routes answer 503: the tab, the buttons and every opener are hidden, never left to 503.
+     */
+    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
+    private readonly allToolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
         { id: 'analysis', label: 'Analysis' },
         { id: 'view', label: 'View' },
         { id: 'investigation', label: 'Investigation' },
     ];
+    private readonly visibleToolboxTabs = computed(() =>
+        this.allToolboxTabs.filter((t) => t.id !== 'investigation' || this.investigationsEnabled()),
+    );
+    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). */
+    get toolboxTabs(): readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] {
+        return this.visibleToolboxTabs();
+    }
     /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
     readonly listMode = signal(false);
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
@@ -1088,7 +1104,10 @@ export class LinkAnalysisComponent implements OnInit {
     );
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
     readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
-    readonly profileOptions = DOMAIN_PROFILES.map((p) => ({ value: p.id, label: p.label, hint: p.description }));
+    /** `generic` plus every Industry pack the server installed (reactive: the packs arrive after the first render). */
+    readonly profileOptions = computed(() =>
+        domainProfiles().map((p) => ({ value: p.id, label: p.label, hint: p.description })),
+    );
     readonly profileId = toSignal(this.profileControl.valueChanges, { initialValue: this.profileControl.value });
     readonly profile = computed(() => domainProfile(this.profileId()));
     /** A reloaded / adopted Investigation brings back the domain profile it was opened under. */
@@ -1103,6 +1122,19 @@ export class LinkAnalysisComponent implements OnInit {
         this.emphasis.set({
             nodeIds: ids,
             edgeIds: g.edges.filter((e) => pair.has([e.source, e.target].sort().join('|'))).map((e) => e.id),
+        });
+    });
+    /**
+     * The Space's selected Domain Profile is the default reading: applied once, when the packs arrive, unless a view, a
+     * case or an Investigation has already chosen a profile (the control then no longer reads `generic`).
+     */
+    private spaceProfileApplied = false;
+    private readonly applySpaceProfile = effect(() => {
+        const id = activeDomainProfileId();
+        if (this.spaceProfileApplied || id === 'generic') return;
+        this.spaceProfileApplied = true;
+        untracked(() => {
+            if (this.profileControl.value === 'generic') this.profileControl.setValue(id);
         });
     });
     private readonly restoreBoundProfile = effect(() => {
@@ -1239,7 +1271,9 @@ export class LinkAnalysisComponent implements OnInit {
         );
         this.pipelinesService.list().subscribe({ next: (p) => this.pipelines.set(p), error: () => undefined });
         this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
-        this.graphRuns.loadCatalogue(); // the footer's server ceiling; absent when the server cannot answer
+        // The footer's server ceiling; absent when the server cannot answer. Graph Run is part of the Investigation surface,
+        // so Basic (no Investigations) does not ask - its browser algorithms keep their own caps.
+        if (this.investigationsEnabled()) this.graphRuns.loadCatalogue();
         this.pendingPivot = this.pivotService.readIncoming(this.route);
         // DR-U9: `?investigation=<id>` (the Alerts page's link from a fired Investigation rule) opens that Investigation.
         // A stream, not the snapshot: a second Alert's link navigates to this same route with a NEW id, which Angular
@@ -1252,6 +1286,7 @@ export class LinkAnalysisComponent implements OnInit {
             )
             .subscribe((investigationId) => {
                 if (!investigationId || investigationId === this.investigation.activeId()) return;
+                if (!this.investigationsEnabled()) return; // Basic: no Investigation to open (LA-EDITIONS-1 ED-4)
                 this.openInvestigation();
                 void this.investigation.adopt(investigationId);
             });
@@ -1289,6 +1324,15 @@ export class LinkAnalysisComponent implements OnInit {
      * open the Dataset picker — the regular start then seeds it.
      */
     async prepareInvestigation(req: InvestigateRequest): Promise<void> {
+        if (!this.investigationsEnabled()) {
+            // Basic (LA-EDITIONS-1 ED-4): there is no Investigation to start; the number is explored on the canvas instead.
+            this.pendingInvestigation.set(null);
+            this.investigateIssue.set(
+                `Investigations are available in Standard and above. Project the Dataset holding ${req.seed}'s links ` +
+                    `and search for ${req.seed} to explore it.`,
+            );
+            return;
+        }
         const badSeed = seedError(req);
         if (badSeed) {
             // The same rule as the starter card: a malformed number is refused, never queued.
@@ -1296,6 +1340,8 @@ export class LinkAnalysisComponent implements OnInit {
             this.investigateIssue.set(`${req.seed} cannot be investigated: ${badSeed}`);
             return;
         }
+        // The packs arrive with the Space's Domain Profile: a deep link that lands first waits for them.
+        if (!profileForEntityType(req.entityType) && !this.domainProfiles.state()) await this.domainProfiles.ready();
         const seed = req.entityType.toLowerCase() === 'msisdn' ? normaliseMsisdn(req.seed) : req.seed;
         const binding = investigateBinding({ ...req, seed });
         const datasets = await this.datasetsLoaded;
@@ -1407,6 +1453,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** "Start an Investigation from the top results": queue the ranked nodes and show the Investigation tab. */
     queueSeedsAndOpen(seeds: QueuedSeed[]): void {
+        if (!this.investigationsEnabled()) return; // Basic: the "start an Investigation" action is not offered
         if (!seeds.length) {
             this.toastr.info('None of the top results can seed an Investigation.', 'Nothing to queue');
             return;
@@ -1761,6 +1808,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** LA-10: open the Investigation tab (start one, or work the open one's op log). */
     openInvestigation(): void {
+        if (!this.investigationsEnabled()) return; // Basic: no Investigation tab (LA-EDITIONS-1 ED-4)
         this.toolboxDockOpen.set(true);
         this.toolboxTab.set('investigation');
     }
@@ -2823,7 +2871,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
         this.pickedLayout.set(view.layout ?? null);
-        this.profileControl.setValue(view.profile ?? 'generic');
+        this.profileControl.setValue(view.profile ?? activeDomainProfileId());
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         if (view.view?.plugins) this.viewOptions.set(view.view.plugins);

@@ -12,6 +12,7 @@ import {
     signal,
     untracked,
 } from '@angular/core';
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Subscription } from 'rxjs';
@@ -51,172 +52,174 @@ import { fmtScore } from './graph-run-summary';
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [DecimalPipe, MatButtonModule, MatIconModule, InspectoAlertComponent, ChipComponent],
     template: `
-        @if (note()) {
-            <p class="text-secondary mt-1 text-sm">{{ note() }}</p>
-        }
-        <div class="mt-1 flex flex-wrap items-center gap-2">
-            @if (!active()) {
-                @if (!indexOnly()) {
-                    <button
-                        mat-stroked-button
-                        data-testid="run-on-server"
-                        [disabled]="!!blockedReason()"
-                        (click)="start()"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                        Run on server
-                    </button>
-                }
-                @if (index(); as ix) {
-                    @if (indexChoices().length > 1) {
-                        <label class="text-secondary text-sm">
-                            Index
-                            <select
-                                class="ml-1 rounded border px-1"
-                                data-testid="index-pick"
-                                (change)="pickIndex($any($event.target).value)"
-                            >
-                                @for (c of indexChoices(); track c.dataset) {
-                                    <option [value]="c.dataset" [selected]="c.dataset === ix.dataset">
-                                        {{ c.dataset }}
-                                    </option>
-                                }
-                            </select>
-                        </label>
-                    }
-                    <button
-                        mat-stroked-button
-                        data-testid="run-on-index"
-                        [disabled]="!!indexBlockedReason()"
-                        (click)="start(undefined, 'index')"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                        Run on index
-                    </button>
-                    @if (ix.stale) {
-                        <inspecto-chip
-                            variant="soft"
-                            tone="warning"
-                            data-testid="index-stale-chip"
-                            [title]="ix.reason ?? ''"
-                        >
-                            Index stale
-                        </inspecto-chip>
-                    }
-                }
-            } @else {
-                <button
-                    mat-stroked-button
-                    data-testid="cancel-run"
-                    [disabled]="cancelling() || !view()"
-                    (click)="cancel()"
-                >
-                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                    {{ cancelling() ? 'Cancelling...' : 'Cancel' }}
-                </button>
+        @if (investigationsEnabled()) {
+            @if (note()) {
+                <p class="text-secondary mt-1 text-sm">{{ note() }}</p>
             }
-        </div>
-        @if (active() && !view()) {
-            <p class="text-secondary mt-1 text-sm" role="status" data-testid="cancel-wait-reason">
-                Cancel is available once the server has queued the run; a small run is answered before that.
-            </p>
-        }
-        @if (blockedReason(); as why) {
-            <p class="text-secondary mt-1 text-sm" role="status" data-testid="blocked-reason">{{ why }}</p>
-        }
-        @if (index() && indexBlockedReason(); as why) {
-            <p class="text-secondary mt-1 text-sm" role="status" data-testid="index-blocked-reason">{{ why }}</p>
-        }
-        @if (error()) {
-            <inspecto-alert variant="error" title="Server run">{{ error() }}</inspecto-alert>
-        }
-        @if (view(); as v) {
-            @if (active()) {
-                <p class="mt-1 text-sm" role="status" data-testid="run-progress">
-                    {{ v.status === 'QUEUED' ? 'Queued on the server' : 'Running on the server' }}
-                    @if (v.status === 'RUNNING' && v.progress.fraction > 0) {
-                        - {{ v.progress.fraction * 100 | number: '1.0-0' }}%
-                    } @else if (v.status === 'RUNNING' && v.progress.work > 0) {
-                        - {{ v.progress.work | number: '1.0-0' }} steps done
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+                @if (!active()) {
+                    @if (!indexOnly()) {
+                        <button
+                            mat-stroked-button
+                            data-testid="run-on-server"
+                            [disabled]="!!blockedReason()"
+                            (click)="start()"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
+                            Run on server
+                        </button>
                     }
-                    - {{ elapsedMs() | number: '1.0-0' }} ms elapsed ({{ v.consumed.nodes }} nodes,
-                    {{ v.consumed.edges }} links)
+                    @if (index(); as ix) {
+                        @if (indexChoices().length > 1) {
+                            <label class="text-secondary text-sm">
+                                Index
+                                <select
+                                    class="ml-1 rounded border px-1"
+                                    data-testid="index-pick"
+                                    (change)="pickIndex($any($event.target).value)"
+                                >
+                                    @for (c of indexChoices(); track c.dataset) {
+                                        <option [value]="c.dataset" [selected]="c.dataset === ix.dataset">
+                                            {{ c.dataset }}
+                                        </option>
+                                    }
+                                </select>
+                            </label>
+                        }
+                        <button
+                            mat-stroked-button
+                            data-testid="run-on-index"
+                            [disabled]="!!indexBlockedReason()"
+                            (click)="start(undefined, 'index')"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
+                            Run on index
+                        </button>
+                        @if (ix.stale) {
+                            <inspecto-chip
+                                variant="soft"
+                                tone="warning"
+                                data-testid="index-stale-chip"
+                                [title]="ix.reason ?? ''"
+                            >
+                                Index stale
+                            </inspecto-chip>
+                        }
+                    }
+                } @else {
+                    <button
+                        mat-stroked-button
+                        data-testid="cancel-run"
+                        [disabled]="cancelling() || !view()"
+                        (click)="cancel()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        {{ cancelling() ? 'Cancelling...' : 'Cancel' }}
+                    </button>
+                }
+            </div>
+            @if (active() && !view()) {
+                <p class="text-secondary mt-1 text-sm" role="status" data-testid="cancel-wait-reason">
+                    Cancel is available once the server has queued the run; a small run is answered before that.
                 </p>
-            } @else {
-                @switch (v.status) {
-                    @case ('COMPLETED') {
-                        <p class="mt-1 text-sm" role="status" data-testid="run-done">
-                            Ran on the server in {{ v.consumed.elapsedMs | number: '1.0-0' }} ms over
-                            {{ v.consumed.nodes }} nodes and {{ v.consumed.edges }} links{{
-                                v.cached ? ' (cached answer)' : ''
-                            }}.
-                        </p>
-                        @if (v.source; as src) {
-                            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="index-source">
-                                Answered from the edge index, version {{ src.version }}.
-                                @if (src.stale) {
-                                    <inspecto-chip variant="soft" tone="warning" data-testid="source-stale-chip">
-                                        Index stale
-                                    </inspecto-chip>
-                                    <span class="text-secondary">
-                                        {{ src.staleReason ?? 'Rows were added to the Dataset after the build.' }}
-                                    </span>
-                                }
+            }
+            @if (blockedReason(); as why) {
+                <p class="text-secondary mt-1 text-sm" role="status" data-testid="blocked-reason">{{ why }}</p>
+            }
+            @if (index() && indexBlockedReason(); as why) {
+                <p class="text-secondary mt-1 text-sm" role="status" data-testid="index-blocked-reason">{{ why }}</p>
+            }
+            @if (error()) {
+                <inspecto-alert variant="error" title="Server run">{{ error() }}</inspecto-alert>
+            }
+            @if (view(); as v) {
+                @if (active()) {
+                    <p class="mt-1 text-sm" role="status" data-testid="run-progress">
+                        {{ v.status === 'QUEUED' ? 'Queued on the server' : 'Running on the server' }}
+                        @if (v.status === 'RUNNING' && v.progress.fraction > 0) {
+                            - {{ v.progress.fraction * 100 | number: '1.0-0' }}%
+                        } @else if (v.status === 'RUNNING' && v.progress.work > 0) {
+                            - {{ v.progress.work | number: '1.0-0' }} steps done
+                        }
+                        - {{ elapsedMs() | number: '1.0-0' }} ms elapsed ({{ v.consumed.nodes }} nodes,
+                        {{ v.consumed.edges }} links)
+                    </p>
+                } @else {
+                    @switch (v.status) {
+                        @case ('COMPLETED') {
+                            <p class="mt-1 text-sm" role="status" data-testid="run-done">
+                                Ran on the server in {{ v.consumed.elapsedMs | number: '1.0-0' }} ms over
+                                {{ v.consumed.nodes }} nodes and {{ v.consumed.edges }} links{{
+                                    v.cached ? ' (cached answer)' : ''
+                                }}.
                             </p>
-                            @if (indexSummary(); as sum) {
-                                <p class="mt-1 text-sm" data-testid="index-summary">{{ sum.headline }}</p>
-                                @if (sum.lines.length) {
-                                    <ol class="mt-1 list-inside list-decimal text-sm" data-testid="index-lines">
-                                        @for (l of sum.lines; track $index) {
-                                            <li [attr.title]="sum.fullLines[$index] || null" [attr.aria-label]="sum.fullLines[$index] || null">{{ l }}</li>
-                                        }
-                                    </ol>
+                            @if (v.source; as src) {
+                                <p class="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="index-source">
+                                    Answered from the edge index, version {{ src.version }}.
+                                    @if (src.stale) {
+                                        <inspecto-chip variant="soft" tone="warning" data-testid="source-stale-chip">
+                                            Index stale
+                                        </inspecto-chip>
+                                        <span class="text-secondary">
+                                            {{ src.staleReason ?? 'Rows were added to the Dataset after the build.' }}
+                                        </span>
+                                    }
+                                </p>
+                                @if (indexSummary(); as sum) {
+                                    <p class="mt-1 text-sm" data-testid="index-summary">{{ sum.headline }}</p>
+                                    @if (sum.lines.length) {
+                                        <ol class="mt-1 list-inside list-decimal text-sm" data-testid="index-lines">
+                                            @for (l of sum.lines; track $index) {
+                                                <li [attr.title]="sum.fullLines[$index] || null" [attr.aria-label]="sum.fullLines[$index] || null">{{ l }}</li>
+                                            }
+                                        </ol>
+                                    }
                                 }
                             }
                         }
-                    }
-                    @case ('BUDGET_EXCEEDED') {
-                        <inspecto-alert variant="warning" title="Over budget - no result">
-                            <p data-testid="budget-reason">{{ reasonFacts() }}</p>
-                            <ul class="mt-1 list-disc pl-5" data-testid="budget-numbers">
-                                <li>
-                                    Limit hit: <strong>{{ v.exceeded }}</strong>
-                                </li>
-                                <li>
-                                    Budget: {{ v.budget.maxNodes }} nodes, {{ v.budget.maxEdges }} links,
-                                    {{ v.budget.timeoutMs }} ms
-                                </li>
-                                <li>
-                                    Measured: {{ v.consumed.nodes }} nodes, {{ v.consumed.edges }} links,
-                                    {{ v.consumed.elapsedMs }} ms
-                                </li>
-                            </ul>
-                            @if (nextAction(); as next) {
-                                @if (next.kind === 'raise') {
-                                    <button
-                                        mat-stroked-button
-                                        class="mt-2"
-                                        data-testid="raise-budget"
-                                        (click)="start(next.budget)"
-                                    >
-                                        {{ next.label }}
-                                    </button>
-                                } @else {
-                                    <p class="mt-1" data-testid="narrow-advice">{{ next.text }}</p>
+                        @case ('BUDGET_EXCEEDED') {
+                            <inspecto-alert variant="warning" title="Over budget - no result">
+                                <p data-testid="budget-reason">{{ reasonFacts() }}</p>
+                                <ul class="mt-1 list-disc pl-5" data-testid="budget-numbers">
+                                    <li>
+                                        Limit hit: <strong>{{ v.exceeded }}</strong>
+                                    </li>
+                                    <li>
+                                        Budget: {{ v.budget.maxNodes }} nodes, {{ v.budget.maxEdges }} links,
+                                        {{ v.budget.timeoutMs }} ms
+                                    </li>
+                                    <li>
+                                        Measured: {{ v.consumed.nodes }} nodes, {{ v.consumed.edges }} links,
+                                        {{ v.consumed.elapsedMs }} ms
+                                    </li>
+                                </ul>
+                                @if (nextAction(); as next) {
+                                    @if (next.kind === 'raise') {
+                                        <button
+                                            mat-stroked-button
+                                            class="mt-2"
+                                            data-testid="raise-budget"
+                                            (click)="start(next.budget)"
+                                        >
+                                            {{ next.label }}
+                                        </button>
+                                    } @else {
+                                        <p class="mt-1" data-testid="narrow-advice">{{ next.text }}</p>
+                                    }
                                 }
-                            }
-                        </inspecto-alert>
-                    }
-                    @case ('CANCELLED') {
-                        <inspecto-alert variant="info" title="Cancelled">
-                            The run was cancelled. Nothing was changed on the canvas.
-                        </inspecto-alert>
-                    }
-                    @case ('FAILED') {
-                        <inspecto-alert variant="error" title="Run failed">
-                            The server run failed{{ v.failure ? ' (' + v.failure + ')' : '' }}. Nothing was changed on
-                            the canvas.
-                        </inspecto-alert>
+                            </inspecto-alert>
+                        }
+                        @case ('CANCELLED') {
+                            <inspecto-alert variant="info" title="Cancelled">
+                                The run was cancelled. Nothing was changed on the canvas.
+                            </inspecto-alert>
+                        }
+                        @case ('FAILED') {
+                            <inspecto-alert variant="error" title="Run failed">
+                                The server run failed{{ v.failure ? ' (' + v.failure + ')' : '' }}. Nothing was changed on
+                                the canvas.
+                            </inspecto-alert>
+                        }
                     }
                 }
             }
@@ -228,6 +231,8 @@ export class LinkAnalysisServerRunComponent {
     private sub: Subscription | null = null;
 
     /** The server algorithm id (`GET /inv/graph/algorithms`). */
+    /** LA-EDITIONS-1 ED-4: Graph Run is part of the Investigation surface; on Basic this control renders nothing. */
+    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
     readonly algorithm = input.required<string>();
     readonly params = input<Record<string, unknown>>({});
     /**

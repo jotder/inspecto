@@ -154,10 +154,10 @@ final class SaveGate {
         if ("pipeline".equals(type))
             for (EditionFeatures.Refusal r : EditionFeatures.pipelineRefusals(draft))
                 out.add(new Finding(Severity.ERROR, r.field(), r.message(), FindingCodes.ERR_EDITION_FEATURE,
-                        "remove it, or run the Professional or Enterprise edition"));
+                        "remove it, or run the Standard or Advanced edition"));
         if ("alert".equals(type) && !EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))
             out.add(new Finding(Severity.ERROR, "alert", EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH),
-                    FindingCodes.ERR_EDITION_FEATURE, "run the Professional or Enterprise edition"));
+                    FindingCodes.ERR_EDITION_FEATURE, "run the Standard or Advanced edition"));
         return out;
     }
 

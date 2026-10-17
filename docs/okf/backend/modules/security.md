@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)
-description: Professional-edition OIDC resource server behind the Authenticator/Subject/TokenRelay SPIs — Nimbus JWKS, RoleMapper, vendor-neutral OIDC token relay; reactor-gated behind the edition-professional profile.
+description: Professional-edition OIDC resource server behind the Authenticator/Subject/TokenRelay SPIs — Nimbus JWKS, RoleMapper, vendor-neutral OIDC token relay; reactor-gated behind the edition-standard profile.
 resource: providers/inspecto-oidc/
 tags: [module, security, oidc, editions, professional, spi]
 timestamp: 2026-07-07T00:00:00Z
@@ -9,7 +9,7 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)
 
-A profile-gated Maven module (`inspecto-oidc`, in the `edition-professional`/`edition-enterprise` profiles only — with `edition-standard` retained as an alias — `pom.xml:76`, `:115`), shipped W6 (2026-07-06). It supplies the
+A profile-gated Maven module (`inspecto-oidc`, in the `edition-standard`/`edition-advanced` profiles only — `pom.xml:76`, `:115`), shipped W6 (2026-07-06). It supplies the
 **Professional/Enterprise** auth implementation; the common core stays auth-free.
 
 * **SPI seam (in core)** — `com.gamma.spi.auth.Authenticator` / `Subject` (id + capabilities) /
@@ -17,8 +17,8 @@ A profile-gated Maven module (`inspecto-oidc`, in the `edition-professional`/`ed
   Personal edition is byte-for-byte unchanged.
 * **Contents** — `OidcAuthenticator` (OIDC resource server on Nimbus JOSE+JWT / JWKS),
   `RoleMapper` (claims → Roles → Capabilities; ⚠ **since RBAC R1 the role→grant table is NOT hardcoded here** — it resolves per request from `Roles.effective`, the bound space's authored `roles.toon` over the shipped seed, fail-closed on an unknown role, plus SEC-7d data scopes via `dataScopesFor` — `RoleMapper.java:14-27`), `OidcTokenRelay`, `FileKeystoreSecretsProvider` (the SEC-07 `${FILE}`/`${KEYSTORE}` secret schemes).
-* **Reactor gating** — the module only builds under the `edition-professional` Maven profile; the default
-  `mvn -o clean test` never compiles it (verify with `-Pedition-professional`: **34 tests** in this module — `OidcAuthenticatorTest` 24 + `OidcTokenRelayTest` 7 + `FileKeystoreSecretsProviderTest` 3 — inside a **31-module / 4106-test** reactor, measured 2026-09-08; the bare default reactor is 23 / 3777).
+* **Reactor gating** — the module only builds under the `edition-standard` Maven profile; the default
+  `mvn -o clean test` never compiles it (verify with `-Pedition-standard`: **34 tests** in this module — `OidcAuthenticatorTest` 24 + `OidcTokenRelayTest` 7 + `FileKeystoreSecretsProviderTest` 3 — inside a **31-module / 4106-test** reactor, measured 2026-09-08; the bare default reactor is 23 / 3777).
 * **Around it (in core, W6/W6d)** — the AuthN gate + per-route capability checks
   (`UNAUTHENTICATED`/`PERMISSION_DENIED`), HTTPS via the pure-JDK `HttpsServer`, and the BFF routes
   `POST /auth/exchange|refresh|logout` (refresh token only in the httpOnly `inspecto_rt` cookie;

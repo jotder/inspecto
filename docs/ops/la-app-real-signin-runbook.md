@@ -1,4 +1,4 @@
-# la-app real OIDC sign-in runbook (local WSO2 Identity Server)
+# Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)
 
 *Status: run end to end 2026-10-13 against WSO2 IS 7.3.0 in Docker and a Professional `-Ui la-app` bundle (`LA-APP-REAL-SIGNIN-1`).
 Rerun this after any change to `SessionService`, `CallbackComponent`, `OidcTokenRelay` or `OidcAuthenticator`.*
@@ -32,7 +32,7 @@ capabilities, refresh/resume, sign-out, expired token, a user with no mapped gro
 ## 3. Build and stage
 
 ```powershell
-pwsh -NoProfile -File inspecto\package.ps1 -Edition Professional -Ui la-app -NoBakeDemo   # 10-25 min; retry on a font-fetch failure
+pwsh -NoProfile -File inspecto\package.ps1 -Edition Standard -Ui la-app -NoBakeDemo   # 10-25 min; retry on a font-fetch failure
 ```
 
 Output: `inspecto-deploy\` at the worktree root. Then:

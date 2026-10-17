@@ -1,3 +1,4 @@
+import { installTelecomFixture } from '@inspecto/link-analysis/graph/domain-profile.testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
@@ -122,6 +123,9 @@ const step = (n: number, op: string) => ({
     truncated: false,
     workingSet: { entities: 0, links: 0, excluded: 0, hash: '' },
 });
+
+// The SPA holds no industry profile of its own (LA-EDITIONS-1): the telecom pack arrives from the server.
+installTelecomFixture();
 
 describe('InvestigationSessionStore (LA-10)', () => {
     it('start sends the time column, so the coverage read has one (LA-SPA-OWED-SURFACES-1 defect)', async () => {

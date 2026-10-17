@@ -93,7 +93,7 @@ test('RED: a removed tripwire is refused, not skipped', () => {
     const r = run(fixture((m) => m('features/inspecto-ops/src/test/java/com/gamma/service/ObjectFamiliesOperationalDbTest.java',
         (t) => t.replace('OperationalDb.all().size()', 'OperationalDb.all().stream().count()'))));
     assert.equal(r.code, 1);
-    assert.match(r.out, /could not find the assertion for the whole roster on an Enterprise classpath/);
+    assert.match(r.out, /could not find the assertion for the whole roster on an Advanced classpath/);
 });
 
 test('RED: an enum whose shape the parse no longer matches (emptiness floor)', () => {

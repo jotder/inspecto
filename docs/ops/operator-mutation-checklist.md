@@ -16,7 +16,7 @@ guard inventories approved in 2026-10.
 3. **Java.** Maven needs JDK 27: `unset JAVA_HOME` (Git Bash) so `PATH`'s java 27 wins, or set it to the JDK 27 home.
    A "release version 27 not supported" failure means the wrong JDK, not a result.
 4. **Command shape** (comma-separate classes, never `+`; `-am` so sibling jars are fresh):
-   `unset JAVA_HOME; mvn -o test -pl <module> -am -Pedition-enterprise -Dtest=<Class> -Dsurefire.failIfNoSpecifiedTests=false`
+   `unset JAVA_HOME; mvn -o test -pl <module> -am -Pedition-advanced -Dtest=<Class> -Dsurefire.failIfNoSpecifiedTests=false`
    Read **`Tests run:`**: `0` tests means the filter matched nothing (a false green), not a pass.
 5. **Red for the RIGHT reason.** Read the failure text against the "Expect" column. A compile error or a different
    test failing is not the proof. In a fresh worktree copy the DuckDB extensions from the main checkout

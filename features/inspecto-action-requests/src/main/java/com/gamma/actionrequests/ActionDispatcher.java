@@ -87,7 +87,7 @@ final class ActionDispatcher {
         }
         if (wire == null) {
             refusal = "this bundle ships no outbound HTTP transport — Action Request dispatch is a "
-                    + "Professional/Enterprise edition capability (inspecto-notify-channels). Nothing was sent.";
+                    + "Standard/Advanced edition capability (inspecto-notify-channels). Nothing was sent.";
         } else {
             try {
                 endpoint = WebhookSink.endpoint(String.valueOf(rec.get("connection")), "action request '" + id + "'");

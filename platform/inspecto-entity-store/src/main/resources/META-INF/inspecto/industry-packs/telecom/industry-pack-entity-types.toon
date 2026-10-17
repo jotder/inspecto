@@ -1,0 +1,25 @@
+entity_types[6]:
+  - id: subscriber
+    normaliser: default
+    masked: true
+    classifications[1]: SUBSCRIBER
+  - id: msisdn
+    normaliser: e164
+    masked: true
+    classifications[1]: MSISDN
+  - id: imsi
+    normaliser: digits
+    masked: true
+    classifications[1]: IMSI
+  - id: imei
+    normaliser: digits
+    masked: true
+    classifications[1]: IMEI
+  - id: handset
+    normaliser: default
+    masked: false
+    classifications[1]: HANDSET
+  - id: cell
+    normaliser: upper-trim
+    masked: false
+    classifications[2]: CELL,CELL_ID

@@ -97,7 +97,7 @@ class SpiSlotFailClosedTest {
     @Test
     void failClosedStillTreatsAnUnregisteredSpiAsALegitimateAbsence() {
         assertEquals(Optional.empty(), new SpiSlot<>(Unregistered.class, true).active(),
-                "no registration at all is the Personal edition's path and must resolve empty");
+                "no registration at all is the Basic edition's path and must resolve empty");
     }
 
     @Test

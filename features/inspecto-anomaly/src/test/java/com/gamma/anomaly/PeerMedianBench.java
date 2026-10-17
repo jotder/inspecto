@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * MEASUREMENT harness, not a test (ANOMALY-DETECTION-RESIDUALS-1 (e), D-AD9 "full recompute until measured slow"):
  * the JVM-side peer medians of {@code anomaly.score}. Never runs in the default suite: it needs
  * {@code -Dinspecto.bench=true}. Example (see the build-verify skill for the module exclusions):
- * {@code mvn -o test -Pedition-enterprise -pl features/inspecto-anomaly -am -Dtest=PeerMedianBench
+ * {@code mvn -o test -Pedition-advanced -pl features/inspecto-anomaly -am -Dtest=PeerMedianBench
  * -Dinspecto.bench=true -Dsurefire.failIfNoSpecifiedTests=false} (optional {@code -Dinspecto.bench.out=<file>},
  * {@code -Dinspecto.bench.timeoutSec=60}, {@code -Dinspecto.bench.sizes=10000,200000,1000000}).
  *

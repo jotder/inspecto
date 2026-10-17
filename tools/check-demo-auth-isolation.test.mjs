@@ -59,8 +59,8 @@ const RED = {
     'an edition module table entry (Preview takes every module)': [
         edit(
             'tools/bundle-modules.mjs',
-            "    // Enterprise only.",
-            "    { artifactId: 'inspecto-demo-auth', dir: 'providers/inspecto-demo-auth', bundleFile: 'inspecto-demo-auth.jar', from: 'enterprise' },\n    // Enterprise only.",
+            "    // Advanced only.",
+            "    { artifactId: 'inspecto-demo-auth', dir: 'providers/inspecto-demo-auth', bundleFile: 'inspecto-demo-auth.jar', from: 'advanced' },\n    // Advanced only.",
         ),
         /bundle-modules\.mjs ships inspecto-demo-auth\.jar/,
     ],
@@ -91,12 +91,12 @@ const RED = {
         /inspecto-connectors\/pom\.xml declares a dependency/,
     ],
     'an edition profile listing it as a module': [
-        edit('pom.xml', '<id>edition-enterprise</id>', '<id>edition-enterprise</id>\n<modules><module>inspecto-demo-auth</module></modules>'),
-        /profile 'edition-enterprise' lists inspecto-demo-auth/,
+        edit('pom.xml', '<id>edition-advanced</id>', '<id>edition-advanced</id>\n<modules><module>inspecto-demo-auth</module></modules>'),
+        /profile 'edition-advanced' lists inspecto-demo-auth/,
     ],
     'a workflow packaging with -DemoAuth': [
         (root) => writeFileSync(join(root, '.github/workflows/release.yml'),
-            'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth\n'),
+            'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Edition Advanced -DemoAuth\n'),
         /release\.yml:4 stages or builds the demo sign-in/,
     ],
 };

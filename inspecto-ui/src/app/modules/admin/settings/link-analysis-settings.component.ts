@@ -14,6 +14,7 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { LinkAnalysisLimitsComponent } from './link-analysis-limits.component';
+import { LinkAnalysisDomainProfileComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-domain-profile.component';
 
 /** `ConfigSpecs.LINK_ANALYSIS_MASKING_MODES`; blank = inherit (`typed`). */
 const MASKING_MODES: { value: string; label: string; hint: string }[] = [
@@ -94,6 +95,7 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
         InspectoAlertComponent,
         InspectoPageHeaderComponent,
         LinkAnalysisLimitsComponent,
+        LinkAnalysisDomainProfileComponent,
     ],
     template: `
         <div class="flex flex-col gap-6 p-6">
@@ -279,6 +281,7 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
                     }
                 </form>
             }
+            <inspecto-link-analysis-domain-profile />
             @if (withLimits()) {
                 <inspecto-link-analysis-limits />
             }

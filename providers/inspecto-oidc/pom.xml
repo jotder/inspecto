@@ -23,7 +23,7 @@
         jar on the classpath (+ -Dauth.oidc.issuer / -Dauth.oidc.jwksUri) is what turns authentication
         on. The Personal edition never bundles it and stays auth-free -- exactly how inspecto-connectors
         and inspecto-agent-hosted isolate their own optional dependencies from the lean core. Only built
-        as part of the reactor under the "edition-professional" profile (see the parent pom's profile-scoped
+        as part of the reactor under the "edition-standard" profile (see the parent pom's profile-scoped
         &lt;modules&gt;), so a routine "mvn -o clean test" (Personal) never touches this module at all.
     </description>
 

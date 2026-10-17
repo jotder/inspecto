@@ -248,7 +248,7 @@ export class LinkAnalysisSnapshotDialog {
     /** Why a new Case cannot be offered here — empty when it can. Stated, never a silently missing option. */
     readonly createUnavailable = computed(() =>
         !this.opsEnabled()
-            ? 'Creating a Case needs operational objects, which this bundle does not include (Professional edition and above).'
+            ? 'Creating a Case needs operational objects, which this bundle does not include (Standard edition and above).'
             : this.candidates.length === 0
               ? noCaseMemberReason(this.data.graph)
               : '',
@@ -580,7 +580,7 @@ export class LinkAnalysisAttachCaseDialog {
     );
     readonly createUnavailable = computed(() =>
         !this.caseMgmt.available()
-            ? 'Creating a Case needs operational objects, which this bundle does not include (Professional edition and above).'
+            ? 'Creating a Case needs operational objects, which this bundle does not include (Standard edition and above).'
             : this.candidates.length === 0
               ? noCaseMemberReason(this.data.graph)
               : '',

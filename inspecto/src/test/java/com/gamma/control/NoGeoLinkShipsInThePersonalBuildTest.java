@@ -20,6 +20,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
+ * <p>⚠ <b>LA-EDITIONS-1 phase 3 (2026-10-17):</b> the module now ships in EVERY edition, Basic included (the Link Analysis
+ * explorer), so the class name records history. What this still proves is the processor-only classpath: a bundle that
+ * lacks the module answers its routes with the 503 "not installed" stub and reports the feature false.
+ *
  * EDG-01 cell 3b — the assertion that makes the CP-09 gating REAL rather than claimed, on the DEFAULT
  * (Personal) build, over real HTTP.
  *
@@ -95,6 +99,6 @@ class NoGeoLinkShipsInThePersonalBuildTest {
         for (RouteModule m : java.util.ServiceLoader.load(RouteModule.class)) found.add(m.getClass().getName());
         // The one discovered module is this module's own test vehicle (RouteModuleDiscoveryTest).
         assertEquals(List.of(TestDiscoveredRoutes.class.getName()), found,
-                "an unexpected RouteModule on the default classpath means an optional module leaked into Personal");
+                "an unexpected RouteModule on the default classpath means an optional module leaked into Basic");
     }
 }

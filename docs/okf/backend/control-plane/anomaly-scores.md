@@ -10,7 +10,7 @@ timestamp: 2026-10-10T00:00:00Z
 # Anomaly Scores
 
 > **Module.** Anomaly Detection is the optional `features/inspecto-anomaly` module (id `anomaly`, package
-> `com.gamma.anomaly`, add-on `anomalyDetection` `status: built` in `offerings/professional.toon`, so
+> `com.gamma.anomaly`, add-on `anomalyDetection` `status: built` in `offerings/standard.toon`, so
 > Professional, Enterprise and Preview; not Personal — D-AD4). It depends on `inspecto-entity-list`
 > (`requires.modules: entity-list`) and **not** on `inspecto-scoring`: the pieces it shares with
 > [Risk Scores](risk-scores.md) are extracted, never copied (D-AD5, fulfilled 2026-10-17 by ANALYTICS-CORE-1 M7):

@@ -81,7 +81,7 @@ import {
                         @if (report()!.engine === 'postgres' && !report()!.driverAvailable) {
                             <inspecto-alert variant="error" title="PostgreSQL driver missing">
                                 Drop <code>postgresql.jar</code> beside <code>inspecto.jar</code> — the
-                                Professional/Enterprise bundle ships it as a sidecar.
+                                Standard/Advanced bundle ships it as a sidecar.
                             </inspecto-alert>
                         }
                     </div>

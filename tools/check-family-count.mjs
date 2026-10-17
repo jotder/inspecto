@@ -6,7 +6,7 @@
  * `OperationalDb.Family` enum, parsed from source) PLUS the families optional modules contribute, which each
  * module declares in its `module.toon` as `provides.storeFamilies` (parsed from every manifest in the tree;
  * a per-module test pins manifest == provider). Prose states the whole roster (core + contributed = what an
- * Enterprise classpath lists); the processor's own test tripwires state the CORE count (that classpath has no
+ * Advanced classpath lists); the processor's own test tripwires state the CORE count (that classpath has no
  * module); the ops module's tripwires state the contributed count and the whole. Same discipline as before — a
  * new family still needs a conscious doc/test update — only the source of truth became two parses.
  *
@@ -58,7 +58,7 @@ const DOC_FILES = [
 /**
  * The test tripwires, and the pattern that carries the number in each. `of` says which count the assertion
  * must state: `core` (the processor's own classpath, no modules), `contributed` (the ops module's own four) or
- * `total` (core + contributed, an Enterprise classpath).
+ * `total` (core + contributed, an Advanced classpath).
  */
 const TEST_ASSERTIONS = [
     {
@@ -82,7 +82,7 @@ const TEST_ASSERTIONS = [
     {
         file: 'features/inspecto-ops/src/test/java/com/gamma/service/ObjectFamiliesOperationalDbTest.java',
         pattern: /assertEquals\((\d+),\s*OperationalDb\.all\(\)\.size\(\)/,
-        what: 'the whole roster on an Enterprise classpath',
+        what: 'the whole roster on an Advanced classpath',
         of: 'total',
     },
 ];
