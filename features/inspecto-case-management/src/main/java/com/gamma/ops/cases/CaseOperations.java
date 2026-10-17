@@ -116,7 +116,11 @@ public final class CaseOperations {
         long now = System.currentTimeMillis();
         long cutoff = rule.windowMinutes() <= 0 ? 0 : now - rule.windowMinutes() * 60_000L;
         List<OperationalObject> matches = new ArrayList<>();   // every page; only the matches are held
-        for (OperationalObject o : svc.allMatching(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()))
+        // ANALYTICS-CORE-1 S8: the window and the filter's narrowing go into the store's query; the exact tests below
+        // stay and decide (the prefilter only drops certain non-matches, and createdFrom = cutoff is the same bound).
+        ObjectQuery inWindow = ObjectQuery.builder().objectType(ObjectType.INCIDENT).createdFrom(cutoff)
+                .prefilter(rule.filter().incidentPrefilter()).build();
+        for (OperationalObject o : svc.allMatching(inWindow))
             if (o.createdAt() >= cutoff && rule.matches(o) && !isCaseMember(o.id())   // not already grouped
                     && (rule.groupBy() == null || groupValue(rule, o) != null))
                 matches.add(o);

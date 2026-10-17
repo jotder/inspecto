@@ -56,9 +56,17 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         this(JdbcDrivers.source(conn));
     }
 
+    /**
+     * True on PostgreSQL. Only the {@link ObjectQuery.Prefilter} reads it: Postgres {@code LOWER} folds by the
+     * database collation (a Turkish one maps {@code I} to dotless {@code ı}), so it is not Java's
+     * {@code Locale.ROOT} fold and the case-insensitive narrowing is applied on DuckDB only.
+     */
+    private final boolean postgres;
+
     /** Borrow from {@code src} per operation; the schema is created if absent. */
     public DbObjectStore(ConnectionSource src) {
         super(src, "objects", "Objects", TABLE, "object");
+        this.postgres = src.isPostgres();
         initSchema();
     }
 
@@ -187,6 +195,9 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         // closed_at = 0 means "not closed" — a reopened object must never satisfy a retention cutoff.
         if (q.closedBefore() > 0) { where.add("closed_at > 0 AND closed_at < ?"); params.add(q.closedBefore()); }
         if (q.openOnly()) where.add("closed_at = 0");
+        // COALESCE: a NULL created_at reads as 0 (mapRow's getLong), exactly what ObjectQuery#matches compares.
+        if (q.createdFrom() > 0) { where.add("COALESCE(created_at, 0) >= ?"); params.add(q.createdFrom()); }
+        if (q.prefilter() != null && !postgres) prefilter(where, params, q.prefilter());
         if (q.textContains() != null) {
             where.add("(LOWER(title) LIKE ? OR LOWER(description) LIKE ?)");
             String like = "%" + q.textContains().toLowerCase(Locale.ROOT) + "%";
@@ -294,6 +305,62 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
             throw new IllegalStateException("object attribute scan failed: " + e.getMessage(), e);
         }
         return out;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>One portable statement on DuckDB and PostgreSQL alike (no JSON operator, no dialect swap): a window
+     * {@code ROW_NUMBER()} over the walk's order gives each group its first-seen position, and the cycle-time
+     * inclusion rule is the same {@code CASE} the walk applied per object. {@code COALESCE(…, 0)} mirrors
+     * {@code ResultSet.getLong} reading a NULL as 0. On failure it logs and answers empty, so the caller walks instead.
+     */
+    @Override
+    public Optional<List<RollupGroup>> rollupGroups(ObjectType type) {
+        String cycle = "cl > 0 AND cl >= cr";
+        String sql = "SELECT status, priority, COUNT(*) AS n, MIN(rn) AS first_rn, "
+                + "CAST(SUM(CASE WHEN " + cycle + " THEN 1 ELSE 0 END) AS BIGINT) AS cycle_n, "
+                + "CAST(SUM(CASE WHEN " + cycle + " THEN cl - cr ELSE 0 END) AS BIGINT) AS cycle_sum "
+                + "FROM (SELECT status, priority, COALESCE(created_at, 0) AS cr, COALESCE(closed_at, 0) AS cl, "
+                + "ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) AS rn FROM " + TABLE + " WHERE object_type = ?) g "
+                + "GROUP BY status, priority ORDER BY first_rn";
+        List<RollupGroup> out = new ArrayList<>();
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, type.name());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next())
+                            out.add(new RollupGroup(rs.getString("status"), rs.getString("priority"), rs.getLong("n"),
+                                    rs.getLong("first_rn"), rs.getLong("cycle_n"), rs.getLong("cycle_sum")));
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("object rollup failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+        return Optional.of(out);
+    }
+
+    /** {@inheritDoc} A {@code NULL} {@code created_at} reads as 0, as {@link #mapRow} reads it. */
+    @Override
+    public boolean scanAttributes(ObjectType type, java.util.function.ObjLongConsumer<String> sink) {
+        String sql = "SELECT created_at, attributes FROM " + TABLE + " WHERE object_type = ? ORDER BY created_at ASC, id ASC";
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, type.name());
+                    ps.setFetchSize(ObjectQuery.MAX_LIMIT);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) sink.accept(rs.getString(2), rs.getLong(1));
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("object attribute scan failed: {}", e.getMessage());
+        }
+        return true;
     }
 
     /** Replace {@code o}'s side-table rows (idempotent): a placeholder row plus one per entity-bearing attribute. */
@@ -435,6 +502,48 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                 rs.getLong("updated_at"),
                 rs.getLong("closed_at"),
                 rs.getLong("version"));
+    }
+
+    /**
+     * The {@link ObjectQuery.Prefilter} as DuckDB SQL: each field a {@code LOWER(col) LIKE '%text%'} containment, so a
+     * padded value still passes (the caller's exact test trims). DuckDB's {@code lower} and Java's
+     * {@code toLowerCase(Locale.ROOT)} agree on printable ASCII only, so a value holding ANY other character
+     * ({@code [^ -~]}: non-ASCII, a tab) always passes and is left to the caller's exact test. The category text is
+     * matched in the encoded attribute bag, JSON-escaped the way {@link JsonAttributes} escapes it (per character, so
+     * a substring of the value stays a substring of its encoding).
+     */
+    private static void prefilter(List<String> where, List<Object> params, ObjectQuery.Prefilter p) {
+        if (p.statusAnyOf() != null) {
+            List<String> any = new ArrayList<>();
+            for (String s : p.statusAnyOf()) { any.add("LOWER(status) LIKE ? ESCAPE '\\'"); params.add(likeContains(s)); }
+            where.add("(" + String.join(" OR ", any) + " OR " + notPlainAscii("status") + ")");
+        }
+        containsOrNotAscii(where, params, "priority", p.priority());
+        containsOrNotAscii(where, params, "severity", p.severity());
+        if (p.category() != null) {
+            String enc = JsonAttributes.toJson(Map.of("k", p.category().toLowerCase(Locale.ROOT)));
+            String fragment = enc.substring("{\"k\":\"".length(), enc.length() - "\"}".length()).toLowerCase(Locale.ROOT);
+            where.add("(LOWER(attributes) LIKE ? ESCAPE '\\' OR " + notPlainAscii("attributes") + ")");
+            params.add("%" + escapeLike(fragment) + "%");
+        }
+    }
+
+    private static void containsOrNotAscii(List<String> where, List<Object> params, String col, String text) {
+        if (text == null) return;
+        where.add("(LOWER(" + col + ") LIKE ? ESCAPE '\\' OR " + notPlainAscii(col) + ")");
+        params.add(likeContains(text));
+    }
+
+    private static String notPlainAscii(String col) {
+        return "regexp_matches(" + col + ", '[^ -~]')";
+    }
+
+    private static String likeContains(String text) {
+        return "%" + escapeLike(text.toLowerCase(Locale.ROOT)) + "%";
+    }
+
+    private static String escapeLike(String s) {
+        return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static void ciEquals(List<String> where, List<Object> params, String col, String val) {

@@ -77,6 +77,35 @@ public interface ObjectStore extends AutoCloseable {
     }
 
     /**
+     * One {@code (status, priority)} group of a type's objects, aggregated by the store for
+     * {@link ObjectService#analytics} (ANALYTICS-CORE-1 S8). The values are the RAW stored ones — upper-casing,
+     * the blank-to-NONE rule and the workflow's terminal test stay with the caller, so they keep Java's semantics.
+     * {@code firstSeen} is the position of the group's first object in the oldest-first walk ({@code createdAt},
+     * then {@code id}), so the caller rebuilds the walk's first-seen key order exactly; {@code cycleCount} /
+     * {@code cycleSumMs} cover the group's objects with {@code closedAt > 0 && closedAt >= createdAt}.
+     */
+    record RollupGroup(String status, String priority, long count, long firstSeen, long cycleCount, long cycleSumMs) {}
+
+    /**
+     * The {@link RollupGroup}s of every object of {@code type}, ordered by {@code firstSeen} — or empty when this
+     * store cannot aggregate itself (the in-memory store: {@link ObjectService#analytics} then walks the objects).
+     * A store that answers here must also answer {@link #scanAttributes}.
+     */
+    default java.util.Optional<List<RollupGroup>> rollupGroups(com.gamma.workflow.ObjectType type) {
+        return java.util.Optional.empty();
+    }
+
+    /**
+     * Feed {@code sink} the {@code createdAt} and encoded attribute bag (the compact JSON
+     * {@link com.gamma.util.JsonAttributes} writes) of every object of {@code type}, oldest first ({@code createdAt},
+     * then {@code id}) — a narrow two-column scan instead of paging whole objects. The sink must not call back into
+     * a store. {@code false} when this store does not offer the scan.
+     */
+    default boolean scanAttributes(com.gamma.workflow.ObjectType type, java.util.function.ObjLongConsumer<String> sink) {
+        return false;
+    }
+
+    /**
      * Persist a mutated object (status/assignee/timestamps) <b>optimistically</b>: it is written only if the
      * stored row is still at {@code obj.version()} (the version the caller read), and the stored version is
      * bumped by one. Returns the stored object, at its new version. The check and the write are one atomic step

@@ -197,6 +197,29 @@ public record TagRule(String name, String tag, Filter filter, long createdAt, Ma
         }
 
         /** Fold the legacy incident lifecycle names onto the mail lifecycle for comparison. */
+        /**
+         * The store-side narrowing for walking INCIDENTs against this filter (ANALYTICS-CORE-1 S8): every Incident
+         * {@link #matches} accepts passes it. The status becomes every raw value that folds to the filter's folded
+         * state ({@code open} → IDENTIFIED or OPEN); priority, severity and category carry their trimmed text. The
+         * {@code type} and {@code q} criteria are left to {@link #matches}: the type is a constant per walk, and
+         * {@code q} searches {@code title + " " + description}, which can match across the join.
+         */
+        public com.gamma.ops.ObjectQuery.Prefilter incidentPrefilter() {
+            List<String> statuses = null;
+            if (notBlank(status)) {
+                String target = foldIncident(status.trim().toUpperCase(Locale.ROOT));
+                statuses = new ArrayList<>(List.of(target));
+                for (String alias : List.of("OPEN", "ASSIGNED", "IN_PROGRESS", "CLOSED"))
+                    if (!alias.equals(target) && foldIncident(alias).equals(target)) statuses.add(alias);
+            }
+            return new com.gamma.ops.ObjectQuery.Prefilter(statuses, trimmedOrNull(priority), trimmedOrNull(severity),
+                    trimmedOrNull(category));
+        }
+
+        private static String trimmedOrNull(String s) {
+            return notBlank(s) ? s.trim() : null;
+        }
+
         private static String foldIncident(String upper) {
             return switch (upper) {
                 case "OPEN" -> "IDENTIFIED";
