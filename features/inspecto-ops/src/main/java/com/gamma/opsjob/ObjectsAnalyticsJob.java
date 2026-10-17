@@ -7,6 +7,7 @@ import com.gamma.job.JobResult;
 import com.gamma.job.JobService;
 
 import com.gamma.ops.ObjectService;
+import com.gamma.util.SqlIdent;
 import com.gamma.workflow.ObjectType;
 import com.gamma.signal.Severity;
 
@@ -298,9 +299,7 @@ public final class ObjectsAnalyticsJob implements Job {
                 if (!rows.isEmpty()) ps.executeBatch();
             }
             try (Statement st = conn.createStatement()) {
-                st.execute("COPY impact_ledger TO '"
-                        + parquet.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                        + "' (FORMAT PARQUET)");
+                st.execute("COPY impact_ledger TO " + SqlIdent.pathStr(parquet) + " (FORMAT PARQUET)");
             }
         }
     }
@@ -330,9 +329,7 @@ public final class ObjectsAnalyticsJob implements Job {
                 ps.executeBatch();
             }
             try (Statement st = conn.createStatement()) {
-                st.execute("COPY analytics_sample TO '"
-                        + parquet.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                        + "' (FORMAT PARQUET)");
+                st.execute("COPY analytics_sample TO " + SqlIdent.pathStr(parquet) + " (FORMAT PARQUET)");
             }
         }
     }
