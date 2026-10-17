@@ -19,9 +19,18 @@ import com.gamma.query.MeasureCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
+import org.duckdb.DuckDBAppender;
+import org.duckdb.DuckDBConnection;
+
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +46,11 @@ import java.util.TreeMap;
  *
  * <p><b>One grammar, not two.</b> A Measure here is the BI Measure shorthand — {@code count} | {@code agg(field)},
  * agg ∈ count/countDistinct/sum/avg/min/max — validated by {@link DatasetMeasureProbe#validMeasure} and split by
- * {@link MeasureCompiler#splitShorthand}, the grammar's one home. Only the EVALUATION differs: the relation is a
- * list of rows evaluated in-JVM from the sealed log (D-E3), never a Dataset a SQL sandbox could address, so each
- * aggregate is applied to the rows with SQL's null rules (nulls ignored; an aggregate over no values is NULL, i.e.
- * empty). {@code sum}/{@code avg}/{@code min}/{@code max} take a numeric column only ({@link #NUMERIC}).
+ * {@link MeasureCompiler#splitShorthand}, the grammar's one home — and EVALUATED there too (ANALYTICS-CORE-1 M9):
+ * the relation is a list of rows derived in-JVM from the sealed log (D-E3), never a Dataset a SQL sandbox could
+ * address, so {@link #evaluate} loads the measured column into a sealed in-memory DuckDB table and runs
+ * {@link MeasureCompiler#compile}'s SELECT over it (SQL's own null rules: nulls ignored; an aggregate over no values
+ * is NULL, i.e. empty). {@code sum}/{@code avg}/{@code min}/{@code max} take a numeric column only ({@link #NUMERIC}).
  *
  * <p><b>The alert gate.</b> A sweep has no caller, so the owner-only / PDP gate cannot be re-run when the rule is
  * evaluated. {@link #value} therefore answers only for a rule that {@code InvestigationMeasureRoutes} BOUND — it
@@ -52,10 +62,10 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
     private static final Logger log = LoggerFactory.getLogger(WorkingSetMeasures.class);
 
     /**
-     * The aggregates this in-JVM evaluator applies — a SUBSET of {@link MeasureCompiler}'s grammar. The statistical
-     * aggregates (median, spread, percentiles; D-AN5) pass {@link DatasetMeasureProbe#validMeasure} but are refused
-     * here rather than re-implemented in Java: a second median or percentile definition is exactly the duplication
-     * the analytics core plan removes, and an unhandled name must never fall through to {@code max}.
+     * The aggregates the Working Set answers — a SUBSET of {@link MeasureCompiler}'s grammar. The statistical
+     * aggregates (median, spread, percentiles; D-AN5) pass {@link DatasetMeasureProbe#validMeasure} but stay refused
+     * here: the Working Set's declared set and its Alert Rules never offered them, and widening the surface is a
+     * product decision, not part of moving the evaluation into {@link MeasureCompiler}.
      */
     static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max");
 
@@ -89,28 +99,59 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
             throw new IllegalArgumentException("measure '" + measure + "': the Working Set evaluates only "
                     + AGGS + " — the statistical aggregates run in SQL over a Dataset");
         Object f = m.get("field");
-        if (f == null) return OptionalDouble.of(rows.size());   // bare count
+        if (f == null) return OptionalDouble.of(rows.size());   // bare count: COUNT(*) of a list is its size, no SQL needed
         String field = String.valueOf(f);
         if (!columns.contains(field))
             throw new IllegalArgumentException("'" + field + "' is not a column of the " + relation + " relation "
                     + columns);
-        List<Object> values = new ArrayList<>();
-        for (Map<String, Object> r : rows) if (r.get(field) != null) values.add(r.get(field));
-        switch (agg) {
-            case "count" -> { return OptionalDouble.of(values.size()); }
-            case "countDistinct" -> { return OptionalDouble.of(new HashSet<>(values).size()); }
-            default -> {
-                if (!NUMERIC.contains(field))
-                    throw new IllegalArgumentException(agg + "(" + field + ") needs a numeric column " + NUMERIC);
-                var stats = values.stream().mapToDouble(v -> ((Number) v).doubleValue()).summaryStatistics();
-                if (stats.getCount() == 0) return OptionalDouble.empty();   // SQL: an aggregate over nothing is NULL
-                return OptionalDouble.of(switch (agg) {
-                    case "sum" -> stats.getSum();
-                    case "avg" -> stats.getAverage();
-                    case "min" -> stats.getMin();
-                    default -> stats.getMax();
-                });
+        if (!"count".equals(agg) && !"countDistinct".equals(agg) && !NUMERIC.contains(field))
+            throw new IllegalArgumentException(agg + "(" + field + ") needs a numeric column " + NUMERIC);
+        return evaluate(rows, agg, field);
+    }
+
+    /** The one-column relation {@link #evaluate} loads the rows into. */
+    private static final String TABLE = "working_set";
+
+    /**
+     * Evaluates one validated Measure through {@link MeasureCompiler} (ANALYTICS-CORE-1 M9: the grammar has ONE
+     * evaluator) over a sealed in-memory DuckDB table holding only the measured column of these rows — a numeric
+     * column as {@code DOUBLE} (as the retired in-JVM loop summed them), any other as its text. {@code count(field)}
+     * is {@code COUNT(*)} over the rows whose field is not null, i.e. SQL's {@code COUNT(field)}. Nothing here
+     * reaches a file: the connection is sealed and its only relation is the rows the caller already holds.
+     */
+    private static OptionalDouble evaluate(List<Map<String, Object>> rows, String agg, String field) {
+        boolean numeric = NUMERIC.contains(field);
+        List<MeasureCompiler.Filter> filters = "count".equals(agg)
+                ? List.of(new MeasureCompiler.Filter(field, "notNull", null)) : List.of();
+        MeasureCompiler.Spec spec = new MeasureCompiler.Spec(TABLE, List.of(new MeasureCompiler.Measure(agg, field)),
+                List.of(), Map.of(), filters, List.of(), 1);
+        try (Connection conn = DuckDbUtil.openInMemory(null)) {
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE TABLE " + SqlIdent.q(TABLE) + " (" + SqlIdent.q(field)
+                        + (numeric ? " DOUBLE)" : " VARCHAR)"));
             }
+            try (DuckDBAppender app = conn.unwrap(DuckDBConnection.class).createAppender("", TABLE)) {
+                for (Map<String, Object> r : rows) {
+                    app.beginRow();
+                    Object v = r.get(field);
+                    if (v == null) app.appendNull();
+                    else if (numeric) app.append(((Number) v).doubleValue());
+                    else app.append(String.valueOf(v));
+                    app.endRow();
+                }
+            }
+            MeasureCompiler.Compiled c = MeasureCompiler.compile(spec);
+            try (PreparedStatement ps = conn.prepareStatement(c.sql())) {
+                for (int i = 0; i < c.params().size(); i++) ps.setObject(i + 1, c.params().get(i));
+                try (ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    double d = rs.getDouble(1);
+                    return rs.wasNull() ? OptionalDouble.empty() : OptionalDouble.of(d);   // SQL: an aggregate over nothing is NULL
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("working-set measure " + agg + "(" + field + ") could not be evaluated: "
+                    + e.getMessage(), e);
         }
     }
 

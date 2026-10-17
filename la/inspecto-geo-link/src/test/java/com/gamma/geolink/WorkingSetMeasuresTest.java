@@ -51,6 +51,55 @@ class WorkingSetMeasuresTest {
                 "an aggregate over no values is NULL — empty, never a made-up zero an alert could compare");
     }
 
+    private static Map<String, Object> entity(String id, Object hop, Object identity, Boolean hidden) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("entityId", id);
+        m.put("type", "msisdn");
+        m.put("hop", hop);
+        m.put("identity", identity);
+        m.put("hidden", hidden);
+        return m;
+    }
+
+    /** ANALYTICS-CORE-1 M9 pin: the values the in-JVM evaluator gave, held while the grammar moves to MeasureCompiler. */
+    @Test
+    void distinctNullAndEmptyCasesKeepTheirValues() {
+        List<Map<String, Object>> es = List.of(entity("a", 0, "x", false), entity("b", 1, "x", true),
+                entity("c", 1, null, null), entity("d", 2, "y", false));
+        assertEquals(OptionalDouble.of(2), WorkingSetMeasures.compute(es, "entities", "countDistinct(identity)"));
+        assertEquals(OptionalDouble.of(3), WorkingSetMeasures.compute(es, "entities", "countDistinct(hop)"));
+        assertEquals(OptionalDouble.of(2), WorkingSetMeasures.compute(es, "entities", "countDistinct(hidden)"));
+        assertEquals(OptionalDouble.of(3), WorkingSetMeasures.compute(es, "entities", "count(hidden)"));
+        assertEquals(OptionalDouble.of(4), WorkingSetMeasures.compute(es, "entities", "sum(hop)"));
+        assertEquals(OptionalDouble.of(1), WorkingSetMeasures.compute(es, "entities", "avg(hop)"));
+        assertEquals(OptionalDouble.of(0), WorkingSetMeasures.compute(es, "entities", "min(hop)"));
+        assertEquals(OptionalDouble.of(2), WorkingSetMeasures.compute(es, "entities", "max(hop)"));
+        assertEquals(OptionalDouble.of(0), WorkingSetMeasures.compute(es, "entities", "count(contacts)"),
+                "a column no row carries counts 0");
+        assertEquals(OptionalDouble.of(0), WorkingSetMeasures.compute(es, "entities", "countDistinct(contacts)"));
+        assertTrue(WorkingSetMeasures.compute(es, "entities", "sum(contacts)").isEmpty(), "all-null sum is NULL");
+        assertEquals(OptionalDouble.of(0), WorkingSetMeasures.compute(List.of(), "links", "count(kind)"));
+        assertEquals(OptionalDouble.of(0), WorkingSetMeasures.compute(List.of(), "links", "countDistinct(kind)"));
+        assertEquals(0.1 + 0.2 + 0.3, WorkingSetMeasures.compute(List.of(Map.of("count", 0.1), Map.of("count", 0.2),
+                Map.of("count", 0.3)), "links", "sum(count)").orElseThrow(), 1e-12);
+    }
+
+    @Test
+    void theDeclaredSetKeepsItsShape() {
+        List<Map<String, Object>> es = List.of(entity("a", 0, "x", false), entity("b", 1, "x", true),
+                entity("c", 2, null, null));
+        Map<String, Object> out = WorkingSetMeasures.declared(new WorkingSetRoutes.Relation("k", 3, "h",
+                Map.of("entities", es, "links", LINKS, "excluded", List.of())));
+        assertEquals("{measures=[{name=entities, relation=entities, measure=count, value=3.0}, "
+                + "{name=links, relation=links, measure=count, value=3.0}, "
+                + "{name=events, relation=links, measure=sum(count), value=7.0}, "
+                + "{name=excluded, relation=excluded, measure=count, value=0.0}, "
+                + "{name=maxHop, relation=entities, measure=max(hop), value=2.0}, "
+                + "{name=identities, relation=entities, measure=countDistinct(identity), value=1.0}], "
+                + "byKind=[{kind=null, links=1, events=4}, {kind=call, links=1, events=1}, {kind=sms, links=1, events=2}]}",
+                out.toString());
+    }
+
     @Test
     void aMeasureOutsideTheGrammarOrTheRelationIsRefused() {
         List<Map<String, Object>> none = new ArrayList<>();

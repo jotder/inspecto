@@ -27,7 +27,8 @@ export const ALLOWED = {
     'inspecto-audit-spi': ['inspecto-api', 'inspecto-util'],
     'inspecto-auth-spi': ['inspecto-api', 'inspecto-util', 'inspecto-config'],
     'inspecto-http-spi': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
-    'inspecto-entity-store': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi'],
+    // ANALYTICS-CORE-1 M8: EntityRegistry's identity fold uses inspecto-graph's UnionFind (graph reaches nothing).
+    'inspecto-entity-store': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-graph'],
     // D-1 step 5b: the host-free halves of Link Analysis. inspecto-sql is host-free too (SqlGuard / SqlSandboxPolicy: it reaches only
     // api, config and util). inspecto-http-spi arrives through inspecto-entity-store, so la-core reaches it transitively whether or not it names it.
     // ANALYTICS-CORE-1 M2: la-core reaches the Analytics Kernel (foundation-only), so every LA module that reaches la-core does too.

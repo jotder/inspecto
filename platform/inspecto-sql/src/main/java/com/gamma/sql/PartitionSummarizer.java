@@ -1,4 +1,6 @@
-package com.gamma.util;
+package com.gamma.sql;
+
+import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
 import java.nio.file.*;

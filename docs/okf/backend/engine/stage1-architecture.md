@@ -244,8 +244,8 @@ com.gamma
     IntegratedProcessor      — extract + move for CBS CDR adjustment archives
     SchemaExtractor          — DuckDB-powered type inference; generates _schema.toon + _pipeline.toon
     MainApp                  — CLI dispatcher for all pre-ETL utility commands
-    ParquetSummarizer        — count rows and bytes across a database/ Parquet tree
-    PartitionSummarizer      — partition-level statistics for one or more tables
+    ParquetSummarizer        — count rows and bytes across a database/ Parquet tree  (moved to com.gamma.sql, inspecto-sql, 2026-10-17)
+    PartitionSummarizer      — partition-level statistics for one or more tables     (moved to com.gamma.sql, inspecto-sql, 2026-10-17)
     FileMoverByDate          — date-partition files from a flat directory into year/month/day tree
 ```
 

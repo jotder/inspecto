@@ -1,18 +1,9 @@
 {
-  "a": {
-    "inspecto-anomaly": 1,
-    "inspecto-engine": 2
-  },
-  "b": {
-    "inspecto-util": 1
-  },
+  "a": {},
+  "b": {},
   "c": {
-    "inspecto-engine": 1,
-    "inspecto-entity-store": 1,
     "inspecto-intelligence": 1,
     "inspecto-screening": 1
   },
-  "d": {
-    "inspecto-geo-link": 1
-  }
+  "d": {}
 }
