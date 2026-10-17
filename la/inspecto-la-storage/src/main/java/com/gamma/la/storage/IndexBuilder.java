@@ -2,7 +2,9 @@ package com.gamma.la.storage;
 
 import com.gamma.la.storage.IndexManifest.TableStats;
 
+import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -439,7 +441,7 @@ public final class IndexBuilder {
                 t = System.nanoTime();
                 progress(d[0], step++);
                 exec("COPY (SELECT " + BucketFunction.sql(d[1], n) + " AS bucket, " + edgeCols + " FROM " + EDGES
-                        + " ORDER BY bucket, " + d[1] + ", ts) TO '" + sqlPath(root.resolve(d[0])) + "' " + COPY_OPTIONS);
+                        + " ORDER BY bucket, " + d[1] + ", ts) TO " + SqlIdent.pathStr(root.resolve(d[0])) + " " + COPY_OPTIONS);
                 timings.put(d[0], ms(t));
             }
             t = System.nanoTime();
@@ -448,7 +450,7 @@ public final class IndexBuilder {
                     + " coalesce(o.ol, 0) AS out_links, coalesce(i.il, 0) AS in_links, least(o.f, i.f) AS first_ts, greatest(o.l, i.l) AS last_ts FROM"
                     + " (SELECT src AS id, count(*) AS oe, count(DISTINCT struct_pack(n := dst, k := kind)) AS ol, min(ts) AS f, max(ts) AS l FROM " + EDGES + " GROUP BY src) o"
                     + " FULL JOIN (SELECT dst AS id, count(*) AS ie, count(DISTINCT struct_pack(n := src, k := kind)) AS il, min(ts) AS f, max(ts) AS l FROM " + EDGES + " GROUP BY dst) i USING (id)"
-                    + " ORDER BY bucket, id) TO '" + sqlPath(root.resolve("nodes")) + "' " + COPY_OPTIONS);
+                    + " ORDER BY bucket, id) TO " + SqlIdent.pathStr(root.resolve("nodes")) + " " + COPY_OPTIONS);
             timings.put("nodes", ms(t));
         }
 
@@ -517,8 +519,8 @@ public final class IndexBuilder {
             IndexMapping m = req.mapping();
             EndpointKey st = req.srcType(), dt = req.dstType();
             exec("CREATE TEMP TABLE __la_links AS SELECT DISTINCT a, b, kind FROM (SELECT " + (st == null ? "src" : st.keySql().apply("src"))
-                    + " AS a, " + (dt == null ? "dst" : dt.keySql().apply("dst")) + " AS b, kind FROM read_parquet('" + sqlPath(stage.resolve("out"))
-                    + "/*/*.parquet', hive_partitioning = false)) l WHERE a <> '' AND b <> '' AND a <> b");
+                    + " AS a, " + (dt == null ? "dst" : dt.keySql().apply("dst")) + " AS b, kind FROM "
+                    + SqlViews.parquet(SqlIdent.pathStr(stage.resolve("out"), "/*/*.parquet"), false, SqlViews.Hive.OFF) + ") l WHERE a <> '' AND b <> '' AND a <> b");
             exec("CREATE TEMP TABLE __la_degree AS SELECT x, count(DISTINCT o) AS d FROM (SELECT a AS x, b AS o FROM __la_links"
                     + " UNION ALL SELECT b AS x, a AS o FROM __la_links) e GROUP BY x");
             Map<String, Long> kinds = new LinkedHashMap<>();
@@ -531,8 +533,8 @@ public final class IndexBuilder {
             Map<Long, Long> histogram = new LinkedHashMap<>();
             for (Object[] r : rows("SELECT d, count(*) FROM __la_degree GROUP BY d ORDER BY d"))
                 histogram.put(((Number) r[0]).longValue(), ((Number) r[1]).longValue());
-            Object[] span = rows("SELECT CAST(min(first_ts) AS VARCHAR), CAST(max(last_ts) AS VARCHAR) FROM read_parquet('"
-                    + sqlPath(stage.resolve("nodes")) + "/*/*.parquet', hive_partitioning = false)").get(0);
+            Object[] span = rows("SELECT CAST(min(first_ts) AS VARCHAR), CAST(max(last_ts) AS VARCHAR) FROM "
+                    + SqlViews.parquet(SqlIdent.pathStr(stage.resolve("nodes"), "/*/*.parquet"), false, SqlViews.Hive.OFF)).get(0);
             exec("DROP TABLE __la_degree");
             exec("DROP TABLE __la_links");
             Map<String, Long> types = new LinkedHashMap<>();
@@ -658,8 +660,8 @@ public final class IndexBuilder {
 
             long t = System.nanoTime();
             progress("estimate", 1);
-            exec("CREATE TEMP VIEW " + EDGES + " AS SELECT src, dst, kind, ts, w" + attrAliases(m) + " FROM read_parquet('"
-                    + sqlPath(parentDir) + "/out/*/*.parquet', hive_partitioning = true)");
+            exec("CREATE TEMP VIEW " + EDGES + " AS SELECT src, dst, kind, ts, w" + attrAliases(m) + " FROM "
+                    + SqlViews.parquet(SqlIdent.pathStr(parentDir, "/out/*/*.parquet"), false, SqlViews.Hive.TYPED));
             long kept = ((Number) rows("SELECT count(*) FROM " + EDGES).get(0)[0]).longValue();
             if (kept != parent.tables().get("out").rows())
                 throw new IndexBuildException("the live version's out table holds " + kept + " rows, its manifest says " + parent.tables().get("out").rows());
@@ -872,22 +874,16 @@ public final class IndexBuilder {
         if (nodes <= 0) throw new IndexBuildException("verification failed: the node table is empty");
         if (token != null && token.isCancelled()) throw new CancelledException();
         List<Path> files = parquetFiles(root.resolve("nodes"), Integer.MAX_VALUE);
-        try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT sum(out_edges), sum(in_edges) FROM read_parquet(" + fileList(files) + ")")) {
+        try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT sum(out_edges), sum(in_edges) FROM " + SqlViews.parquet(fileList(files), false, SqlViews.Hive.AUTO))) {
             rs.next();
             if (rs.getLong(1) != out || rs.getLong(2) != in)
                 throw new IndexBuildException("verification failed: node degrees sum to " + rs.getLong(1) + " out / " + rs.getLong(2) + " in, edge rows are " + out + " / " + in);
         }
     }
 
+    /** A non-empty file list as a SQL list literal (absolute, forward-slashed paths). */
     private static String fileList(List<Path> files) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < files.size(); i++) sb.append(i == 0 ? "'" : ", '").append(sqlPath(files.get(i))).append('\'');
-        return sb.append(']').toString();
-    }
-
-    /** Forward slashes (valid on Windows too) and single quotes doubled, for use inside a SQL string literal. */
-    private static String sqlPath(Path p) {
-        return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
+        return SqlViews.pathList(files.stream().map(f -> f.toAbsolutePath().toString()).toList());
     }
 
     /** A copy of the tree {@code from} at {@code to} made of hard links (the files are immutable), falling back to a byte copy where links are not available. */

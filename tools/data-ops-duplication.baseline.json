@@ -8,7 +8,6 @@
     "inspecto-exchange": 1,
     "inspecto-la-api": 4,
     "inspecto-la-core": 1,
-    "inspecto-la-storage": 1,
     "inspecto-reconciliation": 2,
     "inspecto-scoring": 1
   },
@@ -16,7 +15,6 @@
     "inspecto-engine": 8,
     "inspecto-etl": 2,
     "inspecto-exchange": 2,
-    "inspecto-la-storage": 5,
     "inspecto-util": 1
   },
   "c": {
