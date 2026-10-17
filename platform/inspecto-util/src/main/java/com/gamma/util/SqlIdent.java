@@ -30,6 +30,18 @@ public final class SqlIdent {
         return "\"" + ident.replace("\"", "\"\"") + "\"";
     }
 
+    private static final java.util.regex.Pattern PLAIN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+    /**
+     * {@link #q} only when needed: a plain identifier ({@code [A-Za-z_][A-Za-z0-9_]*}) is returned as written, anything
+     * else (spaces, punctuation from a parsed header) is double-quoted. The rendering an author SEES in a Record
+     * Transform expression — the Java side of the UI twin {@code sql-functions.ts quoteIdentifier}, held to it by
+     * {@code RecordTransformContractTest}; generated SQL nobody reads uses {@link #q}.
+     */
+    public static String qIfNeeded(String ident) {
+        return PLAIN.matcher(ident).matches() ? ident : q(ident);
+    }
+
     /** A single-quoted SQL string literal, with embedded single quotes doubled. */
     public static String sqlStr(String s) {
         return "'" + s.replace("'", "''") + "'";

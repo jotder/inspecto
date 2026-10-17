@@ -83,6 +83,17 @@ class SqlIdentTest {
                 SqlIdent.pathStr(dir, "/*/*.parquet"));
     }
 
+    /** The Record Transform rendering (twin of sql-functions.ts): plain names stay bare, everything else is {@link SqlIdent#q}. */
+    @Test
+    void qIfNeededLeavesOnlyPlainIdentifiersBare() {
+        assertEquals("amount_1", SqlIdent.qIfNeeded("amount_1"));
+        assertEquals("_x", SqlIdent.qIfNeeded("_x"));
+        assertEquals("\"Order Date\"", SqlIdent.qIfNeeded("Order Date"));
+        assertEquals("\"1st\"", SqlIdent.qIfNeeded("1st"));
+        assertEquals("\"a\"\"b\"", SqlIdent.qIfNeeded("a\"b"));
+        assertEquals("\"\"", SqlIdent.qIfNeeded(""));
+    }
+
     /** With a parameter list the value is BOUND (never inlined); without one it is the escaped literal. */
     @Test
     void stringOperandBindsWhenParametersAreCollected() {
