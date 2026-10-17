@@ -1,8 +1,6 @@
 {
   "a": {},
-  "b": {
-    "inspecto-util": 1
-  },
+  "b": {},
   "c": {
     "inspecto-engine": 1,
     "inspecto-entity-store": 1,

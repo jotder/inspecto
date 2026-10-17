@@ -1,4 +1,6 @@
-package com.gamma.util;
+package com.gamma.sql;
+
+import com.gamma.util.DuckDbUtil;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

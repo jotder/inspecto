@@ -1,4 +1,7 @@
-package com.gamma.util;
+package com.gamma.sql;
+
+import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 
 import java.io.File;
 import java.sql.Connection;
@@ -62,7 +65,7 @@ final class SummarizeSupport {
 
     /**
      * The shared DuckDB summarize kernel: open a temp-file DuckDB (prefix {@code tempPrefix}), expose
-     * {@code inputGlob} as the {@code input} view via {@code read_parquet(..., union_by_name=true)}
+     * {@code inputGlob} as the {@code input} view via {@link SqlViews#parquet} with {@code union_by_name}
      * (so multi-file reads with varying precision widen rather than fail), materialise {@code sql} into
      * a {@code summarized} table (the two-step CTAS avoids a DuckDB AVX2 crash), {@code COPY} it to
      * {@code outputPath} in {@code outputFormat}, and return the summarized row count. The temp DB is
@@ -74,10 +77,8 @@ final class SummarizeSupport {
         DuckDbUtil.loadDriver();
         try (Connection conn = DriverManager.getConnection(DuckDbUtil.jdbcUrl(tempDb));
              Statement stmt = conn.createStatement()) {
-            // Single quotes inside the glob path are escaped by doubling them.
-            stmt.execute(String.format(
-                    "CREATE VIEW input AS SELECT * FROM read_parquet('%s', union_by_name=true)",
-                    inputGlob.replace("'", "''")));
+            stmt.execute("CREATE VIEW input AS SELECT * FROM "
+                    + SqlViews.parquet(SqlIdent.sqlStr(inputGlob), true, SqlViews.Hive.AUTO));
             stmt.execute("CREATE TABLE summarized AS\n" + sql);
             long rowCount;
             try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM summarized")) {
