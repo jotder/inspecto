@@ -1258,6 +1258,19 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
   of the same family on one thread takes a second permit; with a family cap of 1 it fails on the timeout rather
   than deadlocking. The old per-store `PooledConnectionSource` was deleted (2026-10-06); its offline
   pool tests moved to `SharedPoolConnectionSourceTest`.
+- ✅ **Two-node and soak proof 2026-10-18 (PostgreSQL 18, Docker, 127.0.0.1 only).**
+  `PostgresTwoNodeSoakTest` (inspecto-ops) covers the last two residuals that need no second host.
+  **Two nodes:** a child JVM with its own driver and pool, standing in for a second host, and the test JVM each run
+  60 read-modify-write increments on ONE Case in ONE Space at the same moment. Nothing in-process is shared, so
+  only the `WHERE version=?` guard keeps a write from being lost. Result: 120/120 increments landed, version 120.
+  **Soak:** 4 writers per Space across two Space schemas for `-Dinspecto.test.pg.soak.seconds` (default 10).
+  Result: no lost increment, one version bump per landed write, and peak server backends stay within the
+  per-process budget (20) of the pre-run baseline. Mutation check: with the version guard turned into
+  `(version=? OR TRUE)`, both tests fail (the soak landed 681 of 1213 increments). The child JVM reuses
+  `java.class.path`, so the test runs forked (surefire's default), never with `-DforkCount=0`.
+  ⚠ **Still not proven:** two physical hosts (network partitions, clock skew between nodes, a lease holder that
+  dies on another host) and an hours-long soak on a real deployment. Both need a deployment this repo cannot
+  provide.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
