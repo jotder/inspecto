@@ -582,6 +582,16 @@ class PipelineEditableTest {
                 node("r", "transform.timeseries.resample", r), node("s", "transform.timeseries.shift", s));
     }
 
+    /** The forecast Step (ANALYTICS-CORE-1 S5) lowers under its plain kind, after a resample. */
+    @Test
+    void forecastStepLowersToAStepUnderItsPlainKind() {
+        Map<String, Object> r = new LinkedHashMap<>(Map.of("time_column", "TS", "grain", "day", "measures", List.of("count")));
+        Map<String, Object> f = new LinkedHashMap<>(Map.of("time_column", "bucket", "grain", "day", "value_column", "count",
+                "period", 7, "horizon", 7));
+        assertChain(List.of("resample", "forecast"), node("r", "transform.timeseries.resample", r),
+                node("f", "transform.timeseries.forecast", f));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

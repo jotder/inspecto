@@ -35,6 +35,7 @@ Packages:
 * `com.gamma.analytics` — `Stats` (the definitions below), `MedianMode`, `QuantileMode`, `ColumnProfiler`
   (§ Column profiler).
 * `com.gamma.analytics.score` — the score output contract (M7, below).
+* `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -292,6 +293,98 @@ turns it red), `TimeSeriesSqlTest` (resample and shift executed on DuckDB), and 
 
 * `ScoreContractTest` — the score output contract's pure parts (names, scale and bands, cap, columns, run files,
   retention); the writer is pinned by the two kinds' golden tests above.
+
+## Forecasting
+
+*ANALYTICS-CORE-1 S5 (a) + (e), built 2026-10-17.* Package `com.gamma.analytics.forecast`. The `business-assurance`
+Space Template's Holt-Winters SQL, lifted into a core function: a JVM kernel (`Forecaster`) for bounded series, its
+DuckDB form (`ForecastSql`) for Datasets, and the Step `transform.timeseries.forecast`
+([step-catalog](pipeline-graph/step-catalog.md)). No training on the request path, no new dependency (W1–W3, W7):
+both methods are closed-form recursions with **declared** parameters — nothing is fitted or searched, so the same
+input gives the same numbers.
+
+### The methods
+
+Over ONE regular series `y(1) … y(n)` — one value per bucket, no gap, no empty value (bucket and fill it first with the
+M5 resample) — with period `m` (buckets per season, ≥ 2). Every series needs **at least 2m values**; the first season
+has no forecast.
+
+| Method | One-step forecast | From the last bucket |
+|---|---|---|
+| `SEASONAL_NAIVE` | ŷ(t) = y(t − m) | ŷ(n+h) = y(n − m + (h − 1) mod m + 1) |
+| `HOLT_WINTERS` (additive) | ŷ(t) = L(t−1) + B(t−1) + S(k), k = (t − 1) mod m + 1 | ŷ(n+h) = L(n) + h·B(n) + S((n + h − 1) mod m + 1) |
+
+Holt-Winters updates, for t = m+1 … n: `L(t) = α(y(t) − S(k)) + (1 − α)(L(t−1) + B(t−1))`,
+`B(t) = β(L(t) − L(t−1)) + (1 − β)B(t−1)`, `S(k) = γ(y(t) − L(t)) + (1 − γ)S(k)`. α, β, γ ∈ [0, 1], declared; the
+defaults 0.25 / 0.02 / 0.15 are the template's.
+
+**Initialisation rule** (the template's, kept so the two agree): `L(m)` = mean of the first season; `B(m)` = (mean of
+the second season − mean of the first) / m; `S(i) = y(i) − L(m)` for i = 1…m. The state is anchored at the end of the
+first season, so the first forecast is bucket m + 1.
+
+### The prediction interval (S5 (e))
+
+A normal approximation with a robust spread (`PredictionInterval`):
+
+| Piece | Definition |
+|---|---|
+| sigma | `Stats.scaledMad` (1.4826 × MAD) of the in-sample one-step errors e(t) = y(t) − ŷ(t), t > m — one planted spike does not widen every band, as a root-mean-square would |
+| z(level) | Φ⁻¹((1 + level) / 2) — Acklam's approximation, relative error < 1.2e-9 (1.96 at 0.95) |
+| v(h) | horizon growth: Holt-Winters `1 + Σ_{j<h} c_j²`, `c_j = α(1 + jβ) + γ(1 − α)·[j mod m = 0]` (the ETS(A,A,A) form of the recursion); seasonal naive `⌊(h − 1)/m⌋ + 1`; 1 for a history bucket |
+| band | ŷ ∓ z · sigma · √v(h) |
+
+⚠ The template's band is different by design (sigma = scaled MAD of the 7-day differences / √2, fixed z = 4); it is
+not compared. A perfectly regular history has sigma 0 and a band of no width.
+
+### The output shape
+
+`ForecastOutput` — long form, one row per series per bucket **per level**, so a reader filters `level` instead of
+knowing column names: `keys…, <time column>, horizon (0 = history, 1…H ahead), actual (empty ahead), forecast,
+level, lower, upper` (the last three empty on the first season). The JVM form is `Forecaster.Result.rows()`;
+`lowerAhead(level)` / `upperAhead(level)` give the horizon band as arrays, so the S5 (b) backtest's
+`(point, lower, upper)` forecast is a one-line adapter (`ahead()`, `lowerAhead(l)`, `upperAhead(l)`, with
+`Spec.withHorizon(h)`).
+
+**Why not the score output contract (M7).** That contract is entity-keyed — one row per entity per run, a 0–100 scale
+and bands, `model_version`, an entity cap and an atomic `_latest` swap written by the engine's `ScoreOutputWriter`. A
+forecast is indexed by time, has no 0–100 scale or band names, and as a Step its output flows through the Pipeline's
+own sink. So the shape is a **sibling** contract in the kernel that **reuses** the score contract's column vocabulary
+(`ScoreColumns.Column`: name, DuckDB type, Dataset role) and its default series cap (`EntityCap.DEFAULT`), and copies
+nothing else. A future scored Prediction kind can still write through `ScoreOutputWriter`.
+
+### The SQL form
+
+`ForecastSql.select` forecasts every series of a relation in one query: Holt-Winters is a recursive CTE that advances
+every series one bucket per step, carrying its seasonal terms as a list (the template's technique); seasonal naive is a
+`lag`. sigma is DuckDB `mad` × 1.4826. The z multipliers and v(h) are computed in Java and inlined as literals — one
+definition each. Ahead buckets are labelled `last + h × grain`, cast back to the time column's type (`DATE` or a
+zone-less `TIMESTAMP`; a `TIMESTAMPTZ` must be resampled with a zone first). `ForecastSql.checkSql` counts what makes a
+series unusable — off-grain or empty times, empty values, a missing or repeated bucket, the shortest and longest series
+— and the Step refuses on it before forecasting. Caps (the Step): period ≤ 1,000, horizon ≤ 1,000, 10,000 buckets per
+series (one recursion step per bucket), 200,000 series.
+
+### Golden result against the template
+
+`ForecastTemplateGoldenTest` runs the template view's SQL **as shipped** on its own synthetic corpus (182 days,
+weekly season, a −400 spike planted on day 151). The template adds three guards to plain Holt-Winters — a day outside
+its band updates the state with the forecast instead of the actual, three such days reset the level, a CUSUM bends the
+trend. Results, tolerance 0.005 (the template rounds to 2 decimals):
+
+* guards switched off (its `z` and CUSUM threshold set to 1e9 in the parameter row, nothing else changed): **equal on
+  all 175 forecast days**;
+* as shipped: **equal on every day up to and including day 151**, the first day the template flags; they differ from
+  day 152 because the template's state was fed its forecast instead of the spike.
+
+Decision: the kernel stays plain Holt-Winters (the definition every textbook and the S5 (b) backtest assume), and the
+template is unchanged. The template's outlier replacement, regime reset and drift are anomaly-handling on top of the
+forecast — candidates for change-point work (Could C6), not part of the forecast definition.
+
+### Tests
+
+`ForecasterTest` (hand figures for both methods, variance factors, z, rows, input rules), `ForecastSqlParityTest`
+(JVM = DuckDB within 1e-9 × max(1, |value|) on three keyed series including the NULL key, both methods, an unkeyed
+monthly TIMESTAMP series, and the check counts), `ForecastTemplateGoldenTest` (above); in the engine
+`RowShaperTimeSeriesTest` (resample → forecast against the JVM kernel, the refusals), `PipelineJobRunnerTest#runsAFlatConfigsResampleAndForecastStepsAndWritesTheForecastWithItsBand`.
 
 ## References
 

@@ -71,6 +71,18 @@ class ForecasterTest {
     }
 
     @Test
+    void theHorizonBandMatchesTheRowsSoABacktestAdapterIsOneLine() {
+        double[] y = {10, 20, 13, 24, 18, 27, 15, 30};
+        Forecaster.Result r = Forecaster.fit(y, hw(2, 0.4, 0.1, 0.3, 1, List.of(0.8)).withHorizon(4));
+        List<ForecastOutput.Row> future = r.rows().subList(y.length, y.length + 4);
+        for (int h = 0; h < 4; h++) {
+            assertEquals(future.get(h).lower(), r.lowerAhead(0.8)[h], EPS);
+            assertEquals(future.get(h).upper(), r.upperAhead(0.8)[h], EPS);
+            assertEquals(future.get(h).forecast(), r.ahead()[h], EPS);
+        }
+    }
+
+    @Test
     void theSameInputGivesTheSameNumbersBitForBit() {
         double[] y = new double[60];
         for (int i = 0; i < y.length; i++) y[i] = 100 + i + 10 * Math.sin(i) + (i % 7) * 3;

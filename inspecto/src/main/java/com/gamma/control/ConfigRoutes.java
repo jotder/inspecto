@@ -599,6 +599,12 @@ final class ConfigRoutes {
                         columns == null ? null : new ArrayList<>(columns), refusals, fields, predicates, active);
     }
 
+    /** A declared column's type, or {@code ""} when the schema does not carry it. */
+    private static String declaredType(List<TypeFlow.Column> columns, String name) {
+        return columns.stream().filter(c -> c.name().equalsIgnoreCase(name)).map(TypeFlow.Column::type).findFirst()
+                .orElse("");
+    }
+
     /** The first refusal the run would raise for one step's config, or {@code null}; {@code columns} null = unknown. */
     private static String stepRefusal(String kind, Map<?, ?> cfg, List<TypeFlow.Column> columns) {
         switch (kind) {
@@ -731,6 +737,24 @@ final class ConfigRoutes {
                 // VARCHAR fails OPEN, as for running: a mapping-derived column is typed VARCHAR here whatever it computes.
                 return type.isEmpty() || "VARCHAR".equalsIgnoreCase(type) ? null
                         : com.gamma.pipeline.exec.TimeSeriesStep.typeRefusal(what, time, zone, type);
+            }
+            case PipelineConfig.Step.FORECAST -> {
+                com.gamma.pipeline.exec.TimeSeriesStep.Forecast spec;
+                try {
+                    spec = com.gamma.pipeline.exec.TimeSeriesStep.parseForecast(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.TimeSeriesStep.columnRefusal("transform.timeseries.forecast",
+                        spec.inputColumns(), List.of(), columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null) return refusal;
+                String time = declaredType(columns, spec.timeColumn());
+                String value = declaredType(columns, spec.valueColumn());
+                // VARCHAR fails OPEN, as for resample: a mapping-derived column is typed VARCHAR here whatever it computes.
+                return com.gamma.pipeline.exec.TimeSeriesStep.forecastTypeRefusal(spec.timeColumn(),
+                        time.isEmpty() || "VARCHAR".equalsIgnoreCase(time) ? "DATE" : time, spec.valueColumn(),
+                        value.isEmpty() || "VARCHAR".equalsIgnoreCase(value) ? "DOUBLE" : value);
             }
             case PipelineConfig.Step.HASH -> {
                 // ⛔ A salt / key in config is refused by name: the key is the Space's, and an authored one would

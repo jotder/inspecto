@@ -356,10 +356,17 @@ public final class PipelineConfig {
          * {@code periods}, {@code suffix}. No legacy spelling - always {@code steps:}.
          */
         public static final String SHIFT = "shift";
+        /**
+         * Time-series forecast ({@code transform.timeseries.forecast}, ANALYTICS-CORE-1 S5). Keys: {@code time_column},
+         * {@code grain}, {@code value_column}, {@code period}, {@code horizon}, optional {@code group_by},
+         * {@code method}, {@code alpha}, {@code beta}, {@code gamma}, {@code levels}. No legacy spelling - always
+         * {@code steps:}.
+         */
+        public static final String FORECAST = "forecast";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE} and {@link #SHIFT} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT} and {@link #FORECAST} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

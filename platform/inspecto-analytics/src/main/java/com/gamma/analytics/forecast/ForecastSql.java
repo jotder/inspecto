@@ -86,7 +86,7 @@ public final class ForecastSql {
                 .append(")");
 
         if (f.method() == ForecastMethod.HOLT_WINTERS) {
-            String a = lit(f.alpha()), b = lit(f.beta()), g = lit(f.gamma()), mm = lit(m);
+            String a = doubleSql(f.alpha()), b = doubleSql(f.beta()), g = doubleSql(f.gamma()), mm = doubleSql(m);
             String k = "CAST((s.__fc_t - 1) % " + m + " AS BIGINT) + 1";
             sql.append(", __fc_init AS (SELECT ").append(prefix(keysCsv))
                     .append("avg(__fc_y) FILTER (WHERE __fc_t <= ").append(m).append(") AS l0, (avg(__fc_y) FILTER (WHERE __fc_t > ")
@@ -116,7 +116,7 @@ public final class ForecastSql {
                     .append("x.h, s.__fc_y AS f FROM __fc_end AS e CROSS JOIN __fc_v AS x JOIN __fc_s AS s ON s.__fc_t = e.__fc_n - ")
                     .append(m).append(" + (x.h - 1) % ").append(m).append(" + 1").append(match("s", "e", s.keys())).append(")");
         }
-        sql.append(", __fc_sig AS (SELECT ").append(prefix(list("s.", s.keys()))).append(lit(Stats.MAD_SCALE))
+        sql.append(", __fc_sig AS (SELECT ").append(prefix(list("s.", s.keys()))).append(doubleSql(Stats.MAD_SCALE))
                 .append(" * mad(s.__fc_y - x.f) AS sigma FROM __fc_s AS s JOIN __fc_fit AS x ON x.__fc_t = s.__fc_t")
                 .append(match("x", "s", s.keys())).append(" WHERE x.f IS NOT NULL").append(groupBy("s.", s.keys())).append(")");
 
@@ -139,13 +139,13 @@ public final class ForecastSql {
         StringBuilder consts = new StringBuilder(", __fc_l AS (SELECT * FROM (VALUES ");
         for (int i = 0; i < f.levels().size(); i++) {
             double level = f.levels().get(i);
-            consts.append(i == 0 ? "" : ", ").append("(").append(lit(level)).append(", ")
-                    .append(lit(PredictionInterval.z(level))).append(")");
+            consts.append(i == 0 ? "" : ", ").append("(").append(doubleSql(level)).append(", ")
+                    .append(doubleSql(PredictionInterval.z(level))).append(")");
         }
         consts.append(") AS t(level, z)), __fc_v AS (SELECT * FROM (VALUES ");
         double[] v = PredictionInterval.varianceFactors(f);
         for (int h = 1; h <= v.length; h++)
-            consts.append(h == 1 ? "" : ", ").append("(").append(h).append(", ").append(lit(v[h - 1])).append(")");
+            consts.append(h == 1 ? "" : ", ").append("(").append(h).append(", ").append(doubleSql(v[h - 1])).append(")");
         consts.append(") AS t(h, v))");
         int firstCte = sql.indexOf(", __fc_end AS");
         sql.insert(firstCte, consts);
@@ -155,7 +155,7 @@ public final class ForecastSql {
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────────────────
 
     /** A DOUBLE literal of a parsed value — the decimal text Java prints, cast so no DECIMAL arithmetic creeps in. */
-    static String lit(double d) {
+    static String doubleSql(double d) {
         if (!Double.isFinite(d)) throw new IllegalArgumentException("not a finite number: " + d);
         return "CAST(" + Double.toString(d) + " AS DOUBLE)";
     }

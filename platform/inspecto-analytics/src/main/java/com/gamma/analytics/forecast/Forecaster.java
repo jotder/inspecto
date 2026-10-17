@@ -67,6 +67,11 @@ public final class Forecaster {
             }
         }
 
+        /** This spec with another horizon (a backtest asks each origin for its own). */
+        public Spec withHorizon(int h) {
+            return new Spec(method, period, alpha, beta, gamma, h, levels);
+        }
+
         /** The smallest series this spec can forecast: two seasons. */
         public int minPoints() {
             return 2 * period;
@@ -82,6 +87,24 @@ public final class Forecaster {
      * the interval's {@code sigma}.
      */
     public record Result(double[] actual, double[] fitted, double[] ahead, double sigma, Spec spec) {
+
+        /** The lower band of {@code ahead} at {@code level}: {@code ŷ(n + h) − z · sigma · sqrt(v(h))}. */
+        public double[] lowerAhead(double level) {
+            return band(level, -1);
+        }
+
+        /** The upper band of {@code ahead} at {@code level}. */
+        public double[] upperAhead(double level) {
+            return band(level, 1);
+        }
+
+        private double[] band(double level, int sign) {
+            double[] v = PredictionInterval.varianceFactors(spec);
+            double z = PredictionInterval.z(level);
+            double[] out = new double[ahead.length];
+            for (int h = 0; h < ahead.length; h++) out[h] = ahead[h] + sign * z * sigma * Math.sqrt(v[h]);
+            return out;
+        }
 
         /** The output rows ({@link ForecastOutput}): every bucket of the history, then the horizon, each per level. */
         public List<ForecastOutput.Row> rows() {

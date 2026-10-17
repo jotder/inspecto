@@ -481,6 +481,43 @@ public final class NodeAttributes {
                     .help("Added to each shifted column's name: sum_amount becomes sum_amount_prev."));
 
     /**
+     * {@code transform.timeseries.forecast} (ANALYTICS-CORE-1 S5): seasonal naive or Holt-Winters additive over a regular
+     * series, with a prediction band per level. Rules in {@code TimeSeriesStep}; the maths is the Analytics Kernel's
+     * {@code Forecaster} / {@code ForecastSql}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_FORECAST = List.of(
+            NodeAttribute.of("time_column", "Time column", "string", "required").placeholder("bucket")
+                    .help("The DATE or TIMESTAMP bucket column of a regular series (a resample's output): one row per key "
+                            + "per bucket, no bucket missing."),
+            grain(),
+            NodeAttribute.of("value_column", "Value column", "string", "required").placeholder("sum_amount")
+                    .help("The number forecast. An empty value is refused: resample with sum or count fills a gap with 0."),
+            NodeAttribute.of("group_by", "Series keys", "list", "optional").placeholder("REGION")
+                    .help("One forecast per key. Leave blank for one series."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("holt_winters")
+                    .options("holt_winters", "Holt-Winters additive (level, trend, season)",
+                            "seasonal_naive", "Seasonal naive (same bucket last season)")
+                    .help("Holt-Winters smooths level, trend and season; seasonal naive repeats the last season."),
+            NodeAttribute.of("period", "Season length", "number", "required").min(2)
+                    .max(com.gamma.pipeline.exec.TimeSeriesStep.MAX_FORECAST_PERIOD)
+                    .help("Buckets per season: 7 for daily data with a weekly pattern, 12 for monthly data with a yearly "
+                            + "one. Every series needs at least two seasons."),
+            NodeAttribute.of("horizon", "Buckets ahead", "number", "required").min(1)
+                    .max(com.gamma.pipeline.exec.TimeSeriesStep.MAX_FORECAST_HORIZON)
+                    .help("How many buckets after the last one to forecast."),
+            NodeAttribute.of("levels", "Interval levels", "list", "optional").placeholder("0.8, 0.95")
+                    .help("Each level gets its own lower and upper band (one row per level). Blank: 0.95."),
+            NodeAttribute.of("alpha", "Level smoothing (alpha)", "number", "advanced").min(0).max(1)
+                    .defaultValue(com.gamma.analytics.forecast.Forecaster.DEFAULT_ALPHA)
+                    .help("Holt-Winters only. Higher follows recent values faster."),
+            NodeAttribute.of("beta", "Trend smoothing (beta)", "number", "advanced").min(0).max(1)
+                    .defaultValue(com.gamma.analytics.forecast.Forecaster.DEFAULT_BETA)
+                    .help("Holt-Winters only. Higher lets the trend change faster."),
+            NodeAttribute.of("gamma", "Season smoothing (gamma)", "number", "advanced").min(0).max(1)
+                    .defaultValue(com.gamma.analytics.forecast.Forecaster.DEFAULT_GAMMA)
+                    .help("Holt-Winters only. Higher lets the seasonal pattern change faster."));
+
+    /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
      * {@code list} type is {@code string[]} and these are MAPS.
@@ -663,7 +700,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -684,6 +721,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_UNPIVOT.type(), TRANSFORM_UNPIVOT);
         m.put(BuiltinNodeType.TRANSFORM_RESAMPLE.type(), TRANSFORM_RESAMPLE);
         m.put(BuiltinNodeType.TRANSFORM_SHIFT.type(), TRANSFORM_SHIFT);
+        m.put(BuiltinNodeType.TRANSFORM_FORECAST.type(), TRANSFORM_FORECAST);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

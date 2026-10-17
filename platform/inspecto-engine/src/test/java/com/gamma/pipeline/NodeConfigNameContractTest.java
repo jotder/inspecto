@@ -820,6 +820,32 @@ class NodeConfigNameContractTest {
         assertEquals(List.of("AMOUNT_last_year"), s.addedColumns());
     }
 
+    /** The forecast node's contract (ANALYTICS-CORE-1 S5): every declared key survives the save and parses as the run reads it. */
+    @Test
+    void forecastAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> forecast = new LinkedHashMap<>();
+        forecast.put("time_column", "EVENT_DATE");
+        forecast.put("grain", "week");
+        forecast.put("value_column", "AMOUNT");
+        forecast.put("group_by", List.of("ID"));
+        forecast.put("method", "seasonal_naive");
+        forecast.put("period", 52);
+        forecast.put("horizon", 26);
+        forecast.put("levels", List.of("0.8", "0.95"));
+        forecast.put("alpha", 0.3);
+        forecast.put("beta", 0.05);
+        forecast.put("gamma", 0.2);
+        Map<String, Object> got = timeSeriesSavedAs(dir, "forecast", "transform.timeseries.forecast", forecast);
+        TimeSeriesStep.Forecast f = TimeSeriesStep.parseForecast(got);
+        assertEquals(com.gamma.analytics.forecast.ForecastMethod.SEASONAL_NAIVE, f.model().method());
+        assertEquals(52, f.model().period());
+        assertEquals(26, f.model().horizon());
+        assertEquals(List.of(0.8, 0.95), f.model().levels());
+        assertEquals(0.05, f.model().beta());
+        assertEquals(List.of("ID", "EVENT_DATE", "horizon", "actual", "forecast", "level", "lower", "upper"),
+                f.outputColumns());
+    }
+
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
             throws Exception {
         java.nio.file.Files.createDirectories(dir);

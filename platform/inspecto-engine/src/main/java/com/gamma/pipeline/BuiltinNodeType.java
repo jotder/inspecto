@@ -196,6 +196,10 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_SHIFT("transform.timeseries.shift", NodeCategory.TRANSFORM, "Period shift",
             "Each row gains the value its key had N buckets earlier (previous month, same week last year).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "shift"),
+    // ANALYTICS-CORE-1 S5: the forecast kernel's SQL (ForecastSql) over a regular series, through TimeSeriesStep.
+    TRANSFORM_FORECAST("transform.timeseries.forecast", NodeCategory.TRANSFORM, "Forecast",
+            "Seasonal naive or Holt-Winters forecast of a regular series, with a prediction band per level.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "forecast"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

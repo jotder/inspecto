@@ -511,6 +511,32 @@ class StepConfigSaveFindingsTest {
                 "grain", "month", "columns", List.of("QTY"), "periods", 0))))), "steps[0].shift", "non-zero");
     }
 
+    // ── forecast (transform.timeseries.forecast, ANALYTICS-CORE-1 S5) ────────────
+
+    private static Map<String, Object> forecast(String time, String value, Object period) {
+        return Map.of("forecast", Map.of("time_column", time, "grain", "day", "value_column", value, "period", period,
+                "horizon", 7));
+    }
+
+    @Test
+    void aForecastWithAOneBucketSeasonIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(forecast("TS", "QTY", 1)))),
+                "steps[0].forecast", "'period' must be between 2");
+    }
+
+    @Test
+    void aForecastValueColumnTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(forecast("ID", "GROSS_AMOUNT", 7)))),
+                "steps[0].forecast", "GROSS_AMOUNT");
+    }
+
+    @Test
+    void aForecastOverANumericTimeColumnIsRefusedAndAVarcharOneFailsOpen(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(forecast("QTY", "QTY", 7)))),
+                "steps[0].forecast", "DATE or TIMESTAMP");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(forecast("ID", "QTY", 7)))));
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

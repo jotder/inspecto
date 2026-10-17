@@ -1343,6 +1343,55 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * A stored {@code resample} then {@code forecast} chain executes at rest (ANALYTICS-CORE-1 S5): four weeks of daily
+     * sums with a weekly pattern, seasonal naive, so the forecast is last week's values; three days ahead.
+     */
+    @Test
+    void runsAFlatConfigsResampleAndForecastStepsAndWritesTheForecastWithItsBand() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("fc_pipeline.toon");
+        Files.writeString(flat, """
+                name: fc_etl
+                active: false
+                output_store: forecast_out
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[2]:
+                  - resample:
+                      time_column: id
+                      grain: day
+                      measures[1]: sum(amt)
+                      bucket_column: day
+                  - forecast:
+                      time_column: day
+                      grain: day
+                      value_column: sum_amt
+                      method: seasonal_naive
+                      period: 7
+                      horizon: 3
+                """);
+        StringBuilder rows = new StringBuilder();
+        for (int d = 0; d < 28; d++)
+            rows.append(d == 0 ? "" : ",").append("(TIMESTAMP '2026-01-05 10:00' + INTERVAL (").append(d)
+                    .append(") DAY,").append(10 * (d % 7) + d / 7).append(")");
+        seedParquet(dataDir, "fc_etl", rows.toString());
+
+        JobConfig cfg = new JobConfig("fc", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        // The last week is 3, 13, 23 ...: repeated one season on. Every one-step error is +1, so MAD 0: a band of no width.
+        assertEquals(List.of("2026-02-02|1|3.0|3.0|3.0", "2026-02-03|2|13.0|13.0|13.0", "2026-02-04|3|23.0|23.0|23.0"),
+                queryStore(dataDir, "forecast_out", "SELECT strftime(day, '%%Y-%%m-%%d'), horizon, forecast, lower, upper"
+                        + " FROM %s WHERE horizon > 0 ORDER BY day"));
+    }
+
+    /**
      * A {@code webhook:} branch run end to end through the job lane: {@code PipelineLift.stageTwo} makes it a
      * second branch beside {@code output_store:}, {@code PartitionSinkWriter} dispatches it to
      * {@code WebhookSink}, and the edition's transport — here a capturing one, discovered through the real

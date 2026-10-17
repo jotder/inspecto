@@ -727,8 +727,10 @@
     "label" : "Time-series forecaster (Holt-Winters)",
     "emoji" : "🔮",
     "icon" : "heroicons_outline:light-bulb",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.timeseries.forecast",
+    "note" : "seasonal naive or Holt-Winters additive over a regular series, point forecast plus a prediction band per level (2026-10-17, ANALYTICS-CORE-1 S5)",
+    "addable" : true
   }, {
     "id" : "transform.semantic.metric",
     "family" : "BI",

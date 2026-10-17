@@ -1,0 +1,29 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEPS: resample (transform.timeseries.resample) then forecast (transform.timeseries.forecast) — processor
+# transform.timeseries.forecast (ANALYTICS-CORE-1 S5). Four weeks of daily NORTH sales with a weekly pattern:
+#   steps[2]: - resample: { time_column: SALE_TS, grain: day, group_by[1]: REGION, measures[1]: sum(AMOUNT),
+#                           bucket_column: DAY }
+#             - forecast: { time_column: DAY, grain: day, value_column: sum_AMOUNT, group_by[1]: REGION,
+#                           method: holt_winters, period: 7, horizon: 7 }
+# The resample makes the regular daily series a forecast needs (one row per day, none missing); the forecast fits
+# Holt-Winters additive with the default weights (alpha 0.25, beta 0.02, gamma 0.15), and writes every day of the
+# history (actual, one-step forecast, band) plus 7 days ahead, at the default level 0.95.
+# At rest, like every steps: kind: the ingest lands out/sales/, the commit fires daily_sales_forecast, and the result
+# lands in out/sales_forecast/.
+#
+# Expected evidence after the run:
+#   /jobs shows daily_sales_forecast type PIPELINE with lastStatus SUCCESS. On disk, out/sales_forecast/*.parquet
+#   holds 35 rows (REGION, DAY, horizon, actual, forecast, level, lower, upper): 28 history days (the first 7 with
+#   no forecast) and 7 ahead (actual empty). The horizon rows, rounded to 2 decimals (sigma 5.31):
+#     NORTH 2026-10-05  1  222.00  211.59  232.41
+#     NORTH 2026-10-06  2  242.10  231.35  252.84
+#     NORTH 2026-10-07  3  254.42  243.34  265.50
+#     NORTH 2026-10-08  4  268.05  256.63  279.47
+#     NORTH 2026-10-09  5  281.44  269.68  293.20
+#     NORTH 2026-10-10  6  312.73  300.63  324.84
+#     NORTH 2026-10-11  7  233.73  221.28  246.17
+#   The job can also be fired by hand: POST /jobs/daily_sales_forecast/trigger.
+/jobs
+/jobs/daily_sales_forecast/runs
