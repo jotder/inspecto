@@ -32,6 +32,37 @@ public final class SqlBuilder {
     }
 
     /**
+     * A typed operand of a generated predicate (the Measure grammar's filter values, {@code MeasureCompiler}).
+     * Rendering ({@code params == null}): numbers and booleans verbatim, everything else an escaped literal
+     * ({@link SqlIdent#sqlStr}). Binding: the value is appended to {@code params} and the placeholder keeps the
+     * literal's type — an integral number as {@code BIGINT}, any other number as {@code DOUBLE} (so {@code 5.5}
+     * is never coerced to an integer column's type and rounded), a boolean as {@code BOOLEAN}, and a string as a
+     * bare {@code ?} that DuckDB types from the column, as it types a string literal. Unlike
+     * {@link #stringOperand} a string is NOT cast to {@code VARCHAR}: it is compared in the column's own type.
+     */
+    public static String typedOperand(Object value, List<Object> params) {
+        if (value == null) throw new IllegalArgumentException("filter value must not be null (use isNull/notNull)");
+        if (params == null) {
+            if (value instanceof Number || value instanceof Boolean) return value.toString();
+            return SqlIdent.sqlStr(value.toString());
+        }
+        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
+            params.add(((Number) value).longValue());
+            return "CAST(? AS BIGINT)";
+        }
+        if (value instanceof Number n) {
+            params.add(n.doubleValue());
+            return "CAST(? AS DOUBLE)";
+        }
+        if (value instanceof Boolean) {
+            params.add(value);
+            return "CAST(? AS BOOLEAN)";
+        }
+        params.add(value.toString());
+        return "?";
+    }
+
+    /**
      * Append a {@code COALESCE(TRY_STRPTIME(col, fmt1), ...)::TYPE} expression to {@code sb}.
      *
      * <p>Used to try multiple date/timestamp format strings in order, returning the

@@ -1,12 +1,13 @@
 package com.gamma.query;
 
 import com.gamma.analytics.time.TimeGrain;
-import com.gamma.util.SqlIdent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import static com.gamma.util.SqlBuilder.typedOperand;
+import static com.gamma.util.SqlIdent.q;
 import static com.gamma.util.Values.trimToNull;
 
 /**
@@ -371,62 +372,29 @@ public final class MeasureCompiler {
         String col = q(f.field());
         String op = f.op() == null ? "=" : f.op().trim();
         return switch (op) {
-            case "=", "==", "eq" -> col + " = " + literal(f.value(), p);
-            case "!=", "<>", "ne" -> col + " <> " + literal(f.value(), p);
-            case ">", "gt" -> col + " > " + literal(f.value(), p);
-            case ">=", "gte" -> col + " >= " + literal(f.value(), p);
-            case "<", "lt" -> col + " < " + literal(f.value(), p);
-            case "<=", "lte" -> col + " <= " + literal(f.value(), p);
-            case "like" -> col + " LIKE " + literal(trimToNull(f.value()), p);
+            case "=", "==", "eq" -> col + " = " + typedOperand(f.value(), p);
+            case "!=", "<>", "ne" -> col + " <> " + typedOperand(f.value(), p);
+            case ">", "gt" -> col + " > " + typedOperand(f.value(), p);
+            case ">=", "gte" -> col + " >= " + typedOperand(f.value(), p);
+            case "<", "lt" -> col + " < " + typedOperand(f.value(), p);
+            case "<=", "lte" -> col + " <= " + typedOperand(f.value(), p);
+            case "like" -> col + " LIKE " + typedOperand(trimToNull(f.value()), p);
             case "isNull" -> col + " IS NULL";
             case "notNull" -> col + " IS NOT NULL";
             case "in" -> {
                 if (!(f.value() instanceof List<?> vs) || vs.isEmpty())
                     throw new IllegalArgumentException("'in' filter needs a non-empty value list");
                 List<String> lits = new ArrayList<>();
-                for (Object v : vs) lits.add(literal(v, p));
+                for (Object v : vs) lits.add(typedOperand(v, p));
                 yield col + " IN (" + String.join(", ", lits) + ")";
             }
             default -> throw new IllegalArgumentException("unknown filter op '" + op + "'");
         };
     }
 
-    /**
-     * A typed operand. Rendering ({@code p == null}): numbers and booleans verbatim, everything else a
-     * single-quoted string. Binding: the value is added to {@code p} and the placeholder keeps the literal's
-     * type — an integral number as {@code BIGINT}, any other number as {@code DOUBLE} (so {@code 5.5} is never
-     * coerced to an integer column's type and rounded), a boolean as {@code BOOLEAN}, and a string as a bare
-     * {@code ?} that DuckDB types from the column, as it types a string literal.
-     */
-    private static String literal(Object v, List<Object> p) {
-        if (v == null) throw new IllegalArgumentException("filter value must not be null (use isNull/notNull)");
-        if (p == null) {
-            if (v instanceof Number || v instanceof Boolean) return v.toString();
-            return "'" + v.toString().replace("'", "''") + "'";
-        }
-        if (v instanceof Byte || v instanceof Short || v instanceof Integer || v instanceof Long) {
-            p.add(((Number) v).longValue());
-            return "CAST(? AS BIGINT)";
-        }
-        if (v instanceof Number n) {
-            p.add(n.doubleValue());
-            return "CAST(? AS DOUBLE)";
-        }
-        if (v instanceof Boolean) {
-            p.add(v);
-            return "CAST(? AS BOOLEAN)";
-        }
-        p.add(v.toString());
-        return "?";
-    }
-
     private static String safeIdent(String s, String what) {
         if (s == null || !SAFE_IDENT.matcher(s).matches())
             throw new IllegalArgumentException("unsafe " + what + " '" + s + "'");
         return s;
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 }

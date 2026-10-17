@@ -1,8 +1,5 @@
 {
-  "a": {
-    "inspecto-anomaly": 1,
-    "inspecto-engine": 2
-  },
+  "a": {},
   "b": {
     "inspecto-util": 1
   },

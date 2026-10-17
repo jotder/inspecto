@@ -32,6 +32,8 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import static com.gamma.util.SqlIdent.q;
+
 /**
  * Evaluates an {@link AnomalyModel} over its Datasets and writes {@code anomaly_scores_<id>} (history) and
  * {@code anomaly_scores_<id>_latest} (this run only, the relation an Alert Rule watches).
@@ -598,6 +600,4 @@ public final class AnomalyScoreEvaluator {
     static Map<String, Long> bands(List<AnomalyScorer.Scored> scored) {
         return ScoreScale.bandCounts(scored.stream().map(AnomalyScorer.Scored::band).toList());
     }
-
-    private static String q(String ident) { return "\"" + ident.replace("\"", "\"\"") + "\""; }
 }

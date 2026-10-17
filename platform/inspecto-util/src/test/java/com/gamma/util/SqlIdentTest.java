@@ -102,4 +102,19 @@ class SqlIdentTest {
         assertEquals(java.util.List.of("x' OR 1=1 --"), params);
         assertEquals("'x'' OR 1=1 --'", SqlBuilder.stringOperand("x' OR 1=1 --", null));
     }
+
+    /** A typed operand keeps its Java type when bound and renders numbers/booleans bare, strings escaped (MeasureCompiler's filters). */
+    @Test
+    void typedOperandKeepsTheValueTypeWhenBoundAndEscapesStringsWhenRendered() {
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        assertEquals("CAST(? AS BIGINT)", SqlBuilder.typedOperand(5, params));
+        assertEquals("CAST(? AS DOUBLE)", SqlBuilder.typedOperand(5.5, params));
+        assertEquals("CAST(? AS BOOLEAN)", SqlBuilder.typedOperand(true, params));
+        assertEquals("?", SqlBuilder.typedOperand("x' OR 1=1 --", params));
+        assertEquals(java.util.List.of(5L, 5.5, true, "x' OR 1=1 --"), params);
+        assertEquals("5", SqlBuilder.typedOperand(5, null));
+        assertEquals("false", SqlBuilder.typedOperand(false, null));
+        assertEquals("'x'' OR 1=1 --'", SqlBuilder.typedOperand("x' OR 1=1 --", null));
+        assertThrows(IllegalArgumentException.class, () -> SqlBuilder.typedOperand(null, null));
+    }
 }
