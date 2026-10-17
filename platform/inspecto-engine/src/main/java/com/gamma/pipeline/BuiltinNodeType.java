@@ -205,6 +205,18 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_SIMILARITY("transform.similarity", NodeCategory.TRANSFORM, "Similarity score",
             "Adds a 0..1 similarity score of two text columns and, with a threshold, a candidate flag. Never asserts the two are the same.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "similarity"),
+    // ANALYTICS-CORE-1 S4. Rank & Top-N (RankStep): types keep the catalog ids, steps: kinds are the plain words.
+    TRANSFORM_RANK("transform.analytics.rank", NodeCategory.TRANSFORM, "Rank & Top-N",
+            "Ranks rows per group by a stated order (ties broken by every column) and keeps the top N or adds the rank.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "rank"),
+    // Deterministic seeded sample (catalog quality.sample.reservoir): the Analytics Kernel's Sampler through SampleStep.
+    TRANSFORM_SAMPLE("transform.sample", NodeCategory.TRANSFORM, "Sample",
+            "Keeps a fixed number or a share of rows per group, chosen by a seeded hash of a row key - the same rows every run.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "sample"),
+    // Rows to columns over DECLARED values (PivotStep), one Measure-grammar aggregate per value.
+    TRANSFORM_PIVOT("transform.matrix.pivot", NodeCategory.TRANSFORM, "Pivot",
+            "One row per key, one column per listed value, each holding an aggregate (sum, count...) of that value's rows.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "pivot"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

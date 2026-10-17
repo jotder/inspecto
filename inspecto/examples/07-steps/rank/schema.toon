@@ -1,0 +1,24 @@
+raw:
+  name: CALLS
+  format: CSV
+  fields[4]{name,selector,type}:
+    CALL_ID,"0",VARCHAR
+    SUBSCRIBER,"1",VARCHAR
+    REGION,"2",VARCHAR
+    AMOUNT,"3",DOUBLE
+mapping:
+  canonicalName: calls
+  rawName: CALLS
+  fields[4]:
+    - name: CALL_ID
+      from: CALL_ID
+      fn: keep
+    - name: SUBSCRIBER
+      from: SUBSCRIBER
+      fn: keep
+    - name: REGION
+      from: REGION
+      fn: keep
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep

@@ -1,0 +1,9 @@
+SUBSCRIBER,CALL_TYPE,AMOUNT
+S1,voice,10.00
+S1,voice,2.50
+S1,sms,0.10
+S1,data,4.00
+S2,data,9.00
+S2,fax,1.00
+S3,sms,0.20
+S3,sms,0.20

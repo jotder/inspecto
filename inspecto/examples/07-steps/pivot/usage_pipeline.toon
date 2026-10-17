@@ -1,0 +1,36 @@
+name: STEP_PIVOT
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/usage/database
+  backup:     out/usage/backup
+  temp:       out/usage/temp
+  errors:     out/usage/errors
+  quarantine: out/usage/quarantine
+  markers:    out/usage/markers
+  status_dir: out/usage/status
+  log_dir:    out/usage/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+
+output_store: usage_by_type
+
+steps[1]:
+  - pivot:
+      group_by[1]: SUBSCRIBER
+      pivot_column: CALL_TYPE
+      values[3]: voice, sms, data
+      measure: sum(AMOUNT)

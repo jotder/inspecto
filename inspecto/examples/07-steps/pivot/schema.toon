@@ -1,0 +1,20 @@
+raw:
+  name: USAGE
+  format: CSV
+  fields[3]{name,selector,type}:
+    SUBSCRIBER,"0",VARCHAR
+    CALL_TYPE,"1",VARCHAR
+    AMOUNT,"2",DOUBLE
+mapping:
+  canonicalName: usage
+  rawName: USAGE
+  fields[3]:
+    - name: SUBSCRIBER
+      from: SUBSCRIBER
+      fn: keep
+    - name: CALL_TYPE
+      from: CALL_TYPE
+      fn: keep
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep

@@ -1,0 +1,37 @@
+name: STEP_RANK
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/calls/database
+  backup:     out/calls/backup
+  temp:       out/calls/temp
+  errors:     out/calls/errors
+  quarantine: out/calls/quarantine
+  markers:    out/calls/markers
+  status_dir: out/calls/status
+  log_dir:    out/calls/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+
+output_store: top_calls
+
+steps[1]:
+  - rank:
+      group_by[1]: REGION
+      order_by[1]: AMOUNT desc
+      method: row_number
+      top: 2
+      rank_column: region_rank

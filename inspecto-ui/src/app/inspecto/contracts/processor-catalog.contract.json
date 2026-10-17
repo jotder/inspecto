@@ -454,8 +454,10 @@
     "label" : "Statistical & reservoir sampler",
     "emoji" : "📊",
     "icon" : "heroicons_outline:beaker",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.sample",
+    "note" : "`transform.sample` — a fixed size or a fraction per group, chosen by an MD5 hash of a seed and a row key on the Analytics Kernel (`Sampler`): the same rows every run and in the JVM twin; never `USING SAMPLE` / `random()` (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "quality.cleanse.transcode",
     "family" : "DQ",
@@ -556,8 +558,10 @@
     "label" : "Dynamic pivot / transpose",
     "emoji" : "🔀",
     "icon" : "heroicons_outline:arrows-up-down",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.matrix.pivot",
+    "note" : "rows to columns over DECLARED values only (at most 200; a dynamic pivot is refused), one Measure-grammar aggregate per value (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "transform.matrix.unpivot",
     "family" : "XFM",
@@ -574,8 +578,10 @@
     "label" : "Rank & Top-N pruner",
     "emoji" : "🏆",
     "icon" : "heroicons_outline:trophy",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.analytics.rank",
+    "note" : "row_number / rank / dense_rank per group by a stated order, ties broken deterministically; keeps the top N or adds the rank (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "transform.explode",
     "family" : "XFM",

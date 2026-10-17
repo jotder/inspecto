@@ -600,6 +600,17 @@ class PipelineEditableTest {
                 node("s", "transform.similarity", s));
     }
 
+    /** The rank, sample and pivot Steps (ANALYTICS-CORE-1 S4) have no singular block and lower under their plain kinds. */
+    @Test
+    void theRankSampleAndPivotStepsLowerToStepsUnderTheirPlainKinds() {
+        assertChain(List.of("filter", "rank", "sample", "pivot"),
+                node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("r", "transform.analytics.rank", new LinkedHashMap<>(Map.of("order_by", List.of("GROSS desc"), "top", 3))),
+                node("s", "transform.sample", new LinkedHashMap<>(Map.of("size", 10, "seed", 7))),
+                node("p", "transform.matrix.pivot", new LinkedHashMap<>(Map.of("pivot_column", "KIND",
+                        "values", List.of("a", "b"), "measure", "sum(GROSS)"))));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

@@ -1027,6 +1027,141 @@
     "default" : true,
     "help" : "Off keeps only the candidate flag (needs a threshold)."
   } ],
+  "transform.analytics.rank" : [ {
+    "key" : "order_by",
+    "label" : "Order by",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "The columns that decide the rank, each optionally followed by asc or desc. Empty values sort last.",
+    "placeholder" : "AMOUNT desc"
+  }, {
+    "key" : "group_by",
+    "label" : "Rank within",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "The rank restarts for each key (top N per region). Leave blank for one ranking of all rows.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "row_number",
+    "options" : [ {
+      "value" : "row_number",
+      "label" : "Row number (1, 2, 3 - ties split)"
+    }, {
+      "value" : "rank",
+      "label" : "Rank (1, 1, 3 - ties share)"
+    }, {
+      "value" : "dense_rank",
+      "label" : "Dense rank (1, 1, 2 - ties share)"
+    } ],
+    "help" : "Row number gives every row its own place; rank and dense rank give tied rows the same one."
+  }, {
+    "key" : "top",
+    "label" : "Keep top N",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "max" : 1000000.0,
+    "help" : "Keep only rows ranked N or better in each group. With rank or dense rank, ties can keep more than N."
+  }, {
+    "key" : "rank_column",
+    "label" : "Rank column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "rank",
+    "help" : "Receives the rank, starting at 1."
+  }, {
+    "key" : "tie_break",
+    "label" : "Tie-break",
+    "type" : "list",
+    "tier" : "advanced",
+    "help" : "Ordered after the order-by columns. Row number then breaks any remaining tie by every column, so the same input always gives the same ranks.",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "keep_rank",
+    "label" : "Keep the rank",
+    "type" : "boolean",
+    "tier" : "advanced",
+    "default" : true,
+    "help" : "Off drops the rank column and keeps only the top rows (needs Keep top N)."
+  } ],
+  "transform.sample" : [ {
+    "key" : "size",
+    "label" : "Rows per group",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "max" : 1000000.0,
+    "help" : "Keep this many rows of each group (all of a smaller group). Set this or Fraction."
+  }, {
+    "key" : "fraction",
+    "label" : "Fraction",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Keep this share of each group, rounded to the nearest row (0.1 = 10%). Set this or Rows per group."
+  }, {
+    "key" : "seed",
+    "label" : "Seed",
+    "type" : "number",
+    "tier" : "optional",
+    "default" : 0,
+    "help" : "The same seed always picks the same rows; another seed picks another sample."
+  }, {
+    "key" : "group_by",
+    "label" : "Sample within",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Sample each key separately (stratified). Leave blank for one sample of all rows.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "key",
+    "label" : "Row key",
+    "type" : "list",
+    "tier" : "advanced",
+    "help" : "The columns that identify a row; the pick hashes them with the seed. Blank: every column.",
+    "placeholder" : "CALL_ID"
+  } ],
+  "transform.matrix.pivot" : [ {
+    "key" : "group_by",
+    "label" : "Row keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "One output row per key. Leave blank for one row.",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "pivot_column",
+    "label" : "Pivot column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The column whose values become columns. Values are matched as text.",
+    "placeholder" : "CALL_TYPE"
+  }, {
+    "key" : "values",
+    "label" : "Values",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Each listed value becomes a column (at most 200). Values not listed are left out; there is no pivot over whatever values the data holds.",
+    "placeholder" : "voice, sms, data"
+  }, {
+    "key" : "measure",
+    "label" : "Measure",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "count or agg(field) - sum, avg, min, max, countDistinct, median, stddev, p90... A value with no rows gets 0 for count, empty otherwise.",
+    "placeholder" : "sum(AMOUNT)"
+  }, {
+    "key" : "prefix",
+    "label" : "Column prefix",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Put before each value to make its column name (needed when a value starts with a digit).",
+    "placeholder" : "v_"
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

@@ -1,0 +1,6 @@
+job:
+  name: call_sample
+  type: pipeline
+  pipeline_config: calls_pipeline.toon
+  data_dir: out
+  on_pipeline: step_sample

@@ -43,7 +43,12 @@ public final class Md5Bucket {
     /** DuckDB SQL for {@link #of} over the VARCHAR expression {@code textExpr}: an INTEGER; NULL for a NULL text. */
     public static String sql(String textExpr, int buckets) {
         check(buckets);
-        return "CAST(md5_number_lower(" + textExpr + ") % " + buckets + " AS INTEGER)";
+        return "CAST(" + lower64Sql(textExpr) + " % " + buckets + " AS INTEGER)";
+    }
+
+    /** DuckDB SQL for {@link #lower64} over the VARCHAR expression {@code textExpr}: a UBIGINT; NULL for a NULL text. */
+    public static String lower64Sql(String textExpr) {
+        return "md5_number_lower(" + textExpr + ")";
     }
 
     private static void check(int buckets) {
