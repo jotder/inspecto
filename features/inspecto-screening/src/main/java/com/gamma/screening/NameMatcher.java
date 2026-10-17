@@ -37,12 +37,12 @@ public final class NameMatcher {
     private NameMatcher() {}
 
     /**
-     * The token metric: the Analytics Kernel's Jaro-Winkler (ANALYTICS-CORE-1 S1) over UTF-16 chars, textbook
+     * The token similarity: the Analytics Kernel's Jaro-Winkler (ANALYTICS-CORE-1 S1) over UTF-16 chars, textbook
      * transpositions, prefix scale 0.1, prefix up to 4, the prefix boost always applied (threshold 0) — exactly this
      * method's own arithmetic before it moved, pinned by {@code NameMatcherGoldenTest}. The folding, honorifics,
      * transliteration and blocking stay here.
      */
-    static final JaroWinkler TOKEN_METRIC = new JaroWinkler(TextUnit.UTF16_CHAR, Transpositions.HALF, 0.1, 4, 0.0);
+    static final JaroWinkler TOKEN_JARO_WINKLER = new JaroWinkler(TextUnit.UTF16_CHAR, Transpositions.HALF, 0.1, 4, 0.0);
 
     /** A token pair less similar than this contributes nothing to {@code tokenSet}. */
     static final double TOKEN_FLOOR = 0.8;
@@ -199,7 +199,7 @@ public final class NameMatcher {
     public static double score(List<String> a, List<String> b) {
         if (a.isEmpty() || b.isEmpty()) return 0.0;
         double set = a.size() == b.size() || Math.min(a.size(), b.size()) >= 2 ? tokenSet(a, b) : 0.0;
-        double joined = a.size() != b.size() ? TOKEN_METRIC.similarity(String.join("", a), String.join("", b)) : 0.0;
+        double joined = a.size() != b.size() ? TOKEN_JARO_WINKLER.similarity(String.join("", a), String.join("", b)) : 0.0;
         double best = Math.max(set, joined);
         if (best < PHONETIC_CAP) {   // second reading: the same score over transliteration skeletons, capped
             List<String> pa = a.stream().map(NameMatcher::phonetic).toList(), pb = b.stream().map(NameMatcher::phonetic).toList();
@@ -210,7 +210,7 @@ public final class NameMatcher {
 
     private static double rawScore(List<String> a, List<String> b) {
         double set = a.size() == b.size() || Math.min(a.size(), b.size()) >= 2 ? tokenSet(a, b) : 0.0;
-        double joined = a.size() != b.size() ? TOKEN_METRIC.similarity(String.join("", a), String.join("", b)) : 0.0;
+        double joined = a.size() != b.size() ? TOKEN_JARO_WINKLER.similarity(String.join("", a), String.join("", b)) : 0.0;
         return Math.max(set, joined);
     }
 
@@ -220,7 +220,7 @@ public final class NameMatcher {
         int n = shorter.size(), m = longer.size();
         double[][] sim = new double[n][m];
         for (int i = 0; i < n; i++)
-            for (int j = 0; j < m; j++) sim[i][j] = TOKEN_METRIC.similarity(shorter.get(i), longer.get(j));
+            for (int j = 0; j < m; j++) sim[i][j] = TOKEN_JARO_WINKLER.similarity(shorter.get(i), longer.get(j));
         boolean[] usedI = new boolean[n], usedJ = new boolean[m];
         double weighted = 0, weight = 0;   // a pair weighs the mean of its two lengths: symmetric in a and b
         for (int k = 0; k < n; k++) {   // greedy: take the best remaining pair each round (ties: lowest i, then j)

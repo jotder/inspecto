@@ -28,7 +28,7 @@
     </description>
 
     <dependencies>
-        <!-- The Analytics Kernel's similarity kit (ANALYTICS-CORE-1 S1): the token metric of the name method (NameMatcher.TOKEN_METRIC). Foundation-only, no third-party library. -->
+        <!-- The Analytics Kernel's similarity kit (ANALYTICS-CORE-1 S1): the token similarity of the name method (NameMatcher.TOKEN_JARO_WINKLER). Foundation-only, no third-party library. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-analytics</artifactId>

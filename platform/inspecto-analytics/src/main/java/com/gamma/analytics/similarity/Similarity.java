@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 
 /**
  * The similarity kit (ANALYTICS-CORE-1 S1): one definition each of Jaro, Jaro-Winkler ({@link JaroWinkler}),
- * Levenshtein distance and its normalised similarity, set and token-set Jaccard, and the text normalisation the
+ * Levenshtein distance and its normalized similarity, set and token-set Jaccard, and the text normalization the
  * Step offers. Pure, deterministic, no locale, no dependency. {@link SimilaritySql} is the DuckDB form.
  *
  * <p><b>Every score is a candidate, never an identity.</b> A high score proposes that two texts may name the same thing;
@@ -48,7 +48,7 @@ public final class Similarity {
     }
 
     /**
-     * Normalised Levenshtein similarity over code points: {@code 1 − d / max(|a|, |b|)}, 0..1; 0 when either side is
+     * Normalized Levenshtein similarity over code points: {@code 1 − d / max(|a|, |b|)}, 0..1; 0 when either side is
      * empty.
      */
     public static double levenshteinSimilarity(String a, String b) {
@@ -96,7 +96,7 @@ public final class Similarity {
 
     /**
      * The tokens of {@code text}: its runs of non-whitespace ({@link #WHITESPACE_CLASS}), each once, in first-seen order.
-     * No case folding — normalise first ({@link #normalise}) to compare without case or accents.
+     * No case folding — normalize first ({@link #normalize}) to compare without case or accents.
      */
     public static Set<String> tokens(String text) {
         Set<String> out = new LinkedHashSet<>();
@@ -112,7 +112,7 @@ public final class Similarity {
     private static final Pattern MARKS = Pattern.compile("\\p{M}+");
 
     /**
-     * The normalised text, in this order:
+     * The normalized text, in this order:
      * <ol>
      *   <li><b>accents stripped</b> — canonical decomposition (NFD), every combining mark (general category M) removed,
      *       then canonical composition (NFC). Only CANONICAL decompositions: {@code é → e}, {@code Å → A}, but
@@ -123,10 +123,10 @@ public final class Similarity {
      *   <li><b>whitespace collapsed</b> — every run of ASCII whitespace ({@link #WHITESPACE_CLASS}) becomes one space,
      *       and leading and trailing spaces are dropped.</li>
      * </ol>
-     * The DuckDB form is {@link SimilaritySql#normalise}; the two agree except on the code points DuckDB's Unicode
+     * The DuckDB form is {@link SimilaritySql#normalize}; the two agree except on the code points DuckDB's Unicode
      * tables predate (see the parity test).
      */
-    public static String normalise(String text) {
+    public static String normalize(String text) {
         Objects.requireNonNull(text, "text");
         String stripped = Normalizer.normalize(
                 MARKS.matcher(Normalizer.normalize(text, Normalizer.Form.NFD)).replaceAll(""), Normalizer.Form.NFC);

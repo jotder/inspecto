@@ -31,7 +31,7 @@ import org.junit.jupiter.api.io.TempDir;
  *   <li>{@code jaccard(s1, s2)} is <b>not</b> a token Jaccard: it is the Jaccard of the two strings' sets of UTF-8
  *       bytes, case-sensitive, and it RAISES on an empty argument. The kit's token Jaccard is built from list
  *       functions instead ({@link SimilaritySql.Method#TOKEN_JACCARD}).</li>
- *   <li>{@code strip_accents} + {@code lower} = {@link Similarity#normalise} except on code points newer than DuckDB's
+ *   <li>{@code strip_accents} + {@code lower} = {@link Similarity#normalize} except on code points newer than DuckDB's
  *       Unicode tables.</li>
  * </ul>
  */
@@ -84,7 +84,7 @@ class SimilarityDuckDbParityTest {
         load(pairs);
         StringBuilder sql = new StringBuilder("SELECT i, jaro_similarity(a, b), jaro_winkler_similarity(a, b), levenshtein(a, b)");
         for (SimilaritySql.Method m : SimilaritySql.Method.values()) sql.append(", ").append(m.sql("a", "b"));
-        sql.append(", ").append(SimilaritySql.Method.JARO_WINKLER.sql(SimilaritySql.normalise("a"), SimilaritySql.normalise("b")));
+        sql.append(", ").append(SimilaritySql.Method.JARO_WINKLER.sql(SimilaritySql.normalize("a"), SimilaritySql.normalize("b")));
         sql.append(" FROM pairs ORDER BY i");
         int checked = 0;
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql.toString())) {
@@ -97,8 +97,8 @@ class SimilarityDuckDbParityTest {
                 int col = 5;
                 for (SimilaritySql.Method m : SimilaritySql.Method.values())
                     assertEquals(m.score(p[0], p[1]), rs.getDouble(col++), 0.0, tag + " " + m);
-                assertEquals(SimilaritySql.Method.JARO_WINKLER.score(Similarity.normalise(p[0]), Similarity.normalise(p[1])),
-                        rs.getDouble(col), 0.0, tag + " normalised jaro_winkler");
+                assertEquals(SimilaritySql.Method.JARO_WINKLER.score(Similarity.normalize(p[0]), Similarity.normalize(p[1])),
+                        rs.getDouble(col), 0.0, tag + " normalized jaro_winkler");
                 checked++;
             }
         }
@@ -128,15 +128,15 @@ class SimilarityDuckDbParityTest {
     }
 
     @Test
-    void normaliseAgreesWithStripAccentsAndLowerExceptOnCodePointsNewerThanDuckDbsTables() throws Exception {
+    void normalizeAgreesWithStripAccentsAndLowerExceptOnCodePointsNewerThanDuckDbsTables() throws Exception {
         List<String> differ = new ArrayList<>();
         int compared = 0;
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT r::INTEGER, " + SimilaritySql.normalise("chr(r::INTEGER)")
+             ResultSet rs = st.executeQuery("SELECT r::INTEGER, " + SimilaritySql.normalize("chr(r::INTEGER)")
                      + " FROM range(1, 196608) t(r) WHERE r < 55296 OR r > 57343 ORDER BY r")) {
             while (rs.next()) {
                 int cp = rs.getInt(1);
-                String jvm = Similarity.normalise(new String(Character.toChars(cp)));
+                String jvm = Similarity.normalize(new String(Character.toChars(cp)));
                 compared++;
                 if (!jvm.equals(rs.getString(2))) differ.add(Integer.toHexString(cp));
             }
@@ -152,18 +152,23 @@ class SimilarityDuckDbParityTest {
         assertTrue(differ.size() <= 200, differ.size() + " differ: " + differ);
         // a mixed sentence agrees exactly
         String text = "  Crème\tBRÛLÉE  İstanbul ΣΑΣ Йосиф Ångstrom\n";
-        assertEquals(Similarity.normalise(text), scalarText("SELECT " + SimilaritySql.normalise(SqlIdent.sqlStr(text))));
+        assertEquals(Similarity.normalize(text), scalarText("SELECT " + SimilaritySql.normalize(SqlIdent.sqlStr(text))));
     }
 
     @Test
     void nullOnEitherSideGivesNull() throws Exception {
-        for (SimilaritySql.Method m : SimilaritySql.Method.values()) {
-            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT " + m.sql("NULL::VARCHAR", "'a'"))) {
-                assertTrue(rs.next());
-                rs.getDouble(1);
-                assertTrue(rs.wasNull(), m + " of NULL");
-            }
-        }
+        String[][] sides = {{"NULL::VARCHAR", "'a b'"}, {"'a b'", "NULL::VARCHAR"}, {"NULL::VARCHAR", "NULL::VARCHAR"},
+                {"NULL::VARCHAR", "''"}, {"''", "NULL::VARCHAR"}};
+        for (SimilaritySql.Method m : SimilaritySql.Method.values())
+            for (String[] s : sides)
+                for (boolean normalized : new boolean[] {false, true}) {
+                    String a = normalized ? SimilaritySql.normalize(s[0]) : s[0], b = normalized ? SimilaritySql.normalize(s[1]) : s[1];
+                    try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT " + m.sql(a, b))) {
+                        assertTrue(rs.next());
+                        rs.getDouble(1);
+                        assertTrue(rs.wasNull(), m + " of " + s[0] + ", " + s[1] + (normalized ? " normalized" : ""));
+                    }
+                }
     }
 
     private static Set<Integer> bytes(String s) {

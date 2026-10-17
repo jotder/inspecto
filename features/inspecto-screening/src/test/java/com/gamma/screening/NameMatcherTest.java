@@ -120,10 +120,10 @@ class NameMatcherTest {
     @Test
     void jaroWinklerMatchesTheReferenceValues() {
         // The textbook pairs (Winkler 1990): MARTHA / MARHTA 0.9611, DWAYNE / DUANE 0.84, DIXON / DICKSONX 0.8133.
-        assertEquals(0.9611, NameMatcher.TOKEN_METRIC.similarity("martha", "marhta"), 1e-4);
-        assertEquals(0.84, NameMatcher.TOKEN_METRIC.similarity("dwayne", "duane"), 1e-4);
-        assertEquals(0.8133, NameMatcher.TOKEN_METRIC.similarity("dixon", "dicksonx"), 1e-4);
-        assertEquals(0.0, NameMatcher.TOKEN_METRIC.similarity("abc", "xyz"));
+        assertEquals(0.9611, NameMatcher.TOKEN_JARO_WINKLER.similarity("martha", "marhta"), 1e-4);
+        assertEquals(0.84, NameMatcher.TOKEN_JARO_WINKLER.similarity("dwayne", "duane"), 1e-4);
+        assertEquals(0.8133, NameMatcher.TOKEN_JARO_WINKLER.similarity("dixon", "dicksonx"), 1e-4);
+        assertEquals(0.0, NameMatcher.TOKEN_JARO_WINKLER.similarity("abc", "xyz"));
     }
 
     // ---- SCREENING-1 (2): phonetic / transliteration blocking + second reading ----

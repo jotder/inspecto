@@ -85,16 +85,16 @@ class SimilarityTest {
     }
 
     @Test
-    void normaliseStripsAccentsFoldsCaseAndCollapsesWhitespaceExactlyAsStated() {
-        assertEquals("creme brulee", Similarity.normalise("  Crème\tBRÛLÉE \n"));
-        assertEquals("angstrom a", Similarity.normalise("Ångstrom Å"));   // Å and the Ångström sign → a
-        assertEquals("istanbul", Similarity.normalise("İstanbul"));                 // dotted capital I → i, no stray mark
-        assertEquals("σασ", Similarity.normalise("ΣΑΣ"), "simple mapping: never the final sigma");
-        assertEquals("иосиф", Similarity.normalise("Йосиф"), "the breve is a mark");
-        assertEquals("straße ø ł æ", Similarity.normalise("Straße Ø Ł Æ"), "letters without a decomposition stay");
-        assertEquals("ﬁx a b", Similarity.normalise("ﬁX A B"), "compatibility forms stay");
-        assertEquals("", Similarity.normalise(" \t\r\n\f\u000B "));
-        assertThrows(NullPointerException.class, () -> Similarity.normalise(null));
+    void normalizeStripsAccentsFoldsCaseAndCollapsesWhitespaceExactlyAsStated() {
+        assertEquals("creme brulee", Similarity.normalize("  Crème\tBRÛLÉE \n"));
+        assertEquals("angstrom a", Similarity.normalize("Ångstrom Å"));   // Å and the Ångström sign → a
+        assertEquals("istanbul", Similarity.normalize("İstanbul"));                 // dotted capital I → i, no stray mark
+        assertEquals("σασ", Similarity.normalize("ΣΑΣ"), "simple mapping: never the final sigma");
+        assertEquals("иосиф", Similarity.normalize("Йосиф"), "the breve is a mark");
+        assertEquals("straße ø ł æ", Similarity.normalize("Straße Ø Ł Æ"), "letters without a decomposition stay");
+        assertEquals("ﬁx a b", Similarity.normalize("ﬁX A B"), "compatibility forms stay");
+        assertEquals("", Similarity.normalize(" \t\r\n\f\u000B "));
+        assertThrows(NullPointerException.class, () -> Similarity.normalize(null));
     }
 
     @Test

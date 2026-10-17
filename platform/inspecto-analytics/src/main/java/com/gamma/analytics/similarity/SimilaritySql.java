@@ -11,7 +11,7 @@ import java.util.Objects;
  * <p>Each {@link Method} has a JVM twin, {@link Method#score}, that returns the same value — bit for bit on the
  * parity corpus — so a figure seen in a Dataset can be recomputed in the JVM. DuckDB's string built-ins work on
  * <b>UTF-8 bytes</b>, so the twin uses {@link TextUnit#UTF8_BYTE}: an accented letter is two units unless the text is
- * normalised first (accents stripped).
+ * normalized first (accents stripped).
  *
  * <p>NULL on either side gives NULL. An empty side gives 0 (the kit's one empty rule, {@link Similarity}).
  */
@@ -63,11 +63,14 @@ public final class SimilaritySql {
             return switch (this) {
                 case JARO -> "jaro_similarity(" + a + ", " + b + ")";
                 case JARO_WINKLER -> "jaro_winkler_similarity(" + a + ", " + b + ")";
-                case LEVENSHTEIN -> "(CASE WHEN " + a + " = '' OR " + b + " = '' THEN 0.0 ELSE 1.0 - levenshtein(" + a + ", " + b
+                case LEVENSHTEIN -> "(CASE WHEN " + a + " IS NULL OR " + b + " IS NULL THEN NULL WHEN " + a + " = '' OR " + b
+                        + " = '' THEN 0.0 ELSE 1.0 - levenshtein(" + a + ", " + b
                         + ") / greatest(strlen(" + a + "), strlen(" + b + ")) END)";
                 case TOKEN_JACCARD -> {
                     String ta = tokensSql(a), tb = tokensSql(b);
-                    yield "(CASE WHEN len(" + ta + ") = 0 OR len(" + tb + ") = 0 THEN 0.0 ELSE len(list_intersect(" + ta + ", " + tb
+                    // NULL first: list_concat / list_intersect treat a NULL list as empty, and NULL = '' OR '' = '' is true
+                    yield "(CASE WHEN " + a + " IS NULL OR " + b + " IS NULL THEN NULL WHEN len(" + ta + ") = 0 OR len(" + tb
+                            + ") = 0 THEN 0.0 ELSE len(list_intersect(" + ta + ", " + tb
                             + ")) / len(list_distinct(list_concat(" + ta + ", " + tb + "))) END)";
                 }
             };
@@ -80,10 +83,10 @@ public final class SimilaritySql {
     }
 
     /**
-     * The normalised text, {@link Similarity#normalise}'s DuckDB form: {@code strip_accents}, then {@code lower}, then
+     * The normalized text, {@link Similarity#normalize}'s DuckDB form: {@code strip_accents}, then {@code lower}, then
      * every run of ASCII whitespace to one space, then the ends trimmed.
      */
-    public static String normalise(String expr) {
+    public static String normalize(String expr) {
         Objects.requireNonNull(expr, "expr");
         return "trim(regexp_replace(lower(strip_accents(" + expr + ")), '" + WS + "+', ' ', 'g'), ' ')";
     }
