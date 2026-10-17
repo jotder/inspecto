@@ -48,6 +48,30 @@ class SqlViewsTest {
                 "the read OPTIONS must not depend on how the source was chosen");
     }
 
+    /** The store read is byte-identical to what it rendered before {@link SqlViews#parquet} took over its body. */
+    @Test
+    void theStoreReadKeepsItsExactOptions() {
+        assertEquals("read_parquet('/d/*.parquet', union_by_name=true)", SqlViews.reader("PARQUET", "/d/*.parquet", false));
+        assertEquals("read_parquet('/d/*.parquet', union_by_name=true, hive_partitioning=true, hive_types_autocast=0)",
+                SqlViews.reader("PARQUET", "/d/*.parquet", true));
+    }
+
+    @Test
+    void eachHiveModeRendersItsOneOption() {
+        assertEquals("read_parquet('x')", SqlViews.parquet("'x'", false, SqlViews.Hive.AUTO));
+        assertEquals("read_parquet('x', hive_partitioning = false)", SqlViews.parquet("'x'", false, SqlViews.Hive.OFF));
+        assertEquals("read_parquet('x', hive_partitioning = true)", SqlViews.parquet("'x'", false, SqlViews.Hive.TYPED));
+        assertEquals("read_parquet('x', union_by_name=true, hive_partitioning=true, hive_types_autocast=0)",
+                SqlViews.parquet("'x'", true, SqlViews.Hive.VARCHAR));
+    }
+
+    @Test
+    void aFileReadIsAbsoluteForwardSlashedAndQuoteDoubled() {
+        java.nio.file.Path p = java.nio.file.Path.of("O'Brien", "a.parquet");
+        assertEquals("read_parquet('" + p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''") + "')",
+                SqlViews.parquetFile(p));
+    }
+
     @Test
     void extDefaultsToCsvForAnythingThatIsNotParquet() {
         assertEquals("parquet", SqlViews.ext("PARQUET"));
