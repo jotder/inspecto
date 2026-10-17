@@ -43,7 +43,8 @@ export const ALLOWED = {
     'inspecto-oidc': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
     'inspecto-secrets': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
     // ANALYTICS-CORE-1 (D-AN1): the Analytics Kernel stands on the foundation layer only; feature modules depend on it, never the reverse.
-    'inspecto-analytics': ['inspecto-api', 'inspecto-config', 'inspecto-sql', 'inspecto-util'],
+    // S2: entity grouping uses the graph library's UnionFind (the one union-find); inspecto-graph reaches nothing.
+    'inspecto-analytics': ['inspecto-api', 'inspecto-config', 'inspecto-graph', 'inspecto-sql', 'inspecto-util'],
     'inspecto-geo-country': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
 };
 
