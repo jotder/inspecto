@@ -15,6 +15,11 @@
 //      quoteLiteral, ident, lit, literal, sqlLiteral, sqlString, sqlStr, sqlPath, escapeSql, esc or escape, outside the
 //      shared builders SqlBuilder and SqlIdent (inspecto-util; SqlBuilder.quoteIdent delegates to SqlIdent.q).
 //      A wrapper that only delegates to SqlIdent/SqlBuilder still counts (it is a private helper M9 retires); the detail marks it.
+//      Also escapeIdent, escapeIdentifier, escapeLiteral, sqlIdent, sqlQuote and quoteSql. AND (M9, inline): every
+//      `.replace("'", "''")` (a string literal or a COPY ... TO '<path>' escaped in place - SqlIdent.sqlStr / pathStr) and
+//      every `.replace("\"", "\"\"")` (an identifier quoted in place - SqlIdent.q), replaceAll and a char-literal first
+//      argument included; one finding per call, its member the enclosing method. A call inside a helper already counted
+//      above is not counted twice. RFC-4180 CSV quoting doubles `"` the same way - it is exempted per method, with a reason.
 //   b  hand-built read_parquet( / read_csv( / read_json( / read_xlsx( (and _auto / ndjson variants) inside a Java string
 //      literal, outside SqlViews (inspecto-sql) — one finding per literal.
 //   c  private statistics / similarity / union-find — a method named median, lowerMedian, percentile*, quantile*, mad or
@@ -23,8 +28,8 @@
 //      (platform/inspecto-analytics) and the graph library (la/inspecto-la-graph, its planned home platform/inspecto-graph).
 //   d  JVM re-implementations of the Measure grammar — a switch with `case "countDistinct"` and `case "avg"` labels outside
 //      query/MeasureCompiler.java and query/ConditionSql.java.
-// NOT detected (name-based by design, stated so nobody reads a 0 as "none"): SQL quoting done INLINE without a helper method,
-// statistics computed inline without a named method (a sort-and-index median, as VolumeBaseline had before ANALYTICS-CORE-1 M2), and a robust z named just `z` (RobustStats.z).
+// NOT detected (stated so nobody reads a 0 as "none"): SQL quoting done some other way than the doubling above (a char
+// loop, a regex, a String.format of a quote), statistics computed inline without a named method (a sort-and-index median, as VolumeBaseline had before ANALYTICS-CORE-1 M2), and a robust z named just `z` (RobustStats.z).
 //
 // EXEMPTIONS are explicit — category + file + member ('*' = the whole file) + reason, one JSON object per line in
 // tools/data-ops-duplication.exemptions.json, never inferred. An HTML/XML/CSV/JSON escaper
@@ -44,7 +49,7 @@ import { moduleLabel, reactorModuleDirs } from './reactor-modules.mjs';
 export const BASELINE = 'tools/data-ops-duplication.baseline.json';
 export const EXEMPTIONS = 'tools/data-ops-duplication.exemptions.json';
 export const CATEGORIES = {
-    a: 'private SQL quoting helpers outside SqlBuilder/SqlIdent',
+    a: 'private SQL quoting helpers and inline quote doubling outside SqlBuilder/SqlIdent',
     b: 'hand-built read_*( outside SqlViews',
     c: 'private statistics / similarity / union-find outside the Analytics Kernel and graph library',
     d: 'JVM re-implementation of the Measure grammar outside MeasureCompiler',
@@ -136,7 +141,9 @@ function headerMethod(header) {
 
 const lineAt = (text, offset) => { let l = 1; for (let k = 0; k < offset; k++) if (text.charCodeAt(k) === 10) l++; return l; };
 
-const QUOTING = /^(q|quote|quoteIdent|quoteIdentifier|quoteLiteral|ident|lit|literal|sqlLiteral|sqlString|sqlStr|sqlPath|escapeSql|esc|escape)$/;
+const QUOTING = /^(q|quote|quoteIdent|quoteIdentifier|quoteLiteral|ident|lit|literal|sqlLiteral|sqlString|sqlStr|sqlPath|escapeSql|esc|escape|escapeIdent|escapeIdentifier|escapeLiteral|sqlIdent|sqlQuote|quoteSql)$/;
+/** Inline SQL quote doubling: .replace("'", "''") = a literal, .replace("\"", "\"\"") = an identifier; replaceAll and a char first argument too. */
+const INLINE = /\.replace(?:All)?\(\s*(?:"(')"|'(\\')'|"\\""|'"')\s*,\s*(?:"''"|"\\"\\"")\s*\)/g;
 const STATS = /^(median|lowerMedian|percentile\w*|quantile\w*|mad|\w*Mad|stddev|stdDev|variance|zScore|robustZ\w*|jaroWinkler|levenshtein|jaccard\w*)$/;
 const READER = /\bread_(parquet|csv|csv_auto|json|json_auto|ndjson|ndjson_auto|xlsx)\s*\(/;
 
@@ -149,8 +156,15 @@ export function scanFile(file, text) {
     const enclosing = (off) => { let best = null; for (const m of ms) if (m.start < off && off < m.end && (!best || m.start > best.start)) best = m; return best?.name ?? '<class>'; };
     const out = [];
     const hit = (category, offset, member, note = '') => out.push({ category, file, line: lineAt(text, offset), member, note });
-    if (!inHome('a', file)) for (const m of ms) if (QUOTING.test(m.name) && /\bString$/.test(m.prefix)) {
-        hit('a', m.offset, m.name, /\b(SqlIdent|SqlBuilder)\.\w+\s*\(/.test(code.slice(m.start, m.end)) ? 'delegates to the shared builder' : 'reimplements');
+    if (!inHome('a', file)) {
+        const helpers = ms.filter((m) => QUOTING.test(m.name) && /\bString$/.test(m.prefix));
+        for (const m of helpers) {
+            hit('a', m.offset, m.name, /\b(SqlIdent|SqlBuilder)\.\w+\s*\(/.test(code.slice(m.start, m.end)) ? 'delegates to the shared builder' : 'reimplements');
+        }
+        for (const r of code.matchAll(INLINE)) {
+            if (helpers.some((m) => m.start < r.index && r.index < m.end)) continue;     // counted once, as its helper
+            hit('a', r.index, enclosing(r.index), r[1] || r[2] ? 'inline literal escape' : 'inline identifier escape');
+        }
     }
     if (!inHome('b', file)) for (const s of strings) { const r = READER.exec(s.value); if (r) hit('b', s.offset, enclosing(s.offset), `read_${r[1]}(`); }
     if (!inHome('c', file)) {

@@ -1,5 +1,16 @@
 {
-  "a": {},
+  "a": {
+    "inspecto": 1,
+    "inspecto-backup": 1,
+    "inspecto-engine": 18,
+    "inspecto-entity-store": 1,
+    "inspecto-etl": 3,
+    "inspecto-intelligence": 1,
+    "inspecto-la-storage": 1,
+    "inspecto-ops": 2,
+    "inspecto-sql": 6,
+    "inspecto-util": 1
+  },
   "b": {},
   "c": {
     "inspecto-intelligence": 1,

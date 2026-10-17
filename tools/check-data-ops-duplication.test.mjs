@@ -44,6 +44,37 @@ test('a: a private SQL quoting helper is found; delegation is noted; a non-Strin
     assert.deepEqual(f.map((x) => [x.category, x.member, x.line, x.note]), [['a', 'q', 2, 'reimplements'], ['a', 'lit', 3, 'delegates to the shared builder']]);
 });
 
+test('a: inline quote doubling is found per call with its enclosing method; JSON/HTML escapes, comments and helper bodies are not', () => {
+    const f = scanFile(J('m', 'I'), `class I {
+        void where(String v, String c) {
+            sql = c + " = '" + v.replace("'", "''") + "'";
+            sql2 = "COPY t TO '" + p.toString().replace('\\\\', '/').replaceAll("'", "''") + "'";
+        }
+        String col(String n) { return "\\"" + n.replace( "\\"" , "\\"\\"" ) + "\\""; }
+        String json(String s) { return s.replace("\\"", "\\\\\\"").replace("'", "&apos;").replace("\\"", "&quot;"); }
+        // v.replace("'", "''")
+        private static String escapeIdent(String s) { return s.replace("\\"", "\\"\\""); }
+    }`);
+    assert.deepEqual(f.map((x) => [x.member, x.line, x.note]), [
+        ['escapeIdent', 9, 'reimplements'],
+        ['where', 3, 'inline literal escape'],
+        ['where', 4, 'inline literal escape'],
+        ['col', 6, 'inline identifier escape'],
+    ]);
+    const ch = scanFile(J('m', 'K'), `class K { String a(String v) { return v.replace('\\'', "''") + v.replace('"', "\\"\\""); } }`);
+    assert.deepEqual(ch.map((x) => x.note), ['inline literal escape', 'inline identifier escape']);
+    assert.deepEqual(scanFile('platform/inspecto-util/src/main/java/com/gamma/util/SqlIdent.java',
+        'class S { static String w(String s) { return s.replace("\'", "\'\'"); } }'), []);
+});
+
+test('a: an exemption on the enclosing method suppresses an inline CSV quote (RFC-4180 doubles " like an identifier)', () => {
+    const src = { [J('m', 'R')]: 'class R { String csv(String v) { return \'"\' + v.replace("\\"", "\\"\\"") + \'"\'; } String sql(String v) { return v.replace("\'", "\'\'"); } }' };
+    const r = run(src, [{ category: 'a', file: J('m', 'R'), member: 'csv', reason: 'RFC-4180 CSV' }]);
+    assert.deepEqual(r.findings.map((f) => [f.member, f.note]), [['sql', 'inline literal escape']]);
+    assert.deepEqual(r.exempted.map((f) => f.member), ['csv']);
+    assert.equal(run(src, []).findings.length, 2);
+});
+
 test('a: the shared builders are the home, not findings', () => {
     assert.deepEqual(scanFile('platform/inspecto-util/src/main/java/com/gamma/util/SqlIdent.java', 'class S { public static String q(String s) { return s; } }'), []);
 });
@@ -125,6 +156,11 @@ test('CLI: report-only exits 0; --ratchet fails on a new copy and passes (asking
         const up = cli('--ratchet');
         assert.equal(up.status, 1);
         assert.match(up.stderr, /RATCHET FAILED[\s\S]*b\/mod: 1 > baseline 0/);
+
+        put(J('mod', 'B'), 'class B { void w(String v) { run("x = \'" + v.replace("\'", "\'\'") + "\'"); } }');
+        const inline = cli('--ratchet');
+        assert.equal(inline.status, 1, 'an inline quote doubling is a new copy too');
+        assert.match(inline.stderr, /a\/mod: 3 > baseline 2/);
 
         put(J('mod', 'B'), 'class B { }');
         put(J('mod', 'A'), 'class A { static String q(String s) { return s; } }');
