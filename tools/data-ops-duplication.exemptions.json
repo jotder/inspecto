@@ -25,5 +25,6 @@
   {"category":"b","file":"platform/inspecto-engine/src/main/java/com/gamma/consignment/GuardedDerivedTableEmitter.java","member":"check","reason":"a refusal MESSAGE quoting the read_parquet(...) of author SQL back to them; builds no SQL"},
   {"category":"b","file":"platform/inspecto-util/src/main/java/com/gamma/util/SchemaExtractor.java","member":"*","reason":"schema discovery over a raw delimited sample file with a caller-given delimiter (read_csv_auto)"},
   {"category":"b","file":"platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/ComponentPreview.java","member":"*","reason":"Pipeline editor preview of a raw INPUT file with the component's own parse options (csv/fixed-width/json), mirroring the ingester"},
-  {"category":"d","file":"platform/inspecto-engine/src/main/java/com/gamma/alert/Alert.java","member":"*","reason":"maps aggregate names to display labels (\"Distinct count\", \"Average\") for an Alert Rule message; evaluates nothing"}
+  {"category":"d","file":"platform/inspecto-engine/src/main/java/com/gamma/alert/Alert.java","member":"*","reason":"maps aggregate names to display labels (\"Distinct count\", \"Average\") for an Alert Rule message; evaluates nothing"},
+  {"category":"c","file":"inspecto/src/main/java/com/gamma/report/ReportService.java","member":"percentile","reason":"delegates to Stats.quantile(x, p / 100, NEAREST_RANK) in the Analytics Kernel (ANALYTICS-CORE-1 M2); holds only the report rule that an empty window reads 0"}
 ]
