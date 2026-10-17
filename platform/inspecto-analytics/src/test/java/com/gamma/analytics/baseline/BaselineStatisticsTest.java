@@ -1,4 +1,4 @@
-package com.gamma.anomaly.baseline;
+package com.gamma.analytics.baseline;
 
 import static org.junit.jupiter.api.Assertions.*;
 

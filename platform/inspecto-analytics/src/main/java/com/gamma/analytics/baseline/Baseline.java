@@ -1,4 +1,4 @@
-package com.gamma.anomaly.baseline;
+package com.gamma.analytics.baseline;
 
 /**
  * One computed baseline: the {@code baseline} / {@code peerBaseline} member of the explanation record (design §5).

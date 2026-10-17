@@ -1,6 +1,6 @@
 # Analytics core — one home for data operations and statistics (plan, 2026-10-17)
 
-> 🟡 **PLAN — nothing built.** MoSCoW scope over what Inspecto has today; decisions D-AN1…D-AN8 **taken
+> 🟡 **IN FLIGHT — M1 and the M6 baseline contract built 2026-10-17** (as-built: `okf/backend/analytics-kernel.md`); everything else not started. MoSCoW scope over what Inspecto has today; decisions D-AN1…D-AN8 **taken
 > 2026-10-17** by the agent under the operator's delegated authority, each with its reason (§7). Row:
 > `ANALYTICS-CORE-1` in `docs/BACKLOG.md`.
 >

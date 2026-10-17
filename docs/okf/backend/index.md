@@ -19,6 +19,7 @@ Start with the [Overview](overview.md) and [Architecture](architecture.md), then
 * [Architecture layers](architecture-layers.md) - the platform layer map, storage-per-concern table (moved from the retired root-level `architecture-layers.md`).
 * [Module taxonomy](module-taxonomy.md) - target model for itemized distribution: three axes, Offerings, Installed/Enabled/Permitted gates (MODULE-REORG-1, P0).
 * [Module reorganisation: decisions](module-reorganisation-decisions.md) - the D-MR1..D-MR12 record, declined items and their preconditions, the offering map, Decision Kernel, deliberate exceptions.
+* [Analytics Kernel](analytics-kernel.md) - `inspecto-analytics`: one written definition per statistic (median and quantile modes, MAD, robust z, IQR), the input rules, DuckDB parity, and the baseline contract (ANALYTICS-CORE-1).
 * [Module reorganisation: gotchas](module-reorganisation-gotchas.md) - the traps hit while splitting, moving and packaging modules, each with its rule.
 * [Modules](modules/) - the five Maven modules (engine, connectors, agent, agent-hosted, security).
 

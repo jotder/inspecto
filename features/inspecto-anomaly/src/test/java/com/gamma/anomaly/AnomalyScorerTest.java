@@ -1,9 +1,9 @@
 package com.gamma.anomaly;
 
-import com.gamma.anomaly.baseline.Baseline;
-import com.gamma.anomaly.baseline.BaselineStatistic;
-import com.gamma.anomaly.baseline.BaselineStatistics;
-import com.gamma.anomaly.baseline.Seasonality;
+import com.gamma.analytics.baseline.Baseline;
+import com.gamma.analytics.baseline.BaselineStatistic;
+import com.gamma.analytics.baseline.BaselineStatistics;
+import com.gamma.analytics.baseline.Seasonality;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;

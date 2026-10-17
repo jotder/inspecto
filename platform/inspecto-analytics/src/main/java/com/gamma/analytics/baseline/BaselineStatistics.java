@@ -1,4 +1,4 @@
-package com.gamma.anomaly.baseline;
+package com.gamma.analytics.baseline;
 
 /** Which {@link BaselineStatistic} a model is scored with. S1 accepts {@code seasonality: none} only. */
 public final class BaselineStatistics {

@@ -20,7 +20,8 @@
         anomaly-model component kind (AnomalyModel, validated fail closed by AnomalyKindValidator, with the reserved
         anomaly_scores_ output stores), the pure scorer (AnomalyScorer: robust z, weighted RMS, 0-100 per D-AD6) and the
         anomaly.score Job Type (AnomalyScoreJobType / AnomalyScoreEvaluator) writing anomaly_scores_{model} and _latest
-        with ownership markers. Baseline statistics live in the pure package com.gamma.anomaly.baseline. Package
+        with ownership markers. Baseline statistics live in the Analytics Kernel (inspecto-analytics, package com.gamma.analytics.baseline,
+        ANALYTICS-CORE-1 M6). Package
         com.gamma.anomaly.
 
         Shares the output-marker writer (com.gamma.alert.ScoreOutputDirs), EvidenceMasker and the entity-key masking
@@ -37,6 +38,13 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
+        </dependency>
+
+        <!-- The Analytics Kernel (ANALYTICS-CORE-1 M6): the baseline contract (BaselineStatistic, SeasonalBaseline,
+             PeerBaseline) and the canonical robust z (RobustStats over com.gamma.analytics.Stats). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
         </dependency>
 
         <!-- The WatchListFeed seam (com.gamma.entitylist): a model's watchList feed and exclusionList test (design §9). -->

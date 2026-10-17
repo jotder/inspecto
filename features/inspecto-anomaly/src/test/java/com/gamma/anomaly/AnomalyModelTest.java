@@ -1,6 +1,6 @@
 package com.gamma.anomaly;
 
-import com.gamma.anomaly.baseline.Seasonality;
+import com.gamma.analytics.baseline.Seasonality;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;

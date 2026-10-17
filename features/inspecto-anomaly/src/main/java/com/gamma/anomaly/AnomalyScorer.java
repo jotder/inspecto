@@ -1,8 +1,8 @@
 package com.gamma.anomaly;
 
-import com.gamma.anomaly.baseline.Baseline;
-import com.gamma.anomaly.baseline.BaselineScore;
-import com.gamma.anomaly.baseline.RobustStats;
+import com.gamma.analytics.baseline.Baseline;
+import com.gamma.analytics.baseline.BaselineScore;
+import com.gamma.analytics.baseline.RobustStats;
 
 import java.math.BigDecimal;
 import java.math.MathContext;

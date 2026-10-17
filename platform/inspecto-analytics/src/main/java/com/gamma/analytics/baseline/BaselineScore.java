@@ -1,4 +1,4 @@
-package com.gamma.anomaly.baseline;
+package com.gamma.analytics.baseline;
 
 /**
  * The z pair of one entity and feature, with the D-AD12 basis flag: when the self baseline is insufficient but a

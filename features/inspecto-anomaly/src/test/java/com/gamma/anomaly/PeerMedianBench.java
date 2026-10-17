@@ -1,11 +1,11 @@
 package com.gamma.anomaly;
 
-import com.gamma.anomaly.baseline.Baseline;
-import com.gamma.anomaly.baseline.BaselineStatistic;
-import com.gamma.anomaly.baseline.BaselineStatistics;
-import com.gamma.anomaly.baseline.PeerBaseline;
-import com.gamma.anomaly.baseline.RobustStats;
-import com.gamma.anomaly.baseline.Seasonality;
+import com.gamma.analytics.baseline.Baseline;
+import com.gamma.analytics.baseline.BaselineStatistic;
+import com.gamma.analytics.baseline.BaselineStatistics;
+import com.gamma.analytics.baseline.PeerBaseline;
+import com.gamma.analytics.baseline.RobustStats;
+import com.gamma.analytics.baseline.Seasonality;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;

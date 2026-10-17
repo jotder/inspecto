@@ -35,6 +35,7 @@ module (build role · offering role · binding time) and the Offerings that comp
 * `platform/inspecto-etl/` — `com.gamma.etl`: ingest/transform/output core, step registry, quarantine, partitioned Parquet (`etl`).
 * `platform/inspecto-event/` — `com.gamma.event` + `metrics`: the Operational-Intelligence event store + metric registry; owns `logback.xml` (`event`).
 * `platform/inspecto-workflow/` — Workflow and SLA models (`workflow`).
+* `platform/inspecto-analytics/` — the Analytics Kernel: canonical statistics and the baseline contract (`analytics`; see [analytics-kernel](../analytics-kernel.md)).
 * `platform/inspecto-access/` — access policy: roles, grants, row scope, audit trail (`access`).
 * `platform/inspecto-acquire/` — `com.gamma.acquire`: Collectors, connection profiles/registry/workbench, fingerprint ledger, stability gate, retry/circuit-breaker (`acquire`).
 * `platform/inspecto-entity-store/` — the entity store (`entity-store`).

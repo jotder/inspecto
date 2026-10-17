@@ -1,4 +1,4 @@
-package com.gamma.anomaly.baseline;
+package com.gamma.analytics.baseline;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

@@ -90,7 +90,7 @@ wording; **confirmed by the operator 2026-10-11**, no change. The peers join `ke
 
 Job Type `anomaly.score` (`AnomalyScoreJobType`; params `model`, optional `as_of` YYYY-MM-DD, UTC days)
 scores the day before `as_of` over a `window` that excludes it. `AnomalyScoreEvaluator` issues one grouped
-DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus `com.gamma.anomaly.baseline`.
+DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus `com.gamma.analytics.baseline` (the Analytics Kernel, [analytics-kernel](../analytics-kernel.md)).
 
 - **Self baseline** (`BaselineStatistic` seam ← `BaselineStatistics.forModel`; `SeasonalBaseline`):
   median and `MAD × 1.4826` of the same-slot buckets, walking the fallback chain `weekday → none` until a

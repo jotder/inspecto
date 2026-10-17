@@ -1,8 +1,8 @@
 package com.gamma.anomaly;
 
-import com.gamma.anomaly.baseline.PeerBaseline;
-import com.gamma.anomaly.baseline.Seasonality;
-import com.gamma.anomaly.baseline.SeasonalBaseline;
+import com.gamma.analytics.baseline.PeerBaseline;
+import com.gamma.analytics.baseline.Seasonality;
+import com.gamma.analytics.baseline.SeasonalBaseline;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.util.Values;
 
