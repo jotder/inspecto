@@ -349,6 +349,14 @@ numbers shown are always the server's, never a client-side sweep. ⚠ Both tiles
 only; the first-run panel (no runs yet) does not show them. Read-shaped GETs, so neither needed a
 `CapabilityManifest` entry; both are in the generated OpenAPI skeleton.
 
+✅ **The Datasets-written tile counts BOTH write signals** (2026-10-17). A live telco-fraud drive showed it at 0
+beside 17 Job writes: `dataset.write` is emitted only by `ConsignmentProcessJobType` and `MaterializeTask`, while
+`sql.template` Jobs emit `job.dataset.produced` and a polled Collector emits neither. `/signals/count` takes ONE
+`type` and returns a distinct-Dataset *number*, not names, so Home calls it twice (`forkJoin`, one failed call
+tolerated) and SUMS `count` and `datasets`; `capped` is the OR. The two types come from disjoint emitters, so a
+write is never double-counted, but a Dataset written both ways counts once per type — `datasets` is an upper
+bound. Exact distinct-across-types would need a route change (several `type` values returning names); not built.
+
 Two guest routes and one public share route sit outside the shell; the
 rest hang off a shelled route with the login guard and an initial-data resolver, with roughly 40 lazily
 loaded children. Breadcrumbs are a shared component fed by each detail pane rather than derived from

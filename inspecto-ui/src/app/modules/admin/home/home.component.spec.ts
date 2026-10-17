@@ -22,6 +22,7 @@ interface Stubs {
     breached?: number;
     breachedError?: unknown;
     writes?: { count: number; datasets: number; capped: boolean };
+    produced?: { count: number; datasets: number; capped: boolean };
     writesError?: unknown;
     runs?: unknown[];
     runsError?: { status: number };
@@ -59,8 +60,10 @@ function create(s: Stubs = {}) {
         ),
     };
     const events = {
-        signalCount: vi.fn(() =>
-            s.writesError ? throwError(() => s.writesError) : of(s.writes ?? { count: 0, datasets: 0, capped: false }),
+        signalCount: vi.fn((type: string) =>
+            s.writesError
+                ? throwError(() => s.writesError)
+                : of((type === 'dataset.write' ? s.writes : s.produced) ?? { count: 0, datasets: 0, capped: false }),
         ),
     };
     const session = {
@@ -277,7 +280,7 @@ describe('HomeComponent', () => {
             try {
                 const { events } = create({ runs: [RUN()] });
                 vi.advanceTimersByTime(30000);
-                expect(events.signalCount).toHaveBeenCalledTimes(2);
+                expect(events.signalCount).toHaveBeenCalledTimes(4);
             } finally {
                 vi.useRealTimers();
             }
@@ -296,6 +299,21 @@ describe('HomeComponent', () => {
             expect(w).not.toContain('at least');
         });
 
+        it('counts a write recorded only as job.dataset.produced, and sums both types', () => {
+            const only = create({ runs: [RUN()], produced: { count: 5, datasets: 2, capped: false } });
+            const t1 = only.el.querySelector('[data-testid="tile-datasets-written"]')?.textContent ?? '';
+            expect(t1).toContain('2');
+            expect(t1).toContain('5 writes');
+            expect(only.events.signalCount).toHaveBeenCalledWith('job.dataset.produced', expect.any(Number));
+            const both = create({
+                runs: [RUN()],
+                writes: { count: 3, datasets: 1, capped: false },
+                produced: { count: 5, datasets: 2, capped: true },
+            });
+            const t2 = both.el.querySelector('[data-testid="tile-datasets-written"]')?.textContent ?? '';
+            expect(t2).toContain('8 writes (at least)');
+        });
+
         it('says "at least" when the ledger count is capped', () => {
             const { el } = create({ runs: [RUN()], writes: { count: 10000, datasets: 12, capped: true } });
             expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('at least');
@@ -304,16 +322,25 @@ describe('HomeComponent', () => {
         it('re-reads the counts on a tick, so a page opened before the writes stops showing 0', () => {
             vi.useFakeTimers();
             try {
-                const { fixture, el, events } = create({ runs: [RUN()], writes: { count: 2, datasets: 1, capped: false } });
+                const { fixture, el, events } = create({
+                    runs: [RUN()],
+                    writes: { count: 2, datasets: 1, capped: false },
+                });
                 expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('2 writes');
-                events.signalCount.mockReturnValue(of({ count: 17, datasets: 9, capped: false }));
+                events.signalCount.mockImplementation((t: string) =>
+                    of(
+                        t === 'dataset.write'
+                            ? { count: 17, datasets: 9, capped: false }
+                            : { count: 0, datasets: 0, capped: false },
+                    ),
+                );
                 vi.advanceTimersByTime(30_000);
                 fixture.detectChanges();
-                expect(events.signalCount).toHaveBeenCalledTimes(2);
+                expect(events.signalCount).toHaveBeenCalledTimes(4);
                 expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('17 writes');
                 fixture.destroy();
                 vi.advanceTimersByTime(60_000);
-                expect(events.signalCount).toHaveBeenCalledTimes(2);   // the tick dies with the page
+                expect(events.signalCount).toHaveBeenCalledTimes(4); // the tick dies with the page
             } finally {
                 vi.useRealTimers();
             }
