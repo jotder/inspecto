@@ -101,6 +101,11 @@ public final class ObjectsAnalyticsJob implements Job {
         // values are still honoured first, so the direct-construction tests are unchanged.
         ObjectService svc = objects == null ? null : objects.get();
         if (svc == null) svc = OpsJobTypes.engineFor(ctx);
+        // Under a dry run the `objects` grant is DryRunServices' stand-in, which deliberately hides the engine
+        // (PLATFORM-SERVICES-DRYRUN-GAP-1) - so there is nothing to sample, and that is not an install fault.
+        if (svc == null && ctx.dryRun())
+            return JobResult.ok("objects.analytics (dry run): the Object Engine is not handed to a dry run - "
+                    + "nothing read, nothing written", (System.nanoTime() - t0) / 1_000_000L);
         if (svc == null)
             throw new IllegalStateException("objects.analytics needs the space Object Engine (the inspecto-ops module's ObjectEngineProvider is not installed)");
         // ⛔ Not the JVM-wide -Dassist.write.root: this job already knows its space (it resolves dataDir

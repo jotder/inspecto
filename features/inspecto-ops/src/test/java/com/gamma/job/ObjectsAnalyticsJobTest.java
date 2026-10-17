@@ -310,6 +310,35 @@ class ObjectsAnalyticsJobTest {
         }
     }
 
+    @Test
+    void aDryRunThroughTheGrantedServicesWritesNothingAndDoesNotFail(@TempDir Path tmp) throws Exception {
+        // The production shape: no supplier, so the engine is resolved from JobContext.services(), which a
+        // dry run wraps in DryRunServices. Since PLATFORM-SERVICES-DRYRUN-GAP-1 that grant holds the `objects`
+        // stand-in, not the engine: the Run must still succeed as a dry run, not fail "engine not installed".
+        Path data = tmp.resolve("data");
+        Path write = tmp.resolve("write");
+        Files.createDirectories(data);
+        Files.createDirectories(write);
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", write.toString());
+        try {
+            PlatformServiceRegistry host = new PlatformServiceRegistry();
+            host.register("objects", com.gamma.objects.ObjectAccess.class, seeded().access());
+            PlatformServices dry = DryRunServices.wrap(host.grant(java.util.Set.of("objects")), new DryRunContext().log());
+            JobResult result = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of()), data.toString(), null)
+                    .run(new DryRunContext() {
+                        @Override public PlatformServices services() { return dry; }
+                    });
+
+            assertEquals("SUCCESS", result.status(), result.message());
+            assertTrue(result.message().contains("dry run"), result.message());
+            assertFalse(Files.exists(data.resolve("ops_analytics")), "no sample directory created");
+            assertFalse(Files.exists(write.resolve("registry")), "no dataset stamped");
+        } finally {
+            restore(prior);
+        }
+    }
+
     // ── 3. fail-closed + registration ─────────────────────────────────────────────────
 
     @Test
@@ -438,7 +467,7 @@ class ObjectsAnalyticsJobTest {
         }
     }
 
-    private static final class DryRunContext extends CapturingContext {
+    private static class DryRunContext extends CapturingContext {
         @Override public boolean dryRun() { return true; }
     }
 }

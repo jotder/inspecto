@@ -68,7 +68,9 @@ final class MailSendJob implements Job {
 
         // Recipients are logged by COUNT, not by address: a Run Log is widely readable and the addresses
         // are the operator's contact data, not diagnostics.
-        ctx.log().info(sent ? "mail sent" : "no email channel configured — nothing sent",
+        // A dry run's `mail` stand-in answers false too: say why, rather than blame a missing channel.
+        String nothingSent = ctx.dryRun() ? "dry run — nothing sent" : "no email channel configured — nothing sent";
+        ctx.log().info(sent ? "mail sent" : nothingSent,
                 "recipients", to.size() + cc.size(), "subject", subject);
         ctx.signals().emit(com.gamma.signal.SignalType.MAIL_SENT, Severity.INFO,
                 Map.of("job", cfg.name(), "run", ctx.runId(), "recipients", to.size() + cc.size(), "sent", sent));
@@ -80,7 +82,7 @@ final class MailSendJob implements Job {
                 // SMTP would not be red on every fire — but a scheduled mail job then read GREEN forever while
                 // delivering nothing, which is the false-green shape this repo records as its commonest
                 // defect. SKIPPED is the honest third status: not red on every fire, and not a success either.
-                : JobResult.skipped("no email channel configured — nothing sent");
+                : JobResult.skipped(nothingSent);
 
     }
 

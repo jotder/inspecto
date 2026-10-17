@@ -73,8 +73,8 @@ Interfaces live beside their engine facility and carry `@PublicApi`.
 | `consignment-status` | `ConsignmentStatusAccess.consignment/latestFor/outputs/fileStages` | the loaded pipelines' manifests, plus the two default-off registries | n/a — read-only |
 | `alerts` | `AlertAccess.evaluateRules()` → `List<Alert>` (also `evaluateFreshnessRules()` and `evaluateInvestigationRules()`, narrower sweeps whose default is the full one) | `AlertService`'s evaluator; `alert.evaluate` and `la.detect` (Link Analysis standing detection, 2026-10-04) are the consumers (added 2026-08-10 on D7's demand — see §6) | ⚠ **cannot be previewed**: logs the would-be evaluation and returns empty, and a consumer must report that nothing was *checked* |
 | `analytics` | `AnalyticsAccess` (`com.gamma.query`): `mean`, `variance`/`stddev` (`Spread.POPULATION` \| `SAMPLE`), `median(MedianMode)`, `quantile(QuantileMode)`, `mad`, `scaledMad`, `zScore`, `robustZ`, `iqr`, `ratio`, `rate`; `profileSql(DatasetAccess.Read, columns, quantiles…)`; `truncate` / `truncateSql(TimeGrain, ZoneId)` | the Analytics Kernel (`platform/inspecto-analytics`) — `AnalyticsAccess.kernel()` delegates every call; the interface is in the engine because the kernel may not reach it (D-12 + D-AN1). Profiling composes with a `datasets` read the caller already holds; it opens nothing. Bound by the host and pre-bound in `PackTestHarness` (ANALYTICS-CORE-1 S7, 2026-10-17) | n/a — read-only: pure functions, handed through unchanged |
-| `mail` | `MailAccess.send(to, cc, subject, body[, attachments])` | the notification channels (`MailAccess.overChannels()`); used by the `mail.send` Job Type | ⚠ **not substituted** in `DryRunServices` today — see `PLATFORM-SERVICES-DRYRUN-GAP-1` |
-| `objects` | `ObjectAccess` — `hasActive`, `hasActiveMatching`, `activeAttributeIndex`, `open`, `transition` | `inspecto-ops` `ObjectServiceAccess`, bound only when the Incidents add-on is installed; used by `objects.analytics` and `caserule.evaluate` | ⚠ **not substituted** in `DryRunServices` today — see `PLATFORM-SERVICES-DRYRUN-GAP-1` |
+| `mail` | `MailAccess.send(to, cc, subject, body[, attachments])` | the notification channels (`MailAccess.overChannels()`); used by the `mail.send` Job Type | logs the would-be send (recipient **count** and subject — never the addresses or the body), sends nothing and answers `false`; `mail.send` then reports SKIPPED *dry run — nothing sent* |
+| `objects` | `ObjectAccess` — `hasActive`, `hasActiveMatching`, `activeAttributeIndex`, `open`, `transition` | `inspecto-ops` `ObjectServiceAccess`, bound only when the Incidents add-on is installed; used by `objects.analytics` and `caserule.evaluate` | reads (`hasActive*`, `activeAttributeIndex`, tags, `summary`, `findByStatus`, `byEntity`) pass through; every write (`open`, `transition`, `saveAttributes`, `link`, `linkSubject`, `addTag`, `ensureTag`) logs and changes nothing — `open` returns a synthetic `dry-run:` id, `transition` / `saveAttributes` answer `false`. ⚠ The stand-in is not an `ObjectServiceAccess`, so `OpsJobTypes.engineFor` finds **no engine** under a dry run: `caserule.evaluate` reports it evaluated nothing (no preview form, like `alert.evaluate`) and `objects.analytics` reports nothing read |
 | `datasets` | `DatasetAccess.read(spaceId, datasetId)` | `DatasetRelation` with per-call pinning (§7e) | n/a — read-only |
 | `link-index` | `LinkIndexAccess.build(Request)` | the Link Analysis index builder | reports a `DRY_RUN` outcome, builds nothing |
 
@@ -88,6 +88,20 @@ interfaces were shown sufficient rather than assumed so.
 act (the stand-in logs to the RunLog and performs nothing), read-only services pass through
 unchanged, and visibility is never widened. **Every new mutating service must be substituted there**
 — otherwise `dryRun()` on the Job becomes a lie the moment the Job calls it.
+
+That rule went unenforced until 2026-10-17: `mail` and `objects` joined the menu without a stand-in, so a
+dry run of `mail.send` really mailed and a dry run of `caserule.evaluate` really opened a Case
+(`PLATFORM-SERVICES-DRYRUN-GAP-1`, reproduced red in `DryRunServicesTest`, `MailSendJobTypeTest` and
+`CaseRuleEvalJobTest` before the fix). It is now a test: **`DryRunCoverageTest`** (`inspecto` module) reads
+every `platformServices.register(...)` in `CollectorService`, binds each interface to a proxy, and fails
+unless a dry-run lookup returns something else — or the id is on the test's read-only list with its reason
+(`schema`, `consignment-status`, `datasets`, `analytics`). A pack-contributed service is held to the same rule
+at registration (`ServiceProvider.readOnly()` or a `dryRun` stand-in).
+
+⚠ **A consumer that downcasts the seam escapes nothing.** The `objects` stand-in is deliberately a
+different class from the real `ObjectServiceAccess`, so `OpsJobTypes.engineFor` — which unwraps the seam to
+reach the whole `ObjectService` — returns null under a dry run. A Job that resolves the engine that way must
+check `ctx.dryRun()` before treating null as "module not installed".
 
 ### Absence is modeled, not crashed on
 
