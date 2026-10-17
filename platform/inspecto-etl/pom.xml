@@ -30,6 +30,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-util</artifactId>
         </dependency>
+        <!-- SqlViews: the one read_*( option list (ANALYTICS-CORE-1 M9) - DuckLakeRegistrar reads the output it registers through it. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-sql</artifactId>
+        </dependency>
 
         <!--
           Path containment (S4): PipelineConfigParser enforces config-declared refs against the

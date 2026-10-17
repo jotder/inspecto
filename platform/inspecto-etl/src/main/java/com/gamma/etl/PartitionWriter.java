@@ -17,6 +17,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static com.gamma.util.SqlIdent.sqlStr;
+
 /**
  * Writes a materialized table to partitioned output, excluding the internal
  * {@code __src_id} column, and reveals each partition file under a stable name
@@ -340,11 +342,6 @@ public final class PartitionWriter {
                 "SELECT sum(total_compressed_size) FROM parquet_metadata(" + sqlStr(file) + ")")) {
             return rs.next() ? rs.getLong(1) : -1L;
         }
-    }
-
-    /** A single-quoted SQL literal. Object keys are config-derived, so the quote doubling is not optional. */
-    private static String sqlStr(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 
     /**

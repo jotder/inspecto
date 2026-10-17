@@ -102,6 +102,27 @@ class JsonParsingTest {
         }
     }
 
+    /**
+     * A JSON key with an apostrophe, read by the array reader: the key is a column of {@code read_json}, so its
+     * projection is an IDENTIFIER ({@code SqlIdent.q}). Before ANALYTICS-CORE-1 M9 it was escaped as a string
+     * literal inside double quotes ({@code "o''brien"}), naming a column that does not exist.
+     */
+    @Test
+    void anApostropheInAJsonKeyReadsThroughTheArrayReader(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema_q1.toon");
+        Files.writeString(schema, SCHEMA.replace("ACCOUNT_NUMBER,\"account\",VARCHAR", "ACCOUNT_NUMBER,\"o'brien\",VARCHAR"),
+                StandardCharsets.UTF_8);
+        PipelineConfig cfg = loadWithSchema(dir, "q1", PARSING.replace("format: newline", "format: array"), schema);
+        File json = write(dir, "ev.json", """
+                [{"o'brien":"A00001","event_date":"2020-04-03","amount":1},
+                 {"o'brien":"B00002","event_date":"2020-04-04","amount":2}]
+                """);
+        try (Connection conn = open()) {
+            DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(List.of("A00001", "B00002"), col(conn, "raw_f0", "ACCOUNT_NUMBER"));
+        }
+    }
+
     // ── validation ──────────────────────────────────────────────────────────────
 
     @Test

@@ -1,5 +1,6 @@
 package com.gamma.etl;
 
+import com.gamma.util.SqlIdent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -206,18 +207,7 @@ public final class RecordTransform {
 
     // ── rendering (mirrors sql-functions.ts § rendering) ─────────────────────────────────────────────
 
-    private static final Pattern PLAIN_IDENT = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     private static final Pattern NUMERIC     = Pattern.compile("^-?\\d+(\\.\\d+)?$");
-
-    /** Double-quote an identifier unless it is already plain — parsed headers carry spaces and punctuation. */
-    public static String quoteIdentifier(String name) {
-        return PLAIN_IDENT.matcher(name).matches() ? name : '"' + name.replace("\"", "\"\"") + '"';
-    }
-
-    /** Single-quote a SQL string literal, doubling any embedded quote. */
-    public static String quoteLiteral(String value) {
-        return "'" + value.replace("'", "''") + "'";
-    }
 
     /**
      * Render one parameter value per its declared type, or {@code null} when unusable.
@@ -229,13 +219,13 @@ public final class RecordTransform {
     static String renderParam(Param param, String raw) {
         String supplied = raw != null ? raw : (param.defaultValue() != null ? param.defaultValue() : "");
         if (param.type() == ParamType.TEXT) {
-            if (supplied.isEmpty()) return param.optional() ? quoteLiteral("") : null;
-            return quoteLiteral(supplied);
+            if (supplied.isEmpty()) return param.optional() ? SqlIdent.sqlStr("") : null;
+            return SqlIdent.sqlStr(supplied);
         }
         String value = supplied.trim();
         if (value.isEmpty()) return null;
         return switch (param.type()) {
-            case COLUMN -> quoteIdentifier(value);
+            case COLUMN -> SqlIdent.qIfNeeded(value);
             case NUMBER -> NUMERIC.matcher(value).matches() ? value : null;
             case ENUM   -> param.options().contains(value) ? value : null;
             case SQL    -> value;
@@ -256,7 +246,7 @@ public final class RecordTransform {
         String src = source == null ? "" : source;
         if (fn.usesSource() && src.trim().isEmpty())
             return new Rendered(null, "Pick the column this field reads.");
-        String out = fn.template().replace("{source}", quoteIdentifier(src.trim()));
+        String out = fn.template().replace("{source}", SqlIdent.qIfNeeded(src.trim()));
         for (Param p : fn.params()) {
             String rendered = renderParam(p, args == null ? null : args.get(p.name()));
             if (rendered == null) {
