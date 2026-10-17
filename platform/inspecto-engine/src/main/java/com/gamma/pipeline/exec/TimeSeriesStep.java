@@ -129,7 +129,7 @@ public final class TimeSeriesStep {
             measures.add(measure);
         }
         Object bc = cfg.get("bucket_column");
-        String bucket = bc == null || bc.toString().isBlank() ? "bucket" : ident(bc, "bucket_column", RESAMPLE);
+        String bucket = bc == null || bc.toString().isBlank() ? "bucket" : columnName(bc, "bucket_column", RESAMPLE);
         LocalDateTime from = bound(cfg, "from", RESAMPLE);
         LocalDateTime to = bound(cfg, "to", RESAMPLE);
         if (from != null && to != null && grain.truncate(from).isAfter(grain.truncate(to)))
@@ -166,7 +166,7 @@ public final class TimeSeriesStep {
         }
         Object sx = cfg.get("suffix");
         String suffix = sx == null || sx.toString().isBlank() ? "_prev" : sx.toString().trim();
-        for (String c : columns) ident(c + suffix, "suffix", SHIFT);
+        for (String c : columns) columnName(c + suffix, "suffix", SHIFT);
         return new Shift(time, grain, zone, List.copyOf(groupBy), List.copyOf(columns), periods, suffix);
     }
 
@@ -214,7 +214,7 @@ public final class TimeSeriesStep {
     private static String required(Map<?, ?> cfg, String key, String kind, String what) {
         Object v = cfg.get(key);
         if (v == null || v.toString().isBlank()) throw bad(kind, "needs a '" + key + "' - " + what);
-        return ident(v, key, kind);
+        return columnName(v, key, kind);
     }
 
     private static TimeGrain grain(Map<?, ?> cfg, String kind) {
@@ -259,15 +259,15 @@ public final class TimeSeriesStep {
         List<String> out = new ArrayList<>();
         Object v = cfg.get(key);
         if (v instanceof List<?> l) {
-            for (Object o : l) if (o != null && !o.toString().isBlank()) out.add(ident(o, key, kind));
+            for (Object o : l) if (o != null && !o.toString().isBlank()) out.add(columnName(o, key, kind));
         } else if (v != null && !v.toString().isBlank()) {
             if (!(v instanceof String)) throw bad(kind, "'" + key + "' must be a list of column names");
-            out.add(ident(v, key, kind));
+            out.add(columnName(v, key, kind));
         }
         return out;
     }
 
-    private static String ident(Object o, String where, String kind) {
+    private static String columnName(Object o, String where, String kind) {
         String s = o.toString().trim();
         try {
             Identifiers.validate(s, kind + " " + where);
