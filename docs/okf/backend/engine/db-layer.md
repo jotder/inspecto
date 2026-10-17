@@ -115,8 +115,10 @@ after someone read the site. RFC-4180 CSV quoting doubles `"` exactly like an id
 writer's method (`EventRoutes.csv`, `AuditLogRoutes.csv`, `ReportRenderer.csvCell`, `ReportJob.csv`,
 `CsvIngester.SourceId.csv`) is exempted by name. ⚠ **It says what it cannot see:** quoting done some other way
 than the doubling `replace` (a char loop, a regex, a `String.format` of a quote), an identifier wrapped in
-`"` with no escape at all (`EnrichmentEngine.buildFilter`'s key, `ConsignmentIngestStrategy`'s `src` /
-`dst` — nothing to match), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
+`"` with no escape at all (nothing to match — `EnrichmentEngine.buildFilter`'s key and
+`ConsignmentIngestStrategy.stampReferenceVersions`' `src` / `dst` moved onto `SqlIdent.q` on 2026-10-17, after a name
+containing `"` was shown to give broken SQL; the same files still wrap other names that way: the reference view names and
+`eventTimeSource` in `EnrichmentEngine`, other table and view names in `ConsignmentIngestStrategy`), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
 only `z` (`RobustStats.z`) are not counted, so a 0 means "no copy of the escape", not "no hand-built SQL". Plan:
 [`analytics-core-plan.md`](../../../superpower/analytics-core-plan.md) §1a, §4a.
 

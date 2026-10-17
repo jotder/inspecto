@@ -71,6 +71,12 @@ class AccuracyTest {
         assertThrows(IllegalArgumentException.class, () -> Accuracy.coverage(new double[] {1}, new double[] {2}, new double[] {1}),
                 "lower > upper");
         assertThrows(NullPointerException.class, () -> Accuracy.summary(new double[] {1}, null));
+        IllegalArgumentException onlyLower = assertThrows(IllegalArgumentException.class,
+                () -> Accuracy.summary(new double[] {1}, new double[] {1}, new double[] {0}, null));
+        assertEquals("a band needs both lower and upper", onlyLower.getMessage());
+        IllegalArgumentException onlyUpper = assertThrows(IllegalArgumentException.class,
+                () -> Accuracy.summary(new double[] {1}, new double[] {1}, null, new double[] {2}));
+        assertEquals("a band needs both lower and upper", onlyUpper.getMessage());
         double[] a = A.clone();
         Accuracy.summary(a, P, LO, HI);
         assertArrayEquals(A, a, "input never modified");

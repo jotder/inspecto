@@ -38,7 +38,7 @@ feature. It ships as its own thin jar beside `inspecto.jar`
 Packages:
 
 * `com.gamma.analytics` — `Stats` (the definitions below), `MedianMode`, `QuantileMode`, `ColumnProfiler`
-  (§ Column profiler).
+  (§ Column profiler), `Md5Bucket` (§ [Holdout split](#holdout-split)).
 * `com.gamma.analytics.score` — the score output contract (M7, below).
 * `com.gamma.analytics.accuracy` — `Accuracy`, `AccuracySql`, `Backtest` (S5b, § [Accuracy and backtest](#accuracy-and-backtest)).
 * `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
@@ -143,6 +143,10 @@ a caller that writes the rest of its statement itself.
 Left in place because they are not column profiles: the rest of `EntityProfiles` (key shapes — lengths, prefixes,
 character classes, sentinels, per-day spread over the union of normalised keys), the `IndexLinkStats` index read and
 the `ValueMeasures` median.
+
+The plan's fourth consumer, **Catalog column statistics, has no code to move**: checked 2026-10-17, neither the engine's
+`com.gamma.catalog` package, `CatalogRoutes` nor the SPA's catalog computes a column statistic. When the Catalog gains
+one, it builds on `ColumnProfiler`.
 
 ⚠ The Expectation `baseline` does **not** implement `BaselineStatistic`. That contract takes one entity's time-bucketed
 history and returns a robust median plus scaled MAD under a minimum-points rule; the Expectation judges each cell against
@@ -251,7 +255,7 @@ instead of forcing one to look like the other. NULL handling in `SimilaritySql` 
 |---|---|---|
 | Screening `NameMatcher` (token similarity of the name method) | `TOKEN_JARO_WINKLER = new JaroWinkler(UTF16_CHAR, HALF, 0.1, 4, 0.0)` — the prefix boost always applied, exactly its old arithmetic. Folding, honorifics, transliteration, the phonetic reading and blocking **stay in Screening** | `NameMatcherGoldenTest` (bit for bit against the frozen old code over 20,000 seeded pairs; SHA-256 of 5,000 seeded `score` results) |
 | Intelligence `TriageRunSimilarity` / `TriageRunStore` (Triage Run recall) | `Similarity.jaccard`; its own tokenizer (lower-case, `[a-z0-9]+`, ≥ 3 characters) stays | `TriageRunSimilarityGoldenTest` (bit for bit over 20,000 seeded set pairs; SHA-256 of 5,000 seeded `score` results) |
-| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep` | [step-catalog § similarity](pipeline-graph/step-catalog.md) |
+| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep`, which adds a 1,000-character cap per value (a longer value fails the run) | [step-catalog § similarity](pipeline-graph/step-catalog.md) |
 
 Each golden test was committed against the old code first and passed after the switch with only its `SUBJECT` line
 repointed. That closed the duplication guard's category c: **0** findings (from 2), baseline rewritten.
@@ -369,13 +373,12 @@ edition; refused at save (`StepConfigSaveFindingsTest`); demo `examples/07-steps
 | `DeliveryCheck` current bucket (engine) | `TimeGrain.of(unit).truncate(now)` | wall, on UTC as before | `DeliveryCheckTest#theLastCompleteBucketIsTheOneBeforeNowAtMonthYearAndHourGrain` |
 | `KpiDefinition.Grain.start` | `TimeGrain.valueOf(name()).truncate(d)` | `LocalDate` | `KpiPeriodStartGoldenTest`, `KpiDefinitionTest`, `KpiEvaluatorTest` |
 | `MeasureCompiler.dimExpression` | `TimeGrain.parse(grain).truncateSql(col)` | wall — the SQL text is byte-identical | `MeasureCompilerTest` (pins the text), `MeasureCompilerGrainExecutionTest` |
+| `DashboardDateRange` `month-` / `quarter-` / `year-to-date` (control plane, shared-Dashboard fence) | `TimeGrain.MONTH` / `QUARTER` / `YEAR` `.truncate(anchor)` | `LocalDate`; the one zone, "today" for a Dashboard with no `asOf`, is passed explicitly (`DashboardDateRange.today(zone)`, the server's `ZoneId.systemDefault()` — the SPA twin `dashboard-date-range.ts` reads the browser's and is unchanged) | `DashboardDateRangeTest#monthAndYearToDateAtEveryBoundary` (pinned first), `#quarterToDateIsCalendarCorrectAtEveryBoundary` |
 
 Each golden test was written and committed against the old code, then passed unchanged after the switch.
 ⚠ **Kept, by decision:** `RecordTransform`'s `date.truncate` function (`DATE_TRUNC({unit}, {source})`) is not a rule of
 its own — it hands the author's free-text unit to DuckDB, any date part included (`decade`, `millisecond`), and
-narrowing it to `TimeGrain` would refuse units that run today. ⚠ `DashboardDateRange` (`month-to-date`,
-`year-to-date` in the control plane) still computes its own period start; it was not in the plan's survey and is left
-for a follow-up.
+narrowing it to `TimeGrain` would refuse units that run today.
 
 ### Tests
 
@@ -413,7 +416,8 @@ sMAPE or MAE instead). sMAPE: of the two common forms — (\|a\| + \|p\|) / 2 as
 \|a\| + \|p\| (range 0–100) — the first is the one the M3 competition and Hyndman–Koehler published, so a figure
 compares with the literature. Bias sign: predicted − actual reads naturally as "how much too high".
 
-**Input rules** are `Stats`': no pairs, unequal lengths, NaN, or a band with lower > upper throw. The SQL form casts each
+**Input rules** are `Stats`': no pairs, unequal lengths, NaN, half a band (only one of lower and upper — the message
+`a band needs both lower and upper`, as `AccuracySql.Spec`), or a band with lower > upper throw. The SQL form casts each
 column to `DOUBLE`, skips a row with a NULL in any column it uses, fails the statement through `error()` on an inverted
 band, and returns `n = 0` with NULL measures for no pairs. `AccuracySql.Spec` takes optional group columns: one row per
 group (per entity, per model).
@@ -486,7 +490,10 @@ read as `VARCHAR` (an integer key hashes as its decimal text; a NULL key has no 
 **Why MD5, not DuckDB's `hash()`.** `hash()` is DuckDB's internal hash, with no published definition and no promise to
 stay the same across versions: the JVM cannot reproduce it, and an upgrade could move entities between roles.
 `md5_number_lower` is the lower 64 bits of the MD5 of the UTF-8 bytes (digest bytes 8..15, little-endian, unsigned) —
-a fixed algorithm the JVM computes exactly, the same reading LA's index `BucketFunction` relies on.
+a fixed algorithm the JVM computes exactly. **One definition, `Md5Bucket`** (`of(text, n)`, `sql(expr, n)`, `lower64`):
+`HashSplit` and LA's index `BucketFunction` (`la-storage`) both delegate to it — before the cleanup each held its own
+copy of the digest reading. `Md5BucketTest` and `BucketFunctionTest#goldenBuckets` pin figures computed outside Java;
+neither caller's buckets moved.
 
 ### Tests (S5 b, c, d)
 

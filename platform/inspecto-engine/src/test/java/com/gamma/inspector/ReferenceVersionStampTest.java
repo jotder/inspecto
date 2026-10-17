@@ -89,6 +89,25 @@ class ReferenceVersionStampTest {
         }
     }
 
+    /**
+     * A source and target table name containing a double quote is quoted through {@code SqlIdent.q}. Before
+     * ANALYTICS-CORE-1 cleanup the two names were wrapped in quotes without escaping, which produced broken SQL.
+     */
+    @Test
+    void tableNamesContainingADoubleQuoteAreQuoted() throws Exception {
+        File db = DuckDbUtil.tempDbFile("stamp_quote_");
+        try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement()) {
+            st.execute("CREATE TABLE \"in\"\"put\" AS SELECT * FROM (VALUES ('C1','NA'),('C2','EU')) t(customer_id, region)");
+            ConsignmentIngestStrategy.stampReferenceVersions(c, "in\"put", "out\"put",
+                    ref(List.of("customer_id")), "b1", null);
+            ConsignmentIngestStrategy.stampReferenceVersions(c, "in\"put", "out\"put",
+                    ref(List.of("customer_id")), "b2", null);   // the DROP of an existing target is quoted too
+            assertEquals(List.of("C1:upsert", "C2:upsert"), ops(st, "\"out\"\"put\""));
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     @Test
     void emptyKeyIsRejected() throws Exception {
         File db = DuckDbUtil.tempDbFile("stamp_");

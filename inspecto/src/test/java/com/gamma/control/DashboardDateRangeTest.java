@@ -43,6 +43,17 @@ class DashboardDateRangeTest {
         firstDay.forEach((anchor, from) -> assertEquals(from + ".." + anchor, span("quarter-to-date", anchor), anchor));
     }
 
+    /** Month and year to date at their boundaries (a leap day included), pinned before the move onto {@code TimeGrain}. */
+    @Test
+    void monthAndYearToDateAtEveryBoundary() {
+        assertEquals("2026-01-01..2026-01-01", span("month-to-date", "2026-01-01"));
+        assertEquals("2026-12-01..2026-12-31", span("month-to-date", "2026-12-31"));
+        assertEquals("2024-02-01..2024-02-29", span("month-to-date", "2024-02-29"));
+        assertEquals("2026-01-01..2026-01-01", span("year-to-date", "2026-01-01"));
+        assertEquals("2026-01-01..2026-12-31", span("year-to-date", "2026-12-31"));
+        assertEquals("2024-01-01..2024-12-31", span("year-to-date", "2024-12-31"));
+    }
+
     @Test
     void everyDeclaredPresetResolves_andAnythingElseDoesNot() {
         for (String preset : ConfigSpecs.DASHBOARD_RANGE_PRESETS)

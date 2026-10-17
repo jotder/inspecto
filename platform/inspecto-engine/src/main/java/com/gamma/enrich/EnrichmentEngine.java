@@ -476,7 +476,7 @@ public final class EnrichmentEngine {
     }
 
     /** Build {@code (c1='v1' AND c2='v2') OR (...)} from the partition filter. */
-    private static String buildFilter(List<Map<String, String>> filter) {
+    static String buildFilter(List<Map<String, String>> filter) {
         if (filter == null || filter.isEmpty()) return "";
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < filter.size(); i++) {
@@ -487,7 +487,7 @@ public final class EnrichmentEngine {
             int j = 0;
             for (Map.Entry<String, String> e : m.entrySet()) {
                 if (j++ > 0) sb.append(" AND ");
-                sb.append('"').append(e.getKey()).append("\"=").append(SqlIdent.sqlStr(e.getValue()));
+                sb.append(SqlIdent.q(e.getKey())).append('=').append(SqlIdent.sqlStr(e.getValue()));
             }
             sb.append(')');
         }

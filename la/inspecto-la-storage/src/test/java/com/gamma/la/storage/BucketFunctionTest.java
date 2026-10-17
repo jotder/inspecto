@@ -105,6 +105,19 @@ class BucketFunctionTest {
         assertThrows(IllegalArgumentException.class, () -> BucketFunction.bucketOf("x", 0));
     }
 
+    /** Frozen buckets, computed outside Java (Python hashlib: lower 64 bits of the MD5, little-endian, unsigned mod N). */
+    @Test
+    void goldenBuckets() {
+        assertEquals(14, BucketFunction.bucketOf("alice", 16));
+        assertEquals(142, BucketFunction.bucketOf("alice", 1024));
+        assertEquals(92, BucketFunction.bucketOf("bob", 1024));
+        assertEquals(450, BucketFunction.bucketOf("\u00e9t\u00e9", 1024), "UTF-8 bytes");
+        assertEquals(971, BucketFunction.bucketOf("acct:42", 1024));
+        assertEquals(1004, BucketFunction.bucketOf("\uD83D\uDE00", 1024), "a code point above U+FFFF");
+        assertEquals(233, BucketFunction.bucketOf("", 1024));
+        assertEquals(4, BucketFunction.bucketOf("acct:42", 7), "a bucket count that is not a power of two");
+    }
+
     private static String printable(String id) {
         String s = id.length() > 40 ? id.substring(0, 40) + "...(" + id.length() + ")" : id;
         StringBuilder sb = new StringBuilder();

@@ -452,6 +452,10 @@ twin the kernel's parity test holds equal bit for bit, so a score in the output 
   characters. Normalizing first removes the common case.
 - A value that is empty (NULL) on either side gives an empty score and flag; a blank text scores 0. A non-text column is
   compared as its text.
+- **Length cap — 1,000 characters per value** (`SimilarityStep.MAX_TEXT_LENGTH`, measured on the raw text before
+  normalizing). Edit-distance and Jaro cost grow with the product of the two lengths, so a longer value **fails the run**
+  with `transform.similarity: a value in '<left>' or '<right>' is longer than 1000 characters`, as the kernel's other caps
+  fail closed. A NULL score was not used for it: NULL already means a side is empty, and would hide the refusal.
 - ⛔ **A candidate, never an identity** (decision D-M1). The flag says a pair is worth a look. The Step never merges,
   links, drops or reorders rows, and nothing may read the flag as "the same entity".
 - Identifiers are validated (`[A-Za-z_][A-Za-z0-9_]*`) and quoted; the added columns must not collide with an inbound

@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -124,7 +123,8 @@ final class ShareRoutes implements RouteModule {
         try {
             // UIE-5 (d): and the Dashboard's DEFAULT date range, for a Dataset that has its date column — same fence.
             List<Map<String, Object>> filters = new ArrayList<>(SharedDashboardFilter.terms(dashboard.get("filter"), dataset));
-            filters.addAll(DashboardDateRange.terms(dashboard, dataset, LocalDate.now()));
+            filters.addAll(DashboardDateRange.terms(dashboard, dataset,
+                    DashboardDateRange.today(java.time.ZoneId.systemDefault())));
             fenced.put("filters", filters);
             spec = MeasureCompiler.parse(fenced, 500, 10_000);
             sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));   // one past the cap, so truncated is exact
