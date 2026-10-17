@@ -59,6 +59,12 @@ class WorkingSetMeasuresTest {
                 {"entities", "sum(count)"}, {"edges", "count"}})
             assertThrows(IllegalArgumentException.class, () -> WorkingSetMeasures.compute(none, bad[0], bad[1]),
                     String.join(" ", bad));
+        // The statistical aggregates are valid Measure grammar (D-AN5) but evaluated only in SQL: over real rows
+        // each must be refused, never fall through to the numeric switch's last arm (max).
+        List<Map<String, Object>> rows = List.of(Map.of("count", 1), Map.of("count", 9));
+        for (String agg : List.of("median", "stddev", "variance", "p05", "p25", "p75", "p90", "p95", "p99"))
+            assertThrows(IllegalArgumentException.class, () -> WorkingSetMeasures.compute(rows, "links", agg + "(count)"),
+                    agg);
     }
 
     /** The engine mirrors the relation names it cannot see; a relation added to LA-20 must be added there too. */

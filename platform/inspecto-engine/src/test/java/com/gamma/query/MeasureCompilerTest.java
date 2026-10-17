@@ -65,11 +65,34 @@ class MeasureCompilerTest {
                 MeasureCompiler.render(spec.withLimit(501)));
     }
 
+    /** D-AN5: the statistical aggregates render to DuckDB's sample spread and CONTINUOUS quantiles (D-AN3). */
+    @Test
+    void theStatisticalAggregatesRenderToSampleSpreadAndContinuousQuantiles() {
+        Map<String, String> expected = new java.util.LinkedHashMap<>();
+        expected.put("median", "MEDIAN(\"amt\") AS \"median_amt\"");
+        expected.put("stddev", "STDDEV_SAMP(\"amt\") AS \"stddev_amt\"");
+        expected.put("variance", "VAR_SAMP(\"amt\") AS \"variance_amt\"");
+        expected.put("p05", "QUANTILE_CONT(\"amt\", 0.05) AS \"p05_amt\"");
+        expected.put("p25", "QUANTILE_CONT(\"amt\", 0.25) AS \"p25_amt\"");
+        expected.put("p75", "QUANTILE_CONT(\"amt\", 0.75) AS \"p75_amt\"");
+        expected.put("p90", "QUANTILE_CONT(\"amt\", 0.9) AS \"p90_amt\"");
+        expected.put("p95", "QUANTILE_CONT(\"amt\", 0.95) AS \"p95_amt\"");
+        expected.put("p99", "QUANTILE_CONT(\"amt\", 0.99) AS \"p99_amt\"");
+        expected.forEach((agg, select) -> {
+            String sql = MeasureCompiler.render(parse(Map.of("dataset", "d",
+                    "measures", List.of(Map.of("agg", agg, "field", "amt")), "groupBy", List.of("k"))));
+            assertEquals("SELECT \"k\", " + select + " FROM \"d\" GROUP BY \"k\" ORDER BY \"k\" ASC LIMIT 500", sql);
+            assertTrue(com.gamma.sql.SqlGuard.isReadOnly(sql), () -> agg + ": " + com.gamma.sql.SqlGuard.check(sql));
+            assertTrue(MeasureCompiler.NUMERIC_AGGS.contains(agg), agg + " aggregates numbers only, like sum/avg");
+        });
+    }
+
     @Test
     void measureIdsMatchTheUiConvention() {
         assertEquals("sum_amount", new MeasureCompiler.Measure("sum", "amount").id());
         assertEquals("count", new MeasureCompiler.Measure("count", null).id());
         assertEquals("countDistinct_user_id", new MeasureCompiler.Measure("countDistinct", "user_id").id());
+        assertEquals("p95_latency_ms", new MeasureCompiler.Measure("p95", "latency_ms").id());
     }
 
     @Test
@@ -88,7 +111,7 @@ class MeasureCompilerTest {
         assertThrows(IllegalArgumentException.class, () -> parse(Map.of(
                 "dataset", "d", "measures", List.of(Map.of("agg", "sum", "field", "amount); DROP TABLE x--")))));
         assertThrows(IllegalArgumentException.class, () -> parse(Map.of(
-                "dataset", "d", "measures", List.of(Map.of("agg", "median", "field", "amount")))),
+                "dataset", "d", "measures", List.of(Map.of("agg", "mode", "field", "amount")))),
                 "unknown aggregation");
         assertThrows(IllegalArgumentException.class, () -> parse(Map.of(
                 "dataset", "d", "groupBy", List.of("a b"))));

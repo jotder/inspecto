@@ -919,8 +919,8 @@ final class ConfigRoutes {
 
     /**
      * {@code transform.summarize} measures aggregating a non-numeric declared field
-     * (`TYPEFLOW-CONSUMERS-1` (a)). Only {@code sum}/{@code avg} are checked
-     * ({@link MeasureCompiler#NUMERIC_AGGS}): {@code min}/{@code max} order dates and text perfectly
+     * (`TYPEFLOW-CONSUMERS-1` (a)). Only {@code sum}/{@code avg} and the statistics (median, spread,
+     * percentiles) are checked ({@link MeasureCompiler#NUMERIC_AGGS}): {@code min}/{@code max} order dates and text perfectly
      * well and {@code count}/{@code countDistinct} ignore the value, so flagging those would be taste,
      * not a type error.
      *

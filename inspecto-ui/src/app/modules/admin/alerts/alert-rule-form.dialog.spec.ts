@@ -333,13 +333,13 @@ describe('AlertRuleFormDialog', () => {
     it('an invalid measure blocks save and shows the grammar error on screen', () => {
         const { c, save, fixture } = create({});
         c.schemaForm.form.get('kind')!.setValue('measure');
-        c.schemaForm.form.patchValue({ dataset: 'usage_ds', measure: 'median(amount)', threshold: 1 });
+        c.schemaForm.form.patchValue({ dataset: 'usage_ds', measure: 'mode(amount)', threshold: 1 });
         c.save();
         fixture.detectChanges();
         expect(c.step()).toBe('config');
         expect(save).not.toHaveBeenCalled();
         const err = fieldByLabel(fixture.nativeElement, 'Measure')!.querySelector('mat-error');
-        expect(err?.textContent).toContain('"median" is not an aggregate');
+        expect(err?.textContent).toContain('"mode" is not an aggregate');
         expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
 

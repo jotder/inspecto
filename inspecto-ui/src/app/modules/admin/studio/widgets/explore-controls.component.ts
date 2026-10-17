@@ -17,7 +17,23 @@ import {
     pickerOptions,
 } from 'app/inspecto/components/option-picker.component';
 
-const AGGS: Aggregation[] = ['sum', 'avg', 'min', 'max', 'count', 'countDistinct'];
+const AGGS: Aggregation[] = [
+    'sum',
+    'avg',
+    'min',
+    'max',
+    'count',
+    'countDistinct',
+    'median',
+    'stddev',
+    'variance',
+    'p05',
+    'p25',
+    'p75',
+    'p90',
+    'p95',
+    'p99',
+];
 const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
 
 /**

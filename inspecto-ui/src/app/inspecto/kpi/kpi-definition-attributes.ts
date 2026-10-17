@@ -1,5 +1,6 @@
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { KpiDefinition } from 'app/inspecto/api';
+import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
 
 /**
  * The KPI definition editor's attributes (ASSURE-KPI-DEFINITIONS-1) — drives `<inspecto-schema-form>` in
@@ -16,9 +17,10 @@ export const KPI_DEFINITION_ATTRIBUTES: AttributeSpec[] = [
         label: 'Measure',
         type: 'string',
         tier: 'required',
-        pattern: '(count|(count|countDistinct|sum|avg|min|max)\\([A-Za-z_][A-Za-z0-9_]*\\))',
+        // Built from the contract-pinned aggregate list, so a new aggregate reaches this form without a hand copy.
+        pattern: `(count|(${MEASURE_AGGS.join('|')})\\([A-Za-z_][A-Za-z0-9_]*\\))`,
         placeholder: 'sum(amount)',
-        help: 'count, or agg(column) with agg one of count, countDistinct, sum, avg, min, max.',
+        help: `count, or agg(column) with agg one of ${MEASURE_AGGS.join(', ')}.`,
     },
     {
         key: 'timeField',

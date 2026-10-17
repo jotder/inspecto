@@ -15,7 +15,23 @@ describe('measure grammar', () => {
         expect(MEASURE_AGGS).toEqual(MEASURE_CONTRACT.aggregations);
         // Pinned so a silently-emptied contract file can't turn the validator into a no-op that
         // accepts every aggregate name.
-        expect(MEASURE_AGGS).toEqual(['count', 'countDistinct', 'sum', 'avg', 'min', 'max']);
+        expect(MEASURE_AGGS).toEqual([
+            'count',
+            'countDistinct',
+            'sum',
+            'avg',
+            'min',
+            'max',
+            'median',
+            'stddev',
+            'variance',
+            'p05',
+            'p25',
+            'p75',
+            'p90',
+            'p95',
+            'p99',
+        ]);
     });
 
     it('takes its identifier pattern from the committed contract too', () => {
@@ -40,8 +56,11 @@ describe('measure grammar', () => {
         });
 
         it('names the allowed aggregates when the function is unknown', () => {
-            const error = measureError('median(x)');
-            expect(error).toBe('"median" is not an aggregate — use count, countDistinct, sum, avg, min, max');
+            const error = measureError('mode(x)');
+            expect(error).toBe(
+                '"mode" is not an aggregate — use count, countDistinct, sum, avg, min, max, median, stddev, variance, ' +
+                    'p05, p25, p75, p90, p95, p99',
+            );
         });
 
         it('rejects a measure with no call brackets', () => {
@@ -79,9 +98,11 @@ describe('measure grammar', () => {
         });
 
         it('reports the first offending entry as a verbatim message', () => {
-            const result = validator(new FormControl(['sum(amount)', 'median(x)', 'nope']));
+            const result = validator(new FormControl(['sum(amount)', 'mode(x)', 'nope']));
             expect(result).toEqual({
-                message: '"median" is not an aggregate — use count, countDistinct, sum, avg, min, max',
+                message:
+                    '"mode" is not an aggregate — use count, countDistinct, sum, avg, min, max, median, stddev, ' +
+                    'variance, p05, p25, p75, p90, p95, p99',
             });
         });
 

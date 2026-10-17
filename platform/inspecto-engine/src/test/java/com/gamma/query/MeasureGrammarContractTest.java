@@ -34,7 +34,7 @@ class MeasureGrammarContractTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     /** Walk up from the module's CWD to the repo root, so the path works under surefire and an IDE alike. */
-    private static Path contractPath() {
+    static Path contractPath() {
         Path dir = Path.of("").toAbsolutePath();
         for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent()) {
             Path candidate = dir.resolve(CONTRACT);
@@ -117,9 +117,9 @@ class MeasureGrammarContractTest {
 
         Map<String, Object> unknown = Map.of(
                 "dataset", "orders",
-                "measures", List.of(Map.of("agg", "median", "field", "amount")));
+                "measures", List.of(Map.of("agg", "p42", "field", "amount")));
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> MeasureCompiler.parse(unknown, 100, 1000));
-        assertTrue(e.getMessage().contains("median"), () -> "unhelpful refusal: " + e.getMessage());
+        assertTrue(e.getMessage().contains("p42"), () -> "unhelpful refusal: " + e.getMessage());
     }
 }

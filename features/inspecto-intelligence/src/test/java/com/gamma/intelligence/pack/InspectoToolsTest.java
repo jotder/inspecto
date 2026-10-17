@@ -982,7 +982,7 @@ class InspectoToolsTest {
 
         ToolResult badAgg = kb.invoke(new ToolCall("kpi_report_builder", Map.of(
                 "dataset", "orders", "title", "X",
-                "measures", List.of(Map.of("agg", "median", "field", "gross"))), new RunId("t")));
+                "measures", List.of(Map.of("agg", "mode", "field", "gross"))), new RunId("t")));
         assertFalse(badAgg.ok(), "an unsupported aggregation is rejected");
 
         ToolResult ghost = kb.invoke(new ToolCall("kpi_report_builder", Map.of(

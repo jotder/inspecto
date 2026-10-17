@@ -10,6 +10,10 @@ describe('table columns — readable headers', () => {
         expect(humanizeColumn('max_value')).toBe('Value (max)');
         expect(humanizeColumn('count_distinct_msisdn')).toBe('MSISDN (distinct)');
         expect(humanizeColumn('count')).toBe('Count');
+        // The statistical aggregates (D-AN5) name what the number is.
+        expect(humanizeColumn('median_amount')).toBe('Amount (median)');
+        expect(humanizeColumn('stddev_amount')).toBe('Amount (std dev)');
+        expect(humanizeColumn('p95_latency_ms')).toBe('Latency (ms) (p95)');
     });
 
     it('sentence-cases dimensions and keeps units and acronyms', () => {

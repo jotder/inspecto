@@ -22,7 +22,7 @@ public interface ReportRowMasking {
      * {@code rows} as a non-revealing caller would see them.
      *
      * @param spec the structured spec the export compiled from, or {@code null} for a raw {@code SELECT *} export
-     * @throws IllegalArgumentException when the spec would return a raw key through {@code min/max/sum/avg} (fails the Run)
+     * @throws IllegalArgumentException when the spec would return a raw key through a value-reading aggregate (min/max/sum/avg, a statistic) (fails the Run)
      */
     Masked mask(Path writeRoot, String datasetId, Map<String, Object> dataset, MeasureCompiler.Spec spec,
                 QueryExecutor.Result rows);

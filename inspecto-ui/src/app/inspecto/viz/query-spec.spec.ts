@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ColumnMeta, emptyGroup } from 'app/inspecto/query';
 import { aggExpression, buildMeasure, compileSpec, measureId } from './query-spec';
-import { QuerySpec } from './viz-types';
+import { Aggregation, QuerySpec } from './viz-types';
+import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.json';
+import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
+import { runSql } from 'app/inspecto/data-table/sql/sql-run';
 
 const COLS: ColumnMeta[] = [
     { name: 'tariff', type: 'string' },
@@ -14,6 +17,57 @@ describe('aggExpression / measureId / buildMeasure', () => {
         expect(aggExpression('avg', 'duration_s')).toBe('AVG("duration_s")');
         expect(aggExpression('count', 'duration_s')).toBe('COUNT(*)');
         expect(aggExpression('countDistinct', 'tariff')).toBe('COUNT(DISTINCT "tariff")');
+    });
+
+    it('compiles the statistics to DuckDB-named sample spread and continuous quantiles (D-AN5)', () => {
+        expect(aggExpression('median', 'd')).toBe('QUANTILE_CONT("d", 0.5)');
+        expect(aggExpression('stddev', 'd')).toBe('STDDEV_SAMP("d")');
+        expect(aggExpression('variance', 'd')).toBe('VAR_SAMP("d")');
+        expect(aggExpression('p05', 'd')).toBe('QUANTILE_CONT("d", 0.05)');
+        expect(aggExpression('p25', 'd')).toBe('QUANTILE_CONT("d", 0.25)');
+        expect(aggExpression('p75', 'd')).toBe('QUANTILE_CONT("d", 0.75)');
+        expect(aggExpression('p90', 'd')).toBe('QUANTILE_CONT("d", 0.9)');
+        expect(aggExpression('p95', 'd')).toBe('QUANTILE_CONT("d", 0.95)');
+        expect(aggExpression('p99', 'd')).toBe('QUANTILE_CONT("d", 0.99)');
+        expect(measureId('p95', 'latency_ms')).toBe('p95_latency_ms');
+    });
+
+    /**
+     * The twin half of `MeasureStatisticsExecutionTest`: the offline engine returns the SAME golden values DuckDB
+     * does, read from the one committed contract file — so a widget reads the same number offline and live.
+     */
+    it('runs every statistic offline to the contract goldens DuckDB is held to', async () => {
+        const stats = MEASURE_CONTRACT.statistics;
+        const rows = stats.values.map((amount) => ({ amount }));
+        const expected = stats.expected as Record<string, number>;
+        expect(Object.keys(expected)).toEqual(MEASURE_AGGS.slice(MEASURE_AGGS.indexOf('median')));
+        for (const [agg, value] of Object.entries(expected)) {
+            const res = await runSql(`SELECT ${aggExpression(agg as Aggregation, 'amount')} AS v FROM "t"`, 't', rows);
+            expect(res.ok, `${agg}: ${res.error}`).toBe(true);
+            expect(res.rows[0]['v'], agg).toBeCloseTo(value, 9);
+        }
+        const even = await runSql(
+            `SELECT ${aggExpression('median', 'amount')} AS v FROM "t"`,
+            't',
+            stats.evenValues.map((amount) => ({ amount })),
+        );
+        expect(even.rows[0]['v']).toBe(stats.evenMedian);
+    });
+
+    it('groups a statistic per category offline, NULL for a sample spread over one value', async () => {
+        const rows = [
+            { k: 'a', amount: 10 },
+            { k: 'a', amount: 30 },
+            { k: 'b', amount: 7 },
+        ];
+        const sql = `SELECT k, ${aggExpression('p95', 'amount')} AS p, ${aggExpression('stddev', 'amount')} AS s FROM "t" GROUP BY k`;
+        const res = await runSql(sql, 't', rows);
+        expect(res.ok, res.error).toBe(true);
+        const byKey = Object.fromEntries(res.rows.map((r) => [r['k'], r]));
+        expect(byKey['a']['p']).toBeCloseTo(29, 9);
+        expect(byKey['a']['s']).toBeCloseTo(Math.sqrt(200), 9);
+        expect(byKey['b']['p']).toBe(7);
+        expect(byKey['b']['s']).toBeNull();
     });
 
     it('produces identifier-safe measure ids', () => {

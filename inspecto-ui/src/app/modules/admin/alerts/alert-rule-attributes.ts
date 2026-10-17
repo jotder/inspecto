@@ -1,4 +1,5 @@
 import { AttributeSpec } from 'app/inspecto/component-model';
+import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
 
 /**
  * The Alert Rule kind's attribute declarations — drives `<inspecto-schema-form>` in
@@ -38,7 +39,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         tier: 'required',
         dependsOn: { key: 'kind', equals: 'measure' },
         placeholder: 'e.g. count, sum(exposure_sar)',
-        help: 'count, or agg(column) with agg one of count, countDistinct, sum, avg, min, max.',
+        help: `count, or agg(column) with agg one of ${MEASURE_AGGS.join(', ')}.`,
     },
     {
         key: 'metric',

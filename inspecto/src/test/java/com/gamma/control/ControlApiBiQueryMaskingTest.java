@@ -441,12 +441,13 @@ class ControlApiBiQueryMaskingTest {
             ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
             reg.write("dataset", "kpi_ds", Map.of("view", "kpi_view", "columns", List.of(
                     Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "amount"), Map.of("name", "seen_on"))));
-            for (String agg : List.of("max", "min", "sum", "avg"))
+            // The statistics (D-AN5) read the values too: a median or percentile IS a key on an odd-sized group.
+            for (String agg : List.of("max", "min", "sum", "avg", "median", "p95", "stddev"))
                 reg.write("kpi", "k_" + agg, Map.of("dataset", "kpi_ds", "measure", agg + "(msisdn)",
                         "timeField", "seen_on", "grain", "month", "comparison", "previous", "direction", "up"));
             reg.write("kpi", "k_cnt", Map.of("dataset", "kpi_ds", "measure", "countDistinct(msisdn)",
                     "timeField", "seen_on", "grain", "month", "comparison", "previous", "direction", "up"));
-            for (String id : List.of("k_max", "k_min", "k_sum", "k_avg")) {
+            for (String id : List.of("k_max", "k_min", "k_sum", "k_avg", "k_median", "k_p95", "k_stddev")) {
                 HttpResponse<String> viewer = get(c, "viewer", "/kpis/" + id + "/value");
                 assertEquals(422, viewer.statusCode(), id + " -> " + viewer.body());
                 assertEquals(200, get(c, "revealer", "/kpis/" + id + "/value").statusCode(), id + " for a revealer");

@@ -336,7 +336,7 @@ class RowShaperTest {
                 PipelineNode.of("sm", "transform.summarize", Map.of("measures", List.of("sum(amt"))), "src", "sm"));
         // well-formed but an aggregation MeasureCompiler does not know
         assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
-                PipelineNode.of("sm", "transform.summarize", Map.of("measures", List.of("median(amt)"))), "src", "sm"));
+                PipelineNode.of("sm", "transform.summarize", Map.of("measures", List.of("mode(amt)"))), "src", "sm"));
     }
 
     // ── join (reference LEFT JOIN through the resolver seam) ────────────────────

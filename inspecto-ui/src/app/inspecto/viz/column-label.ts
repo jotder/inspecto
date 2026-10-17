@@ -4,7 +4,7 @@
  */
 
 /** Aggregations a measure column id is prefixed with (`channelMeasure` → `<agg>_<field>`). */
-const AGG_PREFIX = /^(count_distinct|sum|avg|min|max|count)_(.+)$/;
+const AGG_PREFIX = /^(count_distinct|sum|avg|min|max|count|median|stddev|variance|p05|p25|p75|p90|p95|p99)_(.+)$/;
 
 /** Tokens that read wrong once sentence-cased — units, acronyms and domain abbreviations. */
 const TOKENS: Record<string, string> = {
@@ -33,6 +33,15 @@ const AGG_LABEL: Record<string, string> = {
     max: 'max',
     count: 'count',
     count_distinct: 'distinct',
+    median: 'median',
+    stddev: 'std dev',
+    variance: 'variance',
+    p05: 'p05',
+    p25: 'p25',
+    p75: 'p75',
+    p90: 'p90',
+    p95: 'p95',
+    p99: 'p99',
 };
 
 export function words(field: string): string {

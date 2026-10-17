@@ -41,15 +41,15 @@ describe('SummarizeEditorComponent', () => {
 
     it('round-trips a measure it cannot parse, as a text row', async () => {
         // 🔴 The data-loss case. Opening a hand-written node and pressing Apply must not drop the value.
-        const fixture = mount([], [], ['median(x)']);
+        const fixture = mount([], [], ['mode(x)']);
         // ⚠ ngModel writes the control's value in a microtask, so the input is still empty on the first
         // synchronous pass — assert the DOM only after it settles, or this reads as a component bug.
         await fixture.whenStable();
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.textContent).toContain('as written');
-        expect((el.querySelector('input[aria-label="Measure 1"]') as HTMLInputElement).value).toBe('median(x)');
-        expect(fixture.componentInstance.value().measures).toEqual(['median(x)']);
+        expect((el.querySelector('input[aria-label="Measure 1"]') as HTMLInputElement).value).toBe('mode(x)');
+        expect(fixture.componentInstance.value().measures).toEqual(['mode(x)']);
         // …and it is REFUSED rather than applied silently: the grammar's own message, not a new one.
         expect(fixture.componentInstance.validate()).toBe(false);
     });

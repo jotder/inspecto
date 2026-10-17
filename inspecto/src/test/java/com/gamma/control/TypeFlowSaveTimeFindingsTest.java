@@ -197,6 +197,18 @@ class TypeFlowSaveTimeFindingsTest {
         assertTrue(out.get(0).message().contains("VARCHAR"), out.get(0).message());
     }
 
+    /** D-AN5: the statistical aggregates are numeric-only like sum/avg, and clean over a numeric field. */
+    @Test
+    void aStatisticOverANonNumericDeclaredFieldIsRefusedAndOverANumericOneIsClean(@TempDir Path dir) throws Exception {
+        Path schema = schemaFile(dir, "ev");
+        List<String> stats = List.of("median", "stddev", "variance", "p05", "p25", "p75", "p90", "p95", "p99");
+        List<Finding> out = ConfigRoutes.summarizeMeasureFindings("pipeline",
+                pipelineWithSummarize(schema, true, stats.stream().map(a -> a + "(ID)").toList()), dir);
+        assertEquals(stats.size(), out.size(), out.toString());
+        assertTrue(ConfigRoutes.summarizeMeasureFindings("pipeline",
+                pipelineWithSummarize(schema, true, stats.stream().map(a -> a + "(QTY)").toList()), dir).isEmpty());
+    }
+
     @Test
     void summingAFieldTheMappingRETYPESIsNotJudgedByItsRawType(@TempDir Path dir) throws Exception {
         // AMT is raw VARCHAR but the mapping CASTs it to DOUBLE — summarize sees the mapped AMT.

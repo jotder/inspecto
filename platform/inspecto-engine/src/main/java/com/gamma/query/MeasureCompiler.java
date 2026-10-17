@@ -27,7 +27,13 @@ public final class MeasureCompiler {
     /** Package-private, not public: {@code MeasureGrammarContractTest} pins it against the committed
      *  {@code inspecto-ui/src/app/inspecto/contracts/measure-grammar.contract.json} the Angular authoring form
      *  validates from, so adding an aggregate here fails that test until the client agrees. */
-    static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max");
+    static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max",
+            "median", "stddev", "variance", "p05", "p25", "p75", "p90", "p95", "p99");
+    /** The fixed-name percentile aggregates (D-AN5) and the fraction each one asks {@code QUANTILE_CONT} for —
+     *  continuous, interpolated between neighbours (D-AN3). A fixed name rather than a parameter keeps a Measure
+     *  the {@code {agg, field}} pair (parked-rows D10). */
+    static final Map<String, String> PERCENTILES = Map.of(
+            "p05", "0.05", "p25", "0.25", "p75", "0.75", "p90", "0.9", "p95", "0.95", "p99", "0.99");
     /** Time buckets a temporal dimension may be grouped into. Package-private and contract-pinned for the
      *  same reason as {@link #AGGS}: the UI picks the grain, this side does the bucketing, and a grain the
      *  two disagree on silently groups by the wrong period. The UI's extra {@code auto} means "no grain"
@@ -144,8 +150,9 @@ public final class MeasureCompiler {
 
     /** The aggregations that require a NUMERIC field. {@code min}/{@code max} order dates and text
      *  perfectly well, and {@code count}/{@code countDistinct} ignore the value entirely — so only
-     *  these two are a type error rather than a taste question. */
-    public static final List<String> NUMERIC_AGGS = List.of("sum", "avg");
+     *  these are a type error rather than a taste question: the sum, the mean and the statistics. */
+    public static final List<String> NUMERIC_AGGS = List.of("sum", "avg",
+            "median", "stddev", "variance", "p05", "p25", "p75", "p90", "p95", "p99");
 
     public static Spec parse(Map<String, Object> body, int defaultLimit, int maxLimit) {
         String dataset = trimToNull(body.get("dataset"));
@@ -338,7 +345,12 @@ public final class MeasureCompiler {
         return switch (m.agg()) {
             case "count" -> "COUNT(*)";
             case "countDistinct" -> "COUNT(DISTINCT " + q(m.field()) + ")";
-            case "sum", "avg", "min", "max" -> m.agg().toUpperCase() + "(" + q(m.field()) + ")";
+            case "sum", "avg", "min", "max", "median" -> m.agg().toUpperCase() + "(" + q(m.field()) + ")";
+            // SAMPLE statistics (n - 1), as Excel's STDEV / VAR and the common BI tools default to.
+            case "stddev" -> "STDDEV_SAMP(" + q(m.field()) + ")";
+            case "variance" -> "VAR_SAMP(" + q(m.field()) + ")";
+            case "p05", "p25", "p75", "p90", "p95", "p99" ->
+                    "QUANTILE_CONT(" + q(m.field()) + ", " + PERCENTILES.get(m.agg()) + ")";
             default -> throw new IllegalArgumentException("unknown aggregation '" + m.agg() + "'");
         };
     }
