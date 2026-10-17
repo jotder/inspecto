@@ -1,0 +1,6 @@
+job:
+  name: customer_groups
+  type: pipeline
+  pipeline_config: customers_pipeline.toon
+  data_dir: out
+  on_pipeline: step_entity_link

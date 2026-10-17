@@ -1055,6 +1055,13 @@ a reason; the chain is re-verified on every read. Built kinds: `list.created` ·
 2026-09-27: `/inv/entity-identities*`). Planned: **asserted** identity facts by a named mapping Dataset and **resolved** ones derived deterministically from them — never by similarity (`D-M1`) — each
 withdrawn by a later `retract` fact, never edited.
 
+**Resolution Group** *(added 2026-10-17, ANALYTICS-CORE-1 S2; ✅ built: the Analytics Kernel's `EntityGrouping`, Step `transform.entity.link`)* — A set of
+records judged to be one entity **deterministically**: they share a block (equal **blocking keys**) and agree exactly,
+after normalising, on every column of one **match condition**, closed transitively; its id is the smallest member key.
+Link Analysis folds `identity.asserted` **Identity Facts** into resolution groups the same way. ⛔ Never formed by
+similarity (`D-M1`): a similarity score only marks a **candidate** for review. ⛔ Not a *cluster* (a graph community)
+and not a *duplicate* (`transform.dedup` drops rows; grouping keeps every row).
+
 **Screening** *(added 2026-10-09, `SCREENING-1`; ✅ built: the optional `inspecto-screening` module, add-on `screening`)* — Comparing
 subjects (a name and/or an identifier) against **Entity Lists** of any purpose (sanctions, PEP, deny lists) and reporting a
 **Match Score** per candidate entry. Domain-neutral. Two entry points: an on-demand check (`POST /screening/check`, persists

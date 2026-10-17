@@ -1580,6 +1580,40 @@ class PipelineJobRunnerTest {
                 "SELECT id, similarity, similarity_candidate FROM %s ORDER BY id"));
     }
 
+    /**
+     * A stored {@code entity_link} step executes at rest (ANALYTICS-CORE-1 S2): every row is written with its resolution
+     * group, emails normalised by default; the lift must map the plain kind to {@code transform.entity.link}.
+     */
+    @Test
+    void runsAFlatConfigsEntityLinkStepAndWritesResolutionGroups() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("el_pipeline.toon");
+        Files.writeString(flat, """
+                name: el_etl
+                active: false
+                output_store: grouped
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - entity_link:
+                      key: id
+                      match[1]: amt
+                """);
+        seedParquet(dataDir, "el_etl", "('a2','X@Y '),('a1','x@y'),('a3',NULL),('a4','z@y')");
+
+        JobConfig cfg = new JobConfig("el", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("a1|a1", "a2|a1", "a3|a3", "a4|a4"), queryStore(dataDir, "grouped",
+                "SELECT id, resolution_group FROM %s ORDER BY id"));
+    }
+
     private static List<String> queryStore(String dataDir, String store, String selectFmt) throws Exception {
         String glob = dataDir.replace("\\", "/") + "/" + store + "/**/*.parquet";
         File db = DuckDbUtil.tempDbFile("qs_");

@@ -1,9 +1,9 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6).
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6) and deterministic entity grouping (S2: blocking keys, exact match conditions, union-find, its DuckDB form and parity, Step transform.entity.link; similarity never forms a group, D-M1).
 resource: docs/superpower/analytics-core-plan.md
-tags: [analytics, statistics, baseline, time-series, scores, similarity, modules, duckdb]
+tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
 ---
 
@@ -24,14 +24,17 @@ timestamp: 2026-10-17T00:00:00Z
 > [Seasonality detection](#seasonality-detection), [Holdout split](#holdout-split)). No caller uses them yet.
 > **S1, the similarity kit, is built (2026-10-17):** Jaro, Jaro-Winkler, Levenshtein, Jaccard and normalization with their
 > DuckDB forms; Screening's and Triage recall's copies retired; Step `transform.similarity` (§ [Similarity kit](#similarity-kit)).
+> **S2, deterministic entity grouping, is built (2026-10-17):** blocking keys + exact match conditions + union-find,
+> JVM and DuckDB forms with parity, caps that fail closed; Step `transform.entity.link`; similarity only proposes
+> review candidates, never a group (§ [Entity grouping](#entity-grouping)).
 
 ## The module
 
 `platform/inspecto-analytics` — artifactId `inspecto-analytics`, manifest id `analytics`, `buildRole: platform`,
 `offeringRole: base` (every edition, D-AN1). Pure functions and SQL builders, no routes, no state, **no third-party dependency of its own** (D-AN8).
-Main code depends on `inspecto-util` only, for `SqlIdent` (the one SQL quoting implementation the profiler and the time-series builders quote
+Main code depends on `inspecto-util`, for `SqlIdent` (the one SQL quoting implementation the profiler and the time-series builders quote
 through); `tools/check-module-deps.mjs` and the pom's enforcer rule allow only the foundation layer (`inspecto-api`,
-`-config`, `-sql`, `-util`), so a feature module can depend on the kernel but the kernel can never reach the engine or a
+`-config`, `-sql`, `-util`) plus the JDK-only graph library `inspecto-graph` (since S2, for its `UnionFind`), so a feature module can depend on the kernel but the kernel can never reach the engine or a
 feature. It ships as its own thin jar beside `inspecto.jar`
 (`tools/bundle-modules.mjs` `CORE_MODULES`, the shade exclude in `inspecto/pom.xml`).
 
@@ -46,6 +49,8 @@ Packages:
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
 * `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
   `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
+* `com.gamma.analytics.entity` — deterministic entity grouping (S2): `EntityGrouping`, `EntityGroupingSql`,
+  `MatchCondition`, `KeyColumn`, `Normalization`, `SimilarityCandidate`, `EntityRecord` (§ [Entity grouping](#entity-grouping)).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -261,6 +266,75 @@ repointed. That closed the duplication guard's category c: **0** findings (from 
 `SimilarityTest` (hand figures: Winkler's reference pairs, the odd-transposition case in both modes, the boost threshold,
 the three units, Levenshtein, Jaccard, normalization case by case, refused knobs) and `SimilarityDuckDbParityTest`
 (above; plus NULL on either side for every method, raw and normalized). In the engine, `RowShaperSimilarityTest`.
+
+## Entity grouping
+
+*ANALYTICS-CORE-1 S2, built 2026-10-17.* Package `com.gamma.analytics.entity`. One definition of deterministic
+entity grouping — blocking keys, exact match conditions, union-find — with a JVM form and a DuckDB form held equal by
+a parity test. ⛔ **Identity is never asserted by similarity** (decision D-M1, the plan's Won't W6): only exact match
+conditions form groups; a similarity score can only fill separate candidate columns for a person to review.
+
+### The definition
+
+1. Every key column is normalised (`Normalization`): `TEXT` — the similarity kit's normalisation (accents stripped,
+   lower-cased, ASCII whitespace runs to one space, ends trimmed; the default); `DIGITS` — ASCII digits only; `NONE` —
+   as written. **One empty rule:** NULL, or empty after normalising, is *absent* and never equals anything.
+2. A record's **block** is the tuple of its normalised blocking keys. A record with any blocking key absent is in no
+   block and stays a group of one; with no blocking keys every record is in the one block.
+3. Two records **match** when they share a block and, for at least one `MatchCondition`, every column of it is
+   present on both and equal. The records that share a block and one condition's values form a **match cell**.
+4. **Resolution groups** are the connected components of "match". The **group id** is the key of the member whose key
+   text is smallest in **code-point order** (= UTF-8 byte order = DuckDB's VARCHAR order; Java's `String.compareTo`
+   is UTF-16 order and differs above U+FFFF, so `EntityGrouping.compareText` exists). The id is independent of input
+   order; the Step writes it in the key column's own type, so a numeric key's id is still the smallest *as text*.
+
+**Caps — fail closed, before anything is joined** (the same words from both forms): an empty or repeated record key;
+a match cell or review block above `maxBlockSize` (default 1,000, ceiling 100,000 — in practice a placeholder value
+such as `0` or `unknown` that many records carry); **candidate pairs** — the pairs of records sharing a match cell plus
+the pairs sharing a review block — above `maxPairs` (default 1,000,000, ceiling 100,000,000). The SQL form also stops
+after 1,000 propagation rounds.
+
+### The two forms
+
+| Form | How | Where |
+|---|---|---|
+| JVM | records grouped into match cells by hash; every cell member joined to the cell's first with the graph library's `com.gamma.graph.UnionFind` (the one union-find, M8); smallest key per root | `EntityGrouping.group` |
+| DuckDB | normalised keys as columns; each member paired with its cell's smallest key (`min(key) OVER (PARTITION BY block, condition values)`); the connected components by **min-label propagation with pointer jumping** — each round a record takes the smallest label among itself and its cell partners, then the label of that label — one set-based statement pair per round until no label changes | `EntityGroupingSql.run` |
+
+`EntityGroupingSql.run` is the kernel's one entry that executes statements on the caller's connection rather than
+returning SQL text, because the number of rounds is known only by running them; its scratch tables are dropped before
+it returns. A recursive CTE was not used: with `UNION` it would carry every label a record ever saw (the square of the
+component size), and `USING KEY` recursion waits for DuckDB 2.0 (plan C7). Because of this the kernel now reaches
+`inspecto-graph` (a JDK-only leaf) besides the foundation modules; `check-module-deps` allows exactly that.
+
+### D-M1 in the API
+
+- `MatchCondition` is a list of `KeyColumn(column, normalization)` — no method, score or threshold, so a similarity
+  cannot be expressed as a condition. `EntityGroupingTest` pins those record components by reflection.
+- `SimilarityCandidate(column, method, normalize, threshold)` is a separate type in its own `Spec` component, and needs
+  blocking keys. It is scored only after the groups are final: each record's best score against a record of **another**
+  group in its block (ties: the smaller group id), giving `Candidate(score, group, review)`. The groups map handed to it
+  is read-only. A test runs the same data with and without a threshold-0 review (everything flagged) and asserts the
+  groups are identical.
+- The Step refuses `method`, `threshold`, `similarity`, `fuzzy` or `score` in its config by name, citing D-M1.
+
+### Callers
+
+| Caller | Uses |
+|---|---|
+| Step `transform.entity.link` (catalog `enrichment.entity.link`) | `EntityGroupingSql.run` through the engine's `EntityLinkStep` ([step-catalog § entity_link](pipeline-graph/step-catalog.md)) |
+
+Link Analysis' `EntityRegistry` keeps its own fold of `identity.asserted` / `retracted` facts into resolution groups
+(on the same `UnionFind`): what counts as an identity fact stays in that module (plan §2). The Step's resolution group
+is a Dataset column, not an Identity Fact.
+
+### Tests
+
+`EntityGroupingTest` (hand cases: transitive joins across conditions, blocking, multi-column conditions, input-order
+independence, key refusals, both caps, normalisations, code-point order, D-M1 by reflection and by an all-flagging
+review) and `EntityGroupingParityTest` (JVM = DuckDB on three seeded 600-record corpora with and without blocking,
+every similarity method raw and normalised, a 300-record chain, ids beyond the Basic Multilingual Plane, identical
+refusals with nothing written, a numeric key keeping its type). In the engine, `RowShaperEntityLinkTest`.
 
 ## Score output contract
 

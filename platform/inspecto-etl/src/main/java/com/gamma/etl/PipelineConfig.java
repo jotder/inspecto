@@ -370,10 +370,18 @@ public final class PipelineConfig {
          * identity (D-M1). No legacy spelling - always {@code steps:}.
          */
         public static final String SIMILARITY = "similarity";
+        /**
+         * Deterministic entity grouping ({@code transform.entity.link}, catalog {@code enrichment.entity.link}, ANALYTICS-CORE-1 S2). Keys: {@code key},
+         * {@code match}, optional {@code blocking}, {@code digits}, {@code as_written}, {@code group_column},
+         * {@code max_block_size}, {@code max_pairs}, {@code candidate_by}, {@code candidate_method},
+         * {@code candidate_threshold}, {@code candidate_normalize}. Groups come from exact matches only (D-M1). No legacy
+         * spelling - always {@code steps:}.
+         */
+        public static final String ENTITY_LINK = "entity_link";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST} and {@link #SIMILARITY} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST}, {@link #SIMILARITY} and {@link #ENTITY_LINK} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY, ENTITY_LINK);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

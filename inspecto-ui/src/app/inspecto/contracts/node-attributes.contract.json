@@ -1027,6 +1027,108 @@
     "default" : true,
     "help" : "Off keeps only the candidate flag (needs a threshold)."
   } ],
+  "transform.entity.link" : [ {
+    "key" : "key",
+    "label" : "Record key",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "A column that names each row once. A group's id is its smallest key (as text).",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "match",
+    "label" : "Match keys",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Rows that agree exactly on every column of one entry are the same entity; join columns with +. Any entry is enough, and the links chain (A=B by email, B=C by phone: one group).",
+    "placeholder" : "EMAIL, PHONE+LAST_NAME"
+  }, {
+    "key" : "blocking",
+    "label" : "Blocking keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Rows are only compared inside the same block (same value of every blocking column). A row with an empty blocking value stays a group of its own.",
+    "placeholder" : "COUNTRY"
+  }, {
+    "key" : "digits",
+    "label" : "Digits-only columns",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "These columns are compared on their digits only (+44 20 7946-0001 = 442079460001). Other columns ignore accents, case and extra spaces.",
+    "placeholder" : "PHONE"
+  }, {
+    "key" : "as_written",
+    "label" : "Compare as written",
+    "type" : "list",
+    "tier" : "advanced",
+    "help" : "These columns are compared exactly as stored. An empty value never matches."
+  }, {
+    "key" : "group_column",
+    "label" : "Group column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "resolution_group",
+    "help" : "Receives the resolution group id: the smallest key of the group."
+  }, {
+    "key" : "max_block_size",
+    "label" : "Largest block",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1000,
+    "min" : 2.0,
+    "max" : 100000.0,
+    "help" : "The run fails if more rows than this share one match value or block - usually a placeholder such as 0 or unknown that would wrongly join them."
+  }, {
+    "key" : "max_pairs",
+    "label" : "Most candidate pairs",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1000000,
+    "min" : 1.0,
+    "max" : 1.0E8,
+    "help" : "The run fails rather than compare more pairs of rows than this."
+  }, {
+    "key" : "candidate_by",
+    "label" : "Review look-alikes by",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Optional. Scores this text column against the other groups of the block and flags close ones for review (candidate_score, candidate_group, candidate_review). Never joins a group. Needs blocking keys.",
+    "placeholder" : "FULL_NAME"
+  }, {
+    "key" : "candidate_method",
+    "label" : "Review method",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "jaro_winkler",
+    "options" : [ {
+      "value" : "jaro_winkler",
+      "label" : "Jaro-Winkler (names, short text)"
+    }, {
+      "value" : "jaro",
+      "label" : "Jaro"
+    }, {
+      "value" : "levenshtein",
+      "label" : "Levenshtein (edit distance)"
+    }, {
+      "value" : "token_jaccard",
+      "label" : "Token Jaccard (shared words)"
+    } ],
+    "help" : "How alike two texts are, 0..1."
+  }, {
+    "key" : "candidate_threshold",
+    "label" : "Review threshold",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Required with candidate_by: the score at which a look-alike is flagged for review."
+  }, {
+    "key" : "candidate_normalize",
+    "label" : "Normalize before review",
+    "type" : "boolean",
+    "tier" : "advanced",
+    "default" : true,
+    "help" : "Strip accents, lower-case and collapse spaces before scoring."
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

@@ -870,6 +870,42 @@ class NodeConfigNameContractTest {
         assertFalse(s.normalize());
     }
 
+    /**
+     * The entity grouping node's contract (ANALYTICS-CORE-1 S2): {@code steps: - entity_link:} lifts to ONE
+     * {@code transform.entity.link} node, an edit of every declared key survives the lower and still parses as the run
+     * reads it.
+     */
+    @Test
+    void entityLinkAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> el = new LinkedHashMap<>();
+        el.put("key", "ID");
+        el.put("match", List.of("EMAIL", "PHONE+LAST_NAME"));
+        el.put("blocking", List.of("COUNTRY"));
+        el.put("digits", List.of("PHONE"));
+        el.put("as_written", List.of("LAST_NAME"));
+        el.put("group_column", "person");
+        el.put("max_block_size", 50);
+        el.put("max_pairs", 5000);
+        el.put("candidate_by", "FULL_NAME");
+        el.put("candidate_method", "token_jaccard");
+        el.put("candidate_threshold", 0.7);
+        el.put("candidate_normalize", false);
+        assertEquals(new java.util.TreeSet<>(el.keySet()), new java.util.TreeSet<>(
+                NodeAttributes.TRANSFORM_ENTITY_LINK.stream().map(NodeAttribute::key).toList()),
+                "the edit sets every declared key");
+        Map<String, Object> got = timeSeriesSavedAs(dir, "entity_link", "transform.entity.link", el);
+        com.gamma.pipeline.exec.EntityLinkStep.Spec s = com.gamma.pipeline.exec.EntityLinkStep.parse(got);
+        assertEquals(2, s.grouping().conditions().size());
+        assertEquals(com.gamma.analytics.entity.Normalization.DIGITS, s.grouping().conditions().get(1).columns().get(0).normalization());
+        assertEquals(com.gamma.analytics.entity.Normalization.NONE, s.grouping().conditions().get(1).columns().get(1).normalization());
+        assertEquals(50, s.grouping().maxBlockSize());
+        assertEquals(5000L, s.grouping().maxPairs());
+        assertEquals(0.7, s.grouping().candidate().threshold());
+        assertEquals(com.gamma.analytics.similarity.SimilaritySql.Method.TOKEN_JACCARD, s.grouping().candidate().method());
+        assertFalse(s.grouping().candidate().normalize());
+        assertEquals(List.of("person", "candidate_score", "candidate_group", "candidate_review"), s.addedColumns());
+    }
+
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
             throws Exception {
         java.nio.file.Files.createDirectories(dir);

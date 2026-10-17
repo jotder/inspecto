@@ -205,6 +205,11 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_SIMILARITY("transform.similarity", NodeCategory.TRANSFORM, "Similarity score",
             "Adds a 0..1 similarity score of two text columns and, with a threshold, a candidate flag. Never asserts the two are the same.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "similarity"),
+    // Deterministic entity grouping (catalog enrichment.entity.link, ANALYTICS-CORE-1 S2): the Analytics Kernel's
+    // EntityGroupingSql through EntityLinkStep. Exact matches only; similarity only flags candidates (D-M1).
+    TRANSFORM_ENTITY_LINK("transform.entity.link", NodeCategory.TRANSFORM, "Entity grouping",
+            "Gives every row a resolution group: rows that agree exactly on a match key are the same entity. Similarity only flags look-alikes for review.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "entity_link"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

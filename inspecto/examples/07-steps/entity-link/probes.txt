@@ -1,0 +1,29 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: entity_link (transform.entity.link, catalog enrichment.entity.link, ANALYTICS-CORE-1 S2) - deterministic
+# entity grouping on the Analytics Kernel: every row gains a resolution group.
+#   steps[1]: - entity_link: { key: CUSTOMER_ID, match: [EMAIL, PHONE], digits: [PHONE], blocking: [COUNTRY],
+#                              candidate_by: FULL_NAME, candidate_threshold: 0.9 }
+# Rows of the same COUNTRY that agree exactly on EMAIL (accents, case and spaces ignored) or on the digits of PHONE
+# are one entity, transitively; the group id is the smallest CUSTOMER_ID. 'n/a' has no digits, so it never matches.
+# The similarity review scores FULL_NAME against the OTHER groups of the country and flags look-alikes for a person
+# to check: it never joins a group (D-M1).
+# At rest, like every steps: kind: the ingest lands out/customers/, the commit fires customer_groups, and the result
+# lands in out/customer_groups/.
+#
+# Expected evidence after the run:
+#   /jobs shows customer_groups type PIPELINE with lastStatus SUCCESS. Each run writes 8 rows to
+#   out/customer_groups/*.parquet (the inbound columns + resolution_group, candidate_score, candidate_group,
+#   candidate_review):
+#     C01  Anna Kowalska      C01  0.5548  C08   false
+#     C02  Anna Kowalski      C01  0.5703  C08   false  - same email as C01, case and spaces aside
+#     C03  A. Kowalska        C01  0.4496  C08   false  - same phone digits as C01 (+44 (20) 7946-0001)
+#     C04  José Müller        C04  -       -     false  - alone in FR: nothing to review
+#     C05  Jose Muller        C05  0.5194  C06   false  - same phone as C04, other country: not joined
+#     C06  Bob Stone          C06  0.9576  C07   true   - look-alike flagged for review, NOT joined
+#     C07  Bobby Stone        C07  0.9576  C06   true
+#     C08  Northwind Traders  C08  0.5703  C01   false
+#   The job can also be fired by hand: POST /jobs/customer_groups/trigger.
+/jobs
+/jobs/customer_groups/runs

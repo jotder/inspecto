@@ -1262,7 +1262,7 @@ public final class PipelineEditable {
                     || PipelineConfig.Step.EXPLODE.equals(kind) || PipelineConfig.Step.UNPIVOT.equals(kind)
                     || PipelineConfig.Step.RESAMPLE.equals(kind) || PipelineConfig.Step.SHIFT.equals(kind)
                     || PipelineConfig.Step.FORECAST.equals(kind)
-                    || PipelineConfig.Step.SIMILARITY.equals(kind)) return false;
+                    || PipelineConfig.Step.SIMILARITY.equals(kind) || PipelineConfig.Step.ENTITY_LINK.equals(kind)) return false;
             int position = PipelineConfig.Step.KINDS.indexOf(kind);
             if (position <= previous) return false;
             previous = position;
