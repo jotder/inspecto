@@ -141,6 +141,37 @@ class DeliveryCheckTest {
         assertEquals(1, seen.stream().filter(e -> EventType.SEQUENCE_GAP.equals(e.type())).count());
     }
 
+    /**
+     * Golden (ANALYTICS-CORE-1 M5), written BEFORE the bucket floor moved to the Analytics Kernel's {@code TimeGrain}:
+     * the window ends at the bucket before the one {@code now} (UTC) is in, for month, year and hour templates, at and
+     * just after a bucket boundary. The bucket still being delivered is never a gap; the one before it is.
+     */
+    @Test
+    void theLastCompleteBucketIsTheOneBeforeNowAtMonthYearAndHourGrain(@TempDir Path dir) throws Exception {
+        assertEquals(List.of("202602"), gapsFor(dir.resolve("m1"), "XDR_{yyyyMM}.csv",
+                List.of("XDR_202601.csv", "XDR_202603.csv"), "2026-04-15T06:00:00Z"));
+        GapTracker.shared().reset();
+        assertEquals(List.of("202602", "202603"), gapsFor(dir.resolve("m2"), "XDR_{yyyyMM}.csv",
+                List.of("XDR_202601.csv"), "2026-04-01T00:00:00Z"), "April has just begun: March is complete");
+        GapTracker.shared().reset();
+        assertEquals(List.of("2024"), gapsFor(dir.resolve("y"), "XDR_{yyyy}.csv",
+                List.of("XDR_2023.csv", "XDR_2025.csv"), "2026-01-01T00:00:00Z"));
+        GapTracker.shared().reset();
+        assertEquals(List.of("2026090804"), gapsFor(dir.resolve("h"), "XDR_{yyyyMMddHH}.csv",
+                List.of("XDR_2026090803.csv", "XDR_2026090805.csv"), "2026-09-08T06:59:59Z"),
+                "hour 06 is still being delivered");
+    }
+
+    private List<String> gapsFor(Path dir, String template, List<String> listed, String now) throws Exception {
+        Files.createDirectories(dir);
+        Path p = PipelineConfigBatchTest.writePipeline(dir, "");
+        Files.writeString(p, Files.readString(p) + "collector:\n  gap_detection:\n    file_template: \"" + template + "\"\n",
+                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        return DeliveryCheck.detectFileGaps(cfg, listed.stream().map(DeliveryCheckTest::listed).toList(),
+                Instant.parse(now).toEpochMilli());
+    }
+
     @Test
     void withoutAFileTemplateNothingIsRecordedOrReported(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = config(dir, false);
