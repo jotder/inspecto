@@ -271,6 +271,25 @@ class RecipeCompilerTest {
         assertTrue(e.refusals().get(0).message().contains("explicit 'values'"), e.refusals().get(0).message());
     }
 
+    /** {@code entity_link:} (ANALYTICS-CORE-1 S2) compiles to a {@code steps:} entry; a fuzzy match refuses by name (D-M1). */
+    @Test
+    @SuppressWarnings("unchecked")
+    void theEntityLinkStepCompilesAndAFuzzyMatchRefusesByName() {
+        Map<String, Object> el = new LinkedHashMap<>(Map.of("key", "ID", "match", List.of("EMAIL", "PHONE+NAME")));
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(4, step("entity_link", el));
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) RecipeCompiler.compile(recipe).get("steps");
+        assertTrue(steps.stream().anyMatch(s -> el.equals(s.get("entity_link"))), String.valueOf(steps));
+
+        Map<String, Object> bad = linearRecipe("/data/db");
+        Map<String, Object> broken = new LinkedHashMap<>(el);
+        broken.put("threshold", 0.9);
+        ((List<Map<String, Object>>) (List<?>) bad.get("steps")).add(4, step("entity_link", broken));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class, () -> RecipeCompiler.compile(bad));
+        assertEquals(RecipeCompiler.MALFORMED_STEP, e.refusals().get(0).code());
+        assertTrue(e.refusals().get(0).message().contains("D-M1"), e.refusals().get(0).message());
+    }
+
     /** quality.crypto.hash (2026-10-06): an authored salt is refused by name — the key is the Space's, never config. */
     @Test
     @SuppressWarnings("unchecked")

@@ -423,7 +423,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-ENR-03 | ⚡ Redis / in-memory cache lookup (`enrichment.redis`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
 | SP-ENR-04 | 🌐 Dynamic microservice REST enricher (`enrichment.rest`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
 | SP-ENR-05 | 🗄️ Parameterized stored-procedure caller (`transform.db.procedure`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
-| SP-ENR-06 | 🔗 Master entity resolution & record linkage (`enrichment.entity.link`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-06 | 🔗 Master entity resolution & record linkage (`enrichment.entity.link`) | Enrichment, Entity Resolution & AI/ML | ✅ | ✅ | ✅ | `transform.entity.link` | `transform.entity.link` — every row gets a resolution group: blocking keys + exact match keys (normalised as text, digits or as written) + union-find on the Analytics Kernel, caps fail closed; similarity only flags look-alikes for review, never merges (D-M1) (2026-10-17) |
 | SP-ENR-07 | 🕸️ Graph cluster & connected-component tagger (`enrichment.graph.cluster`) | Enrichment, Entity Resolution & AI/ML | — | 🟡 | 🟡 | `link-analysis` | link-analysis VIEW ships (projection); no tagging step |
 | SP-ENR-08 | 🤖 ONNX Runtime embedded inference (`ml.inference.onnx`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — | onnxruntime ships in the Enterprise bundle inside `inspecto-intelligence` (its embeddings, ASSURE-INTELLIGENCE-BUNDLE-1); this Step Processor is not built |
 | SP-ENR-09 | 🏷️ LLM zero-shot classifier & tagging (`ml.llm.classify`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — | still unbuilt; the assist agent now ships Professional+ (CP-14, `PKG-5` 2026-09-12) but this step kind does not exist |
@@ -452,7 +452,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `sink.webhook` | top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Professional+ |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 119 processors — 47 delivered, 17 partial, 55 planned.
+**Count:** 119 processors — 48 delivered, 17 partial, 54 planned.
 
 **SP-CTL-07 behaviour change 2026-10-07 (operator, MODULE-REORG-P7-INCIDENTS slice 2): Alert records are durable on EVERY edition, Personal included.** Fired Alerts live in an Alert-owned store (`ALERTS` family, the Space's own `duckdb/inspecto-alerts.db`, `-Dalerts.backend=db` default), not in operational objects: wherever an Alert does fire on Personal (rule authoring is Professional+, so this is the rules a Personal Space was handed), it now remembers its Alerts across a restart — `GET /alerts` history survives and an open Alert is not re-fired. Personal still has NO Incidents, Cases or operational objects (CP-11 unchanged); only the Incident escalation is skipped there. A Personal operator works a stored Alert with `POST /alerts/{id}/ack|resolve` (`canWorkIncidents`, a no-op without a Subject). (Narrative kept here, outside the generated rows: the catalog `note` stays short.)
 

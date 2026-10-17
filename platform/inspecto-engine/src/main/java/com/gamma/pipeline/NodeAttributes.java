@@ -603,6 +603,48 @@ public final class NodeAttributes {
                     .help("Put before each value to make its column name (needed when a value starts with a digit)."));
 
     /**
+     * {@code transform.entity.link} (ANALYTICS-CORE-1 S2, catalog {@code enrichment.entity.link}): deterministic entity grouping. Grammar in
+     * {@code EntityLinkStep}; the grouping is the Analytics Kernel's; keys proven by {@code NodeConfigNameContractTest}.
+     * Groups come from exact matches only; the candidate keys only flag look-alikes for review (D-M1).
+     */
+    public static final List<NodeAttribute> TRANSFORM_ENTITY_LINK = List.of(
+            NodeAttribute.of("key", "Record key", "string", "required").placeholder("CUSTOMER_ID")
+                    .help("A column that names each row once. A group's id is its smallest key (as text)."),
+            NodeAttribute.of("match", "Match keys", "list", "required").placeholder("EMAIL, PHONE+LAST_NAME")
+                    .help("Rows that agree exactly on every column of one entry are the same entity; join columns with +. "
+                            + "Any entry is enough, and the links chain (A=B by email, B=C by phone: one group)."),
+            NodeAttribute.of("blocking", "Blocking keys", "list", "optional").placeholder("COUNTRY")
+                    .help("Rows are only compared inside the same block (same value of every blocking column). "
+                            + "A row with an empty blocking value stays a group of its own."),
+            NodeAttribute.of("digits", "Digits-only columns", "list", "optional").placeholder("PHONE")
+                    .help("These columns are compared on their digits only (+44 20 7946-0001 = 442079460001). "
+                            + "Other columns ignore accents, case and extra spaces."),
+            NodeAttribute.of("as_written", "Compare as written", "list", "advanced")
+                    .help("These columns are compared exactly as stored. An empty value never matches."),
+            NodeAttribute.of("group_column", "Group column", "string", "optional").defaultValue("resolution_group")
+                    .help("Receives the resolution group id: the smallest key of the group."),
+            NodeAttribute.of("max_block_size", "Largest block", "number", "advanced")
+                    .min(2).max(com.gamma.analytics.entity.EntityGrouping.MAX_BLOCK_SIZE_CEILING)
+                    .defaultValue(com.gamma.analytics.entity.EntityGrouping.DEFAULT_MAX_BLOCK_SIZE)
+                    .help("The run fails if more rows than this share one match value or block - usually a placeholder "
+                            + "such as 0 or unknown that would wrongly join them."),
+            NodeAttribute.of("max_pairs", "Most candidate pairs", "number", "advanced")
+                    .min(1).max(com.gamma.analytics.entity.EntityGrouping.MAX_PAIRS_CEILING)
+                    .defaultValue(com.gamma.analytics.entity.EntityGrouping.DEFAULT_MAX_PAIRS)
+                    .help("The run fails rather than compare more pairs of rows than this."),
+            NodeAttribute.of("candidate_by", "Review look-alikes by", "string", "advanced").placeholder("FULL_NAME")
+                    .help("Optional. Scores this text column against the other groups of the block and flags close ones "
+                            + "for review (candidate_score, candidate_group, candidate_review). Never joins a group. Needs blocking keys."),
+            NodeAttribute.of("candidate_method", "Review method", "select", "advanced").defaultValue("jaro_winkler")
+                    .options("jaro_winkler", "Jaro-Winkler (names, short text)", "jaro", "Jaro",
+                            "levenshtein", "Levenshtein (edit distance)", "token_jaccard", "Token Jaccard (shared words)")
+                    .help("How alike two texts are, 0..1."),
+            NodeAttribute.of("candidate_threshold", "Review threshold", "number", "advanced").min(0).max(1)
+                    .help("Required with candidate_by: the score at which a look-alike is flagged for review."),
+            NodeAttribute.of("candidate_normalize", "Normalize before review", "boolean", "advanced").defaultValue(true)
+                    .help("Strip accents, lower-case and collapse spaces before scoring."));
+
+    /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
      * {@code list} type is {@code string[]} and these are MAPS.
@@ -785,7 +827,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, TRANSFORM_RANK, TRANSFORM_SAMPLE, TRANSFORM_PIVOT, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, TRANSFORM_RANK, TRANSFORM_SAMPLE, TRANSFORM_PIVOT, TRANSFORM_ENTITY_LINK, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -811,6 +853,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_RANK.type(), TRANSFORM_RANK);
         m.put(BuiltinNodeType.TRANSFORM_SAMPLE.type(), TRANSFORM_SAMPLE);
         m.put(BuiltinNodeType.TRANSFORM_PIVOT.type(), TRANSFORM_PIVOT);
+        m.put(BuiltinNodeType.TRANSFORM_ENTITY_LINK.type(), TRANSFORM_ENTITY_LINK);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

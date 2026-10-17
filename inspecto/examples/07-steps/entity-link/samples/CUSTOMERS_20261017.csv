@@ -1,0 +1,9 @@
+CUSTOMER_ID,FULL_NAME,EMAIL,PHONE,COUNTRY
+C01,Anna Kowalska,ANNA.K@example.com,+44 20 7946 0001,GB
+C02,Anna Kowalski, anna.k@example.com ,,GB
+C03,A. Kowalska,,+44 (20) 7946-0001,gb
+C04,José Müller,jose@example.org,+33 1 23 45 67 89,FR
+C05,Jose Muller,,+33 1 23 45 67 89,GB
+C06,Bob Stone,bob@example.com,n/a,GB
+C07,Bobby Stone,bobby@example.com,n/a,GB
+C08,Northwind Traders,ops@northwind.example,,GB

@@ -589,6 +589,29 @@ class StepConfigSaveFindingsTest {
                 Map.of("dedup", Map.of("keys", List.of("QTY")))))), "steps[1].dedup", "QTY");
     }
 
+    // ── entity_link (transform.entity.link, ANALYTICS-CORE-1 S2) ───────────────────
+
+    @Test
+    void anEntityLinkMatchColumnTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("entity_link",
+                Map.of("key", "ID", "match", List.of("NOPE")))))), "steps[0].entity_link", "NOPE");
+    }
+
+    @Test
+    void aFuzzyEntityLinkMatchIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("entity_link",
+                Map.of("key", "A", "match", List.of("B"), "threshold", 0.9))))), "steps[0].entity_link", "D-M1");
+    }
+
+    @Test
+    void anEntityLinkGroupColumnThatCollidesIsRefusedAndAValidOnePasses(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("entity_link",
+                Map.of("key", "ID", "match", List.of("QTY"), "group_column", "qty"))))), "steps[0].entity_link", "collides");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("entity_link",
+                Map.of("key", "ID", "match", List.of("QTY"), "blocking", List.of("QTY"), "candidate_by", "ID",
+                        "candidate_threshold", 0.9))))));
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

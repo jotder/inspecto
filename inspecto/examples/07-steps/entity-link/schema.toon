@@ -1,0 +1,28 @@
+raw:
+  name: CUSTOMERS
+  format: CSV
+  fields[5]{name,selector,type}:
+    CUSTOMER_ID,"0",VARCHAR
+    FULL_NAME,"1",VARCHAR
+    EMAIL,"2",VARCHAR
+    PHONE,"3",VARCHAR
+    COUNTRY,"4",VARCHAR
+mapping:
+  canonicalName: customers
+  rawName: CUSTOMERS
+  fields[5]:
+    - name: CUSTOMER_ID
+      from: CUSTOMER_ID
+      fn: keep
+    - name: FULL_NAME
+      from: FULL_NAME
+      fn: keep
+    - name: EMAIL
+      from: EMAIL
+      fn: keep
+    - name: PHONE
+      from: PHONE
+      fn: keep
+    - name: COUNTRY
+      from: COUNTRY
+      fn: keep

@@ -612,6 +612,24 @@ final class ConfigRoutes {
                         columns = null;
                     }
                 }
+            } else if (PipelineConfig.Step.ENTITY_LINK.equals(kind)) {
+                // every inbound column survives; the group (the key's type) and the candidate columns are added
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.EntityLinkStep.parse(cfg);
+                        String keyType = columns.stream().filter(c -> c.name().equalsIgnoreCase(spec.grouping().keyColumn()))
+                                .map(TypeFlow.Column::type).findFirst().orElse("VARCHAR");
+                        var out = spec.columns();
+                        columns.add(new TypeFlow.Column(out.group(), keyType));
+                        if (spec.grouping().candidate() != null) {
+                            columns.add(new TypeFlow.Column(out.candidateScore(), "DOUBLE"));
+                            columns.add(new TypeFlow.Column(out.candidateGroup(), keyType));
+                            columns.add(new TypeFlow.Column(out.candidateReview(), "BOOLEAN"));
+                        }
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;   // already refused above; what follows cannot be judged
+                    }
+                }
             } else if (PipelineConfig.Step.HASH.equals(kind)) {
                 // names survive a hash; with keep_original each column gains a <col>_hash beside it
                 if (columns != null && "true".equalsIgnoreCase(String.valueOf(cfg.get("keep_original")))
@@ -803,6 +821,17 @@ final class ConfigRoutes {
                 if (!(cfg.get("columns") instanceof List<?> cols) || cols.stream().allMatch(o -> o == null || o.toString().isBlank()))
                     return "transform.hash needs a non-empty 'columns' list - the columns to hash";
                 return undeclared("transform.hash column", cols, columns);
+            }
+            case PipelineConfig.Step.ENTITY_LINK -> {
+                com.gamma.pipeline.exec.EntityLinkStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.EntityLinkStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                return columns == null ? null
+                        : com.gamma.pipeline.exec.EntityLinkStep.columnRefusal(spec,
+                                columns.stream().map(TypeFlow.Column::name).toList());
             }
             case PipelineConfig.Step.SIMILARITY -> {
                 com.gamma.pipeline.exec.SimilarityStep.Spec spec;

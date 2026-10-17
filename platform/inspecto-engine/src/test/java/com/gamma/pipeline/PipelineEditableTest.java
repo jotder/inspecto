@@ -611,6 +611,14 @@ class PipelineEditableTest {
                         "values", List.of("a", "b"), "measure", "sum(GROSS)"))));
     }
 
+    /** The entity grouping Step (ANALYTICS-CORE-1 S2) has no singular block and lowers under its plain kind. */
+    @Test
+    void theEntityLinkStepLowersToStepsUnderItsPlainKind() {
+        Map<String, Object> e = new LinkedHashMap<>(Map.of("key", "ID", "match", List.of("EMAIL")));
+        assertChain(List.of("filter", "entity_link"), node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("e", "transform.entity.link", e));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

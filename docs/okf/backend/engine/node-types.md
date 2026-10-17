@@ -184,6 +184,7 @@ need the runtime decision (tracked as X5 on [`BACKLOG.md`](../../../BACKLOG.md))
 | `transform.analytics.rank` (2026-10-17) | `DATA` — every inbound row plus its rank per group (`row_number` / `rank` / `dense_rank` by a stated order, ties broken deterministically), or only the top N (`RankStep`) | ✅ (verb `rank`) |
 | `transform.sample` (2026-10-17) | `DATA` — the sampled rows, columns unchanged: a fixed size or a fraction per group by a seeded MD5 order of a row key (`SampleStep` → the Analytics Kernel's `Sampler`) | ✅ (verb `sample`) |
 | `transform.matrix.pivot` (2026-10-17) | `DATA` — one row per key, one column per DECLARED value holding a Measure-grammar aggregate (`PivotStep`); no dynamic pivot | ✅ (verb `pivot`) |
+| `transform.entity.link` (2026-10-17) | `DATA` — every inbound row plus its resolution group (exact match keys within a block, closed transitively; `EntityLinkStep` → the Analytics Kernel's `EntityGroupingSql`) and, with `candidate_by`, a similarity review that never joins a group (D-M1). Catalog `enrichment.entity.link` | ✅ (verb `entity_link`) |
 | `transform.split` | `DATA` | ❌ |
 | `transform.merge` | `DATA` (multi-**input**) | ❌ |
 | `enrichment` | accepts/emits `DATA`; fires the **`on_commit` Signal** (⚠ spelled `ON_COMMIT` in `PipelineRel` until Phase 7 — a Signal, not an edge, per the token model above) | ✅ |

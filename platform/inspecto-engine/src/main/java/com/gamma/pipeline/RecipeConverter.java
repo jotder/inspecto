@@ -181,6 +181,7 @@ public final class RecipeConverter {
                     case PipelineConfig.Step.RANK -> steps.add(step("rank", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.SAMPLE -> steps.add(step("sample", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.PIVOT -> steps.add(step("pivot", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.ENTITY_LINK -> steps.add(step("entity_link", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.ROUTE -> {
                         steps.add(step("route", routeStep(cfg, sink, extraSinks, dirs)));
                         routed = true;
@@ -316,6 +317,7 @@ public final class RecipeConverter {
                             case PipelineConfig.Step.RANK -> branchSteps.add(step("rank", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.SAMPLE -> branchSteps.add(step("sample", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.PIVOT -> branchSteps.add(step("pivot", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.ENTITY_LINK -> branchSteps.add(step("entity_link", new LinkedHashMap<>(cfg)));
                             default -> branchSteps.add(step(kind, cfg));
                         }
                     }

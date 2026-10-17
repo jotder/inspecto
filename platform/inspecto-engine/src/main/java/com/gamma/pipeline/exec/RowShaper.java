@@ -216,6 +216,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_RANK.type().equals(type))     return rank(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SAMPLE.type().equals(type))   return sample(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PIVOT.type().equals(type))    return pivot(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_ENTITY_LINK.type().equals(type)) return entityLink(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -891,6 +892,32 @@ public final class RowShaper {
         if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.entity.link} (ANALYTICS-CORE-1 S2) — every inbound row gains its resolution group (and, with
+     * {@code candidate_by}, a similarity review). {@link EntityLinkStep} owns the grammar; the grouping is the Analytics
+     * Kernel's ({@code EntityGroupingSql}), which refuses an empty or repeated key and the block / pair caps before
+     * writing anything. Groups come from exact matches only (D-M1).
+     */
+    private static List<Relation> entityLink(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        EntityLinkStep.Spec spec;
+        try {
+            spec = EntityLinkStep.parse(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        String refusal = EntityLinkStep.columnRefusal(spec, columnsOf(conn, input));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        try {
+            com.gamma.analytics.entity.EntityGroupingSql.run(conn, spec.grouping(), spec.columns(), input, data,
+                    prefix + "_eg");
+        } catch (IllegalStateException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + EntityLinkStep.KIND + ": " + e.getMessage(), e);
+        }
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

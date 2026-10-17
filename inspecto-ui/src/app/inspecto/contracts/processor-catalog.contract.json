@@ -857,8 +857,10 @@
     "label" : "Master entity resolution & record linkage",
     "emoji" : "🔗",
     "icon" : "heroicons_outline:user-group",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.entity.link",
+    "note" : "`transform.entity.link` — every row gets a resolution group: blocking keys + exact match keys (normalised as text, digits or as written) + union-find on the Analytics Kernel, caps fail closed; similarity only flags look-alikes for review, never merges (D-M1) (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "enrichment.graph.cluster",
     "family" : "ENR",
