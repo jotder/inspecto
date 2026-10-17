@@ -24,8 +24,8 @@ import org.junit.jupiter.api.Test;
  */
 class NameMatcherGoldenTest {
 
-    /** The metric under test: NameMatcher's own Jaro-Winkler before the switch. */
-    private static final ToDoubleBiFunction<String, String> SUBJECT = NameMatcher::jaroWinkler;
+    /** The metric under test: since ANALYTICS-CORE-1 S1, the Analytics Kernel's Jaro-Winkler with NameMatcher's options. */
+    private static final ToDoubleBiFunction<String, String> SUBJECT = NameMatcher.TOKEN_METRIC::similarity;
 
     /** Verbatim copy of NameMatcher.jaroWinkler before ANALYTICS-CORE-1 S1 (prefix scale 0.1, prefix up to 4). */
     static double frozenJaroWinkler(String s, String t) {

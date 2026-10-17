@@ -28,6 +28,11 @@
     </description>
 
     <dependencies>
+        <!-- The Analytics Kernel's similarity kit (ANALYTICS-CORE-1 S1): the token metric of the name method (NameMatcher.TOKEN_METRIC). Foundation-only, no third-party library. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
         <!-- The core: RouteModule/ApiContext/ApiException/WriteGates, PendingChanges (the record MAC), the Job SPI,
              DatasetRelation, QueryExecutor, EvidenceMasker. Compile scope, as inspecto-scoring does. -->
         <dependency>

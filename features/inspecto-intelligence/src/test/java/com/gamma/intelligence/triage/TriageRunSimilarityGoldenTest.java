@@ -1,5 +1,6 @@
 package com.gamma.intelligence.triage;
 
+import com.gamma.analytics.similarity.Similarity;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
@@ -20,7 +21,8 @@ import org.junit.jupiter.api.Test;
  */
 class TriageRunSimilarityGoldenTest {
 
-    private static final ToDoubleBiFunction<Set<String>, Set<String>> SUBJECT = TriageRunSimilarity::jaccard;
+    /** Since ANALYTICS-CORE-1 S1 the Jaccard is the Analytics Kernel's. */
+    private static final ToDoubleBiFunction<Set<String>, Set<String>> SUBJECT = Similarity::jaccard;
 
     /** Verbatim copy of TriageRunSimilarity.jaccard before ANALYTICS-CORE-1 S1. */
     static double frozenJaccard(Set<String> a, Set<String> b) {

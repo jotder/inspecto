@@ -1,5 +1,6 @@
 package com.gamma.intelligence.triage;
 
+import com.gamma.analytics.similarity.Similarity;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -25,20 +26,20 @@ class TriageRunSimilarityTest {
     @Test
     void jaccardOfIdenticalSetsIsOne() {
         Set<String> a = TriageRunSimilarity.tokens("orders pipeline failed schema");
-        assertEquals(1.0, TriageRunSimilarity.jaccard(a, a), 1e-9);
+        assertEquals(1.0, Similarity.jaccard(a, a), 1e-9);
     }
 
     @Test
     void jaccardOfDisjointSetsIsZero() {
         assertEquals(0.0,
-                TriageRunSimilarity.jaccard(TriageRunSimilarity.tokens("alpha bravo"), TriageRunSimilarity.tokens("charlie delta")),
+                Similarity.jaccard(TriageRunSimilarity.tokens("alpha bravo"), TriageRunSimilarity.tokens("charlie delta")),
                 1e-9);
     }
 
     @Test
     void jaccardComputesIntersectionOverUnion() {
         // {aaa,bbb,ccc} vs {bbb,ccc,ddd} → ∩ = 2, ∪ = 4 → 0.5
-        double s = TriageRunSimilarity.jaccard(
+        double s = Similarity.jaccard(
                 TriageRunSimilarity.tokens("aaa bbb ccc"),
                 TriageRunSimilarity.tokens("bbb ccc ddd"));
         assertEquals(0.5, s, 1e-9);
@@ -46,7 +47,7 @@ class TriageRunSimilarityTest {
 
     @Test
     void emptyFingerprintScoresZeroNotOne() {
-        assertEquals(0.0, TriageRunSimilarity.jaccard(Set.of(), Set.of()), 1e-9,
+        assertEquals(0.0, Similarity.jaccard(Set.of(), Set.of()), 1e-9,
                 "two content-free Triage Runs must not look identical");
     }
 

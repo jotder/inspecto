@@ -1,5 +1,6 @@
 package com.gamma.intelligence.triage;
 
+import com.gamma.analytics.similarity.Similarity;
 import com.gamma.intelligence.store.DurableJsonlRing;
 
 import java.nio.file.Path;
@@ -54,7 +55,7 @@ public final class TriageRunStore extends DurableJsonlRing<TriageRun> {
         List<Scored> scored = new ArrayList<>();
         for (TriageRun c : ring) {
             if (excludeId != null && excludeId.equals(c.id())) continue;
-            double s = TriageRunSimilarity.jaccard(queryTokens, TriageRunSimilarity.tokens(c.symptomText()));
+            double s = Similarity.jaccard(queryTokens, TriageRunSimilarity.tokens(c.symptomText()));
             if (s > 0.0) scored.add(new Scored(c, s));
         }
         scored.sort(Comparator.comparingDouble(Scored::score).reversed()
