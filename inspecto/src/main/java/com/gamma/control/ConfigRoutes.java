@@ -575,6 +575,17 @@ final class ConfigRoutes {
                     columns.add(new TypeFlow.Column(String.valueOf(cfg.get("target")), "VARCHAR"));
             } else if (PipelineConfig.Step.MASK.equals(kind)) {
                 // names survive a mask; only the values change
+            } else if (PipelineConfig.Step.SIMILARITY.equals(kind)) {
+                // every inbound column survives; the score (DOUBLE) and/or the candidate flag (BOOLEAN) are added
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.SimilarityStep.parse(cfg);
+                        if (spec.keepScore()) columns.add(new TypeFlow.Column(spec.scoreColumn(), "DOUBLE"));
+                        if (spec.threshold() != null) columns.add(new TypeFlow.Column(spec.candidateColumn(), "BOOLEAN"));
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;   // already refused above; what follows cannot be judged
+                    }
+                }
             } else if (PipelineConfig.Step.HASH.equals(kind)) {
                 // names survive a hash; with keep_original each column gains a <col>_hash beside it
                 if (columns != null && "true".equalsIgnoreCase(String.valueOf(cfg.get("keep_original")))
@@ -766,6 +777,17 @@ final class ConfigRoutes {
                 if (!(cfg.get("columns") instanceof List<?> cols) || cols.stream().allMatch(o -> o == null || o.toString().isBlank()))
                     return "transform.hash needs a non-empty 'columns' list - the columns to hash";
                 return undeclared("transform.hash column", cols, columns);
+            }
+            case PipelineConfig.Step.SIMILARITY -> {
+                com.gamma.pipeline.exec.SimilarityStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.SimilarityStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                return columns == null ? null
+                        : com.gamma.pipeline.exec.SimilarityStep.columnRefusal(spec,
+                                columns.stream().map(TypeFlow.Column::name).toList());
             }
             case PipelineConfig.Step.MASK -> {
                 List<String> problems = com.gamma.pipeline.exec.MaskSpec.problems(cfg);

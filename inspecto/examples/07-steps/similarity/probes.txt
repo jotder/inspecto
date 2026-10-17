@@ -1,0 +1,25 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: similarity (transform.similarity, catalog quality.match.fuzzy, ANALYTICS-CORE-1 S1) - a 0..1 similarity
+# score of two columns on the Analytics Kernel, plus a candidate flag at a threshold:
+#   steps[1]: - similarity: { left: CUSTOMER_NAME, right: ACCOUNT_NAME, method: jaro_winkler, threshold: 0.92,
+#                             score_column: name_score, candidate_column: review_candidate }
+# Both names are normalized first (accents stripped, lower-cased, spaces collapsed - the default), then scored
+# with DuckDB's jaro_winkler_similarity. The flag marks a pair worth a look; it never says the two are the same
+# customer (D-M1), and no row is merged or dropped.
+# At rest, like every steps: kind: the ingest lands out/customers/, the commit fires name_review, and the result
+# lands in out/name_review/.
+#
+# Expected evidence after the run:
+#   /jobs shows name_review type PIPELINE with lastStatus SUCCESS. On disk, out/name_review/*.parquet holds 6 rows
+#   (CUSTOMER_ID, CUSTOMER_NAME, ACCOUNT_NAME, name_score, review_candidate):
+#     C1  José Müller        Jose Muller          1.0     true    - accents and case only
+#     C2  Vladimir Putin     Putin, Vladimir      0.4341  false   - Jaro-Winkler reads order; token_jaccard would not
+#     C3  Acme Trading LLC   ACME Trading L.L.C.  0.9684  true
+#     C4  Dwayne Smith       Duane Smith          0.9227  true
+#     C5  Anna Kowalska      Ann Kowalski         0.9022  false   - below 0.92: scored, not flagged
+#     C6  Northwind Traders  Contoso Ltd          0.5217  false
+#   The job can also be fired by hand: POST /jobs/name_review/trigger.
+/jobs
+/jobs/name_review/runs

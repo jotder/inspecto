@@ -1,9 +1,9 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the temporal motif matcher that moved to the graph library (S6).
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6).
 resource: docs/superpower/analytics-core-plan.md
-tags: [analytics, statistics, baseline, time-series, scores, modules, duckdb]
+tags: [analytics, statistics, baseline, time-series, scores, similarity, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
 ---
 
@@ -22,6 +22,8 @@ timestamp: 2026-10-17T00:00:00Z
 > S5 (b), (c), (d) built 2026-10-17, model-agnostic: accuracy measures and a rolling-origin backtest, seasonality
 > detection, and a deterministic holdout split (§ [Accuracy and backtest](#accuracy-and-backtest),
 > [Seasonality detection](#seasonality-detection), [Holdout split](#holdout-split)). No caller uses them yet.
+> **S1, the similarity kit, is built (2026-10-17):** Jaro, Jaro-Winkler, Levenshtein, Jaccard and normalization with their
+> DuckDB forms; Screening's and Triage recall's copies retired; Step `transform.similarity` (§ [Similarity kit](#similarity-kit)).
 
 ## The module
 
@@ -42,6 +44,8 @@ Packages:
 * `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
 * `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)).
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
+* `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
+  `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -183,13 +187,80 @@ Two more category-c sites closed on 2026-10-17: `EntityRegistry.resolve` (`inspe
 now uses the graph library's `com.gamma.graph.UnionFind` (M8; `union(a, b)` roots at `b`'s root, so the larger root is
 passed first to keep group id = smallest key — `EntityResolutionFoldTest`), which made `inspecto-graph` an allowed
 dependency of `inspecto-entity-store`. `DbJobRunStore.percentile` only renders `quantile_cont` / `percentile_cont`
-SQL — a SQL-side statistic that stays SQL — and is exempted with that reason. Category c now counts only the Jaccard
-(intelligence) and Jaro-Winkler (screening) copies, left for the similarity kit (Should S1).
+SQL — a SQL-side statistic that stays SQL — and is exempted with that reason. The last two category-c copies, the Jaccard (intelligence) and the
+Jaro-Winkler (screening), moved to the similarity kit (Should S1): category c is now 0 (§ [Similarity kit](#similarity-kit)).
 
 ⚠ **`VolumeBaseline` does not implement `BaselineStatistic` (M6).** That contract takes a timestamped `Double` history and
 returns a `Baseline` with a median and a scaled MAD for a robust z; `VolumeBaseline` takes calendar-day `long` row
 counts over a rolling window and answers a signed fractional deviation with four statuses. Fitting it would add an unused
 spread and change its types and outputs, so it shares the median definition only.
+
+## Similarity kit
+
+*ANALYTICS-CORE-1 S1, built 2026-10-17.* Package `com.gamma.analytics.similarity`. One definition of each string
+similarity, a JVM form and a DuckDB form, held equal by a parity test. ⛔ **A score proposes a candidate; it never asserts
+that two values name the same thing** (decision D-M1, the plan's Won't W6) — nothing in the kit merges, links or resolves.
+
+### The definitions
+
+**One empty rule:** every similarity scores **0 when either side is empty**, both empty included (nothing to match on);
+DuckDB's built-ins do the same. A distance is a plain count. NULL in SQL gives NULL.
+
+| Similarity | Definition | JVM | DuckDB |
+|---|---|---|---|
+| Jaro | units match when equal and at most `w = max(0, max(|s|, |t|) / 2 − 1)` apart (each used once, first free match, left to right); with `m` matches and `x` matched positions out of order: `(m/|s| + m/|t| + (m − h)/m) / 3`, `h = x / 2` | `Similarity.jaro`, `JaroWinkler.jaro` | `jaro_similarity` (with `h = ⌊x / 2⌋`, bytes — see below) |
+| Jaro-Winkler | `jaro + ℓ · p · (1 − jaro)`, `ℓ` = common prefix up to `maxPrefix`, applied only when `jaro > boostThreshold`. `STANDARD`: p = 0.1, prefix ≤ 4, threshold 0.7 (Winkler) | `Similarity.jaroWinkler`, `JaroWinkler` | `jaro_winkler_similarity` |
+| Levenshtein distance | fewest single-unit insertions, deletions and substitutions | `Similarity.levenshtein` | `levenshtein` (bytes) |
+| Levenshtein similarity | `1 − d / max(|a|, |b|)` | `Similarity.levenshteinSimilarity` | `SimilaritySql.Method.LEVENSHTEIN` |
+| Jaccard (sets) | `|A ∩ B| / |A ∪ B|` (`equals`) | `Similarity.jaccard` | — |
+| Token Jaccard | Jaccard of the distinct runs of non-whitespace (whitespace = space, tab, LF, VT, FF, CR; nothing else) — no case folding inside | `Similarity.tokens`, `tokenJaccard` | `SimilaritySql.Method.TOKEN_JACCARD` (list functions) |
+
+**Normalization** (`Similarity.normalize`, SQL `SimilaritySql.normalize`), in this order: (1) **accents stripped** —
+NFD, every combining mark (general category M) removed, NFC; canonical decompositions only, so `é → e`, `Å → a`, but
+`ß`, `ø`, `ł`, `æ` and compatibility forms (`ﬁ`, full-width letters, no-break space) stay; (2) **case folded** — each code
+point by `Character.toLowerCase(int)`, the simple context-free mapping (`Σ → σ` always, never the final `ς`; `İ → i`);
+(3) **whitespace** — each run of the six ASCII whitespace characters to one space, ends trimmed. SQL:
+`trim(regexp_replace(lower(strip_accents(x)), '[ \t\n\x0B\f\r]+', ' ', 'g'), ' ')`.
+
+**What one character is** is stated, never assumed — `TextUnit`: `CODE_POINT` (the default), `UTF16_CHAR` (a code point
+above U+FFFF is two), `UTF8_BYTE` (an accented letter is two). `JaroWinkler` carries its unit, its transposition rule
+(`HALF` = `x / 2.0`, `HALF_FLOORED` = `⌊x / 2⌋`), prefix scale, max prefix and boost threshold as data, so a caller's exact
+arithmetic is a named instance rather than a private copy.
+
+### DuckDB 1.5.6, as found
+
+Checked against the engine's DuckDB (`SimilarityDuckDbParityTest`, 4,014 pairs with accents, emoji, tabs, empties and
+one-swap near-duplicates, compared **bit for bit**):
+
+| Built-in | What it computes | Kit form that equals it |
+|---|---|---|
+| `jaro_similarity`, `jaro_winkler_similarity` | Jaro / Jaro-Winkler over **UTF-8 bytes**, half-transpositions **rounded down**, p 0.1, prefix ≤ 4, boost above 0.7; empty → 0 | `JaroWinkler.DUCKDB` |
+| `levenshtein` | edit distance over **UTF-8 bytes** (`é` ↔ `e` costs 2) | `levenshtein(a, b, UTF8_BYTE)` |
+| `jaccard(s1, s2)` | ⚠ **not** a token Jaccard: Jaccard of the two strings' sets of UTF-8 **bytes**, case-sensitive, and it **raises** on an empty argument | none needed — the token Jaccard is built from `regexp_extract_all`, `list_distinct`, `list_intersect` |
+| `strip_accents` + `lower` | as `normalize`, except on code points newer than DuckDB's Unicode tables | `normalize` — equal on every code point below U+0870 and in U+1E00–U+1FFF; 154 of planes 0–2 differ on JDK 27 (recent additions such as U+0897, U+1ACF–U+1ADC, U+A7CB–U+A7DC) |
+| `trim(x)` | ⚠ also strips Unicode spaces (no-break space, U+3000) | the normalizer trims `' '` only |
+
+So the textbook definition (`STANDARD`: code points, `h = x / 2`) and DuckDB's differ in two stated places — the unit
+and the rounding of `h` — and agree on ASCII text with an even out-of-order count. The kit keeps both as named instances
+instead of forcing one to look like the other. NULL handling in `SimilaritySql` tests NULL first: DuckDB's
+`list_concat` / `list_intersect` read a NULL list as empty, and `NULL = '' OR '' = ''` is true.
+
+### Callers
+
+| Caller | Uses | Proof the output did not move |
+|---|---|---|
+| Screening `NameMatcher` (token similarity of the name method) | `TOKEN_JARO_WINKLER = new JaroWinkler(UTF16_CHAR, HALF, 0.1, 4, 0.0)` — the prefix boost always applied, exactly its old arithmetic. Folding, honorifics, transliteration, the phonetic reading and blocking **stay in Screening** | `NameMatcherGoldenTest` (bit for bit against the frozen old code over 20,000 seeded pairs; SHA-256 of 5,000 seeded `score` results) |
+| Intelligence `TriageRunSimilarity` / `TriageRunStore` (Triage Run recall) | `Similarity.jaccard`; its own tokenizer (lower-case, `[a-z0-9]+`, ≥ 3 characters) stays | `TriageRunSimilarityGoldenTest` (bit for bit over 20,000 seeded set pairs; SHA-256 of 5,000 seeded `score` results) |
+| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep` | [step-catalog § similarity](pipeline-graph/step-catalog.md) |
+
+Each golden test was committed against the old code first and passed after the switch with only its `SUBJECT` line
+repointed. That closed the duplication guard's category c: **0** findings (from 2), baseline rewritten.
+
+### Tests
+
+`SimilarityTest` (hand figures: Winkler's reference pairs, the odd-transposition case in both modes, the boost threshold,
+the three units, Levenshtein, Jaccard, normalization case by case, refused knobs) and `SimilarityDuckDbParityTest`
+(above; plus NULL on either side for every method, raw and normalized). In the engine, `RowShaperSimilarityTest`.
 
 ## Score output contract
 

@@ -846,6 +846,30 @@ class NodeConfigNameContractTest {
                 f.outputColumns());
     }
 
+    /**
+     * The similarity node's contract (ANALYTICS-CORE-1 S1): {@code steps: - similarity:} lifts to ONE
+     * {@code transform.similarity} node, an edit of every declared key survives the lower and still parses as the run
+     * reads it, and the declared keys are exactly the ones carried.
+     */
+    @Test
+    void similarityAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> sim = new LinkedHashMap<>();
+        sim.put("left", "ID");
+        sim.put("right", "NAME");
+        sim.put("method", "levenshtein");
+        sim.put("normalize", false);
+        sim.put("score_column", "name_score");
+        sim.put("threshold", 0.75);
+        sim.put("candidate_column", "review");
+        sim.put("keep_score", false);
+        Map<String, Object> got = timeSeriesSavedAs(dir, "similarity", "transform.similarity", sim);
+        com.gamma.pipeline.exec.SimilarityStep.Spec s = com.gamma.pipeline.exec.SimilarityStep.parse(got);
+        assertEquals(com.gamma.analytics.similarity.SimilaritySql.Method.LEVENSHTEIN, s.method());
+        assertEquals(0.75, s.threshold());
+        assertEquals(List.of("review"), s.addedColumns());
+        assertFalse(s.normalize());
+    }
+
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
             throws Exception {
         java.nio.file.Files.createDirectories(dir);

@@ -1,5 +1,8 @@
 package com.gamma.screening;
 
+import com.gamma.analytics.similarity.JaroWinkler;
+import com.gamma.analytics.similarity.JaroWinkler.Transpositions;
+import com.gamma.analytics.similarity.TextUnit;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +35,14 @@ import java.util.regex.Pattern;
 public final class NameMatcher {
 
     private NameMatcher() {}
+
+    /**
+     * The token similarity: the Analytics Kernel's Jaro-Winkler (ANALYTICS-CORE-1 S1) over UTF-16 chars, textbook
+     * transpositions, prefix scale 0.1, prefix up to 4, the prefix boost always applied (threshold 0) — exactly this
+     * method's own arithmetic before it moved, pinned by {@code NameMatcherGoldenTest}. The folding, honorifics,
+     * transliteration and blocking stay here.
+     */
+    static final JaroWinkler TOKEN_JARO_WINKLER = new JaroWinkler(TextUnit.UTF16_CHAR, Transpositions.HALF, 0.1, 4, 0.0);
 
     /** A token pair less similar than this contributes nothing to {@code tokenSet}. */
     static final double TOKEN_FLOOR = 0.8;
@@ -188,7 +199,7 @@ public final class NameMatcher {
     public static double score(List<String> a, List<String> b) {
         if (a.isEmpty() || b.isEmpty()) return 0.0;
         double set = a.size() == b.size() || Math.min(a.size(), b.size()) >= 2 ? tokenSet(a, b) : 0.0;
-        double joined = a.size() != b.size() ? jaroWinkler(String.join("", a), String.join("", b)) : 0.0;
+        double joined = a.size() != b.size() ? TOKEN_JARO_WINKLER.similarity(String.join("", a), String.join("", b)) : 0.0;
         double best = Math.max(set, joined);
         if (best < PHONETIC_CAP) {   // second reading: the same score over transliteration skeletons, capped
             List<String> pa = a.stream().map(NameMatcher::phonetic).toList(), pb = b.stream().map(NameMatcher::phonetic).toList();
@@ -199,7 +210,7 @@ public final class NameMatcher {
 
     private static double rawScore(List<String> a, List<String> b) {
         double set = a.size() == b.size() || Math.min(a.size(), b.size()) >= 2 ? tokenSet(a, b) : 0.0;
-        double joined = a.size() != b.size() ? jaroWinkler(String.join("", a), String.join("", b)) : 0.0;
+        double joined = a.size() != b.size() ? TOKEN_JARO_WINKLER.similarity(String.join("", a), String.join("", b)) : 0.0;
         return Math.max(set, joined);
     }
 
@@ -209,7 +220,7 @@ public final class NameMatcher {
         int n = shorter.size(), m = longer.size();
         double[][] sim = new double[n][m];
         for (int i = 0; i < n; i++)
-            for (int j = 0; j < m; j++) sim[i][j] = jaroWinkler(shorter.get(i), longer.get(j));
+            for (int j = 0; j < m; j++) sim[i][j] = TOKEN_JARO_WINKLER.similarity(shorter.get(i), longer.get(j));
         boolean[] usedI = new boolean[n], usedJ = new boolean[m];
         double weighted = 0, weight = 0;   // a pair weighs the mean of its two lengths: symmetric in a and b
         for (int k = 0; k < n; k++) {   // greedy: take the best remaining pair each round (ties: lowest i, then j)
@@ -231,37 +242,5 @@ public final class NameMatcher {
         for (String t : longer) lenLong += t.length();
         double coverage = 0.8 + 0.2 * Math.min(lenShort, lenLong) / Math.max(lenShort, lenLong);
         return (weighted / weight) * coverage;
-    }
-
-    /** Jaro-Winkler similarity (prefix scale 0.1, prefix up to 4), 0..1. */
-    static double jaroWinkler(String s, String t) {
-        if (s.equals(t)) return s.isEmpty() ? 0.0 : 1.0;
-        int ls = s.length(), lt = t.length();
-        if (ls == 0 || lt == 0) return 0.0;
-        int window = Math.max(0, Math.max(ls, lt) / 2 - 1);
-        boolean[] ms = new boolean[ls], mt = new boolean[lt];
-        int matches = 0;
-        for (int i = 0; i < ls; i++) {
-            int lo = Math.max(0, i - window), hi = Math.min(lt - 1, i + window);
-            for (int j = lo; j <= hi; j++) {
-                if (mt[j] || s.charAt(i) != t.charAt(j)) continue;
-                ms[i] = mt[j] = true;
-                matches++;
-                break;
-            }
-        }
-        if (matches == 0) return 0.0;
-        int transpositions = 0;
-        for (int i = 0, j = 0; i < ls; i++) {
-            if (!ms[i]) continue;
-            while (!mt[j]) j++;
-            if (s.charAt(i) != t.charAt(j)) transpositions++;
-            j++;
-        }
-        double m = matches;
-        double jaro = (m / ls + m / lt + (m - transpositions / 2.0) / m) / 3.0;
-        int prefix = 0;
-        for (int i = 0; i < Math.min(4, Math.min(ls, lt)) && s.charAt(i) == t.charAt(i); i++) prefix++;
-        return jaro + prefix * 0.1 * (1.0 - jaro);
     }
 }

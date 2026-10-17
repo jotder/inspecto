@@ -35,6 +35,12 @@ AML function pack (`PACK-AML-1`) builds on it. Vocabulary: `docs/GLOSSARY.md` §
     mean token length, times `0.8 + 0.2·min/max` of the two total token lengths; it applies when the token counts are
     equal or the shorter name has two or more tokens. Joined: Jaro-Winkler of the tokens written together, only when
     the counts differ ("Abdul Rahman" = "Abdulrahman"). Symmetric, 0..1, 4 decimals.
+  - *the Jaro-Winkler itself* comes from the Analytics Kernel's similarity kit (ANALYTICS-CORE-1 S1,
+    [analytics-kernel § Similarity kit](../analytics-kernel.md#similarity-kit)): `NameMatcher.TOKEN_JARO_WINKLER` =
+    `JaroWinkler(UTF16_CHAR, HALF, 0.1, 4, boost threshold 0)` — UTF-16 chars, textbook transpositions, prefix scale
+    0.1 up to 4, the prefix boost always applied — exactly the arithmetic Screening had before (`NameMatcherGoldenTest`
+    pins it bit for bit). Still dependency-free (SCR-D2: the kernel carries no third-party library). The fold,
+    honorifics, transliteration, phonetic reading and blocking stay here; only the token similarity's definition moved.
 - **Phonetic reading** (`SCREENING-1` 2): when the plain score is below 0.95 the same score is taken over per-token
   transliteration skeletons (`dh gh kh`→first letter, `ou oo`→u, `ei ai ay ey`→i, doubled letters collapsed, a token of
   6+ letters starting q / g read as k) and capped at 0.95; the larger wins. Gaddafi / Qadhafi / Kadhafi / Gadhafi / Khadafi

@@ -1,0 +1,20 @@
+raw:
+  name: CUSTOMERS
+  format: CSV
+  fields[3]{name,selector,type}:
+    CUSTOMER_ID,"0",VARCHAR
+    CUSTOMER_NAME,"1",VARCHAR
+    ACCOUNT_NAME,"2",VARCHAR
+mapping:
+  canonicalName: customers
+  rawName: CUSTOMERS
+  fields[3]:
+    - name: CUSTOMER_ID
+      from: CUSTOMER_ID
+      fn: keep
+    - name: CUSTOMER_NAME
+      from: CUSTOMER_NAME
+      fn: keep
+    - name: ACCOUNT_NAME
+      from: ACCOUNT_NAME
+      fn: keep

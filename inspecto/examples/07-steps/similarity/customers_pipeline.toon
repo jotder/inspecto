@@ -1,0 +1,38 @@
+name: STEP_SIMILARITY
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/customers/database
+  backup:     out/customers/backup
+  temp:       out/customers/temp
+  errors:     out/customers/errors
+  quarantine: out/customers/quarantine
+  markers:    out/customers/markers
+  status_dir: out/customers/status
+  log_dir:    out/customers/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+
+output_store: name_review
+
+steps[1]:
+  - similarity:
+      left: CUSTOMER_NAME
+      right: ACCOUNT_NAME
+      method: jaro_winkler
+      threshold: 0.92
+      score_column: name_score
+      candidate_column: review_candidate

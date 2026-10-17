@@ -180,6 +180,7 @@ need the runtime decision (tracked as X5 on [`BACKLOG.md`](../../../BACKLOG.md))
 | `transform.timeseries.resample` (2026-10-17) | `DATA` — one row per key per bucket, gaps filled (`TimeSeriesStep` → the Analytics Kernel's `TimeSeriesSql.resample`) | ✅ (verb `resample`) |
 | `transform.timeseries.shift` (2026-10-17) | `DATA` — every inbound row plus each listed column's value N buckets earlier, matched by bucket (`TimeSeriesSql.shift`) | ✅ (verb `shift`) |
 | `transform.timeseries.forecast` (2026-10-17) | `DATA` — per key, every bucket of a regular series with its one-step forecast and band, then `horizon` buckets ahead; one row per level (`TimeSeriesStep` → the Analytics Kernel's `ForecastSql`) | ✅ (verb `forecast`) |
+| `transform.similarity` (2026-10-17) | `DATA` — every inbound row plus a 0..1 similarity score of two columns and an optional candidate flag (`SimilarityStep` → the Analytics Kernel's `SimilaritySql`); never asserts identity (D-M1) | ✅ (verb `similarity`) |
 | `transform.split` | `DATA` | ❌ |
 | `transform.merge` | `DATA` (multi-**input**) | ❌ |
 | `enrichment` | accepts/emits `DATA`; fires the **`on_commit` Signal** (⚠ spelled `ON_COMMIT` in `PipelineRel` until Phase 7 — a Signal, not an edge, per the token model above) | ✅ |

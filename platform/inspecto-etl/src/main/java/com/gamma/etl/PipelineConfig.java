@@ -363,10 +363,17 @@ public final class PipelineConfig {
          * {@code steps:}.
          */
         public static final String FORECAST = "forecast";
+        /**
+         * Similarity score between two columns ({@code transform.similarity}, catalog {@code quality.match.fuzzy},
+         * ANALYTICS-CORE-1 S1). Keys: {@code left}, {@code right}, optional {@code method}, {@code normalize},
+         * {@code score_column}, {@code threshold}, {@code candidate_column}, {@code keep_score}. A candidate, never an
+         * identity (D-M1). No legacy spelling - always {@code steps:}.
+         */
+        public static final String SIMILARITY = "similarity";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT} and {@link #FORECAST} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST} and {@link #SIMILARITY} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

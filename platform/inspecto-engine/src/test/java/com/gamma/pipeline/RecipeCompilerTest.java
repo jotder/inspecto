@@ -221,6 +221,26 @@ class RecipeCompilerTest {
         assertTrue(e.refusals().get(0).message().contains("arima"), e.refusals().get(0).message());
     }
 
+    /** {@code similarity:} (ANALYTICS-CORE-1 S1) compiles to a {@code steps:} entry; a bad method refuses as the run would. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void theSimilarityStepCompilesAndABadMethodRefusesByName() {
+        Map<String, Object> sim = new LinkedHashMap<>(Map.of("left", "NAME", "right", "ALIAS", "method", "token_jaccard",
+                "threshold", 0.8));
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(4, step("similarity", sim));
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) RecipeCompiler.compile(recipe).get("steps");
+        assertTrue(steps.stream().anyMatch(s -> sim.equals(s.get("similarity"))), String.valueOf(steps));
+
+        Map<String, Object> bad = linearRecipe("/data/db");
+        Map<String, Object> broken = new LinkedHashMap<>(sim);
+        broken.put("method", "soundex");
+        ((List<Map<String, Object>>) (List<?>) bad.get("steps")).add(4, step("similarity", broken));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class, () -> RecipeCompiler.compile(bad));
+        assertEquals(RecipeCompiler.MALFORMED_STEP, e.refusals().get(0).code());
+        assertTrue(e.refusals().get(0).message().contains("soundex"), e.refusals().get(0).message());
+    }
+
     /** quality.crypto.hash (2026-10-06): an authored salt is refused by name — the key is the Space's, never config. */
     @Test
     @SuppressWarnings("unchecked")

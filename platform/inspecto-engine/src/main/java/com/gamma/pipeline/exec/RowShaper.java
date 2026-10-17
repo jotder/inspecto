@@ -212,6 +212,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_RESAMPLE.type().equals(type)) return resample(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SHIFT.type().equals(type))    return shift(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_FORECAST.type().equals(type)) return forecast(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_SIMILARITY.type().equals(type)) return similarity(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -805,6 +806,26 @@ public final class RowShaper {
         if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input, timeType));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.similarity} (ANALYTICS-CORE-1 S1) — every inbound row gains a 0..1 similarity score of two
+     * columns and, with a threshold, a candidate flag. {@link SimilarityStep} owns the grammar; the SQL is the Analytics
+     * Kernel's ({@code SimilaritySql}). Proposes candidates only: no row is merged, linked or dropped (D-M1).
+     */
+    private static List<Relation> similarity(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        SimilarityStep.Spec spec;
+        try {
+            spec = SimilarityStep.parse(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        String refusal = SimilarityStep.columnRefusal(spec, columnsOf(conn, input));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

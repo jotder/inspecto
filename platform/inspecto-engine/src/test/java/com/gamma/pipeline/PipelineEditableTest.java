@@ -592,6 +592,14 @@ class PipelineEditableTest {
                 node("f", "transform.timeseries.forecast", f));
     }
 
+    /** The similarity Step (ANALYTICS-CORE-1 S1) has no singular block and a type that is not transform.<kind>'s catalog id. */
+    @Test
+    void theSimilarityStepLowersToStepsUnderItsPlainKind() {
+        Map<String, Object> s = new LinkedHashMap<>(Map.of("left", "A", "right", "B", "threshold", 0.9));
+        assertChain(List.of("filter", "similarity"), node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("s", "transform.similarity", s));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);
