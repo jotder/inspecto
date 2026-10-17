@@ -20,7 +20,6 @@ import com.gamma.audit.EventSink;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.JsonAttributes;
-import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -31,6 +30,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Investigation-studio backend (INV-1): the real <b>Entity Projection</b> over a Dataset — the DuckDB-side
@@ -1350,9 +1351,5 @@ public final class InvRoutes implements RouteModule {
         if (!SAFE_IDENT.matcher(v).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
         return v;
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 }

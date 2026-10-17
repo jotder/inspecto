@@ -13,7 +13,6 @@ import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
 
-import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -24,6 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Geo Map Phase 4 backend: the real <b>server-side projection</b> the Geo Map studio's client-side
@@ -302,9 +303,5 @@ public final class GeoRoutes implements RouteModule {
         if (!SAFE_IDENT.matcher(v).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
         return v;
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 }
