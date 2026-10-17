@@ -80,6 +80,21 @@ storage. `CommitFence` stops a lease-lost holder committing but not writing outp
 involved (it serves `transform.dedup` only). Pinned by `KillBeforeAckDuplicateTest`; options and status in
 BACKLOG; the operator-facing contract is in the [HA/DR drill runbook](../../../ops/ha-dr-drill-runbook.md).
 
+### Write-path identity audit (`SCALEOUT-WRITEPATH-IDENTITY-AUDIT-1`, closed 2026-10-18)
+
+`batchId` is deterministic: `ConsignmentPlanner.buildBatch` calls `ConsignmentId.of(slug, seq, pollRoot, members)`, which hashes the sorted member paths and sizes (no clock). So a re-execution with the SAME member set rewrites the same names; a re-plan with a DIFFERENT member set mints a new id. What each write path does on such a re-plan:
+
+| Write path | Named from | Re-plan with another member set |
+|---|---|---|
+| `ConsignmentIngestStrategy.consolidatedBaseName` (2+ survivors; callers `writeAndTrace`, `DrainCommand`) | `batchId` | **second output file**: the open hole, closed only with `processing.output_per_member` on (default off, operator call in BACKLOG §1) |
+| same, 1 survivor, and `memberStem` with the setting on | member stem / origin hash | overwrite in place |
+| versioned reference `__v_<batchId>` | `batchId` | a second version, by design (append-only store) |
+| park table, manifest, `ParkedCommit`, branch commit log | `batchId` | a second state file; no data output |
+| `RefusalQuarantine` `refused-<code>-<millis>-<seq>` | wall clock | another quarantine copy |
+| `PartitionCompactor` / `ReferenceCompactor` `compacted_<millis>_out` | wall clock | replaces its journalled inputs; not an ingest re-run |
+| `DbFileStageStore`, `DbConsignmentOutputStore` | keyed incl. `batchId` / `consignment_id` + path, `ON CONFLICT` | same id is a no-op; a new id adds rows |
+| `DbAcquisitionLedger` watermark | `source_key` (DELETE + INSERT) | replaces the row |
+
 ### Output-stem collision guard and the stage-2 design (`INGEST-MULTIFILE-BATCH-REPLAN-DUP-1`, operator staging 2026-10-12)
 
 **Stage 1, built.** Two members of ONE batch with the same output stem (`a/x.bin`, `b/x.bin`: `FileNames.outputStem` drops the directory) used to write the same `<stem>_gNNNNN_out.*` in the same partition; the later reveal replaced the earlier, so the first member's rows were GONE while lineage still counted both and both read as `SUCCESS` (reproduced 2026-10-12: one file holding only the second member's row, 2 lineage rows). Decision D3: the second member FAILS CLOSED. `ConsignmentIngestStrategy.claimOutputStem` is the one place a stem is claimed (case-folded, the tree may sit on a case-insensitive filesystem); a collision quarantines the member under `output_stem_collision` (`QuarantineManager.REASON_OUTPUT_STEM_COLLISION`; the quarantine path keeps its directory) and returns a `QUARANTINED_MISMATCH` audit row whose error starts `output_stem_collision:`. Only `GenerationModeIngester` names a member's output by its stem inside a multi-member batch, so only it calls the guard. The consolidated lanes (`CsvIngestStrategy`, `NativeCsvStreamingEngine.unionStreamingIngest`, `UnionModeIngester`, the `DrainCommand` resume) go through `consolidatedBaseName`: a multi-member batch is named by its batch id and a one-survivor batch by its own stem, so they cannot collide inside a batch (pinned by `OutputStemCollisionTest`: a same-stem union batch lands both). The single-member `streamingIngest` and `chunkedIngest` units are one member by construction. ⚠ Residual, not guarded: ACROSS batches, `b/x.bin` arriving in a later batch still replaces an earlier batch's `x_out` for the same partition, because a deliberate `OVERWRITE_OR_IGNORE` re-run of the same file lands on the same name and the engine cannot tell the two apart without per-output origin in the registry. Stage 2 does not fix it either unless the name carries the origin path (below).
