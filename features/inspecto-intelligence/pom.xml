@@ -30,7 +30,8 @@
          optional agent modules — they were previously kept in lockstep by hand. -->
 
     <dependencies>
-        <!-- The Analytics Kernel's similarity kit (ANALYTICS-CORE-1 S1): Triage Run recall's Jaccard (TriageRunSimilarity). Foundation-only, no third-party library. -->
+        <!-- The Analytics Kernel (ANALYTICS-CORE-1): the similarity kit for Triage Run recall's Jaccard (S1) and the z-score
+             definition anomaly_scan builds its SQL from (S7). Foundation-only, no third-party library. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-analytics</artifactId>
@@ -51,14 +52,6 @@
             <!-- `provided` (ASSURE-INTELLIGENCE-BUNDLE-1), as inspecto-agent scopes it: the core is always
                  on a bundle's classpath as inspecto.jar, so shading it into the sidecar would ship a second
                  copy of the product. Still on the compile and test classpath. -->
-            <scope>provided</scope>
-        </dependency>
-        <!-- ANALYTICS-CORE-1 S7: anomaly_scan takes its z-score definition from the Analytics Kernel. `provided`
-             for the same reason as the core: the kernel ships as its own jar beside inspecto.jar. -->
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-analytics</artifactId>
-            <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
         <!-- S9: no longer depends on inspecto-agent. The pack's ModelProfile + LlmGateway are built

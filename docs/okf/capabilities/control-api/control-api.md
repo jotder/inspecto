@@ -462,8 +462,8 @@ automatic modules is high-risk for little gain. The **release notes for the pend
 `PlatformServices` (`com.gamma.job`, `@PublicApi`) is a **flat typed lookup** — `find(Class)`, `get(Class)`,
 `granted()` — built once at boot and filtered per consumer by its declared `requires: [...]`, validated at
 registration (a pack fails atomically on an unknown id), substituted under a dry run. Menu (2026-10-17):
-`notifications`, `mail`, `incidents`, `schema`, `consignment-status`, `datasets`, `analytics`, `alerts` (the owner
-concept `platform-services.md` §3 is authoritative); `requires` travels on
+`notifications`, `mail`, `incidents`, `objects`, `schema`, `consignment-status`, `datasets`, `link-index`, `analytics`,
+`alerts` (the owner concept `platform-services.md` §3 is authoritative); `requires` travels on
 `GET /jobs/types[/{id}]`. ⛔ It must not grow scopes, proxies, lifecycle or annotation injection — the moment
 it does it is the dependency-injection framework this codebase deliberately does not have. Mechanism:
 `platform-services.md`.
