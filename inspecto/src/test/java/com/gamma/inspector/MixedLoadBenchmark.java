@@ -82,6 +82,10 @@ class MixedLoadBenchmark {
         Path writeRoot = Files.createDirectories(dir.resolve("root"));
         Path pipe = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("cfg")), "");
         System.setProperty("assist.write.root", writeRoot.toString());
+        // measure load, not the /bi/query throttle: a fast runner's readers drain the default dashboard bucket
+        // (burst 120, 2/s) and every later query is a 429 (nightly red 2026-10-16/17, 652 of 705 refused)
+        System.setProperty("control.rateLimit.dashboard.capacity", "1e9");
+        System.setProperty("control.rateLimit.dashboard.refillPerSecond", "1e9");
         CollectorService svc;
         ControlApi api;
         try {
@@ -90,6 +94,8 @@ class MixedLoadBenchmark {
             api.start();
         } finally {
             System.clearProperty("assist.write.root");
+            System.clearProperty("control.rateLimit.dashboard.capacity");
+            System.clearProperty("control.rateLimit.dashboard.refillPerSecond");
         }
         try {
             new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("load_view", "flow-x", List.of(),
@@ -127,6 +133,8 @@ class MixedLoadBenchmark {
             System.out.printf("ingest alone       : %,.0f rows/s%n", i2);
             System.out.printf("ingest + readers   : %,.0f rows/s (%.0f%% of alone)%n", i3, 100 * i3 / i2);
             System.out.printf("readers during ing.: %s%n", r3);
+            if (!solo.failures.isEmpty() || !mixed.failures.isEmpty())
+                System.out.printf("reader failures    : alone %s, during ingest %s%n", solo.failures, mixed.failures);
             assertEquals(0, r1.errors + r3.errors, "every /bi/query must answer 200 under load");
             assertTrue(r3.count > 0, "readers must complete at least one query during ingest");
 
@@ -159,6 +167,7 @@ class MixedLoadBenchmark {
     private static final class Readers {
         final AtomicBoolean running = new AtomicBoolean(true);
         final AtomicInteger errors = new AtomicInteger();
+        final java.util.Map<String, Integer> failures = new java.util.concurrent.ConcurrentSkipListMap<>();
         final List<Long> latencies = Collections.synchronizedList(new ArrayList<>());
         final List<Thread> threads = new ArrayList<>();
         long t0;
@@ -170,9 +179,11 @@ class MixedLoadBenchmark {
                     while (running.get()) {
                         long t = System.nanoTime();
                         try {
-                            if (query(c, uri, body) != 200) errors.incrementAndGet();
+                            int code = query(c, uri, body);
+                            if (code != 200) { errors.incrementAndGet(); failures.merge("HTTP " + code, 1, Integer::sum); }
                         } catch (Exception e) {
                             errors.incrementAndGet();
+                            failures.merge(e.getClass().getSimpleName(), 1, Integer::sum);
                         }
                         latencies.add((System.nanoTime() - t) / 1_000_000);
                     }

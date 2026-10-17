@@ -29,8 +29,13 @@ final class RateLimiter {
     /** The original budget: burst 20, then one request every 3 seconds per subject. */
     static RateLimiter standard() { return new RateLimiter(20.0, 1.0 / 3.0); }
 
-    /** The dashboard budget for {@code /bi/query}: burst 120 (≈ ten 12-tile dashboards), then 2 requests/second. */
-    static RateLimiter dashboard() { return new RateLimiter(120.0, 2.0); }
+    /** The dashboard budget for {@code /bi/query}: burst 120 (≈ ten 12-tile dashboards), then 2 requests/second;
+     *  {@code control.rateLimit.dashboard.capacity} / {@code .refillPerSecond} override it (a load benchmark must not
+     *  measure the throttle — {@code MixedLoadBenchmark}). */
+    static RateLimiter dashboard() {
+        return new RateLimiter(positive("control.rateLimit.dashboard.capacity", 120.0),
+                positive("control.rateLimit.dashboard.refillPerSecond", 2.0));
+    }
 
     /** The public delivery-status callback budget (SEC review F1): burst 60, then 5 requests/second per
      *  caller IP. Unauthenticated, so the key is the IP; a provider posting from a handful of addresses

@@ -387,8 +387,19 @@ Three runs on the 12-core Windows dev host, JDK 27, 2026-10-14:
 
 Both thresholds sit ~8x outside the worst run because the 4-vCPU hosted runner shares its cores between the
 ingest and four CPU-bound readers. Negatives checked: a floor of 1,000,000,000 and a ceiling of 1 ms each fail
-the test; the real thresholds pass. Nightly + on-demand only (never `ci.yml`). ⚠ No runner number exists yet:
-tighten only from the logged `ingest under reader load` figure of a real run.
+the test; the real thresholds pass. Nightly + on-demand only (never `ci.yml`).
+
+**Runner numbers and the throttle fix (2026-10-18).** The first runner runs (2026-10-14/15) passed; the
+2026-10-15 run logged ingest 635,419 rows/s alone, 241,086 rows/s (38%) under readers, reader p95 477 ms during
+ingest. 2026-10-16 and 10-17 went RED with `every /bi/query must answer 200 under load` (10-17: 652 of 705
+reader queries refused, p50 4 ms). Cause: the readers hit the production `/bi/query` dashboard bucket
+(`RateLimiter.dashboard()`, burst 120, then 2/s, one key since the benchmark is unauthenticated). The runner's
+solo phase alone spent 89 tokens (17.4 q/s), so the mixed phase got fast 429s. The benchmark was measuring the
+throttle. Fix: the dashboard bucket reads `-Dcontrol.rateLimit.dashboard.capacity` / `.refillPerSecond` like
+the other tunable buckets (a malformed or non-positive value keeps the default; `RateLimiterBudgetTest`), and
+`MixedLoadBenchmark` raises both to 1e9 for its own `ControlApi`. A failing reader run now also prints the
+refusals by HTTP status / exception. The thresholds are unchanged; ⚠ tighten them only from a green runner
+run after this fix.
 
 ## DuckDB version comparison harness
 
