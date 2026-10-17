@@ -78,7 +78,7 @@ The golden corpus ships in `data/samples`; copy it into `data/inbox/<feed>` to i
 ## Limits
 
 - Detection is daily batch (02:00), not real-time; only the Decision Rules act at ingest.
-- The Anomaly Model part needs Professional or Enterprise with Anomaly Detection; `offerings/basic.toon`
-  lists `telco-fraud` as a Personal pack, so on Personal the anomaly Job has no module to run it.
+- The Anomaly Model part needs Anomaly Detection, so the pack is Standard and up (`minEdition: standard`;
+  listed in `offerings/standard.toon` `contentPacks`).
 - Thresholds are illustrative values tuned to the synthetic corpus.
 - The pending Alert Rule must be created by hand after the first scoring run.

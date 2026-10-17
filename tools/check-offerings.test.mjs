@@ -54,6 +54,11 @@ test('a missing content pack, an unknown include and a cycle are RED', () => {
 
 const POSTURE_GREEN = { authMode: 'none', eventsBackend: 'default', objectsBackend: 'default', postgresSidecar: 'absent' };
 const withPosture = (mutate, launcher) => run((g) => { g.offerings.basic.posture = { ...POSTURE_GREEN }; mutate?.(g.offerings.basic.posture); if (launcher) g.launcher = launcher; });
+test('a content pack whose minEdition is above the Offering tier is RED; at or below it is GREEN', () => {
+    assert.match(run((g) => { g.templateMinEdition = { t1: 'standard' }; }).join(' | '), /basic: content pack 't1' needs minEdition standard but the Offering is tier basic/);
+    assert.match(run((g) => { g.templateMinEdition = { t1: 'gold' }; }).join(' | '), /unknown minEdition 'gold'/);
+    assert.deepEqual(run((g) => { g.templateMinEdition = { t1: 'basic' }; }), []);
+});
 test('posture: a complete in-vocabulary section is GREEN, and so is its absence', () => {
     assert.deepEqual(withPosture(), []);
     assert.deepEqual(run(), []);

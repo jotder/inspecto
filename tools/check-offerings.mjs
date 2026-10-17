@@ -20,7 +20,7 @@
 // CHECKS  1 every module id named has a manifest   2 resolved module set == bundleModules(edition) == the edition pom profile
 //         (profile modules = bundle set minus the default-reactor modules)   3 requires.modules closure of the resolved set
 //         4 a `built` add-on names existing modules that are in the resolved set; a `planned` one's hostedBy modules exist
-//         5 contentPacks exist under spaces/_templates   6 includes resolve, no cycle, id equals file name.
+//         5 contentPacks exist under spaces/_templates, and a template's `minEdition:` (template.toon) is not above the tier   6 includes resolve, no cycle, id equals file name.
 //         7 (P6b) an OPTIONAL `posture:` section holds only POSTURE keys/values from the closed vocabulary below, complete when
 //         present, and - when the caller supplies the launcher facts (main() does) - equal to what the launcher scenarios of
 //         tools/check-launchers.mjs prove each edition gets (auth.mode, events.backend, objects.backend) and to whether the
@@ -72,6 +72,8 @@ export const POSTURE = {
 export const idOf = (artifactId) => artifactId.replace(/^inspecto-/, '');
 
 const EDITION_OF = { basic: 'Basic', standard: 'Standard', advanced: 'Advanced', preview: 'Preview' };
+/** Tiers in ascending order: a pack's minEdition must not be above the listing Offering's tier. */
+const TIERS = Object.keys(EDITION_OF);
 const PROFILE_OF = { standard: 'edition-standard', advanced: 'edition-advanced', preview: 'edition-preview' };
 
 /** pom.xml -> { defaults: [ids], profiles: { profileId: [ids] } }. */
@@ -93,7 +95,7 @@ const setDiff = (a, b) => [[...a].filter((x) => !b.has(x)), [...b].filter((x) =>
  * Pure check. in: { offerings: {id: parsed}, manifests: {id: {offeringRole, requires?}}, bundle: (edition) => [artifactId],
  * pom: {defaults, profiles}, templates: [ids] }. Returns a list of findings (empty = green).
  */
-export function check({ offerings, manifests, bundle, pom, templates, launcher }) {
+export function check({ offerings, manifests, bundle, pom, templates, templateMinEdition, launcher }) {
     const out = [];
     const exempt = (id) => ['base', 'internal'].includes(manifests[id]?.offeringRole);
     const resolve = (id, seen = []) => {
@@ -157,7 +159,12 @@ export function check({ offerings, manifests, bundle, pom, templates, launcher }
                 else if (launcher?.[edition]?.[k] !== undefined && launcher[edition][k] !== v) say(`posture ${k}: '${v}' but the launcher/classpath gives ${edition} '${launcher[edition][k]}'`);
             }
         }
-        for (const t of o.contentPacks ?? []) if (!templates.includes(t)) say(`content pack '${t}' not found under spaces/_templates`);
+        for (const t of o.contentPacks ?? []) {
+            if (!templates.includes(t)) say(`content pack '${t}' not found under spaces/_templates`);
+            const need = templateMinEdition?.[t];
+            if (need && !(need in EDITION_OF)) say(`content pack '${t}' has unknown minEdition '${need}'`);
+            else if (need && TIERS.indexOf(o.tier) < TIERS.indexOf(need)) say(`content pack '${t}' needs minEdition ${need} but the Offering is tier ${o.tier}`);
+        }
     }
     return out;
 }
@@ -176,6 +183,11 @@ export function gather(root) {
         bundle: (e) => bundleModules(e).map((m) => m.artifactId),
         pom: parsePom(readFileSync(join(root, 'pom.xml'), 'utf8')),
         templates: existsSync(tdir) ? readdirSync(tdir) : [],
+        templateMinEdition: Object.fromEntries((existsSync(tdir) ? readdirSync(tdir) : []).flatMap((t) => {
+            const f = join(tdir, t, 'template.toon');
+            const m = existsSync(f) && /^minEdition:\s*(\S+)\s*$/m.exec(readFileSync(f, 'utf8'));
+            return m ? [[t, m[1]]] : [];
+        })),
     };
 }
 

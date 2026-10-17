@@ -806,8 +806,9 @@ Configuration only (no platform edit, no new Step Processor). Five synthetic fee
 `wallet_txn` (the wallet-platform ledger: `CASH_IN`, `CASH_OUT`, `P2P`, `BILL_PAY`, `BANK_OUT`, `BANK_IN`, with
 `fee` and agent `commission`), `bank_statement` (the trust-account statement, `bank_ref` = the platform's
 `txn_id`), `partner_settlement` (biller / aggregator files, `txn_ref`), and the daily snapshots `wallets` (KYC tier,
-status, `last_activity_date`) and `core_subscribers`. Money is `DECIMAL(18,2)`. Needs Professional or Enterprise; the
-requirement is declared by Offering placement (`offerings/standard.toon` `contentPacks`), not a template key.
+status, `last_activity_date`) and `core_subscribers`. Money is `DECIMAL(18,2)`. Needs Standard or above; declared by
+Offering placement (`offerings/standard.toon` `contentPacks`) and by the template key `minEdition: standard`, which
+`tools/check-offerings.mjs` holds against every Offering that lists the pack.
 
 - **Two Reconciliations** (`recon.run`, 04:00): `mm_bank_float` (ledger `BANK_*` rows vs the statement) and
   `mm_partner_settlement` (ledger `BILL_PAY` rows vs settlement lines). Both select their ledger side with the
