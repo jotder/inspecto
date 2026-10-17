@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { JobsService } from 'app/inspecto/api';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { ToastrService } from 'ngx-toastr';
@@ -112,6 +113,36 @@ describe('JobDetailComponent', () => {
         (el.querySelector('button[aria-label="Close panel"]') as HTMLButtonElement).click();
         expect(closed).toHaveBeenCalled();
         await expectNoA11yViolations(el);
+    });
+
+    it('the embedded panel offers Run with parameters…, opens the dialog and reloads + toasts on a started run', () => {
+        const fixture = create({ name: 'cdr_ingest_daily', embedded: true });
+        const open = vi.fn(() => ({ afterClosed: () => of({ runId: 'r9' }) }));
+        fixture.debugElement.injector.get(MatDialog).open = open as never;
+        const toast = vi.spyOn(TestBed.inject(ToastrService), 'success');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const btn = Array.from(el.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('Run with parameters'),
+        ) as HTMLButtonElement;
+        expect(btn).toBeTruthy();
+        const get = vi.spyOn(TestBed.inject(JobsService), 'get');
+        btn.click();
+        expect(open).toHaveBeenCalledWith(expect.anything(), {
+            width: '560px',
+            data: { name: 'cdr_ingest_daily', type: 'ingest' },
+        });
+        expect(toast).toHaveBeenCalledWith('Job "cdr_ingest_daily" run started.');
+        expect(get).toHaveBeenCalled(); // load() after the run
+    });
+
+    it('hides Run with parameters… without the canOperateRuns capability', () => {
+        const fixture = create({ name: 'cdr_ingest_daily', embedded: true });
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canAuthorWorkbench']);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).not.toContain('Run with parameters');
     });
 
     it('shows a structured parameter as JSON, not [object Object]', () => {
