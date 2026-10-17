@@ -17,7 +17,8 @@
     <name>Inspecto — Graph algorithms (graph, base)</name>
     <description>
         The platform graph library: shortest and weighted paths, centrality, PageRank, Louvain, k-core, cliques, link
-        prediction, max-flow, propagated risk, the suspicion blend and RunControl, over plain node and edge ids. A
+        prediction, max-flow, propagated risk, the suspicion blend, the temporal motif matcher (analytics core S6) and
+        RunControl, over plain node and edge ids. A
         server-side port of the Link Analysis SPA's graph algorithms, carved out of inspecto-geo-link (LA separation D-1)
         and moved out of the la/ family into the platform by the analytics core plan (D-AN2, M8) so Fraud, AML and
         Case Management can use it without depending on Link Analysis. Plain JDK: NO dependency on any inspecto module.

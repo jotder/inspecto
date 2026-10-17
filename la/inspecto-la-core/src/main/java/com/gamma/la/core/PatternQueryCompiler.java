@@ -1,5 +1,6 @@
 package com.gamma.la.core;
 
+import com.gamma.graph.TemporalMotifMatcher;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 
@@ -27,7 +28,7 @@ import static com.gamma.util.SqlIdent.q;
  * <p><b>Split of work.</b> SQL selects each stage's ELIGIBLE legs and prunes them with necessary conditions only
  * (stage 0: an anchor with at least {@code minBranches} distinct counterparties; stage k: a leg whose tail was
  * reached by stage k-1, and — with {@code afterPrevious} — strictly after the earliest leg that reached it).
- * The windowed, per-branch search then runs over those few legs in {@link BranchingPatternEngine}, a line-for-
+ * The windowed, per-branch search then runs over those few legs in the platform {@link TemporalMotifMatcher}, a line-for-
  * line port of the TS matcher — so the two engines cannot disagree on what a window or an arrival means. A
  * necessary-condition prune can only remove legs no match could use, which is what keeps the results identical.
  *
@@ -49,7 +50,14 @@ public final class PatternQueryCompiler {
     public record Threshold(String attr, Double min, Double max) {}
 
     public record Stage(boolean fanIn, int minBranches, String edgeKind, String nodeKind, Threshold threshold,
-                 Double windowHours, boolean afterPrevious, Double maxGapHours, boolean closesToStart) {}
+                 Double windowHours, boolean afterPrevious, Double maxGapHours, boolean closesToStart) {
+
+        /** The platform matcher's stage. Every projected node is an {@code entity}, so a stage naming another node kind admits none. */
+        public TemporalMotifMatcher.Stage motif() {
+            return new TemporalMotifMatcher.Stage(fanIn, minBranches, windowHours, afterPrevious, maxGapHours, closesToStart,
+                    nodeKind == null || ENTITY_KIND.equals(nodeKind));
+        }
+    }
 
     /** One statement plus its positional binds (all strings; the SQL casts each). */
     public record Compiled(String sql, List<String> binds) {}

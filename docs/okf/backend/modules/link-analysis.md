@@ -435,6 +435,13 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
   against `graph-paths-parity.fixture.json`). `GraphSuspicion` stays in the library: it is the generic weighted blend
   of five graph factors (default weight 1 each) with no LA preset in it. The TypeScript twins and the parity fixtures
   stay under `inspecto-ui/projects/link-analysis/src/graph/`; the Java parity tests read them from there.
+* **Motif search: the matcher is the platform's, the compiler stays** (S6, 2026-10-17). The windowed fan-in / fan-out
+  search behind `/inv/pattern/branching` is `com.gamma.graph.TemporalMotifMatcher` in `platform/inspecto-graph`
+  ([Analytics Kernel § Temporal motif matcher](../analytics-kernel.md#temporal-motif-matcher)), so AML, Mobile Money
+  and Fraud can match structuring rings without Link Analysis. LA keeps `PatternQueryCompiler` (stage parsing and its
+  422s, the SQL prune over the whole Dataset, key normalisation), its `Stage` with edge kind, node kind and threshold
+  band, and `Stage.motif()` — the mapping onto the matcher's neutral stage, where a node kind other than `entity`
+  admits no nodes. `PatternRoutes` (la-api) still masks, labels and shapes the answer.
 
 * **Input** is a sealed `GraphInput`: `Materialised` (from the Working Set, `WorkingSetGraphInput`) or `IndexRef`.
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`

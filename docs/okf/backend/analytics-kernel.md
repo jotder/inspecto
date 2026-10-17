@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split).
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the temporal motif matcher that moved to the graph library (S6).
 resource: docs/superpower/analytics-core-plan.md
 tags: [analytics, statistics, baseline, time-series, scores, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
@@ -430,6 +430,35 @@ a fixed algorithm the JVM computes exactly, the same reading LA's index `BucketF
 * `HoldoutSplitTest`, `HoldoutSplitDuckDbParityTest` — golden MD5 buckets computed outside Java; shares within 2 % of
   the fractions; SQL bucket, role and predicates = JVM over 3,000+ keys (quotes, accents, CJK, emoji, mixed case, an
   integer key, NULL); the time split in both modes against `TimeSplit.role`, and its no-train failure in both forms.
+
+## Temporal motif matcher
+
+ANALYTICS-CORE-1 S6 (2026-10-17). `com.gamma.graph.TemporalMotifMatcher` finds ordered `fan-in` / `fan-out` stages over
+timed directed legs: each stage needs at least `minBranches` distinct counterparties inside the earliest qualifying
+window (`windowHours`), optionally strictly after the time the previous stage reached each frontier node and within
+`maxGapHours`; the last stage may close back onto the origin layer (`closesToStart`, a round trip). Structuring,
+layering and circular-financing rings are this shape. It returns each match's nodes, edges and layers and a
+`truncated` flag (match `limit` reached, or the 500 000 leg-examination `WORK_BUDGET` spent).
+
+* **Home: the graph library `platform/inspecto-graph`, not this module.** Its input is nodes and directed edges
+  (legs), its output a subgraph, and it needs nothing but the JDK — the graph library's own rule (no `inspecto-*`
+  dependency). This module is statistics over numeric vectors and SQL builders; putting a graph search here would
+  have mixed the two and given LA no shorter path (la-core already depends on `inspecto-graph`). So the move changed
+  no pom, no allow-list and no enforcer rule.
+* **Neutral input.** `TemporalMotifMatcher.Stage` carries only the search: shape, breadth, window, ordering, gap,
+  closure and `admitsNodes` (false = the caller's stage names a node kind its graph does not hold, so it matches
+  nothing — legs are still counted against the budget). The caller applies any edge kind or value band before it
+  hands over each stage's eligible legs.
+* **Link Analysis keeps** `PatternQueryCompiler` (stage parsing, the 422 refusals, the necessary-condition SQL prune
+  over the whole Dataset and key normalisation), its `Stage` (edge kind, node kind, threshold band), and the
+  mapping `Stage.motif()` (every projected node is an `entity`); see
+  [link-analysis §5](modules/link-analysis.md#5-graph-run-graph--la-core--la-storage).
+* **Twin and tests.** It is a line-for-line port of `matchBranchingPattern`
+  (`inspecto-ui/projects/link-analysis/src/graph/branching-pattern-engine.ts`); the TypeScript stays with Link
+  Analysis. `TemporalMotifMatcherGoldenTest` (inspecto-graph) pins the exact output — written against the LA class
+  and committed before the move, unchanged since; `PatternStageMotifTest` (la-core) pins the stage mapping;
+  `ControlApiInvPatternTest` (geo-link) and `branching-parity.spec.ts` still assert the same
+  `branching-parity.fixture.json`.
 
 ## References
 
