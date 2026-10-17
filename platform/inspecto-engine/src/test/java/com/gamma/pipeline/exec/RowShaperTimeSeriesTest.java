@@ -115,6 +115,66 @@ class RowShaperTimeSeriesTest {
                 "window", "1"), "does not take 'window'");
     }
 
+    /**
+     * {@code transform.timeseries.forecast} (ANALYTICS-CORE-1 S5): a resample's daily sums forecast per region, the
+     * numbers the kernel's JVM form gives, the horizon labelled on the grain and typed as the input.
+     */
+    @Test
+    void forecastAfterResampleGivesTheKernelsNumbersPerKey() throws Exception {
+        exec("CREATE TABLE sales AS SELECT r AS region, TIMESTAMP '2026-01-05 09:00' + INTERVAL (d) DAY AS ts,"
+                + " CAST(100 + 10 * (r = 'S')::INTEGER + d + 5 * (d % 7) AS DOUBLE) AS amt FROM range(21) t(d),"
+                + " (VALUES ('N'), ('S')) k(r) WHERE NOT (r = 'N' AND d = 9)");   // N has an empty day: 0 after resample
+        String daily = run("transform.timeseries.resample", "sales", cfg("time_column", "ts", "grain", "day",
+                "group_by", List.of("region"), "measures", List.of("sum(amt)"), "bucket_column", "day"));
+        String out = run("transform.timeseries.forecast", daily, cfg("time_column", "day", "grain", "day",
+                "value_column", "sum_amt", "group_by", List.of("region"), "period", 7, "horizon", 3,
+                "levels", List.of(0.8, 0.95)));
+        assertEquals(List.of("region", "day", "horizon", "actual", "forecast", "level", "lower", "upper"),
+                rows("SELECT column_name FROM (DESCRIBE " + q(out) + ")"));
+        assertEquals(List.of("TIMESTAMP"), rows("SELECT DISTINCT typeof(day) FROM " + q(out)));
+        for (String region : List.of("N", "S")) {
+            List<String> ys = rows("SELECT sum_amt FROM " + q(daily) + " WHERE region = '" + region + "' ORDER BY day");
+            double[] y = ys.stream().mapToDouble(Double::parseDouble).toArray();
+            com.gamma.analytics.forecast.Forecaster.Result jvm = com.gamma.analytics.forecast.Forecaster.fit(y,
+                    TimeSeriesStep.parseForecast(cfg("time_column", "day", "grain", "day", "value_column", "sum_amt",
+                            "period", 7, "horizon", 3, "levels", List.of(0.8, 0.95))).model());
+            List<String> fut = rows("SELECT strftime(day, '%Y-%m-%d'), forecast, upper FROM " + q(out) + " WHERE region = '"
+                    + region + "' AND horizon > 0 AND level = 0.95 ORDER BY day");
+            assertEquals(3, fut.size());
+            assertTrue(fut.get(0).startsWith("2026-01-26|"), fut.toString());
+            for (int h = 0; h < 3; h++) {
+                String[] c = fut.get(h).split("\\|");
+                assertEquals(jvm.ahead()[h], Double.parseDouble(c[1]), 1e-9 * Math.abs(jvm.ahead()[h]));
+                assertEquals(jvm.upperAhead(0.95)[h], Double.parseDouble(c[2]), 1e-9 * Math.abs(jvm.upperAhead(0.95)[h]));
+            }
+        }
+        assertEquals(List.of("96"), rows("SELECT count(*) FROM " + q(out)));   // (21 + 3) days x 2 regions x 2 levels
+    }
+
+    @Test
+    void forecastRefusesAnIrregularOrShortSeriesBeforeForecasting() throws Exception {
+        Map<String, Object> base = cfg("time_column", "ts", "grain", "day", "value_column", "amt",
+                "group_by", List.of("region"), "period", 2, "horizon", 1);
+        assertRefused("transform.timeseries.forecast", base, "not the start of a day");
+        exec("CREATE TABLE gappy AS SELECT * FROM (VALUES ('N', DATE '2026-01-01', 1.0), ('N', DATE '2026-01-03', 2.0))"
+                + " t(region, ts, amt)");
+        assertRefused("transform.timeseries.forecast", base, "missing or repeated day", "gappy");
+        exec("CREATE TABLE short AS SELECT * FROM (VALUES ('N', DATE '2026-01-01', 1.0), ('N', DATE '2026-01-02', 2.0),"
+                + " ('N', DATE '2026-01-03', 2.0)) t(region, ts, amt)");
+        assertRefused("transform.timeseries.forecast", base, "at least 4 (two seasons)", "short");
+        exec("CREATE TABLE holes AS SELECT region, ts, CASE WHEN ts = DATE '2026-01-02' THEN NULL ELSE amt END AS amt"
+                + " FROM short");
+        assertRefused("transform.timeseries.forecast", base, "empty 'amt'", "holes");
+        assertRefused("transform.timeseries.forecast", cfg("time_column", "ts", "grain", "day", "value_column", "region",
+                "period", 2, "horizon", 1), "must be a number", "short");
+        assertRefused("transform.timeseries.forecast", cfg("time_column", "ts", "grain", "day", "value_column", "amt",
+                "period", 1, "horizon", 1), "'period' must be between 2");
+        assertRefused("transform.timeseries.forecast", cfg("time_column", "ts", "grain", "day", "value_column", "amt",
+                "period", 2, "horizon", 1, "group_by", List.of("forecast")), "appears twice");
+        assertRefused("transform.timeseries.forecast", cfg("time_column", "ts", "grain", "day", "value_column", "amt",
+                "period", 2, "horizon", 1, "levels", List.of(1.5)), "between 0 and 1");
+    }
+
     @Test
     void aResampleOverTooManyBucketsFailsTheRun() throws Exception {
         SQLException e = assertThrows(SQLException.class, () -> run("transform.timeseries.resample", "src",

@@ -1,0 +1,47 @@
+name: STEP_FORECAST
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/sales/database
+  backup:     out/sales/backup
+  temp:       out/sales/temp
+  errors:     out/sales/errors
+  quarantine: out/sales/quarantine
+  markers:    out/sales/markers
+  status_dir: out/sales/status
+  log_dir:    out/sales/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: sales_forecast
+
+steps[2]:
+  - resample:
+      time_column: SALE_TS
+      grain: day
+      group_by[1]: REGION
+      measures[1]: "sum(AMOUNT)"
+      bucket_column: DAY
+  - forecast:
+      time_column: DAY
+      grain: day
+      value_column: sum_AMOUNT
+      group_by[1]: REGION
+      method: holt_winters
+      period: 7
+      horizon: 7

@@ -211,6 +211,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_UNPIVOT.type().equals(type))  return unpivot(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RESAMPLE.type().equals(type)) return resample(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SHIFT.type().equals(type))    return shift(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_FORECAST.type().equals(type)) return forecast(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -771,6 +772,39 @@ public final class RowShaper {
         }
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.timeseries.forecast} (ANALYTICS-CORE-1 S5) — seasonal naive or Holt-Winters per key over a
+     * regular series, with a prediction band per level. {@link TimeSeriesStep} owns the grammar; the SQL is the Analytics
+     * Kernel's ({@code ForecastSql}). Refuses, before forecasting, a series that is not regular (off-grain, missing or
+     * repeated bucket, empty value), too short for two seasons, or past the caps.
+     */
+    private static List<Relation> forecast(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        TimeSeriesStep.Forecast spec;
+        try {
+            spec = TimeSeriesStep.parseForecast(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = TimeSeriesStep.columnRefusal(TimeSeriesStep.FORECAST, spec.inputColumns(), List.of(),
+                List.copyOf(types.keySet()));
+        String timeType = typeOf(types, spec.timeColumn());
+        if (refusal == null)
+            refusal = TimeSeriesStep.forecastTypeRefusal(spec.timeColumn(), timeType, spec.valueColumn(),
+                    typeOf(types, spec.valueColumn()));
+        if (refusal == null)
+            try (Statement st = conn.createStatement(); java.sql.ResultSet rs = st.executeQuery(spec.checkSql(input, timeType))) {
+                rs.next();
+                refusal = spec.checkRefusal(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5),
+                        rs.getLong(6), rs.getLong(7));
+            }
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input, timeType));
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

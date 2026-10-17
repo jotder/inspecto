@@ -90,7 +90,7 @@ public final class PipelineSchemas {
     private static final List<String> RESHAPING = List.of(PipelineConfig.Step.SUMMARIZE, PipelineConfig.Step.JOIN,
             PipelineConfig.Step.SQL, PipelineConfig.Step.LOOKUP, PipelineConfig.Step.ROUTE, PipelineConfig.Step.RUNNING,
             PipelineConfig.Step.EXPLODE, PipelineConfig.Step.UNPIVOT, PipelineConfig.Step.RESAMPLE,
-            PipelineConfig.Step.SHIFT);
+            PipelineConfig.Step.SHIFT, PipelineConfig.Step.FORECAST);
 
     /** The schemas a pipeline declares, in the order the Catalog lays them out. */
     public static List<Entry> entries(PipelineConfig cfg) {

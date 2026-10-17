@@ -1,5 +1,10 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.analytics.forecast.ForecastMethod;
+import com.gamma.analytics.forecast.ForecastOutput;
+import com.gamma.analytics.forecast.ForecastSql;
+import com.gamma.analytics.forecast.Forecaster;
+import com.gamma.analytics.score.EntityCap;
 import com.gamma.analytics.time.TimeGrain;
 import com.gamma.analytics.time.TimeSeriesSql;
 import com.gamma.etl.Identifiers;
@@ -16,8 +21,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The config grammar of the two time-series Steps (ANALYTICS-CORE-1 M5) — {@code transform.timeseries.resample}
- * ({@code steps:} kind {@code resample}) and {@code transform.timeseries.shift} (kind {@code shift}) — parsed once, so
+ * The config grammar of the time-series Steps — {@code transform.timeseries.resample} ({@code steps:} kind
+ * {@code resample}) and {@code transform.timeseries.shift} (kind {@code shift}), ANALYTICS-CORE-1 M5, and
+ * {@code transform.timeseries.forecast} (kind {@code forecast}, S5; the kernel's {@link Forecaster}) — parsed once, so
  * the run ({@link RowShaper}), the recipe compiler and the save-time check refuse the same configs with the same words.
  * The SQL is the Analytics Kernel's ({@link TimeSeriesSql}, bucketing by {@link TimeGrain}); the resample's aggregates
  * are the Measure grammar's ({@link MeasureCompiler#aggregateSql}).
@@ -41,6 +47,16 @@ public final class TimeSeriesStep {
 
     static final String RESAMPLE = "transform.timeseries.resample";
     static final String SHIFT = "transform.timeseries.shift";
+    static final String FORECAST = "transform.timeseries.forecast";
+
+    /** The longest season a forecast takes, in buckets. */
+    public static final int MAX_FORECAST_PERIOD = 1_000;
+    /** The most buckets a forecast looks ahead. */
+    public static final int MAX_FORECAST_HORIZON = 1_000;
+    /** The longest series a forecast takes: Holt-Winters advances one bucket per recursion step. */
+    public static final long MAX_FORECAST_POINTS = 10_000;
+    /** The most series one forecast run takes; past it the run fails (D-AD10, the score contract's default cap). */
+    public static final long MAX_FORECAST_SERIES = EntityCap.DEFAULT;
 
     /** A parsed resample config. */
     public record Resample(String timeColumn, TimeGrain grain, ZoneId zone, List<String> groupBy,
@@ -105,6 +121,135 @@ public final class TimeSeriesStep {
             return TimeSeriesSql.duplicateBucketsSql(kernel(input));
         }
     }
+
+    /** A parsed forecast config: the series, and the kernel's model spec. */
+    public record Forecast(String timeColumn, TimeGrain grain, String valueColumn, List<String> groupBy,
+                           Forecaster.Spec model) {
+
+        public List<String> inputColumns() {
+            List<String> out = new ArrayList<>(groupBy);
+            out.add(timeColumn);
+            out.add(valueColumn);
+            return out;
+        }
+
+        /** The output columns: the keys, the time column, then {@link ForecastOutput}'s. */
+        public List<String> outputColumns() {
+            List<String> out = new ArrayList<>(groupBy);
+            out.add(timeColumn);
+            out.addAll(ForecastOutput.valueColumnNames());
+            return out;
+        }
+
+        private ForecastSql.Spec kernel(String input, String timeType) {
+            return new ForecastSql.Spec(input, timeColumn, timeType, grain, groupBy, valueColumn, model);
+        }
+
+        /** The kernel's forecast query; {@code timeType} is the time column's DuckDB type. */
+        public String select(String input, String timeType) {
+            return ForecastSql.select(kernel(input, timeType));
+        }
+
+        /** The kernel's regularity check: one row of problem counts ({@link ForecastSql#checkSql}). */
+        public String checkSql(String input, String timeType) {
+            return ForecastSql.checkSql(kernel(input, timeType));
+        }
+
+        /**
+         * The refusal for a check row, or {@code null}: {@code series, off_grain, null_time, null_value,
+         * irregular_series, min_points, max_points}.
+         */
+        public String checkRefusal(long series, long offGrain, long nullTime, long nullValue, long irregular,
+                                   long minPoints, long maxPoints) {
+            String g = grain.wire();
+            if (series > MAX_FORECAST_SERIES)
+                return FORECAST + ": " + series + " series is more than the cap of " + MAX_FORECAST_SERIES
+                        + " - narrow the input or the group_by";
+            if (nullTime > 0)
+                return FORECAST + ": " + nullTime + " row(s) have an empty '" + timeColumn + "' - filter them out first";
+            if (offGrain > 0)
+                return FORECAST + ": " + offGrain + " '" + timeColumn + "' value(s) are not the start of a " + g
+                        + " - resample to the " + g + " grain first";
+            if (irregular > 0)
+                return FORECAST + ": " + irregular + " series have a missing or repeated " + g + " - a forecast needs "
+                        + "one row per key per " + g + " with no gap; resample first";
+            if (nullValue > 0)
+                return FORECAST + ": " + nullValue + " empty '" + valueColumn + "' value(s) - fill them first (a "
+                        + "resample with count or sum fills an empty bucket with 0)";
+            if (series > 0 && minPoints < model.minPoints())
+                return FORECAST + ": a series has " + minPoints + " " + g + "(s); with period " + model.period()
+                        + " every series needs at least " + model.minPoints() + " (two seasons)";
+            if (maxPoints > MAX_FORECAST_POINTS)
+                return FORECAST + ": a series has " + maxPoints + " " + g + "s, more than the cap of "
+                        + MAX_FORECAST_POINTS + " - use a coarser grain or a shorter history";
+            return null;
+        }
+    }
+
+    /** Parse and validate a forecast config; {@link IllegalArgumentException} names the first problem. */
+    public static Forecast parseForecast(Map<?, ?> cfg) {
+        known(cfg, FORECAST, Set.of("time_column", "grain", "value_column", "group_by", "method", "period", "horizon",
+                "levels", "alpha", "beta", "gamma"));
+        String time = required(cfg, "time_column", FORECAST, "the bucket column of the series");
+        TimeGrain grain = grain(cfg, FORECAST);
+        String value = required(cfg, "value_column", FORECAST, "the number to forecast");
+        List<String> groupBy = identList(cfg, "group_by", FORECAST);
+        ForecastMethod method = ForecastMethod.HOLT_WINTERS;
+        Object m = cfg.get("method");
+        if (m != null && !m.toString().isBlank()) {
+            try {
+                method = ForecastMethod.parse(m.toString());
+            } catch (IllegalArgumentException e) {
+                throw bad(FORECAST, "'method' '" + m + "' is not holt_winters or seasonal_naive");
+            }
+        }
+        int period = wholeNumber(cfg, "period", 2, MAX_FORECAST_PERIOD, "buckets per season, e.g. 7 for daily data "
+                + "with a weekly pattern");
+        int horizon = wholeNumber(cfg, "horizon", 1, MAX_FORECAST_HORIZON, "how many buckets ahead to forecast");
+        List<Double> levels = new ArrayList<>();
+        Object lv = cfg.get("levels");
+        List<?> raw = lv instanceof List<?> l ? l : lv == null || lv.toString().isBlank() ? List.of()
+                : List.of(lv.toString().split(","));
+        for (Object o : raw) {
+            if (o == null || o.toString().isBlank()) continue;
+            levels.add(fraction(o, "levels", true));
+        }
+        if (levels.isEmpty()) levels.add(0.95);
+        levels.sort(null);
+        Forecaster.Spec model;
+        try {
+            model = new Forecaster.Spec(method, period, weight(cfg, "alpha", Forecaster.DEFAULT_ALPHA),
+                    weight(cfg, "beta", Forecaster.DEFAULT_BETA), weight(cfg, "gamma", Forecaster.DEFAULT_GAMMA),
+                    horizon, levels);
+        } catch (IllegalArgumentException e) {
+            throw bad(FORECAST, e.getMessage());
+        }
+        Forecast f = new Forecast(time, grain, value, List.copyOf(groupBy), model);
+        Set<String> seen = new HashSet<>();
+        for (String c : f.outputColumns())
+            if (!seen.add(c.toLowerCase(Locale.ROOT)))
+                throw bad(FORECAST, "output column '" + c + "' appears twice - the group_by columns and the time column "
+                        + "must differ from each other and from " + ForecastOutput.valueColumnNames());
+        return f;
+    }
+
+    /**
+     * {@code null} when a forecast's time and value columns have usable types, else the refusal: the time column a
+     * {@code DATE} or zone-less {@code TIMESTAMP}, the value column a number.
+     */
+    public static String forecastTypeRefusal(String timeColumn, String timeType, String valueColumn, String valueType) {
+        String t = timeType == null ? "" : timeType.toUpperCase(Locale.ROOT).trim();
+        if (!ForecastSql.TIME_TYPES.contains(t))
+            return FORECAST + ": '" + timeColumn + "' must be a DATE or TIMESTAMP bucket column, not " + timeType
+                    + " (a TIMESTAMP WITH TIME ZONE: resample it with a timezone first)";
+        String v = valueType == null ? "" : valueType.toUpperCase(Locale.ROOT).trim();
+        if (!(v.startsWith("DECIMAL") || NUMERIC.contains(v)))
+            return FORECAST + ": '" + valueColumn + "' must be a number, not " + valueType;
+        return null;
+    }
+
+    private static final Set<String> NUMERIC = Set.of("TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT", "UTINYINT",
+            "USMALLINT", "UINTEGER", "UBIGINT", "UHUGEINT", "FLOAT", "DOUBLE");
 
     /** Parse and validate a resample config; {@link IllegalArgumentException} names the first problem. */
     public static Resample parseResample(Map<?, ?> cfg) {
@@ -253,6 +398,38 @@ public final class TimeSeriesStep {
         } catch (DateTimeException e) {
             throw bad(kind, "'" + key + "' '" + s + "' is not a date (2026-01-31) or date-time (2026-01-31T08:00)");
         }
+    }
+
+    private static int wholeNumber(Map<?, ?> cfg, String key, int min, int max, String what) {
+        Object v = cfg.get(key);
+        if (v == null || v.toString().isBlank()) throw bad(FORECAST, "needs a '" + key + "' - " + what);
+        int n;
+        try {
+            n = Integer.parseInt(v.toString().trim());
+        } catch (NumberFormatException e) {
+            throw bad(FORECAST, "'" + key + "' '" + v + "' is not a whole number");
+        }
+        if (n < min || n > max) throw bad(FORECAST, "'" + key + "' must be between " + min + " and " + max + ", got " + n);
+        return n;
+    }
+
+    private static double weight(Map<?, ?> cfg, String key, double dflt) {
+        Object v = cfg.get(key);
+        return v == null || v.toString().isBlank() ? dflt : fraction(v, key, false);
+    }
+
+    /** A number in [0, 1] ({@code open}: strictly between). */
+    private static double fraction(Object v, String key, boolean open) {
+        double d;
+        try {
+            d = Double.parseDouble(v.toString().trim());
+        } catch (NumberFormatException e) {
+            throw bad(FORECAST, "'" + key + "' value '" + v + "' is not a number");
+        }
+        if (open ? !(d > 0 && d < 1) : !(d >= 0 && d <= 1))
+            throw bad(FORECAST, "'" + key + "' value " + v + " must be " + (open ? "between 0 and 1, e.g. 0.95"
+                    : "from 0 to 1"));
+        return d;
     }
 
     private static List<String> identList(Map<?, ?> cfg, String key, String kind) {

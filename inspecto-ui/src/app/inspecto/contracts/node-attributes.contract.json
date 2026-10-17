@@ -839,6 +839,123 @@
     "default" : "_prev",
     "help" : "Added to each shifted column's name: sum_amount becomes sum_amount_prev."
   } ],
+  "transform.timeseries.forecast" : [ {
+    "key" : "time_column",
+    "label" : "Time column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The DATE or TIMESTAMP bucket column of a regular series (a resample's output): one row per key per bucket, no bucket missing.",
+    "placeholder" : "bucket"
+  }, {
+    "key" : "grain",
+    "label" : "Time grain",
+    "type" : "select",
+    "tier" : "required",
+    "options" : [ {
+      "value" : "second",
+      "label" : "Second"
+    }, {
+      "value" : "minute",
+      "label" : "Minute"
+    }, {
+      "value" : "hour",
+      "label" : "Hour"
+    }, {
+      "value" : "day",
+      "label" : "Day"
+    }, {
+      "value" : "week",
+      "label" : "Week (Monday)"
+    }, {
+      "value" : "month",
+      "label" : "Month"
+    }, {
+      "value" : "quarter",
+      "label" : "Quarter"
+    }, {
+      "value" : "year",
+      "label" : "Year"
+    } ],
+    "help" : "The bucket size. Weeks start on Monday."
+  }, {
+    "key" : "value_column",
+    "label" : "Value column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The number forecast. An empty value is refused: resample with sum or count fills a gap with 0.",
+    "placeholder" : "sum_amount"
+  }, {
+    "key" : "group_by",
+    "label" : "Series keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "One forecast per key. Leave blank for one series.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "holt_winters",
+    "options" : [ {
+      "value" : "holt_winters",
+      "label" : "Holt-Winters additive (level, trend, season)"
+    }, {
+      "value" : "seasonal_naive",
+      "label" : "Seasonal naive (same bucket last season)"
+    } ],
+    "help" : "Holt-Winters smooths level, trend and season; seasonal naive repeats the last season."
+  }, {
+    "key" : "period",
+    "label" : "Season length",
+    "type" : "number",
+    "tier" : "required",
+    "min" : 2.0,
+    "max" : 1000.0,
+    "help" : "Buckets per season: 7 for daily data with a weekly pattern, 12 for monthly data with a yearly one. Every series needs at least two seasons."
+  }, {
+    "key" : "horizon",
+    "label" : "Buckets ahead",
+    "type" : "number",
+    "tier" : "required",
+    "min" : 1.0,
+    "max" : 1000.0,
+    "help" : "How many buckets after the last one to forecast."
+  }, {
+    "key" : "levels",
+    "label" : "Interval levels",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Each level gets its own lower and upper band (one row per level). Blank: 0.95.",
+    "placeholder" : "0.8, 0.95"
+  }, {
+    "key" : "alpha",
+    "label" : "Level smoothing (alpha)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 0.25,
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Holt-Winters only. Higher follows recent values faster."
+  }, {
+    "key" : "beta",
+    "label" : "Trend smoothing (beta)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 0.02,
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Holt-Winters only. Higher lets the trend change faster."
+  }, {
+    "key" : "gamma",
+    "label" : "Season smoothing (gamma)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 0.15,
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Holt-Winters only. Higher lets the seasonal pattern change faster."
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",
