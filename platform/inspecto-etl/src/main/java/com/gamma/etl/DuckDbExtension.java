@@ -2,6 +2,7 @@ package com.gamma.etl;
 
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.safety.SafetyPolicyTier;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,7 +91,7 @@ public final class DuckDbExtension {
                         + "from there, and " + file + " does not exist. Stage this platform's " + name
                         + ".duckdb_extension into it (package.ps1 -RequireExtensions), or unset -D"
                         + DIR_PROPERTY + " on a networked host to allow an INSTALL.");
-            execute(conn, "LOAD '" + file.toString().replace('\\', '/').replace("'", "''") + "'");
+            execute(conn, "LOAD " + SqlIdent.sqlStr(file.toString().replace('\\', '/')));
             log.debug("DuckDB {} extension loaded from staged file {}", name, file);
             return;
         }

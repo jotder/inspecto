@@ -1,5 +1,6 @@
 package com.gamma.etl;
 
+import com.gamma.util.SqlIdent;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -131,7 +132,7 @@ public final class PartitionWriter {
                 .append(String.join(", ", exclude)).append("), CASE \"__src_id\"");
         for (var e : srcIdToFile.entrySet())
             proj.append(" WHEN ").append(e.getKey())
-                .append(" THEN '").append(e.getValue().replace("'", "''")).append('\'');
+                .append(" THEN ").append(SqlIdent.sqlStr(e.getValue()));
         proj.append(" ELSE NULL END AS \"").append(filenameColumn).append("\" FROM ").append(table);
         return writeProjected(conn, proj.toString(), databaseDir, outputFormat, compression,
                 baseName, partitionColumns);

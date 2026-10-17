@@ -341,7 +341,7 @@ public final class DuckDbCsvIngester {
         StringBuilder proj = new StringBuilder();
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
-            String cell = "\"" + escapeIdent(String.valueOf(fields.get(i).get("selector"))) + "\"";
+            String cell = SqlIdent.q(String.valueOf(fields.get(i).get("selector")));
             proj.append(xlsxSerialAsText(cell, String.valueOf(fields.get(i).get("type")), cfg.csv()))
                 .append(" AS \"").append(fields.get(i).get("name")).append('"');
         }
@@ -421,8 +421,8 @@ public final class DuckDbCsvIngester {
         StringBuilder proj = new StringBuilder();
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
-            proj.append("CAST(\"").append(escapeIdent(String.valueOf(fields.get(i).get("selector"))))
-                .append("\" AS VARCHAR) AS \"").append(fields.get(i).get("name")).append('\"');
+            proj.append("CAST(").append(SqlIdent.q(String.valueOf(fields.get(i).get("selector"))))
+                .append(" AS VARCHAR) AS \"").append(fields.get(i).get("name")).append('\"');
         }
 
         return new ReadSpec(proj.toString(), parquetReadRelation(filePath, cfg.parquet()));
@@ -434,9 +434,6 @@ public final class DuckDbCsvIngester {
         return "read_parquet(" + SqlIdent.sqlStr(filePath)
                 + (p != null && p.hivePartitioning() ? ", hive_partitioning=true" : "") + ")";
     }
-
-    /** A double-quoted SQL identifier's escape ({@code "} doubles) — selectors are sheet-column names. */
-    private static String escapeIdent(String s) { return s.replace("\"", "\"\""); }
 
     private static ReadSpec buildJsonReadSpec(File file, Map<String, Object> schemaConfig,
                                               PipelineConfig cfg) {
