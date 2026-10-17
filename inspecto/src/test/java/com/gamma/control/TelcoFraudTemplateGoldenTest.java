@@ -254,8 +254,8 @@ class TelcoFraudTemplateGoldenTest {
     /** TELCO-FRAUD-DEMO-REHEARSAL-1: a viewer without {@code canRevealLinkEntities} sees {@code masked:} aliases only where a
      *  column is CLASSIFIED {@code MSISDN}; the feeds said {@code CONFIDENTIAL}, which no masked Entity Type claims, so a
      *  viewer read raw subscriber numbers in the feed Datasets. Pin the classification on the three feed schemas. (The sink
-     *  Datasets stay unclassified on purpose: a bar Widget orders by its key, and a masked key refuses ordering, so the
-     *  dashboard would go blank for a viewer - P2 TELCO-FRAUD-MASKED-DASHBOARD-1.) */
+     *  Datasets classify their subscriber key too; the dashboard test proves a viewer still gets every bar, masked -
+     *  TELCO-FRAUD-MASKED-DASHBOARD-1.) */
     @Test
     void everyFeedSubscriberNumberColumnIsClassifiedMsisdn(@TempDir Path root) throws Exception {
         Path config = createSpace(root).resolve("config");
@@ -463,6 +463,11 @@ class TelcoFraudTemplateGoldenTest {
         }
         TelcoFraudCorpus corpus = new TelcoFraudCorpus().generate();
         com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.gamma.mask.EvidenceMasker masker = com.gamma.mask.EvidenceMasker.forSpace(config);
+        // "admin" may reveal entity keys; "viewer" holds no capability at all.
+        Authenticators.forTest(ex -> Optional.of("Bearer viewer".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? new Subject("viewer", Set.of())
+                : new Subject("admin-1", Set.of(Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES))));
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         try {
@@ -489,13 +494,24 @@ class TelcoFraudTemplateGoldenTest {
                 String x = w.get("controls").get("x").get(0).get("field").asText();
                 com.fasterxml.jackson.databind.JsonNode y = w.get("controls").get("y").get(0);
                 String agg = y.get("agg").asText(), field = y.get("field").asText();
+                // As the SPA's bar plugin sends it: the category order on the group key is cosmetic.
                 String body = json.writeValueAsString(Map.of("dataset", dataset, "groupBy", List.of(x),
-                        "measures", List.of(Map.of("agg", agg, "field", field))));
-                com.fasterxml.jackson.databind.JsonNode rows = V1Body.of(call(base + "/bi/query", body)).get("rows");
-                Map<String, Double> bars = new TreeMap<>();
-                for (com.fasterxml.jackson.databind.JsonNode r : rows) bars.put(r.get(x).asText(), r.get(agg + "_" + field).asDouble());
+                        "measures", List.of(Map.of("agg", agg, "field", field)),
+                        "orderBy", List.of(Map.of("field", x, "dir", "asc", "cosmetic", true))));
+                Map<String, Double> bars = bars(call(base + "/bi/query", body), x, agg + "_" + field);
                 for (String offender : corpus.offenders.get(dataset))
                     assertTrue(bars.getOrDefault(offender, 0.0) > 0, id + ": planted offender " + offender + " has a bar: " + bars);
+                // TELCO-FRAUD-MASKED-DASHBOARD-1: a viewer without canRevealLinkEntities gets the SAME bars, a subscriber
+                // key under its masked alias (never the number), every other key raw.
+                String viewerBody = call(base + "/bi/query", body, "viewer");
+                Map<String, Double> viewerBars = bars(viewerBody, x, agg + "_" + field);
+                boolean subscriberKey = SUBSCRIBER_KEYS.contains(x);
+                for (String offender : corpus.offenders.get(dataset)) {
+                    String shown = subscriberKey ? masker.tokenFor(offender) : offender;
+                    assertEquals(bars.get(offender), viewerBars.get(shown), id + ": the viewer's bar for " + offender + ": " + viewerBars);
+                    if (subscriberKey) assertFalse(viewerBody.contains(offender), id + ": raw " + offender + " reached a viewer");
+                }
+                assertEquals(bars.size(), viewerBars.size(), id + ": one viewer bar per key");
                 typologiesShown.add(dataset);
             }
             assertEquals(18, tiles, "four KPI tiles and fourteen typology Widgets");
@@ -506,8 +522,22 @@ class TelcoFraudTemplateGoldenTest {
         }
     }
 
+    /** The sink group keys classified MSISDN, masked for a non-revealer. ({@code id_doc} is classified PII, which no
+     *  telecom Entity Type claims, so the default {@code typed} masking mode leaves it raw.) */
+    private static final Set<String> SUBSCRIBER_KEYS = Set.of("msisdn", "caller");
+
+    private static Map<String, Double> bars(String body, String x, String measure) throws Exception {
+        Map<String, Double> bars = new TreeMap<>();
+        for (com.fasterxml.jackson.databind.JsonNode r : V1Body.of(body).get("rows")) bars.put(r.get(x).asText(), r.get(measure).asDouble());
+        return bars;
+    }
+
     private static String call(String url, String jsonBody) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).header("Authorization", "Bearer admin");
+        return call(url, jsonBody, "admin");
+    }
+
+    private static String call(String url, String jsonBody, String user) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).header("Authorization", "Bearer " + user);
         if (jsonBody != null) b.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(jsonBody));
         HttpResponse<String> r = HttpClient.newHttpClient().send(b.build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(200, r.statusCode(), url + " -> " + r.body());

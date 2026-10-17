@@ -1,2 +1,8 @@
 name: fraud_reversal
 physicalRef: fraud_reversal
+columns[5]{name,type,classification}:
+  msisdn,string,MSISDN
+  payments,number,
+  reversals,number,
+  reversed_amount,number,
+  window_date,date,

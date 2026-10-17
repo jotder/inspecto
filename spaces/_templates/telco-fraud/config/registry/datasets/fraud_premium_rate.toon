@@ -1,2 +1,7 @@
 name: fraud_premium_rate
 physicalRef: fraud_premium_rate
+columns[4]{name,type,classification}:
+  msisdn,string,MSISDN
+  premium_calls,number,
+  premium_charge,number,
+  window_date,date,

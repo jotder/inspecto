@@ -1,2 +1,6 @@
 name: fraud_identity
 physicalRef: fraud_identity
+columns[3]{name,type,classification}:
+  id_doc,string,PII
+  lines_on_document,number,
+  window_date,date,
