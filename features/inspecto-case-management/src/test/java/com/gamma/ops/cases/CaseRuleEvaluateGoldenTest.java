@@ -42,6 +42,7 @@ class CaseRuleEvaluateGoldenTest {
             "C-case-type matched=0 grouped=0 opened=false case=[]",
             "D-in-progress matched=2 grouped=2 opened=true case=[In progress|corr-n06|[n10, n06]]",
             "E-kelvin matched=1 grouped=1 opened=true case=[Kelvin key|corr-n07|[n07]]",
+            "G-final-sigma matched=1 grouped=1 opened=true case=[Final sigma|corr-n13|[n13]]",
             "F-threshold-unmet matched=0 grouped=0 opened=false case=[]",
             "A-again matched=0 grouped=0 opened=false");
 
@@ -68,6 +69,8 @@ class CaseRuleEvaluateGoldenTest {
         s.create(inc("n10", now - 40 * MIN, "ASSIGNED", "LOW", "HIGH", "assigned", "s"));
         s.create(inc("n11", now - 3 * 24 * 60 * MIN, "IN_PROGRESS", "LOW", "high", "sim box", "progress", "key.msisdn", "222"));
         s.create(inc("n12", now - 50 * MIN, "identified", "critical", "HIGH", "SIM BOX twin", "t", "key.msisdn", "111"));
+        // Java folds a final capital sigma to the final form; a database lower() maps it to the medial one
+        s.create(inc("n13", now - 45 * MIN, "IDENTIFIED", "\u039F\u0394\u039F\u03A3", "LOW", "sigma", "s"));
     }
 
     private static List<CaseRule> rules() {
@@ -79,6 +82,7 @@ class CaseRuleEvaluateGoldenTest {
                 new CaseRule("C-case-type", "Only cases", new TagRule.Filter("CASE", null, null, null, null, null), 1, 0, null, null, 1),
                 new CaseRule("D-in-progress", "In progress", new TagRule.Filter(null, null, "in_progress", null, null, null), 2, 0, null, null, 1),
                 new CaseRule("E-kelvin", "Kelvin key", new TagRule.Filter(null, null, null, "key", null, null), 1, 1440, null, null, 1),
+                new CaseRule("G-final-sigma", "Final sigma", new TagRule.Filter(null, null, null, "\u03BF\u03B4\u03BF\u03C2", null, null), 1, 1440, null, null, 1),
                 new CaseRule("F-threshold-unmet", "Unmet", new TagRule.Filter(null, null, null, null, "medium", null), 5, 1440, null, null, 1));
     }
 
