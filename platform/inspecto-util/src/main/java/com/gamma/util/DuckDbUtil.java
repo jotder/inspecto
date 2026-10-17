@@ -217,7 +217,7 @@ public final class DuckDbUtil {
                         String dir = d.toAbsolutePath().normalize().toString().replace('\\', '/');
                         if (!dir.endsWith("/")) dir += "/";
                         if (list.length() > 1) list.append(", ");
-                        list.append('\'').append(dir.replace("'", "''")).append('\'');
+                        list.append(SqlIdent.sqlStr(dir));
                     }
                     st.execute("SET allowed_directories=" + list.append(']'));
                 }
