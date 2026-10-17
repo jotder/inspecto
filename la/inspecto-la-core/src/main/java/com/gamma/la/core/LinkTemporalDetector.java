@@ -1,7 +1,7 @@
 package com.gamma.la.core;
 
+import com.gamma.analytics.Stats;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
@@ -57,21 +57,16 @@ public final class LinkTemporalDetector {
     public static Periodic periodicity(long[] sortedTimes, int minEvents, double maxCv) {
         int n = sortedTimes.length;
         if (n < minEvents || n < 3) return null;                           // two events make one gap: nothing to call regular
-        long[] gaps = new long[n - 1];
-        double sum = 0;
-        for (int i = 1; i < n; i++) {
-            gaps[i - 1] = sortedTimes[i] - sortedTimes[i - 1];
-            sum += gaps[i - 1];
-        }
-        double mean = sum / gaps.length;
+        // The Analytics Kernel's mean, population stddev and STANDARD median (ANALYTICS-CORE-1 M2). Gaps of a sorted
+        // epoch-ms series are non-negative and far below 2^53, so the doubles are exact and the cast of the median
+        // truncates exactly as the integer (a + b) / 2 it replaced.
+        double[] g = new double[n - 1];
+        for (int i = 1; i < n; i++) g[i - 1] = sortedTimes[i] - sortedTimes[i - 1];
+        double mean = Stats.mean(g);
         if (mean <= 0) return null;
-        double sq = 0;
-        for (long g : gaps) sq += (g - mean) * (g - mean);
-        double cv = Math.sqrt(sq / gaps.length) / mean;
+        double cv = Stats.stddevPopulation(g) / mean;
         if (cv > maxCv) return null;
-        long[] sorted = gaps.clone();
-        Arrays.sort(sorted);
-        long median = sorted.length % 2 == 1 ? sorted[sorted.length / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+        long median = (long) Stats.median(g);
         return new Periodic(median, cv, n, sortedTimes[0], sortedTimes[n - 1]);
     }
 

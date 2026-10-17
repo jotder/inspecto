@@ -65,6 +65,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-util</artifactId>
         </dependency>
+        <!-- ANALYTICS-CORE-1 M2: the canonical statistics (LinkTemporalDetector's median gap and population stddev). Base, foundation-only. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -123,6 +128,7 @@
                                     </excludes>
                                     <includes>
                                         <include>com.gamma.inspector:inspecto-access</include>
+                                        <include>com.gamma.inspector:inspecto-analytics</include>
                                         <include>com.gamma.inspector:inspecto-api</include>
                                         <include>com.gamma.inspector:inspecto-audit-spi</include>
                                         <include>com.gamma.inspector:inspecto-auth-spi</include>
