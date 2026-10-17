@@ -46,6 +46,14 @@
                  copy of the product. Still on the compile and test classpath. -->
             <scope>provided</scope>
         </dependency>
+        <!-- ANALYTICS-CORE-1 S7: anomaly_scan takes its z-score definition from the Analytics Kernel. `provided`
+             for the same reason as the core: the kernel ships as its own jar beside inspecto.jar. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- S9: no longer depends on inspecto-agent. The pack's ModelProfile + LlmGateway are built
              from the core-owned read-side model settings (com.gamma.model.ModelSettings/ModelSettingsStore),
              which read the same assist-settings.properties the agent module's settings screen writes — so

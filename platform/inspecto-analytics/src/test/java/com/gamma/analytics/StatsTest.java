@@ -108,6 +108,18 @@ class StatsTest {
     }
 
     @Test
+    void zScoreIsTheDistanceFromTheMeanInStddevsAndRefusesNoSpread() {
+        // {2,4,4,4,5,5,7,9}: mean 5, population stddev 2 -> z(9) = 2; the sample stddev is the caller's choice.
+        double[] v = {2, 4, 4, 4, 5, 5, 7, 9};
+        assertEquals(2.0, Stats.zScore(9, Stats.mean(v), Stats.stddevPopulation(v)), EPS);
+        assertEquals(-1.5, Stats.zScore(2, 5, 2), EPS);
+        assertThrows(IllegalArgumentException.class, () -> Stats.zScore(1, 5, 0));
+        assertThrows(IllegalArgumentException.class, () -> Stats.zScore(1, Double.NaN, 1));
+        assertThrows(IllegalArgumentException.class, () -> Stats.zScore(1, 5, Double.POSITIVE_INFINITY));
+        assertEquals("((\"v\" - 5.0) / 2.0)", StatsSql.zScore("\"v\"", 5, 2));
+    }
+
+    @Test
     void robustZUsesTheFloorWhenTheSpreadIsTiny() {
         // constant history: scaled MAD 0, floor = max(unit 1, 5 % of 10 = 0.5) = 1
         assertEquals(3.0, Stats.robustZ(13, new double[] {10, 10, 10, 10}, 1), EPS);

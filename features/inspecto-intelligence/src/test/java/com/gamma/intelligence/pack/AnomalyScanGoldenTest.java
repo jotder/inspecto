@@ -4,6 +4,7 @@ import com.eoiagent.core.RunId;
 import com.eoiagent.core.ToolCall;
 import com.eoiagent.core.ToolResult;
 import com.eoiagent.tool.Tool;
+import com.gamma.analytics.Stats;
 import com.gamma.service.CollectorService;
 import com.gamma.util.BrowsableStore;
 import com.gamma.util.ConnectionSource;
@@ -24,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Golden figures of the Assistant's {@code anomaly_scan} tool (ANALYTICS-CORE-1 S7), pinned against the tool as it
  * stood before it took its definitions from the Analytics Kernel: z = (x − mean) / <b>population</b> stddev over the
- * column's non-NULL values. The hand figures were computed independently (Python {@code statistics.fmean} /
+ * column's non-NULL values. Since S7 the tool builds that SQL with the kernel's {@code StatsSql}. The hand figures were computed independently (Python {@code statistics.fmean} /
  * {@code pstdev}); a sample-stddev definition would move every z by √((n−1)/n), which the cutoff-3.1 case catches.
  */
 class AnomalyScanGoldenTest {
@@ -89,6 +90,23 @@ class AnomalyScanGoldenTest {
         assertEquals(95.0, row.get("value"));
         assertEquals(12, row.get("rowIdentifier"));
         close(Z_95, row.get("zscore"));
+    }
+
+    /** S7: the tool's figures ARE the kernel's definitions — mean, population stddev, classic z. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void theFiguresEqualTheAnalyticsKernelsMeanPopulationStddevAndZ() throws Exception {
+        double[] v = {10, 12, 11, 13, 9, 10, 11, 12, 10, 11, 95};
+        double mean = Stats.mean(v);
+        double sd = Stats.stddevPopulation(v);
+        Map<String, Object> out = withScan("CREATE TABLE metrics(id INTEGER, v DOUBLE)", ROWS,
+                scan -> invoke(scan, Map.of("table", "metrics", "column", "v", "threshold", 0.39)));
+        close(mean, out.get("mean"));
+        close(sd, out.get("stddev"));
+        for (Map<String, Object> row : (List<Map<String, Object>>) out.get("rows"))
+            close(Stats.zScore((Double) row.get("value"), mean, sd), row.get("zscore"));
+        assertNotEquals(Stats.stddevSample(v), ((Number) out.get("stddev")).doubleValue(), 1e-6,
+                "the tool states the POPULATION stddev, not the sample one");
     }
 
     @Test
