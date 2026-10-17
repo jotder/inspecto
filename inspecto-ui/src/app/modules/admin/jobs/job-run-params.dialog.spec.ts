@@ -76,8 +76,9 @@ describe('JobRunParamsDialog', () => {
         c.run();
         fixture.detectChanges();
         expect(ref.close).not.toHaveBeenCalled();
-        expect(c.error()).not.toBe('');
-        expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeTruthy();
+        expect(c.error()).toContain('as_of: bad date');
+        expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('as_of: bad date');
+        expect(c.running()).toBe(false); // Run is usable again to retry
     });
 
     it('has no axe violations', async () => {
