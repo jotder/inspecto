@@ -225,14 +225,39 @@ three parameter namespaces are deliberately distinct and each resolver ignores t
 `GET|POST /bi/templates` (+ apply, capability-gated). ⛔ `GET /bi/datasets` was **retired 2026-09-14**
 (`RETIRE-HALVES-1`) — no client ever listed Datasets through it. `/bi/query` takes a **spec** — measures, dimensions,
 filters, an optional `grains` map — and **`MeasureCompiler`** (`platform/inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`)
-compiles it over the Dataset's trusted relation: `AGGS` = `count · countDistinct · sum · avg · min · max`,
-`GRAINS` = `day · week · month`. **Time grain travels on the wire** (2026-08-14): a grain naming a column that is
+compiles it over the Dataset's trusted relation: `AGGS` = `count · countDistinct · sum · avg · min · max ·
+median · stddev · variance · p05 · p25 · p75 · p90 · p95 · p99`, `GRAINS` = `day · week · month`. **Time grain travels on the wire** (2026-08-14): a grain naming a column that is
 not grouped is a **`422`, not a silent no-op**; the bucket is emitted as `STRFTIME(DATE_TRUNC(...))` **and
 repeated in the `GROUP BY`**; ⚠ **the bucket is TEXT** (`%Y-%m-%d`, `%Y-%m`), never a timestamp, because those
 are the exact keys the SPA's offline `bucketValue` produced — one widget must label categories identically
 live and offline; `MeasureCompilerGrainExecutionTest` **runs** the SQL rather than string-comparing it. The
 `AGGS` vocabulary is pinned by `measure-grammar.contract.json` — ⚠ the SPA's `measure-grammar.ts` consumer is
 the **pipeline `transform.summarize` editor**, not `/bi/query`; the two share a grammar, not a code path.
+
+**Statistical aggregates (ANALYTICS-CORE-1 M3, decision D-AN5, 2026-10-17).** `median`, `stddev`, `variance` and
+the fixed percentiles `p05 p25 p75 p90 p95 p99` are **fixed names**, so a Measure stays the `{agg, field}` pair
+(parked-rows D10) and the id stays `agg_field` (`p95_latency_ms`). SQL: `MEDIAN(x)`, `STDDEV_SAMP(x)`,
+`VAR_SAMP(x)`, `QUANTILE_CONT(x, 0.95)` (`MeasureCompiler.PERCENTILES`). Decisions as built:
+- **Sample, not population** (`n − 1`): the figure Excel's `STDEV`/`VAR`, Tableau's `STDEV`, Power BI's
+  `STDEV.S` and pandas default to, so a number a user cross-checks in their own tool agrees. Consequence: a group
+  of one row has a NULL spread, not 0. A population variant was not added — it would be a second name for a
+  near-identical number, and D-AN5 fixed the list.
+- **Continuous quantiles** (D-AN3): interpolated, `p95` of {10, 30} = 29; LA's `quantile_disc` link statistics are
+  untouched.
+- **Numeric only**, like `sum`/`avg` (`MeasureCompiler.NUMERIC_AGGS`, the summarize type check).
+- **DuckDB only.** Every `MeasureCompiler` statement runs in the DuckDB sandbox (it already emits `STRFTIME`);
+  PostgreSQL is an operational-store dialect (`DbJobRunStore`, `DbEventStore`), never a Measure target, so no
+  `percentile_cont … WITHIN GROUP` mapping exists. Add one only if a Measure ever runs over a JDBC store.
+- **Masking:** `BiResultMasking.revealsValues` refuses every aggregate but `count`/`countDistinct` over a masked
+  column (a median or percentile IS a key on an odd-sized group) — fail closed for any aggregate added later.
+- **Working Set excluded:** `WorkingSetMeasures` (in-JVM, LA) evaluates only the first six and refuses the
+  statistics; `AlertRule` refuses them on an Investigation rule at save. Re-implementing a median in Java is the
+  duplication the analytics core plan removes.
+- **Twin + goldens:** the SPA's offline engine (AlaSQL) gets DuckDB-named `QUANTILE_CONT` / `STDDEV_SAMP` /
+  `VAR_SAMP` aggregates (`inspecto-ui/src/app/inspecto/data-table/sql/stat-aggregates.ts`); the SPA's median is
+  `QUANTILE_CONT(x, 0.5)` because AlaSQL's own `MEDIAN` takes the upper middle of an even count. The contract file's
+  `statistics` block carries golden values that `MeasureStatisticsExecutionTest` (DuckDB) and `query-spec.spec.ts`
+  (AlaSQL) both assert.
 
 **The structured boundary, stated once.** `/queries/{id}/run` answers `422` on `type: structured` by product
 sign-off (R6, 2026-07-22): the builder emits SQL, so re-compiling structured bodies there duplicates the

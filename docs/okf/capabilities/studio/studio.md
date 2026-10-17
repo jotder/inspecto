@@ -170,8 +170,9 @@ Server side, `BiRoutes` (`inspecto/src/main/java/com/gamma/control/BiRoutes.java
 `POST /bi/templates/{id}/apply`. A query is compiled by **`MeasureCompiler`**
 (`platform/inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`) from
 `Spec(dataset, measures, groupBy, grains, filters, orderBy, limit)` into **one** SELECT built only from
-validated identifiers and typed literals — six aggregations (`count`, `countDistinct`, `sum`, `avg`,
-`min`, `max`) and three grains (`day`, `week`, `month`). The compiled text then passes `SqlGuard.check`
+validated identifiers and typed literals — fifteen aggregations (`count`, `countDistinct`, `sum`, `avg`,
+`min`, `max`, and the statistics `median`, `stddev`, `variance`, `p05`…`p99` — see
+[data-plane §3.5](../data-plane/data-plane.md)) and three grains (`day`, `week`, `month`). The compiled text then passes `SqlGuard.check`
 as defence in depth (422 with findings if it fails), the Dataset resolves through
 `DatasetRelation.relationSql`, and execution happens in **the same ephemeral DuckDB sandbox that
 `POST /queries/{id}/run` uses**. The response is the shared Result Set shape:

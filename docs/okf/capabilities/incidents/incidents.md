@@ -133,7 +133,8 @@ id is 404, a move illegal from the Alert's state (a second ack, anything after R
 shapes**: the ledger-metric shape — `metric` ∈ `error_rate | failed_batches | rejected_files | duration_ms`,
 comparator, threshold, `window`, optional `onPipeline` — and the **Measure shape** (BI-5, 2026-09-06) —
 `dataset` (a Dataset component id) + `measure` (`count | agg(field)`, agg ∈ count / countDistinct / sum /
-avg / min / max). Both take a `when` condition tree that scopes rows before aggregation (metric shape only).
+avg / min / max / median / stddev / variance / p05 / p25 / p75 / p90 / p95 / p99; an Investigation rule takes only
+the first six). Both take a `when` condition tree that scopes rows before aggregation (metric shape only).
 `severity` ∈ `INFO | WARNING | CRITICAL`. Rules are `alert-rule` components under `<write-root>/registry/alert-rules/`
 (`ComponentStore`, `ComponentRegistry` dir `alert-rules`), armed at boot by `ServiceBootstrap.loadAlerts` —
 promoted off raw `*_alert.toon` files 2026-07-18. ⚠ A leftover `*_alert.toon` is **not read by anything**.
