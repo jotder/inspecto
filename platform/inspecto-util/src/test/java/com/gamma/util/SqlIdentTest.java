@@ -69,4 +69,23 @@ class SqlIdentTest {
         for (String s : new String[]{"col", "a\"b", "", "Ärger", "x\"; DROP TABLE t; --"})
             assertEquals(SqlIdent.q(s), SqlBuilder.quoteIdent(s));
     }
+
+    /** A path renders absolute, forward-slashed and quote-doubled — byte-identical to the private copies it replaced. */
+    @Test
+    void pathStrIsAbsoluteForwardSlashedAndQuoteDoubled() {
+        java.nio.file.Path p = java.nio.file.Path.of("dir", "O'Brien", "f.parquet");
+        String abs = p.toAbsolutePath().toString();
+        assertEquals("'" + abs.replace('\\', '/').replace("'", "''") + "'", SqlIdent.pathStr(p));
+        org.junit.jupiter.api.Assertions.assertFalse(SqlIdent.pathStr(p).contains("\\"));
+        org.junit.jupiter.api.Assertions.assertTrue(SqlIdent.pathStr(p).contains("O''Brien/f.parquet'"));
+    }
+
+    /** With a parameter list the value is BOUND (never inlined); without one it is the escaped literal. */
+    @Test
+    void stringOperandBindsWhenParametersAreCollected() {
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        assertEquals("CAST(? AS VARCHAR)", SqlBuilder.stringOperand("x' OR 1=1 --", params));
+        assertEquals(java.util.List.of("x' OR 1=1 --"), params);
+        assertEquals("'x'' OR 1=1 --'", SqlBuilder.stringOperand("x' OR 1=1 --", null));
+    }
 }

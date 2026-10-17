@@ -10,8 +10,7 @@
     "inspecto-la-core": 1,
     "inspecto-la-storage": 1,
     "inspecto-reconciliation": 2,
-    "inspecto-scoring": 1,
-    "inspecto-util": 2
+    "inspecto-scoring": 1
   },
   "b": {
     "inspecto-engine": 8,

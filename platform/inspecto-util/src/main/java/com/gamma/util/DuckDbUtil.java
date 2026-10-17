@@ -111,18 +111,15 @@ public final class DuckDbUtil {
             throws SQLException {
         try (Statement st = conn.createStatement()) {
             if (notBlank(tempDirectory))
-                st.execute("SET temp_directory='" + sqlLiteral(tempDirectory.replace('\\', '/')) + "'");
+                st.execute("SET temp_directory=" + SqlIdent.sqlStr(tempDirectory.replace('\\', '/')));
             if (notBlank(memoryLimit))
-                st.execute("SET memory_limit='" + sqlLiteral(memoryLimit) + "'");
+                st.execute("SET memory_limit=" + SqlIdent.sqlStr(memoryLimit));
             if (notBlank(maxTempDirectorySize))
-                st.execute("SET max_temp_directory_size='" + sqlLiteral(maxTempDirectorySize) + "'");
+                st.execute("SET max_temp_directory_size=" + SqlIdent.sqlStr(maxTempDirectorySize));
         }
     }
 
     private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
-
-    /** Escape single quotes for a single-quoted SQL string literal. */
-    private static String sqlLiteral(String s) { return s.replace("'", "''"); }
 
     /**
      * Opens a DuckDB JDBC connection to {@code dbFile}.

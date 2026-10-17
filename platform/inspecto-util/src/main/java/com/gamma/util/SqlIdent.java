@@ -34,4 +34,13 @@ public final class SqlIdent {
     public static String sqlStr(String s) {
         return "'" + s.replace("'", "''") + "'";
     }
+
+    /**
+     * A single-quoted SQL string literal naming a file: the absolute path with forward slashes (DuckDB reads
+     * them on Windows too), embedded single quotes doubled. The one rendering of a path in generated SQL
+     * (ANALYTICS-CORE-1 M9 retired five private copies of it).
+     */
+    public static String pathStr(java.nio.file.Path p) {
+        return sqlStr(p.toAbsolutePath().toString().replace('\\', '/'));
+    }
 }
