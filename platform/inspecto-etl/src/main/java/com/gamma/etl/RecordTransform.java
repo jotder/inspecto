@@ -151,6 +151,9 @@ public final class RecordTransform {
             new Fn("date.part", "Take part of a date", "Dates", "EXTRACT({part} FROM {source})",
                     List.of(Param.of("part", "Part", ParamType.ENUM).withOptions(DATE_PARTS).withDefault("YEAR")),
                     null),
+            // Not a truncation rule of its own (ANALYTICS-CORE-1 M5 reviewed it): the author's free-text unit goes to
+            // DuckDB's DATE_TRUNC as is, any DuckDB date part (decade, millisecond…) included, on the value's own clock.
+            // Narrowing it to the kernel's TimeGrain would refuse units that run today.
             new Fn("date.truncate", "Start of the period", "Dates", "DATE_TRUNC({unit}, {source})",
                     List.of(Param.of("unit", "Period", ParamType.TEXT).withDefault("month")),
                     "A date in March with period \"month\" becomes the 1st of March."),

@@ -1,5 +1,6 @@
 package com.gamma.query;
 
+import com.gamma.analytics.time.TimeGrain;
 import com.gamma.util.SqlIdent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -337,7 +338,7 @@ public final class MeasureCompiler {
         String grain = grains == null ? null : grains.get(dim);
         if (grain == null) return q(dim);
         String format = "month".equals(grain) ? "%Y-%m" : "%Y-%m-%d";
-        return "STRFTIME(DATE_TRUNC('" + grain + "', " + q(dim) + "), '" + format + "')";
+        return "STRFTIME(" + TimeGrain.parse(grain).truncateSql(q(dim)) + ", '" + format + "')";
     }
 
     /** The SQL aggregate for a measure — the same set as the UI's aggExpression(). */

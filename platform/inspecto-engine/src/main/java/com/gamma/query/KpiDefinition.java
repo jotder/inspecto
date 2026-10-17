@@ -1,9 +1,8 @@
 package com.gamma.query;
 
-import java.time.DayOfWeek;
+import com.gamma.analytics.time.TimeGrain;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,15 +38,12 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
     public enum Grain {
         DAY, WEEK, MONTH, QUARTER, YEAR;
 
-        /** The first day of the period that holds {@code d}. Weeks start on Monday, as DuckDB's DATE_TRUNC does. */
+        /**
+         * The first day of the period that holds {@code d}: the Analytics Kernel's {@link TimeGrain} (ANALYTICS-CORE-1
+         * M5). Weeks start on Monday, as DuckDB's DATE_TRUNC does.
+         */
         public LocalDate start(LocalDate d) {
-            return switch (this) {
-                case DAY -> d;
-                case WEEK -> d.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-                case MONTH -> d.withDayOfMonth(1);
-                case QUARTER -> LocalDate.of(d.getYear(), ((d.getMonthValue() - 1) / 3) * 3 + 1, 1);
-                case YEAR -> d.withDayOfYear(1);
-            };
+            return TimeGrain.valueOf(name()).truncate(d);
         }
 
         /** {@code d} moved by {@code n} periods (negative = back). */

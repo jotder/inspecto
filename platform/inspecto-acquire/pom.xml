@@ -37,6 +37,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>
         </dependency>
+        <!-- ANALYTICS-CORE-1 M5: the one time-grain truncation (com.gamma.analytics.time.TimeGrain). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-event</artifactId>
