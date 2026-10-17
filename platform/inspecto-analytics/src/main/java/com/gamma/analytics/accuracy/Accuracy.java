@@ -26,7 +26,8 @@ import java.util.OptionalDouble;
  *   <tr><td>Mean interval width</td><td>Σ(upper − lower) / n</td></tr>
  * </table>
  *
- * <p>Input rules, as {@code Stats}: no pairs, a length mismatch, NaN anywhere, or a band with lower &gt; upper throws
+ * <p>Input rules, as {@code Stats}: no pairs, a length mismatch, NaN anywhere, half a band (only one of lower and
+ * upper), or a band with lower &gt; upper throws
  * {@link IllegalArgumentException}; the caller drops missing pairs first (the SQL form skips rows with a NULL in a used
  * column, so both count the same pairs). The arrays are never modified.
  */
@@ -54,6 +55,7 @@ public final class Accuracy {
     /** All measures; {@code lower} and {@code upper} both {@code null} (no band) or both the pairs' length. */
     public static Summary summary(double[] actual, double[] predicted, double[] lower, double[] upper) {
         check(actual, predicted);
+        if ((lower == null) != (upper == null)) throw new IllegalArgumentException("a band needs both lower and upper");
         int n = actual.length;
         double abs = 0, sq = 0, err = 0, sym = 0, pct = 0;
         int zeros = 0;

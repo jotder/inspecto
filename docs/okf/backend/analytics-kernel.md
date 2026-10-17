@@ -413,7 +413,8 @@ sMAPE or MAE instead). sMAPE: of the two common forms — (\|a\| + \|p\|) / 2 as
 \|a\| + \|p\| (range 0–100) — the first is the one the M3 competition and Hyndman–Koehler published, so a figure
 compares with the literature. Bias sign: predicted − actual reads naturally as "how much too high".
 
-**Input rules** are `Stats`': no pairs, unequal lengths, NaN, or a band with lower > upper throw. The SQL form casts each
+**Input rules** are `Stats`': no pairs, unequal lengths, NaN, half a band (only one of lower and upper — the message
+`a band needs both lower and upper`, as `AccuracySql.Spec`), or a band with lower > upper throw. The SQL form casts each
 column to `DOUBLE`, skips a row with a NULL in any column it uses, fails the statement through `error()` on an inverted
 band, and returns `n = 0` with NULL measures for no pairs. `AccuracySql.Spec` takes optional group columns: one row per
 group (per entity, per model).
