@@ -1,8 +1,9 @@
 # Analytics core — one home for data operations and statistics (plan, 2026-10-17)
 
-> 🟡 **IN FLIGHT — M1 and the M6 baseline contract built 2026-10-17** (as-built: `okf/backend/analytics-kernel.md`); everything else not started. MoSCoW scope over what Inspecto has today; decisions D-AN1…D-AN8 **taken
-> 2026-10-17** by the agent under the operator's delegated authority, each with its reason (§7). Row:
-> `ANALYTICS-CORE-1` in `docs/BACKLOG.md`.
+> 🟢 **MUST ITEMS BUILT 2026-10-17** (M1–M10; M6 amended by D-AN9). As-built: `okf/backend/analytics-kernel.md`
+> and `okf/backend/engine/db-layer.md` (one SQL building path). Duplication inventory 74 → 2 (only Jaccard and
+> Jaro-Winkler left, Should item S1). Should / Could not started. Decisions D-AN1…D-AN9 taken by the agent under the
+> operator's delegated authority, each with its reason (§7). Row: `ANALYTICS-CORE-1` in `docs/BACKLOG.md`.
 >
 > **Operator brief (2026-10-17).** Every application on the platform — Link Analysis, Revenue Assurance, Fraud,
 > Case Management — is data-heavy. Generic data munching and statistics belong in the core, once; what only one
@@ -185,7 +186,7 @@ Sizes: S / M / L. "Consumers" names who gets it first.
 ## 7. Decisions — taken 2026-10-17 by the agent under the operator's delegated authority
 
 The operator delegated these calls for this plan ("take the decisions for me in this context") and asked for a short
-note on each. Any of them can be reversed by the operator; none is built yet.
+note on each. Any of them can be reversed by the operator.
 
 | # | Decision | Why |
 |---|---|---|
@@ -197,6 +198,7 @@ note on each. Any of them can be reversed by the operator; none is built yet.
 | D-AN6 | The **score-output contract lives in the Analytics Kernel**, superseding D-AD5's "extract to the engine" | Anomaly, Risk Score and future Predictions are separate add-ons; the shared piece belongs in a module they all depend on, and D-AD5's intent (extract, never copy) is kept |
 | D-AN7 | New statistics **Steps are Base**, every edition | They are generic munging, like the 40 delivered Steps; gating them would push editions back to hand-written SQL, the duplication this plan removes |
 | D-AN8 | **No new dependency**: hand-written kernels plus DuckDB built-in functions | Keeps the recorded stance (predictive OD-4/6/9, Screening SCR-D2, sealed sandbox) and the SBOM / air-gap story; the statistics needed are small and well defined |
+| D-AN9 | **M6 amended**: the baseline contract is adopted where its shape fits (Anomaly); the Expectation `baseline` and `VolumeBaseline` share the kernel *definitions* (median modes, column profiler) but not the `BaselineStatistic` contract | That contract takes a timestamped history and returns a robust median plus scaled MAD; the Expectation compares the plain median of ordered profiles and `VolumeBaseline` answers a signed deviation over calendar days. Forcing them in would invent timestamps or change outputs — the plan's first rule is that no shipped figure moves |
 
 ## 8. Grounding
 

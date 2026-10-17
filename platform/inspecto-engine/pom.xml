@@ -44,7 +44,8 @@
         </dependency>
         <!-- ANALYTICS-CORE-1: the canonical statistics (M2 - VolumeBaseline's lower median is Stats.median(x, LOWER));
              transform.profile builds its SQL with the kernel's ColumnProfiler (M4); the time-grain truncation and the
-             resample / shift Steps use com.gamma.analytics.time (M5). -->
+             resample / shift Steps use com.gamma.analytics.time (M5); com.gamma.alert.ScoreOutputWriter writes every
+             score kind through the score output contract com.gamma.analytics.score (M7, D-AN6). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-analytics</artifactId>
@@ -73,12 +74,6 @@
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-workflow</artifactId>
-        </dependency>
-        <!-- The Analytics Kernel (ANALYTICS-CORE-1 M7, D-AN6): the score output contract com.gamma.analytics.score, which
-             com.gamma.alert.ScoreOutputWriter writes through for every score kind. -->
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-analytics</artifactId>
         </dependency>
 
         <!-- DuckDB (parent-managed since WS-D). -->

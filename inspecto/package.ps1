@@ -267,7 +267,7 @@ if (-not $NoBuild) {
     Push-Location $sandboxRoot
     # CONNECTORS-BUNDLE-1: `inspecto-connectors` is NOT upstream of `inspecto`, so `-am` (which walks
     # upstream only) never reaches it - it has to be named explicitly or the sidecar is silently absent.
-    # D-AN2: the same holds for the core thin jar `inspecto-graph` (nothing in the processor depends on it).
+    # D-AN2: the core thin jar `inspecto-graph` is named explicitly too, so it is always built and staged as its own jar.
     & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,:inspecto-connectors,:inspecto-graph -am -DskipTests -q
     if ($LASTEXITCODE -ne 0) { throw "mvn build failed" }
     Pop-Location
