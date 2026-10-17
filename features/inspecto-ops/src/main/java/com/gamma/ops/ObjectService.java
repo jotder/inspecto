@@ -526,7 +526,8 @@ public final class ObjectService {
                     if (last) return false;
                     page = store.query(new ObjectQuery(filter.objectType(), filter.status(), filter.severity(),
                             filter.assignee(), filter.owner(), filter.correlationId(), filter.textContains(),
-                            ObjectQuery.MAX_LIMIT, offset, filter.closedBefore(), true, filter.openOnly()));
+                            ObjectQuery.MAX_LIMIT, offset, filter.closedBefore(), true, filter.openOnly(),
+                            filter.createdFrom(), filter.prefilter()));
                     index = 0;
                     offset += page.size();
                     last = page.size() < ObjectQuery.MAX_LIMIT;
@@ -583,44 +584,43 @@ public final class ObjectService {
      */
     public Map<String, Object> analytics(ObjectType type) {
         Workflow wf = workflow(type);
-        Map<String, Integer> byStatus = new LinkedHashMap<>();
-        Map<String, Integer> byCategory = new LinkedHashMap<>();
-        Map<String, Integer> byPriority = new LinkedHashMap<>();
-        int backlog = 0;
-        long cycleSum = 0;
-        int cycleCount = 0;
-        long mttrSum = 0;
-        int mttrCount = 0;
-        long mttdSum = 0;
-        int mttdCount = 0;
-        Map<String, Map<String, Object>> impactByCurrency = new java.util.TreeMap<>();
-        long recordsAffected = 0;
-        int total = 0;
-        // Every object of the type, a page at a time — never one MAX_LIMIT page (ASSURE-IMPACT-LEDGER-RESIDUALS-1).
-        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).build())) {
-            if (o.isInert()) continue;   // an unknown-typed row is never counted (nor stamped): it is outside every workflow
-            total++;
-            bump(byStatus, o.status() == null ? "UNKNOWN" : o.status().toUpperCase(java.util.Locale.ROOT));
-            bump(byCategory, categoryL1(o.attributes().get("category")));
-            bump(byPriority, o.priority() == null || o.priority().isBlank() ? "NONE" : o.priority().toUpperCase(java.util.Locale.ROOT));
-            if (!wf.isTerminal(o.status())) backlog++;
-            if (o.closedAt() > 0 && o.closedAt() >= o.createdAt()) {
-                cycleSum += o.closedAt() - o.createdAt();
-                cycleCount++;
+        RollupAcc acc = new RollupAcc();
+        Optional<List<ObjectStore.RollupGroup>> groups = store.rollupGroups(type);
+        if (groups.isPresent()) {
+            // ANALYTICS-CORE-1 S8: the counts, backlog and cycle time are aggregated by the store's SQL per RAW
+            // (status, priority) group; the case fold, NONE rule and terminal test stay here, applied per group in
+            // first-seen order, so every key lands where the per-object walk put it. Only the attribute-derived
+            // figures still need the objects — a two-column scan, not whole-object pages (RollupAcc#attributes).
+            for (ObjectStore.RollupGroup g : groups.get()) {
+                int n = Math.toIntExact(g.count());
+                acc.total += n;
+                bump(acc.byStatus, statusKey(g.status()), n);
+                bump(acc.byPriority, priorityKey(g.priority()), n);
+                if (!wf.isTerminal(g.status())) acc.backlog += n;
+                acc.cycleCount += Math.toIntExact(g.cycleCount());
+                acc.cycleSum += g.cycleSumMs();
             }
-            long resolvedAt = parseEpoch(o.attributes().get(ATTR_RESOLVED_AT));
-            if (resolvedAt > 0 && resolvedAt >= o.createdAt()) {
-                mttrSum += resolvedAt - o.createdAt();
-                mttrCount++;
+            store.scanAttributes(type, (json, createdAt) -> acc.attributes(createdAt, JsonAttributes.fromJson(json)));
+        } else {
+            // Every object of the type, a page at a time — never one MAX_LIMIT page (ASSURE-IMPACT-LEDGER-RESIDUALS-1).
+            for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).build())) {
+                if (o.isInert()) continue;   // an unknown-typed row is never counted (nor stamped): it is outside every workflow
+                acc.total++;
+                bump(acc.byStatus, statusKey(o.status()), 1);
+                bump(acc.byPriority, priorityKey(o.priority()), 1);
+                if (!wf.isTerminal(o.status())) acc.backlog++;
+                if (o.closedAt() > 0 && o.closedAt() >= o.createdAt()) {
+                    acc.cycleSum += o.closedAt() - o.createdAt();
+                    acc.cycleCount++;
+                }
+                acc.attributes(o.createdAt(), o.attributes());
             }
-            long occurredAt = parseEpoch(o.attributes().get(ATTR_OCCURRED_AT));
-            if (occurredAt > 0 && o.createdAt() >= occurredAt) {
-                mttdSum += o.createdAt() - occurredAt;
-                mttdCount++;
-            }
-            Impact.of(o).filter(i -> i.currency() != null).ifPresent(i -> addImpact(impactByCurrency, i));
-            recordsAffected += parseEpoch(o.attributes().get("recordsAffected")); // long-or-0 parse
         }
+        int total = acc.total, backlog = acc.backlog, cycleCount = acc.cycleCount;
+        int mttrCount = acc.mttrCount, mttdCount = acc.mttdCount;
+        long cycleSum = acc.cycleSum, mttrSum = acc.mttrSum, mttdSum = acc.mttdSum, recordsAffected = acc.recordsAffected;
+        Map<String, Integer> byStatus = acc.byStatus, byCategory = acc.byCategory, byPriority = acc.byPriority;
+        Map<String, Map<String, Object>> impactByCurrency = acc.impactByCurrency;
         Map<String, Object> cycle = new LinkedHashMap<>();
         cycle.put("count", cycleCount);
         cycle.put("avgMs", cycleCount == 0 ? 0 : cycleSum / cycleCount);
@@ -679,8 +679,44 @@ public final class ObjectService {
         if (v != null) totals.put(key, ((java.math.BigDecimal) totals.get(key)).add(v));
     }
 
-    private static void bump(Map<String, Integer> m, String key) {
-        m.merge(key, 1, Integer::sum);
+    private static void bump(Map<String, Integer> m, String key, int n) {
+        m.merge(key, n, Integer::sum);
+    }
+
+    private static String statusKey(String status) {
+        return status == null ? "UNKNOWN" : status.toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private static String priorityKey(String priority) {
+        return priority == null || priority.isBlank() ? "NONE" : priority.toUpperCase(java.util.Locale.ROOT);
+    }
+
+    /** The running totals of one {@link #analytics} call; both the store-aggregated and the walked path fill it. */
+    private static final class RollupAcc {
+        final Map<String, Integer> byStatus = new LinkedHashMap<>();
+        final Map<String, Integer> byCategory = new LinkedHashMap<>();
+        final Map<String, Integer> byPriority = new LinkedHashMap<>();
+        final Map<String, Map<String, Object>> impactByCurrency = new java.util.TreeMap<>();
+        int total, backlog, cycleCount, mttrCount, mttdCount;
+        long cycleSum, mttrSum, mttdSum, recordsAffected;
+
+        /** The attribute-derived figures of one object: category, MTTR, MTTD, impact, records affected. */
+        void attributes(long createdAt, Map<String, String> attrs) {
+            bump(byCategory, categoryL1(attrs.get("category")), 1);
+            long resolvedAt = parseEpoch(attrs.get(ATTR_RESOLVED_AT));
+            if (resolvedAt > 0 && resolvedAt >= createdAt) {
+                mttrSum += resolvedAt - createdAt;
+                mttrCount++;
+            }
+            long occurredAt = parseEpoch(attrs.get(ATTR_OCCURRED_AT));
+            if (occurredAt > 0 && createdAt >= occurredAt) {
+                mttdSum += createdAt - occurredAt;
+                mttdCount++;
+            }
+            Impact i = Impact.fromAttribute(attrs.get(Impact.ATTR));
+            if (!i.isEmpty() && i.currency() != null) addImpact(impactByCurrency, i);
+            recordsAffected += parseEpoch(attrs.get("recordsAffected")); // long-or-0 parse
+        }
     }
 
     /** The first level of a "L1 / L2 / L3" category path, or "UNCATEGORIZED". */
