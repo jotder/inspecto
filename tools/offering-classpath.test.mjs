@@ -144,7 +144,7 @@ test('P3d stage 2: every edition carries the core thin jars, directly behind ins
         assert.deepEqual(cp.slice(1, 1 + CORE_JARS.length), CORE_JARS, `${ed}: the core jars follow the product jar in CORE_MODULES order`);
         assert.equal(new Set(cp).size, cp.length, `${ed}: no jar twice`);
     }
-    assert.equal(CORE_JARS.length, 14);
+    assert.equal(CORE_JARS.length, 15);
 });
 
 test('RED: a core jar with no place in CLASSPATH_ORDER fails', () => {

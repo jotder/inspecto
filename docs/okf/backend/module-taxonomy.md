@@ -62,7 +62,7 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
 | Directory | Modules |
 |---|---|
 | `spi/` | inspecto-audit-spi, inspecto-auth-spi, inspecto-http-spi |
-| `platform/` | inspecto-api, -util, -config, -sql, -etl, -event, -workflow, -acquire, -entity-store, -engine |
+| `platform/` | inspecto-api, -util, -config, -sql, -etl, -event, -workflow, -analytics, -acquire, -entity-store, -engine |
 | `features/` | inspecto-agent, -backup, -entity-list, -exchange, -intelligence, -observability, -ops, -reconciliation, -scoring |
 | `la/` | inspecto-la-core, -la-api, -la-graph, -la-storage, -la-store-pg, -geo-link |
 | `providers/` | inspecto-agent-hosted, -connectors, -connectors-kafka, -demo-auth, -geo-country, -notify-channels, -oidc, -policy, -secrets, -telecom-asn1, asn-parser (nested reactor, moves as a unit) |
@@ -139,7 +139,7 @@ hand-authored there.
 
 ## Packaging (thin jars, P3d-P3f)
 - `tools/offering-classpath.mjs` resolves the Offering (includes + the `requires.modules` closure) and asserts it equals what `tools/bundle-modules.mjs` ships; it writes the bundle's `modules.list` (one jar per line, classpath order, processor first) and `edition.properties` (`edition=Professional`; `variant=demo` for a demo build). Every launcher reads `modules.list`; none hand-keeps a jar list.
-- The first-party core ships as 14 thin jars plus `inspecto.jar` (the processor and third-party code), listed in `core.list`; optional modules ship one jar each, in `modules.list` order after the core.
+- The first-party core ships as 15 thin jars (the Analytics Kernel joined 2026-10-17) plus `inspecto.jar` (the processor and third-party code), listed in `core.list`; optional modules ship one jar each, in `modules.list` order after the core.
 - One CycloneDX SBOM per shipped jar under `sbom/`, beside the combined edition SBOM (`tools/sbom-modules.mjs --verify`).
 
 - **Build-id stamp (P3a).** Every module jar carries the manifest attribute `Inspecto-Build-Id` (the git short sha, `-Dinspecto.build.id=<sha>`, default `dev`; set once in the parent pom, no timestamp so builds stay reproducible). At boot `ModuleActivator.resolve(manifests, hostBuildId)` starts a module whose stamp differs from the host's INERT (`build id <x> does not match host <y>`; dependants follow). It never trips on an absent stamp, `dev`, an exploded directory or an unknown host. `GET /modules` shows `hostBuildId` and per-module `buildId`. `package.ps1` fails when the staged jars carry more than one non-`dev` id.

@@ -634,7 +634,7 @@ Copy-Item $jarSrc "$bundleDir\inspecto.jar"
 
 # ── step 3-core: the first-party CORE libraries as THIN jars (MODULE-REORG-P3d stage 2, 2026-10-08) ───────────
 # inspecto.jar is no longer one fat jar of everything: inspecto/pom.xml's shade now carries only the processor's own classes plus
-# the THIRD-PARTY libraries. api, util, config, sql, etl, the three SPIs, access, entity-store, event, workflow, acquire and engine
+# the THIRD-PARTY libraries. api, util, config, sql, etl, the three SPIs, access, entity-store, event, workflow, analytics, acquire and engine
 # (tools/bundle-modules.mjs CORE_MODULES, printed by `offering-classpath.mjs --list-core`) ship as their own thin jars, named by
 # artifactId, in the bundle root and on modules.list right behind inspecto.jar - so each can be signed and SBOM'd on its own and
 # the module.toon / ServiceLoader merge hacks of the shade are gone. Never the `-tests` jar (etl and engine attach one).

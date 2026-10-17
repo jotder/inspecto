@@ -232,6 +232,7 @@
                                     <exclude>com.gamma.inspector:inspecto-entity-store</exclude>
                                     <exclude>com.gamma.inspector:inspecto-event</exclude>
                                     <exclude>com.gamma.inspector:inspecto-workflow</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-analytics</exclude>
                                     <exclude>com.gamma.inspector:inspecto-acquire</exclude>
                                     <exclude>com.gamma.inspector:inspecto-engine</exclude>
                                 </excludes>

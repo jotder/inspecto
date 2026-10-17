@@ -1,0 +1,5 @@
+id: analytics
+title: Analytics Kernel (canonical statistics and baselines)
+buildRole: platform
+offeringRole: base
+bindingTime: build

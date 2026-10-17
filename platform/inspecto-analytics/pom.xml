@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- ANALYTICS-CORE-1 M1 + M6 (docs/superpower/analytics-core-plan.md, D-AN1): the Analytics Kernel - one written
+         definition per statistic (Stats: mean, variance / stddev, median modes, quantile modes, MAD, robust z, IQR,
+         Tukey fences) and the baseline contract promoted from inspecto-anomaly (com.gamma.analytics.baseline). Pure
+         functions, no routes, no state. BASE in every edition. Main code depends on NO inspecto-* module and NO
+         third-party library (D-AN8); the policy below allows only the foundation layer (api, config, sql, util) for the
+         SQL builders to come. inspecto-util is test scope only: the JVM/DuckDB parity test opens DuckDB through it. -->
+    <artifactId>inspecto-analytics</artifactId>
+    <name>Inspecto Analytics Kernel</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- This module may reach ONLY the inspecto-* modules below, directly or transitively, at compile/provided/runtime
+                 scope. tools/check-module-deps.mjs derives the same answer from the poms and fails if this list drifts from its
+                 ALLOWED table. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>platform-layer-deps</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.gamma.inspector:*:*:*:compile</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:provided</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <includes>
+                                        <include>com.gamma.inspector:inspecto-api</include>
+                                        <include>com.gamma.inspector:inspecto-config</include>
+                                        <include>com.gamma.inspector:inspecto-sql</include>
+                                        <include>com.gamma.inspector:inspecto-util</include>
+                                    </includes>
+                                    <message>inspecto-analytics may depend only on the foundation modules listed in tools/check-module-deps.mjs (ANALYTICS-CORE-1, D-AN1): feature modules depend on the kernel, never the reverse.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

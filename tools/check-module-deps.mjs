@@ -39,6 +39,8 @@ export const ALLOWED = {
     'inspecto-la-store-pg': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
     'inspecto-oidc': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
     'inspecto-secrets': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
+    // ANALYTICS-CORE-1 (D-AN1): the Analytics Kernel stands on the foundation layer only; feature modules depend on it, never the reverse.
+    'inspecto-analytics': ['inspecto-api', 'inspecto-config', 'inspecto-sql', 'inspecto-util'],
     'inspecto-geo-country': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
 };
 

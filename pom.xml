@@ -54,6 +54,7 @@
         <module>platform/inspecto-entity-store</module>
         <module>platform/inspecto-event</module>
         <module>platform/inspecto-workflow</module>
+        <module>platform/inspecto-analytics</module>
         <module>platform/inspecto-acquire</module>
         <module>platform/inspecto-engine</module>
         <module>inspecto</module>
@@ -473,6 +474,11 @@
             <dependency>
                 <groupId>com.gamma.inspector</groupId>
                 <artifactId>inspecto-workflow</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-analytics</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

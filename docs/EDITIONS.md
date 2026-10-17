@@ -60,6 +60,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `http-spi` - Route module contract | spi | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `access` - Access policy (roles, grants, row scope, audit trail) | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `acquire` - Acquisition and collectors | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `analytics` - Analytics Kernel (canonical statistics and baselines) | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `api` - Public API annotations | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `config` - Config model and codecs | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `engine` - Execution engine | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
@@ -135,10 +136,10 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 
 | | Personal | Professional | Enterprise | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 16 | 40 | 43 | 43 |
-| of which core thin jars | 14 | 14 | 14 | 14 |
+| First-party jars (processor + connectors + optional + core thin) | 17 | 41 | 44 | 44 |
+| of which core thin jars | 15 | 15 | 15 | 15 |
 | Optional modules beyond Personal | 0 | 24 | 27 | 27 |
-| Total on the classpath (+ third-party sidecars) | 16 | 41 | 44 | 44 |
+| Total on the classpath (+ third-party sidecars) | 17 | 42 | 45 | 45 |
 <!-- offerings-matrix:end -->
 
 ## Preview — not a customer-facing tier

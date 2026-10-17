@@ -111,6 +111,7 @@ export const CORE_MODULES = [
     { artifactId: 'inspecto-entity-store', dir: 'platform/inspecto-entity-store' },
     { artifactId: 'inspecto-event', dir: 'platform/inspecto-event' },
     { artifactId: 'inspecto-workflow', dir: 'platform/inspecto-workflow' },
+    { artifactId: 'inspecto-analytics', dir: 'platform/inspecto-analytics' },   // ANALYTICS-CORE-1: the Analytics Kernel (Base, D-AN1)
     { artifactId: 'inspecto-acquire', dir: 'platform/inspecto-acquire' },
     { artifactId: 'inspecto-engine', dir: 'platform/inspecto-engine' },
 ].map((m) => ({ ...m, bundleFile: `${m.artifactId}.jar`, from: 'all', kind: 'base' }));

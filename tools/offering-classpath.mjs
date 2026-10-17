@@ -51,7 +51,7 @@ export const CLASSPATH_ORDER = [
     // P3d stage 2: the first-party core libraries (bundle-modules.mjs CORE_MODULES), thin jars, directly behind the product jar -
     // exactly where the shade used to put them (the processor's own classes first, then its first-party dependencies).
     'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-sql', 'inspecto-etl', 'inspecto-audit-spi', 'inspecto-auth-spi',
-    'inspecto-access', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-event', 'inspecto-workflow', 'inspecto-acquire', 'inspecto-engine',
+    'inspecto-access', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-event', 'inspecto-workflow', 'inspecto-analytics', 'inspecto-acquire', 'inspecto-engine',
     'inspecto-oidc', 'inspecto-secrets', 'inspecto-geo-country', 'inspecto-connectors-kafka', 'inspecto-telecom-asn1',
     'inspecto-policy',
     'inspecto-connectors', 'inspecto-notify-channels', 'inspecto-backup',

@@ -2,7 +2,7 @@
 // PER-MODULE SBOMs for a packaged bundle (MODULE-REORG-P3f).
 //
 // The combined bundle SBOM (tools/sbom.mjs) answers "what is in this bundle". Since P3d stage 2 the bundle is a set of
-// separately-signable jars (14 thin core jars, optional module jars, sidecars, the processor jar, postgresql.jar), and an
+// separately-signable jars (15 thin core jars, optional module jars, sidecars, the processor jar, postgresql.jar), and an
 // auditor/customer who takes ONE jar needs ITS bill of materials: the jar itself as the root component (purl, version,
 // build id, SHA-256 as shipped) and the third-party components that jar carries or needs.
 //
