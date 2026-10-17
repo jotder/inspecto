@@ -55,6 +55,15 @@ public final class CaseRuleEvalJob implements Job {
     public JobResult run(JobContext ctx) throws Exception {
         long t0 = System.nanoTime();
         String ruleName = cfg.require("rule");
+        if (ctx.dryRun()) {
+            // Evaluation IS the action (it opens or attaches a Case), so it has no preview form - the same
+            // posture as alert.evaluate. Under a dry run the `objects` grant is a stand-in anyway, so
+            // engineFor below would find no engine (PLATFORM-SERVICES-DRYRUN-GAP-1).
+            ctx.log().info("dry run: Case Rule was NOT evaluated (evaluation groups Incidents into a Case, "
+                    + "so it has no preview form)", "rule", ruleName);
+            return JobResult.ok("caserule.evaluate '" + ruleName + "' (dry run): nothing evaluated, nothing grouped",
+                    (System.nanoTime() - t0) / 1_000_000L);
+        }
         // ⚠ Resolved at RUN time since EDG-01 cell 7: this Job Type is contributed by ServiceLoader now,
         // and a JobTypeProvider is constructed with no arguments — it cannot know the Space. A running job
         // can: JobContext.services() carries the ObjectAccess seam core registered for this Space. The

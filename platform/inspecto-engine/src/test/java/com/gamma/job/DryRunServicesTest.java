@@ -3,11 +3,14 @@ package com.gamma.job;
 import com.gamma.alert.Alert;
 import com.gamma.alert.AlertAccess;
 import com.gamma.notify.InMemoryNotificationStore;
+import com.gamma.notify.MailAccess;
+import com.gamma.notify.MailAttachment;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.notify.NotificationStore;
 import com.gamma.objects.IncidentAccess;
 import com.gamma.objects.FakeObjectAccess;
+import com.gamma.objects.ObjectAccess;
 import com.gamma.workflow.ObjectType;
 import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
@@ -99,5 +102,75 @@ class DryRunServicesTest {
         PlatformServices narrow = DryRunServices.wrap(
                 new PlatformServiceRegistry().grant(Set.of()), new CapturingLog());
         assertTrue(narrow.find(NotificationAccess.class).isEmpty(), "dry run never widens a grant");
+    }
+
+    /** A {@code mail} binding that records every call — any entry is a message that really went out. */
+    static final class RecordingMail implements MailAccess {
+        final List<String> sent = new ArrayList<>();
+        @Override public boolean send(List<String> to, List<String> cc, String subject, String body,
+                                      List<MailAttachment> attachments) {
+            sent.add(subject);
+            return true;
+        }
+    }
+
+    @Test
+    void mailRecordsInsteadOfSendingUnderDryRun() throws Exception {
+        // PLATFORM-SERVICES-DRYRUN-GAP-1: `mail` used to pass through a dry run unchanged.
+        RecordingMail mail = new RecordingMail();
+        PlatformServiceRegistry registry = new PlatformServiceRegistry();
+        registry.register("mail", MailAccess.class, mail);
+        CapturingLog log = new CapturingLog();
+
+        boolean sent = DryRunServices.wrap(registry.grant(Set.of("mail")), log).get(MailAccess.class)
+                .send(List.of("ann@example.test", "bob@example.test"), List.of("cat@example.test"),
+                        "Daily report", "the confidential body");
+
+        assertEquals(List.of(), mail.sent, "a dry run never reaches the real mail service");
+        assertFalse(sent, "a dry run never claims a send");
+        assertTrue(log.lines.stream().anyMatch(l -> l.contains("would send mail")
+                && l.contains("recipients=3") && l.contains("subject=Daily report")), log.lines.toString());
+        assertTrue(log.lines.stream().noneMatch(l -> l.contains("@example.test") || l.contains("confidential")),
+                "recipients by COUNT, never the addresses or the body: " + log.lines);
+    }
+
+    @Test
+    void objectWritesRecordInsteadOfActWhileReadsPassThrough() {
+        // PLATFORM-SERVICES-DRYRUN-GAP-1: `objects` used to pass through a dry run unchanged.
+        FakeObjectAccess objects = new FakeObjectAccess();
+        String existing = objects.open(ObjectType.INCIDENT, "seed", "d", "HIGH", "orders", Map.of("rule", "r1"));
+        PlatformServiceRegistry registry = new PlatformServiceRegistry();
+        registry.register("objects", ObjectAccess.class, objects);
+        CapturingLog log = new CapturingLog();
+        ObjectAccess dry = DryRunServices.wrap(registry.grant(Set.of("objects")), log).get(ObjectAccess.class);
+
+        // Reads answer from the real service.
+        assertTrue(dry.hasActive(ObjectType.INCIDENT, "orders"));
+        assertTrue(dry.hasActiveMatching(ObjectType.INCIDENT, "orders", Map.of("rule", "r1")));
+        assertEquals(Map.of("r1", existing), dry.activeAttributeIndex(ObjectType.INCIDENT, "orders", "rule"));
+        assertTrue(dry.summary(existing).isPresent());
+
+        // Writes reach nothing.
+        String opened = dry.open(ObjectType.CASE, "Cluster", "d", "HIGH", "orders", Map.of("rule", "r1"));
+        boolean moved = dry.transition(existing, "resolve", "alice");
+        dry.link(existing, opened, "ESCALATED_FROM", "alice");
+        dry.linkSubject(existing, "alert", "a1", "ESCALATED_FROM", "alice");
+        dry.addTag("hot", "incident", existing, "alice");
+        dry.ensureTag("hot");
+        assertFalse(dry.saveAttributes(existing, Map.of("k", "v"), "alice", "refresh"));
+
+        assertEquals(1, objects.opened.size(), "only the seeded object exists");
+        assertEquals(List.of(), objects.transitioned, "dry run transitions nothing");
+        assertEquals(List.of(), objects.linked);
+        assertEquals(List.of(), objects.subjectLinked);
+        assertEquals(List.of(), objects.tagsEnsured);
+        assertEquals(List.of(), objects.tagsOf("incident", existing));
+        assertFalse(moved, "a dry run never claims a transition");
+        assertTrue(opened.startsWith("dry-run:"), "a synthetic id, clearly marked: " + opened);
+        assertTrue(dry.hasActive(ObjectType.INCIDENT, "orders"), "the real object is still active");
+        assertTrue(log.lines.stream().anyMatch(l -> l.contains("would open object") && l.contains("kind=CASE")),
+                log.lines.toString());
+        assertTrue(log.lines.stream().anyMatch(l -> l.contains("would transition object") && l.contains("action=resolve")),
+                log.lines.toString());
     }
 }

@@ -120,4 +120,30 @@ class MailSendJobTypeTest {
         assertEquals(List.of("mail"), bare.descriptor("mail.send").orElseThrow().requires(),
                 "the declaration stays honest even where nothing can satisfy it");
     }
+
+    @Test
+    void aDryRunSendsNothingAndSaysSo() {
+        // PLATFORM-SERVICES-DRYRUN-GAP-1: the `mail` service passed through a dry run, so a preview fire of
+        // mail.send really mailed the recipients. The harness applies the same DryRunServices a real Run does.
+        java.util.List<String> sent = new java.util.ArrayList<>();
+        PackTestHarness harness = PackTestHarness.create()
+                .service("mail", com.gamma.notify.MailAccess.class, (to, cc, subject, body, attachments) -> {
+                    sent.add(subject);
+                    return true;
+                })
+                .load(new MailSendJobType());
+
+        PackTestHarness.Outcome dry = harness.dryRun("mail.send",
+                Map.of("to", "ann@example.test", "subject", "Daily report", "body", "b"));
+
+        assertEquals(List.of(), sent, "a dry run never reaches the real mail service");
+        assertEquals("SKIPPED", dry.status(), "nothing was sent, so not SUCCESS: " + dry.message());
+        assertTrue(dry.message().contains("dry run"), dry.message());
+        assertTrue(dry.logged("would send mail"), dry.log().toString());
+
+        PackTestHarness.Outcome real = harness.run("mail.send",
+                Map.of("to", "ann@example.test", "subject", "Daily report", "body", "b"));
+        assertEquals("SUCCESS", real.status(), real.message());
+        assertEquals(List.of("Daily report"), sent, "a real Run still sends");
+    }
 }

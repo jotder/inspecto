@@ -111,6 +111,32 @@ class CaseRuleEvalJobTest {
     }
 
     @Test
+    void aDryRunGroupsNothing() throws Exception {
+        // PLATFORM-SERVICES-DRYRUN-GAP-1: `objects` passed through a dry run, so a preview fire of
+        // caserule.evaluate reached the real engine (OpsJobTypes.engineFor) and really opened a Case.
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        CaseOperations.of(svc).registerCaseRule(rule(3));
+        incident(svc, "one", "CRITICAL");
+        incident(svc, "two", "CRITICAL");
+        incident(svc, "three", "CRITICAL");
+        PlatformServiceRegistry host = new PlatformServiceRegistry();
+        host.register("objects", com.gamma.objects.ObjectAccess.class, svc.access());
+        RunLog log = new RunLog() {
+            @Override public void info(String message, Object... kv) {}
+            @Override public void warn(String message, Object... kv) {}
+            @Override public void error(String message, Throwable t, Object... kv) {}
+        };
+        CapturingContext ctx = new CapturingContext(Map.of("rule", "crit-cluster"),
+                DryRunServices.wrap(host.grant(java.util.Set.of("objects")), log));
+
+        JobResult result = new com.gamma.ops.cases.CaseRuleEvalJob(cfg("crit-cluster"), null).run(ctx);
+
+        assertEquals(0, caseCount(svc), "a dry run opens no Case");
+        assertEquals("SUCCESS", result.status(), result.message());
+        assertTrue(result.message().contains("dry run"), result.message());
+    }
+
+    @Test
     void unknownCaseRuleFailsClosed() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
         com.gamma.ops.cases.CaseRuleEvalJob job = new com.gamma.ops.cases.CaseRuleEvalJob(cfg("ghost"), () -> svc);
@@ -155,8 +181,20 @@ class CaseRuleEvalJobTest {
         final AtomicReference<Severity> severity = new AtomicReference<>();
         final AtomicReference<Map<String, Object>> payload = new AtomicReference<>();
         private final Map<String, String> params;
+        private final PlatformServices services;
 
-        CapturingContext(Map<String, String> params) { this.params = params; }
+        CapturingContext(Map<String, String> params) { this(params, null); }
+
+        /** A dry-run fire whose grant is {@code services} — what JobService hands a preview Run. */
+        CapturingContext(Map<String, String> params, PlatformServices services) {
+            this.params = params;
+            this.services = services;
+        }
+
+        @Override public boolean dryRun() { return services != null; }
+        @Override public PlatformServices services() {
+            return services != null ? services : JobContext.super.services();
+        }
 
         @Override public String runId() { return "test-run"; }
         @Override public String spaceId() { return "default"; }
