@@ -2,7 +2,6 @@ package com.gamma.la.core;
 
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
-import com.gamma.util.SqlIdent;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -10,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * <b>Branching pattern compiler (LA-14b, server half)</b> — compiles the SAME motif model the browser matcher
@@ -219,10 +220,6 @@ public final class PatternQueryCompiler {
         }
         sb.append(") ORDER BY stage, s, t, ts NULLS LAST, tr");
         return new Compiled(sb.toString(), binds);
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 
     private static String text(Object v) {
