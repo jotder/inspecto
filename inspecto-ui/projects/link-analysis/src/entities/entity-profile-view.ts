@@ -24,7 +24,9 @@ export function count(n: number | null | undefined): string {
 /** A 0..1 share as a percent with one decimal ("99.9 %"); an em dash when absent. */
 export function percent(share: number | null | undefined): string {
     if (share == null || !Number.isFinite(share)) return '—';
-    return `${formatNumber(Math.round(share * 1000) / 10)} %`;
+    const pct = Math.round(share * 1000) / 10;
+    // A share short of all never reads 100 % (99.95 % one-to-one beside a maximum of 15 per Entity).
+    return `${formatNumber(share < 1 && pct >= 100 ? 99.9 : pct)} %`;
 }
 
 /** The freshness badge: a status-badge value (its tone) and the word it shows (never colour alone). */

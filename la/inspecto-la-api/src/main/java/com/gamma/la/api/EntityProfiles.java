@@ -405,13 +405,15 @@ final class EntityProfiles {
             int b = (int) ColumnProfile.num(r.get("b"));
             sentinels.add(sentinel(f.usable.get(b), "builtin", String.valueOf(r.get("v")), ColumnProfile.num(r.get("n")), nonNull.get(b)));
         }
+        // A value the normaliser rejects (a name in a number column) counts by its raw text, so it can still dominate.
         // A dominant value groups every distinct key: above shape_sample_rows that group-by does not fit a profile's memory
         // budget (7.4 M distinct IMSIs over 132 M rows ran out of 1 GB), so it is read from a row reservoir instead. A row
         // sample, not an Entity sample: a value holding a fifth of a column is certain to be in it.
         boolean sampled = ColumnProfile.num(total.get("n")) > f.lim.sampleRows();
         String from = sampled ? "(SELECT b, k, raw FROM " + KEYS + " USING SAMPLE reservoir(" + f.lim.sampleRows() + " ROWS) REPEATABLE (42)) AS s" : KEYS;
-        DatasetProvider.Result dominant = f.keys("SELECT b, MAX(n) FILTER (WHERE ok) AS n, SUM(n) AS of FROM (SELECT b, k, (k <> '' AND NOT "
-                + SENTINEL_SQL + ") AS ok, COUNT(*) AS n FROM " + from + " GROUP BY b, k, ok) AS g GROUP BY b ORDER BY b", f.usable.size(), List.of());
+        DatasetProvider.Result dominant = f.keys("SELECT b, MAX(n) FILTER (WHERE ok) AS n, SUM(n) AS of FROM (SELECT b, v, (v <> 'r:' AND NOT "
+                + SENTINEL_SQL + ") AS ok, COUNT(*) AS n FROM (SELECT b, raw, CASE WHEN k <> '' THEN 'k:' || k ELSE 'r:' || "
+                + "COALESCE(trim(raw), '') END AS v FROM " + from + ") AS kv GROUP BY b, v, ok) AS g GROUP BY b ORDER BY b", f.usable.size(), List.of());
         for (Map<String, Object> r : dominant.rows()) {
             int b = (int) ColumnProfile.num(r.get("b"));
             long n = ColumnProfile.num(r.get("n")), seen = ColumnProfile.num(r.get("of")), of = nonNull.getOrDefault(b, 0L);

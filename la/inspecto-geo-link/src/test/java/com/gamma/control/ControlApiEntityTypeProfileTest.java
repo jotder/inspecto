@@ -11,6 +11,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -362,6 +363,33 @@ class ControlApiEntityTypeProfileTest {
         if (!Files.exists(dir)) return;
         try (Stream<Path> s = Files.walk(dir)) {
             for (Path p : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(p);
+        }
+    }
+
+    @Test
+    void aValueTheNormaliserRejectsStillDominatesByItsRawText(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            String name = "Ahmed Ali Osman";   // fails e164, so its normalised key is empty
+            List<String> b = List.of(EntityProfileFixture.B, EntityProfileFixture.C, EntityProfileFixture.D, "+249912000005",
+                    "+249912000006", "+249912000007");   // every b_msisdn distinct: only a_msisdn has a dominant value
+            List<String> parts = new ArrayList<>();
+            for (int i = 0; i < 6; i++)
+                parts.add("('" + (i < 4 ? name : A) + "','" + b.get(i) + "','350000000000011','call',TIMESTAMP '2026-10-01 10:00:00')");
+            String rows = String.join(",", parts);
+            new com.gamma.pipeline.ViewStore(root.resolve("views")).write(new com.gamma.pipeline.ViewDefinition("calls_view", "flow-x",
+                    List.of(), "SELECT a_msisdn, b_msisdn, imei, kind, ts FROM (VALUES " + rows + ") AS t(a_msisdn,b_msisdn,imei,kind,ts)",
+                    "2026-10-15T00:00:00Z"));
+            settings(c, "entity_profile:\n  sentinel_share: 50\n");
+            HttpResponse<String> r = get(c, "/inv/entity-types/msisdn/profile?sections=volume", OWNER);
+            assertFalse(r.body().contains(name), "D-EP3: the dominant raw value is never shown");
+            List<String> dominant = new ArrayList<>();
+            for (JsonNode s : data(r).at("/volume/sentinels"))
+                if ("dominant".equals(s.get("kind").asText())) {
+                    assertTrue(s.get("value").isNull());
+                    dominant.add(s.get("column").asText() + ":" + s.get("rows").asLong());
+                }
+            assertEquals(List.of("a_msisdn:4"), dominant, "the name holds 4 of 6 a_msisdn values; A only 2 (33 %, below 50 %)");
         }
     }
 }

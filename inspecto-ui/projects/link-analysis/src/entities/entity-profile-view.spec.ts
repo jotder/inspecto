@@ -35,6 +35,12 @@ describe('entity-profile-view', () => {
         expect(percent(null)).toBe('—');
     });
 
+    it('never rounds a share short of all up to 100 %', () => {
+        expect(percent(0.9995)).toBe('99.9 %');
+        expect(percent(0.99999)).toBe('99.9 %');
+        expect(percent(1)).toBe('100 %');
+    });
+
     it('reads freshness from data-as-of: not assessed, not known, fresh, stale', () => {
         const now = new Date('2026-10-15T12:00:00Z');
         expect(freshness('2026-10-15T00:00:00Z', false, now)).toEqual({ value: 'UNKNOWN', label: 'Not assessed' });
