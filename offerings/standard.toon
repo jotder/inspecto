@@ -8,7 +8,7 @@ posture:
   postgresSidecar: bundled
 includes[1]: basic
 modules[18]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,exchange,observability,ops,case-management,action-requests,regulatory-reporting,reconciliation,scoring,screening,anomaly,agent
-contentPacks[2]: mobile-money,aml
+contentPacks[5]: mobile-money,aml,payment-fraud,telco-fraud,telco-ra
 addons:
   aiAssist:
     status: built
@@ -20,8 +20,8 @@ addons:
     status: built
     modules[1]: exchange
   incidents:
-    status: planned
-    hostedBy[2]: engine,ops
+    status: built
+    modules[1]: ops
   caseManagement:
     status: built
     modules[1]: case-management
@@ -44,8 +44,8 @@ addons:
     status: built
     modules[1]: anomaly
   workflowSla:
-    status: planned
-    hostedBy[1]: engine
+    status: built
+    modules[1]: ops
   premiumConnectors:
     status: built
     modules[1]: connectors-kafka

@@ -170,7 +170,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | aiAssist | `agent` | — | built | built | built |
 | anomalyDetection | `anomaly` | — | built | built | built |
 | caseManagement | `case-management` | — | built | built | built |
-| incidents | planned in `engine`, `ops` | — | planned | planned | planned |
+| incidents | `ops` | — | built | built | built |
 | integrationDelivery | `notify-channels` | — | built | built | built |
 | linkAnalysis | `la-storage`, `la-core`, `la-api`, `geo-link` | built | built | built | built |
 | multiEntity | `exchange` | — | built | built | built |
@@ -180,7 +180,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | scoringLists | `entity-list`, `scoring` | — | built | built | built |
 | screening | `screening` | — | built | built | built |
 | telecomIndustryPack | `telecom-asn1` | — | built | built | built |
-| workflowSla | planned in `engine` | — | planned | planned | planned |
+| workflowSla | `ops` | — | built | built | built |
 
 ### Deployment posture
 
