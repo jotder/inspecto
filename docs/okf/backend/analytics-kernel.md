@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), and the baseline package moved from Anomaly Detection.
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split).
 resource: docs/superpower/analytics-core-plan.md
 tags: [analytics, statistics, baseline, time-series, scores, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
@@ -19,6 +19,9 @@ timestamp: 2026-10-17T00:00:00Z
 > shift serve the `transform.timeseries.*` Steps, file-sequence gaps, delivery checks, KPI periods and BI grains
 > (§ [Time-series primitives](#time-series-primitives)).
 > Anomaly Detection and Risk Score write their outputs through the score output contract (§ [Score output contract](#score-output-contract)).
+> S5 (b), (c), (d) built 2026-10-17, model-agnostic: accuracy measures and a rolling-origin backtest, seasonality
+> detection, and a deterministic holdout split (§ [Accuracy and backtest](#accuracy-and-backtest),
+> [Seasonality detection](#seasonality-detection), [Holdout split](#holdout-split)). No caller uses them yet.
 
 ## The module
 
@@ -35,6 +38,9 @@ Packages:
 * `com.gamma.analytics` — `Stats` (the definitions below), `MedianMode`, `QuantileMode`, `ColumnProfiler`
   (§ Column profiler).
 * `com.gamma.analytics.score` — the score output contract (M7, below).
+* `com.gamma.analytics.accuracy` — `Accuracy`, `AccuracySql`, `Backtest` (S5b, § [Accuracy and backtest](#accuracy-and-backtest)).
+* `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
+* `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -292,6 +298,121 @@ turns it red), `TimeSeriesSqlTest` (resample and shift executed on DuckDB), and 
 
 * `ScoreContractTest` — the score output contract's pure parts (names, scale and bands, cap, columns, run files,
   retention); the writer is pinned by the two kinds' golden tests above.
+
+## Accuracy and backtest
+
+*ANALYTICS-CORE-1 S5b, built 2026-10-17.* Package `com.gamma.analytics.accuracy`. Model-agnostic: it scores any
+forecast or prediction, whatever model made it.
+
+### Accuracy measures — `Accuracy` (JVM), `AccuracySql` (DuckDB)
+
+Error **e = predicted − actual**; a positive bias means the model over-forecasts.
+
+| Measure | Definition | Output column |
+|---|---|---|
+| MAE | Σ\|e\| / n | `mae` |
+| RMSE | √(Σe² / n) | `rmse` |
+| MAPE (percent) | 100 · mean of \|e\| / \|a\| over the pairs whose actual is **not zero**; a zero actual is **excluded and counted** (`mapeZeroActuals`), never divided by; no value (empty / NULL) when every actual is zero | `mape`, `mape_zero_actuals` |
+| sMAPE (percent, 0–200) | 100 / n · Σ 2\|e\| / (\|a\| + \|p\|) — the M3 / Hyndman–Koehler form (denominator = mean of the absolute values); a pair with a = p = 0 adds 0 and is counted | `smape` |
+| Bias | Σe / n (mean error) | `bias` |
+| Interval coverage | share of pairs with lower ≤ a ≤ upper, both ends inclusive | `coverage` |
+| Mean interval width | Σ(upper − lower) / n | `mean_interval_width` |
+
+**Why these choices.** MAPE's zero rule: dropping and counting is the only rule that neither invents a number nor
+divides by zero, and the count tells the reader how much of the series MAPE ignored (on intermittent series, read
+sMAPE or MAE instead). sMAPE: of the two common forms — (\|a\| + \|p\|) / 2 as denominator (range 0–200) or
+\|a\| + \|p\| (range 0–100) — the first is the one the M3 competition and Hyndman–Koehler published, so a figure
+compares with the literature. Bias sign: predicted − actual reads naturally as "how much too high".
+
+**Input rules** are `Stats`': no pairs, unequal lengths, NaN, or a band with lower > upper throw. The SQL form casts each
+column to `DOUBLE`, skips a row with a NULL in any column it uses, fails the statement through `error()` on an inverted
+band, and returns `n = 0` with NULL measures for no pairs. `AccuracySql.Spec` takes optional group columns: one row per
+group (per entity, per model).
+
+### Rolling-origin backtest — `Backtest`
+
+`Backtest.run(series, Spec(minTrain, horizon, step[, maxOrigins]), ForecastFn)`. `ForecastFn` is any forecaster:
+history (oldest first) and a horizon → a `Forecast(point, lower, upper)`, the band optional.
+
+* **Origins** t = minTrain, minTrain + step, … while t + horizon ≤ n — only origins whose whole horizon is observed,
+  so every origin scores exactly `horizon` pairs.
+* **Expanding window**: the forecaster gets a **copy** of x[0..t−1] — everything before the origin, nothing after.
+* **Result**: each origin (its actuals, forecast and `Accuracy.Summary`), the measures over every pair, and
+  `byHorizon` — the measures of the 1-step-ahead pairs, the 2-step-ahead pairs, and so on.
+* **Deterministic**: origins in order, nothing random — a deterministic forecaster gives the same result every run.
+* **Fail closed** (D-AD10), never a silent subset: a series longer than 100,000 values; more origins than `maxOrigins`
+  (default 500, ceiling 5,000); more than 1,000,000 scored pairs; a NaN in the series (gap-fill first with
+  `transform.timeseries.resample`); a forecast of the wrong length, with a NaN, with lower > upper, or with a band at
+  some origins and not others.
+
+JVM only: the driver calls a JVM forecaster; the measures it reports are `Accuracy`'s, which have the SQL form above.
+
+## Seasonality detection
+
+*ANALYTICS-CORE-1 S5c, built 2026-10-17.* `com.gamma.analytics.time.SeasonalityDetector` — the dominant period of an
+evenly spaced series, chosen among candidate periods, so a declared period becomes optional.
+
+**ACF** — the standard (Box–Jenkins) **biased** estimator: r(k) = Σ_{t<n−k} (x_t − x̄)(x_{t+k} − x̄) / Σ_t (x_t − x̄)².
+The denominator is the whole series' sum of squares (not n − k terms), so r(k) stays in [−1, 1] and shrinks by
+(n − k) / n: of two equally strong periods the shorter scores higher (14 never beats 7 on a weekly signal). Undefined
+(empty / NULL) for a constant series; 0 at a lag ≥ n.
+
+**Rule.** A candidate k ≥ 2 is eligible when (1) **minimum cycles**: n ≥ 3k (`Params.minCycles`, ≥ 2); (2)
+**significant**: r(k) ≥ max(0.3, 1.96 / √n) — above the 95 % white-noise band and a floor (`Params.minAcf`) that a long
+series' tiny band cannot undercut; (3) **a peak**: r(k) > r(k − 1) and r(k) > r(k + 1), so a trend's slowly decaying ACF
+is not read as a season. The period is the eligible candidate with the highest r(k), a tie to the shorter; none → no
+period. Every candidate is returned with its r(k − 1), r(k), r(k + 1) and a verdict (`TOO_FEW_CYCLES`,
+`CONSTANT_SERIES`, `NOT_SIGNIFICANT`, `NOT_A_PEAK`, `ELIGIBLE`, `CHOSEN`) — the explanation. Series longer than
+1,000,000 values are refused.
+
+**Default candidates** (`candidatesFor(TimeGrain)`): second 60; minute 60, 1440; hour 24, 168; day 7, 365; week 52;
+month 12; quarter 4; year none. A caller may pass its own list.
+
+**SQL form.** `acfSql(relation, orderColumn, valueColumn, keys, lags)` → `<keys…>, n, lag, acf` per key, the series
+being the key's rows ordered by `orderColumn` (one row per bucket), NULL values left out. `lagsFor(candidates)` names
+the lags the rule reads and `decide(n, candidates, params, acfAt)` applies the rule to those rows — the JVM `detect`
+calls the same `decide`, so the two forms share one decision.
+
+⚠ The series must have no gaps (resample first); a gap shifts every lag. Detrending is the caller's choice (a first
+difference through `transform.timeseries.shift`); the peak rule only keeps a trend from being *chosen*.
+
+## Holdout split
+
+*ANALYTICS-CORE-1 S5d, built 2026-10-17.* `com.gamma.analytics.split.HoldoutSplit` — train / validation / test for any
+model, as JVM functions and DuckDB SQL that agree. Shares are held in **basis points** (1/10,000, a fraction rounded to
+the nearest), so both forms cut with integer arithmetic.
+
+**By time — `TimeSplit`.** No shuffle and no seed (deterministic by construction): over the distinct buckets, oldest
+first, the newest are test, the ones before them validation, the rest train. `lastBuckets(v, t)` takes bucket counts;
+`fractions(v, t)` takes shares of the bucket count, each **rounded down** (⌊N · bp / 10000⌋), so a share never exceeds
+its fraction. Fails when no train bucket is left. SQL: `sql(relation, bucketColumn, splitColumn)` adds the role column
+(`'train'`, `'validation'`, `'test'`) by `dense_rank` over the relation's distinct buckets — one global cut, not per
+entity; a NULL bucket gets a NULL role; no train bucket fails the statement through `error()`.
+
+**By entity — `HashSplit(seed, train, validation)`.** bucket(key) = `md5_number_lower(seed ':' key) mod 10000`;
+bucket < train → train, < train + validation → validation, else test. Every row of an entity gets the same role; the
+same seed never reshuffles, a new seed does. SQL: `bucketSql`, `roleSql` and `predicateSql(column, role)` over the key
+read as `VARCHAR` (an integer key hashes as its decimal text; a NULL key has no role).
+
+**Why MD5, not DuckDB's `hash()`.** `hash()` is DuckDB's internal hash, with no published definition and no promise to
+stay the same across versions: the JVM cannot reproduce it, and an upgrade could move entities between roles.
+`md5_number_lower` is the lower 64 bits of the MD5 of the UTF-8 bytes (digest bytes 8..15, little-endian, unsigned) —
+a fixed algorithm the JVM computes exactly, the same reading LA's index `BucketFunction` relies on.
+
+### Tests (S5 b, c, d)
+
+* `AccuracyTest` — hand figures for every measure, the zero-actual and a = p = 0 rules, input rules.
+* `AccuracyDuckDbParityTest` — 60 seeded pair sets (zero actuals, bands) through `Accuracy` and `AccuracySql`, groups
+  and NULL skipping, the inverted band failing both; agreement within 1e-9 × max(1, |value|).
+* `BacktestTest` — a hand-computed naive backtest (origins, overall and per-step measures), the expanding copy, band
+  coverage, determinism, every cap and forecast check.
+* `SeasonalityDetectorTest` — hand ACF, weekly / hourly / monthly detection, noise, trend and constant giving no
+  period, minimum cycles, highest-wins and the tie rule.
+* `SeasonalityDuckDbParityTest` — `acfSql` per key against `acf` (seasonal, noise, trend, constant, short series, a
+  NULL value) and `decide` over the SQL rows = `detect`, verdict for verdict.
+* `HoldoutSplitTest`, `HoldoutSplitDuckDbParityTest` — golden MD5 buckets computed outside Java; shares within 2 % of
+  the fractions; SQL bucket, role and predicates = JVM over 3,000+ keys (quotes, accents, CJK, emoji, mixed case, an
+  integer key, NULL); the time split in both modes against `TimeSplit.role`, and its no-train failure in both forms.
 
 ## References
 
