@@ -1,0 +1,34 @@
+{
+  "a": {
+    "inspecto": 1,
+    "inspecto-acquire": 1,
+    "inspecto-anomaly": 2,
+    "inspecto-engine": 21,
+    "inspecto-etl": 6,
+    "inspecto-exchange": 1,
+    "inspecto-la-api": 4,
+    "inspecto-la-core": 1,
+    "inspecto-la-storage": 1,
+    "inspecto-reconciliation": 2,
+    "inspecto-scoring": 1,
+    "inspecto-util": 2
+  },
+  "b": {
+    "inspecto-engine": 8,
+    "inspecto-etl": 2,
+    "inspecto-exchange": 2,
+    "inspecto-la-storage": 5,
+    "inspecto-util": 1
+  },
+  "c": {
+    "inspecto": 2,
+    "inspecto-anomaly": 2,
+    "inspecto-engine": 1,
+    "inspecto-entity-store": 1,
+    "inspecto-intelligence": 1,
+    "inspecto-screening": 1
+  },
+  "d": {
+    "inspecto-geo-link": 1
+  }
+}

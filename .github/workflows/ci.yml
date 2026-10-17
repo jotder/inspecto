@@ -338,6 +338,14 @@ jobs:
       - name: Guard — module-architecture report and no-regression ratchet
         run: node tools/check-module-architecture.mjs && node tools/check-module-architecture.mjs --json --ratchet && node --test tools/check-module-architecture.test.mjs
 
+      # Data-ops duplication inventory (ANALYTICS-CORE-1 M10): private SQL quoting helpers, hand-built read_*( outside
+      # SqlViews, private statistics / union-find, JVM Measure-grammar copies — per category per module. The report is
+      # informational; --ratchet fails when a count rises above tools/data-ops-duplication.baseline.json or an exemption
+      # in tools/data-ops-duplication.exemptions.json goes stale. Counts may only fall: lower the baseline with
+      # --baseline-write when a copy is retired, never raise it. Reads tracked files only; no build, ~1s.
+      - name: Guard — data-ops duplication may only go down
+        run: node tools/check-data-ops-duplication.mjs --ratchet && node --test tools/check-data-ops-duplication.test.mjs
+
       # OpenAPI fragments guard (MODULE-REORG-1 P1): docs/api/openapi-v1.json is GENERATED from the core fragment +
       # each module's META-INF/inspecto/openapi.fragment.json. Reads tracked files only; no build, ~0.3s.
       - name: Guard — the OpenAPI document is the merge of the module fragments

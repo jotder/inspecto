@@ -66,6 +66,26 @@ as a `view`-backed Dataset and **failed** as a `physicalRef`-backed one — same
 **off** for datasets: turning it on would surface partition segments as new columns on every existing
 Dataset, which is a product decision, not a bug fix.
 
+**The rule is counted, and the count may only fall (2026-10-17, `ANALYTICS-CORE-1` M10).**
+[`tools/check-data-ops-duplication.mjs`](../../../../tools/check-data-ops-duplication.mjs) inventories,
+per module with `file:line`, every copy of a data operation that has a shared home: (a) private SQL
+quoting helpers (`q`, `lit`, `sqlStr`, `ident`…) outside `SqlBuilder` / `SqlIdent`, (b) hand-built
+`read_*(` in a Java string literal outside `SqlViews`, (c) private median / percentile / MAD / z-score /
+Jaro-Winkler / Jaccard / union-find outside the Analytics Kernel and the graph library, (d) a JVM switch
+over the Measure aggregate names outside `MeasureCompiler`. It reads tracked `src/main/java` only, with
+comments stripped, and states that scope on every run. Its baseline at the start (43 / 22 / 8 / 1) is
+[`tools/data-ops-duplication.baseline.json`](../../../../tools/data-ops-duplication.baseline.json); the CI
+guards job runs `--ratchet`, which fails when a module's count rises or an exemption goes stale. When a copy
+is retired, lower the baseline with `--baseline-write`; never raise it.
+⚠ **Exemptions are never inferred.** An HTML/XML/CSV/JSON escaper or a token validator that happens to be
+named `esc` / `quote` / `ident`, and an ingest reader that opens a raw input file with its own parse
+options (`DuckDbCsvIngester`, `ComponentPreview`, `FileSampler`), is listed with its reason in
+[`tools/data-ops-duplication.exemptions.json`](../../../../tools/data-ops-duplication.exemptions.json)
+after someone read the site. ⚠ **It is name-based on purpose and says what it cannot see:** SQL quoting
+written inline without a helper, statistics computed inline (`VolumeBaseline`'s lower median), and a robust
+z named only `z` (`RobustStats.z`) are not counted, so a 0 means "no named copy", not "no copy". Plan:
+[`analytics-core-plan.md`](../../../superpower/analytics-core-plan.md) §1a, §4a.
+
 ---
 
 ## 2. Operational store inventory
