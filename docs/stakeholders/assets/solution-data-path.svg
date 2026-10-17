@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" viewBox="0 0 940 560" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title>Inspecto solution data path</title><desc>Data enters through Collectors, is parsed and ingested into the lakehouse, shaped by Pipelines, analysed, and turned into alerts, incidents, cases and actions; the control plane and UI sit over all of it.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="940" height="560" fill="#FFFFFF"/>
+<rect x="40" y="30" width="860" height="46" rx="4" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+<text x="470" y="49" text-anchor="middle" font-size="13" font-weight="500" fill="#0C447C">inspecto-ui (Angular)  +  external clients</text>
+<text x="470" y="65" text-anchor="middle" font-size="11" fill="#185FA5">one operator console · Studio · Link Analysis app · /api/v1 consumers</text>
+<line x1="470" y1="76" x2="470" y2="100" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="40" y="100" width="860" height="46" rx="4" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+<text x="470" y="119" text-anchor="middle" font-size="13" font-weight="500" fill="#0C447C">Control plane — ControlApi /api/v1</text>
+<text x="470" y="135" text-anchor="middle" font-size="11" fill="#185FA5">envelope, ETag, idempotency, OpenAPI contract · authN / authZ gates · maker-checker hold · per-Space routing</text>
+<line x1="470" y1="146" x2="470" y2="170" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="40" y="170" width="150" height="66" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="115" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Collect</text>
+<text x="115" y="205" text-anchor="middle" font-size="11" fill="#0F6E56">Collectors: file, SFTP,</text>
+<text x="115" y="219" text-anchor="middle" font-size="11" fill="#0F6E56">FTP, DB, Kafka, cloud</text>
+<rect x="212" y="170" width="150" height="66" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="287" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Parse + ingest</text>
+<text x="287" y="205" text-anchor="middle" font-size="11" fill="#0F6E56">Stage-1 M..N, typed</text>
+<text x="287" y="219" text-anchor="middle" font-size="11" fill="#0F6E56">Parquet, quarantine</text>
+<rect x="384" y="170" width="150" height="66" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="459" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Shape</text>
+<text x="459" y="205" text-anchor="middle" font-size="11" fill="#0F6E56">Pipelines of Steps,</text>
+<text x="459" y="219" text-anchor="middle" font-size="11" fill="#0F6E56">enrichment, dedup</text>
+<rect x="556" y="170" width="150" height="66" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="631" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Analyse</text>
+<text x="631" y="205" text-anchor="middle" font-size="11" fill="#0F6E56">Measures, KPIs,</text>
+<text x="631" y="219" text-anchor="middle" font-size="11" fill="#0F6E56">analytics Steps, scores</text>
+<rect x="728" y="170" width="150" height="66" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="803" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Act</text>
+<text x="803" y="205" text-anchor="middle" font-size="11" fill="#0F6E56">Alerts, Decision Rules,</text>
+<text x="803" y="219" text-anchor="middle" font-size="11" fill="#0F6E56">Incidents, Cases</text>
+<line x1="190" y1="203" x2="212" y2="203" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="362" y1="203" x2="384" y2="203" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="534" y1="203" x2="556" y2="203" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="706" y1="203" x2="728" y2="203" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="470" y1="236" x2="470" y2="262" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="40" y="262" width="860" height="92" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="48" y="277" font-size="11" fill="#5F5E5A">Storage — every Space has its own roots</text>
+<rect x="48.0" y="286" width="203.5" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="149.75" y="305" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Lakehouse</text>
+<text x="149.75" y="321" text-anchor="middle" font-size="11" fill="#5F5E5A">Parquet + DuckDB</text>
+<rect x="261.5" y="286" width="203.5" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="363.25" y="305" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Configuration</text>
+<text x="363.25" y="321" text-anchor="middle" font-size="11" fill="#5F5E5A">TOON + .history</text>
+<rect x="475.0" y="286" width="203.5" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="576.75" y="305" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Operational DB</text>
+<text x="576.75" y="321" text-anchor="middle" font-size="11" fill="#5F5E5A">DuckDB / Postgres</text>
+<rect x="688.5" y="286" width="203.5" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="790.25" y="305" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Event log</text>
+<text x="790.25" y="321" text-anchor="middle" font-size="11" fill="#5F5E5A">append-only Parquet</text>
+<line x1="470" y1="354" x2="470" y2="378" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="40" y="378" width="860" height="92" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="48" y="393" font-size="11" fill="#5F5E5A">Outcomes</text>
+<rect x="48.0" y="402" width="160.8" height="56" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="128.4" y="421" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">Dashboards</text>
+<text x="128.4" y="437" text-anchor="middle" font-size="11" fill="#534AB7">Studio &amp; BI</text>
+<rect x="218.8" y="402" width="160.8" height="56" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="299.2" y="421" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">Notifications</text>
+<text x="299.2" y="437" text-anchor="middle" font-size="11" fill="#534AB7">in-app, mail, webhook</text>
+<rect x="389.6" y="402" width="160.8" height="56" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="470" y="421" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">Action Requests</text>
+<text x="470" y="437" text-anchor="middle" font-size="11" fill="#534AB7">four-eyes outbound</text>
+<rect x="560.4000000000001" y="402" width="160.8" height="56" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="640.8" y="421" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">Reports</text>
+<text x="640.8" y="437" text-anchor="middle" font-size="11" fill="#534AB7">regulatory, publication</text>
+<rect x="731.2" y="402" width="160.8" height="56" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="811.6" y="421" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">Investigations</text>
+<text x="811.6" y="437" text-anchor="middle" font-size="11" fill="#534AB7">Link Analysis</text>
+<text x="40" y="500" text-anchor="start" font-size="11" fill="#5F5E5A">Steps and Jobs reach engine facilities only through granted Platform Services; analytics Steps and score kinds share one Analytics Kernel.</text>
+<text x="40" y="518" text-anchor="start" font-size="11" fill="#5F5E5A">Every authoring write passes ConfigSafetyValidator and, when the Space's Approval Policy governs the kind, the maker-checker hold.</text>
+</svg>

@@ -149,10 +149,10 @@ Enforcement returns through five SPIs the core *defines* and never *implements*:
 
 | SPI | Package | Contract | `@PublicApi` | Implemented by |
 |---|---|---|---|---|
-| `Authenticator` | `com.gamma.control` | `Optional<Subject> authenticate(HttpExchange)` | `since = "4.0.0"` | `OidcAuthenticator` (`inspecto-oidc`) |
-| `Subject` | `com.gamma.control` | record `(id, capabilities, dataScopes, attributes)`; `dataScopes == null` = unscoped | — | built by the authenticator |
-| `TokenRelay` | `com.gamma.control` | `exchangeCode`, `refresh`, default no-op `revoke`; absent ⇒ `/auth/*` answers `503 CAPABILITY_UNAVAILABLE` | `since = "4.0.0"` | `OidcTokenRelay` |
-| `AccessDecider` | `com.gamma.control` | `decide(...)` → `ALLOW | DENY | ABSTAIN`; `explain(...)`; `seededPolicies()` default-empty | `since = "4.0.0"` | `PolicyEngine` (`inspecto-policy`) |
+| `Authenticator` | `com.gamma.spi.auth` | `Optional<Subject> authenticate(HttpExchange)` | `since = "4.0.0"` | `OidcAuthenticator` (`inspecto-oidc`) |
+| `Subject` | `com.gamma.spi.auth` | record `(id, capabilities, dataScopes, attributes)`; `dataScopes == null` = unscoped | — | built by the authenticator |
+| `TokenRelay` | `com.gamma.spi.auth` | `exchangeCode`, `refresh`, default no-op `revoke`; absent ⇒ `/auth/*` answers `503 CAPABILITY_UNAVAILABLE` | `since = "4.0.0"` | `OidcTokenRelay` |
+| `AccessDecider` | `com.gamma.spi.auth` | `decide(...)` → `ALLOW | DENY | ABSTAIN`; `explain(...)`; `seededPolicies()` default-empty | `since = "4.0.0"` | `PolicyEngine` (`inspecto-policy`) |
 | `SecretsProvider` | `com.gamma.acquire` | `supports(scope)`, `resolve(scope, key)` | — | `FileKeystoreSecretsProvider` (`inspecto-secrets`) |
 
 Discovery is `ServiceLoader` through `META-INF/services`; the core's `Authenticators` / `SpiSlot` wrapper
@@ -415,7 +415,7 @@ is the one SEC mechanism with **no test** (§8.7).
 
 ### 3.12 Secrets
 
-`SecretResolver` (`inspecto-acquire`) resolves `${ENV:NAME}`, `${SYS:NAME}` and bare `${NAME}` in every
+`SecretResolver` (`spi/inspecto-auth-spi`) resolves `${ENV:NAME}`, `${SYS:NAME}` and bare `${NAME}` in every
 edition; `${FILE:path}` and `${KEYSTORE:alias}` (JCEKS) route to a `SecretsProvider` and arrive by
 `ServiceLoader` from `inspecto-secrets` (`FileKeystoreSecretsProvider`), which only the Standard and
 Enterprise bundles carry. **A Personal bundle refuses those two schemes with an edition-naming message, never
@@ -572,7 +572,9 @@ against this decision and fixed the same day (§4). ⛔ Do not re-open Q5; do no
 one vendor's URL layout. `docs/api/deployment/README.md` ships Keycloak and WSO2 **blueprints** — examples of
 a compliant configuration, not a choice.
 
-### 6.2 OIDC discovery (`/.well-known`) for `tokenEndpoint` or `endSessionUrl` — REFUSED
+### 6.2 OIDC discovery (`/.well-known`) for `tokenEndpoint` or `endSessionUrl` — REFUSED (later superseded)
+
+> ⚠ 2026-10-17: superseded by the provider presets — `OidcConfig` now reads an optional `-Dauth.oidc.discoveryUrl`, fetched once at first use (`providers/inspecto-oidc/src/main/java/com/gamma/oidc/OidcConfig.java`). The refusal below is kept as history.
 
 Both are declared configuration. The relay fails fast at construction without `auth.oidc.tokenEndpoint`;
 the SPA's `endSessionUrl` is a value, not a lookup. Reason: this module configures `jwksUri` explicitly by

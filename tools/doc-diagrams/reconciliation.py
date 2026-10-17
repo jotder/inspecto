@@ -1,0 +1,31 @@
+import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
+
+s = Svg(940, 420, 'Reconciliation Break lifecycle',
+        'States of one recorded Break (ReconBreaks.merge and POST /recon/{id}/breaks/status).')
+s.text(470, 24, 'Break lifecycle (one record per pair + type + key + column)', anchor='middle', size=13, color='#444441')
+# entry
+s.box(20, 170, 150, 56, 'gray', 'Run records', 'new Break found')
+s.box(240, 70, 170, 64, 'purple', 'open', 'firstSeenAt stamped')
+s.box(240, 280, 170, 64, 'purple', 'assigned', 'carries assignee')
+s.box(500, 170, 170, 64, 'teal', 'resolved', 'note kept')
+s.box(740, 170, 180, 64, 'coral', 'auto_closed', 'absentRuns counted')
+s.box(740, 330, 180, 56, 'gray', 'dropped', 'gone 3 runs')
+s.arrow(170, 198, 240, 110)
+s.arrow(325, 134, 325, 280, label='assign')
+s.path('M 305 280 L 305 134')
+s.text(250, 210, 'open (clears', size=10); s.text(250, 222, 'assignee)', size=10)
+s.arrow(410, 110, 500, 190, label='resolve')
+s.arrow(410, 312, 500, 220, label='resolve')
+s.path('M 585 170 L 585 50 L 300 50 L 300 70')
+s.text(430, 44, 're-open (status open)', size=10)
+s.arrow(670, 202, 740, 202, label='absent')
+s.path('M 410 90 L 830 90 L 830 170')
+s.text(600, 84, 'absent from a recorded run', size=10)
+s.path('M 830 234 L 830 260 L 410 300', dash=True)
+s.text(560, 262, 'reappears with assignee (recurrence)', size=10)
+s.path('M 790 170 L 790 140 L 410 125', dash=True)
+s.text(560, 132, 'reappears (recurrence)', size=10)
+s.arrow(830, 234, 830, 330, label='absentRuns = 3')
+s.text(20, 405, 'Transitions on a run come from ReconBreaks.merge (POST /recon/{id}/record or the recon.run Job); '
+       'assign / resolve / open come from POST /recon/{id}/breaks/status.', size=10)
+s.save('docs/stakeholders/modules/assets/reconciliation.svg')

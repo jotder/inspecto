@@ -1,0 +1,21 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+from svglib import Svg
+
+s = Svg(940, 300, 'Screening: check, run, review', 'Subjects are matched against Entity Lists; a run raises signed hits; a confirm opens an Incident and a Case.')
+s.box(20, 40, 170, 60, 'gray', 'Analyst / caller', 'POST /screening/check')
+s.box(20, 160, 170, 60, 'teal', 'Dataset rows', 'screening.run Job')
+s.box(250, 100, 190, 70, 'purple', 'Screener', 'identifier match 1.0\nNameMatcher score 0..1')
+s.box(250, 220, 190, 50, 'teal', 'Entity Lists', 'LIVE members only')
+s.box(500, 40, 180, 60, 'blue', 'Match results', 'nothing persisted')
+s.box(500, 160, 180, 70, 'purple', 'Screening Hits', 'signed JSON per hit\nscreening-hits/<id>.json')
+s.box(740, 100, 180, 60, 'coral', 'Decide', 'confirm | dismiss | escalate')
+s.box(740, 210, 180, 60, 'teal', 'Incident + Case', 'opened on confirm')
+s.arrow(190, 70, 250, 125)
+s.arrow(190, 190, 250, 150)
+s.arrow(345, 220, 345, 170, dash=True)
+s.arrow(440, 120, 500, 70)
+s.arrow(440, 150, 500, 190, label='>= threshold')
+s.arrow(680, 190, 740, 135)
+s.arrow(830, 160, 830, 210)
+s.save('docs/stakeholders/modules/assets/screening.svg')

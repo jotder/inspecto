@@ -1,0 +1,20 @@
+import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
+
+s = Svg(940, 400, 'SLA clock and escalation', 'How the SLA sweep moves one Incident or Case through its SLA states (SlaDecisions, ObjectService.sweepIncidentSla).')
+s.text(470, 24, 'SLA overlay on a governed item (sweep every objects.sla.sweep.seconds)', anchor='middle', size=13, color='#444441')
+s.box(20, 160, 160, 64, 'gray', 'Item created', 'SlaPolicy by priority')
+s.box(240, 160, 170, 64, 'teal', 'Clock running', 'dueAt, responseDueAt')
+s.box(480, 60, 190, 64, 'coral', 'Response breached', 'slaResponseBreachedAt')
+s.box(480, 260, 190, 64, 'coral', 'Resolution breached', 'slaBreachedAt (once)')
+s.box(740, 160, 180, 64, 'purple', 'Escalated', 'reassign / notify /\nraisePriority')
+s.box(240, 300, 170, 56, 'gray', 'Clock stopped', 'RESOLVED or terminal')
+s.arrow(180, 192, 240, 192, label='stamp')
+s.arrow(410, 175, 480, 95, label='still initial')
+s.arrow(410, 210, 480, 285, label='past dueAt')
+s.arrow(670, 92, 760, 160, label='on: breach')
+s.arrow(670, 292, 760, 224, label='on: breach')
+s.arrow(410, 192, 740, 192, dash=True, label='on: age (afterMinutes)')
+s.arrow(325, 224, 325, 300, label='resolve')
+s.text(20, 385, 'Each breach emits OBJECT_SLA_BREACH; each firing emits OBJECT_ESCALATED and records <rule>@<breach stamp> '
+       'so a rule fires once per breach (max 500 firings per sweep).', size=10)
+s.save('docs/stakeholders/modules/assets/workflow-sla.svg')

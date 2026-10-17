@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" viewBox="0 0 940 484" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title>File to dashboard</title><desc>Sequence: discover + stability gate; fetch to staging, integrity check; dedup in ledger, land in dirs.poll; Consignment planned; parse (grammar) + Expectations; commit: DuckLake register, manifest, markers, ledger; read committed Parquet; write Pipeline output; Dataset bound to output table; POST /bi/query; Result Set rendered in Widget</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="940" height="484" fill="#FFFFFF"/>
+<rect x="26.0" y="20" width="116.57142857142858" height="40" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="84.2857" y="45" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Remote store</text>
+<line x1="84.2857" y1="60" x2="84.2857" y2="474" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="3 3"/>
+<rect x="154.5714285714286" y="20" width="116.57142857142858" height="40" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="212.857" y="45" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Collector</text>
+<line x1="212.857" y1="60" x2="212.857" y2="474" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="3 3"/>
+<rect x="283.14285714285717" y="20" width="116.57142857142858" height="40" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="341.429" y="45" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Stage-1 ingest</text>
+<line x1="341.429" y1="60" x2="341.429" y2="474" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="3 3"/>
+<rect x="411.7142857142858" y="20" width="116.57142857142858" height="40" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="470" y="45" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Lakehouse</text>
+<line x1="470" y1="60" x2="470" y2="474" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="3 3"/>
+<rect x="540.2857142857143" y="20" width="116.57142857142858" height="40" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="598.571" y="45" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Pipeline Run</text>
+<line x1="598.571" y1="60" x2="598.571" y2="474" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="3 3"/>
+<rect x="668.8571428571429" y="20" width="116.57142857142858" height="40" rx="4" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+<text x="727.143" y="45" text-anchor="middle" font-size="13" font-weight="500" fill="#0C447C">Dataset</text>
+<line x1="727.143" y1="60" x2="727.143" y2="474" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="3 3"/>
+<rect x="797.4285714285716" y="20" width="116.57142857142858" height="40" rx="4" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+<text x="855.714" y="45" text-anchor="middle" font-size="13" font-weight="500" fill="#0C447C">Dashboard</text>
+<line x1="855.714" y1="60" x2="855.714" y2="474" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="3 3"/>
+<line x1="212.8571428571429" y1="95" x2="90.28571428571429" y2="95" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="90.2857" y="90" text-anchor="start" font-size="10.5" fill="#5F5E5A">1. discover + stability gate</text>
+<line x1="84.28571428571429" y1="129" x2="206.8571428571429" y2="129" stroke="#888780" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+<text x="90.2857" y="124" text-anchor="start" font-size="10.5" fill="#5F5E5A">2. fetch to staging, integrity check</text>
+<path d="M212.857 155 h28 v14 h-24" fill="none" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="246.857" y="165" text-anchor="start" font-size="11" fill="#5F5E5A">3. dedup in ledger, land in dirs.poll</text>
+<line x1="212.8571428571429" y1="197" x2="335.42857142857144" y2="197" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="218.857" y="192" text-anchor="start" font-size="10.5" fill="#5F5E5A">4. Consignment planned</text>
+<path d="M341.429 223 h28 v14 h-24" fill="none" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="375.429" y="233" text-anchor="start" font-size="11" fill="#5F5E5A">5. parse (grammar) + Expectations</text>
+<line x1="341.42857142857144" y1="265" x2="464.00000000000006" y2="265" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="347.429" y="260" text-anchor="start" font-size="10.5" fill="#5F5E5A">6. commit: DuckLake register, manifest, markers, ledger</text>
+<line x1="598.5714285714287" y1="299" x2="476.00000000000006" y2="299" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="476" y="294" text-anchor="start" font-size="10.5" fill="#5F5E5A">7. read committed Parquet</text>
+<line x1="598.5714285714287" y1="333" x2="476.00000000000006" y2="333" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="476" y="328" text-anchor="start" font-size="10.5" fill="#5F5E5A">8. write Pipeline output</text>
+<line x1="727.1428571428572" y1="367" x2="476.00000000000006" y2="367" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="476" y="362" text-anchor="start" font-size="10.5" fill="#5F5E5A">9. Dataset bound to output table</text>
+<line x1="855.7142857142859" y1="401" x2="733.1428571428572" y2="401" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="733.143" y="396" text-anchor="start" font-size="10.5" fill="#5F5E5A">10. POST /bi/query</text>
+<line x1="727.1428571428572" y1="435" x2="849.7142857142859" y2="435" stroke="#888780" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+<text x="733.143" y="430" text-anchor="start" font-size="10.5" fill="#5F5E5A">11. Result Set rendered in Widget</text>
+</svg>

@@ -110,7 +110,7 @@ preserves unknown/absent actions. `GET /decision-rules/consequences` lists every
 `reason` and `module`; the SPA editor reads it. Background: [module-reorganisation-decisions](../module-reorganisation-decisions.md).
 
 The **record-routing** consequences (`route`/`tag`/`quarantine`/`drop`) are applied by the engine
-itself, per batch, via `com.gamma.etl.DecisionRuleApplier` — invoked from
+itself, per batch, via `com.gamma.query.DecisionRuleApplier` — invoked from
 `ConsignmentIngestStrategy.writeAndTrace`, the shared tail of every ingest path (Java parse engine +
 all three native `read_csv` streaming paths), between `DataTransformer` and `PartitionWriter`:
 

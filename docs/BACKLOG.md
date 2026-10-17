@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **68<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 47<!--count:backlog-p3--> × P3** —
+> **69<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 48<!--count:backlog-p3--> × P3** —
+> ⬆ **68 → 69 (P3 47 → 48) on 2026-10-17**: filed P3 `OFFERING-DECLARATION-DRIFT-1` - five places where offering files, template manifests or module messages disagree with what is built, found while writing the solution suite.
 > ⬇ **69 → 68 (P2 22 → 21) on 2026-10-17**: closed P2 `PLATFORM-SERVICES-DRYRUN-GAP-1` - `DryRunServices` now substitutes `mail` (logs recipient count and subject, sends nothing, answers `false`) and `objects` (reads pass through; `open` / `transition` / link / tag / attribute writes log and change nothing; `open` returns a `dry-run:` id). The engine behind `objects` is no longer reachable from a dry run, so `caserule.evaluate` reports it evaluated nothing and `objects.analytics` reports nothing read. `DryRunCoverageTest` fails when a built-in service the host registers is neither substituted nor declared read-only (as-built: `okf/backend/control-plane/platform-services.md` §3).
 > ⬆ **68 → 69 (P2 21 → 22) on 2026-10-17**: filed P2 `LA-EDITIONS-1` (Inspecto LA naming, Basic / Standard / Advanced editions, bundled industry packs, third-party integration; decided after the stakeholder demo).
 > ↔ **63 (P2 19 → 18, P3 44 → 45) on 2026-10-15**: `LA-CONFIG-LIMITS-1` SHIPPED (every Link Analysis limit is a server-gated configuration item; plan archived); its leftovers filed as P3 `LA-CONFIG-LIMITS-RESIDUALS-1`.
@@ -249,10 +250,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 47<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 48<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 47<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 68<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 48<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 69<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -481,6 +482,8 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 
 ### 3.8 Security, Policy, Editions & Compliance
+
+- **P3** · `OFFERING-DECLARATION-DRIFT-1` — **offering files, template manifests and module messages disagree with what is built** (found writing the solution suite, `SOLUTION-SUITE-DOCS-1`, 2026-10-17). (a) `offerings/personal.toon` lists `telco-ra`, `telco-fraud` and `payment-fraud` as content packs, but those templates use Alert Rules, Anomaly Models and Risk Scores (Professional and above); (b) `offerings/professional.toon` marks `workflowSla` and `incidents` `status: planned` though both are built; (c) the `POST /recon/promote` 503 message still names "Standard and Enterprise"; (d) `telco-ra`'s `template.toon` says 4 control Jobs (11 ship), `payment-fraud`'s says both five and 7 feature Datasets; (e) no Link Analysis template except `la-daily-feed` is in any offering's `contentPacks`. Each is a one-line fix once the intended answer is chosen. → `stakeholders/solutions/README.md`
 
 
 

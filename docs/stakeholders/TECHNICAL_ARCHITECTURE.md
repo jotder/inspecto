@@ -1,88 +1,112 @@
-# Inspecto — Technical Architecture (for architects & integrators)
+# Inspecto — Technical Architecture
 
-> Audience: solution architects, integrators, senior engineers · Status date: **2026-07-07**
-> Deep dives: the [OKF knowledge bundle](../okf/index.md) (one concept per file) ·
-> engine details [`../okf/backend/engine/stage1-architecture.md`](../okf/backend/engine/stage1-architecture.md) · ops internals
-> [`../ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md).
+> **Status:** current as of 2026-10-17. Audience: architects, integrators, technical evaluators.
+> Deeper, per-concept detail lives in `docs/okf/` (linked per section); vocabulary follows `docs/GLOSSARY.md`.
 
-## Shape of the system
+## 1. Shape of the system
 
-Three cooperating applications, one product:
+Inspecto is one framework-free Java application (JDK `HttpServer`, manual wiring, `ServiceLoader` contracts,
+virtual threads) with an embedded DuckDB analytical engine, plus one Angular operator console. It is shipped as
+thin per-module jars on a jlinked runtime. There is no external database to install: storage is files under each
+Space's roots, with Postgres as an optional Operational DB family.
 
-```
-┌─ inspecto-ui (Angular 21) ──────────────────────────────────────────────┐
-│  One operator console · Lens-filtered nav · needs a live control plane  │
-│  → talks /api/v1 (envelope-unwrapping interceptor chain)                │
-└──────────────────────────────┬───────────────────────────────────────────┘
-                               │ HTTPS (Professional) / HTTP (Personal)
-┌─ Java backend (single JVM) ──▼───────────────────────────────────────────┐
-│  ControlApi (JDK HttpServer) → /api/v1 versioned contract               │
-│  CollectorService: acquisition → Stage-1 M..N ingest → Parquet lakehouse   │
-│  Stage-2 enrichment · authored Pipelines (DAG) · Jobs/Scheduler         │
-│  Component store + metadata graphs · Signal ledger · embedded DuckDB    │
-│  Modules: core │ connectors │ agent │ agent-hosted │ security(Professional) │
-└──────────────────────────────┬───────────────────────────────────────────┘
-                               │ LlmGateway bridge (offline-capable)
-┌─ eoiagent (separate repo) ───▼───────────────────────────────────────────┐
-│  Embeddable agent platform: model gateway, governed tools, audit        │
-└───────────────────────────────────────────────────────────────────────────┘
-```
+What a customer runs is an **Offering**: a tier (Personal, Professional, Enterprise; Preview bundles everything)
+plus add-ons plus content packs, composed in `offerings/*.toon`. A module is usable only when it is Installed in
+the build, Enabled for the Space, and Permitted for the user.
 
-**Design stance:** framework-free Java core (JDK `HttpServer`, manual DI, `ServiceLoader` SPIs, virtual
-threads), embedded DuckDB, TOON config files, one fat JAR + jlink runtime. Small SBOM by policy.
+![Architecture layers](assets/architecture-layers.svg)
 
-## Backend
+| Layer | Directory | Rule |
+|---|---|---|
+| Content packs | `spaces/_templates` | Space Templates: function packs (RA, Fraud, AML …) and industry packs (Telecom, Mobile Money …); data and config, no code |
+| Feature modules | `features/` | Optional add-ons; depend on platform modules, never on each other's internals |
+| Link Analysis family | `la/` | Host-free core; routes written against ports; adapters bind it to the host |
+| Platform modules | `platform/`, `inspecto/` | Base of every Offering: control plane, engine, Analytics Kernel, graph library, storage |
+| Contracts | `spi/` | Interfaces only, no state |
+| Providers | `providers/` | Swap-in implementations of the contracts, chosen by deployment |
+| Foundation | `inspecto-api`, `inspecto-util`, `inspecto-config` | Shared types, utilities, TOON configuration |
 
-- **Data plane** — Stage-1 **M..N multiplexer** (M input files → typed, Hive-partitioned Parquet
-  Tables), batch-atomic, crash-isolated, idempotent; DuckDB `Appender` ingest (~75× JDBC). Stage-2
-  enrichment does joins/aggregations downstream. Authored **Pipelines** (DAGs of Steps) run as
-  `type: pipeline` Jobs. [Engine concepts](../okf/backend/engine/index.md) ·
-  [pipeline-graph](../okf/backend/pipeline-graph/index.md).
-- **Control plane** — the versioned **`/api/v1`** business contract: response envelope + error-code
-  catalog, `Correlation-ID`, gzip, ETag/`contentHash` optimistic concurrency, `GET /bootstrap`,
-  query execution, async runs (`202`+`runId`, `Idempotency-Key`), OpenAPI 3.1 enforced by contract
-  tests. Legacy routes stay byte-for-byte until a metered sunset.
-  [api-v1](../okf/backend/control-plane/api-v1.md) · contract: [`../api/openapi-v1.json`](../api/openapi-v1.json).
-- **Multi-space** — isolated Spaces (`spaces/<id>/…`), MDC-routed singletons, space segment after the
-  version: `/api/v1/spaces/{id}/…`. [multi-space](../okf/backend/control-plane/multi-space.md).
-- **Metadata spine** — everything authored is a `Component {kind, config, parts?, wiring?}`; reuse +
-  lineage graphs are *derived*; single ref-derivation. [components](../okf/backend/components/index.md).
+See `docs/okf/backend/module-taxonomy.md` for the module list and placement rules.
 
-## Security & editions
+## 2. Solution data path
 
-Editions are **build flavors** (never branches): the common core has **no auth code**. Professional adds
-the `inspecto-oidc` module behind three core SPIs (`Authenticator`/`Subject`/`TokenRelay`): OIDC
-resource server (Nimbus/JWKS) against the customer's IAM (Keycloak/WSO2/Okta/Entra), `RoleMapper`,
-HTTPS (pure-JDK `HttpsServer`), and a BFF session (`/auth/exchange|refresh|logout`; refresh token never
-reaches the browser; SameSite + Origin CSRF). Write routes are separately fail-closed behind
-`-Dassist.write.root` (503). [security module](../okf/backend/modules/security.md) ·
-[`../EDITIONS.md`](../EDITIONS.md).
+![Solution data path](assets/solution-data-path.svg)
 
-## Frontend
+1. **Collect** — Collectors pull from files, SFTP/FTP, databases, Kafka and cloud stores.
+2. **Parse and ingest** — Stage-1 parsing (M..N records), typed Parquet into the lakehouse, bad rows quarantined.
+3. **Shape** — Pipelines of Steps: enrichment, deduplication, joins, time-series and analytics Steps.
+4. **Analyse** — Measures and KPIs in Studio & BI; scores and baselines through the Analytics Kernel.
+5. **Act** — Alerts, Decision Rules (Decision Kernel + condition tree), Incidents, Cases, Action Requests.
 
-Angular 21 standalone components + signals, Material/Tailwind, ag-Grid, Chart.js, AntV G6 (graphs),
-MapLibre GL + PMTiles (fully-offline geo). Interceptor chain: `v1Interceptor` (envelope unwrap) →
-`spaceInterceptor` → error/connectivity → auth (no-op on Personal, OIDC when
-`bootstrap.features.authMode` says so). **The UI requires a running control plane** — the offline mock store
-that once served the whole app with v1-envelope parity was deleted 2026-08-31, so there is no
-no-backend demo path; a failed call surfaces as an error, never as sample data. Design system + a11y
-(WCAG 2.2 AA) + no-hardcoded-colors gates in CI. [Frontend section](../okf/frontend/index.md).
+Everything is reached through the control plane, `ControlApi` under `/api/v1` (response envelope, ETags,
+idempotency keys, an OpenAPI contract checked in the build), with per-Space routing and authN/authZ gates.
 
-## Agentic layer
+## 3. Engine and analytics
 
-Inspecto embeds AI **narrowly and governably**: the assist module's reasoning layer is vendored
-in-tree; **eoiagent** supplies the model transport (`LlmGateway` bridge — Ollama local, OpenAI-compatible,
-hosted SDKs isolated in a module that air-gapped builds physically omit). Every assist skill is
-read-only/draft-only today; the embedded-intelligence design adds a governed autonomy ladder later.
-[Agentic section](../okf/agentic/index.md) · [integration seam](../okf/agentic/inspecto-integration.md).
+- **Pipelines, Consignments and Jobs** run in the engine; Jobs reach engine facilities only via Platform Services (§4).
+- **Analytics Kernel** (`platform/inspecto-analytics`) is the single home of generic data operations: statistics,
+  column profiler, time-series grain and SQL, baselines, score-output contract, forecasting with intervals,
+  accuracy and backtest, seasonality, similarity, entity grouping, sampling. Domain logic stays in its module.
+  See `docs/okf/backend/analytics-kernel.md`.
+- **Graph library** (`platform/inspecto-graph`): graph algorithms, union-find, temporal motif matcher.
+- **One SQL building path**: `SqlIdent`, `SqlBuilder`, `SqlViews`; `SqlGuard` validates user SQL.
+  See `docs/okf/backend/engine/db-layer.md`.
+- A CI ratchet (`tools/check-data-ops-duplication.mjs`) keeps one home per data operation; its inventory is 0.
 
-## Integration checklist (for a deployment)
+## 4. Platform Services
 
-1. **API**: consume `/api/v1` only (envelope + error codes; OpenAPI file is the contract).
-2. **Identity (Professional)**: point OIDC at your IAM; roles map via `RoleMapper`; gateway (WSO2-style)
-   can front the API unchanged.
-3. **Data**: land files via Connections/Collectors (SFTP/FTP/FTPS/DB today; object storage on the MUST
-   list); query the lakehouse via the warehouse layer (pg_duckdb) — [`../okf/backend/integrations.md`](../okf/backend/integrations.md).
-4. **Observability**: scrape Prometheus metrics; consume the Signal ledger; ship the audit trail.
-5. **Packaging**: `package.ps1 -Edition <personal|professional|…>` → fat JAR + jlink bundle; air-gap
-   flavors omit hosted-AI SDKs. [build & run](../okf/backend/build-run/index.md).
+![Platform Services seam](assets/platform-services.svg)
+
+Job Types and pack providers declare the services they require; `JobContext.services()` returns a filtered view
+of the boot-built registry. Ten services are bound today. Under a dry run every mutating service is replaced by a
+stand-in that records the would-be effect, and a guard test fails the build if one is missing.
+See `docs/okf/backend/control-plane/platform-services.md`.
+
+## 5. Governance
+
+![Governance flows](assets/governance.svg)
+
+- **Maker-checker for configuration** (base, opt-in per Space): a write to a kind the Approval Policy governs is
+  held as a Pending Change and applied only when a different user approves it.
+- **Action Requests** (add-on): outbound calls raised by Incidents, Cases or Decision Rules are always four-eyes;
+  the payload is fixed at creation and dispatched once under one idempotency key, with bounded retries.
+- Every authoring write passes `ConfigSafetyValidator`; audit events go through `audit-spi`.
+
+## 6. Storage
+
+| Store | Format | Holds |
+|---|---|---|
+| Lakehouse | Parquet read by DuckDB | Ingested and derived Datasets |
+| Configuration | TOON files with history | Pipelines, Collectors, rules, dashboards |
+| Operational DB | DuckDB, or Postgres family | Incidents, Cases, Pending Changes, investigations |
+| Event log | Append-only Parquet | Platform events and audit |
+
+Each Space has its own roots; nothing is shared across Spaces except the installation.
+
+## 7. Security and editions
+
+- Identity through `auth-spi` with an OIDC provider (Keycloak or WSO2, a config choice) or demo auth;
+  policies and ABAC through `inspecto-access` and the policy provider; secrets through the secrets provider.
+- Editions are build flavors of one codebase; an Offering file decides which modules are bundled.
+  See `docs/EDITIONS.md`.
+
+## 8. Frontend
+
+`inspecto-ui` is one Angular SPA: operator console, Studio (Pipelines, dashboards, Measures), Link Analysis app
+and administration. It talks only to `/api/v1`; feature screens appear only when their module is Enabled and
+Permitted.
+
+## 9. Go deeper
+
+- [Solution pages](solutions/README.md) — one per content pack, plus three journeys (file to dashboard, alert to
+  closed Case, changing configuration safely).
+- [Module pages](modules/README.md) — one per module, each on the same nine-heading template with a flow diagram.
+
+## 10. Integration checklist
+
+1. Choose an Offering and identity provider.
+2. Define Collectors for each Stream and Reference.
+3. Apply a content pack (Space Template) or author Pipelines in Studio.
+4. Configure Alert Rules, Decision Rules and notification channels.
+5. Turn on maker-checker for the kinds that need approval.
+6. Integrate external systems through `/api/v1` (OpenAPI contract) or Action Requests.

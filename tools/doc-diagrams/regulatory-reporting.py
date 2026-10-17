@@ -1,0 +1,23 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+from svglib import Svg
+
+s = Svg(940, 260, 'Regulatory Reporting lifecycle', 'A template renders a Case or Incident once at draft; four-eyes approval submits the fixed bytes to a jailed file drop.')
+s.box(20, 30, 170, 60, 'teal', 'Case / Incident', 'subject + member Incidents')
+s.box(20, 140, 170, 60, 'gray', 'Report Template', 'xml | csv | json')
+s.box(250, 80, 170, 70, 'purple', 'ReportRenderer', 'render once at draft\nrefuse, never truncate')
+s.box(480, 30, 130, 50, 'blue', 'draft', 'maker')
+s.box(480, 120, 130, 50, 'blue', 'pending', 'request-approval')
+s.box(670, 30, 120, 50, 'coral', 'approve', 'checker')
+s.box(670, 120, 120, 50, 'gray', 'decline', 'checker')
+s.box(810, 30, 115, 50, 'teal', 'FileDrop', 'atomic, once')
+s.box(810, 140, 115, 60, 'gray', 'submitted', 'or failed: retry')
+s.arrow(190, 60, 250, 105)
+s.arrow(190, 170, 250, 130)
+s.arrow(420, 100, 480, 55)
+s.arrow(545, 80, 545, 120)
+s.arrow(610, 140, 670, 60)
+s.arrow(610, 150, 670, 145)
+s.arrow(790, 55, 810, 55)
+s.arrow(867, 80, 867, 140)
+s.save('docs/stakeholders/modules/assets/regulatory-reporting.svg')

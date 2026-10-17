@@ -1,0 +1,22 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+from svglib import Svg
+
+s = Svg(940, 280, 'Exchange: offer, grant, consume', 'An owner Space offers an item; a consumer requests; an active grant makes shared/<owner>/<item> resolve to a published snapshot.')
+s.box(20, 40, 180, 60, 'teal', 'Owner Space', 'POST /exchange/offers')
+s.box(20, 170, 180, 60, 'teal', 'Consumer Space', 'POST /exchange/requests')
+s.group(250, 20, 400, 240, 'spaces/_shared/ (installation scope)')
+s.box(270, 45, 170, 55, 'purple', 'offers.toon', 'metadata, never rows')
+s.box(270, 130, 170, 55, 'purple', 'grants.toon', 'requested -> active')
+s.box(460, 45, 175, 55, 'gray', 'snapshot.parquet', 'exchange/<owner>/<item>/vN')
+s.box(460, 130, 175, 55, 'gray', 'current.toon', 'atomic pointer flip')
+s.box(270, 205, 365, 40, 'coral', 'Signal forwarder: exchange.<origin>.<type>')
+s.box(710, 80, 210, 70, 'blue', 'ExchangeRefResolver', 'shared/<owner>/<item>\ngrant-checked, fail-closed')
+s.box(710, 190, 210, 50, 'teal', 'Widget / Alert Rule / Job')
+s.arrow(200, 70, 270, 72)
+s.arrow(200, 195, 270, 160)
+s.arrow(440, 72, 460, 72, dash=True)
+s.arrow(547, 100, 547, 130)
+s.arrow(635, 157, 710, 120)
+s.arrow(815, 150, 815, 190)
+s.save('docs/stakeholders/modules/assets/exchange.svg')

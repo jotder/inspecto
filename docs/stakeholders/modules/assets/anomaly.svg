@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" viewBox="0 0 940 420" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title>Anomaly score per entity</title><desc>How one anomaly.score run bands an entity and what each band drives.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="940" height="420" fill="#FFFFFF"/>
+<text x="470" y="24" text-anchor="middle" font-size="13" fill="#444441">One anomaly.score run, per entity (band re-decided every run)</text>
+<rect x="20" y="60" width="180" height="64" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="110" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Feature buckets</text>
+<text x="110" y="95" text-anchor="middle" font-size="11" fill="#5F5E5A">day grain, window days</text>
+<rect x="20" y="170" width="180" height="64" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="110" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Excluded</text>
+<text x="110" y="205" text-anchor="middle" font-size="11" fill="#5F5E5A">exclusionList hit,</text>
+<text x="110" y="219" text-anchor="middle" font-size="11" fill="#5F5E5A">never scored</text>
+<rect x="250" y="60" width="200" height="64" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="350" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">Baselines</text>
+<text x="350" y="95" text-anchor="middle" font-size="11" fill="#0F6E56">self (seasonal median/MAD)</text>
+<text x="350" y="109" text-anchor="middle" font-size="11" fill="#0F6E56">+ Peer Group, cohort shift</text>
+<rect x="510" y="40" width="170" height="50" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="595" y="59" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">insufficient</text>
+<text x="595" y="75" text-anchor="middle" font-size="11" fill="#5F5E5A">contributes 0</text>
+<rect x="510" y="110" width="170" height="50" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="595" y="129" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">normal</text>
+<text x="595" y="145" text-anchor="middle" font-size="11" fill="#0F6E56">&lt; elevatedThreshold</text>
+<rect x="510" y="180" width="170" height="50" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="595" y="199" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">elevated</text>
+<text x="595" y="215" text-anchor="middle" font-size="11" fill="#534AB7">evidence rows kept</text>
+<rect x="510" y="250" width="170" height="50" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="595" y="269" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">high</text>
+<text x="595" y="285" text-anchor="middle" font-size="11" fill="#993C1D">&gt;= highThreshold</text>
+<rect x="740" y="180" width="180" height="56" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="830" y="199" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">watch Entity List</text>
+<text x="830" y="215" text-anchor="middle" font-size="11" fill="#534AB7">ttlHours 1..24</text>
+<rect x="740" y="270" width="180" height="56" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="830" y="289" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">afterScore Alert Rule</text>
+<text x="830" y="305" text-anchor="middle" font-size="11" fill="#993C1D">opens an Incident</text>
+<rect x="740" y="360" width="180" height="46" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="830" y="379" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Alert heals</text>
+<text x="830" y="395" text-anchor="middle" font-size="11" fill="#5F5E5A">next run back to normal</text>
+<line x1="200" y1="92" x2="250" y2="92" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="110" y1="124" x2="110" y2="170" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="114" y="143" text-anchor="start" font-size="10" fill="#5F5E5A">list check</text>
+<line x1="450" y1="80" x2="510" y2="65" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="450" y1="92" x2="510" y2="135" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="450" y1="104" x2="510" y2="205" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="450" y1="116" x2="510" y2="270" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="680" y1="270" x2="740" y2="208" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="714" y="235" text-anchor="start" font-size="10" fill="#5F5E5A">feed</text>
+<line x1="680" y1="285" x2="740" y2="298" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="830" y1="326" x2="830" y2="360" stroke="#888780" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+<text x="20" y="330" text-anchor="start" font-size="10" fill="#5F5E5A">score = 100 x (1 - exp(-raw/3));</text>
+<text x="20" y="345" text-anchor="start" font-size="10" fill="#5F5E5A">raw = weighted RMS of per-Feature deviations</text>
+<text x="20" y="360" text-anchor="start" font-size="10" fill="#5F5E5A">(max of self and peer z, capped at zCap).</text>
+<text x="20" y="400" text-anchor="start" font-size="10" fill="#5F5E5A">Each run writes the scores Datasets and emits anomaly.score.produced.</text>
+</svg>

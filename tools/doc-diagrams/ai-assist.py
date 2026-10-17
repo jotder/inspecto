@@ -1,0 +1,22 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+from svglib import Svg
+
+s = Svg(940, 300, 'AI assist layers', 'Professional assist agent (read/draft, abstain-safe) with hosted providers; Enterprise intelligence agent with sessions, triage runs and gated autonomy.')
+s.box(20, 40, 170, 60, 'blue', 'Assist screens', '/assist/{intent}')
+s.box(20, 180, 170, 60, 'blue', 'Agent chat, approvals', '/agent/*')
+s.group(230, 20, 420, 110, 'agent (Professional)')
+s.box(245, 45, 190, 70, 'purple', 'UccAssistAgent', 'confidence or abstain\nread / draft only')
+s.box(450, 45, 185, 70, 'gray', 'FailureReactor', 'heuristic diagnosis\nmodel optional')
+s.group(230, 160, 420, 120, 'intelligence (Enterprise)')
+s.box(245, 185, 190, 80, 'purple', 'IntelligenceAgent', 'sessions, tools\nInvestigator -> Triage Run')
+s.box(450, 185, 185, 80, 'coral', 'Autonomy policy', 'kill switch, budgets\napprovals gate')
+s.box(710, 40, 210, 70, 'teal', 'ModelRouter', 'small / medium / large')
+s.box(710, 140, 210, 60, 'gray', 'agent-hosted', 'anthropic, openai, gemini,\ngrok, llamacpp')
+s.box(710, 225, 210, 50, 'gray', 'Local model (Ollama)')
+s.arrow(190, 70, 245, 80)
+s.arrow(190, 210, 245, 225)
+s.arrow(435, 80, 710, 75)
+s.arrow(815, 110, 815, 140, dash=True)
+s.arrow(815, 110, 815, 225, dash=True)
+s.save('docs/stakeholders/modules/assets/ai-assist.svg')

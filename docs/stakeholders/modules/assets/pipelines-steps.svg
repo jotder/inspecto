@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" viewBox="0 0 940 320" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title>Pipelines and Steps</title><desc>The editor graph lowers to a *_pipeline.toon; the ingest lane and the at-rest lane execute its Steps.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="940" height="320" fill="#FFFFFF"/>
+<rect x="20" y="40" width="190" height="60" rx="4" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+<text x="115" y="59" text-anchor="middle" font-size="13" font-weight="500" fill="#0C447C">Pipeline editor</text>
+<text x="115" y="75" text-anchor="middle" font-size="11" fill="#185FA5">palette: node-types,</text>
+<text x="115" y="89" text-anchor="middle" font-size="11" fill="#185FA5">processor-catalog</text>
+<rect x="250" y="40" width="190" height="60" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="345" y="59" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">PipelineEditable</text>
+<text x="345" y="75" text-anchor="middle" font-size="11" fill="#0F6E56">lift (toMap) / lower</text>
+<rect x="480" y="40" width="200" height="60" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="580" y="59" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">&lt;id&gt;_pipeline.toon</text>
+<text x="580" y="75" text-anchor="middle" font-size="11" fill="#5F5E5A">canonical config</text>
+<rect x="720" y="40" width="200" height="60" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="820" y="59" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">PipelineValidator</text>
+<text x="820" y="75" text-anchor="middle" font-size="11" fill="#0F6E56">edges vs emits()</text>
+<line x1="210" y1="70" x2="250" y2="70" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="440" y1="70" x2="480" y2="70" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="680" y1="70" x2="720" y2="70" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="20" y="130" width="440" height="170" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="28" y="145" font-size="11" fill="#5F5E5A">Ingest lane (poll cycle)</text>
+<rect x="40" y="160" width="120" height="50" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="100" y="190" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">collect</text>
+<rect x="180" y="160" width="120" height="50" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="240" y="190" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">parse</text>
+<rect x="320" y="160" width="120" height="50" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="380" y="190" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">route / sink</text>
+<line x1="160" y1="185" x2="180" y2="185" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="300" y1="185" x2="320" y2="185" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="480" y="130" width="440" height="170" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="488" y="145" font-size="11" fill="#5F5E5A">At-rest lane (type: pipeline Job)</text>
+<rect x="500" y="160" width="120" height="50" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="560" y="190" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">source_store</text>
+<rect x="640" y="160" width="120" height="50" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="700" y="190" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">steps[n]</text>
+<rect x="780" y="160" width="120" height="50" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="840" y="190" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">output_store</text>
+<line x1="620" y1="185" x2="640" y2="185" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="760" y1="185" x2="780" y2="185" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<text x="500" y="240" text-anchor="start" font-size="11" fill="#5F5E5A">PipelineJobRunner: on_pipeline, cron or manual</text>
+<path d="M 380 210 L 380 275 L 560 275 L 560 210" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+<text x="400" y="270" text-anchor="start" font-size="10" fill="#5F5E5A">landed store</text>
+</svg>

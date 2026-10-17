@@ -1,0 +1,21 @@
+import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
+
+s = Svg(940, 400, 'Case lifecycle', 'Built-in CASE workflow (Workflow.defaultFor) plus the merge and split edges of CaseOperations.')
+s.text(470, 24, 'Built-in CASE workflow and administrative edges', anchor='middle', size=13, color='#444441')
+s.box(20, 70, 180, 72, 'gray', 'Openers', 'Case Rule, from-entities,\nPOST /objects, split')
+s.box(250, 80, 140, 52, 'purple', 'OPEN', 'initial')
+s.box(440, 80, 160, 52, 'purple', 'INVESTIGATING')
+s.box(440, 240, 160, 52, 'coral', 'ESCALATED')
+s.box(660, 80, 130, 52, 'teal', 'RESOLVED')
+s.box(660, 240, 130, 52, 'gray', 'CLOSED', 'terminal')
+s.arrow(200, 106, 250, 106)
+s.arrow(390, 106, 440, 106, label='investigate')
+s.arrow(520, 132, 520, 240, label='escalate')
+s.arrow(600, 106, 660, 106, label='resolve')
+s.arrow(600, 258, 690, 132, label='resolve')
+s.arrow(740, 132, 740, 240, label='close')
+s.path('M 320 132 L 320 330 L 725 330 L 725 292', dash=True)
+s.text(330, 322, 'merge: source Case goes straight to CLOSED (mergedInto, MERGED_INTO link)', size=10)
+s.text(20, 380, 'Split opens a new Case in OPEN with a SPLIT_FROM link; the original keeps its state. '
+       'No reopen transition exists for a Case.', size=10)
+s.save('docs/stakeholders/modules/assets/case-management.svg')

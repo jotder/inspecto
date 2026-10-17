@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" viewBox="0 0 940 410" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title>Payment fraud content pack</title><desc>Data in, Pipelines and Jobs, outputs and the modules the Payment fraud pack uses.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="940" height="410" fill="#FFFFFF"/>
+<rect x="12" y="30" width="216" height="370" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="20" y="45" font-size="11" fill="#5F5E5A">Data in</text>
+<rect x="20" y="60" width="200" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="120" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">payment_attempts</text>
+<text x="120" y="95" text-anchor="middle" font-size="11" fill="#5F5E5A">card / wallet attempts</text>
+<rect x="20" y="124" width="200" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="120" y="143" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">sim_changes</text>
+<text x="120" y="159" text-anchor="middle" font-size="11" fill="#5F5E5A">SIM change events</text>
+<rect x="20" y="188" width="200" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="120" y="207" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">disputes</text>
+<text x="120" y="223" text-anchor="middle" font-size="11" fill="#5F5E5A">chargeback labels</text>
+<rect x="244" y="30" width="216" height="370" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="252" y="45" font-size="11" fill="#5F5E5A">Pipelines and Jobs</text>
+<rect x="252" y="60" width="200" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="352" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">3 Pipelines</text>
+<text x="352" y="95" text-anchor="middle" font-size="11" fill="#0F6E56">refusal_scan: card_number</text>
+<rect x="252" y="124" width="200" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="352" y="143" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">7 sql.template Jobs</text>
+<text x="352" y="159" text-anchor="middle" font-size="11" fill="#0F6E56">hourly feature windows</text>
+<rect x="252" y="188" width="200" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="352" y="207" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">pf_risk_score Job</text>
+<text x="352" y="223" text-anchor="middle" font-size="11" fill="#0F6E56">risk.score, hourly at :30</text>
+<rect x="476" y="30" width="216" height="370" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="484" y="45" font-size="11" fill="#5F5E5A">Outputs</text>
+<rect x="484" y="60" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">Feature Datasets</text>
+<text x="584" y="95" text-anchor="middle" font-size="11" fill="#993C1D">velocity, BIN, device ...</text>
+<rect x="484" y="124" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="143" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">4 typology Alert Rules</text>
+<text x="584" y="159" text-anchor="middle" font-size="11" fill="#993C1D">card testing, BIN attack,</text>
+<text x="584" y="173" text-anchor="middle" font-size="11" fill="#993C1D">velocity, SIM swap</text>
+<rect x="484" y="188" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="207" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">Account Risk Score</text>
+<text x="584" y="223" text-anchor="middle" font-size="11" fill="#993C1D">payment_account</text>
+<rect x="484" y="252" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="271" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">Dashboard</text>
+<text x="584" y="287" text-anchor="middle" font-size="11" fill="#993C1D">4 KPIs</text>
+<rect x="708" y="30" width="216" height="370" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="716" y="45" font-size="11" fill="#5F5E5A">Modules</text>
+<rect x="716" y="60" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="91" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">pipelines-steps</text>
+<rect x="716" y="124" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="155" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">jobs-scheduler</text>
+<rect x="716" y="188" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="219" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">alerts</text>
+<rect x="716" y="252" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="283" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">scoring-entity-lists</text>
+<rect x="716" y="316" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="347" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">studio-bi</text>
+<line x1="222" y1="86.0" x2="250" y2="86.0" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="454" y1="86.0" x2="482" y2="86.0" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="686" y1="86.0" x2="714" y2="86.0" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+</svg>

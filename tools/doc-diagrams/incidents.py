@@ -1,0 +1,23 @@
+import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
+
+s = Svg(940, 380, 'Incident lifecycle', 'Built-in INCIDENT workflow from Workflow.defaultFor (states and actions).')
+s.text(470, 24, 'Built-in INCIDENT workflow (Workflow.defaultFor)', anchor='middle', size=13, color='#444441')
+s.box(20, 150, 170, 72, 'gray', 'Openers', 'Alert, recon, Job,\nDecision Rule, API')
+s.box(250, 150, 150, 56, 'purple', 'IDENTIFIED', 'initial')
+s.box(470, 60, 150, 56, 'purple', 'DIAGNOSING')
+s.box(470, 240, 150, 56, 'teal', 'RESOLVED', 'SLA clock stops')
+s.box(730, 150, 170, 56, 'coral', 'ARCHIVED', 'terminal')
+s.arrow(190, 186, 250, 178)
+s.arrow(400, 165, 470, 95, label='accept')
+s.arrow(400, 192, 470, 262, label='resolve')
+s.arrow(530, 116, 530, 240, label='resolve')
+s.path('M 570 240 L 570 116')
+s.text(578, 180, 'reopen', size=10)
+s.arrow(400, 178, 730, 178, label='archive')
+s.arrow(620, 88, 760, 150, label='archive')
+s.arrow(620, 268, 760, 206, label='archive')
+s.path('M 815 150 L 815 40 L 545 40 L 545 60', dash=True)
+s.text(640, 34, 'reopen (clears closedAt)', size=10)
+s.text(20, 345, 'Actions arrive via POST /objects/{id}/transition or /resolve. A Space may replace this workflow '
+       '(registry/workflows/ or *_workflow.toon).', size=10)
+s.save('docs/stakeholders/modules/assets/incidents.svg')

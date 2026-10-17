@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" viewBox="0 0 940 474" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title>AML content pack</title><desc>Data in, Pipelines and Jobs, outputs and the modules the AML pack uses.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="940" height="474" fill="#FFFFFF"/>
+<rect x="12" y="30" width="216" height="434" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="20" y="45" font-size="11" fill="#5F5E5A">Data in</text>
+<rect x="20" y="60" width="200" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="120" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">aml_txn</text>
+<text x="120" y="95" text-anchor="middle" font-size="11" fill="#5F5E5A">core-banking ledger</text>
+<rect x="20" y="124" width="200" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="120" y="143" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">aml_parties</text>
+<text x="120" y="159" text-anchor="middle" font-size="11" fill="#5F5E5A">party register</text>
+<rect x="244" y="30" width="216" height="434" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="252" y="45" font-size="11" fill="#5F5E5A">Pipelines and Jobs</text>
+<rect x="252" y="60" width="200" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="352" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">2 Pipelines</text>
+<text x="352" y="95" text-anchor="middle" font-size="11" fill="#0F6E56">Parquet per feed</text>
+<rect x="252" y="124" width="200" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="352" y="143" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">4 sql.template Jobs</text>
+<text x="352" y="159" text-anchor="middle" font-size="11" fill="#0F6E56">structuring, threshold,</text>
+<text x="352" y="173" text-anchor="middle" font-size="11" fill="#0F6E56">fan-in, high-risk traffic</text>
+<rect x="252" y="188" width="200" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="352" y="207" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">risk / anomaly Jobs</text>
+<text x="352" y="223" text-anchor="middle" font-size="11" fill="#0F6E56">aml_risk_score,</text>
+<text x="352" y="237" text-anchor="middle" font-size="11" fill="#0F6E56">aml_anomaly_score</text>
+<rect x="252" y="252" width="200" height="52" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+<text x="352" y="271" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">aml_screening Job</text>
+<text x="352" y="287" text-anchor="middle" font-size="11" fill="#0F6E56">screening.run, disabled</text>
+<rect x="476" y="30" width="216" height="434" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="484" y="45" font-size="11" fill="#5F5E5A">Outputs</text>
+<rect x="484" y="60" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="79" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">4 per-account Alerts</text>
+<text x="584" y="95" text-anchor="middle" font-size="11" fill="#993C1D">one Alert Rule per Job</text>
+<rect x="484" y="124" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="143" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">Account Risk Score</text>
+<text x="584" y="159" text-anchor="middle" font-size="11" fill="#993C1D">aml_account</text>
+<rect x="484" y="188" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="207" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">Screening Hits</text>
+<text x="584" y="223" text-anchor="middle" font-size="11" fill="#993C1D">aml_sanctions, aml_pep</text>
+<rect x="484" y="252" width="200" height="52" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="584" y="271" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">STR template, LA view</text>
+<text x="584" y="287" text-anchor="middle" font-size="11" fill="#993C1D">aml-str, 4 pattern packs</text>
+<rect x="708" y="30" width="216" height="434" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
+<text x="716" y="45" font-size="11" fill="#5F5E5A">Modules</text>
+<rect x="716" y="60" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="91" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">alerts, incidents</text>
+<rect x="716" y="124" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="155" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">scoring-entity-lists</text>
+<rect x="716" y="188" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="219" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">anomaly</text>
+<rect x="716" y="252" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="283" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">screening</text>
+<rect x="716" y="316" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="347" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">regulatory-reporting</text>
+<rect x="716" y="380" width="200" height="52" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="816" y="411" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">link-analysis</text>
+<line x1="222" y1="86.0" x2="250" y2="86.0" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="454" y1="86.0" x2="482" y2="86.0" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="686" y1="86.0" x2="714" y2="86.0" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+</svg>

@@ -1,0 +1,25 @@
+import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
+
+s = Svg(940, 330, 'Stage-1 parsing and ingest',
+        'Inbox files become a Consignment, are parsed, typed and committed as Parquet; bad files go to quarantine.')
+s.box(20, 40, 150, 60, 'gray', 'Inbox', 'Collector-landed files')
+s.box(200, 40, 150, 60, 'teal', 'Unpack', 'Archives -> plain files')
+s.box(380, 40, 160, 60, 'teal', 'ConsignmentPlanner', 'collector.consignment')
+s.box(570, 40, 160, 60, 'teal', 'Parse frontend', 'parsing: block')
+s.box(760, 40, 160, 60, 'teal', 'Transform + cast', 'SchemaFieldTypes.castSql')
+for a, b in [(170, 200), (350, 380), (540, 570), (730, 760)]:
+    s.arrow(a, 70, b, 70)
+s.box(760, 150, 160, 60, 'teal', 'PartitionWriter', 'stage, atomic rename')
+s.arrow(840, 100, 840, 150)
+s.box(540, 150, 190, 60, 'teal', 'Commit', 'manifest, backup,\nmarkers, ledger last')
+s.arrow(760, 180, 730, 180)
+s.box(280, 150, 220, 60, 'blue', 'Typed Parquet store', '<store>/database/year=/...')
+s.arrow(540, 180, 500, 180)
+s.box(20, 250, 230, 60, 'coral', 'Quarantine tree', '<quarantine>/<subpath>/<reason>/')
+s.box(280, 250, 230, 60, 'coral', 'Reject rows', 'errors/<base>_errors.csv')
+s.box(540, 250, 230, 60, 'coral', 'Restricted store (opt-in)', '<data root>/.restricted/<pipeline>/')
+s.path('M 610 100 L 610 125 L 135 125 L 135 250', dash=True)
+s.path('M 650 100 L 650 135 L 395 135 L 395 250', dash=True)
+s.path('M 700 100 L 700 140 L 655 140 L 655 250', dash=True)
+s.text(140, 240, 'unreadable, field_mismatch, empty, retry_exhausted', size=10)
+s.save('docs/stakeholders/modules/assets/parsing-ingest.svg')

@@ -12,6 +12,10 @@ in [`GLOSSARY.md`](GLOSSARY.md) — the canonical vocabulary — so if a word he
 > what to notice → how it connects** to the rest of the app. If you're brand new, read
 > [Getting around](#1-getting-around) and the [Common workflows](#8-common-workflows) at the end;
 > then dip into individual screens as you need them.
+>
+> **How a part works underneath.** This guide is screen by screen. For how each module works end to end
+> (maker-checker, Decision Rules, Alerts, Cases …) see the [module pages](stakeholders/modules/README.md); for how
+> modules combine into a solution, the [solution pages](stakeholders/solutions/README.md).
 
 > **Editions & personas.** Inspecto ships in build *editions* (Personal / Professional / Enterprise),
 > and each user views it through a *Lens* (Business / Builder / Ops). An edition can add or remove

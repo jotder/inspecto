@@ -1,0 +1,21 @@
+import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
+
+s = Svg(940, 290, 'Studio BI result path',
+        'A Widget of a Visualization Type builds a QuerySpec over a Dataset; MeasureCompiler compiles one guarded SELECT.')
+s.box(20, 40, 180, 60, 'teal', 'Dataset', 'component kind dataset')
+s.box(20, 140, 180, 60, 'teal', 'Measures', 'agg + field pairs')
+s.box(240, 90, 190, 60, 'blue', 'Widget', 'a Visualization Type')
+s.arrow(200, 70, 240, 110)
+s.arrow(200, 170, 240, 130)
+s.box(470, 90, 190, 60, 'blue', 'QuerySpec', 'groupBy, grains, filters')
+s.arrow(430, 120, 470, 120)
+s.box(700, 90, 220, 60, 'teal', 'POST /bi/query', 'MeasureCompiler, SqlGuard')
+s.arrow(660, 120, 700, 120)
+s.box(700, 200, 220, 60, 'gray', 'DuckDB sandbox', 'Dataset relation, Parquet')
+s.arrow(810, 150, 810, 200)
+s.box(240, 200, 190, 60, 'blue', 'Dashboard', 'tiles, filter bar, drill')
+s.box(470, 200, 190, 60, 'gray', 'Result Set', 'columns, rows, statistics')
+s.arrow(700, 230, 660, 230)
+s.arrow(470, 230, 430, 230)
+s.arrow(335, 200, 335, 150, dash=True)
+s.save('docs/stakeholders/modules/assets/studio-bi.svg')

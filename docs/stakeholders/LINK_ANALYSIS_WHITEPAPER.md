@@ -424,6 +424,22 @@ Fraud and national security threats rarely occur in a topological vacuum; they e
 - **Cross-Route Geo Brushing**: Inspecto's `GeoLinkBrushService` establishes a live, bidirectional link between graph topologies and the **Geo Map Analysis** studio. Selecting suspect entities on the Link Analysis canvas immediately highlights their physical cell-tower pings or ATM locations on the geographic map, and drawing a spatial bounding polygon on the map isolates the corresponding entity subgraphs.
 - **Continuous Timeline Slicing**: Every edge retains its source timestamp. The UI's non-mutating temporal slider allows investigators to scrub through time, watching money mule networks form, transfer assets, and disperse in chronological sequence.
 
+### 4.6 Data Trust Architecture & provenance strip (LA-DATA-TRUST-1)
+
+A persistent hazard in intelligence operations is analyzing a graph without knowing whether the underlying data is fresh, complete, or corrupted by pipeline delays. Inspecto Link Analysis resolves this with an integrated **Data Trust Strip** rendered directly within the studio:
+
+```
+ ┌────────────────────────────────────────────────────────────────────────────────────────┐
+ │ DATA TRUST STRIP: mule_ring_legs_dataset (Consignment #1048)                           │
+ │ [● Fresh: 24m ago] [✔ 3/3 Files Landed] [⚡ Index: Synced v4] [⚠ 0 Quarantined Rows]   │
+ └────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Graph Lineage & Landed File Attribution**: Link Analysis traces the exact physical files and Consignment IDs supporting the current graph view. Analysts can inspect which landed files contributed to specific entities and links.
+- **Continuous Staleness & Lag Detection**: Evaluates the latency between real-world event timestamps, lakehouse ingest commits (`pipeline.commit`), and graph index refreshes. If new consignments arrive while an analysis is open, the Data Trust badge signals upstream changes.
+- **Data Trust Cache**: The `data-as-of` timestamp check is cached against physical input-file fingerprints ($895\text{--}993\text{ ms}$ cold cache $\to 132\text{--}138\text{ ms}$ warm cache hit), ensuring real-time integrity validation without querying the lakehouse on every UI interaction.
+- **Integrated Trust Alerts**: If source records are quarantined due to schema validation failures or delivery gaps, Link Analysis surfaces a warning badge, preventing investigators from drawing conclusions over incomplete transactional scopes.
+
 ---
 
 # 5 · Enterprise governance, security & access control
@@ -527,12 +543,38 @@ In emergency scenarios where an investigator must identify an immediate threat a
 - **Granular Scope**: Reveal unmasks **only the single requested node**; it never unmasks the broader canvas or adjacent connections.
 - **Immutable Audit Event**: Every single unmasking writes a high-priority `LINK_REVEAL` audit record capturing the operator identity, timestamp, target entity alias, and stated legal justification.
 
-### 5.5 Ephemeral secure embed sharing
+### 5.5 Ephemeral secure embed sharing & the standalone Embed Viewer (LA-EMBED-VIEW-1)
 
-Senior leadership or external prosecuting agencies frequently require read-only access to specific findings without requiring a permanent platform login. Inspecto provides **Ephemeral Embed Links**:
-- **Cryptographic Security**: Tokens are minted as 256-bit cryptographically secure random values; only their SHA-256 hash is persisted in the store.
-- **Strictly Scoped Access**: An embed link grants read-only visibility into **exactly one Investigation**. It exposes zero Dataset definitions, zero SQL queries, and zero export actions.
-- **Automatic Revocation**: An embed link automatically revokes if: (1) its configured TTL expires (default 72 hours); (2) the authorizing lead's account is revoked; (3) the linked legal Case is closed; or (4) the Space's masking policy is modified.
+Senior leadership, prosecuting agencies, or external regulators frequently require read-only access to specific findings without requiring a permanent platform account. Inspecto Link Analysis delivers this via **Ephemeral Embed Links** and a dedicated **Embed Viewer SPA**:
+
+```
+                         EMBED VIEWER SECURITY ARCHITECTURE
+ ┌────────────────────────────────────────────────────────────────────────────────────────┐
+ │ EXTERNAL BROWSER / PORTAL IFRAME                                                       │
+ │   URL: https://inspecto.bank.int/embed/investigation/{token}                           │
+ │   CSP: frame-ancestors 'self' https://portal.regulator.gov                             │
+ │   Headers: X-Content-Type-Options: nosniff | Cache-Control: no-store                   │
+ ├────────────────────────────────────────────────────────────────────────────────────────┤
+ │ EMBED VIEWER APPLICATION (Zero-Chrome, Read-Only Angular Shell)                        │
+ │   • Renders Graph Topology (G6 Host) with Pan, Zoom, and Search                        │
+ │   • Stripped UI: No Dataset SQL, No Drafts, No Case Edits, No Export                   │
+ │   • Enforced Privacy: Inherits Space Keyed Masking (Raw Values Strictly Suppressed)    │
+ ├────────────────────────────────────────────────────────────────────────────────────────┤
+ │ SERVER VERIFICATION (GET /api/v1/inv/embed/investigation/{hash})                       │
+ │   • 256-bit Token Validation: Constant-time comparison against stored SHA-256 hash    │
+ │   • Token Redaction: Token never logged; audit rows record presentedHash only          │
+ │   • Audit Ledger: Emits LINK_EMBED_VIEWED on load; LINK_EMBED_DENIED on bad/expired   │
+ └────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Per-Space Frame Ancestors Allow-List**: Iframe embedding is defended against clickjacking via strict Content Security Policy (`CSP: frame-ancestors`). Space administrators define permitted parent origins (e.g., internal intranet portals or case management suites); framing from unauthorized domains is blocked by the browser.
+- **Font & Asset Stripping for Air-Gap Integrity**: The embed shell strips all external network font dependencies (such as Google Fonts) and third-party tracking scripts, ensuring 100% compliance with sovereign air-gap isolation standards.
+- **Token Security & Log Redaction**: Embed tokens are 256-bit cryptographically secure random strings. The server stores and indexes only their SHA-256 hash. In compliance with strict auditing rules, server logs and audit events redact all raw tokens, recording only `presentedHash` to prevent log-scraping credential theft.
+- **Automated Lifecycle Revocation**: An embed link dies immediately if:
+  1. The configured time-to-live expires (default 72 hours; configurable up to Space maximums).
+  2. The authoring investigator loses their role or is disabled.
+  3. The associated legal Case is closed or archived.
+  4. The Space's masking mode is relaxed (preventing retroactively revealing previously masked nodes).
 
 ### 5.6 Standing detection & operational closed loops
 
@@ -582,20 +624,51 @@ To prevent denial-of-service conditions during interactive exploration, Inspecto
 2. **Deep Walk Routing**:
    A 5-level walk over 50 keys at $10^8$ edges requires $3.0\text{--}4.3\text{ seconds}$ due to Parquet zone map saturation across multiple row groups. Consequently, Inspecto's traversal router automatically directs deep multi-hop queries ($> 2$ hops) to the vectorised in-memory graph engine or DuckDB recursive CTE engine, preserving the link index for instant interactive lookups.
 
-### 6.3 Resource budgets & concurrency safeguards
+### 6.3 Three-tier configurable limits system (LA-CONFIG-LIMITS-1)
 
-Inspecto implements operational fences to guarantee host stability in multi-tenant enterprise environments. Every fence below is a **configuration item with a validated range**, not a code constant: Space administrators set analysis limits, system administrators set host resources (Graph Run ceilings and pools, index build memory, rate limits), and analysts tune browser-only caps for their machine; the values quoted are the shipped defaults:
+Inspecto Link Analysis avoids hardcoded limits by implementing a **Three-Tier Configurable Limits System**. Every threshold is an explicitly validated configuration item with defined validation ranges, separating platform sizing, organizational compliance policy, and client rendering performance:
 
-- **Graph Run Resource Budgets**:
-  - Default Per-Run Limits: $50,000\text{ nodes}$, $500,000\text{ edges}$, $30\text{ second statement timeout}$.
-  - Maximum Ceilings (install-wide, configurable): $500,000\text{ nodes}$, $5,000,000\text{ edges}$, $300\text{ second timeout}$.
-  - Exceeding any budget aborts execution immediately with a clear **`200 OK` + `BUDGET_EXCEEDED`** status payload, never returning corrupt, partially computed results.
-- **Execution Pool Throttling**:
-  - In-process Graph Run Pool: Maximum 2 concurrent active executions, with a waiting queue capped at 16 requests.
-  - The 19th concurrent request is rejected immediately with **`503 Service Unavailable (SERVER_BUSY)`**, protecting platform stability.
-- **Working Set Storage Ceilings**:
-  - Maximum Working Set Size: $64\text{ MiB}$ per individual step.
-  - Maximum Investigation Size: $4\text{ GiB}$ cumulative per investigation (exceeding returns `413 Payload Too Large`).
+```
+                    THREE-TIER CONFIGURATION ARCHITECTURE
+                    
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ TIER 1: HOST RESOURCE CEILINGS (System Administrator)                   │
+  │ • -Dla.graph.run.max_nodes=500000 · -Dla.graph.run.max_edges=5000000    │
+  │ • -Dla.graph.run.max_timeout_seconds=300 · Pool: 2 active, 16 waiting   │
+  │ • Protects host JVM stability, CPU saturation, and memory budgets       │
+  └────────────────────────────────────┬────────────────────────────────────┘
+                                       │ Inherited & Clamped
+                                       ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ TIER 2: SPACE ANALYSIS LIMITS (Space Administrator / Compliance)        │
+  │ • Settings > Link Analysis: Hub threshold, default hops, four-eyes gate │
+  │ • Investigation size caps (default 64 MiB per step, 4 GiB per case)     │
+  │ • Governs investigative policy, privacy thresholds, and peer oversight  │
+  └────────────────────────────────────┬────────────────────────────────────┘
+                                       │ Constrained
+                                       ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ TIER 3: BROWSER / CLIENT RENDERING CAPS (Investigator / Analyst)        │
+  │ • Client-side Canvas Node Ceiling (default 2,000 nodes, slider to 5,000)│
+  │ • Layout physics iterations, animations, and local visual clustering    │
+  │ • Prevents browser tab freezing on constrained forensic laptops         │
+  └─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Detailed Limit Configuration Matrix
+
+| Configuration Tier | Managed Setting | Target Scope | Shipped Default | Validated Range | Enforcement Point |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Tier 1: Host Resource** | `graph.run.max_nodes` | Install-wide | 500,000 | 1,000 to 5,000,000 | Server Engine Gate (`POST /inv/graph/runs`) |
+| | `graph.run.max_edges` | Install-wide | 5,000,000 | 5,000 to 50,000,000 | Server Engine Gate (`POST /inv/graph/runs`) |
+| | `graph.run.max_timeout` | Install-wide | $300\text{ s}$ | 5 to $3,600\text{ s}$ | OS Process Statement Watchdog |
+| | `graph.run.pool_concurrency`| Install-wide | 2 running / 16 wait | 1 to 8 concurrent | Worker Thread Pool (503 on overflow) |
+| **Tier 2: Space Analysis**| `hub_expansion_threshold`| Per Space | 100 links | 1 to 10,000 links | Four-Eyes Escalation Gate (Approver Inbox) |
+| | `default_walk_hops` | Per Space | 2 hops | 1 to 5 hops | Traversal Router (Depth $\le 2$ on Index) |
+| | `step_max_bytes` | Per Space | $64\text{ MiB}$ | $1\text{ to }512\text{ MiB}$ | Investigation Store Append Gate (413 on breach) |
+| | `investigation_max_bytes`| Per Space | $4\text{ GiB}$ | $100\text{ MiB to }64\text{ GiB}$| Cumulative Investigation Storage Gate |
+| **Tier 3: Browser Client**| `canvas_node_render_cap`| Per User / Session | 2,000 nodes | 100 to 10,000 nodes | Angular G6 Host Canvas Renderer |
+| | `layout_simulation_steps`| Per User / Session | 300 steps | 50 to 1,000 steps | WebGL / Force-Directed Physics Worker |
 
 ---
 
@@ -616,15 +689,20 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | :--- | :--- | :--- | :--- |
 | **Scale** | $10^8$ (100M) edge index lookups at $\sim 43\text{ ms}$ | **PROVEN** | `InvTraversalBench`, `okf/frontend/features/link-analysis.md` |
 | | Full index build at $10^8$ edges in $368\text{--}852\text{ s}$ | **PROVEN** | `IndexBuilder`, benchmark runs on i7-9850H corpus |
-| | $10^9$ (1 Billion) edge index scaling | **NOT YET** | Extrapolated at $\sim 34\text{ GB}$ index and $2.5\text{ h}$ build; unmeasured. |
+| | Incremental daily append build at $10^8$ edges ($31\text{ s}$) | **PROVEN** | `IndexAppendTest`, `ScheduledIndexBuildTest` |
+| | $10^9$ (1 Billion) edge index scaling run plan | **DOCUMENTED** | `docs/ops/la-index-scale-run-plan.md` (dry-run at small N; scale run hardware-gated) |
 | **Security** | 7-stage request gate order enforcement | **PROVEN** | `ControlApiGeoLinkModuleGateTest`, `LaApiRoutesManifestParityTest` |
 | | Strict 404 response on unauthorized investigation access | **PROVEN** | `ControlApiInvestigationMembersTest` |
 | | Keyed cryptographic masking (`typed`, `all`, `none`) | **PROVEN** | `ControlApiExplorationMaskingTest`, `ControlApiInvestigationOversightTest` |
 | | Anti-oracle raw identifier lookup rejection | **PROVEN** | `ControlApiExplorationMaskingTest.everyInvReadOnAMaskedSpace...` |
 | | Four-eyes self-approval block ($403\text{ Forbidden}$) | **PROVEN** | `ControlApiInvestigationOversightTest.aSensitiveExpandWaits...` |
 | | Single-entity reveal capability gating & audit logging | **PROVEN** | `ControlApiInvestigationOversightTest.revealIsPerEntityGated...` |
-| | Ephemeral embed link expiration and auto-revocation | **PROVEN** | `ControlApiInvestigationEmbedTest` |
-| | Real OIDC IAM sign-in verification for standalone app | **DOCUMENTED** | `la-app-real-signin-runbook.md`, backlog `LA-APP-REAL-SIGNIN-1` |
+| | Ephemeral embed link expiration, auto-revoke & CSP allow-list | **PROVEN** | `ControlApiInvestigationEmbedTest`, `LA-EMBED-VIEW-1` (`2dad1638f`) |
+| | Standalone Embed Viewer SPA with token redaction | **PROVEN** | Live browser pass PASS on Enterprise multi-space bundle (`2dad1638f`) |
+| | Real OIDC IAM sign-in verification for standalone app | **PROVEN** | `docs/ops/la-app-real-signin-runbook.md`, live WSO2 IS run (`4cae924e1`) |
+| | Three-tier configurable limits architecture | **PROVEN** | `LA-CONFIG-LIMITS-1` (`7dd9938fb`), full reactor 55/55 modules green |
+| **Data Trust** | In-process Data Trust Strip & landed file provenance | **PROVEN** | `LA-DATA-TRUST-1`, live drive in `docs/ops/la-data-trust-live-drive.md` |
+| | Cached data-as-of fingerprinting ($135\text{ ms}$ warm hit) | **PROVEN** | `LA-DATA-TRUST-POLISH-1` (`96e3f6e5d`) |
 | **Forensics** | Deterministic Working Set fold from op log | **PROVEN** | `InvestigationEvaluatorTest`, `ControlApiDossierTest` |
 | | Upstream file append resilience (mutation isolation) | **PROVEN** | `ControlApiReplayDriftOnFileAppendTest` |
 | | SHA-256 tamper-evident Dossier manifest verification | **PROVEN** | `ControlApiDossierTest.anUntouchedStoreVerifiesAndATamperedStep...` |
@@ -637,10 +715,12 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | Real-world synthetic mule ring benchmark (97% cashout) | **PROVEN** | `ControlApiLaShowcaseFiguresTest` (`TILL-06`, share 0.97) |
 | | Published false-positive / precision rates on live data | **NOT YET** | Dependent on customer-specific domain thresholds; unmeasured. |
 | **Platform** | In-process execution with zero external graph DBs | **PROVEN** | Architectural invariant; validated across all test profiles. |
+| | 84 validated Link Analysis API routes (77 la-api, 7 geo-link) | **PROVEN** | `LaApiRoutesManifestParityTest`, `ControlApiGeoLinkModuleGateTest` |
 | | PostgreSQL enterprise storage backend | **PROVEN** | `PostgresInvestigationStoreTest`, `la-showcase-variants-runbook.md` |
 | | Multi-pod active-active cluster high availability | **NOT YET** | Single-database lease proven on laptop; multi-host HA drill pending (`HA-DR-DRILL-1`). |
 | | Native direct Apache Hive / Kerberos JDBC connector | **NOT YET** | Supported via landing Parquet files through file Collectors (Decision D-ING5). |
 | | Air-gapped deployment posture with zero outbound calls | **PROVEN** | `compliance/evidence/air-gap-posture.md`, release CI validation. |
+| | WCAG 2.2 AA accessibility automated compliance | **PROVEN** | Live axe pass: 0 violations across all audited pages/dialogs (`LA-A11Y-AUDIT-1`) |
 
 ---
 

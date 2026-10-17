@@ -8,10 +8,10 @@
 |---|---|---|
 | **Executive / sponsor** | [`EXECUTIVE_BRIEF.md`](EXECUTIVE_BRIEF.md) | — |
 | **Product owner / business analyst** | [`PRODUCT_CAPABILITIES.md`](PRODUCT_CAPABILITIES.md) | [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (full MoSCoW) · [`../roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) |
-| **Solution architect / integrator** | [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) | the [OKF bundle](../okf/index.md) · [`../api/openapi-v1.json`](../api/openapi-v1.json) |
+| **Solution architect / integrator** | [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) | [solution pages](solutions/README.md) · [module pages](modules/README.md) · the [OKF bundle](../okf/index.md) · [`../api/openapi-v1.json`](../api/openapi-v1.json) |
 | **Operations / support** | [`OPERATIONS_GUIDE.md`](OPERATIONS_GUIDE.md) | [`../ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md) (the ops hub) |
 | **Tester / QA** | [`TESTING_GUIDE.md`](TESTING_GUIDE.md) | [`../USER_GUIDE.md`](../USER_GUIDE.md) (expected behavior) · [`../BACKLOG.md`](../BACKLOG.md) |
-| **End user (any Lens)** | [`../USER_GUIDE.md`](../USER_GUIDE.md) | — |
+| **End user (any Lens)** | [`../USER_GUIDE.md`](../USER_GUIDE.md) | [module pages](modules/README.md) — how each part works |
 | **Mixed exec + technical briefing** | [`../roadmap/STAKEHOLDER_OVERVIEW.md`](../roadmap/STAKEHOLDER_OVERVIEW.md) | — |
 | **Prospects, sponsors, sales (external)** | [`INSPECTO_ENTERPRISE_WHITEPAPER.md`](INSPECTO_ENTERPRISE_WHITEPAPER.md) — the market whitepaper, v1.2; its release-basis note states which Sprint 8 rows it assumes shipped | [`COMPETITIVE_LANDSCAPE.md`](COMPETITIVE_LANDSCAPE.md) §4 (the claims register every sentence must trace to) |
 | **Product owner + market/sales, aligning** | [`COMPETITIVE_LANDSCAPE.md`](COMPETITIVE_LANDSCAPE.md) — a living two-sided document: what ships (grounded) vs who we meet (verified, dated), with an open alignment table | [`../okf/capabilities/editions/editions.md`](../okf/capabilities/editions/editions.md) · [`../okf/backend/build-run/performance.md`](../okf/backend/build-run/performance.md) |
