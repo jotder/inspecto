@@ -347,4 +347,30 @@ class ControlApiRegulatoryReportsTest {
             assertFalse(d.get("content").asText().contains("late.pdf"), "the pinned content is never re-rendered");
         }
     }
+
+    /** OBJECT-READ-MASKING-RESIDUALS-1 (1): the filing keeps the real key; a caller without canRevealLinkEntities reads it masked. */
+    @Test
+    void aNonRevealerReadsTheReportWithTheCasesClassifiedKeyMasked() throws Exception {
+        try (Ctx c = open(true)) {
+            String raw = "255712345678";
+            String kase = seedCase(c, Map.of("key.msisdn", raw), Map.of());   // no `dataset`: fails closed as classified
+            c.objects().attach(kase, "author-1", "cdr.csv", "text/csv", "https://dms.example/" + raw, "calls of " + raw);
+            JsonNode drafted = data(send(c, "POST", "/regulatory-reports", draftBody(kase), AUTHOR), 200);
+            String id = drafted.get("id").asText();
+            assertFalse(drafted.toString().contains(raw), drafted.toString());
+            assertTrue(drafted.get("content").asText().contains("masked:"), drafted.toString());
+            JsonNode read = data(send(c, "GET", "/regulatory-reports/" + id, null, AUTHOR), 200);
+            assertFalse(read.toString().contains(raw), read.toString());
+            assertTrue(read.get("keyMasked").asBoolean());
+            JsonNode pend = data(send(c, "POST", "/regulatory-reports/" + id + "/request-approval", "{}", AUTHOR), 200);
+            assertFalse(pend.toString().contains(raw), pend.toString());
+
+            JsonNode revealed = data(send(c, "GET", "/regulatory-reports/" + id, null, CHECKER), 200);
+            assertTrue(revealed.get("content").asText().contains(raw), "a revealer reads the filing as delivered");
+            JsonNode done = data(send(c, "POST", "/regulatory-reports/" + id + "/approve", "{}", CHECKER), 200);
+            assertEquals("submitted", done.get("status").asText(), done.toString());
+            Path file = c.root.resolve("regulatory-submissions/sample-sar").resolve(id + ".xml");
+            assertTrue(Files.readString(file).contains(raw), "the delivered filing carries the real identifier");
+        }
+    }
 }

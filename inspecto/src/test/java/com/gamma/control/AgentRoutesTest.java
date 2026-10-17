@@ -519,6 +519,38 @@ class AgentRoutesTest {
         }
     }
 
+    /**
+     * OBJECT-READ-MASKING-RESIDUALS-1: the agent's records about Incidents (Triage Runs, their feedback, the approvals
+     * inbox) are free text that cannot be masked per object, so each read takes canRevealLinkEntities.
+     */
+    @Test
+    void agentRecordReadsNeedTheRevealCapability(@TempDir Path dir) throws Exception {
+        Authenticators.forTest(ex -> {
+            String auth = ex.getRequestHeaders().getFirst("Authorization");
+            if ("Bearer admin".equals(auth)) return java.util.Optional.of(new Subject("admin", java.util.Set.of("canAdminister")));
+            if ("Bearer revealer".equals(auth))
+                return java.util.Optional.of(new Subject("revealer", java.util.Set.of("canRevealLinkEntities")));
+            return java.util.Optional.empty();
+        });
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent(Map.of("run-1", Map.of("id", "run-1", "outcome", "open")));
+        agent.seedApproval("appr-1", "component_apply", "PENDING");
+        try (Ctx ctx = open(dir, agent)) {
+            for (String path : List.of("/agent/triage-runs", "/agent/triage-runs/run-1", "/agent/triage-runs/run-1/similar",
+                    "/agent/feedback", "/agent/approvals", "/agent/approvals/appr-1")) {
+                HttpResponse<String> refused = getAs(ctx.port(), "admin", path);
+                assertEquals(403, refused.statusCode(), path + " " + refused.body());
+                assertEquals(200, getAs(ctx.port(), "revealer", path).statusCode(), path);
+            }
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    private HttpResponse<String> getAs(int port, String who, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Authorization", "Bearer " + who).GET().build(), BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> sendAs(int port, String who, String path, String body) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Content-Type", "application/json").header("Authorization", "Bearer " + who)

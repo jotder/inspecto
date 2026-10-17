@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import com.gamma.access.WriteGates;
 import static com.gamma.util.Values.intOr;
@@ -141,6 +142,7 @@ final class DbBrowserRoutes implements RouteModule {
 
         if (group.startsWith("ops:")) {
             requireOperationalRead(ex);
+            requireUnmaskedOperational(ex, group, false);
             return browseOperational(api, group, name, null, limit, offset);
         }
         if (!STORES_GROUP.equals(group))
@@ -156,7 +158,10 @@ final class DbBrowserRoutes implements RouteModule {
         String tableName = ApiContext.str(body, "table");
         String sql = ApiContext.str(body, "sql");
         if (sql == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'sql'");
-        if (group.startsWith("ops:")) requireOperationalRead(ex);
+        if (group.startsWith("ops:")) {
+            requireOperationalRead(ex);
+            requireUnmaskedOperational(ex, group, true);
+        }
 
         // A store id may itself contain path-like characters (e.g. "mule_transfers/database") without
         // being a smuggled file reference — SqlGuard's PATH_LIKE check can't tell those apart from the
@@ -191,6 +196,25 @@ final class DbBrowserRoutes implements RouteModule {
      */
     private static void requireOperationalRead(HttpExchange ex) {
         ApiContext.requireCapability(ex, "canAuthorWorkbench");
+    }
+
+    /** The operational stores whose rows carry no Incident / Alert content (the agent scan tools' allow-list). */
+    static final Set<String> KEYLESS_OPERATIONAL = Set.of("acquire", "consignment-outputs", "file-stages", "jobs",
+            "provenance", "status");
+
+    /**
+     * OBJECT-READ-MASKING-RESIDUALS-1: the object / link / note / tag / event / receipt stores hold raw classified keys,
+     * and their rows cannot be masked column-by-column ({@code BiResultMasking} covers Dataset-backed stores only). A
+     * caller without {@code canRevealLinkEntities} may page a keyless store's tables, but never runs SQL on {@code ops:*}:
+     * the stores share one connection, so a query named under {@code ops:status} could read {@code objects}. Fails closed.
+     */
+    private static void requireUnmaskedOperational(HttpExchange ex, String group, boolean sql) {
+        boolean reveals = ApiContext.subject(ex)
+                .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
+        if (reveals || (!sql && KEYLESS_OPERATIONAL.contains(group.substring("ops:".length())))) return;
+        throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, sql
+                ? "SQL over operational stores needs " + AuditReadMasking.UNMASK_CAPABILITY
+                : "operational store '" + group + "' holds classified keys; reading it needs " + AuditReadMasking.UNMASK_CAPABILITY);
     }
 
     // ── shared Parquet/CSV store read ──────────────────────────────────────────────

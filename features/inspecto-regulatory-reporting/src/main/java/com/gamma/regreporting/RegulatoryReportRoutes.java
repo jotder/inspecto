@@ -7,6 +7,7 @@ import com.gamma.util.AtomicFiles;
 import com.gamma.audit.EventLevel;
 import com.gamma.control.ApproverCheck;
 import com.gamma.control.ApproverRoster;
+import com.gamma.control.ObjectReadMasking;
 import com.gamma.control.PendingChanges;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.OperationalObject;
@@ -202,7 +203,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
                             && blankOr(incident, rec.get("incidentId")) && blankOr(kase, rec.get("caseId"))
                             && visible(api, ex, rec)) {
                         total++;
-                        if (items.size() < LIST_CAP) items.add(RegulatoryReports.summary(rec));
+                        if (items.size() < LIST_CAP) items.add(shown(api, ex, RegulatoryReports.summary(rec)));
                     }
                 }
             }
@@ -241,7 +242,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
             }
             if (RegulatoryReports.PENDING.equals(rec.get("status"))) view.put("approverCheck", approverCheck(root, rec));
         }
-        return view;
+        return shown(api, ex, view);
     }
 
     /**
@@ -349,6 +350,44 @@ public final class RegulatoryReportRoutes implements RouteModule {
         return m;
     }
 
+    /**
+     * A report as THIS caller sees it. The stored filing keeps the real identifiers (it is what is delivered); a caller
+     * without the reveal capability gets {@code content}, {@code subjectTitle} and the string {@code inputs} with the
+     * subject's and member Incidents' classified keys replaced inline ({@link ObjectReadMasking#text}). Without the
+     * engine the keys cannot be resolved, so those fields are withheld (fail closed).
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> shown(ApiContext api, HttpExchange ex, Map<String, Object> view) {
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
+        if (masking == null) return view;
+        Map<String, Object> out = new LinkedHashMap<>(view);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try {
+            ObjectService svc = OpsEngine.of(api);
+            Object linked = view.get("caseId") != null ? view.get("caseId") : view.get("incidentId");
+            if (linked != null) {
+                String id = String.valueOf(linked);
+                svc.get(id).ifPresent(o -> rows.add(o.toMap()));
+                for (ObjectLink l : svc.linksOf(id))
+                    if (LinkRelationship.CONTAINS.equals(l.relationship()) && id.equals(l.fromId()))
+                        svc.get(l.toId()).ifPresent(o -> rows.add(o.toMap()));
+            }
+        } catch (ApiException noEngine) {
+            out.keySet().removeAll(Set.of("content", "subjectTitle", "inputs"));
+            out.put("keyMasked", true);
+            return out;
+        }
+        for (String f : List.of("content", "subjectTitle"))
+            if (out.get(f) instanceof String s) out.put(f, ObjectReadMasking.text(masking, rows, s));
+        if (out.get("inputs") instanceof Map<?, ?> in) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            ((Map<String, Object>) in).forEach((k, v) -> m.put(k, v instanceof String s ? ObjectReadMasking.text(masking, rows, s) : v));
+            out.put("inputs", m);
+        }
+        out.put("keyMasked", true);
+        return out;
+    }
+
     private static String iso(long epochMillis) {
         return epochMillis <= 0 ? null : Instant.ofEpochMilli(epochMillis).truncatedTo(ChronoUnit.SECONDS).toString();
     }
@@ -450,7 +489,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
         RegulatoryReports.audit(author, ApiContext.actorType(ex), "regulatory-report.drafted", rec.get("id")
                 + " drafted from " + (kase != null ? "case " + kase : "incident " + incident) + " with template '"
                 + t.id() + "'", rec, null);
-        return RegulatoryReports.detail(rec);
+        return shown(api, ex, RegulatoryReports.detail(rec));
     }
 
     private static ApiException invalid(String message) {
@@ -507,7 +546,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
             RegulatoryReports.audit(by, ApiContext.actorType(ex), "regulatory-report.no-eligible-approver", id
                     + " has no eligible approver: no one holding canApproveChanges in this Space is outside its makers",
                     rec, Authenticators.active().isPresent() ? EventLevel.WARN : EventLevel.INFO);
-        return current(root, id);
+        return shown(api, ex, current(root, id));
     }
 
     private static Path subjectAndRoot(ApiContext api, HttpExchange ex, String what) {
@@ -539,7 +578,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
                     : "regulatory-report.declined", id + (approve ? " approved" : " declined") + " by " + by, rec, null);
             if (approve) submit(root, rec, by, ApiContext.actorType(ex));
         }
-        return current(root, id);
+        return shown(api, ex, current(root, id));
     }
 
     private Object retry(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
@@ -551,7 +590,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
             RegulatoryReports.audit(by, ApiContext.actorType(ex), "regulatory-report.retried", id + " retried by " + by, rec, null);
             submit(root, rec, by, ApiContext.actorType(ex));
         }
-        return current(root, id);
+        return shown(api, ex, current(root, id));
     }
 
     /**

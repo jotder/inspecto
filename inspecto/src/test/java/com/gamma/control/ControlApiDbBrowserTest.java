@@ -107,6 +107,8 @@ class ControlApiDbBrowserTest {
         String auth = ex.getRequestHeaders().getFirst("Authorization");
         if ("Bearer reader".equals(auth)) return Optional.of(new Subject("reader", Set.of()));
         if ("Bearer builder".equals(auth)) return Optional.of(new Subject("builder", Set.of(Roles.CAN_AUTHOR_WORKBENCH)));
+        if ("Bearer revealer".equals(auth))
+            return Optional.of(new Subject("revealer", Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_REVEAL_LINK_ENTITIES)));
         return Optional.empty();
     };
 
@@ -140,7 +142,7 @@ class ControlApiDbBrowserTest {
             assertEquals(403, as("reader", c.port, "GET", opsTable, null).statusCode());
             assertEquals(401, as(null, c.port, "POST", "/spaces/s1/db/query", opsSql).statusCode());
 
-            HttpResponse<String> q = as("builder", c.port, "POST", "/spaces/s1/db/query", opsSql);
+            HttpResponse<String> q = as("revealer", c.port, "POST", "/spaces/s1/db/query", opsSql);
             assertEquals(200, q.statusCode(), q.body());
             HttpResponse<String> t = as("builder", c.port, "GET", opsTable, null);
             assertEquals(200, t.statusCode(), t.body());
@@ -149,6 +151,27 @@ class ControlApiDbBrowserTest {
             assertEquals(200, rq.statusCode(), "business-store SQL stays open: " + rq.body());
             assertEquals(200, as("reader", c.port, "GET", "/spaces/s1/db/table?name=orders", null).statusCode());
             assertEquals(200, as("reader", c.port, "GET", "/spaces/s1/db/catalog", null).statusCode());
+        }
+    }
+
+    /**
+     * OBJECT-READ-MASKING-RESIDUALS-1: the operational stores share one connection, so SQL under any {@code ops:*} group
+     * can read the object / note / event tables raw. A builder without {@code canRevealLinkEntities} may page a keyless
+     * store's tables but runs no operational SQL and reads no object-bearing store.
+     */
+    @Test
+    void operationalSqlAndObjectStoresNeedTheRevealCapability(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            String opsSql = "{\"group\":\"ops:status\",\"sql\":\"SELECT 1 AS a\"}";
+            HttpResponse<String> q = as("builder", c.port, "POST", "/spaces/s1/db/query", opsSql);
+            assertEquals(403, q.statusCode(), q.body());
+            assertTrue(q.body().contains("canRevealLinkEntities"), q.body());
+            HttpResponse<String> objects = as("builder", c.port, "GET", "/spaces/s1/db/table?group=ops:objects&name=objects", null);
+            assertEquals(403, objects.statusCode(), objects.body());
+            String opsTable = "/spaces/s1/db/table?group=ops:status&name=" + firstOpsTable(c.port);
+            assertEquals(200, as("builder", c.port, "GET", opsTable, null).statusCode(), "a keyless store still pages");
+            assertEquals(200, as("revealer", c.port, "POST", "/spaces/s1/db/query", opsSql).statusCode());
         }
     }
 

@@ -123,6 +123,19 @@ public final class ObjectReadMasking {
         return out;
     }
 
+    /**
+     * Free text rendered FROM objects (a Regulatory Report's content, its subject title): every classified key of every
+     * row in {@code objectRows} ({@code toMap()} shapes) is replaced inline. The text when {@code masking} is {@code null}.
+     */
+    @SuppressWarnings("unchecked")
+    public static String text(ObjectReadMasking masking, List<Map<String, Object>> objectRows, String text) {
+        if (masking == null || text == null) return text;
+        Map<String, String> replaced = new LinkedHashMap<>();
+        for (Map<String, Object> row : objectRows)
+            if (row.get("attributes") instanceof Map<?, ?> a) replaced.putAll(masking.replacements((Map<String, String>) a));
+        return replaced.isEmpty() ? text : inline(text, replaced);
+    }
+
     @SuppressWarnings("unchecked")
     Map<String, Object> maskObject(Map<String, Object> row) {
         if (!(row.get("attributes") instanceof Map<?, ?> a)) return row;
