@@ -369,13 +369,12 @@ edition; refused at save (`StepConfigSaveFindingsTest`); demo `examples/07-steps
 | `DeliveryCheck` current bucket (engine) | `TimeGrain.of(unit).truncate(now)` | wall, on UTC as before | `DeliveryCheckTest#theLastCompleteBucketIsTheOneBeforeNowAtMonthYearAndHourGrain` |
 | `KpiDefinition.Grain.start` | `TimeGrain.valueOf(name()).truncate(d)` | `LocalDate` | `KpiPeriodStartGoldenTest`, `KpiDefinitionTest`, `KpiEvaluatorTest` |
 | `MeasureCompiler.dimExpression` | `TimeGrain.parse(grain).truncateSql(col)` | wall — the SQL text is byte-identical | `MeasureCompilerTest` (pins the text), `MeasureCompilerGrainExecutionTest` |
+| `DashboardDateRange` `month-` / `quarter-` / `year-to-date` (control plane, shared-Dashboard fence) | `TimeGrain.MONTH` / `QUARTER` / `YEAR` `.truncate(anchor)` | `LocalDate`; the one zone, "today" for a Dashboard with no `asOf`, is passed explicitly (`DashboardDateRange.today(zone)`, the server's `ZoneId.systemDefault()` — the SPA twin `dashboard-date-range.ts` reads the browser's and is unchanged) | `DashboardDateRangeTest#monthAndYearToDateAtEveryBoundary` (pinned first), `#quarterToDateIsCalendarCorrectAtEveryBoundary` |
 
 Each golden test was written and committed against the old code, then passed unchanged after the switch.
 ⚠ **Kept, by decision:** `RecordTransform`'s `date.truncate` function (`DATE_TRUNC({unit}, {source})`) is not a rule of
 its own — it hands the author's free-text unit to DuckDB, any date part included (`decade`, `millisecond`), and
-narrowing it to `TimeGrain` would refuse units that run today. ⚠ `DashboardDateRange` (`month-to-date`,
-`year-to-date` in the control plane) still computes its own period start; it was not in the plan's survey and is left
-for a follow-up.
+narrowing it to `TimeGrain` would refuse units that run today.
 
 ### Tests
 
