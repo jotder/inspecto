@@ -1493,6 +1493,44 @@ class PipelineJobRunnerTest {
     }
 
     /** Rows of {@code selectFmt} (its {@code %s} = the store's Parquet reader), each row's values joined by {@code |}. */
+    /**
+     * A stored {@code similarity} step executes at rest (ANALYTICS-CORE-1 S1): every row is written with its score and
+     * candidate flag, normalized by default; the lift must map the plain kind to {@code transform.similarity}.
+     */
+    @Test
+    void runsAFlatConfigsSimilarityStepAndWritesScoresAndCandidates() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("sim_pipeline.toon");
+        Files.writeString(flat, """
+                name: sim_etl
+                active: false
+                output_store: scored
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - similarity:
+                      left: id
+                      right: amt
+                      method: token_jaccard
+                      threshold: 0.5
+                """);
+        seedParquet(dataDir, "sim_etl", "('Vladimir Putin','putin  VLADIMIR'),('Crème Brûlée','creme brulee'),"
+                + "('Acme Trading','Acme Holding'),('x',NULL)");
+
+        JobConfig cfg = new JobConfig("sim", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("Acme Trading|0.3333333333333333|false", "Crème Brûlée|1.0|true", "Vladimir Putin|1.0|true",
+                "x|null|null"), queryStore(dataDir, "scored",
+                "SELECT id, similarity, similarity_candidate FROM %s ORDER BY id"));
+    }
+
     private static List<String> queryStore(String dataDir, String store, String selectFmt) throws Exception {
         String glob = dataDir.replace("\\", "/") + "/" + store + "/**/*.parquet";
         File db = DuckDbUtil.tempDbFile("qs_");

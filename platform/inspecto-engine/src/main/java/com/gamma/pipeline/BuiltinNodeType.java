@@ -196,6 +196,11 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_SHIFT("transform.timeseries.shift", NodeCategory.TRANSFORM, "Period shift",
             "Each row gains the value its key had N buckets earlier (previous month, same week last year).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "shift"),
+    // Similarity score between two columns (catalog quality.match.fuzzy, ANALYTICS-CORE-1 S1): the Analytics Kernel's
+    // SimilaritySql through SimilarityStep. A candidate, never an identity (D-M1). steps: kind `similarity`.
+    TRANSFORM_SIMILARITY("transform.similarity", NodeCategory.TRANSFORM, "Similarity score",
+            "Adds a 0..1 similarity score of two text columns and, with a threshold, a candidate flag. Never asserts the two are the same.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "similarity"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

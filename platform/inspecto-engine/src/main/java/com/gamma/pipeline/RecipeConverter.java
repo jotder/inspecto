@@ -176,6 +176,7 @@ public final class RecipeConverter {
                     case PipelineConfig.Step.UNPIVOT -> steps.add(step("unpivot", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.RESAMPLE -> steps.add(step("resample", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.SHIFT -> steps.add(step("shift", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.SIMILARITY -> steps.add(step("similarity", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.ROUTE -> {
                         steps.add(step("route", routeStep(cfg, sink, extraSinks, dirs)));
                         routed = true;
@@ -306,6 +307,7 @@ public final class RecipeConverter {
                             case PipelineConfig.Step.UNPIVOT -> branchSteps.add(step("unpivot", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.RESAMPLE -> branchSteps.add(step("resample", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.SHIFT -> branchSteps.add(step("shift", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.SIMILARITY -> branchSteps.add(step("similarity", new LinkedHashMap<>(cfg)));
                             default -> branchSteps.add(step(kind, cfg));
                         }
                     }

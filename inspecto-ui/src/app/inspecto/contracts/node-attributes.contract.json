@@ -839,6 +839,77 @@
     "default" : "_prev",
     "help" : "Added to each shifted column's name: sum_amount becomes sum_amount_prev."
   } ],
+  "transform.similarity" : [ {
+    "key" : "left",
+    "label" : "Left column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The first text of each pair. A non-text column is compared as its text.",
+    "placeholder" : "CUSTOMER_NAME"
+  }, {
+    "key" : "right",
+    "label" : "Right column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The second text of each pair, from the same row.",
+    "placeholder" : "ACCOUNT_NAME"
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "jaro_winkler",
+    "options" : [ {
+      "value" : "jaro_winkler",
+      "label" : "Jaro-Winkler (names, short text)"
+    }, {
+      "value" : "jaro",
+      "label" : "Jaro"
+    }, {
+      "value" : "levenshtein",
+      "label" : "Levenshtein (edit distance)"
+    }, {
+      "value" : "token_jaccard",
+      "label" : "Token Jaccard (shared words)"
+    } ],
+    "help" : "How alike the two texts are, 0..1. Jaro-Winkler favours a shared beginning; token Jaccard ignores word order."
+  }, {
+    "key" : "normalize",
+    "label" : "Normalize first",
+    "type" : "boolean",
+    "tier" : "optional",
+    "default" : true,
+    "help" : "Strip accents, lower-case and collapse spaces on both sides before scoring. On by default."
+  }, {
+    "key" : "score_column",
+    "label" : "Score column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "similarity",
+    "help" : "Receives the score, 0..1: empty when either value is empty, 0 when either text is blank."
+  }, {
+    "key" : "threshold",
+    "label" : "Candidate threshold",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "When set, adds a true/false column: the score is at least this. A candidate to review, never a confirmed match."
+  }, {
+    "key" : "candidate_column",
+    "label" : "Candidate column",
+    "type" : "string",
+    "tier" : "advanced",
+    "default" : "similarity_candidate",
+    "help" : "Receives the candidate flag; only with a threshold."
+  }, {
+    "key" : "keep_score",
+    "label" : "Keep the score",
+    "type" : "boolean",
+    "tier" : "advanced",
+    "default" : true,
+    "help" : "Off keeps only the candidate flag (needs a threshold)."
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

@@ -129,6 +129,7 @@ public final class RecipeCompiler {
                 case "unpivot" -> nodes.add(unpivot(id, cfg, refusals));
                 case "resample" -> nodes.add(resample(id, cfg, refusals));
                 case "shift" -> nodes.add(shift(id, cfg, refusals));
+                case "similarity" -> nodes.add(similarity(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -433,6 +434,20 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SHIFT.type(), new LinkedHashMap<>(cfg));
     }
 
+    /**
+     * {@code similarity:} -> a {@code transform.similarity} node, config verbatim (ANALYTICS-CORE-1 S1); refused as the
+     * run would refuse it ({@link com.gamma.pipeline.exec.SimilarityStep#parse}).
+     */
+    private static PipelineNode similarity(String id, Map<String, Object> cfg,
+                                           List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.pipeline.exec.SimilarityStep.parse(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SIMILARITY.type(), new LinkedHashMap<>(cfg));
+    }
+
     /** {@code unpivot: {columns[] | columns_pattern, name_column?, value_column?, value_type?, include_nulls?}} ->
      *  a transform.matrix.unpivot node, config verbatim. Exactly one column selector; the rest is judged at run. */
     private static PipelineNode unpivot(String id, Map<String, Object> cfg,
@@ -665,6 +680,7 @@ public final class RecipeCompiler {
                     case "unpivot" -> stepNode = unpivot(stepId, stepCfg, refusals);
                     case "resample" -> stepNode = resample(stepId, stepCfg, refusals);
                     case "shift" -> stepNode = shift(stepId, stepCfg, refusals);
+                    case "similarity" -> stepNode = similarity(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);

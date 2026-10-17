@@ -481,6 +481,31 @@ public final class NodeAttributes {
                     .help("Added to each shifted column's name: sum_amount becomes sum_amount_prev."));
 
     /**
+     * {@code transform.similarity} (ANALYTICS-CORE-1 S1, catalog {@code quality.match.fuzzy}): a similarity score of two
+     * columns and an optional candidate flag. Grammar in {@code SimilarityStep}; keys proven by
+     * {@code NodeConfigNameContractTest}. A candidate, never an identity (D-M1).
+     */
+    public static final List<NodeAttribute> TRANSFORM_SIMILARITY = List.of(
+            NodeAttribute.of("left", "Left column", "string", "required").placeholder("CUSTOMER_NAME")
+                    .help("The first text of each pair. A non-text column is compared as its text."),
+            NodeAttribute.of("right", "Right column", "string", "required").placeholder("ACCOUNT_NAME")
+                    .help("The second text of each pair, from the same row."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("jaro_winkler")
+                    .options("jaro_winkler", "Jaro-Winkler (names, short text)", "jaro", "Jaro",
+                            "levenshtein", "Levenshtein (edit distance)", "token_jaccard", "Token Jaccard (shared words)")
+                    .help("How alike the two texts are, 0..1. Jaro-Winkler favours a shared beginning; token Jaccard ignores word order."),
+            NodeAttribute.of("normalize", "Normalize first", "boolean", "optional").defaultValue(true)
+                    .help("Strip accents, lower-case and collapse spaces on both sides before scoring. On by default."),
+            NodeAttribute.of("score_column", "Score column", "string", "optional").defaultValue("similarity")
+                    .help("Receives the score, 0..1: empty when either value is empty, 0 when either text is blank."),
+            NodeAttribute.of("threshold", "Candidate threshold", "number", "advanced").min(0).max(1)
+                    .help("When set, adds a true/false column: the score is at least this. A candidate to review, never a confirmed match."),
+            NodeAttribute.of("candidate_column", "Candidate column", "string", "advanced").defaultValue("similarity_candidate")
+                    .help("Receives the candidate flag; only with a threshold."),
+            NodeAttribute.of("keep_score", "Keep the score", "boolean", "advanced").defaultValue(true)
+                    .help("Off keeps only the candidate flag (needs a threshold)."));
+
+    /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
      * {@code list} type is {@code string[]} and these are MAPS.
@@ -663,7 +688,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_SIMILARITY, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -684,6 +709,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_UNPIVOT.type(), TRANSFORM_UNPIVOT);
         m.put(BuiltinNodeType.TRANSFORM_RESAMPLE.type(), TRANSFORM_RESAMPLE);
         m.put(BuiltinNodeType.TRANSFORM_SHIFT.type(), TRANSFORM_SHIFT);
+        m.put(BuiltinNodeType.TRANSFORM_SIMILARITY.type(), TRANSFORM_SIMILARITY);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

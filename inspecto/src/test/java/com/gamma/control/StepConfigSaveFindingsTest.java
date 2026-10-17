@@ -511,6 +511,28 @@ class StepConfigSaveFindingsTest {
                 "grain", "month", "columns", List.of("QTY"), "periods", 0))))), "steps[0].shift", "non-zero");
     }
 
+    // ── similarity (transform.similarity, ANALYTICS-CORE-1 S1) ──────────────────────
+
+    @Test
+    void aSimilarityColumnTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("similarity",
+                Map.of("left", "ID", "right", "NOPE"))))), "steps[0].similarity", "NOPE");
+    }
+
+    @Test
+    void aSimilarityThresholdOutsideZeroToOneIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("similarity",
+                Map.of("left", "A", "right", "B", "threshold", 2))))), "steps[0].similarity", "between 0 and 1");
+    }
+
+    @Test
+    void aSimilarityScoreColumnThatCollidesIsRefusedAndAValidOnePasses(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("similarity",
+                Map.of("left", "ID", "right", "QTY", "score_column", "qty"))))), "steps[0].similarity", "collides");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("similarity",
+                Map.of("left", "ID", "right", "QTY", "threshold", 0.9))))));
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

@@ -179,6 +179,7 @@ need the runtime decision (tracked as X5 on [`BACKLOG.md`](../../../BACKLOG.md))
 | `transform.running` (2026-10-06) | `DATA` — every inbound row plus one window-measure column each (`RunningWindow`: count/sum/avg/min/max per key over a time or row window, per run) | ✅ (verb `running`) |
 | `transform.timeseries.resample` (2026-10-17) | `DATA` — one row per key per bucket, gaps filled (`TimeSeriesStep` → the Analytics Kernel's `TimeSeriesSql.resample`) | ✅ (verb `resample`) |
 | `transform.timeseries.shift` (2026-10-17) | `DATA` — every inbound row plus each listed column's value N buckets earlier, matched by bucket (`TimeSeriesSql.shift`) | ✅ (verb `shift`) |
+| `transform.similarity` (2026-10-17) | `DATA` — every inbound row plus a 0..1 similarity score of two columns and an optional candidate flag (`SimilarityStep` → the Analytics Kernel's `SimilaritySql`); never asserts identity (D-M1) | ✅ (verb `similarity`) |
 | `transform.split` | `DATA` | ❌ |
 | `transform.merge` | `DATA` (multi-**input**) | ❌ |
 | `enrichment` | accepts/emits `DATA`; fires the **`on_commit` Signal** (⚠ spelled `ON_COMMIT` in `PipelineRel` until Phase 7 — a Signal, not an edge, per the token model above) | ✅ |

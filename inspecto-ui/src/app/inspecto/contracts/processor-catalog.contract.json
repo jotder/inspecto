@@ -434,8 +434,10 @@
     "label" : "Fuzzy string (Jaro-Winkler) matcher",
     "emoji" : "🔍",
     "icon" : "heroicons_outline:magnifying-glass-circle",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.similarity",
+    "note" : "`transform.similarity` — a 0..1 score of two columns (Jaro-Winkler, Jaro, Levenshtein, token Jaccard; normalized first by default) on the Analytics Kernel, plus an optional candidate flag at a threshold; proposes candidates, never asserts identity (D-M1) (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "quality.profiler.inline",
     "family" : "DQ",
