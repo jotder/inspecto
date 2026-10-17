@@ -155,6 +155,13 @@ the `STANDARD` median of two integer gaps truncates exactly as the integer `(a +
 ⚠ `ReportService.percentile` remains as a two-line delegate that keeps the report's "an empty window reads 0" rule; the
 duplication guard exempts it by name (`tools/data-ops-duplication.exemptions.json`), and the category-c baseline fell by one.
 
+Two more category-c sites closed on 2026-10-17: `EntityRegistry.resolve` (`inspecto-entity-store`, the identity fold)
+now uses the graph library's `com.gamma.graph.UnionFind` (M8; `union(a, b)` roots at `b`'s root, so the larger root is
+passed first to keep group id = smallest key — `EntityResolutionFoldTest`), which made `inspecto-graph` an allowed
+dependency of `inspecto-entity-store`. `DbJobRunStore.percentile` only renders `quantile_cont` / `percentile_cont`
+SQL — a SQL-side statistic that stays SQL — and is exempted with that reason. Category c now counts only the Jaccard
+(intelligence) and Jaro-Winkler (screening) copies, left for the similarity kit (Should S1).
+
 ⚠ **`VolumeBaseline` does not implement `BaselineStatistic` (M6).** That contract takes a timestamped `Double` history and
 returns a `Baseline` with a median and a scaled MAD for a robust z; `VolumeBaseline` takes calendar-day `long` row
 counts over a rolling window and answers a signed fractional deviation with four statuses. Fitting it would add an unused

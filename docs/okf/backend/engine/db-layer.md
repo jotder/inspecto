@@ -77,13 +77,19 @@ com.gamma.util.SqlIdent.q;` are the house idiom):
 | A file path as a literal (absolute, forward slashes, `'` doubled) | `SqlIdent.pathStr(path)`, `pathStr(dir, "/*.parquet")` for a glob |
 | An identifier shown to an author in a Record Transform (bare when plain) | `SqlIdent.qIfNeeded` (the twin of `sql-functions.ts quoteIdentifier`) |
 | A user-input string operand of a predicate | `SqlBuilder.stringOperand(value, params)`: bound `CAST(? AS VARCHAR)` when `params` is collected, else the literal |
+| A typed operand of a Measure filter (compared in the column's own type) | `SqlBuilder.typedOperand(value, params)`: bound `CAST(? AS BIGINT / DOUBLE / BOOLEAN)` or a bare `?` for a string; rendered, numbers and booleans bare and strings escaped (`MeasureCompiler`'s filters) |
 | A store read | `SqlViews.reader` / `readerOverLiteral` (union_by_name, VARCHAR hive values) |
 | A read of files the caller wrote itself (index, compaction input, just-written snapshot) | `SqlViews.parquet(source, unionByName, Hive.AUTO / OFF / VARCHAR / TYPED)`, `SqlViews.parquetFile(path)` |
 
 A name that must be validated before it is quoted keeps a validator that returns it **unquoted** (e.g.
 `PostgresPublishSql.safeId`, the `SAFE_IDENT` checks) and quotes through `SqlIdent.q` at the call site.
-Not yet on the path: `SummarizeSupport` (`inspecto-util` sits below `inspecto-sql`, so it cannot reach
-`SqlViews`), and the sites in the anomaly/scoring modules and `MeasureCompiler` that other lanes own.
+Every named site is now on the path (2026-10-17): `MeasureCompiler` and `AnomalyScoreEvaluator` quote
+through `SqlIdent.q` and `SqlBuilder.typedOperand`, and the Parquet/partition summarizers moved from
+`inspecto-util` up to `inspecto-sql` (`com.gamma.sql.SummarizeSupport`) so their input view is
+`SqlViews.parquet(..., true, Hive.AUTO)` rather than a hand-built `read_parquet(` — `inspecto-util` sits below
+`inspecto-sql`, and moving the one caller up kept ONE option list where a util-level copy would have made two.
+The Measure grammar has one evaluator: `WorkingSetMeasures` (geo-link) loads the measured column of a Working
+Set relation into a sealed in-memory DuckDB table and runs `MeasureCompiler`'s SELECT over it.
 
 **The rule is counted, and the count may only fall (2026-10-17, `ANALYTICS-CORE-1` M10).**
 [`tools/check-data-ops-duplication.mjs`](../../../../tools/check-data-ops-duplication.mjs) inventories,
@@ -92,7 +98,8 @@ quoting helpers (`q`, `lit`, `sqlStr`, `ident`…) outside `SqlBuilder` / `SqlId
 `read_*(` in a Java string literal outside `SqlViews`, (c) private median / percentile / MAD / z-score /
 Jaro-Winkler / Jaccard / union-find outside the Analytics Kernel and the graph library, (d) a JVM switch
 over the Measure aggregate names outside `MeasureCompiler`. It reads tracked `src/main/java` only, with
-comments stripped, and states that scope on every run. Its baseline at the start (43 / 22 / 8 / 1) is
+comments stripped, and states that scope on every run. Its baseline at the start (43 / 22 / 8 / 1; 0 / 0 / 2 / 0
+after the M8/M9 lanes of 2026-10-17 — the two left are the Jaccard and Jaro-Winkler copies, Should item S1) is
 [`tools/data-ops-duplication.baseline.json`](../../../../tools/data-ops-duplication.baseline.json); the CI
 guards job runs `--ratchet`, which fails when a module's count rises or an exemption goes stale. When a copy
 is retired, lower the baseline with `--baseline-write`; never raise it.
