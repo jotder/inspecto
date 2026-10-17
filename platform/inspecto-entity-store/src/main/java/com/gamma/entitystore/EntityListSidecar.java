@@ -1,6 +1,7 @@
 package com.gamma.entitystore;
 
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +86,7 @@ public final class EntityListSidecar {
                         ps.executeBatch();
                     }
                 }
-                st.execute("COPY e TO '" + tmp.toString().replace('\\', '/').replace("'", "''") + "' (FORMAT PARQUET)");
+                st.execute("COPY e TO " + SqlIdent.sqlStr(tmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");
             }
             Files.move(tmp, dir.resolve(FILE), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             return "written";
