@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
+import com.gamma.util.SqlIdent;
 
 /**
  * Dataset actions ({@code POST /datasets/{id}/materialize}) plus the Dataset's own row page
@@ -156,7 +157,7 @@ final class DatasetRoutes implements RouteModule {
         int limit = Math.max(1, Math.min(MAX_ROW_LIMIT,
                 ApiContext.parseIntOr(ApiContext.query(ex, "limit"), DEFAULT_ROW_LIMIT)));
         // The view is named after the Dataset id; QueryExecutor quotes it on CREATE VIEW the same way.
-        String sql = "SELECT * FROM \"" + id.replace("\"", "\"\"") + "\"";
+        String sql = "SELECT * FROM " + SqlIdent.q(id);
         QueryExecutor.Result r;
         try {
             r = QueryExecutor.run(new QueryExecutor.Request(id, relationSql, sql, limit, 0, List.of(), List.of()));
