@@ -34,7 +34,8 @@ export const ALLOWED = {
     // D-3 step 2: the Link Analysis index store. la-core's closure plus la-core itself; la-core must NEVER reach it (la-api depends on it since D-3 step 4).
     'inspecto-la-storage': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
     // D-3 step 4: la-api now depends on la-storage (the index build service + manifest); the reverse edge, and la-core -> la-storage, stay banned.
-    'inspecto-la-api': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core', 'inspecto-la-storage'],
+    // ANALYTICS-CORE-1 M4: la-api builds its column-profile SQL with the Analytics Kernel (foundation-only, so it adds no host module).
+    'inspecto-la-api': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core', 'inspecto-la-storage', 'inspecto-analytics'],
     // LA-INVESTIGATION-STORE-DESIGN-1 S2 (D-IS7): the Postgres InvestigationStore - la-core's closure plus la-core itself. JDBC only (java.sql); the driver is the host's. la-core must NEVER reach it.
     'inspecto-la-store-pg': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
     'inspecto-oidc': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],

@@ -79,7 +79,7 @@ public final class ColumnProfiler {
     /**
      * What to profile.
      *
-     * @param columns      the columns, in output order (at least one)
+     * @param columns      the columns, in output order; empty only for a row count per group ({@link #rowPerGroup})
      * @param groupBy      group columns; empty = the whole relation is one group
      * @param statistics   the statistics, in output order (at least one)
      * @param bounds       how min/max read a column
@@ -97,7 +97,6 @@ public final class ColumnProfiler {
             groupBy = List.copyOf(groupBy);
             statistics = List.copyOf(statistics);
             quantiles = List.copyOf(quantiles);
-            if (columns.isEmpty()) throw new IllegalArgumentException("a column profile needs at least one column");
             if (statistics.isEmpty() && quantiles.isEmpty())
                 throw new IllegalArgumentException("a column profile needs at least one statistic or quantile");
             for (double q : quantiles)
@@ -144,6 +143,7 @@ public final class ColumnProfiler {
      * the caller spelled it.
      */
     public static String rowPerColumn(String relation, Spec spec) {
+        if (spec.columns().isEmpty()) throw new IllegalArgumentException("a row-per-column profile needs at least one column");
         List<String> groups = groupExprs(spec);
         StringBuilder sql = new StringBuilder();
         for (String c : spec.columns()) {
@@ -161,9 +161,11 @@ public final class ColumnProfiler {
     /**
      * One row per group: {@code group_<j>…}, then {@code row_count} once if {@link Statistic#ROW_COUNT} is chosen, then
      * per column {@code i} (in column order) every other chosen statistic as {@code <statistic>_<i>} and every quantile as
-     * {@code <quantile column>_<i>}.
+     * {@code <quantile column>_<i>}. With no column it is the row count per group.
      */
     public static String rowPerGroup(String relation, Spec spec) {
+        if (spec.columns().isEmpty() && !spec.statistics().contains(Statistic.ROW_COUNT))
+            throw new IllegalArgumentException("a row-per-group profile with no column needs the row count");
         List<String> groups = groupExprs(spec);
         List<String> select = new ArrayList<>(aliased(groups, "group_"));
         if (spec.statistics().contains(Statistic.ROW_COUNT)) select.add(statistic(Statistic.ROW_COUNT, null, spec) + " AS row_count");

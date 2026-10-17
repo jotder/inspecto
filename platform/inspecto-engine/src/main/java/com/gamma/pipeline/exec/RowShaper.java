@@ -1,5 +1,6 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.analytics.ColumnProfiler;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.DataTransformer;
 import com.gamma.etl.PipelineConfig;
@@ -632,7 +633,9 @@ public final class RowShaper {
      */
     /**
      * {@code transform.profile} — one row per profiled column: row count, nulls, distinct values, min and max
-     * (catalog {@code transform.profiler.inline}, operator pick 2026-09-15).
+     * (catalog {@code transform.profiler.inline}, operator pick 2026-09-15). The SQL is the Analytics Kernel's
+     * {@link ColumnProfiler} (ANALYTICS-CORE-1 M4) in its row-per-column layout with exactly these five statistics,
+     * text bounds and exact distinct; {@code RowShaperProfileGoldenTest} pins the output.
      *
      * <p>🔴 <b>The output columns are declared here, not delegated to DuckDB's own {@code SUMMARIZE}.</b>
      * {@code SUMMARIZE} would be one line and gives a richer set — but its column list belongs to the
@@ -671,17 +674,9 @@ public final class RowShaper {
             throw new IllegalArgumentException("transform.profile node '" + node.id()
                     + "': the inbound data has no columns to profile");
 
-        StringBuilder select = new StringBuilder();
-        for (String c : wanted) {
-            if (select.length() > 0) select.append(" UNION ALL ");
-            select.append("SELECT ").append(sqlStr(c)).append(" AS column_name, ")
-                    .append("COUNT(*) AS row_count, ")
-                    .append("COUNT(*) - COUNT(").append(q(c)).append(") AS null_count, ")
-                    .append("COUNT(DISTINCT ").append(q(c)).append(") AS distinct_count, ")
-                    .append("CAST(MIN(").append(q(c)).append(") AS VARCHAR) AS min_value, ")
-                    .append("CAST(MAX(").append(q(c)).append(") AS VARCHAR) AS max_value ")
-                    .append("FROM ").append(q(input));
-        }
+        String select = ColumnProfiler.rowPerColumn(q(input), ColumnProfiler.Spec.of(wanted).withStatistics(
+                ColumnProfiler.Statistic.ROW_COUNT, ColumnProfiler.Statistic.NULL_COUNT, ColumnProfiler.Statistic.DISTINCT_COUNT,
+                ColumnProfiler.Statistic.MIN, ColumnProfiler.Statistic.MAX));
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
         return List.of(new Relation(PipelineRel.DATA, data));

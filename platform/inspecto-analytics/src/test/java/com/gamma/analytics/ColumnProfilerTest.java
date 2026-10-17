@@ -139,6 +139,13 @@ class ColumnProfilerTest {
     }
 
     @Test
+    void rowPerGroupWithNoColumnIsTheRowCountPerGroup() throws Exception {
+        String sql = ColumnProfiler.rowPerGroup("f", Spec.of(List.of()).withGroupBy(List.of("region"))
+                .withStatistics(Statistic.ROW_COUNT)) + " ORDER BY group_0";
+        assertEquals(List.of("EU|3", "US|2"), rows(sql));
+    }
+
+    @Test
     void approximateDistinctOverAnExpressionNeverExceedsTheNonNullRows() throws Exception {
         Spec spec = Spec.of(List.of("name")).withStatistics(Statistic.DISTINCT_COUNT)
                 .withDistinct(Distinct.APPROXIMATE, c -> "NULLIF(upper(" + c + "), 'B')");
@@ -205,7 +212,9 @@ class ColumnProfilerTest {
 
     @Test
     void aSpecRefusesWhatHasNoAnswer() {
-        assertThrows(IllegalArgumentException.class, () -> Spec.of(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> ColumnProfiler.rowPerColumn("f", Spec.of(List.of())));
+        assertThrows(IllegalArgumentException.class, () -> ColumnProfiler.rowPerGroup("f",
+                Spec.of(List.of()).withStatistics(Statistic.NULL_COUNT)));
         assertThrows(IllegalArgumentException.class, () -> Spec.of(List.of("a")).withStatistics());
         assertThrows(IllegalArgumentException.class, () -> Spec.of(List.of("a")).withQuantiles(QuantileMode.CONTINUOUS, 1.5));
         assertThrows(IllegalArgumentException.class, () -> ColumnProfiler.topValues("f", "a", 0));

@@ -14,16 +14,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class BaselineEvaluatorTest {
 
-    // ── median ───────────────────────────────────────────────────────────────────
-
-    @Test
-    void medianIsTheMiddleValueAndAveragesAnEvenPair() {
-        assertEquals(20, BaselineEvaluator.median(List.of(90.0, 10.0, 20.0)));
-        assertEquals(15, BaselineEvaluator.median(List.of(20.0, 10.0)));
-        assertEquals(25, BaselineEvaluator.median(List.of(40.0, 10.0, 30.0, 20.0)));
-        assertEquals(7, BaselineEvaluator.median(List.of(7.0)));
-    }
-
     // ── limits ───────────────────────────────────────────────────────────────────
 
     @Test

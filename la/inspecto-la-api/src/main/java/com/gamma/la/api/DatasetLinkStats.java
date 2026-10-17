@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.analytics.ColumnProfiler;
+import com.gamma.analytics.QuantileMode;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.la.core.DatasetProvider;
 
@@ -80,9 +82,14 @@ final class DatasetLinkStats implements LinkStatsSource {
         return out;
     }
 
-    /** The type's degree distribution: discrete p50 / p90 / p99, the maximum, hubs above {@code hub}, single-link Entities, the count. */
+    /**
+     * The type's degree distribution: p50 / p90 / p99, the maximum, hubs above {@code hub}, single-link Entities, the count.
+     * The quantiles are the kernel's explicit {@link QuantileMode#DISCRETE} mode (D-AN3): a degree is always one an Entity has.
+     */
     static String degreeSummarySql(int hub) {
-        return "SELECT quantile_disc(d, 0.5) AS p50, quantile_disc(d, 0.9) AS p90, quantile_disc(d, 0.99) AS p99, "
+        return "SELECT " + ColumnProfiler.quantile("d", 0.5, QuantileMode.DISCRETE) + " AS p50, "
+                + ColumnProfiler.quantile("d", 0.9, QuantileMode.DISCRETE) + " AS p90, "
+                + ColumnProfiler.quantile("d", 0.99, QuantileMode.DISCRETE) + " AS p99, "
                 + "MAX(d) AS mx, COUNT(*) FILTER (WHERE d > " + hub + ") AS hubs, COUNT(*) FILTER (WHERE d = 1) AS single, COUNT(*) AS n FROM "
                 + DEGREE + " AS g";
     }
