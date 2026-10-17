@@ -453,6 +453,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                         this::dataRoot,
                         () -> new com.gamma.pipeline.ViewStore(root.config() == null
                                 ? java.nio.file.Path.of("views") : root.config().resolve("views"))));
+        // ANALYTICS-CORE-1 S7: the Analytics Kernel's read-only functions (statistics, the column profiler's SQL over a
+        // `datasets` read, time-grain truncation). Pure and stateless, so a dry run hands it through unchanged.
+        platformServices.register("analytics", com.gamma.query.AnalyticsAccess.class,
+                com.gamma.query.AnalyticsAccess.kernel());
         // D7: the evaluator the alert.evaluate built-in used to receive by injection. Bound through the
         // accessor, so it resolves the engine at call time rather than capturing a not-yet-assigned field.
         platformServices.register("alerts", com.gamma.alert.AlertAccess.class,
