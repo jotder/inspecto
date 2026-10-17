@@ -72,6 +72,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-workflow</artifactId>
         </dependency>
+        <!-- ANALYTICS-CORE-1 M2: the canonical statistics (VolumeBaseline's lower median is Stats.median(x, LOWER)). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
 
         <!-- DuckDB (parent-managed since WS-D). -->
         <dependency>

@@ -1,5 +1,7 @@
 package com.gamma.consignment;
 
+import com.gamma.analytics.MedianMode;
+import com.gamma.analytics.Stats;
 import com.gamma.consignment.DbConsignmentOutputStore.DailyVolume;
 
 import java.time.LocalDate;
@@ -30,7 +32,7 @@ import java.util.Objects;
  * The baseline is the <b>median</b> of the observed prior days. A single recompute spike or one half-day
  * outage inside the window would drag a mean far enough to manufacture or to hide the next day's breach; a
  * median absorbs it. With an even count it takes the lower of the two middle values, so the baseline never
- * reads higher than a day actually received.
+ * reads higher than a day actually received: the Analytics Kernel's {@link MedianMode#LOWER} (ANALYTICS-CORE-1 M2).
  */
 public final class VolumeBaseline {
 
@@ -99,8 +101,9 @@ public final class VolumeBaseline {
         if (prior.size() < minBaselineDays)
             return new Assessment(recordDay, Status.NO_BASELINE, actual, -1, null, prior.size());
 
-        prior.sort(null);
-        long baseline = prior.get((prior.size() - 1) / 2);      // lower median: never above a day really received
+        // Lower median: never above a day really received. Row counts below 2^53 are exact as doubles, so the cast
+        // back returns the observed day's count unchanged.
+        long baseline = (long) Stats.median(prior.stream().mapToDouble(Long::doubleValue).toArray(), MedianMode.LOWER);
         if (baseline == 0)
             // Every fraction of zero is undefined rather than infinite. A pipeline whose usual day is empty
             // has no shortfall to measure, and "-100%" here would alert on the first day it produced anything.

@@ -24,7 +24,7 @@
 //   d  JVM re-implementations of the Measure grammar — a switch with `case "countDistinct"` and `case "avg"` labels outside
 //      query/MeasureCompiler.java and query/ConditionSql.java.
 // NOT detected (name-based by design, stated so nobody reads a 0 as "none"): SQL quoting done INLINE without a helper method,
-// statistics computed inline (e.g. VolumeBaseline's lower median), and a robust z named just `z` (RobustStats.z).
+// statistics computed inline without a named method (a sort-and-index median, as VolumeBaseline had before ANALYTICS-CORE-1 M2), and a robust z named just `z` (RobustStats.z).
 //
 // EXEMPTIONS are explicit — category + file + member ('*' = the whole file) + reason, one JSON object per line in
 // tools/data-ops-duplication.exemptions.json, never inferred. An HTML/XML/CSV/JSON escaper

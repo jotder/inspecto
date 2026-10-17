@@ -86,6 +86,7 @@
                                     </excludes>
                                     <includes>
                                         <include>com.gamma.inspector:inspecto-access</include>
+                                        <include>com.gamma.inspector:inspecto-analytics</include>
                                         <include>com.gamma.inspector:inspecto-api</include>
                                         <include>com.gamma.inspector:inspecto-audit-spi</include>
                                         <include>com.gamma.inspector:inspecto-auth-spi</include>

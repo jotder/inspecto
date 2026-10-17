@@ -1,6 +1,7 @@
 package com.gamma.analytics;
 
 import java.util.Arrays;
+import java.util.OptionalDouble;
 
 /**
  * The canonical statistics of the Analytics Kernel (ANALYTICS-CORE-1 M1): ONE written definition each, so two modules
@@ -201,6 +202,31 @@ public final class Stats {
         public boolean outside(double value) {
             return value < lower || value > upper;
         }
+    }
+
+    // ---- ratio and rate ------------------------------------------------------------------------------------------
+
+    /**
+     * Ratio: {@code numerator / denominator}, or <b>empty when the denominator is zero</b> (±0.0) — there is no number
+     * to state, and the result is never NaN. Both arguments must be finite (NaN or ±Infinity throws
+     * {@link IllegalArgumentException}); a finite quotient too large for a double overflows to ±Infinity as in IEEE.
+     * DuckDB {@code numerator / NULLIF(denominator, 0)} (NULL where this is empty).
+     */
+    public static OptionalDouble ratio(double numerator, double denominator) {
+        if (!Double.isFinite(numerator) || !Double.isFinite(denominator))
+            throw new IllegalArgumentException("ratio needs finite values, got " + numerator + " / " + denominator);
+        return denominator == 0 ? OptionalDouble.empty() : OptionalDouble.of(numerator / denominator);
+    }
+
+    /**
+     * Rate: the share {@code events / total} of a count, in {@code [0, 1]} — e.g. failed runs of all runs, null values
+     * of all rows. <b>Empty when {@code total} is 0</b> (no trials, no rate; never NaN). {@code events} must be in
+     * {@code [0, total]}, otherwise {@link IllegalArgumentException}. DuckDB {@code events::DOUBLE / NULLIF(total, 0)}.
+     */
+    public static OptionalDouble rate(long events, long total) {
+        if (events < 0 || events > total)
+            throw new IllegalArgumentException("rate needs 0 <= events <= total, got " + events + " of " + total);
+        return total == 0 ? OptionalDouble.empty() : OptionalDouble.of((double) events / total);
     }
 
     // ---- input rules ---------------------------------------------------------------------------------------------

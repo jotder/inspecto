@@ -92,6 +92,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-workflow</artifactId>
         </dependency>
+        <!-- ANALYTICS-CORE-1 M2: the canonical statistics (ReportService's percentile is Stats.quantile(x, q, NEAREST_RANK)). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-http-spi</artifactId>

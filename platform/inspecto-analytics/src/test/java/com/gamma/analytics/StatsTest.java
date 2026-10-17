@@ -185,4 +185,29 @@ class StatsTest {
         Stats.tukeyFences(v);
         assertArrayEquals(copy, v);
     }
+
+    @Test
+    void ratioDividesAndIsEmptyForAZeroDenominator() {
+        assertEquals(2.5, Stats.ratio(5, 2).orElseThrow(), 0.0);
+        assertEquals(-0.25, Stats.ratio(-1, 4).orElseThrow(), 0.0);
+        assertEquals(0.0, Stats.ratio(0, 7).orElseThrow(), 0.0);
+        assertTrue(Stats.ratio(3, 0).isEmpty(), "x / 0 has no number");
+        assertTrue(Stats.ratio(0, 0).isEmpty(), "0 / 0 is empty, never NaN");
+        assertTrue(Stats.ratio(3, -0.0).isEmpty(), "negative zero is zero");
+        assertThrows(IllegalArgumentException.class, () -> Stats.ratio(Double.NaN, 1));
+        assertThrows(IllegalArgumentException.class, () -> Stats.ratio(1, Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> Stats.ratio(Double.POSITIVE_INFINITY, 1));
+        assertThrows(IllegalArgumentException.class, () -> Stats.ratio(1, Double.NEGATIVE_INFINITY));
+    }
+
+    @Test
+    void rateIsAShareOfACountAndIsEmptyWithNoTrials() {
+        assertEquals(0.25, Stats.rate(1, 4).orElseThrow(), 0.0);
+        assertEquals(0.0, Stats.rate(0, 9).orElseThrow(), 0.0);
+        assertEquals(1.0, Stats.rate(9, 9).orElseThrow(), 0.0);
+        assertEquals(1.0 / 3, Stats.rate(1, 3).orElseThrow(), 0.0);
+        assertTrue(Stats.rate(0, 0).isEmpty(), "no trials, no rate; never NaN");
+        assertThrows(IllegalArgumentException.class, () -> Stats.rate(-1, 4));
+        assertThrows(IllegalArgumentException.class, () -> Stats.rate(5, 4), "more events than trials");
+    }
 }

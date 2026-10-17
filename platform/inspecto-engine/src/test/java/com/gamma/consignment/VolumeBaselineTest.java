@@ -190,4 +190,54 @@ class VolumeBaselineTest {
         assertThrows(IllegalArgumentException.class,
                 () -> VolumeBaseline.assess(series, "2026-08-08", 7, 3, Double.NaN));
     }
+
+    // ── golden figures (ANALYTICS-CORE-1 M2): pinned BEFORE the median moved to the Analytics Kernel ─────────
+
+    /** The prior days {@code rows[0..]} end on 2026-08-30; the target 2026-08-31 received {@code actual}. */
+    private static VolumeBaseline.Assessment golden(long actual, long... rows) {
+        List<DailyVolume> series = new ArrayList<>();
+        for (int i = 0; i < rows.length; i++) series.add(day(String.format("2026-08-%02d", 30 - i), rows[i]));
+        series.add(day("2026-08-31", actual));
+        return VolumeBaseline.assess(series, "2026-08-31", 30, 1, 0.3);
+    }
+
+    private static VolumeBaseline.Assessment expect(long actual, long baseline, int days) {
+        VolumeBaseline.Status status = (actual - (double) baseline) / baseline < -0.3
+                ? VolumeBaseline.Status.BREACH : VolumeBaseline.Status.STEADY;
+        return new VolumeBaseline.Assessment("2026-08-31", status, actual, baseline,
+                (actual - (double) baseline) / baseline, days);
+    }
+
+    @Test
+    @DisplayName("golden: the lower median over odd, even, tied, single and huge histories")
+    void goldenLowerMedian() {
+        assertEquals(expect(1000, 700, 1), golden(1000, 700));                       // n = 1
+        assertEquals(expect(1000, 300, 2), golden(1000, 700, 300));                  // n = 2: the lower, not 500
+        assertEquals(expect(1000, 3, 3), golden(1000, 5, 1, 3));                     // odd
+        assertEquals(expect(1000, 4, 4), golden(1000, 4, 4, 1, 9));                  // even with a tie in the middle
+        assertEquals(expect(1000, 6, 6), golden(1000, 2, 8, 6, 4, 10, 12));          // even: 6, never 7
+        assertEquals(expect(1000, 7, 4), golden(1000, 7, 7, 7, 7));                  // all tied
+        assertEquals(expect(1000, 1500, 2), golden(1000, 1500, 2500));               // BREACH against the lower
+        assertEquals(expect(1000, 1, 2), golden(1000, 9_000_000_000_000L, 1));       // a huge outlier
+        assertEquals(expect(5_000_000_000L, 4_000_000_000L, 3),
+                golden(5_000_000_000L, 4_000_000_000L, 3_000_000_000L, 4_500_000_000L));
+        assertEquals(new VolumeBaseline.Assessment("2026-08-31", VolumeBaseline.Status.STEADY, 1000, 0, null, 4),
+                golden(1000, 0, 0, 5, 9));                                           // lower median 0: no deviation
+    }
+
+    @Test
+    @DisplayName("golden: the baseline equals the pre-kernel lower median on 2,000 seeded histories")
+    void goldenAgainstThePreKernelRule() {
+        java.util.Random r = new java.util.Random(20261017);
+        for (int k = 0; k < 2000; k++) {
+            int n = 1 + r.nextInt(30);
+            long[] rows = new long[n];
+            for (int i = 0; i < n; i++) rows[i] = r.nextInt(4) == 0 ? r.nextInt(5) : r.nextInt(2_000_000);
+            List<Long> prior = new ArrayList<>();
+            for (long v : rows) prior.add(v);
+            prior.sort(null);
+            long frozen = prior.get((prior.size() - 1) / 2);   // VolumeBaseline's rule as shipped before M2
+            assertEquals(frozen, golden(1000, rows).baselineRows(), "history " + prior);
+        }
+    }
 }

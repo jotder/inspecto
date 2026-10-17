@@ -107,6 +107,36 @@ class StatsDuckDbParityTest {
         assertTrue(checked > 2000, "parity checks run: " + checked);
     }
 
+    @Test
+    void ratioAndRateMatchDivisionByNullifZero() throws Exception {
+        double[][] pairs = {{5, 2}, {-1, 4}, {0, 7}, {3, 0}, {0, 0}, {1, 3}, {1e6 + 0.5, 3.25}, {-7.5, -2.5}};
+        for (double[] p : pairs) {
+            try (PreparedStatement ps = conn.prepareStatement("SELECT ?::DOUBLE / NULLIF(?::DOUBLE, 0)")) {
+                ps.setDouble(1, p[0]);
+                ps.setDouble(2, p[1]);
+                try (ResultSet rs = ps.executeQuery()) {
+                    assertTrue(rs.next());
+                    double duck = rs.getDouble(1);
+                    if (rs.wasNull()) assertTrue(Stats.ratio(p[0], p[1]).isEmpty(), p[0] + " / " + p[1] + " is NULL in DuckDB");
+                    else assertEquals(duck, Stats.ratio(p[0], p[1]).orElseThrow(), 0.0, p[0] + " / " + p[1]);
+                }
+            }
+        }
+        long[][] counts = {{1, 4}, {0, 9}, {9, 9}, {1, 3}, {0, 0}, {123_456, 1_000_000}};
+        for (long[] c : counts) {
+            try (PreparedStatement ps = conn.prepareStatement("SELECT ?::BIGINT::DOUBLE / NULLIF(?::BIGINT, 0)")) {
+                ps.setLong(1, c[0]);
+                ps.setLong(2, c[1]);
+                try (ResultSet rs = ps.executeQuery()) {
+                    assertTrue(rs.next());
+                    double duck = rs.getDouble(1);
+                    if (rs.wasNull()) assertTrue(Stats.rate(c[0], c[1]).isEmpty(), c[0] + " of " + c[1] + " is NULL in DuckDB");
+                    else assertEquals(duck, Stats.rate(c[0], c[1]).orElseThrow(), 0.0, c[0] + " of " + c[1]);
+                }
+            }
+        }
+    }
+
     private static void load(double[] v) throws Exception {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE OR REPLACE TABLE t(x DOUBLE)");

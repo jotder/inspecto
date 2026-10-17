@@ -1,5 +1,7 @@
 package com.gamma.report;
 
+import com.gamma.analytics.QuantileMode;
+import com.gamma.analytics.Stats;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.service.EnrichmentService;
@@ -11,7 +13,6 @@ import com.gamma.job.ReportRunner;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -278,14 +279,14 @@ public final class ReportService implements ReportRunner {
                 first, last, window.from(), window.to());
     }
 
-    /** Nearest-rank percentile (p in {@code [0,100]}) of {@code values}; 0 when empty. */
+    /**
+     * Nearest-rank percentile (p in {@code [0,100]}) of {@code values}; 0 when empty. The Analytics Kernel's
+     * {@link QuantileMode#NEAREST_RANK} (ANALYTICS-CORE-1 M2) — always an observed duration, and durations below 2^53 ms
+     * are exact as doubles, so the cast back returns it unchanged.
+     */
     private static long percentile(List<Long> values, double p) {
         if (values.isEmpty()) return 0L;
-        List<Long> s = new ArrayList<>(values);
-        Collections.sort(s);
-        int rank = (int) Math.ceil(p / 100.0 * s.size());
-        int idx = Math.min(Math.max(rank, 1), s.size()) - 1;
-        return s.get(idx);
+        return (long) Stats.quantile(values.stream().mapToDouble(Long::doubleValue).toArray(), p / 100.0, QuantileMode.NEAREST_RANK);
     }
 
     private static long asLong(String v) {
