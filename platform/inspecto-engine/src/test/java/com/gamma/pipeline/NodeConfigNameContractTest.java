@@ -870,6 +870,150 @@ class NodeConfigNameContractTest {
         assertFalse(s.normalize());
     }
 
+    /**
+     * The rank node's contract (ANALYTICS-CORE-1 S4): {@code steps: - rank:} lifts to ONE {@code transform.analytics.rank}
+     * node, an edit of every declared key survives the lower and still parses as the run reads it.
+     */
+    @Test
+    void rankAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("order_by", List.of("QTY desc"));
+        r.put("group_by", List.of("REGION"));
+        r.put("method", "dense_rank");
+        r.put("top", 5);
+        r.put("rank_column", "place");
+        r.put("tie_break", List.of("ID"));
+        r.put("keep_rank", false);
+        Map<String, Object> got = timeSeriesSavedAs(dir, "rank", "transform.analytics.rank", r);
+        com.gamma.pipeline.exec.RankStep.Spec s = com.gamma.pipeline.exec.RankStep.parse(got);
+        assertEquals(com.gamma.pipeline.exec.RankStep.Method.DENSE_RANK, s.method());
+        assertEquals(5, s.top());
+        assertTrue(s.orderBy().get(0).descending());
+        assertEquals(List.of(), s.addedColumns());
+    }
+
+    /** The sample node's contract (ANALYTICS-CORE-1 S4); size and fraction are exclusive, so each half is re-parsed. */
+    @Test
+    void sampleAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> s = new LinkedHashMap<>();
+        s.put("size", 25);
+        s.put("fraction", 0.2);
+        s.put("seed", 42);
+        s.put("group_by", List.of("REGION"));
+        s.put("key", List.of("ID"));
+        Map<String, Object> got = timeSeriesSavedAs(dir, "sample", "transform.sample", s);
+        Map<String, Object> sized = new LinkedHashMap<>(got);
+        sized.remove("fraction");
+        Map<String, Object> shared = new LinkedHashMap<>(got);
+        shared.remove("size");
+        assertEquals(25, com.gamma.pipeline.exec.SampleStep.parse(sized).sample().size());
+        com.gamma.pipeline.exec.SampleStep.Spec f = com.gamma.pipeline.exec.SampleStep.parse(shared);
+        assertEquals(2000, f.sample().fractionBp());
+        assertEquals(42, f.sample().seed());
+        assertEquals(List.of("ID"), f.key());
+    }
+
+    /** The pivot node's contract (ANALYTICS-CORE-1 S4). */
+    @Test
+    void pivotAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("group_by", List.of("REGION"));
+        p.put("pivot_column", "KIND");
+        p.put("values", List.of("voice", "sms"));
+        p.put("measure", "sum(QTY)");
+        p.put("prefix", "k_");
+        Map<String, Object> got = timeSeriesSavedAs(dir, "pivot", "transform.matrix.pivot", p);
+        com.gamma.pipeline.exec.PivotStep.Spec s = com.gamma.pipeline.exec.PivotStep.parse(got);
+        assertEquals(List.of("REGION", "k_voice", "k_sms"), s.outputColumns());
+        assertEquals("sum", s.measure().agg());
+    }
+
+    /**
+     * The entity grouping node's contract (ANALYTICS-CORE-1 S2): {@code steps: - entity_link:} lifts to ONE
+     * {@code transform.entity.link} node, an edit of every declared key survives the lower and still parses as the run
+     * reads it.
+     */
+    @Test
+    void entityLinkAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> el = new LinkedHashMap<>();
+        el.put("key", "ID");
+        el.put("match", List.of("EMAIL", "PHONE+LAST_NAME"));
+        el.put("blocking", List.of("COUNTRY"));
+        el.put("digits", List.of("PHONE"));
+        el.put("as_written", List.of("LAST_NAME"));
+        el.put("group_column", "person");
+        el.put("max_block_size", 50);
+        el.put("max_pairs", 5000);
+        el.put("candidate_by", "FULL_NAME");
+        el.put("candidate_method", "token_jaccard");
+        el.put("candidate_threshold", 0.7);
+        el.put("candidate_normalize", false);
+        assertEquals(new java.util.TreeSet<>(el.keySet()), new java.util.TreeSet<>(
+                NodeAttributes.TRANSFORM_ENTITY_LINK.stream().map(NodeAttribute::key).toList()),
+                "the edit sets every declared key");
+        Map<String, Object> got = timeSeriesSavedAs(dir, "entity_link", "transform.entity.link", el);
+        com.gamma.pipeline.exec.EntityLinkStep.Spec s = com.gamma.pipeline.exec.EntityLinkStep.parse(got);
+        assertEquals(2, s.grouping().conditions().size());
+        assertEquals(com.gamma.analytics.entity.Normalization.DIGITS, s.grouping().conditions().get(1).columns().get(0).normalization());
+        assertEquals(com.gamma.analytics.entity.Normalization.NONE, s.grouping().conditions().get(1).columns().get(1).normalization());
+        assertEquals(50, s.grouping().maxBlockSize());
+        assertEquals(5000L, s.grouping().maxPairs());
+        assertEquals(0.7, s.grouping().candidate().threshold());
+        assertEquals(com.gamma.analytics.similarity.SimilaritySql.Method.TOKEN_JACCARD, s.grouping().candidate().method());
+        assertFalse(s.grouping().candidate().normalize());
+        assertEquals(List.of("person", "candidate_score", "candidate_group", "candidate_review"), s.addedColumns());
+    }
+
+    /**
+     * The distribution Steps' contract (ANALYTICS-CORE-1 S3): {@code outlier:}, {@code binning:} and
+     * {@code correlation:} each lift to ONE node of their type, an edit of every declared key survives the lower and still
+     * parses as the run reads it.
+     */
+    @Test
+    void distributionAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> outlier = new LinkedHashMap<>();
+        outlier.put("column", "QTY");
+        outlier.put("method", "robust_z");
+        outlier.put("group_by", List.of("ID"));
+        outlier.put("k", 3.0);
+        outlier.put("quantile_mode", "discrete");
+        outlier.put("threshold", 2.5);
+        outlier.put("unit", 0.01);
+        outlier.put("prefix", "qty_");
+        var o = com.gamma.pipeline.exec.DistributionStep.parseOutlier(
+                timeSeriesSavedAs(dir.resolve("o"), "outlier", "transform.stats.outlier", outlier));
+        assertEquals(com.gamma.analytics.distribution.OutlierSql.Method.ROBUST_Z, o.kernel().method());
+        assertEquals(2.5, o.kernel().threshold());
+        assertEquals(0.01, o.kernel().unit());
+        assertEquals(List.of("qty_score", "qty_flag"), o.addedColumns());
+        assertEquals(List.of("ID"), o.kernel().groupBy());
+
+        Map<String, Object> bins = new LinkedHashMap<>();
+        bins.put("column", "QTY");
+        bins.put("bins", 5);
+        bins.put("method", "equal_width");
+        bins.put("group_by", List.of("ID"));
+        bins.put("min", 0);
+        bins.put("max", 100);
+        bins.put("quantile_mode", "discrete");
+        bins.put("bin_column", "qty_bin");
+        bins.put("label_column", "qty_range");
+        var b = com.gamma.pipeline.exec.DistributionStep.parseBinning(
+                timeSeriesSavedAs(dir.resolve("b"), "binning", "transform.data.binning", bins));
+        assertEquals(5, b.kernel().bins());
+        assertEquals(0.0, b.kernel().rangeMin());
+        assertEquals(100.0, b.kernel().rangeMax());
+        assertEquals(List.of("qty_bin", "qty_range"), b.addedColumns());
+
+        Map<String, Object> corr = new LinkedHashMap<>();
+        corr.put("columns", List.of("QTY", "PRICE", "TAX"));
+        corr.put("group_by", List.of("ID"));
+        var c = com.gamma.pipeline.exec.DistributionStep.parseCorrelation(
+                timeSeriesSavedAs(dir.resolve("c"), "correlation", "transform.stats.correlation", corr));
+        assertEquals(3, c.pairs().size());
+        assertEquals(List.of("ID"), c.groupBy());
+    }
+
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
             throws Exception {
         java.nio.file.Files.createDirectories(dir);

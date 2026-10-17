@@ -1,0 +1,38 @@
+name: STEP_ENTITY_LINK
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/customers/database
+  backup:     out/customers/backup
+  temp:       out/customers/temp
+  errors:     out/customers/errors
+  quarantine: out/customers/quarantine
+  markers:    out/customers/markers
+  status_dir: out/customers/status
+  log_dir:    out/customers/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+
+output_store: customer_groups
+
+steps[1]:
+  - entity_link:
+      key: CUSTOMER_ID
+      match[2]: EMAIL, PHONE
+      digits[1]: PHONE
+      blocking[1]: COUNTRY
+      candidate_by: FULL_NAME
+      candidate_threshold: 0.9

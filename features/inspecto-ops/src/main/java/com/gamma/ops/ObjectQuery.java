@@ -30,13 +30,31 @@ import static com.gamma.util.Values.trimToNull;
  * @param openOnly      {@code true} to keep only objects not yet closed ({@code closedAt == 0}, which
  *                      {@link OperationalObject#withStatus} maintains on every terminal move) — pushed into
  *                      SQL so an "active" lookup never reads the terminal history. {@code false} = no constraint.
+ * @param createdFrom   when {@code > 0}, keep only objects created at or after this epoch-millis instant
+ *                      ({@code createdAt >= createdFrom}, the bound inclusive) — a Case Rule's window, pushed
+ *                      into SQL. {@code 0} (or less) means no constraint.
+ * @param prefilter     a {@link Prefilter} NARROWING hint a store may apply, or {@code null}; it never decides
+ *                      a match, so a caller that sets it re-checks every row it gets back.
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record ObjectQuery(ObjectType objectType, String status, String severity, String assignee,
                           String owner, String correlationId, String textContains,
                           int limit, int offset, long closedBefore, boolean oldestFirst,
-                          boolean openOnly) {
+                          boolean openOnly, long createdFrom, Prefilter prefilter) {
+
+    /**
+     * A case-insensitive narrowing hint (ANALYTICS-CORE-1 S8) for a walk whose exact test the caller keeps — the
+     * Case Rule's {@link com.gamma.ops.tag.TagRule.Filter}. Each non-null field is a CONTAINS test, ignoring case, that
+     * every true match passes: the status holds one of {@code statusAnyOf}; the priority / severity holds that text;
+     * the encoded attribute bag holds the {@code category} text. A store may drop rows that fail it, or ignore it
+     * altogether ({@link #matches} and the in-memory store do), so it can only ever remove certain non-matches.
+     */
+    public record Prefilter(java.util.List<String> statusAnyOf, String priority, String severity, String category) {
+        public Prefilter {
+            statusAnyOf = statusAnyOf == null || statusAnyOf.isEmpty() ? null : java.util.List.copyOf(statusAnyOf);
+        }
+    }
 
     public static final int DEFAULT_LIMIT = 100;
     public static final int MAX_LIMIT = 10_000;
@@ -49,6 +67,13 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
     }
 
     /** The pre-open-only shape: no {@code openOnly} constraint. */
+    public ObjectQuery(ObjectType objectType, String status, String severity, String assignee,
+                       String owner, String correlationId, String textContains,
+                       int limit, int offset, long closedBefore, boolean oldestFirst, boolean openOnly) {
+        this(objectType, status, severity, assignee, owner, correlationId, textContains, limit, offset,
+                closedBefore, oldestFirst, openOnly, 0L, null);
+    }
+
     public ObjectQuery(ObjectType objectType, String status, String severity, String assignee,
                        String owner, String correlationId, String textContains,
                        int limit, int offset, long closedBefore, boolean oldestFirst) {
@@ -72,7 +97,7 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
      *  the ordered source set a caller slices itself (keyset pagination, scope-filtered analytics). */
     public ObjectQuery unbounded() {
         return new ObjectQuery(objectType, status, severity, assignee, owner, correlationId, textContains,
-                MAX_LIMIT, 0, closedBefore, oldestFirst, openOnly);
+                MAX_LIMIT, 0, closedBefore, oldestFirst, openOnly, createdFrom, prefilter);
     }
 
     /**
@@ -109,6 +134,7 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         // closedAt == 0 means "not closed", so a reopened object can never satisfy a retention cutoff.
         if (closedBefore > 0 && !(o.closedAt() > 0 && o.closedAt() < closedBefore)) return false;
         if (openOnly && o.closedAt() != 0) return false;
+        if (createdFrom > 0 && o.createdAt() < createdFrom) return false;
         if (textContains != null && !textContains.isBlank()) {
             String needle = textContains.toLowerCase(Locale.ROOT);
             boolean inTitle = o.title() != null && o.title().toLowerCase(Locale.ROOT).contains(needle);
@@ -127,6 +153,8 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         private long closedBefore = 0L;
         private boolean oldestFirst = false;
         private boolean openOnly = false;
+        private long createdFrom = 0L;
+        private Prefilter prefilter = null;
 
         public Builder objectType(ObjectType t) { this.objectType = t; return this; }
         public Builder status(String s) { this.status = trimToNull(s); return this; }
@@ -140,10 +168,12 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         public Builder closedBefore(long epochMillis) { this.closedBefore = epochMillis; return this; }
         public Builder oldestFirst(boolean b) { this.oldestFirst = b; return this; }
         public Builder openOnly(boolean b) { this.openOnly = b; return this; }
+        public Builder createdFrom(long epochMillis) { this.createdFrom = epochMillis; return this; }
+        public Builder prefilter(Prefilter p) { this.prefilter = p; return this; }
 
         public ObjectQuery build() {
             return new ObjectQuery(objectType, status, severity, assignee, owner, correlationId,
-                    textContains, limit, offset, closedBefore, oldestFirst, openOnly);
+                    textContains, limit, offset, closedBefore, oldestFirst, openOnly, createdFrom, prefilter);
         }
     }
 }

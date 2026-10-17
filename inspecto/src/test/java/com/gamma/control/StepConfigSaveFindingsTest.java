@@ -559,6 +559,86 @@ class StepConfigSaveFindingsTest {
                 Map.of("left", "ID", "right", "QTY", "threshold", 0.9))))));
     }
 
+    // ── rank, sample, pivot (ANALYTICS-CORE-1 S4) ─────────────────────────────────────
+
+    @Test
+    void aRankOrderColumnTheSchemaDoesNotDeclareIsRefusedAndTheRankColumnFlowsOn(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("rank",
+                Map.of("order_by", List.of("NOPE desc")))))), "steps[0].rank", "NOPE");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("rank", Map.of("order_by", List.of("QTY desc"), "top", 3)),
+                Map.of("filter", Map.of("where", "rank <= 2"))))));
+    }
+
+    @Test
+    void aSampleWithBothSizeAndFractionIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("sample",
+                Map.of("size", 5, "fraction", 0.5))))), "steps[0].sample", "exactly one");
+    }
+
+    @Test
+    void aDynamicPivotIsRefusedAndOnlyTheKeysFlowOn(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("pivot",
+                Map.of("pivot_column", "ID", "measure", "count"))))), "steps[0].pivot", "explicit 'values'");
+        // a VARCHAR field fails OPEN (a mapping-derived column is typed VARCHAR here whatever it computes); the run refuses it
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("pivot",
+                Map.of("pivot_column", "QTY", "values", List.of("a"), "measure", "sum(ID)"))))));
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("pivot", Map.of("group_by", List.of("ID"), "pivot_column", "QTY", "values", List.of("1", "2"),
+                        "measure", "count", "prefix", "q")),
+                Map.of("dedup", Map.of("keys", List.of("QTY")))))), "steps[1].dedup", "QTY");
+    }
+
+    // ── entity_link (transform.entity.link, ANALYTICS-CORE-1 S2) ───────────────────
+
+    @Test
+    void anEntityLinkMatchColumnTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("entity_link",
+                Map.of("key", "ID", "match", List.of("NOPE")))))), "steps[0].entity_link", "NOPE");
+    }
+
+    @Test
+    void aFuzzyEntityLinkMatchIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("entity_link",
+                Map.of("key", "A", "match", List.of("B"), "threshold", 0.9))))), "steps[0].entity_link", "D-M1");
+    }
+
+    @Test
+    void anEntityLinkGroupColumnThatCollidesIsRefusedAndAValidOnePasses(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("entity_link",
+                Map.of("key", "ID", "match", List.of("QTY"), "group_column", "qty"))))), "steps[0].entity_link", "collides");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("entity_link",
+                Map.of("key", "ID", "match", List.of("QTY"), "blocking", List.of("QTY"), "candidate_by", "ID",
+                        "candidate_threshold", 0.9))))));
+    }
+
+    // ── distribution Steps (ANALYTICS-CORE-1 S3) ─────────────────────────────────────
+
+    @Test
+    void anOutlierColumnTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("outlier",
+                Map.of("column", "NOPE"))))), "steps[0].outlier", "NOPE");
+    }
+
+    @Test
+    void aBinningWithNoBinsIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("binning",
+                Map.of("column", "QTY", "bins", 0))))), "steps[0].binning", "between 1 and");
+    }
+
+    @Test
+    void aCollidingBinColumnOrARepeatedCorrelationColumnIsRefusedAndValidOnesPass(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("binning",
+                Map.of("column", "QTY", "bins", 3, "bin_column", "qty"))))), "steps[0].binning", "collides");
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("correlation",
+                Map.of("columns", List.of("QTY", "qty")))))), "steps[0].correlation", "twice");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("outlier", Map.of("column", "QTY", "group_by", List.of("ID"))),
+                Map.of("binning", Map.of("column", "QTY", "bins", 4, "method", "quantile")),
+                Map.of("correlation", Map.of("columns", List.of("QTY", "outlier_upper"), "group_by", List.of("ID")))))),
+                "the outlier and bin columns flow on: correlation may read outlier_upper");
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

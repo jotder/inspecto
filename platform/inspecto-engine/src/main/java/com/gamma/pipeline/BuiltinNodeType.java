@@ -205,6 +205,34 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_SIMILARITY("transform.similarity", NodeCategory.TRANSFORM, "Similarity score",
             "Adds a 0..1 similarity score of two text columns and, with a threshold, a candidate flag. Never asserts the two are the same.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "similarity"),
+    // ANALYTICS-CORE-1 S4. Rank & Top-N (RankStep): types keep the catalog ids, steps: kinds are the plain words.
+    TRANSFORM_RANK("transform.analytics.rank", NodeCategory.TRANSFORM, "Rank & Top-N",
+            "Ranks rows per group by a stated order (ties broken by every column) and keeps the top N or adds the rank.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "rank"),
+    // Deterministic seeded sample (catalog quality.sample.reservoir): the Analytics Kernel's Sampler through SampleStep.
+    TRANSFORM_SAMPLE("transform.sample", NodeCategory.TRANSFORM, "Sample",
+            "Keeps a fixed number or a share of rows per group, chosen by a seeded hash of a row key - the same rows every run.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "sample"),
+    // Rows to columns over DECLARED values (PivotStep), one Measure-grammar aggregate per value.
+    TRANSFORM_PIVOT("transform.matrix.pivot", NodeCategory.TRANSFORM, "Pivot",
+            "One row per key, one column per listed value, each holding an aggregate (sum, count...) of that value's rows.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "pivot"),
+    // Deterministic entity grouping (catalog enrichment.entity.link, ANALYTICS-CORE-1 S2): the Analytics Kernel's
+    // EntityGroupingSql through EntityLinkStep. Exact matches only; similarity only flags candidates (D-M1).
+    TRANSFORM_ENTITY_LINK("transform.entity.link", NodeCategory.TRANSFORM, "Entity grouping",
+            "Gives every row a resolution group: rows that agree exactly on a match key are the same entity. Similarity only flags look-alikes for review.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "entity_link"),
+    // Distribution Steps (ANALYTICS-CORE-1 S3) on the Analytics Kernel (OutlierSql, Binning, CorrelationSql) through
+    // DistributionStep. steps: kinds `outlier`, `binning`, `correlation`.
+    TRANSFORM_OUTLIER("transform.stats.outlier", NodeCategory.TRANSFORM, "Outlier flags",
+            "Flags each row whose number lies outside Tukey's fences (IQR) or past a robust z, per group; every row kept.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "outlier"),
+    TRANSFORM_BINNING("transform.data.binning", NodeCategory.TRANSFORM, "Bins",
+            "Adds a bin number and label to each row: equal-width or equal-frequency (quantile) bins of a number column.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "binning"),
+    TRANSFORM_CORRELATION("transform.stats.correlation", NodeCategory.TRANSFORM, "Correlation",
+            "One row per column pair (per group): Pearson correlation and the least-squares line (slope, intercept, r2).",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "correlation"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

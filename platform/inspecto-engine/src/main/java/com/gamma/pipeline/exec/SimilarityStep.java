@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.gamma.util.SqlIdent.q;
+import static com.gamma.util.SqlIdent.sqlStr;
 
 /**
  * The config grammar of {@code transform.similarity} ({@code steps:} kind {@code similarity}, catalog
@@ -39,6 +40,16 @@ public final class SimilarityStep {
     /** The scratch name of the score when {@code keep_score: false}; never left in the output. */
     static final String SCRATCH_SCORE = "__similarity_score";
 
+    /**
+     * The longest value, in characters of the raw text (before {@code normalize}), either side of a pair may hold.
+     * Levenshtein and Jaro cost grows with the product of the two lengths, so one huge cell can stall a run. A longer
+     * value <b>fails the run</b> through DuckDB's {@code error()}, naming the columns and the cap - as the kernel's
+     * other caps fail closed (entity cap D-AD10, the resample bucket cap). A NULL score was not chosen: NULL already
+     * means "a side is NULL", and a silent NULL would hide the refusal. 1,000 characters is far above any name,
+     * address or identifier this Step is meant for.
+     */
+    public static final int MAX_TEXT_LENGTH = 1_000;
+
     private static final Set<String> KEYS = Set.of("left", "right", "method", "normalize", "score_column",
             "threshold", "candidate_column", "keep_score");
 
@@ -63,14 +74,20 @@ public final class SimilarityStep {
             return out;
         }
 
-        /** The score expression over the two (quoted, VARCHAR-cast, optionally normalized) columns. */
+        /**
+         * The score expression over the two (quoted, VARCHAR-cast, optionally normalized) columns; a raw value longer
+         * than {@link #MAX_TEXT_LENGTH} characters fails the statement.
+         */
         String scoreSql() {
             String a = "CAST(" + q(left) + " AS VARCHAR)", b = "CAST(" + q(right) + " AS VARCHAR)";
+            String tooLong = "length(" + a + ") > " + MAX_TEXT_LENGTH + " OR length(" + b + ") > " + MAX_TEXT_LENGTH;
+            String refusal = KIND + ": a value in '" + left + "' or '" + right + "' is longer than " + MAX_TEXT_LENGTH
+                    + " characters - the similarity cap per value";
             if (normalize) {
                 a = SimilaritySql.normalize(a);
                 b = SimilaritySql.normalize(b);
             }
-            return method.sql(a, b);
+            return "CASE WHEN " + tooLong + " THEN error(" + sqlStr(refusal) + ") ELSE " + method.sql(a, b) + " END";
         }
 
         /** Every inbound row with the added columns; NULL on either side gives a NULL score and candidate. */

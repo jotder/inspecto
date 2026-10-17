@@ -33,6 +33,13 @@
             <artifactId>inspecto-la-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The Analytics Kernel's Md5Bucket - the one definition of the md5 bucket BucketFunction renders; already in the
+             allowed closure via la-core. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- The sealed read connection (SqlSandbox) and its policy; already in the allowed closure via la-core. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>

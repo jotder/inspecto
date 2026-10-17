@@ -1,6 +1,9 @@
 package com.gamma.control;
 
+import com.gamma.analytics.time.TimeGrain;
+
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,10 +19,19 @@ import java.util.Map;
  * day. The range applies only to a Dataset that declares the {@code dateField} column (as a column or a calculated
  * column) — the same per-tile scoping the viewer uses. A {@code defaultRange} that is set but cannot be read is
  * REFUSED, never dropped: an unranged share would show more than the Dashboard does.
+ *
+ * <p>The to-date presets start at the Analytics Kernel's {@link TimeGrain} truncation of the anchor day (month, quarter,
+ * year) - calendar days, no zone involved. The one zone is in "today": {@link #today(ZoneId)} takes it explicitly, and the
+ * share route passes the server's ({@link ZoneId#systemDefault()}), as the SPA's {@code todayIso} reads the browser's.
  */
 final class DashboardDateRange {
 
     private DashboardDateRange() {}
+
+    /** Today's calendar day in {@code zone} - the anchor of a Dashboard that has no {@code asOf}. */
+    static LocalDate today(ZoneId zone) {
+        return LocalDate.now(zone);
+    }
 
     /** The range terms for one Dataset — empty when the Dashboard has no range or the Dataset lacks the column. */
     static List<Map<String, Object>> terms(Map<String, Object> dashboard, Map<String, Object> dataset, LocalDate today) {
@@ -45,9 +57,9 @@ final class DashboardDateRange {
             case "last-7-days" -> anchor.minusDays(6);
             case "last-30-days" -> anchor.minusDays(29);
             case "last-90-days" -> anchor.minusDays(89);
-            case "month-to-date" -> anchor.withDayOfMonth(1);
-            case "quarter-to-date" -> LocalDate.of(anchor.getYear(), (anchor.getMonthValue() - 1) / 3 * 3 + 1, 1);
-            case "year-to-date" -> anchor.withDayOfYear(1);
+            case "month-to-date" -> TimeGrain.MONTH.truncate(anchor);
+            case "quarter-to-date" -> TimeGrain.QUARTER.truncate(anchor);
+            case "year-to-date" -> TimeGrain.YEAR.truncate(anchor);
             case "last-12-months" -> anchor.minusMonths(12).plusDays(1);   // minusMonths clamps to the month's end
             default -> null;
         };

@@ -1027,6 +1027,438 @@
     "default" : true,
     "help" : "Off keeps only the candidate flag (needs a threshold)."
   } ],
+  "transform.analytics.rank" : [ {
+    "key" : "order_by",
+    "label" : "Order by",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "The columns that decide the rank, each optionally followed by asc or desc. Empty values sort last.",
+    "placeholder" : "AMOUNT desc"
+  }, {
+    "key" : "group_by",
+    "label" : "Rank within",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "The rank restarts for each key (top N per region). Leave blank for one ranking of all rows.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "row_number",
+    "options" : [ {
+      "value" : "row_number",
+      "label" : "Row number (1, 2, 3 - ties split)"
+    }, {
+      "value" : "rank",
+      "label" : "Rank (1, 1, 3 - ties share)"
+    }, {
+      "value" : "dense_rank",
+      "label" : "Dense rank (1, 1, 2 - ties share)"
+    } ],
+    "help" : "Row number gives every row its own place; rank and dense rank give tied rows the same one."
+  }, {
+    "key" : "top",
+    "label" : "Keep top N",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "max" : 1000000.0,
+    "help" : "Keep only rows ranked N or better in each group. With rank or dense rank, ties can keep more than N."
+  }, {
+    "key" : "rank_column",
+    "label" : "Rank column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "rank",
+    "help" : "Receives the rank, starting at 1."
+  }, {
+    "key" : "tie_break",
+    "label" : "Tie-break",
+    "type" : "list",
+    "tier" : "advanced",
+    "help" : "Ordered after the order-by columns. Row number then breaks any remaining tie by every column, so the same input always gives the same ranks.",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "keep_rank",
+    "label" : "Keep the rank",
+    "type" : "boolean",
+    "tier" : "advanced",
+    "default" : true,
+    "help" : "Off drops the rank column and keeps only the top rows (needs Keep top N)."
+  } ],
+  "transform.sample" : [ {
+    "key" : "size",
+    "label" : "Rows per group",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "max" : 1000000.0,
+    "help" : "Keep this many rows of each group (all of a smaller group). Set this or Fraction."
+  }, {
+    "key" : "fraction",
+    "label" : "Fraction",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Keep this share of each group, rounded to the nearest row (0.1 = 10%). Set this or Rows per group."
+  }, {
+    "key" : "seed",
+    "label" : "Seed",
+    "type" : "number",
+    "tier" : "optional",
+    "default" : 0,
+    "help" : "The same seed always picks the same rows; another seed picks another sample."
+  }, {
+    "key" : "group_by",
+    "label" : "Sample within",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Sample each key separately (stratified). Leave blank for one sample of all rows.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "key",
+    "label" : "Row key",
+    "type" : "list",
+    "tier" : "advanced",
+    "help" : "The columns that identify a row; the pick hashes them with the seed. Blank: every column.",
+    "placeholder" : "CALL_ID"
+  } ],
+  "transform.matrix.pivot" : [ {
+    "key" : "group_by",
+    "label" : "Row keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "One output row per key. Leave blank for one row.",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "pivot_column",
+    "label" : "Pivot column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The column whose values become columns. Values are matched as text.",
+    "placeholder" : "CALL_TYPE"
+  }, {
+    "key" : "values",
+    "label" : "Values",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Each listed value becomes a column (at most 200). Values not listed are left out; there is no pivot over whatever values the data holds.",
+    "placeholder" : "voice, sms, data"
+  }, {
+    "key" : "measure",
+    "label" : "Measure",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "count or agg(field) - sum, avg, min, max, countDistinct, median, stddev, p90... A value with no rows gets 0 for count, empty otherwise.",
+    "placeholder" : "sum(AMOUNT)"
+  }, {
+    "key" : "prefix",
+    "label" : "Column prefix",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Put before each value to make its column name (needed when a value starts with a digit).",
+    "placeholder" : "v_"
+  } ],
+  "transform.entity.link" : [ {
+    "key" : "key",
+    "label" : "Record key",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "A column that names each row once. A group's id is its smallest key (as text).",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "match",
+    "label" : "Match keys",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Rows that agree exactly on every column of one entry are the same entity; join columns with +. Any entry is enough, and the links chain (A=B by email, B=C by phone: one group).",
+    "placeholder" : "EMAIL, PHONE+LAST_NAME"
+  }, {
+    "key" : "blocking",
+    "label" : "Blocking keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Rows are only compared inside the same block (same value of every blocking column). A row with an empty blocking value stays a group of its own.",
+    "placeholder" : "COUNTRY"
+  }, {
+    "key" : "digits",
+    "label" : "Digits-only columns",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "These columns are compared on their digits only (+44 20 7946-0001 = 442079460001). Other columns ignore accents, case and extra spaces.",
+    "placeholder" : "PHONE"
+  }, {
+    "key" : "as_written",
+    "label" : "Compare as written",
+    "type" : "list",
+    "tier" : "advanced",
+    "help" : "These columns are compared exactly as stored. An empty value never matches."
+  }, {
+    "key" : "group_column",
+    "label" : "Group column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "resolution_group",
+    "help" : "Receives the resolution group id: the smallest key of the group."
+  }, {
+    "key" : "max_block_size",
+    "label" : "Largest block",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1000,
+    "min" : 2.0,
+    "max" : 100000.0,
+    "help" : "The run fails if more rows than this share one match value or block - usually a placeholder such as 0 or unknown that would wrongly join them."
+  }, {
+    "key" : "max_pairs",
+    "label" : "Most candidate pairs",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1000000,
+    "min" : 1.0,
+    "max" : 1.0E8,
+    "help" : "The run fails rather than compare more pairs of rows than this."
+  }, {
+    "key" : "candidate_by",
+    "label" : "Review look-alikes by",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Optional. Scores this text column against the other groups of the block and flags close ones for review (candidate_score, candidate_group, candidate_review). Never joins a group. Needs blocking keys.",
+    "placeholder" : "FULL_NAME"
+  }, {
+    "key" : "candidate_method",
+    "label" : "Review method",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "jaro_winkler",
+    "options" : [ {
+      "value" : "jaro_winkler",
+      "label" : "Jaro-Winkler (names, short text)"
+    }, {
+      "value" : "jaro",
+      "label" : "Jaro"
+    }, {
+      "value" : "levenshtein",
+      "label" : "Levenshtein (edit distance)"
+    }, {
+      "value" : "token_jaccard",
+      "label" : "Token Jaccard (shared words)"
+    } ],
+    "help" : "How alike two texts are, 0..1."
+  }, {
+    "key" : "candidate_threshold",
+    "label" : "Review threshold",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Required with candidate_by: the score at which a look-alike is flagged for review."
+  }, {
+    "key" : "candidate_normalize",
+    "label" : "Normalize before review",
+    "type" : "boolean",
+    "tier" : "advanced",
+    "default" : true,
+    "help" : "Strip accents, lower-case and collapse spaces before scoring."
+  } ],
+  "transform.stats.outlier" : [ {
+    "key" : "column",
+    "label" : "Number column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The number judged. An empty value gets no flag.",
+    "placeholder" : "AMOUNT"
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "iqr",
+    "options" : [ {
+      "value" : "iqr",
+      "label" : "IQR fences (Tukey: outside Q1 - k*IQR .. Q3 + k*IQR)"
+    }, {
+      "value" : "robust_z",
+      "label" : "Robust z (distance from the median in scaled MADs)"
+    } ],
+    "help" : "IQR suits skewed data and writes the fences; robust z writes a score."
+  }, {
+    "key" : "group_by",
+    "label" : "Groups",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Judge each value against its own group's figures. Blank: the whole column is one group.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "k",
+    "label" : "Fence multiplier (k)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1.5,
+    "min" : 0.0,
+    "max" : 100.0,
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "iqr"
+    },
+    "help" : "IQR only. 1.5 is Tukey's outlier, 3 a far-out value."
+  }, {
+    "key" : "quantile_mode",
+    "label" : "Quartiles",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "continuous",
+    "options" : [ {
+      "value" : "continuous",
+      "label" : "Interpolated (quantile_cont)"
+    }, {
+      "value" : "discrete",
+      "label" : "An observed value (quantile_disc)"
+    } ],
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "iqr"
+    },
+    "help" : "IQR only. How Q1 and Q3 are read."
+  }, {
+    "key" : "threshold",
+    "label" : "Score threshold",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 3.5,
+    "min" : 0.0,
+    "max" : 1000.0,
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "robust_z"
+    },
+    "help" : "Robust z only. A value whose score is beyond this (either side) is flagged."
+  }, {
+    "key" : "unit",
+    "label" : "Smallest meaningful change",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1.0,
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "robust_z"
+    },
+    "help" : "Robust z only. Floors the spread so a near-constant group does not flag a tiny change: 1 for counts, 0.01 for cents."
+  }, {
+    "key" : "prefix",
+    "label" : "Column prefix",
+    "type" : "string",
+    "tier" : "advanced",
+    "default" : "outlier_",
+    "help" : "Names the added columns: outlier_lower, outlier_upper (IQR) or outlier_score (robust z), and outlier_flag."
+  } ],
+  "transform.data.binning" : [ {
+    "key" : "column",
+    "label" : "Number column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The number binned. An empty value gets no bin.",
+    "placeholder" : "AMOUNT"
+  }, {
+    "key" : "bins",
+    "label" : "Bins",
+    "type" : "number",
+    "tier" : "required",
+    "min" : 1.0,
+    "max" : 1000.0,
+    "help" : "How many bins, numbered from 0."
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "equal_width",
+    "options" : [ {
+      "value" : "equal_width",
+      "label" : "Equal width (same range per bin)"
+    }, {
+      "value" : "quantile",
+      "label" : "Quantile (about the same number of rows per bin)"
+    } ],
+    "help" : "Equal width splits the range; quantile splits the rows, ties kept together."
+  }, {
+    "key" : "group_by",
+    "label" : "Groups",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Bin each group over its own range or quantiles. Blank: the whole column.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "min",
+    "label" : "Range from",
+    "type" : "number",
+    "tier" : "advanced",
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "equal_width"
+    },
+    "help" : "Equal width only. A stated lower end; a value below it gets no bin. Blank: the smallest value."
+  }, {
+    "key" : "max",
+    "label" : "Range to",
+    "type" : "number",
+    "tier" : "advanced",
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "equal_width"
+    },
+    "help" : "Equal width only. A stated upper end; a value above it gets no bin. Blank: the largest value."
+  }, {
+    "key" : "quantile_mode",
+    "label" : "Quantiles",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "continuous",
+    "options" : [ {
+      "value" : "continuous",
+      "label" : "Interpolated (quantile_cont)"
+    }, {
+      "value" : "discrete",
+      "label" : "An observed value (quantile_disc)"
+    } ],
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "quantile"
+    },
+    "help" : "Quantile only. How the bin edges are read."
+  }, {
+    "key" : "bin_column",
+    "label" : "Bin column",
+    "type" : "string",
+    "tier" : "advanced",
+    "default" : "bin",
+    "help" : "Receives the bin number, 0 to bins - 1."
+  }, {
+    "key" : "label_column",
+    "label" : "Label column",
+    "type" : "string",
+    "tier" : "advanced",
+    "default" : "bin_label",
+    "help" : "Receives the bin's range as text: [lower, upper), the last bin [lower, upper]."
+  } ],
+  "transform.stats.correlation" : [ {
+    "key" : "columns",
+    "label" : "Number columns",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Every pair of these is correlated; in each pair the later column is regressed on the earlier.",
+    "placeholder" : "PRICE, QUANTITY"
+  }, {
+    "key" : "group_by",
+    "label" : "Groups",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "One row per group per pair. Blank: one row per pair.",
+    "placeholder" : "REGION"
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

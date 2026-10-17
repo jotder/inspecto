@@ -586,6 +586,75 @@ final class ConfigRoutes {
                         columns = null;   // already refused above; what follows cannot be judged
                     }
                 }
+            } else if (PipelineConfig.Step.RANK.equals(kind)) {
+                // every inbound column survives; the rank (BIGINT) is added unless keep_rank: false
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.RankStep.parse(cfg);
+                        for (String c : spec.addedColumns()) columns.add(new TypeFlow.Column(c, "BIGINT"));
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;   // already refused above; what follows cannot be judged
+                    }
+                }
+            } else if (PipelineConfig.Step.SAMPLE.equals(kind)) {
+                // a subset of the rows; the columns are unchanged
+            } else if (PipelineConfig.Step.PIVOT.equals(kind)) {
+                // the keys keep their types; each pivoted column's type depends on the aggregate - VARCHAR, which every
+                // later check treats as unknown and fails open on
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.PivotStep.parse(cfg);
+                        List<TypeFlow.Column> out = new ArrayList<>();
+                        for (String g : spec.groupBy()) out.add(new TypeFlow.Column(g, declaredType(columns, g)));
+                        for (String c : spec.pivotedColumns()) out.add(new TypeFlow.Column(c, "VARCHAR"));
+                        columns = out;
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;
+                    }
+                }
+            } else if (PipelineConfig.Step.ENTITY_LINK.equals(kind)) {
+                // every inbound column survives; the group (the key's type) and the candidate columns are added
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.EntityLinkStep.parse(cfg);
+                        String keyType = columns.stream().filter(c -> c.name().equalsIgnoreCase(spec.grouping().keyColumn()))
+                                .map(TypeFlow.Column::type).findFirst().orElse("VARCHAR");
+                        var out = spec.columns();
+                        columns.add(new TypeFlow.Column(out.group(), keyType));
+                        if (spec.grouping().candidate() != null) {
+                            columns.add(new TypeFlow.Column(out.candidateScore(), "DOUBLE"));
+                            columns.add(new TypeFlow.Column(out.candidateGroup(), keyType));
+                            columns.add(new TypeFlow.Column(out.candidateReview(), "BOOLEAN"));
+                        }
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;   // already refused above; what follows cannot be judged
+                    }
+                }
+            } else if (PipelineConfig.Step.OUTLIER.equals(kind) || PipelineConfig.Step.BINNING.equals(kind)) {
+                // every inbound column survives; the outlier figures and flag, or the bin number and label, are added
+                if (columns != null) {
+                    try {
+                        columns.addAll(distributionAdded(kind, cfg));
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;   // already refused above; what follows cannot be judged
+                    }
+                }
+            } else if (PipelineConfig.Step.CORRELATION.equals(kind)) {
+                // summarising: the group columns, then the pair and its figures
+                if (columns != null) {
+                    try {
+                        var spec = com.gamma.pipeline.exec.DistributionStep.parseCorrelation(cfg);
+                        List<TypeFlow.Column> out = new ArrayList<>();
+                        for (String g : spec.groupBy()) out.add(new TypeFlow.Column(g, declaredType(columns, g)));
+                        out.add(new TypeFlow.Column("x_column", "VARCHAR"));
+                        out.add(new TypeFlow.Column("y_column", "VARCHAR"));
+                        out.add(new TypeFlow.Column("n", "BIGINT"));
+                        for (String f : List.of("correlation", "slope", "intercept", "r2")) out.add(new TypeFlow.Column(f, "DOUBLE"));
+                        columns = out;
+                    } catch (IllegalArgumentException malformed) {
+                        columns = null;
+                    }
+                }
             } else if (PipelineConfig.Step.HASH.equals(kind)) {
                 // names survive a hash; with keep_original each column gains a <col>_hash beside it
                 if (columns != null && "true".equalsIgnoreCase(String.valueOf(cfg.get("keep_original")))
@@ -608,6 +677,21 @@ final class ConfigRoutes {
             if (branches.get(b) instanceof Map<?, ?> branch && branch.get("steps") instanceof List<?> sub)
                 walkSteps(sub, prefix + ".branches[" + b + "].steps",
                         columns == null ? null : new ArrayList<>(columns), refusals, fields, predicates, active);
+    }
+
+    /** The columns an outlier or binning step adds, with their DuckDB types; {@link IllegalArgumentException} if malformed. */
+    private static List<TypeFlow.Column> distributionAdded(String kind, Map<?, ?> cfg) {
+        List<TypeFlow.Column> out = new ArrayList<>();
+        if (PipelineConfig.Step.BINNING.equals(kind)) {
+            var spec = com.gamma.pipeline.exec.DistributionStep.parseBinning(cfg);
+            out.add(new TypeFlow.Column(spec.kernel().binColumn(), "BIGINT"));
+            out.add(new TypeFlow.Column(spec.kernel().labelColumn(), "VARCHAR"));
+        } else {
+            List<String> added = com.gamma.pipeline.exec.DistributionStep.parseOutlier(cfg).addedColumns();
+            for (int i = 0; i < added.size(); i++)
+                out.add(new TypeFlow.Column(added.get(i), i == added.size() - 1 ? "BOOLEAN" : "DOUBLE"));
+        }
+        return out;
     }
 
     /** A declared column's type, or {@code ""} when the schema does not carry it. */
@@ -778,6 +862,17 @@ final class ConfigRoutes {
                     return "transform.hash needs a non-empty 'columns' list - the columns to hash";
                 return undeclared("transform.hash column", cols, columns);
             }
+            case PipelineConfig.Step.ENTITY_LINK -> {
+                com.gamma.pipeline.exec.EntityLinkStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.EntityLinkStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                return columns == null ? null
+                        : com.gamma.pipeline.exec.EntityLinkStep.columnRefusal(spec,
+                                columns.stream().map(TypeFlow.Column::name).toList());
+            }
             case PipelineConfig.Step.SIMILARITY -> {
                 com.gamma.pipeline.exec.SimilarityStep.Spec spec;
                 try {
@@ -788,6 +883,76 @@ final class ConfigRoutes {
                 return columns == null ? null
                         : com.gamma.pipeline.exec.SimilarityStep.columnRefusal(spec,
                                 columns.stream().map(TypeFlow.Column::name).toList());
+            }
+            case PipelineConfig.Step.RANK -> {
+                com.gamma.pipeline.exec.RankStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.RankStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                return columns == null ? null
+                        : com.gamma.pipeline.exec.RankStep.columnRefusal(spec,
+                                columns.stream().map(TypeFlow.Column::name).toList());
+            }
+            case PipelineConfig.Step.SAMPLE -> {
+                com.gamma.pipeline.exec.SampleStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.SampleStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                return columns == null ? null
+                        : com.gamma.pipeline.exec.SampleStep.columnRefusal(spec,
+                                columns.stream().map(TypeFlow.Column::name).toList());
+            }
+            case PipelineConfig.Step.PIVOT -> {
+                com.gamma.pipeline.exec.PivotStep.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.PivotStep.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.PivotStep.columnRefusal(spec,
+                        columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null || spec.measure().field() == null) return refusal;
+                String type = declaredType(columns, spec.measure().field());
+                // VARCHAR fails OPEN, as for resample: a mapping-derived column is typed VARCHAR here whatever it computes.
+                return type.isEmpty() || "VARCHAR".equalsIgnoreCase(type) ? null
+                        : com.gamma.pipeline.exec.PivotStep.typeRefusal(spec, type);
+            }
+            case PipelineConfig.Step.OUTLIER, PipelineConfig.Step.BINNING, PipelineConfig.Step.CORRELATION -> {
+                String what;
+                List<String> required, added, numbers;
+                try {
+                    if (PipelineConfig.Step.OUTLIER.equals(kind)) {
+                        var spec = com.gamma.pipeline.exec.DistributionStep.parseOutlier(cfg);
+                        what = "transform.stats.outlier";
+                        required = spec.inputColumns(); added = spec.addedColumns(); numbers = List.of(spec.kernel().column());
+                    } else if (PipelineConfig.Step.BINNING.equals(kind)) {
+                        var spec = com.gamma.pipeline.exec.DistributionStep.parseBinning(cfg);
+                        what = "transform.data.binning";
+                        required = spec.inputColumns(); added = spec.addedColumns(); numbers = List.of(spec.kernel().column());
+                    } else {
+                        var spec = com.gamma.pipeline.exec.DistributionStep.parseCorrelation(cfg);
+                        what = "transform.stats.correlation";
+                        required = spec.inputColumns(); added = List.of(); numbers = spec.columns();
+                    }
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.DistributionStep.columnRefusal(what, required, added,
+                        columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null) return refusal;
+                // VARCHAR fails OPEN, as for forecast: a mapping-derived column is typed VARCHAR here whatever it computes.
+                Map<String, String> types = new java.util.LinkedHashMap<>();
+                for (String c : numbers) {
+                    String t = declaredType(columns, c);
+                    types.put(c, t.isEmpty() || "VARCHAR".equalsIgnoreCase(t) ? "DOUBLE" : t);
+                }
+                return com.gamma.pipeline.exec.DistributionStep.numberRefusal(what, numbers, types);
             }
             case PipelineConfig.Step.MASK -> {
                 List<String> problems = com.gamma.pipeline.exec.MaskSpec.problems(cfg);

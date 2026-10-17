@@ -206,9 +206,17 @@ public final class Stats {
 
     /** Tukey's fences: {@code [Q1 − k·IQR, Q3 + k·IQR]}, quartiles {@link QuantileMode#CONTINUOUS}; k must be ≥ 0. */
     public static Fences tukeyFences(double[] values, double k) {
+        return tukeyFences(values, k, QuantileMode.CONTINUOUS);
+    }
+
+    /**
+     * Tukey's fences with the quartiles in an explicit {@link QuantileMode}: {@code Q1 − k·(Q3 − Q1)} and
+     * {@code Q3 + k·(Q3 − Q1)}, written in that order so the SQL form ({@code OutlierSql}) computes the same doubles.
+     */
+    public static Fences tukeyFences(double[] values, double k, QuantileMode mode) {
         if (!(k >= 0)) throw new IllegalArgumentException("fence multiplier must be >= 0, got " + k);
-        double q1 = quantile(values, 0.25);
-        double q3 = quantile(values, 0.75);
+        double q1 = quantile(values, 0.25, mode);
+        double q3 = quantile(values, 0.75, mode);
         double iqr = q3 - q1;
         return new Fences(q1 - k * iqr, q3 + k * iqr);
     }
@@ -218,6 +226,74 @@ public final class Stats {
         public boolean outside(double value) {
             return value < lower || value > upper;
         }
+    }
+
+    // ---- correlation and simple linear regression ------------------------------------------------------------------
+
+    /**
+     * Pearson correlation of the pairs {@code (x[i], y[i])}: {@code Σ(x − x̄)(y − ȳ) / √(Σ(x − x̄)² · Σ(y − ȳ)²)}
+     * (two-pass). <b>Empty when either side is constant</b> (one pair included) — no spread, no correlation; DuckDB
+     * {@code corr} returns NaN there and the SQL form ({@code CorrelationSql}) turns it into NULL. Input rules as every
+     * statistic here, plus equal lengths. DuckDB {@code corr(y, x)}.
+     */
+    public static OptionalDouble correlation(double[] x, double[] y) {
+        checkPairs(x, y, "correlation");
+        if (constant(x) || constant(y)) return OptionalDouble.empty();
+        double mx = mean(x), my = mean(y);
+        double sxy = 0, sxx = 0, syy = 0;
+        for (int i = 0; i < x.length; i++) {
+            double dx = x[i] - mx, dy = y[i] - my;
+            sxy += dx * dy;
+            sxx += dx * dx;
+            syy += dy * dy;
+        }
+        return OptionalDouble.of(sxy / Math.sqrt(sxx * syy));
+    }
+
+    /**
+     * Ordinary least squares of {@code y} on {@code x} — DuckDB's {@code regr_*} family:
+     * <ul>
+     *   <li>{@code count} = n, the pairs ({@code regr_count});</li>
+     *   <li>{@code slope} = {@code Σ(x − x̄)(y − ȳ) / Σ(x − x̄)²} ({@code regr_slope}); empty when x is constant;</li>
+     *   <li>{@code intercept} = {@code ȳ − slope · x̄} ({@code regr_intercept}); empty with the slope;</li>
+     *   <li>{@code r2} ({@code regr_r2}): empty when x is constant, <b>1 when y is constant</b> (a flat line fits it
+     *       exactly — DuckDB's rule, kept), otherwise the squared {@link #correlation}.</li>
+     * </ul>
+     * Input rules as {@link #correlation}.
+     */
+    public static Regression linearRegression(double[] x, double[] y) {
+        checkPairs(x, y, "linear regression");
+        if (constant(x)) return new Regression(x.length, OptionalDouble.empty(), OptionalDouble.empty(), OptionalDouble.empty());
+        double mx = mean(x), my = mean(y);
+        double sxy = 0, sxx = 0;
+        for (int i = 0; i < x.length; i++) {
+            double dx = x[i] - mx;
+            sxy += dx * (y[i] - my);
+            sxx += dx * dx;
+        }
+        double slope = sxy / sxx;
+        double r2;
+        if (constant(y)) r2 = 1.0;
+        else {
+            double r = correlation(x, y).getAsDouble();
+            r2 = r * r;
+        }
+        return new Regression(x.length, OptionalDouble.of(slope), OptionalDouble.of(my - slope * mx), OptionalDouble.of(r2));
+    }
+
+    /** {@link #linearRegression}'s result; an empty member has no number (see there). */
+    public record Regression(long count, OptionalDouble slope, OptionalDouble intercept, OptionalDouble r2) {}
+
+    private static void checkPairs(double[] x, double[] y, String what) {
+        check(x, what);
+        check(y, what);
+        if (x.length != y.length)
+            throw new IllegalArgumentException(what + " needs pairs: " + x.length + " x values, " + y.length + " y values");
+    }
+
+    private static boolean constant(double[] v) {
+        for (double d : v) if (d != v[0]) return false;
+        return true;
     }
 
     // ---- ratio and rate ------------------------------------------------------------------------------------------

@@ -248,7 +248,7 @@ public final class TimeSeriesStep {
         return null;
     }
 
-    private static final Set<String> NUMERIC = Set.of("TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT", "UTINYINT",
+    static final Set<String> NUMERIC = Set.of("TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT", "UTINYINT",
             "USMALLINT", "UINTEGER", "UBIGINT", "UHUGEINT", "FLOAT", "DOUBLE");
 
     /** Parse and validate a resample config; {@link IllegalArgumentException} names the first problem. */

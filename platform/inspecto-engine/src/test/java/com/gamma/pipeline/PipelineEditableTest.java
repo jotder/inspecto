@@ -600,6 +600,35 @@ class PipelineEditableTest {
                 node("s", "transform.similarity", s));
     }
 
+    /** The rank, sample and pivot Steps (ANALYTICS-CORE-1 S4) have no singular block and lower under their plain kinds. */
+    @Test
+    void theRankSampleAndPivotStepsLowerToStepsUnderTheirPlainKinds() {
+        assertChain(List.of("filter", "rank", "sample", "pivot"),
+                node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("r", "transform.analytics.rank", new LinkedHashMap<>(Map.of("order_by", List.of("GROSS desc"), "top", 3))),
+                node("s", "transform.sample", new LinkedHashMap<>(Map.of("size", 10, "seed", 7))),
+                node("p", "transform.matrix.pivot", new LinkedHashMap<>(Map.of("pivot_column", "KIND",
+                        "values", List.of("a", "b"), "measure", "sum(GROSS)"))));
+    }
+
+    /** The entity grouping Step (ANALYTICS-CORE-1 S2) has no singular block and lowers under its plain kind. */
+    @Test
+    void theEntityLinkStepLowersToStepsUnderItsPlainKind() {
+        Map<String, Object> e = new LinkedHashMap<>(Map.of("key", "ID", "match", List.of("EMAIL")));
+        assertChain(List.of("filter", "entity_link"), node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("e", "transform.entity.link", e));
+    }
+
+    /** The distribution Steps (ANALYTICS-CORE-1 S3) lower to steps: under their plain kinds, in canvas order. */
+    @Test
+    void theDistributionStepsLowerToStepsUnderTheirPlainKinds() {
+        assertChain(List.of("filter", "outlier", "binning", "correlation"),
+                node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("o", "transform.stats.outlier", new LinkedHashMap<>(Map.of("column", "GROSS"))),
+                node("b", "transform.data.binning", new LinkedHashMap<>(Map.of("column", "GROSS", "bins", 4))),
+                node("c", "transform.stats.correlation", new LinkedHashMap<>(Map.of("columns", List.of("GROSS", "NET")))));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

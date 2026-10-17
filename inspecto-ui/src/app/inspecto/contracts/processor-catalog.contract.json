@@ -454,8 +454,10 @@
     "label" : "Statistical & reservoir sampler",
     "emoji" : "📊",
     "icon" : "heroicons_outline:beaker",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.sample",
+    "note" : "`transform.sample` — a fixed size or a fraction per group, chosen by an MD5 hash of a seed and a row key on the Analytics Kernel (`Sampler`): the same rows every run and in the JVM twin; never `USING SAMPLE` / `random()` (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "quality.cleanse.transcode",
     "family" : "DQ",
@@ -556,8 +558,10 @@
     "label" : "Dynamic pivot / transpose",
     "emoji" : "🔀",
     "icon" : "heroicons_outline:arrows-up-down",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.matrix.pivot",
+    "note" : "rows to columns over DECLARED values only (at most 200; a dynamic pivot is refused), one Measure-grammar aggregate per value (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "transform.matrix.unpivot",
     "family" : "XFM",
@@ -574,8 +578,10 @@
     "label" : "Rank & Top-N pruner",
     "emoji" : "🏆",
     "icon" : "heroicons_outline:trophy",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.analytics.rank",
+    "note" : "row_number / rank / dense_rank per group by a stated order, ties broken deterministically; keeps the top N or adds the rank (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "transform.explode",
     "family" : "XFM",
@@ -759,8 +765,10 @@
     "label" : "Histogram & quantile binner",
     "emoji" : "📦",
     "icon" : "heroicons_outline:chart-bar",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.data.binning",
+    "note" : "`transform.data.binning` — equal-width or quantile (equal-frequency) bins of a number column, per group, with a bin number and label; a histogram is binning then summarize (count by bin), and the profiler's histogram shares the equal-width bin (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "addable" : true
   }, {
     "id" : "transform.string.smart_split",
     "family" : "BI",
@@ -793,16 +801,20 @@
     "label" : "Outlier detector & IQR boxplot fencer",
     "emoji" : "🚨",
     "icon" : "heroicons_outline:exclamation-circle",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.stats.outlier",
+    "note" : "`transform.stats.outlier` — Tukey's fences (k, quantile mode) or a robust z (median and MAD) per group; every row kept with its fences or score and a flag (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "addable" : true
   }, {
     "id" : "transform.stats.correlation",
     "family" : "BI",
     "label" : "Pearson & Spearman correlation matrix",
     "emoji" : "🧮",
     "icon" : "heroicons_outline:squares-2x2",
-    "status" : "planned",
-    "addable" : false
+    "status" : "partial",
+    "nodeType" : "transform.stats.correlation",
+    "note" : "`transform.stats.correlation` ships Pearson plus the least-squares line (slope, intercept, r2) per column pair and group, as long-form rows; Spearman (rank) correlation is not built (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "addable" : true
   }, {
     "id" : "enrichment.reference",
     "family" : "ENR",
@@ -851,8 +863,10 @@
     "label" : "Master entity resolution & record linkage",
     "emoji" : "🔗",
     "icon" : "heroicons_outline:user-group",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.entity.link",
+    "note" : "`transform.entity.link` — every row gets a resolution group: blocking keys + exact match keys (normalised as text, digits or as written) + union-find on the Analytics Kernel, caps fail closed; similarity only flags look-alikes for review, never merges (D-M1) (2026-10-17)",
+    "addable" : true
   }, {
     "id" : "enrichment.graph.cluster",
     "family" : "ENR",

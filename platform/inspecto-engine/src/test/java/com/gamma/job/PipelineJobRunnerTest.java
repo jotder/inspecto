@@ -1580,6 +1580,199 @@ class PipelineJobRunnerTest {
                 "SELECT id, similarity, similarity_candidate FROM %s ORDER BY id"));
     }
 
+    /**
+     * Stored {@code rank}, {@code sample} and {@code pivot} steps execute at rest (ANALYTICS-CORE-1 S4): the lift maps each
+     * plain kind to its node type; rank keeps the top 2 by amount, the sample is the same on a second run, and the pivot
+     * writes one column per declared value.
+     */
+    @Test
+    void runsAFlatConfigsRankSampleAndPivotSteps() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquet(dataDir, "rsp_etl", "('a',10),('b',30),('c',20),('d',30),('e',5)");
+        Path rank = tmp.resolve("rank_pipeline.toon");
+        Files.writeString(rank, """
+                name: rsp_etl
+                active: false
+                output_store: ranked
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - rank:
+                      order_by[1]: amt desc
+                      top: 2
+                """);
+        assertTrue(new PipelineJobRunner(new JobConfig("rank", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", rank.toString(), "data_dir", dataDir)), new ConsignmentEventBus(), null,
+                dataDir, auditDir).run().success());
+        assertEquals(List.of("b|30|1", "d|30|2"), queryStore(dataDir, "ranked", "SELECT id, amt, rank FROM %s ORDER BY rank"));
+
+        Path sample = tmp.resolve("sample_pipeline.toon");
+        Files.writeString(sample, """
+                name: rsp_etl
+                active: false
+                output_store: sampled
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - sample:
+                      size: 2
+                      seed: 7
+                      key[1]: id
+                """);
+        JobConfig sc = new JobConfig("sample", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", sample.toString(), "data_dir", dataDir));
+        assertTrue(new PipelineJobRunner(sc, new ConsignmentEventBus(), null, dataDir, auditDir).run().success());
+        List<String> first = queryStore(dataDir, "sampled", "SELECT id FROM %s ORDER BY id");
+        List<List<String>> groups = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
+        List<String> ids = List.of("a", "b", "c", "d", "e");
+        for (String id : ids) { groups.add(List.of()); keys.add(com.gamma.analytics.sample.Sampler.keyText(List.of(id))); }
+        assertEquals(com.gamma.analytics.sample.Sampler.select(com.gamma.analytics.sample.Sampler.Spec.ofSize(7, 2), groups, keys)
+                .stream().map(ids::get).toList(), first, "the kernel's JVM selection");
+
+        Path pivot = tmp.resolve("pivot_pipeline.toon");
+        Files.writeString(pivot, """
+                name: rsp_etl
+                active: false
+                output_store: pivoted
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - pivot:
+                      pivot_column: id
+                      values[3]: a, b, z
+                      measure: sum(amt)
+                      prefix: id_
+                """);
+        assertTrue(new PipelineJobRunner(new JobConfig("pivot", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", pivot.toString(), "data_dir", dataDir)), new ConsignmentEventBus(), null,
+                dataDir, auditDir).run().success());
+        assertEquals(List.of("10.0|30.0|null"), queryStore(dataDir, "pivoted", "SELECT id_a, id_b, id_z FROM %s"));
+    }
+
+    /**
+     * A stored {@code entity_link} step executes at rest (ANALYTICS-CORE-1 S2): every row is written with its resolution
+     * group, emails normalised by default; the lift must map the plain kind to {@code transform.entity.link}.
+     */
+    @Test
+    void runsAFlatConfigsEntityLinkStepAndWritesResolutionGroups() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("el_pipeline.toon");
+        Files.writeString(flat, """
+                name: el_etl
+                active: false
+                output_store: grouped
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - entity_link:
+                      key: id
+                      match[1]: amt
+                """);
+        seedParquet(dataDir, "el_etl", "('a2','X@Y '),('a1','x@y'),('a3',NULL),('a4','z@y')");
+
+        JobConfig cfg = new JobConfig("el", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("a1|a1", "a2|a1", "a3|a3", "a4|a4"), queryStore(dataDir, "grouped",
+                "SELECT id, resolution_group FROM %s ORDER BY id"));
+    }
+
+    /**
+     * Stored {@code outlier} then {@code binning} steps execute at rest (ANALYTICS-CORE-1 S3): every row is written with
+     * its Tukey fences, flag, bin and label; the lift must map the plain kinds to their node types.
+     */
+    @Test
+    void runsAFlatConfigsOutlierAndBinningStepsAndWritesFlagsAndBins() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("dist_pipeline.toon");
+        Files.writeString(flat, """
+                name: dist_etl
+                active: false
+                output_store: judged
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[2]:
+                  - outlier:
+                      column: amt
+                  - binning:
+                      column: amt
+                      bins: 2
+                """);
+        seedParquet(dataDir, "dist_etl", "(1,10.0),(2,11.0),(3,12.0),(4,13.0),(5,100.0)");
+
+        JobConfig cfg = new JobConfig("dist", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("1|8.0|16.0|false|0|[10.0, 55.0)", "2|8.0|16.0|false|0|[10.0, 55.0)",
+                "3|8.0|16.0|false|0|[10.0, 55.0)", "4|8.0|16.0|false|0|[10.0, 55.0)", "5|8.0|16.0|true|1|[55.0, 100.0]"),
+                queryStore(dataDir, "judged",
+                        "SELECT id, outlier_lower, outlier_upper, outlier_flag, bin, bin_label FROM %s ORDER BY id"));
+    }
+
+    /**
+     * A stored {@code correlation} step executes at rest (ANALYTICS-CORE-1 S3): one row for the pair, its figures the
+     * kernel's JVM definitions.
+     */
+    @Test
+    void runsAFlatConfigsCorrelationStepAndWritesOneRowPerPair() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("corr_pipeline.toon");
+        Files.writeString(flat, """
+                name: corr_etl
+                active: false
+                output_store: related
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - correlation:
+                      columns[2]: id, amt
+                """);
+        seedParquet(dataDir, "corr_etl", "(1,2.0),(2,4.5),(3,5.5),(4,8.0),(5,9.5)");
+
+        JobConfig cfg = new JobConfig("corr", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        double[] x = {1, 2, 3, 4, 5}, y = {2, 4.5, 5.5, 8, 9.5};
+        com.gamma.analytics.Stats.Regression reg = com.gamma.analytics.Stats.linearRegression(x, y);
+        List<String> got = queryStore(dataDir, "related", "SELECT x_column, y_column, n, correlation, slope, intercept, r2 FROM %s");
+        assertEquals(1, got.size(), "one pair, no group: one row");
+        String[] f = got.get(0).split("[|]");
+        assertEquals(List.of("id", "amt", "5"), List.of(f[0], f[1], f[2]));
+        assertEquals(com.gamma.analytics.Stats.correlation(x, y).orElseThrow(), Double.parseDouble(f[3]), 1e-12);
+        assertEquals(reg.slope().orElseThrow(), Double.parseDouble(f[4]), 1e-12);
+        assertEquals(reg.intercept().orElseThrow(), Double.parseDouble(f[5]), 1e-12);
+        assertEquals(reg.r2().orElseThrow(), Double.parseDouble(f[6]), 1e-12);
+    }
+
     private static List<String> queryStore(String dataDir, String store, String selectFmt) throws Exception {
         String glob = dataDir.replace("\\", "/") + "/" + store + "/**/*.parquet";
         File db = DuckDbUtil.tempDbFile("qs_");

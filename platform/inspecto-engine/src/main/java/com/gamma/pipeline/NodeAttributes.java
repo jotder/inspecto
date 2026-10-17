@@ -518,6 +518,71 @@ public final class NodeAttributes {
                     .help("Holt-Winters only. Higher lets the seasonal pattern change faster."));
 
     /**
+     * {@code transform.stats.outlier} (ANALYTICS-CORE-1 S3): Tukey's fences or a robust z per group, every row kept with
+     * a flag. Grammar in {@code DistributionStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_OUTLIER = List.of(
+            NodeAttribute.of("column", "Number column", "string", "required").placeholder("AMOUNT")
+                    .help("The number judged. An empty value gets no flag."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("iqr")
+                    .options("iqr", "IQR fences (Tukey: outside Q1 - k*IQR .. Q3 + k*IQR)",
+                            "robust_z", "Robust z (distance from the median in scaled MADs)")
+                    .help("IQR suits skewed data and writes the fences; robust z writes a score."),
+            NodeAttribute.of("group_by", "Groups", "list", "optional").placeholder("REGION")
+                    .help("Judge each value against its own group's figures. Blank: the whole column is one group."),
+            NodeAttribute.of("k", "Fence multiplier (k)", "number", "advanced").min(0).max(100)
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_K)
+                    .dependsOn("method", "iqr").help("IQR only. 1.5 is Tukey's outlier, 3 a far-out value."),
+            NodeAttribute.of("quantile_mode", "Quartiles", "select", "advanced").defaultValue("continuous")
+                    .options("continuous", "Interpolated (quantile_cont)", "discrete", "An observed value (quantile_disc)")
+                    .dependsOn("method", "iqr").help("IQR only. How Q1 and Q3 are read."),
+            NodeAttribute.of("threshold", "Score threshold", "number", "advanced").min(0).max(1000)
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_THRESHOLD)
+                    .dependsOn("method", "robust_z").help("Robust z only. A value whose score is beyond this (either side) is flagged."),
+            NodeAttribute.of("unit", "Smallest meaningful change", "number", "advanced")
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_UNIT)
+                    .dependsOn("method", "robust_z").help("Robust z only. Floors the spread so a near-constant group does not flag a tiny change: 1 for counts, 0.01 for cents."),
+            NodeAttribute.of("prefix", "Column prefix", "string", "advanced")
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_OUTLIER_PREFIX)
+                    .help("Names the added columns: outlier_lower, outlier_upper (IQR) or outlier_score (robust z), and outlier_flag."));
+
+    /**
+     * {@code transform.data.binning} (ANALYTICS-CORE-1 S3): equal-width or quantile bins, a bin number and label per row.
+     * Grammar in {@code DistributionStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_BINNING = List.of(
+            NodeAttribute.of("column", "Number column", "string", "required").placeholder("AMOUNT")
+                    .help("The number binned. An empty value gets no bin."),
+            NodeAttribute.of("bins", "Bins", "number", "required").min(1).max(com.gamma.analytics.distribution.Binning.MAX_BINS)
+                    .help("How many bins, numbered from 0."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("equal_width")
+                    .options("equal_width", "Equal width (same range per bin)", "quantile", "Quantile (about the same number of rows per bin)")
+                    .help("Equal width splits the range; quantile splits the rows, ties kept together."),
+            NodeAttribute.of("group_by", "Groups", "list", "optional").placeholder("REGION")
+                    .help("Bin each group over its own range or quantiles. Blank: the whole column."),
+            NodeAttribute.of("min", "Range from", "number", "advanced")
+                    .dependsOn("method", "equal_width").help("Equal width only. A stated lower end; a value below it gets no bin. Blank: the smallest value."),
+            NodeAttribute.of("max", "Range to", "number", "advanced")
+                    .dependsOn("method", "equal_width").help("Equal width only. A stated upper end; a value above it gets no bin. Blank: the largest value."),
+            NodeAttribute.of("quantile_mode", "Quantiles", "select", "advanced").defaultValue("continuous")
+                    .options("continuous", "Interpolated (quantile_cont)", "discrete", "An observed value (quantile_disc)")
+                    .dependsOn("method", "quantile").help("Quantile only. How the bin edges are read."),
+            NodeAttribute.of("bin_column", "Bin column", "string", "advanced").defaultValue("bin")
+                    .help("Receives the bin number, 0 to bins - 1."),
+            NodeAttribute.of("label_column", "Label column", "string", "advanced").defaultValue("bin_label")
+                    .help("Receives the bin's range as text: [lower, upper), the last bin [lower, upper]."));
+
+    /**
+     * {@code transform.stats.correlation} (ANALYTICS-CORE-1 S3): one row per column pair per group. Grammar in
+     * {@code DistributionStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_CORRELATION = List.of(
+            NodeAttribute.of("columns", "Number columns", "list", "required").placeholder("PRICE, QUANTITY")
+                    .help("Every pair of these is correlated; in each pair the later column is regressed on the earlier."),
+            NodeAttribute.of("group_by", "Groups", "list", "optional").placeholder("REGION")
+                    .help("One row per group per pair. Blank: one row per pair."));
+
+    /**
      * {@code transform.similarity} (ANALYTICS-CORE-1 S1, catalog {@code quality.match.fuzzy}): a similarity score of two
      * columns and an optional candidate flag. Grammar in {@code SimilarityStep}; keys proven by
      * {@code NodeConfigNameContractTest}. A candidate, never an identity (D-M1).
@@ -541,6 +606,108 @@ public final class NodeAttributes {
                     .help("Receives the candidate flag; only with a threshold."),
             NodeAttribute.of("keep_score", "Keep the score", "boolean", "advanced").defaultValue(true)
                     .help("Off keeps only the candidate flag (needs a threshold)."));
+
+    /**
+     * {@code transform.analytics.rank} (ANALYTICS-CORE-1 S4): a rank per group by a stated order, ties broken
+     * deterministically; the top N kept or the rank added. Grammar in {@code RankStep}; keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_RANK = List.of(
+            NodeAttribute.of("order_by", "Order by", "list", "required").placeholder("AMOUNT desc")
+                    .help("The columns that decide the rank, each optionally followed by asc or desc. Empty values sort last."),
+            NodeAttribute.of("group_by", "Rank within", "list", "optional").placeholder("REGION")
+                    .help("The rank restarts for each key (top N per region). Leave blank for one ranking of all rows."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("row_number")
+                    .options("row_number", "Row number (1, 2, 3 - ties split)", "rank", "Rank (1, 1, 3 - ties share)",
+                            "dense_rank", "Dense rank (1, 1, 2 - ties share)")
+                    .help("Row number gives every row its own place; rank and dense rank give tied rows the same one."),
+            NodeAttribute.of("top", "Keep top N", "number", "optional").min(1).max(com.gamma.pipeline.exec.RankStep.MAX_TOP)
+                    .help("Keep only rows ranked N or better in each group. With rank or dense rank, ties can keep more than N."),
+            NodeAttribute.of("rank_column", "Rank column", "string", "optional").defaultValue("rank")
+                    .help("Receives the rank, starting at 1."),
+            NodeAttribute.of("tie_break", "Tie-break", "list", "advanced").placeholder("CUSTOMER_ID")
+                    .help("Ordered after the order-by columns. Row number then breaks any remaining tie by every column, so "
+                            + "the same input always gives the same ranks."),
+            NodeAttribute.of("keep_rank", "Keep the rank", "boolean", "advanced").defaultValue(true)
+                    .help("Off drops the rank column and keeps only the top rows (needs Keep top N)."));
+
+    /**
+     * {@code transform.sample} (ANALYTICS-CORE-1 S4, catalog {@code quality.sample.reservoir}): a seeded, reproducible
+     * sample per group. Grammar in {@code SampleStep}; the order is the Analytics Kernel's {@code Sampler}; keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_SAMPLE = List.of(
+            NodeAttribute.of("size", "Rows per group", "number", "optional").min(1)
+                    .max(com.gamma.analytics.sample.Sampler.MAX_SIZE)
+                    .help("Keep this many rows of each group (all of a smaller group). Set this or Fraction."),
+            NodeAttribute.of("fraction", "Fraction", "number", "optional").min(0).max(1)
+                    .help("Keep this share of each group, rounded to the nearest row (0.1 = 10%). Set this or Rows per group."),
+            NodeAttribute.of("seed", "Seed", "number", "optional").defaultValue(0)
+                    .help("The same seed always picks the same rows; another seed picks another sample."),
+            NodeAttribute.of("group_by", "Sample within", "list", "optional").placeholder("REGION")
+                    .help("Sample each key separately (stratified). Leave blank for one sample of all rows."),
+            NodeAttribute.of("key", "Row key", "list", "advanced").placeholder("CALL_ID")
+                    .help("The columns that identify a row; the pick hashes them with the seed. Blank: every column."));
+
+    /**
+     * {@code transform.matrix.pivot} (ANALYTICS-CORE-1 S4): rows to columns over declared values, one Measure-grammar
+     * aggregate per value. Grammar in {@code PivotStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_PIVOT = List.of(
+            NodeAttribute.of("group_by", "Row keys", "list", "optional").placeholder("CUSTOMER_ID")
+                    .help("One output row per key. Leave blank for one row."),
+            NodeAttribute.of("pivot_column", "Pivot column", "string", "required").placeholder("CALL_TYPE")
+                    .help("The column whose values become columns. Values are matched as text."),
+            NodeAttribute.of("values", "Values", "list", "required").placeholder("voice, sms, data")
+                    .help("Each listed value becomes a column (at most 200). Values not listed are left out; there is no "
+                            + "pivot over whatever values the data holds."),
+            NodeAttribute.of("measure", "Measure", "string", "required").placeholder("sum(AMOUNT)")
+                    .help("count or agg(field) - sum, avg, min, max, countDistinct, median, stddev, p90... A value with "
+                            + "no rows gets 0 for count, empty otherwise."),
+            NodeAttribute.of("prefix", "Column prefix", "string", "optional").placeholder("v_")
+                    .help("Put before each value to make its column name (needed when a value starts with a digit)."));
+
+    /**
+     * {@code transform.entity.link} (ANALYTICS-CORE-1 S2, catalog {@code enrichment.entity.link}): deterministic entity grouping. Grammar in
+     * {@code EntityLinkStep}; the grouping is the Analytics Kernel's; keys proven by {@code NodeConfigNameContractTest}.
+     * Groups come from exact matches only; the candidate keys only flag look-alikes for review (D-M1).
+     */
+    public static final List<NodeAttribute> TRANSFORM_ENTITY_LINK = List.of(
+            NodeAttribute.of("key", "Record key", "string", "required").placeholder("CUSTOMER_ID")
+                    .help("A column that names each row once. A group's id is its smallest key (as text)."),
+            NodeAttribute.of("match", "Match keys", "list", "required").placeholder("EMAIL, PHONE+LAST_NAME")
+                    .help("Rows that agree exactly on every column of one entry are the same entity; join columns with +. "
+                            + "Any entry is enough, and the links chain (A=B by email, B=C by phone: one group)."),
+            NodeAttribute.of("blocking", "Blocking keys", "list", "optional").placeholder("COUNTRY")
+                    .help("Rows are only compared inside the same block (same value of every blocking column). "
+                            + "A row with an empty blocking value stays a group of its own."),
+            NodeAttribute.of("digits", "Digits-only columns", "list", "optional").placeholder("PHONE")
+                    .help("These columns are compared on their digits only (+44 20 7946-0001 = 442079460001). "
+                            + "Other columns ignore accents, case and extra spaces."),
+            NodeAttribute.of("as_written", "Compare as written", "list", "advanced")
+                    .help("These columns are compared exactly as stored. An empty value never matches."),
+            NodeAttribute.of("group_column", "Group column", "string", "optional").defaultValue("resolution_group")
+                    .help("Receives the resolution group id: the smallest key of the group."),
+            NodeAttribute.of("max_block_size", "Largest block", "number", "advanced")
+                    .min(2).max(com.gamma.analytics.entity.EntityGrouping.MAX_BLOCK_SIZE_CEILING)
+                    .defaultValue(com.gamma.analytics.entity.EntityGrouping.DEFAULT_MAX_BLOCK_SIZE)
+                    .help("The run fails if more rows than this share one match value or block - usually a placeholder "
+                            + "such as 0 or unknown that would wrongly join them."),
+            NodeAttribute.of("max_pairs", "Most candidate pairs", "number", "advanced")
+                    .min(1).max(com.gamma.analytics.entity.EntityGrouping.MAX_PAIRS_CEILING)
+                    .defaultValue(com.gamma.analytics.entity.EntityGrouping.DEFAULT_MAX_PAIRS)
+                    .help("The run fails rather than compare more pairs of rows than this."),
+            NodeAttribute.of("candidate_by", "Review look-alikes by", "string", "advanced").placeholder("FULL_NAME")
+                    .help("Optional. Scores this text column against the other groups of the block and flags close ones "
+                            + "for review (candidate_score, candidate_group, candidate_review). Never joins a group. Needs blocking keys."),
+            NodeAttribute.of("candidate_method", "Review method", "select", "advanced").defaultValue("jaro_winkler")
+                    .options("jaro_winkler", "Jaro-Winkler (names, short text)", "jaro", "Jaro",
+                            "levenshtein", "Levenshtein (edit distance)", "token_jaccard", "Token Jaccard (shared words)")
+                    .help("How alike two texts are, 0..1."),
+            NodeAttribute.of("candidate_threshold", "Review threshold", "number", "advanced").min(0).max(1)
+                    .help("Required with candidate_by: the score at which a look-alike is flagged for review."),
+            NodeAttribute.of("candidate_normalize", "Normalize before review", "boolean", "advanced").defaultValue(true)
+                    .help("Strip accents, lower-case and collapse spaces before scoring."));
 
     /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
@@ -725,7 +892,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, TRANSFORM_RANK, TRANSFORM_SAMPLE, TRANSFORM_PIVOT, TRANSFORM_ENTITY_LINK, TRANSFORM_OUTLIER, TRANSFORM_BINNING, TRANSFORM_CORRELATION, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -748,6 +915,13 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_SHIFT.type(), TRANSFORM_SHIFT);
         m.put(BuiltinNodeType.TRANSFORM_FORECAST.type(), TRANSFORM_FORECAST);
         m.put(BuiltinNodeType.TRANSFORM_SIMILARITY.type(), TRANSFORM_SIMILARITY);
+        m.put(BuiltinNodeType.TRANSFORM_RANK.type(), TRANSFORM_RANK);
+        m.put(BuiltinNodeType.TRANSFORM_SAMPLE.type(), TRANSFORM_SAMPLE);
+        m.put(BuiltinNodeType.TRANSFORM_PIVOT.type(), TRANSFORM_PIVOT);
+        m.put(BuiltinNodeType.TRANSFORM_ENTITY_LINK.type(), TRANSFORM_ENTITY_LINK);
+        m.put(BuiltinNodeType.TRANSFORM_OUTLIER.type(), TRANSFORM_OUTLIER);
+        m.put(BuiltinNodeType.TRANSFORM_BINNING.type(), TRANSFORM_BINNING);
+        m.put(BuiltinNodeType.TRANSFORM_CORRELATION.type(), TRANSFORM_CORRELATION);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

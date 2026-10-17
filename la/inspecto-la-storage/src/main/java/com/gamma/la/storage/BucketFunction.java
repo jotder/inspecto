@@ -1,22 +1,19 @@
 package com.gamma.la.storage;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import com.gamma.analytics.Md5Bucket;
 
 /**
  * THE definition of the index bucket (D-3 Decision 3, amended 2026-10-02): {@code bucket(id) = md5_number_lower(id) % N}.
  *
- * <p>Two renderings of that one definition live here and nowhere else, and {@code BucketFunctionTest} proves they agree:
+ * <p>Two renderings of that one definition are exposed here, and {@code BucketFunctionTest} proves they agree:
  * <ul>
  *   <li>{@link #sql(String, int)} - what the builder emits into the {@code COPY ... PARTITION_BY (bucket)} statement;</li>
  *   <li>{@link #bucketOf(String, int)} - what the engine computes in Java, so a lookup needs no round trip.</li>
  * </ul>
- * DuckDB's {@code md5_number_lower(VARCHAR)} is the LOWER 64 bits of the MD5 digest of the id's UTF-8 bytes, as an
- * unsigned 64-bit integer: digest bytes 8..15 read little-endian. {@code % N} is an unsigned remainder
- * ({@code Long.remainderUnsigned}), because the value is a UBIGINT. MD5 is a fixed algorithm, so the bucket cannot drift
- * with a DuckDB upgrade; that DuckDB keeps THIS function's byte order is checked by the golden test and recorded in the
- * manifest ({@link #NAME}).
+ * Both delegate to the Analytics Kernel's {@link Md5Bucket}, the one definition of the MD5 bucket (shared with the
+ * holdout split): the lower 64 bits of the MD5 of the id's UTF-8 bytes, little-endian, unsigned {@code % N}. MD5 is a
+ * fixed algorithm, so the bucket cannot drift with a DuckDB upgrade; that DuckDB keeps THIS function's byte order is
+ * checked by the golden test and recorded in the manifest ({@link #NAME}).
  *
  * <p>An id must be valid Unicode (a database VARCHAR always is); an unpaired surrogate would be encoded as '?' by Java and
  * differ from DuckDB.
@@ -35,22 +32,12 @@ public final class BucketFunction {
 
     /** The SQL for the bucket of the VARCHAR expression {@code idExpr}: an INTEGER in {@code [0, buckets)}; NULL for a NULL id. */
     public static String sql(String idExpr, int buckets) {
-        checkBuckets(buckets);
-        return "CAST(md5_number_lower(" + idExpr + ") % " + buckets + " AS INTEGER)";
+        return Md5Bucket.sql(idExpr, buckets);
     }
 
     /** Java twin of {@link #sql(String, int)}. */
     public static int bucketOf(String id, int buckets) {
-        checkBuckets(buckets);
-        byte[] d;
-        try {
-            d = MessageDigest.getInstance("MD5").digest(id.getBytes(StandardCharsets.UTF_8));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        long lower = 0;
-        for (int i = 15; i >= 8; i--) lower = (lower << 8) | (d[i] & 0xFFL);
-        return (int) Long.remainderUnsigned(lower, buckets);
+        return Md5Bucket.of(id, buckets);
     }
 
     /** {@code clamp(pow2(ceil(edges / 4e6)), 16, 1024)} - the signed bucket-count formula at the shipped {@link Sizing#DEFAULT}. */
@@ -86,9 +73,5 @@ public final class BucketFunction {
         public String signature() {
             return edgesPerBucket + "/" + minBuckets + "/" + maxBuckets;
         }
-    }
-
-    private static void checkBuckets(int buckets) {
-        if (buckets < 1) throw new IllegalArgumentException("buckets must be >= 1: " + buckets);
     }
 }

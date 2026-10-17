@@ -1,0 +1,22 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: rank (transform.analytics.rank, ANALYTICS-CORE-1 S4) - the top 2 calls per region by amount:
+#   steps[1]: - rank: { group_by: [REGION], order_by: [AMOUNT desc], method: row_number, top: 2,
+#                       rank_column: region_rank }
+# The tie-break is mandatory: K02 and K03 both cost 40.00, so row_number orders them by every remaining
+# column (CALL_ID first) - K02 is 1, K03 is 2, on every run. An empty AMOUNT sorts last (K07).
+# At rest, like every steps: kind: the ingest lands out/calls/, the commit fires top_calls, and the result
+# lands in out/top_calls/.
+#
+# Expected evidence after the run:
+#   /jobs shows top_calls type PIPELINE with lastStatus SUCCESS. On disk, out/top_calls/*.parquet holds 5 rows
+#   (CALL_ID, SUBSCRIBER, REGION, AMOUNT, region_rank):
+#     K02  S2  North  40.0   1
+#     K03  S3  North  40.0   2    - tie with K02, broken by CALL_ID
+#     K06  S6  South  31.75  1
+#     K05  S5  South  22.0   2    - K07 (no amount) sorts last and is cut
+#     K08  S8  East   5.0    1    - a region with one call keeps it
+#   The job can also be fired by hand: POST /jobs/top_calls/trigger.
+/jobs
+/jobs/top_calls/runs

@@ -1,0 +1,6 @@
+job:
+  name: payment_review
+  type: pipeline
+  pipeline_config: payments_pipeline.toon
+  data_dir: out
+  on_pipeline: step_outliers

@@ -1,0 +1,21 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: pivot (transform.matrix.pivot, ANALYTICS-CORE-1 S4) - usage per subscriber, one column per call type:
+#   steps[1]: - pivot: { group_by: [SUBSCRIBER], pivot_column: CALL_TYPE, values: [voice, sms, data],
+#                        measure: sum(AMOUNT) }
+# The values are DECLARED: a pivot over whatever values the data holds is refused (its columns would be unbounded).
+# S2's fax call is in no listed value, so it adds to no column; S2 still gets its row. The aggregate is the
+# Measure grammar's (count, sum, avg, min, max, countDistinct, median, stddev, p90...).
+# At rest, like every steps: kind: the ingest lands out/usage/, the commit fires usage_by_type, and the result
+# lands in out/usage_by_type/.
+#
+# Expected evidence after the run:
+#   /jobs shows usage_by_type type PIPELINE with lastStatus SUCCESS. On disk, out/usage_by_type/*.parquet holds 3 rows
+#   (SUBSCRIBER, voice, sms, data):
+#     S1  12.5  0.1   4.0
+#     S2  -     -     9.0    - the fax call is not a listed value
+#     S3  -     0.4   -
+#   The job can also be fired by hand: POST /jobs/usage_by_type/trigger.
+/jobs
+/jobs/usage_by_type/runs

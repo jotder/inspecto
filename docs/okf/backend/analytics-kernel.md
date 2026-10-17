@@ -1,9 +1,9 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6).
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6), and ranking, sampling and pivot (S4: the deterministic seeded sampler with DuckDB parity, Steps transform.analytics.rank, transform.sample, transform.matrix.pivot), and deterministic entity grouping (S2: blocking keys, exact match conditions, union-find, its DuckDB form and parity, Step transform.entity.link; similarity never forms a group, D-M1). Also the distribution Steps (S3: outlier flags, equal-width and quantile bins, Pearson correlation and linear regression, their edge rules and DuckDB parity).
 resource: docs/superpower/analytics-core-plan.md
-tags: [analytics, statistics, baseline, time-series, scores, similarity, modules, duckdb]
+tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
 ---
 
@@ -24,28 +24,40 @@ timestamp: 2026-10-17T00:00:00Z
 > [Seasonality detection](#seasonality-detection), [Holdout split](#holdout-split)). No caller uses them yet.
 > **S1, the similarity kit, is built (2026-10-17):** Jaro, Jaro-Winkler, Levenshtein, Jaccard and normalization with their
 > DuckDB forms; Screening's and Triage recall's copies retired; Step `transform.similarity` (§ [Similarity kit](#similarity-kit)).
+> **S4, ranking, sampling and pivot, is built (2026-10-17):** the deterministic seeded sampler (`Sampler`, JVM = DuckDB)
+> and Steps `transform.analytics.rank`, `transform.sample`, `transform.matrix.pivot` (§ [Ranking, sampling and pivot](#ranking-sampling-and-pivot)).
+> **S2, deterministic entity grouping, is built (2026-10-17):** blocking keys + exact match conditions + union-find,
+> JVM and DuckDB forms with parity, caps that fail closed; Step `transform.entity.link`; similarity only proposes
+> review candidates, never a group (§ [Entity grouping](#entity-grouping)).
+> **S3, the distribution Steps, are built (2026-10-17):** `transform.stats.outlier`, `transform.data.binning` and
+> `transform.stats.correlation` on the definitions here (§ [Distribution Steps](#distribution-steps)).
 
 ## The module
 
 `platform/inspecto-analytics` — artifactId `inspecto-analytics`, manifest id `analytics`, `buildRole: platform`,
 `offeringRole: base` (every edition, D-AN1). Pure functions and SQL builders, no routes, no state, **no third-party dependency of its own** (D-AN8).
-Main code depends on `inspecto-util` only, for `SqlIdent` (the one SQL quoting implementation the profiler and the time-series builders quote
+Main code depends on `inspecto-util`, for `SqlIdent` (the one SQL quoting implementation the profiler and the time-series builders quote
 through); `tools/check-module-deps.mjs` and the pom's enforcer rule allow only the foundation layer (`inspecto-api`,
-`-config`, `-sql`, `-util`), so a feature module can depend on the kernel but the kernel can never reach the engine or a
+`-config`, `-sql`, `-util`) plus the JDK-only graph library `inspecto-graph` (since S2, for its `UnionFind`), so a feature module can depend on the kernel but the kernel can never reach the engine or a
 feature. It ships as its own thin jar beside `inspecto.jar`
 (`tools/bundle-modules.mjs` `CORE_MODULES`, the shade exclude in `inspecto/pom.xml`).
 
 Packages:
 
 * `com.gamma.analytics` — `Stats` (the definitions below), `MedianMode`, `QuantileMode`, `ColumnProfiler`
-  (§ Column profiler).
+  (§ Column profiler), `Md5Bucket` (§ [Holdout split](#holdout-split)).
 * `com.gamma.analytics.score` — the score output contract (M7, below).
 * `com.gamma.analytics.accuracy` — `Accuracy`, `AccuracySql`, `Backtest` (S5b, § [Accuracy and backtest](#accuracy-and-backtest)).
 * `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
+* `com.gamma.analytics.sample` — `Sampler` (S4, § [Ranking, sampling and pivot](#ranking-sampling-and-pivot)).
 * `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)).
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
 * `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
   `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
+* `com.gamma.analytics.entity` — deterministic entity grouping (S2): `EntityGrouping`, `EntityGroupingSql`,
+  `MatchCondition`, `KeyColumn`, `Normalization`, `SimilarityCandidate`, `EntityRecord` (§ [Entity grouping](#entity-grouping)).
+* `com.gamma.analytics.distribution` — the distribution Steps' kernel (S3): `OutlierSql`, `Binning`, `CorrelationSql`
+  (§ [Distribution Steps](#distribution-steps)).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -71,7 +83,9 @@ Values are sorted ascending as `v[0..n-1]`.
 | Classic z | (observed − mean) / stddev; stddev finite and > 0, which stddev is the caller's to state | `zScore` | `StatsSql.zScore` = `((x - mean) / stddev)` |
 | Robust z | (observed − median) / max(scaledMad, floor), floor = max(unit, 5 % of \|median\|) | `robustZ`, `robustZFloor` | — |
 | IQR | Q3 − Q1, both `CONTINUOUS` | `iqr` | `quantile_cont(x, 0.75) - quantile_cont(x, 0.25)` |
-| Tukey fences | [Q1 − k·IQR, Q3 + k·IQR], k = 1.5 by default; a value strictly outside is an outlier | `tukeyFences(x[, k])` → `Fences.outside(v)` | — |
+| Tukey fences | [Q1 − k·IQR, Q3 + k·IQR], k = 1.5 by default; a value strictly outside is an outlier | `tukeyFences(x[, k[, mode]])` → `Fences.outside(v)` | `OutlierSql` (S3) |
+| Pearson correlation | Σ(x − x̄)(y − ȳ) / √(Σ(x − x̄)² Σ(y − ȳ)²); **empty** when a side is constant | `correlation(x, y)` | `corr` (NaN there → NULL) |
+| Least-squares line | slope Sxy / Sxx, intercept ȳ − slope·x̄; r2 empty for constant x, 1 for constant y, else r² | `linearRegression(x, y)` | `regr_slope`, `regr_intercept`, `regr_r2`, `regr_count` |
 | Ratio | numerator / denominator; **empty** (`OptionalDouble`) when the denominator is ±0 — never NaN | `ratio(num, den)` | `num / NULLIF(den, 0)` |
 | Rate | events / total, a share in [0, 1] of a count; **empty** when total = 0 | `rate(events, total)` | `events::DOUBLE / NULLIF(total, 0)` |
 
@@ -144,6 +158,10 @@ Left in place because they are not column profiles: the rest of `EntityProfiles`
 character classes, sentinels, per-day spread over the union of normalised keys), the `IndexLinkStats` index read and
 the `ValueMeasures` median.
 
+The plan's fourth consumer, **Catalog column statistics, has no code to move**: checked 2026-10-17, neither the engine's
+`com.gamma.catalog` package, `CatalogRoutes` nor the SPA's catalog computes a column statistic. When the Catalog gains
+one, it builds on `ColumnProfiler`.
+
 ⚠ The Expectation `baseline` does **not** implement `BaselineStatistic`. That contract takes one entity's time-bucketed
 history and returns a robust median plus scaled MAD under a minimum-points rule; the Expectation judges each cell against
 the plain median of the accepted profiles (ordered, not time-keyed) or of the prior day groups. Fitting it would mean
@@ -194,6 +212,27 @@ Jaro-Winkler (screening), moved to the similarity kit (Should S1): category c is
 returns a `Baseline` with a median and a scaled MAD for a robust z; `VolumeBaseline` takes calendar-day `long` row
 counts over a rolling window and answers a signed fractional deviation with four statuses. Fitting it would add an unused
 spread and change its types and outputs, so it shares the median definition only.
+
+**S8, JVM-side aggregation moved to the store's SQL (2026-10-17).** Goldens committed first:
+`ObjectAnalyticsGoldenTest` (`inspecto-ops`; in-memory, DuckDB, Postgres when configured) and
+`CaseRuleEvaluateGoldenTest` (`inspecto-case-management`).
+
+* `ObjectService.analytics` — `DbObjectStore.rollupGroups` runs one portable `GROUP BY` over the raw `(status, priority)`
+  pair: count, cycle-time count and sum, and a `ROW_NUMBER()` first-seen position. Java still applies the upper-case
+  fold, the NONE rule and the workflow's terminal test to each group, so map keys keep the walk's order. Category, MTTR,
+  MTTD, impact and `recordsAffected` stay in the JVM over `scanAttributes` (a two-column ordered scan). The attribute
+  bag is JSON in a `VARCHAR` with no portable operator. `Long.parseLong` is not DuckDB's cast (`'1.5'` casts to 2), and
+  `Impact` validates `BigDecimal` text. The in-memory store keeps the per-object walk. The means stay integer division,
+  not `Stats.mean`: a `double` quotient can round up across an integer boundary.
+* `CaseOperations.evaluateCaseRule` — the window is `ObjectQuery.createdFrom` (exact, every store). The Tag Rule
+  filter's status aliases, priority, severity and category become an `ObjectQuery.Prefilter`, a `LOWER(...) LIKE`
+  containment that only narrows. It runs on DuckDB only and keeps any value with a character outside printable ASCII.
+  Postgres `LOWER` follows the database collation, so Postgres gets the window only. The exact JVM test still decides
+  every match. `type` and `q` stay in the JVM: `q` matches across the `title + " " + description` join.
+* ⚠ A row the old walk could not load now counts instead of failing the rollup. Examples are a NULL status, or a NULL
+  attribute value that `Map.copyOf` rejects.
+* Measured on 100k Incidents (file DuckDB, median of 5): analytics 3.9 s → 2.1 s; a 1-day rule 4.4 s → 0.06 s; an
+  all-time rule 3.3 s → 0.19 s; an all-time rule with `q` 2.9 s → 1.2 s.
 
 ## Similarity kit
 
@@ -251,7 +290,7 @@ instead of forcing one to look like the other. NULL handling in `SimilaritySql` 
 |---|---|---|
 | Screening `NameMatcher` (token similarity of the name method) | `TOKEN_JARO_WINKLER = new JaroWinkler(UTF16_CHAR, HALF, 0.1, 4, 0.0)` — the prefix boost always applied, exactly its old arithmetic. Folding, honorifics, transliteration, the phonetic reading and blocking **stay in Screening** | `NameMatcherGoldenTest` (bit for bit against the frozen old code over 20,000 seeded pairs; SHA-256 of 5,000 seeded `score` results) |
 | Intelligence `TriageRunSimilarity` / `TriageRunStore` (Triage Run recall) | `Similarity.jaccard`; its own tokenizer (lower-case, `[a-z0-9]+`, ≥ 3 characters) stays | `TriageRunSimilarityGoldenTest` (bit for bit over 20,000 seeded set pairs; SHA-256 of 5,000 seeded `score` results) |
-| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep` | [step-catalog § similarity](pipeline-graph/step-catalog.md) |
+| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep`, which adds a 1,000-character cap per value (a longer value fails the run) | [step-catalog § similarity](pipeline-graph/step-catalog.md) |
 
 Each golden test was committed against the old code first and passed after the switch with only its `SUBJECT` line
 repointed. That closed the duplication guard's category c: **0** findings (from 2), baseline rewritten.
@@ -261,6 +300,143 @@ repointed. That closed the duplication guard's category c: **0** findings (from 
 `SimilarityTest` (hand figures: Winkler's reference pairs, the odd-transposition case in both modes, the boost threshold,
 the three units, Levenshtein, Jaccard, normalization case by case, refused knobs) and `SimilarityDuckDbParityTest`
 (above; plus NULL on either side for every method, raw and normalized). In the engine, `RowShaperSimilarityTest`.
+
+## Entity grouping
+
+*ANALYTICS-CORE-1 S2, built 2026-10-17.* Package `com.gamma.analytics.entity`. One definition of deterministic
+entity grouping — blocking keys, exact match conditions, union-find — with a JVM form and a DuckDB form held equal by
+a parity test. ⛔ **Identity is never asserted by similarity** (decision D-M1, the plan's Won't W6): only exact match
+conditions form groups; a similarity score can only fill separate candidate columns for a person to review.
+
+### The definition
+
+1. Every key column is normalised (`Normalization`): `TEXT` — the similarity kit's normalisation (accents stripped,
+   lower-cased, ASCII whitespace runs to one space, ends trimmed; the default); `DIGITS` — ASCII digits only; `NONE` —
+   as written. **One empty rule:** NULL, or empty after normalising, is *absent* and never equals anything.
+2. A record's **block** is the tuple of its normalised blocking keys. A record with any blocking key absent is in no
+   block and stays a group of one; with no blocking keys every record is in the one block.
+3. Two records **match** when they share a block and, for at least one `MatchCondition`, every column of it is
+   present on both and equal. The records that share a block and one condition's values form a **match cell**.
+4. **Resolution groups** are the connected components of "match". The **group id** is the key of the member whose key
+   text is smallest in **code-point order** (= UTF-8 byte order = DuckDB's VARCHAR order; Java's `String.compareTo`
+   is UTF-16 order and differs above U+FFFF, so `EntityGrouping.compareText` exists). The id is independent of input
+   order; the Step writes it in the key column's own type, so a numeric key's id is still the smallest *as text*.
+
+**Caps — fail closed, before anything is joined** (the same words from both forms): an empty or repeated record key;
+a match cell or review block above `maxBlockSize` (default 1,000, ceiling 100,000 — in practice a placeholder value
+such as `0` or `unknown` that many records carry); **candidate pairs** — the pairs of records sharing a match cell plus
+the pairs sharing a review block — above `maxPairs` (default 1,000,000, ceiling 100,000,000). The SQL form also stops
+after 1,000 propagation rounds.
+
+### The two forms
+
+| Form | How | Where |
+|---|---|---|
+| JVM | records grouped into match cells by hash; every cell member joined to the cell's first with the graph library's `com.gamma.graph.UnionFind` (the one union-find, M8); smallest key per root | `EntityGrouping.group` |
+| DuckDB | normalised keys as columns; each member paired with its cell's smallest key (`min(key) OVER (PARTITION BY block, condition values)`); the connected components by **min-label propagation with pointer jumping** — each round a record takes the smallest label among itself and its cell partners, then the label of that label — one set-based statement pair per round until no label changes | `EntityGroupingSql.run` |
+
+`EntityGroupingSql.run` is the kernel's one entry that executes statements on the caller's connection rather than
+returning SQL text, because the number of rounds is known only by running them; its scratch tables are dropped before
+it returns. A recursive CTE was not used: with `UNION` it would carry every label a record ever saw (the square of the
+component size), and `USING KEY` recursion waits for DuckDB 2.0 (plan C7). Because of this the kernel now reaches
+`inspecto-graph` (a JDK-only leaf) besides the foundation modules; `check-module-deps` allows exactly that.
+
+### D-M1 in the API
+
+- `MatchCondition` is a list of `KeyColumn(column, normalization)` — no method, score or threshold, so a similarity
+  cannot be expressed as a condition. `EntityGroupingTest` pins those record components by reflection.
+- `SimilarityCandidate(column, method, normalize, threshold)` is a separate type in its own `Spec` component, and needs
+  blocking keys. It is scored only after the groups are final: each record's best score against a record of **another**
+  group in its block (ties: the smaller group id), giving `Candidate(score, group, review)`. The groups map handed to it
+  is read-only. A test runs the same data with and without a threshold-0 review (everything flagged) and asserts the
+  groups are identical.
+- The Step refuses `method`, `threshold`, `similarity`, `fuzzy` or `score` in its config by name, citing D-M1.
+
+### Callers
+
+| Caller | Uses |
+|---|---|
+| Step `transform.entity.link` (catalog `enrichment.entity.link`) | `EntityGroupingSql.run` through the engine's `EntityLinkStep` ([step-catalog § entity_link](pipeline-graph/step-catalog.md)) |
+
+Link Analysis' `EntityRegistry` keeps its own fold of `identity.asserted` / `retracted` facts into resolution groups
+(on the same `UnionFind`): what counts as an identity fact stays in that module (plan §2). The Step's resolution group
+is a Dataset column, not an Identity Fact.
+
+### Tests
+
+`EntityGroupingTest` (hand cases: transitive joins across conditions, blocking, multi-column conditions, input-order
+independence, key refusals, both caps, normalisations, code-point order, D-M1 by reflection and by an all-flagging
+review) and `EntityGroupingParityTest` (JVM = DuckDB on three seeded 600-record corpora with and without blocking,
+every similarity method raw and normalised, a 300-record chain, ids beyond the Basic Multilingual Plane, identical
+refusals with nothing written, a numeric key keeping its type). In the engine, `RowShaperEntityLinkTest`.
+
+## Distribution Steps
+
+*ANALYTICS-CORE-1 S3, built 2026-10-17.* Package `com.gamma.analytics.distribution`. Three Steps — outlier flags, bins and
+correlation — built **on the definitions above**: no statistic of their own (the duplication guard's category c stays
+at 0). Each SQL form names the `Stats` definition it renders and a parity test holds the two equal.
+
+| Piece | Kernel | Definition it rests on | Step |
+|---|---|---|---|
+| Tukey fences per row | `OutlierSql` (`Method.IQR`) | `Stats.tukeyFences(values, k, QuantileMode)` — `Q1 − k·(Q3 − Q1)`, `Q3 + k·(Q3 − Q1)`; strictly outside = outlier | `transform.stats.outlier` |
+| Robust z per row | `OutlierSql` (`Method.ROBUST_Z`) | `Stats.robustZ` with `Stats.robustZFloor` — DuckDB `median`, `mad`; flag `abs(z) > threshold` | `transform.stats.outlier` |
+| Equal-width bin | `Binning.equalWidthIndex` / `equalWidthIndexSql` | `min(⌊(x − lo) / (hi − lo) · bins⌋, bins − 1)`, 0 when `hi = lo` — **also `ColumnProfiler.histogram`'s bin** | `transform.data.binning` |
+| Quantile bin | `Binning.quantileEdges` / `quantileIndex` | edges `Stats.quantile(x, i / bins, mode)`; bin = interior edges at or below x | `transform.data.binning` |
+| Pearson r | `CorrelationSql` (`corr`) | `Stats.correlation` — `Σ(x − x̄)(y − ȳ) / √(Σ(x − x̄)² Σ(y − ȳ)²)`, empty when a side is constant | `transform.stats.correlation` |
+| Least-squares line | `CorrelationSql` (`regr_slope`, `regr_intercept`, `regr_r2`, `regr_count`) | `Stats.linearRegression` — slope `Sxy / Sxx`, intercept `ȳ − slope · x̄`, r2: empty for constant x, **1 for constant y**, else r² | `transform.stats.correlation` |
+
+Added to `Stats` for these: `tukeyFences(values, k, mode)` (the quartiles in an explicit `QuantileMode`; the two-argument
+form stays `CONTINUOUS`), `correlation(x, y)` and `linearRegression(x, y)` → `Regression(count, slope, intercept, r2)`
+(input rules as every statistic: equal lengths, no NaN, not empty).
+
+### Edge rules, written down
+
+* **Missing values.** The SQL reads the column as `DOUBLE` with **NaN read as NULL**; a NULL is missing — it gets no
+  flag, score or bin, and is not counted in its group's statistics. The JVM forms refuse NaN (as all of `Stats`), so the
+  two count the same values. Correlation counts a pair only when **both** values are present (`n`).
+* **Groups.** `PARTITION BY` / `GROUP BY` the group columns; a NULL key is a group of its own. No group = the whole
+  column.
+* **Inclusive / exclusive.** Outlier: strictly outside the fences (a value on a fence is not an outlier); `|z|` strictly
+  above the threshold. Bins: `[lower, upper)`, the **last bin closed** `[lower, upper]`; a value on an edge opens the
+  next bin; for quantile bins, ties always share a bin (the higher one when a value equals an edge).
+* **Out of range.** Equal-width bins over a **stated** `min` / `max`: a value below or above gets no bin (NULL index and
+  label) — never clamped. Over the group's own range nothing is out of range.
+* **Degenerate groups.** A group of one value: fences equal to it (never flagged); robust z 0. All values equal (one
+  value included): equal-width bin 0, quantile bin `bins − 1` (every edge equals the value). Correlation: a constant side has no r,
+  a constant x no line, a constant y slope 0 and r2 1; DuckDB's NaN for these is written as NULL — **never NaN**.
+* **Quantile mode.** `CONTINUOUS` (`quantile_cont`, D-AN3's canonical mode) by default; `DISCRETE` (`quantile_disc`) when
+  stated, for the fences and the quantile edges.
+
+### Parity
+
+* `OutlierDuckDbParityTest` — four groups of 7–70 seeded values with planted highs, lows and heavy ties, NULL and NaN, a
+  NULL key, an all-missing group, a one-value and a constant group; IQR in both quantile modes at k 0 / 0.75 / 1.5 / 3,
+  robust z at two units and thresholds: fences and z within 1e-9 × max(1, |value|), flags equal row by row.
+* `BinningTest` — hand figures, then equal width (group range and stated ranges with out-of-range values) and quantile
+  bins (both modes, 1–10 bins) row by row: the **bin index equal**, the label's edges within 1e-9 (DuckDB's
+  `quantile_cont` and the JVM's can differ in the last bit); `ColumnProfiler.histogram`'s counts = the Step's bins.
+* `CorrelationDuckDbParityTest` — groups of every size 1–30 with NULL and NaN on either side, constant x, constant y, both
+  constant, a NULL key, no complete pair: within 1e-9; ⚠ a group on a **1e9 offset** agrees only within 1e-8 — DuckDB's
+  streaming covariance loses digits there (measured slope error 5e-12 relative at 1e6, 1.7e-9 at 1e9, 5e-6 at 1e12; the
+  two-pass JVM form does not). The Step documents it; centre such data first.
+
+### Histogram — no separate Step
+
+`ColumnProfiler.histogram` (M4) stays the profiler's one-column histogram (every bin listed, empty ones with 0) and now
+computes its bin with `Binning.equalWidthIndexSql` — one equal-width definition. A Pipeline gets a histogram as
+`binning` then `summarize` (`group_by: [bin, bin_label]`, `measures: [count]`). A separate Step would add a fourth
+grammar for the same bins and differ only in listing empty bins — not worth a node type; reopen if a consumer needs the
+empty bins in a Pipeline.
+
+### The Steps
+
+`DistributionStep` (engine) owns the three grammars; `RowShaper`, the recipe compiler and the save gate (`ConfigRoutes`)
+refuse with its words. Keys, outputs and release bar: [step-catalog](pipeline-graph/step-catalog.md) § `outlier`,
+§ `binning`, § `correlation`. Base in every edition (D-AN7). The catalog's *Pearson & Spearman correlation matrix* is
+**PARTIAL**: Spearman is not built. In the engine: `RowShaperDistributionTest`,
+`PipelineJobRunnerTest#runsAFlatConfigsOutlierAndBinningStepsAndWritesFlagsAndBins`,
+`PipelineJobRunnerTest#runsAFlatConfigsCorrelationStepAndWritesOneRowPerPair`; demos `examples/07-steps/outliers` and
+`examples/07-steps/correlation`.
 
 ## Score output contract
 
@@ -369,13 +545,12 @@ edition; refused at save (`StepConfigSaveFindingsTest`); demo `examples/07-steps
 | `DeliveryCheck` current bucket (engine) | `TimeGrain.of(unit).truncate(now)` | wall, on UTC as before | `DeliveryCheckTest#theLastCompleteBucketIsTheOneBeforeNowAtMonthYearAndHourGrain` |
 | `KpiDefinition.Grain.start` | `TimeGrain.valueOf(name()).truncate(d)` | `LocalDate` | `KpiPeriodStartGoldenTest`, `KpiDefinitionTest`, `KpiEvaluatorTest` |
 | `MeasureCompiler.dimExpression` | `TimeGrain.parse(grain).truncateSql(col)` | wall — the SQL text is byte-identical | `MeasureCompilerTest` (pins the text), `MeasureCompilerGrainExecutionTest` |
+| `DashboardDateRange` `month-` / `quarter-` / `year-to-date` (control plane, shared-Dashboard fence) | `TimeGrain.MONTH` / `QUARTER` / `YEAR` `.truncate(anchor)` | `LocalDate`; the one zone, "today" for a Dashboard with no `asOf`, is passed explicitly (`DashboardDateRange.today(zone)`, the server's `ZoneId.systemDefault()` — the SPA twin `dashboard-date-range.ts` reads the browser's and is unchanged) | `DashboardDateRangeTest#monthAndYearToDateAtEveryBoundary` (pinned first), `#quarterToDateIsCalendarCorrectAtEveryBoundary` |
 
 Each golden test was written and committed against the old code, then passed unchanged after the switch.
 ⚠ **Kept, by decision:** `RecordTransform`'s `date.truncate` function (`DATE_TRUNC({unit}, {source})`) is not a rule of
 its own — it hands the author's free-text unit to DuckDB, any date part included (`decade`, `millisecond`), and
-narrowing it to `TimeGrain` would refuse units that run today. ⚠ `DashboardDateRange` (`month-to-date`,
-`year-to-date` in the control plane) still computes its own period start; it was not in the plan's survey and is left
-for a follow-up.
+narrowing it to `TimeGrain` would refuse units that run today.
 
 ### Tests
 
@@ -413,7 +588,8 @@ sMAPE or MAE instead). sMAPE: of the two common forms — (\|a\| + \|p\|) / 2 as
 \|a\| + \|p\| (range 0–100) — the first is the one the M3 competition and Hyndman–Koehler published, so a figure
 compares with the literature. Bias sign: predicted − actual reads naturally as "how much too high".
 
-**Input rules** are `Stats`': no pairs, unequal lengths, NaN, or a band with lower > upper throw. The SQL form casts each
+**Input rules** are `Stats`': no pairs, unequal lengths, NaN, half a band (only one of lower and upper — the message
+`a band needs both lower and upper`, as `AccuracySql.Spec`), or a band with lower > upper throw. The SQL form casts each
 column to `DOUBLE`, skips a row with a NULL in any column it uses, fails the statement through `error()` on an inverted
 band, and returns `n = 0` with NULL measures for no pairs. `AccuracySql.Spec` takes optional group columns: one row per
 group (per entity, per model).
@@ -486,7 +662,10 @@ read as `VARCHAR` (an integer key hashes as its decimal text; a NULL key has no 
 **Why MD5, not DuckDB's `hash()`.** `hash()` is DuckDB's internal hash, with no published definition and no promise to
 stay the same across versions: the JVM cannot reproduce it, and an upgrade could move entities between roles.
 `md5_number_lower` is the lower 64 bits of the MD5 of the UTF-8 bytes (digest bytes 8..15, little-endian, unsigned) —
-a fixed algorithm the JVM computes exactly, the same reading LA's index `BucketFunction` relies on.
+a fixed algorithm the JVM computes exactly. **One definition, `Md5Bucket`** (`of(text, n)`, `sql(expr, n)`, `lower64`):
+`HashSplit` and LA's index `BucketFunction` (`la-storage`) both delegate to it — before the cleanup each held its own
+copy of the digest reading. `Md5BucketTest` and `BucketFunctionTest#goldenBuckets` pin figures computed outside Java;
+neither caller's buckets moved.
 
 ### Tests (S5 b, c, d)
 
@@ -502,6 +681,68 @@ a fixed algorithm the JVM computes exactly, the same reading LA's index `BucketF
 * `HoldoutSplitTest`, `HoldoutSplitDuckDbParityTest` — golden MD5 buckets computed outside Java; shares within 2 % of
   the fractions; SQL bucket, role and predicates = JVM over 3,000+ keys (quotes, accents, CJK, emoji, mixed case, an
   integer key, NULL); the time split in both modes against `TimeSplit.role`, and its no-train failure in both forms.
+
+## Ranking, sampling and pivot
+
+*ANALYTICS-CORE-1 S4, built 2026-10-17.* Three Steps for BI, investigations and testing large Datasets. Only the sampler
+needs kernel code — its order must be reproducible outside DuckDB; ranking is one window function and the pivot's
+aggregates are the Measure grammar's, so both live in the engine's Step grammar (`RankStep`, `PivotStep`). Every Step:
+[step-catalog](pipeline-graph/step-catalog.md) (`rank`, `sample`, `pivot`).
+
+### The sampler — `com.gamma.analytics.sample.Sampler`
+
+Deterministic, seeded and stratified, as a JVM function and DuckDB SQL that keep the same rows.
+
+**Key text.** A row's key values, in key order, each as `<UTF-8 byte length>:<text>` (the text as DuckDB reads the
+value as `VARCHAR`), a NULL as `-`, concatenated. A present value starts with a digit and a NULL with `-`, and the
+length fixes where each value ends, so **two different keys never share a key text** (`ab`,`c` ≠ `a`,`bc`; NULL ≠ `''`
+≠ `'-'`). SQL: `keyTextSql` — `CASE WHEN c IS NULL THEN '-' ELSE strlen(c::VARCHAR)::VARCHAR || ':' || c::VARCHAR END`
+per column, joined with `||`.
+
+**Hash.** `md5_number_lower('<seed>:' || key text)` — the holdout split's MD5 reading (§ [Holdout split](#holdout-split);
+`Md5Bucket.lower64`, the one MD5 implementation in the platform), an **unsigned** 64-bit number.
+
+**Order and quota.** Within each group (`group_by`; NULLs form a group of their own), rows are ordered by hash
+(unsigned), then key text (UTF-8 bytes — DuckDB's `VARCHAR` order), then the tie columns the caller passes (the Step
+passes every inbound column, so rows still tied are identical). The first `quota(n)` rows of a group of `n` are kept:
+
+| Mode | `quota(n)` |
+|---|---|
+| Fixed size `k` (1 … 1,000,000) | `min(k, n)` — exactly `k`, or the whole of a smaller group (reservoir semantics) |
+| Fraction `f` → `bp` basis points (rounded to the nearest, ≥ 1) | `⌊(n · bp + 5000) / 10000⌋` — the group's share, half up: 0.4 → 0, 0.5 → 1, 1.5 → 2 |
+
+**Why not `USING SAMPLE` / `random()`.** Neither is reproducible across runs, threads or DuckDB versions, and neither has
+a JVM twin; and a reservoir in the textbook sense (one pass, a random replacement) depends on arrival order. Ordering by
+a keyed hash gives the reservoir's *result* — `k` rows per group, each equally likely across seeds — with none of that.
+Properties that follow: the sample does not depend on input order; a row keeps its place as long as its key does, so
+adding rows can only push a sampled row out (fixed size), never reshuffle the rest; another seed gives another sample.
+
+**SQL.** `Sampler.sql(spec, relation, groupBy, keyColumns, tieColumns, scratch)` — `row_number()` and `count(*)` over the
+group, `WHERE rn <= quota`; the four working columns (`<scratch>k`, `h`, `rn`, `n`) are excluded, so the columns are
+unchanged. The Step uses scratch `__sample_` and refuses an inbound column with that prefix.
+
+### Rank and pivot — the rules the Steps state
+
+* **Rank** (`RankStep`): `row_number` / `rank` / `dense_rank` over `order_by` then `tie_break`, each direction stated and
+  **NULLs last in both directions**. The tie-break is mandatory: `row_number` then orders by every remaining inbound
+  column ascending, NULLs last — two rows still tied are identical, so the output is the same in any arrival order.
+  `rank` / `dense_rank` give tied rows one rank by definition; `top: N` then keeps every row at place N.
+* **Pivot** (`PivotStep`): `MeasureCompiler.aggregateSql(measure) FILTER (WHERE CAST(pivot AS VARCHAR) = 'value')` per
+  declared value, `GROUP BY` the keys. Values are matched as text, required, at most 200 — a dynamic pivot (columns
+  decided by the data) is refused. No aggregate of its own: the grammar's (count, countDistinct, sum, avg, min, max,
+  median, stddev, variance, p05 … p99).
+
+### Tests
+
+* `SamplerTest` — key text (injectivity cases, UTF-8 length), golden hashes computed with Python's `hashlib`, quotas
+  (half up), refusals, lowest-hash selection per group, independence from input order, a new seed, stability when rows
+  are added, a NULL group.
+* `SamplerDuckDbParityTest` — 2,500 seeded rows (accents, CJK, emoji, quotes, `:` and `-` in values, NULLs in key parts
+  and groups, an integer column): 6 specs × 3 keys (unique and not) × stratified or not, **SQL rows = JVM rows**, on a
+  second run and over a shuffled copy of the table; key text SQL = JVM for every row; the working columns do not leak.
+* Engine: `RowShaperRankTest`, `RowShaperSampleTest` (written rows = `Sampler.select`), `RowShaperPivotTest`,
+  `PipelineJobRunnerTest#runsAFlatConfigsRankSampleAndPivotSteps`. The demo `07-steps/sample`'s expected rows were
+  computed by a third implementation of the definition (Python) and matched the run.
 
 ## Temporal motif matcher
 
