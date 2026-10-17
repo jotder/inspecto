@@ -113,6 +113,29 @@ class RowShaperSimilarityTest {
                 "the scratch score column is not left behind");
     }
 
+    /**
+     * The per-value length cap ({@link SimilarityStep#MAX_TEXT_LENGTH}, characters of the raw text): a value at the cap
+     * scores as before, one character past it fails the run naming the cap - the kernel's caps fail closed.
+     */
+    @Test
+    void aValueLongerThanTheCapFailsTheRunAndOneAtTheCapScores() throws Exception {
+        int cap = SimilarityStep.MAX_TEXT_LENGTH;
+        exec("CREATE TABLE src_ok AS SELECT 1 AS id, repeat('é', " + cap + ") AS name_a, repeat('e', " + cap
+                + ") AS name_b");
+        String out = RowShaper.shape(conn, PipelineNode.of("n", "transform.similarity",
+                        cfg("left", "name_a", "right", "name_b", "method", "levenshtein")), "src_ok", "n_ok").stream()
+                .filter(r -> r.rel().equals(PipelineRel.DATA)).findFirst().orElseThrow().table();
+        assertEquals(1.0, scalar("SELECT similarity FROM \"" + out + "\""), 0.0, "accents normalized away, at the cap");
+
+        exec("CREATE TABLE src_long AS SELECT * FROM (VALUES (1, 'a', 'a'), (2, 'b', repeat('b', " + (cap + 1)
+                + "))) t(id, name_a, name_b)");
+        SQLException e = assertThrows(SQLException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("n", "transform.similarity", cfg("left", "name_a", "right", "name_b")), "src_long",
+                "n_long"));
+        assertTrue(e.getMessage().contains("longer than " + cap + " characters"), e.getMessage());
+        assertTrue(e.getMessage().contains("'name_a' or 'name_b'"), e.getMessage());
+    }
+
     @Test
     void refusalsNameTheProblem() {
         IllegalArgumentException missing = assertThrows(IllegalArgumentException.class,

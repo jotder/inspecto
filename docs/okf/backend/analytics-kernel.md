@@ -251,7 +251,7 @@ instead of forcing one to look like the other. NULL handling in `SimilaritySql` 
 |---|---|---|
 | Screening `NameMatcher` (token similarity of the name method) | `TOKEN_JARO_WINKLER = new JaroWinkler(UTF16_CHAR, HALF, 0.1, 4, 0.0)` — the prefix boost always applied, exactly its old arithmetic. Folding, honorifics, transliteration, the phonetic reading and blocking **stay in Screening** | `NameMatcherGoldenTest` (bit for bit against the frozen old code over 20,000 seeded pairs; SHA-256 of 5,000 seeded `score` results) |
 | Intelligence `TriageRunSimilarity` / `TriageRunStore` (Triage Run recall) | `Similarity.jaccard`; its own tokenizer (lower-case, `[a-z0-9]+`, ≥ 3 characters) stays | `TriageRunSimilarityGoldenTest` (bit for bit over 20,000 seeded set pairs; SHA-256 of 5,000 seeded `score` results) |
-| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep` | [step-catalog § similarity](pipeline-graph/step-catalog.md) |
+| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep`, which adds a 1,000-character cap per value (a longer value fails the run) | [step-catalog § similarity](pipeline-graph/step-catalog.md) |
 
 Each golden test was committed against the old code first and passed after the switch with only its `SUBJECT` line
 repointed. That closed the duplication guard's category c: **0** findings (from 2), baseline rewritten.
