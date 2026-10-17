@@ -144,6 +144,10 @@ Left in place because they are not column profiles: the rest of `EntityProfiles`
 character classes, sentinels, per-day spread over the union of normalised keys), the `IndexLinkStats` index read and
 the `ValueMeasures` median.
 
+The plan's fourth consumer, **Catalog column statistics, has no code to move**: checked 2026-10-17, neither the engine's
+`com.gamma.catalog` package, `CatalogRoutes` nor the SPA's catalog computes a column statistic. When the Catalog gains
+one, it builds on `ColumnProfiler`.
+
 ⚠ The Expectation `baseline` does **not** implement `BaselineStatistic`. That contract takes one entity's time-bucketed
 history and returns a robust median plus scaled MAD under a minimum-points rule; the Expectation judges each cell against
 the plain median of the accepted profiles (ordered, not time-keyed) or of the prior day groups. Fitting it would mean
