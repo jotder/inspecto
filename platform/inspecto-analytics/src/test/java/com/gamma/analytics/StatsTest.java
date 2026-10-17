@@ -222,4 +222,57 @@ class StatsTest {
         assertThrows(IllegalArgumentException.class, () -> Stats.rate(-1, 4));
         assertThrows(IllegalArgumentException.class, () -> Stats.rate(5, 4), "more events than trials");
     }
+    // ---- S3: fences with an explicit quantile mode, correlation, linear regression -----------------------------------
+
+    @Test
+    void tukeyFencesTakeTheQuartilesInTheStatedMode() {
+        double[] v = {1, 2, 3, 4};
+        Stats.Fences cont = Stats.tukeyFences(v, 1.5, QuantileMode.CONTINUOUS);   // Q1 1.75, Q3 3.25, IQR 1.5
+        assertEquals(-0.5, cont.lower(), 0.0);
+        assertEquals(5.5, cont.upper(), 0.0);
+        assertEquals(cont, Stats.tukeyFences(v, 1.5), "CONTINUOUS is the default");
+        Stats.Fences disc = Stats.tukeyFences(v, 1.5, QuantileMode.DISCRETE);     // Q1 1, Q3 3, IQR 2
+        assertEquals(-2.0, disc.lower(), 0.0);
+        assertEquals(6.0, disc.upper(), 0.0);
+        assertTrue(cont.outside(5.6) && !cont.outside(5.5), "strictly outside");
+    }
+
+    @Test
+    void correlationAndRegressionHaveTheirHandFigures() {
+        double[] x = {1, 2, 3, 4}, y = {2, 4, 5, 4};   // Sxy 3.5, Sxx 5, Syy 4.75
+        assertEquals(3.5 / Math.sqrt(5 * 4.75), Stats.correlation(x, y).orElseThrow(), 1e-15);
+        Stats.Regression r = Stats.linearRegression(x, y);
+        assertEquals(4, r.count());
+        assertEquals(0.7, r.slope().orElseThrow(), 1e-15);
+        assertEquals(2.0, r.intercept().orElseThrow(), 1e-15);
+        assertEquals(3.5 * 3.5 / (5 * 4.75), r.r2().orElseThrow(), 1e-15);
+
+        double[] line = {3, 5, 7, 9};                  // y = 2x + 1
+        assertEquals(1.0, Stats.correlation(x, line).orElseThrow(), 1e-15);
+        assertEquals(2.0, Stats.linearRegression(x, line).slope().orElseThrow(), 1e-15);
+        assertEquals(1.0, Stats.linearRegression(x, line).intercept().orElseThrow(), 1e-15);
+        assertEquals(-1.0, Stats.correlation(x, new double[] {8, 6, 4, 2}).orElseThrow(), 1e-15);
+    }
+
+    @Test
+    void aConstantSideHasNoCorrelationAndAConstantXNoLine() {
+        double[] x = {1, 2, 3}, flat = {0.1, 0.1, 0.1};
+        assertTrue(Stats.correlation(flat, x).isEmpty(), "constant x");
+        assertTrue(Stats.correlation(x, flat).isEmpty(), "constant y");
+        assertTrue(Stats.correlation(new double[] {4}, new double[] {9}).isEmpty(), "one pair");
+        Stats.Regression vertical = Stats.linearRegression(flat, x);
+        assertEquals(3, vertical.count());
+        assertTrue(vertical.slope().isEmpty() && vertical.intercept().isEmpty() && vertical.r2().isEmpty());
+        Stats.Regression level = Stats.linearRegression(x, flat);
+        assertEquals(0.0, level.slope().orElseThrow(), 0.0);
+        assertEquals(0.1, level.intercept().orElseThrow(), 1e-15);
+        assertEquals(1.0, level.r2().orElseThrow(), 0.0, "a flat line fits a constant y exactly (DuckDB regr_r2)");
+    }
+
+    @Test
+    void correlationRefusesUnequalLengthsNaNAndNoValues() {
+        assertThrows(IllegalArgumentException.class, () -> Stats.correlation(new double[] {1, 2}, new double[] {1}));
+        assertThrows(IllegalArgumentException.class, () -> Stats.linearRegression(new double[] {1, Double.NaN}, new double[] {1, 2}));
+        assertThrows(IllegalArgumentException.class, () -> Stats.correlation(new double[0], new double[0]));
+    }
 }
