@@ -44,7 +44,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
                              Integer retainDays, Integer retainRuns, Integer maxEntities) {
 
     /** The highest per-model {@code maxEntities} a model may author (operator, 2026-10-06): 10x the system default. */
-    public static final int MAX_ENTITIES_CEILING = 2_000_000;
+    public static final int MAX_ENTITIES_CEILING = com.gamma.analytics.score.EntityCap.CEILING;
 
     /** The named entity types (D-P1). Anything else that is a plain token is accepted as free-form. */
     public static final List<String> ENTITY_TYPES =

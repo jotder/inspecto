@@ -1,29 +1,20 @@
 package com.gamma.risk;
 
+import com.gamma.alert.RiskScoreOutputs;
+import com.gamma.alert.ScoreOutputWriter;
+import com.gamma.analytics.score.EntityCap;
+import com.gamma.analytics.score.ScoreColumns;
+import com.gamma.analytics.score.ScoreRunFiles;
 import com.gamma.mask.EvidenceMasker;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 import com.gamma.sql.SqlSandboxPolicy;
-import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +34,8 @@ import java.util.function.Function;
  * {@code <dataDir>/<scoresDataset>_latest/} is swapped to this run's rows alone — the relation an Alert Rule
  * watches, so an entity whose score falls back below the threshold HEALS instead of staying breached on history.
  * Columns: {@code model, entity_type, entity_key, score, high, factors (JSON), model_version, run_id, scored_at}.
+ * Written through the score output contract ({@code com.gamma.analytics.score}, ANALYTICS-CORE-1 M7, D-AN6) by
+ * {@link ScoreOutputWriter}, the one writer every score kind shares.
  */
 public final class RiskScoreEvaluator {
 
@@ -51,24 +44,17 @@ public final class RiskScoreEvaluator {
      * Operator decision 2026-10-06: configurable, never disabled — {@code -D}{@value #MAX_ENTITIES_PROPERTY} sets the
      * system default (malformed or non-positive keeps this one), a model's {@code maxEntities} overrides it.
      */
-    public static final int MAX_ENTITIES = 200_000;
+    public static final int MAX_ENTITIES = EntityCap.DEFAULT;
     public static final String MAX_ENTITIES_PROPERTY = "risk.score.maxEntities";
 
     /** The system default cap: the property when it is a positive whole number, else {@link #MAX_ENTITIES}. */
     static int defaultMaxEntities(String raw) {
-        if (raw == null) return MAX_ENTITIES;
-        try {
-            int v = Integer.parseInt(raw.trim());
-            return v > 0 ? v : MAX_ENTITIES;
-        } catch (NumberFormatException e) {
-            return MAX_ENTITIES;
-        }
+        return EntityCap.systemDefault(raw);
     }
 
     /** The cap a run of {@code model} uses: the model's own, else the system default. */
     public static int maxEntities(RiskScoreModel model) {
-        return model.maxEntities() != null ? model.maxEntities()
-                : defaultMaxEntities(System.getProperty(MAX_ENTITIES_PROPERTY));
+        return EntityCap.resolve(model.maxEntities(), MAX_ENTITIES_PROPERTY);
     }
     /** Evidence rows read per factor, and kept per entity. */
     static final int MAX_EVIDENCE_ROWS = 20_000;
@@ -79,10 +65,13 @@ public final class RiskScoreEvaluator {
      * directory it created (marker present and naming THIS model) and deletes only its own {@code scores-*.parquet}
      * there — so a scores name that happens to equal a real store can never be wiped.
      */
-    public static final String OWNER_MARKER = com.gamma.alert.RiskScoreOutputs.OWNER_MARKER;
+    public static final String OWNER_MARKER = RiskScoreOutputs.OWNER_MARKER;
 
-    private static final ObjectMapper JSON = new ObjectMapper()
-            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+    /** This kind's own columns, between the contract's head and tail ({@link ScoreColumns#table}). */
+    static final List<ScoreColumns.Column> COLUMNS = List.of(
+            ScoreColumns.Column.measure("score", "DOUBLE"),
+            ScoreColumns.Column.dimension("high", "BOOLEAN"),
+            ScoreColumns.Column.dimension("factors", "VARCHAR"));
 
     private RiskScoreEvaluator() {}
 
@@ -198,118 +187,32 @@ public final class RiskScoreEvaluator {
      * change how it scores.
      */
     public static String version(Map<String, Object> modelContent) {
-        try {
-            Map<String, Object> scored = new TreeMap<>(modelContent);
-            scored.keySet().removeAll(RiskScoreModel.ENVELOPE_KEYS);
-            byte[] canonical = JSON.writeValueAsBytes(scored);
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical)).substring(0, 12);
-        } catch (JsonProcessingException | NoSuchAlgorithmException e) {
-            throw new IllegalStateException("cannot hash risk-score model", e);
-        }
+        return ScoreOutputWriter.version(modelContent, RiskScoreModel.ENVELOPE_KEYS, "risk-score model");
     }
 
     /** The {@code factors} column's JSON. */
     public static String factorsJson(List<RiskScorer.FactorResult> factors) {
-        try {
-            List<Map<String, Object>> out = new ArrayList<>(factors.size());
-            for (RiskScorer.FactorResult f : factors) out.add(f.toMap());
-            return new ObjectMapper().writeValueAsString(out);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("cannot serialise factors", e);
-        }
+        return ScoreOutputWriter.explanationJson(factors, "factors");
     }
 
     /**
-     * Append this run to the history Dataset and swap the {@code _latest} Dataset to it. Both files land as
-     * {@code *.tmp} and are revealed by an atomic move, so a reader never sees a half-written file.
+     * Append this run to the history Dataset and swap the {@code _latest} Dataset to it, then apply the model's opt-in
+     * retention ({@code retainDays} / {@code retainRuns}; a pruned run's factors are no longer reproducible: the
+     * audit-vs-storage trade the operator chose). See {@link ScoreOutputWriter#write}.
      *
      * @return the history directory written
      */
     public static Path write(Path dataDir, RiskScoreModel model, String modelVersion, String runId,
                              Instant scoredAt, List<RiskScorer.Scored> scored) throws SQLException, IOException {
-        Path history = dataDir.resolve(model.scoresDataset()).normalize();
-        Path latest = dataDir.resolve(model.latestDataset()).normalize();
-        if (!history.startsWith(dataDir.normalize()) || !latest.startsWith(dataDir.normalize()))
-            throw new IllegalArgumentException("scores Dataset escapes the data root");
-        claim(history, model.id());
-        claim(latest, model.id());
-        String stamp = scoredAt.toEpochMilli() + "-" + runId.replaceAll("[^A-Za-z0-9_-]", "_");
-        Path histTmp = history.resolve("scores-" + stamp + ".parquet.tmp");
-        Path latestTmp = latest.resolve("scores-" + stamp + ".parquet.tmp");
-        try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataDir), java.util.List.of(history, latest));
-             Statement st = c.createStatement()) {
-            st.execute("CREATE TABLE s (model VARCHAR, entity_type VARCHAR, entity_key VARCHAR, score DOUBLE, "
-                    + "high BOOLEAN, factors VARCHAR, model_version VARCHAR, run_id VARCHAR, scored_at TIMESTAMP)");
-            try (PreparedStatement ps = c.prepareStatement("INSERT INTO s VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-                Timestamp ts = Timestamp.from(scoredAt);
-                for (RiskScorer.Scored s : scored) {
-                    ps.setString(1, model.id());
-                    ps.setString(2, model.entityType());
-                    ps.setString(3, s.entityKey());
-                    ps.setDouble(4, s.score());
-                    ps.setBoolean(5, s.high());
-                    ps.setString(6, factorsJson(s.factors()));
-                    ps.setString(7, modelVersion);
-                    ps.setString(8, runId);
-                    ps.setTimestamp(9, ts);
-                    ps.addBatch();
-                }
-                ps.executeBatch();
-            }
-            st.execute("COPY s TO " + sqlStr(histTmp) + " (FORMAT PARQUET)");
-            st.execute("COPY s TO " + sqlStr(latestTmp) + " (FORMAT PARQUET)");
-        }
-        Files.move(histTmp, history.resolve("scores-" + stamp + ".parquet"), StandardCopyOption.ATOMIC_MOVE);
-        swapIn(latest, latestTmp, "scores-" + stamp + ".parquet");
-        prune(history, model, scoredAt, "scores-" + stamp + ".parquet");
-        return history;
-    }
-
-    /**
-     * Opt-in retention: delete whole older history run files ({@code retainDays} by file stamp, or all but the newest
-     * {@code retainRuns}). Never touches {@code _latest} or the run just written. A no-op unless the model opts in.
-     * ⚠ A pruned run's factors are no longer reproducible: that is the audit-vs-storage trade the operator chose.
-     */
-    static void prune(Path history, RiskScoreModel model, Instant now, String keep) throws IOException {
-        if (model.retainDays() == null && model.retainRuns() == null) return;
-        java.util.List<Path> runs = new java.util.ArrayList<>();
-        try (DirectoryStream<Path> ds = Files.newDirectoryStream(history, "scores-*.parquet")) {
-            for (Path p : ds) runs.add(p);
-        }
-        runs.sort(java.util.Comparator.comparingLong(RiskScoreEvaluator::stampOf));
-        long cutoff = model.retainDays() == null ? Long.MIN_VALUE
-                : now.minus(java.time.Duration.ofDays(model.retainDays())).toEpochMilli();
-        int excess = model.retainRuns() == null ? 0 : Math.max(0, runs.size() - model.retainRuns());
-        for (int i = 0; i < runs.size(); i++) {
-            Path p = runs.get(i);
-            if (p.getFileName().toString().equals(keep)) continue;
-            if (model.retainDays() != null ? stampOf(p) < cutoff : i < excess) Files.deleteIfExists(p);
-        }
-    }
-
-    private static long stampOf(Path p) {
-        String n = p.getFileName().toString().substring("scores-".length());
-        try { return Long.parseLong(n.substring(0, n.indexOf('-'))); } catch (RuntimeException e) { return Long.MAX_VALUE; }
+        List<ScoreOutputWriter.Row> rows = new ArrayList<>(scored.size());
+        for (RiskScorer.Scored s : scored)
+            rows.add(new ScoreOutputWriter.Row(s.entityKey(), List.of(s.score(), s.high(), factorsJson(s.factors()))));
+        return ScoreOutputWriter.write(dataDir, RiskScoreOutputs.SCORE_KIND, model.id(), model.entityType(), COLUMNS, rows,
+                modelVersion, runId, scoredAt, new ScoreRunFiles.Retention(model.retainDays(), model.retainRuns()));
     }
 
     /** Whether {@code dir} is a scores directory THIS model created (its marker names the model). */
     public static boolean ownedBy(Path dir, String modelId) {
-        return com.gamma.alert.RiskScoreOutputs.ownedBy(dir, modelId);
-    }
-
-    /**
-     * Create {@code dir} with this model's marker, or accept it when the marker already names this model.
-     * Anything else — a directory with no marker, or another model's — is refused, untouched.
-     */
-    static void claim(Path dir, String modelId) throws IOException {
-        com.gamma.alert.ScoreOutputDirs.claim(dir, OWNER_MARKER, "risk-score", modelId);
-    }
-
-    private static void swapIn(Path dir, Path tmp, String name) throws IOException {
-        com.gamma.alert.ScoreOutputDirs.swapIn(dir, tmp, name, "scores-*.parquet");
-    }
-
-    private static String sqlStr(Path p) {
-        return "'" + p.toString().replace('\\', '/').replace("'", "''") + "'";
+        return RiskScoreOutputs.ownedBy(dir, modelId);
     }
 }

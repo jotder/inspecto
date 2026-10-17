@@ -1,5 +1,7 @@
 package com.gamma.alert;
 
+import com.gamma.analytics.score.ScoreKind;
+
 import java.nio.file.Path;
 
 /**
@@ -15,9 +17,12 @@ public final class AnomalyScoreOutputs {
     public static final String KIND = "anomaly-model";
     /** The prefix of every Anomaly Score store — the output name is derived, never authored. */
     public static final String SCORES_PREFIX = "anomaly_scores_";
-    public static final String LATEST_SUFFIX = "_latest";
+    public static final String LATEST_SUFFIX = ScoreKind.LATEST_SUFFIX;
     /** The ownership marker in each scores directory, holding the model id. */
     public static final String OWNER_MARKER = ".anomaly-score-output";
+
+    /** This kind's output identity in the score output contract (ANALYTICS-CORE-1 M7, D-AN6). */
+    public static final ScoreKind SCORE_KIND = new ScoreKind(KIND, SCORES_PREFIX, OWNER_MARKER);
 
     /** Whether {@code dir} is a scores directory THIS model created (its marker names the model). */
     public static boolean ownedBy(Path dir, String modelId) {

@@ -40,6 +40,23 @@ public interface WatchListFeed {
     int feed(Path writeRoot, Path dataDir, String listId, Collection<String> keys, Instant expiresAt, String actor,
              String reason) throws IOException;
 
+    /**
+     * A score run's feed, the one path every score kind takes (ANALYTICS-CORE-1 M7): add {@code highKeys} to
+     * {@code listId}, expiring {@code ttlHours} after {@code now}, as actor {@code job:<jobType>:<modelId>}. With no
+     * provider installed (Personal) the run fails naming the model, never left silently unfed; no keys writes nothing.
+     *
+     * @param kind the model's component kind, as the refusal names it ({@code risk-score}, {@code anomaly-model})
+     */
+    static int feedScored(Optional<WatchListFeed> provider, String kind, String modelId, String jobType, String listId,
+                          int ttlHours, Path writeRoot, Path dataDir, java.util.List<String> highKeys, Instant now,
+                          String reason) throws IOException {
+        WatchListFeed feed = provider.orElseThrow(() -> new IllegalStateException(kind + " '" + modelId
+                + "' feeds watch list '" + listId + "', but Entity Lists are not installed in this edition"));
+        if (highKeys.isEmpty()) return 0;
+        return feed.feed(writeRoot, dataDir, listId, highKeys, now.plus(java.time.Duration.ofHours(ttlHours)),
+                "job:" + jobType + ":" + modelId, reason);
+    }
+
     /** The installed provider, if any. */
     static Optional<WatchListFeed> installed() {
         return ServiceLoader.load(WatchListFeed.class, WatchListFeed.class.getClassLoader()).findFirst();

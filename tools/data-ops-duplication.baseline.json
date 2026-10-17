@@ -2,7 +2,7 @@
   "a": {
     "inspecto": 1,
     "inspecto-acquire": 1,
-    "inspecto-anomaly": 2,
+    "inspecto-anomaly": 1,
     "inspecto-engine": 21,
     "inspecto-etl": 6,
     "inspecto-exchange": 1,
@@ -10,7 +10,6 @@
     "inspecto-la-core": 1,
     "inspecto-la-storage": 1,
     "inspecto-reconciliation": 2,
-    "inspecto-scoring": 1,
     "inspecto-util": 2
   },
   "b": {

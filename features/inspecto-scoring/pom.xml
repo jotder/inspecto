@@ -57,6 +57,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- The Analytics Kernel (ANALYTICS-CORE-1 M7, D-AN6): the score output contract com.gamma.analytics.score
+             (scale, entity cap, columns, run files and retention, the explanation part). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
+
         <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest the moved HTTP
              tests boot a real CollectorService + ControlApi with. -->
         <dependency>

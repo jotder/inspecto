@@ -3,6 +3,8 @@ package com.gamma.anomaly;
 import com.gamma.analytics.baseline.Baseline;
 import com.gamma.analytics.baseline.BaselineScore;
 import com.gamma.analytics.baseline.RobustStats;
+import com.gamma.analytics.score.ExplanationPart;
+import com.gamma.analytics.score.ScoreScale;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -50,7 +52,7 @@ public final class AnomalyScorer {
                                 Baseline peerBaseline, double cohortShift, double unit, double zSelf, double zPeer,
                                 double deviation, String direction, double weight, double contribution, double share,
                                 boolean peersOnly, boolean insufficient, String reason,
-                                List<Map<String, Object>> evidence) {
+                                List<Map<String, Object>> evidence) implements ExplanationPart {
 
         public FeatureResult {
             evidence = evidence == null ? List.of() : List.copyOf(evidence);
@@ -70,7 +72,7 @@ public final class AnomalyScorer {
                     zPeer, deviation, direction, weight, contribution, share, peersOnly, insufficient, reason, rows);
         }
 
-        public Map<String, Object> toMap() {
+        @Override public Map<String, Object> toMap() {
             Map<String, Object> b = new LinkedHashMap<>();
             b.put("kind", baseline.kind());
             b.put("median", finite(baseline.median()));
@@ -177,7 +179,7 @@ public final class AnomalyScorer {
 
     /** {@code 100 · (1 − exp(−raw / scale))} (D-AD6). */
     public static double score(double raw, double scale) {
-        return 100.0 * (1.0 - Math.exp(-raw / scale));
+        return ScoreScale.saturating(raw, scale);
     }
 
     /**

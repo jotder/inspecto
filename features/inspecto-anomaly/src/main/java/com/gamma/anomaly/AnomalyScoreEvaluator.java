@@ -1,42 +1,34 @@
 package com.gamma.anomaly;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.gamma.alert.AnomalyScoreOutputs;
 import com.gamma.alert.ScoreOutputDirs;
+import com.gamma.alert.ScoreOutputWriter;
 import com.gamma.analytics.baseline.Baseline;
 import com.gamma.analytics.baseline.BaselineStatistic;
 import com.gamma.analytics.baseline.BaselineStatistics;
 import com.gamma.analytics.baseline.PeerBaseline;
 import com.gamma.analytics.baseline.RobustStats;
+import com.gamma.analytics.score.EntityCap;
+import com.gamma.analytics.score.ScoreColumns;
+import com.gamma.analytics.score.ScoreRunFiles;
+import com.gamma.analytics.score.ScoreScale;
 import com.gamma.mask.EvidenceMasker;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 import com.gamma.sql.SqlSandboxPolicy;
-import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -55,15 +47,12 @@ import java.util.function.Predicate;
  */
 public final class AnomalyScoreEvaluator {
 
-    public static final int MAX_ENTITIES = 200_000;
+    public static final int MAX_ENTITIES = EntityCap.DEFAULT;
     public static final String MAX_ENTITIES_PROPERTY = "anomaly.score.maxEntities";
     public static final int MAX_BUCKET_ROWS = 50_000_000;
     /** Evidence rows read per feature (design section 11), and kept per entity (design section 5). */
     static final int MAX_EVIDENCE_ROWS = 20_000;
     static final int EVIDENCE_PER_ENTITY = 3;
-
-    private static final ObjectMapper JSON = new ObjectMapper()
-            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
     /** Excludes nothing; the one predicate for which no per-feature key read is made. */
     public static final Predicate<String> NONE = k -> false;
@@ -71,19 +60,12 @@ public final class AnomalyScoreEvaluator {
     private AnomalyScoreEvaluator() {}
 
     static int defaultMaxEntities(String raw) {
-        if (raw == null) return MAX_ENTITIES;
-        try {
-            int v = Integer.parseInt(raw.trim());
-            return v > 0 ? v : MAX_ENTITIES;
-        } catch (NumberFormatException e) {
-            return MAX_ENTITIES;
-        }
+        return EntityCap.systemDefault(raw);
     }
 
     /** The cap a run of {@code model} uses: the model's own, else the system default. */
     public static int maxEntities(AnomalyModel model) {
-        return model.maxEntities() != null ? model.maxEntities()
-                : defaultMaxEntities(System.getProperty(MAX_ENTITIES_PROPERTY));
+        return EntityCap.resolve(model.maxEntities(), MAX_ENTITIES_PROPERTY);
     }
 
     /** The outcome of a run: the scored day and one score per entity. */
@@ -575,24 +557,11 @@ public final class AnomalyScoreEvaluator {
 
     /** A 12-hex hash of the stored model minus its envelope — the {@code model_version} on every row. */
     public static String version(Map<String, Object> modelContent) {
-        try {
-            Map<String, Object> scored = new TreeMap<>(modelContent);
-            scored.keySet().removeAll(AnomalyModel.ENVELOPE_KEYS);
-            byte[] canonical = JSON.writeValueAsBytes(scored);
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical)).substring(0, 12);
-        } catch (JsonProcessingException | NoSuchAlgorithmException e) {
-            throw new IllegalStateException("cannot hash anomaly-model", e);
-        }
+        return ScoreOutputWriter.version(modelContent, AnomalyModel.ENVELOPE_KEYS, "anomaly-model");
     }
 
     public static String featuresJson(List<AnomalyScorer.FeatureResult> features) {
-        try {
-            List<Map<String, Object>> out = new ArrayList<>(features.size());
-            for (AnomalyScorer.FeatureResult f : features) out.add(f.toMap());
-            return new ObjectMapper().writeValueAsString(out);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("cannot serialise features", e);
-        }
+        return ScoreOutputWriter.explanationJson(features, "features");
     }
 
     /** Whether {@code dir} is an output directory THIS model created. */
@@ -600,66 +569,35 @@ public final class AnomalyScoreEvaluator {
         return ScoreOutputDirs.ownedBy(dir, AnomalyModel.OWNER_MARKER, modelId);
     }
 
+    /** This kind's own columns, between the contract's head and tail ({@link ScoreColumns#table}). */
+    static final List<ScoreColumns.Column> COLUMNS = List.of(
+            ScoreColumns.Column.temporal("period_start", "TIMESTAMP"),
+            ScoreColumns.Column.measure("score", "DOUBLE"),
+            ScoreColumns.Column.dimension("band", "VARCHAR"),
+            ScoreColumns.Column.measure("raw", "DOUBLE"),
+            ScoreColumns.Column.dimension("features", "VARCHAR"),
+            ScoreColumns.Column.measure("insufficient_count", "INTEGER"));
+
     /**
      * Append this run to the history store and swap {@code _latest} to it, both via {@code *.tmp} + atomic move,
-     * into directories this model owns (marker {@value AnomalyModel#OWNER_MARKER}).
+     * into directories this model owns (marker {@value AnomalyModel#OWNER_MARKER}); see {@link ScoreOutputWriter#write}.
+     * No retention: every run stays in the history.
      */
     public static Path write(Path dataDir, AnomalyModel model, String modelVersion, String runId, Instant scoredAt,
                              Run run) throws SQLException, IOException {
-        Path history = dataDir.resolve(model.scoresDataset()).normalize();
-        Path latest = dataDir.resolve(model.latestDataset()).normalize();
-        if (!history.startsWith(dataDir.normalize()) || !latest.startsWith(dataDir.normalize()))
-            throw new IllegalArgumentException("scores Dataset escapes the data root");
-        ScoreOutputDirs.claim(history, AnomalyModel.OWNER_MARKER, AnomalyModel.KIND, model.id());
-        ScoreOutputDirs.claim(latest, AnomalyModel.OWNER_MARKER, AnomalyModel.KIND, model.id());
-        String stamp = scoredAt.toEpochMilli() + "-" + runId.replaceAll("[^A-Za-z0-9_-]", "_");
-        String name = "scores-" + stamp + ".parquet";
-        Path histTmp = history.resolve(name + ".tmp");
-        Path latestTmp = latest.resolve(name + ".tmp");
-        try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataDir), List.of(history, latest));
-             Statement st = c.createStatement()) {
-            st.execute("CREATE TABLE s (model VARCHAR, entity_type VARCHAR, entity_key VARCHAR, period_start TIMESTAMP, "
-                    + "score DOUBLE, band VARCHAR, raw DOUBLE, features VARCHAR, insufficient_count INTEGER, "
-                    + "model_version VARCHAR, run_id VARCHAR, scored_at TIMESTAMP)");
-            try (PreparedStatement ps = c.prepareStatement("INSERT INTO s VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-                Timestamp ts = Timestamp.from(scoredAt);
-                Timestamp period = Timestamp.valueOf(run.period().atStartOfDay());
-                for (AnomalyScorer.Scored s : run.scored()) {
-                    ps.setString(1, model.id());
-                    ps.setString(2, model.entityType());
-                    ps.setString(3, s.entityKey());
-                    ps.setTimestamp(4, period);
-                    ps.setDouble(5, s.score());
-                    ps.setString(6, s.band());
-                    ps.setDouble(7, s.raw());
-                    ps.setString(8, featuresJson(s.features()));
-                    ps.setInt(9, s.insufficientCount());
-                    ps.setString(10, modelVersion);
-                    ps.setString(11, runId);
-                    ps.setTimestamp(12, ts);
-                    ps.addBatch();
-                }
-                ps.executeBatch();
-            }
-            st.execute("COPY s TO " + sqlStr(histTmp) + " (FORMAT PARQUET)");
-            st.execute("COPY s TO " + sqlStr(latestTmp) + " (FORMAT PARQUET)");
-        }
-        Files.move(histTmp, history.resolve(name), StandardCopyOption.ATOMIC_MOVE);
-        ScoreOutputDirs.swapIn(latest, latestTmp, name, "scores-*.parquet");
-        return history;
+        LocalDateTime period = run.period().atStartOfDay();
+        List<ScoreOutputWriter.Row> rows = new ArrayList<>(run.scored().size());
+        for (AnomalyScorer.Scored s : run.scored())
+            rows.add(new ScoreOutputWriter.Row(s.entityKey(), List.of(period, s.score(), s.band(), s.raw(),
+                    featuresJson(s.features()), s.insufficientCount())));
+        return ScoreOutputWriter.write(dataDir, AnomalyScoreOutputs.SCORE_KIND, model.id(), model.entityType(), COLUMNS,
+                rows, modelVersion, runId, scoredAt, ScoreRunFiles.Retention.OFF);
     }
 
     /** Entity counts per band, for the run log and the Signal. */
     static Map<String, Long> bands(List<AnomalyScorer.Scored> scored) {
-        Map<String, Long> out = new TreeMap<>();
-        for (String b : new TreeSet<>(List.of("normal", "elevated", "high"))) out.put(b, 0L);
-        for (AnomalyScorer.Scored s : scored) out.merge(s.band(), 1L, Long::sum);
-        return out;
+        return ScoreScale.bandCounts(scored.stream().map(AnomalyScorer.Scored::band).toList());
     }
 
     private static String q(String ident) { return "\"" + ident.replace("\"", "\"\"") + "\""; }
-
-    private static String sqlStr(Path p) {
-        return "'" + p.toString().replace('\\', '/').replace("'", "''") + "'";
-    }
 }

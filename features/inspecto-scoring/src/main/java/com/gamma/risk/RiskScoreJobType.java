@@ -125,25 +125,12 @@ public final class RiskScoreJobType implements JobTypeProvider {
             throws java.io.IOException {
         RiskScoreModel.WatchList w = model.watchList();
         if (w == null) return 0;
-        com.gamma.entitylist.WatchListFeed feed = provider.orElseThrow(() ->
-                new IllegalStateException("risk-score '" + model.id() + "' feeds watch list '" + w.list()
-                        + "', but Entity Lists are not installed in this edition"));
         List<String> keys = scored.stream().filter(RiskScorer.Scored::high).map(RiskScorer.Scored::entityKey).toList();
-        if (keys.isEmpty()) return 0;
-        return feed.feed(writeRoot, dataDir, w.list(), keys, now.plus(java.time.Duration.ofHours(w.ttlHours())),
-                "job:risk.score:" + model.id(), "risk.score " + model.id() + " run " + runId + ": score >= "
-                        + model.highThreshold());
+        return com.gamma.entitylist.WatchListFeed.feedScored(provider, com.gamma.alert.RiskScoreOutputs.KIND, model.id(), "risk.score", w.list(),
+                w.ttlHours(), writeRoot, dataDir, keys, now,
+                "risk.score " + model.id() + " run " + runId + ": score >= " + model.highThreshold());
     }
 
     /** The scores Dataset's fixed shape. */
-    static final ResultSetMeta META = new ResultSetMeta(List.of(
-            new ResultSetMeta.Column("model", "VARCHAR", ResultSetMeta.Role.DIMENSION),
-            new ResultSetMeta.Column("entity_type", "VARCHAR", ResultSetMeta.Role.DIMENSION),
-            new ResultSetMeta.Column("entity_key", "VARCHAR", ResultSetMeta.Role.DIMENSION),
-            new ResultSetMeta.Column("score", "DOUBLE", ResultSetMeta.Role.MEASURE),
-            new ResultSetMeta.Column("high", "BOOLEAN", ResultSetMeta.Role.DIMENSION),
-            new ResultSetMeta.Column("factors", "VARCHAR", ResultSetMeta.Role.DIMENSION),
-            new ResultSetMeta.Column("model_version", "VARCHAR", ResultSetMeta.Role.DIMENSION),
-            new ResultSetMeta.Column("run_id", "VARCHAR", ResultSetMeta.Role.DIMENSION),
-            new ResultSetMeta.Column("scored_at", "TIMESTAMP", ResultSetMeta.Role.TEMPORAL)));
+    static final ResultSetMeta META = com.gamma.alert.ScoreOutputWriter.meta(RiskScoreEvaluator.COLUMNS);
 }

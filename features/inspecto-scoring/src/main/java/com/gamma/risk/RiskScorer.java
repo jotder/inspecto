@@ -1,5 +1,8 @@
 package com.gamma.risk;
 
+import com.gamma.analytics.score.ExplanationPart;
+import com.gamma.analytics.score.ScoreScale;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,9 +25,10 @@ public final class RiskScorer {
 
     /** One factor's evaluated line, in the shape the {@code factors} JSON column carries. */
     public record FactorResult(String indicator, String label, Double value, boolean missing, double weight,
-                               Double cap, boolean capped, double contribution, List<Map<String, Object>> evidence) {
+                               Double cap, boolean capped, double contribution, List<Map<String, Object>> evidence)
+            implements ExplanationPart {
 
-        public Map<String, Object> toMap() {
+        @Override public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("indicator", indicator);
             if (label != null) m.put("label", label);
@@ -61,7 +65,7 @@ public final class RiskScorer {
         for (RiskScoreModel.Factor f : model.factors())
             out.add(factor(f, values.get(f.id()), evidence == null ? null : evidence.get(f.id())));
         double score = total(out);
-        return new Scored(entityKey, score, score >= model.highThreshold(), List.copyOf(out));
+        return new Scored(entityKey, score, ScoreScale.isHigh(score, model.highThreshold()), List.copyOf(out));
     }
 
     /** {@code Σ contribution}, clamped to {@code [0, 100]} — the same sum a reader recomputes from the JSON. */
@@ -89,6 +93,6 @@ public final class RiskScorer {
     }
 
     static double clamp(double s) {
-        return Math.max(0.0, Math.min(100.0, s));
+        return ScoreScale.clamp(s);
     }
 }
