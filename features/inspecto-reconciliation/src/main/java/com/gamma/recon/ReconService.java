@@ -4,7 +4,6 @@ import com.gamma.query.ExpressionGuard;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 
-import com.gamma.util.SqlIdent;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -20,6 +19,9 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static com.gamma.util.SqlIdent.q;
+import static com.gamma.util.SqlIdent.sqlStr;
 
 /**
  * Dataset reconciliation execution (DAT-7; design {@code docs/superpower/reconciliation-board-design.md}).
@@ -482,7 +484,7 @@ public final class ReconService {
             // CAST + IS NOT DISTINCT FROM: the wire carries the key as text, and a NULL dim value must
             // match a NULL — the same rules pathPredicate and keyJoin already apply to the grouped sides.
             pred.append("CAST(").append(q(spec.physical(side, k))).append(" AS VARCHAR) IS NOT DISTINCT FROM ")
-                .append(lit(key.get(k)));
+                .append(sqlStr(key.get(k)));
         }
         String filter = whereFilter(spec, side);
         return "SELECT * FROM " + VIEWS[side]
@@ -990,7 +992,7 @@ public final class ReconService {
         for (Map.Entry<String, String> e : path.entrySet()) {
             int i = spec.keyColumns().indexOf(e.getKey());
             sb.append(" AND CAST(").append(qualifier).append(q("k" + i)).append(" AS VARCHAR) = ")
-              .append(lit(e.getValue()));
+              .append(sqlStr(e.getValue()));
         }
         return sb.toString();
     }
@@ -1005,13 +1007,5 @@ public final class ReconService {
     private static void safeIdent(String s, String what) {
         if (s == null || !SAFE_IDENT.matcher(s).matches())
             throw new IllegalArgumentException(what + " must be a plain identifier, got '" + s + "'");
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
-    }
-
-    private static String lit(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 }
