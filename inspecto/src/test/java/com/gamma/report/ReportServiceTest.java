@@ -201,6 +201,74 @@ class ReportServiceTest {
         }
     }
 
+    // ── golden percentiles (ANALYTICS-CORE-1 M2): pinned BEFORE percentile moved to the Analytics Kernel ──────
+
+    /** A StatusStore whose batch rows a test swaps between reports. */
+    private static final class SwapStore implements StatusStore {
+        List<Map<String, String>> rows = List.of();
+        void durations(long... ms) {
+            List<Map<String, String>> out = new java.util.ArrayList<>();
+            for (int i = 0; i < ms.length; i++) out.add(batch(String.format("2026-05-10 %02d:%02d:%02d", i / 3600, i / 60 % 60, i % 60), ms[i]));
+            rows = out;
+        }
+        public Set<String> committedBatches(PipelineConfig cfg) { return Set.of(); }
+        public List<Map<String, String>> batches(PipelineConfig cfg) { return rows; }
+        public List<Map<String, String>> files(PipelineConfig cfg) { return List.of(); }
+        public List<Map<String, String>> lineage(PipelineConfig cfg, String batchId) { return List.of(); }
+        public List<Map<String, String>> quarantine(PipelineConfig cfg) { return List.of(); }
+    }
+
+    private static long[] range(int n, long step) {
+        long[] out = new long[n];
+        for (int i = 0; i < n; i++) out[i] = (i + 1) * step;
+        return out;
+    }
+
+    private static void assertPercentiles(CollectorService svc, SwapStore store, long p50, long p95, long p99, long... ms) {
+        store.durations(ms);
+        ReportService.ConsignmentAuditReport r = svc.reports().batchReport("test_etl");
+        String tag = java.util.Arrays.toString(ms);
+        assertEquals(p50, r.p50DurationMs(), "p50 of " + tag);
+        assertEquals(p95, r.p95DurationMs(), "p95 of " + tag);
+        assertEquals(p99, r.p99DurationMs(), "p99 of " + tag);
+    }
+
+    @Test
+    void goldenNearestRankPercentilesOverSmallEvenTiedAndLongSeries(@TempDir Path dir) throws Exception {
+        SwapStore store = new SwapStore();
+        try (CollectorService svc = new CollectorService(List.of(seed(dir)), List.of(), 3600, 1, store)) {
+            assertPercentiles(svc, store, 0, 0, 0);                                  // empty: 0, never throws
+            assertPercentiles(svc, store, 42, 42, 42, 42);                           // n = 1
+            assertPercentiles(svc, store, 10, 20, 20, 10, 20);                       // n = 2: no interpolation
+            assertPercentiles(svc, store, 20, 40, 40, 40, 10, 30, 20);               // even, unsorted input
+            assertPercentiles(svc, store, 5, 9, 9, 5, 5, 9, 5, 5);                   // ties
+            assertPercentiles(svc, store, 2, 3, 3, 3, 1, 2);                         // odd
+            assertPercentiles(svc, store, 50, 100, 100, range(10, 10));
+            assertPercentiles(svc, store, 100, 190, 200, range(20, 10));             // 0.95 * 20 rounds to rank 19
+            assertPercentiles(svc, store, 50, 95, 99, range(100, 1));
+            assertPercentiles(svc, store, 51, 96, 100, range(101, 1));
+
+            // 300 seeded sets against the pre-kernel rule, frozen here
+            java.util.Random r = new java.util.Random(20261017);
+            for (int k = 0; k < 300; k++) {
+                long[] ms = new long[1 + r.nextInt(60)];
+                for (int i = 0; i < ms.length; i++) ms[i] = r.nextInt(3) == 0 ? r.nextInt(4) * 100 : r.nextInt(100_000);
+                assertPercentiles(svc, store, frozenPercentile(ms, 50), frozenPercentile(ms, 95), frozenPercentile(ms, 99), ms);
+            }
+        }
+    }
+
+    /** {@code ReportService.percentile} as shipped before ANALYTICS-CORE-1 M2. */
+    private static long frozenPercentile(long[] values, double p) {
+        if (values.length == 0) return 0L;
+        List<Long> s = new java.util.ArrayList<>();
+        for (long v : values) s.add(v);
+        java.util.Collections.sort(s);
+        int rank = (int) Math.ceil(p / 100.0 * s.size());
+        int idx = Math.min(Math.max(rank, 1), s.size()) - 1;
+        return s.get(idx);
+    }
+
     @Test
     void windowContainsBoundariesAreInclusive() {
         ReportService.Window w = ReportService.Window.of("2026-05-01", "2026-05-31");
