@@ -518,6 +518,71 @@ public final class NodeAttributes {
                     .help("Holt-Winters only. Higher lets the seasonal pattern change faster."));
 
     /**
+     * {@code transform.stats.outlier} (ANALYTICS-CORE-1 S3): Tukey's fences or a robust z per group, every row kept with
+     * a flag. Grammar in {@code DistributionStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_OUTLIER = List.of(
+            NodeAttribute.of("column", "Number column", "string", "required").placeholder("AMOUNT")
+                    .help("The number judged. An empty value gets no flag."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("iqr")
+                    .options("iqr", "IQR fences (Tukey: outside Q1 - k*IQR .. Q3 + k*IQR)",
+                            "robust_z", "Robust z (distance from the median in scaled MADs)")
+                    .help("IQR suits skewed data and writes the fences; robust z writes a score."),
+            NodeAttribute.of("group_by", "Groups", "list", "optional").placeholder("REGION")
+                    .help("Judge each value against its own group's figures. Blank: the whole column is one group."),
+            NodeAttribute.of("k", "Fence multiplier (k)", "number", "advanced").min(0).max(100)
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_K)
+                    .dependsOn("method", "iqr").help("IQR only. 1.5 is Tukey's outlier, 3 a far-out value."),
+            NodeAttribute.of("quantile_mode", "Quartiles", "select", "advanced").defaultValue("continuous")
+                    .options("continuous", "Interpolated (quantile_cont)", "discrete", "An observed value (quantile_disc)")
+                    .dependsOn("method", "iqr").help("IQR only. How Q1 and Q3 are read."),
+            NodeAttribute.of("threshold", "Score threshold", "number", "advanced").min(0).max(1000)
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_THRESHOLD)
+                    .dependsOn("method", "robust_z").help("Robust z only. A value whose score is beyond this (either side) is flagged."),
+            NodeAttribute.of("unit", "Smallest meaningful change", "number", "advanced")
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_UNIT)
+                    .dependsOn("method", "robust_z").help("Robust z only. Floors the spread so a near-constant group does not flag a tiny change: 1 for counts, 0.01 for cents."),
+            NodeAttribute.of("prefix", "Column prefix", "string", "advanced")
+                    .defaultValue(com.gamma.pipeline.exec.DistributionStep.DEFAULT_OUTLIER_PREFIX)
+                    .help("Names the added columns: outlier_lower, outlier_upper (IQR) or outlier_score (robust z), and outlier_flag."));
+
+    /**
+     * {@code transform.data.binning} (ANALYTICS-CORE-1 S3): equal-width or quantile bins, a bin number and label per row.
+     * Grammar in {@code DistributionStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_BINNING = List.of(
+            NodeAttribute.of("column", "Number column", "string", "required").placeholder("AMOUNT")
+                    .help("The number binned. An empty value gets no bin."),
+            NodeAttribute.of("bins", "Bins", "number", "required").min(1).max(com.gamma.analytics.distribution.Binning.MAX_BINS)
+                    .help("How many bins, numbered from 0."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("equal_width")
+                    .options("equal_width", "Equal width (same range per bin)", "quantile", "Quantile (about the same number of rows per bin)")
+                    .help("Equal width splits the range; quantile splits the rows, ties kept together."),
+            NodeAttribute.of("group_by", "Groups", "list", "optional").placeholder("REGION")
+                    .help("Bin each group over its own range or quantiles. Blank: the whole column."),
+            NodeAttribute.of("min", "Range from", "number", "advanced")
+                    .dependsOn("method", "equal_width").help("Equal width only. A stated lower end; a value below it gets no bin. Blank: the smallest value."),
+            NodeAttribute.of("max", "Range to", "number", "advanced")
+                    .dependsOn("method", "equal_width").help("Equal width only. A stated upper end; a value above it gets no bin. Blank: the largest value."),
+            NodeAttribute.of("quantile_mode", "Quantiles", "select", "advanced").defaultValue("continuous")
+                    .options("continuous", "Interpolated (quantile_cont)", "discrete", "An observed value (quantile_disc)")
+                    .dependsOn("method", "quantile").help("Quantile only. How the bin edges are read."),
+            NodeAttribute.of("bin_column", "Bin column", "string", "advanced").defaultValue("bin")
+                    .help("Receives the bin number, 0 to bins - 1."),
+            NodeAttribute.of("label_column", "Label column", "string", "advanced").defaultValue("bin_label")
+                    .help("Receives the bin's range as text: [lower, upper), the last bin [lower, upper]."));
+
+    /**
+     * {@code transform.stats.correlation} (ANALYTICS-CORE-1 S3): one row per column pair per group. Grammar in
+     * {@code DistributionStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_CORRELATION = List.of(
+            NodeAttribute.of("columns", "Number columns", "list", "required").placeholder("PRICE, QUANTITY")
+                    .help("Every pair of these is correlated; in each pair the later column is regressed on the earlier."),
+            NodeAttribute.of("group_by", "Groups", "list", "optional").placeholder("REGION")
+                    .help("One row per group per pair. Blank: one row per pair."));
+
+    /**
      * {@code transform.similarity} (ANALYTICS-CORE-1 S1, catalog {@code quality.match.fuzzy}): a similarity score of two
      * columns and an optional candidate flag. Grammar in {@code SimilarityStep}; keys proven by
      * {@code NodeConfigNameContractTest}. A candidate, never an identity (D-M1).
@@ -725,7 +790,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, TRANSFORM_OUTLIER, TRANSFORM_BINNING, TRANSFORM_CORRELATION, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -748,6 +813,9 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_SHIFT.type(), TRANSFORM_SHIFT);
         m.put(BuiltinNodeType.TRANSFORM_FORECAST.type(), TRANSFORM_FORECAST);
         m.put(BuiltinNodeType.TRANSFORM_SIMILARITY.type(), TRANSFORM_SIMILARITY);
+        m.put(BuiltinNodeType.TRANSFORM_OUTLIER.type(), TRANSFORM_OUTLIER);
+        m.put(BuiltinNodeType.TRANSFORM_BINNING.type(), TRANSFORM_BINNING);
+        m.put(BuiltinNodeType.TRANSFORM_CORRELATION.type(), TRANSFORM_CORRELATION);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

@@ -1,0 +1,24 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEPS: outlier (transform.stats.outlier) then binning (transform.data.binning) - ANALYTICS-CORE-1 S3, on the
+# Analytics Kernel's definitions (Tukey fences, equal-width bins):
+#   steps[2]: - outlier: { column: AMOUNT, group_by[1]: REGION }
+#             - binning: { column: AMOUNT, bins: 4, min: 0, max: 1000, bin_column: AMOUNT_BAND,
+#                          label_column: AMOUNT_RANGE }
+# The outlier Step judges each payment against its OWN region: Tukey's fences Q1 - 1.5 IQR .. Q3 + 1.5 IQR, the
+# quartiles interpolated (quantile_cont); a value strictly outside is flagged. Every row is kept. The binning Step
+# puts each amount in one of four 250-wide bands of the stated range 0..1000; the last band is closed.
+# At rest, like every steps: kind: the ingest lands out/payments/, the commit fires payment_review, and the result
+# lands in out/payment_review/.
+#
+# Expected evidence after the run:
+#   /jobs shows payment_review type PIPELINE with lastStatus SUCCESS. On disk, out/payment_review/*.parquet holds 14
+#   rows (PAYMENT_ID, REGION, AMOUNT, outlier_lower, outlier_upper, outlier_flag, AMOUNT_BAND, AMOUNT_RANGE):
+#     NORTH fences 111.3125 .. 157.8125: P06 960.00 flagged (band 3, [750.0, 1000.0]); P01-P05 not, band 0
+#     SOUTH fences 362.1875 .. 435.6875: P11 15.00 flagged (band 0, [0.0, 250.0)); P07-P10, P12 not, band 1
+#     EAST  one value: fences 1250 .. 1250, P14 not flagged, and no band - 1250 is above the stated range;
+#           P13 has no amount: no flag, no band
+#   The job can also be fired by hand: POST /jobs/payment_review/trigger.
+/jobs
+/jobs/payment_review/runs

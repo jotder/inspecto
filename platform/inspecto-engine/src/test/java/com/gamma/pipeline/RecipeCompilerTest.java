@@ -241,6 +241,31 @@ class RecipeCompilerTest {
         assertTrue(e.refusals().get(0).message().contains("soundex"), e.refusals().get(0).message());
     }
 
+    /** The distribution Steps (ANALYTICS-CORE-1 S3) compile to steps: entries; a malformed one refuses as the run would. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void theDistributionStepsCompileAndAMalformedOneRefusesByName() {
+        Map<String, Object> outlier = new LinkedHashMap<>(Map.of("column", "GROSS", "method", "robust_z"));
+        Map<String, Object> bins = new LinkedHashMap<>(Map.of("column", "GROSS", "bins", 4, "method", "quantile"));
+        Map<String, Object> corr = new LinkedHashMap<>(Map.of("columns", List.of("GROSS", "NET")));
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> chain = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        chain.add(4, step("correlation", corr));
+        chain.add(4, step("binning", bins));
+        chain.add(4, step("outlier", outlier));
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) RecipeCompiler.compile(recipe).get("steps");
+        assertTrue(steps.stream().anyMatch(s -> outlier.equals(s.get("outlier"))), String.valueOf(steps));
+        assertTrue(steps.stream().anyMatch(s -> bins.equals(s.get("binning"))), String.valueOf(steps));
+        assertTrue(steps.stream().anyMatch(s -> corr.equals(s.get("correlation"))), String.valueOf(steps));
+
+        Map<String, Object> bad = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) bad.get("steps")).add(4, step("binning",
+                new LinkedHashMap<>(Map.of("column", "GROSS", "bins", 4, "method", "ntile"))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class, () -> RecipeCompiler.compile(bad));
+        assertEquals(RecipeCompiler.MALFORMED_STEP, e.refusals().get(0).code());
+        assertTrue(e.refusals().get(0).message().contains("ntile"), e.refusals().get(0).message());
+    }
+
     /** quality.crypto.hash (2026-10-06): an authored salt is refused by name — the key is the Space's, never config. */
     @Test
     @SuppressWarnings("unchecked")

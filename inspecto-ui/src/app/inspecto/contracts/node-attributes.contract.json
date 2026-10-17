@@ -1027,6 +1027,201 @@
     "default" : true,
     "help" : "Off keeps only the candidate flag (needs a threshold)."
   } ],
+  "transform.stats.outlier" : [ {
+    "key" : "column",
+    "label" : "Number column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The number judged. An empty value gets no flag.",
+    "placeholder" : "AMOUNT"
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "iqr",
+    "options" : [ {
+      "value" : "iqr",
+      "label" : "IQR fences (Tukey: outside Q1 - k*IQR .. Q3 + k*IQR)"
+    }, {
+      "value" : "robust_z",
+      "label" : "Robust z (distance from the median in scaled MADs)"
+    } ],
+    "help" : "IQR suits skewed data and writes the fences; robust z writes a score."
+  }, {
+    "key" : "group_by",
+    "label" : "Groups",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Judge each value against its own group's figures. Blank: the whole column is one group.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "k",
+    "label" : "Fence multiplier (k)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1.5,
+    "min" : 0.0,
+    "max" : 100.0,
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "iqr"
+    },
+    "help" : "IQR only. 1.5 is Tukey's outlier, 3 a far-out value."
+  }, {
+    "key" : "quantile_mode",
+    "label" : "Quartiles",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "continuous",
+    "options" : [ {
+      "value" : "continuous",
+      "label" : "Interpolated (quantile_cont)"
+    }, {
+      "value" : "discrete",
+      "label" : "An observed value (quantile_disc)"
+    } ],
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "iqr"
+    },
+    "help" : "IQR only. How Q1 and Q3 are read."
+  }, {
+    "key" : "threshold",
+    "label" : "Score threshold",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 3.5,
+    "min" : 0.0,
+    "max" : 1000.0,
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "robust_z"
+    },
+    "help" : "Robust z only. A value whose score is beyond this (either side) is flagged."
+  }, {
+    "key" : "unit",
+    "label" : "Smallest meaningful change",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 1.0,
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "robust_z"
+    },
+    "help" : "Robust z only. Floors the spread so a near-constant group does not flag a tiny change: 1 for counts, 0.01 for cents."
+  }, {
+    "key" : "prefix",
+    "label" : "Column prefix",
+    "type" : "string",
+    "tier" : "advanced",
+    "default" : "outlier_",
+    "help" : "Names the added columns: outlier_lower, outlier_upper (IQR) or outlier_score (robust z), and outlier_flag."
+  } ],
+  "transform.data.binning" : [ {
+    "key" : "column",
+    "label" : "Number column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The number binned. An empty value gets no bin.",
+    "placeholder" : "AMOUNT"
+  }, {
+    "key" : "bins",
+    "label" : "Bins",
+    "type" : "number",
+    "tier" : "required",
+    "min" : 1.0,
+    "max" : 1000.0,
+    "help" : "How many bins, numbered from 0."
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "equal_width",
+    "options" : [ {
+      "value" : "equal_width",
+      "label" : "Equal width (same range per bin)"
+    }, {
+      "value" : "quantile",
+      "label" : "Quantile (about the same number of rows per bin)"
+    } ],
+    "help" : "Equal width splits the range; quantile splits the rows, ties kept together."
+  }, {
+    "key" : "group_by",
+    "label" : "Groups",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Bin each group over its own range or quantiles. Blank: the whole column.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "min",
+    "label" : "Range from",
+    "type" : "number",
+    "tier" : "advanced",
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "equal_width"
+    },
+    "help" : "Equal width only. A stated lower end; a value below it gets no bin. Blank: the smallest value."
+  }, {
+    "key" : "max",
+    "label" : "Range to",
+    "type" : "number",
+    "tier" : "advanced",
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "equal_width"
+    },
+    "help" : "Equal width only. A stated upper end; a value above it gets no bin. Blank: the largest value."
+  }, {
+    "key" : "quantile_mode",
+    "label" : "Quantiles",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "continuous",
+    "options" : [ {
+      "value" : "continuous",
+      "label" : "Interpolated (quantile_cont)"
+    }, {
+      "value" : "discrete",
+      "label" : "An observed value (quantile_disc)"
+    } ],
+    "dependsOn" : {
+      "key" : "method",
+      "equals" : "quantile"
+    },
+    "help" : "Quantile only. How the bin edges are read."
+  }, {
+    "key" : "bin_column",
+    "label" : "Bin column",
+    "type" : "string",
+    "tier" : "advanced",
+    "default" : "bin",
+    "help" : "Receives the bin number, 0 to bins - 1."
+  }, {
+    "key" : "label_column",
+    "label" : "Label column",
+    "type" : "string",
+    "tier" : "advanced",
+    "default" : "bin_label",
+    "help" : "Receives the bin's range as text: [lower, upper), the last bin [lower, upper]."
+  } ],
+  "transform.stats.correlation" : [ {
+    "key" : "columns",
+    "label" : "Number columns",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Every pair of these is correlated; in each pair the later column is regressed on the earlier.",
+    "placeholder" : "PRICE, QUANTITY"
+  }, {
+    "key" : "group_by",
+    "label" : "Groups",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "One row per group per pair. Blank: one row per pair.",
+    "placeholder" : "REGION"
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",
