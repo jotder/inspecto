@@ -195,6 +195,27 @@ returns a `Baseline` with a median and a scaled MAD for a robust z; `VolumeBasel
 counts over a rolling window and answers a signed fractional deviation with four statuses. Fitting it would add an unused
 spread and change its types and outputs, so it shares the median definition only.
 
+**S8, JVM-side aggregation moved to the store's SQL (2026-10-17).** Goldens committed first:
+`ObjectAnalyticsGoldenTest` (`inspecto-ops`; in-memory, DuckDB, Postgres when configured) and
+`CaseRuleEvaluateGoldenTest` (`inspecto-case-management`).
+
+* `ObjectService.analytics` — `DbObjectStore.rollupGroups` runs one portable `GROUP BY` over the raw `(status, priority)`
+  pair: count, cycle-time count and sum, and a `ROW_NUMBER()` first-seen position. Java still applies the upper-case
+  fold, the NONE rule and the workflow's terminal test to each group, so map keys keep the walk's order. Category, MTTR,
+  MTTD, impact and `recordsAffected` stay in the JVM over `scanAttributes` (a two-column ordered scan). The attribute
+  bag is JSON in a `VARCHAR` with no portable operator. `Long.parseLong` is not DuckDB's cast (`'1.5'` casts to 2), and
+  `Impact` validates `BigDecimal` text. The in-memory store keeps the per-object walk. The means stay integer division,
+  not `Stats.mean`: a `double` quotient can round up across an integer boundary.
+* `CaseOperations.evaluateCaseRule` — the window is `ObjectQuery.createdFrom` (exact, every store). The Tag Rule
+  filter's status aliases, priority, severity and category become an `ObjectQuery.Prefilter`, a `LOWER(...) LIKE`
+  containment that only narrows. It runs on DuckDB only and keeps any value with a character outside printable ASCII.
+  Postgres `LOWER` follows the database collation, so Postgres gets the window only. The exact JVM test still decides
+  every match. `type` and `q` stay in the JVM: `q` matches across the `title + " " + description` join.
+* ⚠ A row the old walk could not load now counts instead of failing the rollup. Examples are a NULL status, or a NULL
+  attribute value that `Map.copyOf` rejects.
+* Measured on 100k Incidents (file DuckDB, median of 5): analytics 3.9 s → 2.1 s; a 1-day rule 4.4 s → 0.06 s; an
+  all-time rule 3.3 s → 0.19 s; an all-time rule with `q` 2.9 s → 1.2 s.
+
 ## Similarity kit
 
 *ANALYTICS-CORE-1 S1, built 2026-10-17.* Package `com.gamma.analytics.similarity`. One definition of each string
