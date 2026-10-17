@@ -953,6 +953,13 @@ interface ConsignmentIngestStrategy {
         // is refused like any other file access. (An object-store dirs.database needs httpfs + a URL
         // allowlist; it is refused at the write gate today, so it stays refused here too — fail closed.)
         if (cfg.xlsx() != null) com.gamma.etl.ExcelExtension.ensureLoaded(conn);
+        // The write gate now ACCEPTS an allow-listed s3:// dirs.database (SCALEOUT-OBJSTORE-DATABASE-DIR-1), but
+        // this lane has no credentials route and no URL seal yet — and Paths.get below would turn the URI into
+        // a local 's3:' directory on Linux. Refuse by name rather than mishandle it.
+        if (cfg.dirs() != null && com.gamma.config.safety.PathJail.isUri(cfg.dirs().database()))
+            throw new SQLException("refusing to ingest: dirs.database '" + cfg.dirs().database() + "' is an "
+                    + "object-store location, which the ingest lane does not write yet "
+                    + "(SCALEOUT-OBJSTORE-DATABASE-DIR-1)");
         List<java.nio.file.Path> allowed = ingestAllowedDirs(cfg, inputs);
         for (java.nio.file.Path dir : allowed) {
             String why = forbiddenIngestDir(dir);

@@ -357,6 +357,39 @@ class ConfigSafetyValidatorTest {
         assertTrue(hasError(f, "dirs.database"), "an s3:// URI must be rejected: " + f);
     }
 
+    /**
+     * SCALEOUT-OBJSTORE-DATABASE-DIR-1: with an operator allow-list, {@code dirs.database} may be an object-store
+     * location under it - and ONLY there, and only that key. The accepted value is the probe each refusal
+     * below would otherwise pass with.
+     */
+    @Test
+    void anAllowListedObjectStoreDatabaseDirIsAcceptedAndNothingElseIs(@TempDir Path root) {
+        String prior = System.getProperty(PathJail.OBJECT_ROOTS_PROPERTY);
+        try {
+            System.setProperty(PathJail.OBJECT_ROOTS_PROPERTY, "s3://inspecto-lakehouse/space-a");
+            Map<String, Object> ok = safeDirs(root);
+            ok.put("database", "s3://inspecto-lakehouse/space-a/partitions");
+            List<Finding> f = ConfigSafetyValidator.check("pipeline", pipeline(ok), SafetyPolicy.withRoots(root));
+            assertFalse(hasError(f, "dirs.database"), "an allow-listed location must be accepted: " + f);
+
+            for (String bad : new String[] {"s3://inspecto-lakehouse/space-b/partitions",
+                    "s3://inspecto-lakehouse/space-a/../space-b", "gs://inspecto-lakehouse/space-a/p"}) {
+                Map<String, Object> dirs = safeDirs(root);
+                dirs.put("database", bad);
+                assertTrue(hasError(ConfigSafetyValidator.check("pipeline", pipeline(dirs),
+                        SafetyPolicy.withRoots(root)), "dirs.database"), bad + " must be refused");
+            }
+            // Only dirs.database dispatches to the object-store rule; every other dir keeps the flat refusal.
+            Map<String, Object> backup = safeDirs(root);
+            backup.put("backup", "s3://inspecto-lakehouse/space-a/backup");
+            assertTrue(hasError(ConfigSafetyValidator.check("pipeline", pipeline(backup),
+                    SafetyPolicy.withRoots(root)), "dirs.backup"), "dirs.backup must still refuse a URI");
+        } finally {
+            if (prior == null) System.clearProperty(PathJail.OBJECT_ROOTS_PROPERTY);
+            else System.setProperty(PathJail.OBJECT_ROOTS_PROPERTY, prior);
+        }
+    }
+
     /** A clean pipeline whose {@code processing.duckdb.temp_directory} is {@code dir}. */
     private static Map<String, Object> withDuckTempDir(Path root, String dir) {
         Map<String, Object> raw = pipeline(safeDirs(root));

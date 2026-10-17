@@ -52,6 +52,13 @@ class PartitionWriterObjectStoreTest {
         endpoint = env("INSPECTO_TEST_S3_ENDPOINT", "inspecto.test.s3.endpoint");
         key      = env("INSPECTO_TEST_S3_KEY", "inspecto.test.s3.key");
         secret   = env("INSPECTO_TEST_S3_SECRET", "inspecto.test.s3.secret");
+        // The write re-checks containment (SCALEOUT-OBJSTORE-DATABASE-DIR-1): allow this test's bucket.
+        System.setProperty(com.gamma.config.safety.PathJail.OBJECT_ROOTS_PROPERTY, "s3://" + BUCKET);
+    }
+
+    @org.junit.jupiter.api.AfterAll
+    static void clearAllowList() {
+        System.clearProperty(com.gamma.config.safety.PathJail.OBJECT_ROOTS_PROPERTY);
     }
 
     private static String env(String envName, String propName) {
