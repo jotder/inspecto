@@ -1,9 +1,9 @@
-package com.gamma.la.core;
+package com.gamma.graph;
 
-import com.gamma.la.core.BranchingPatternEngine.Edge;
-import com.gamma.la.core.BranchingPatternEngine.Match;
-import com.gamma.la.core.BranchingPatternEngine.Result;
-import com.gamma.la.core.PatternQueryCompiler.Stage;
+import com.gamma.graph.TemporalMotifMatcher.Edge;
+import com.gamma.graph.TemporalMotifMatcher.Match;
+import com.gamma.graph.TemporalMotifMatcher.Result;
+import com.gamma.graph.TemporalMotifMatcher.Stage;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -15,32 +15,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Golden tests of the motif search alone (no SQL): exact node order, edge order, layers and the truncated flag,
- * pinned BEFORE the analytics core plan's S6 move so the move provably changes no output. The end-to-end parity
+ * pinned BEFORE the analytics core plan's S6 move out of Link Analysis (written against LA's
+ * {@code BranchingPatternEngine}, unchanged expectations since) so the move provably changes no output. The end-to-end parity
  * with the browser matcher stays with {@code ControlApiInvPatternTest} over {@code branching-parity.fixture.json}.
  */
-class BranchingPatternEngineGoldenTest {
+class TemporalMotifMatcherGoldenTest {
 
     private static final long H = 3_600_000L;
 
     private static Stage fanIn(int min, Double window, boolean after, Double gap) {
-        return new Stage(true, min, null, null, null, window, after, gap, false);
+        return new Stage(true, min, window, after, gap, false, true);
     }
 
     private static Stage fanOut(int min, Double window, boolean after, Double gap) {
-        return new Stage(false, min, null, null, null, window, after, gap, false);
+        return new Stage(false, min, window, after, gap, false, true);
     }
 
     private static Stage closingFanIn(int min) {
-        return new Stage(true, min, null, null, null, null, true, null, true);
+        return new Stage(true, min, null, true, null, true, true);
     }
 
-    private static Stage withNodeKind(Stage s, String kind) {
-        return new Stage(s.fanIn(), s.minBranches(), s.edgeKind(), kind, s.threshold(), s.windowHours(),
-                s.afterPrevious(), s.maxGapHours(), s.closesToStart());
+    private static Stage admittingNoNodes(Stage s) {
+        return new Stage(s.fanIn(), s.minBranches(), s.windowHours(), s.afterPrevious(), s.maxGapHours(),
+                s.closesToStart(), false);
     }
 
     private static Result match(List<Stage> stages, List<List<Edge>> legs, int limit) {
-        return BranchingPatternEngine.match(stages, legs, limit);
+        return TemporalMotifMatcher.match(stages, legs, limit);
     }
 
     private static Edge e(String id, String s, String t, Long hours) {
@@ -112,16 +113,14 @@ class BranchingPatternEngineGoldenTest {
     }
 
     @Test
-    void aStageNamingANonEntityNodeKindMatchesNothing() {
+    void aStageAdmittingNoNodesMatchesNothing() {
         List<Stage> base = structuring();
         for (int i = 0; i < base.size(); i++) {
             List<Stage> st = new ArrayList<>(base);
-            st.set(i, withNodeKind(base.get(i), "account"));
+            st.set(i, admittingNoNodes(base.get(i)));
             assertEquals(0, match(st, structuringLegs(21L), 10).matches().size(), "stage " + i);
         }
-        List<Stage> entity = new ArrayList<>(base);
-        entity.set(1, withNodeKind(base.get(1), PatternQueryCompiler.ENTITY_KIND));
-        assertEquals(1, match(entity, structuringLegs(21L), 10).matches().size());
+        assertEquals(1, match(base, structuringLegs(21L), 10).matches().size());
     }
 
     @Test
@@ -143,13 +142,13 @@ class BranchingPatternEngineGoldenTest {
 
     @Test
     void theWorkBudgetStopsTheSearchAndSaysSo() {
-        int n = BranchingPatternEngine.WORK_BUDGET + 1;
+        int n = TemporalMotifMatcher.WORK_BUDGET + 1;
         List<Edge> legs = new ArrayList<>(n);
         for (int i = 0; i < n; i++) legs.add(new Edge("e" + i, "A", "t" + i, (long) i));
         Result r = match(List.of(fanOut(n + 1, null, false, null)), List.of(legs), 10);
         assertTrue(r.truncated());
         assertEquals(0, r.matches().size());
-        assertEquals(500_000, BranchingPatternEngine.WORK_BUDGET);
+        assertEquals(500_000, TemporalMotifMatcher.WORK_BUDGET);
     }
 
     @Test
@@ -162,10 +161,10 @@ class BranchingPatternEngineGoldenTest {
     @Test
     void followsInTimeIsStrictAndBoundedByTheGap() {
         Stage st = fanOut(1, null, true, 2.0);
-        assertTrue(BranchingPatternEngine.followsInTime(0L, 2 * H, st));
-        assertFalse(BranchingPatternEngine.followsInTime(0L, 2 * H + 1, st));
-        assertFalse(BranchingPatternEngine.followsInTime(5L, 5L, st));
-        assertFalse(BranchingPatternEngine.followsInTime(null, 5L, st));
-        assertTrue(BranchingPatternEngine.followsInTime(null, null, fanOut(1, null, false, null)));
+        assertTrue(TemporalMotifMatcher.followsInTime(0L, 2 * H, st));
+        assertFalse(TemporalMotifMatcher.followsInTime(0L, 2 * H + 1, st));
+        assertFalse(TemporalMotifMatcher.followsInTime(5L, 5L, st));
+        assertFalse(TemporalMotifMatcher.followsInTime(null, 5L, st));
+        assertTrue(TemporalMotifMatcher.followsInTime(null, null, fanOut(1, null, false, null)));
     }
 }

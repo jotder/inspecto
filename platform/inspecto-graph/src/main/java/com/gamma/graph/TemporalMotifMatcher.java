@@ -1,6 +1,4 @@
-package com.gamma.la.core;
-
-import com.gamma.la.core.PatternQueryCompiler.Stage;
+package com.gamma.graph;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -12,23 +10,41 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The windowed search of a branching motif over the legs {@link PatternQueryCompiler} selected — a line-for-line
- * port of {@code matchBranchingPattern} in {@code inspecto-ui/projects/link-analysis/src/graph/branching-pattern-engine.ts}.
- * Keep the two in step: {@code ControlApiInvPatternTest} and {@code branching-parity.spec.ts} assert the
- * SAME golden fixture ({@code inspecto-ui/projects/link-analysis/src/link-analysis/branching-parity.fixture.json}).
+ * <b>Temporal motif matcher</b> — finds ordered {@code fan-in} / {@code fan-out} stages over timed directed legs:
+ * stage i needs at least {@code minBranches} DISTINCT counterparties inside a sliding window, and (optionally)
+ * strictly after the time stage i-1 reached each frontier node, within a maximum gap. The last stage may close back
+ * onto the origin layer (a round trip). Structuring, layering and circular-financing rings are this shape.
  *
- * <p>Differences from the browser, all deliberate: there is no node cap (the SQL prune bounds the input
- * instead), and the anchors of stage 0 are visited in key order rather than projection order — only which
- * matches a {@code limit} cuts can differ, never whether a match exists.
+ * <p>Plain JDK over node and edge ids. Moved out of Link Analysis by the analytics core plan (S6) so AML, Mobile
+ * Money and Fraud can use it without depending on Link Analysis; LA keeps its SQL prune ({@code PatternQueryCompiler})
+ * and maps its stages onto {@link Stage}.
+ *
+ * <p>A line-for-line port of {@code matchBranchingPattern} in
+ * {@code inspecto-ui/projects/link-analysis/src/graph/branching-pattern-engine.ts}. Keep the two in step:
+ * {@code ControlApiInvPatternTest} and {@code branching-parity.spec.ts} assert the SAME golden fixture
+ * ({@code inspecto-ui/projects/link-analysis/src/link-analysis/branching-parity.fixture.json}), and
+ * {@code TemporalMotifMatcherGoldenTest} pins this class's exact output.
+ *
+ * <p>Differences from the browser, all deliberate: there is no node cap (the caller bounds the input instead), and
+ * the anchors of stage 0 are visited in key order rather than projection order — only which matches a {@code limit}
+ * cuts can differ, never whether a match exists.
  */
-public final class BranchingPatternEngine {
+public final class TemporalMotifMatcher {
 
     /** Ceiling on leg examinations per run — the TS {@code BRANCHING_WORK_BUDGET}. */
     public static final int WORK_BUDGET = 500_000;
 
-    private BranchingPatternEngine() {}
+    private TemporalMotifMatcher() {}
 
-    /** A leg of a stage: its id, endpoints (normalised keys) and time (epoch ms, null when unknown). */
+    /**
+     * One stage of the motif. {@code windowHours} / {@code maxGapHours} null = unbounded. {@code admitsNodes} false
+     * = the caller's stage names a node kind its graph does not hold: the stage then matches nothing (its legs are
+     * still counted against the work budget, as in the browser).
+     */
+    public record Stage(boolean fanIn, int minBranches, Double windowHours, boolean afterPrevious, Double maxGapHours,
+                        boolean closesToStart, boolean admitsNodes) {}
+
+    /** A leg of a stage: its id, endpoints (node keys, compared exactly) and time (epoch ms, null when unknown). */
     public record Edge(String id, String source, String target, Long t) {}
 
     public record Match(List<String> nodeIds, List<String> edgeIds, List<List<String>> layers) {}
@@ -90,8 +106,8 @@ public final class BranchingPatternEngine {
     }
 
     /**
-     * Find every match. {@code legsByStage.get(i)} are stage i's ELIGIBLE legs (kind + threshold already
-     * applied). Every projected node is an {@code entity} — see {@link #kindOk}.
+     * Find every match. {@code legsByStage.get(i)} are stage i's ELIGIBLE legs (any edge kind or
+     * value band already applied by the caller), each with its time in epoch ms or null when unknown.
      */
     public static Result match(List<Stage> stages, List<List<Edge>> legsByStage, int limit) {
         List<Map<String, List<Leg>>> outIdx = new ArrayList<>(), inIdx = new ArrayList<>();
@@ -114,8 +130,8 @@ public final class BranchingPatternEngine {
             if (s.truncated || s.matches.size() >= limit) break;
             List<Leg> legs = (first.fanIn() ? inIdx.get(0) : outIdx.get(0)).getOrDefault(n, List.of());
             if (!s.spend(legs.size() + 1)) break;
-            if (first.fanIn() && !kindOk(first.nodeKind())) continue;
-            List<Leg> usable = !first.fanIn() && !kindOk(first.nodeKind()) ? List.of() : legs;
+            if (first.fanIn() && !first.admitsNodes()) continue;
+            List<Leg> usable = !first.fanIn() && !first.admitsNodes() ? List.of() : legs;
             Window win = selectWindow(usable, first.minBranches(), first.windowHours());
             if (win == null) continue;
             List<String> others = new ArrayList<>(new LinkedHashSet<>(win.legs().stream().map(Leg::other).toList()));
@@ -133,11 +149,6 @@ public final class BranchingPatternEngine {
         }
         if (s.matches.size() >= limit) s.truncated = true;
         return new Result(s.matches, s.truncated);
-    }
-
-    /** Every projected node is an {@code entity}; a stage naming another node kind matches nothing, as in the browser. */
-    private static boolean kindOk(String k) {
-        return k == null || PatternQueryCompiler.ENTITY_KIND.equals(k);
     }
 
     private static Map<String, Long> single(String node, Long at) {
@@ -180,7 +191,7 @@ public final class BranchingPatternEngine {
                     List<Leg> cand = idx.getOrDefault(f.getKey(), List.of());
                     if (!spend(cand.size())) return;
                     for (Leg l : cand) {
-                        if (s.used().contains(l.other()) || !kindOk(st.nodeKind())) continue;
+                        if (s.used().contains(l.other()) || !st.admitsNodes()) continue;
                         if (followsInTime(f.getValue(), l.t(), st)) legs.add(l);
                     }
                 }
@@ -204,7 +215,7 @@ public final class BranchingPatternEngine {
                 if (!spend(cand.size())) return;
                 for (Leg l : cand) {
                     if (origin != null ? !origin.contains(l.other()) : s.used().contains(l.other())) continue;
-                    if (!kindOk(st.nodeKind()) || !followsInTime(f.getValue(), l.t(), st)) continue;
+                    if (!st.admitsNodes() || !followsInTime(f.getValue(), l.t(), st)) continue;
                     // Re-framed so `other` is the SENDER — breadth is counted over distinct frontier members.
                     byCollector.computeIfAbsent(l.other(), k -> new ArrayList<>()).add(new Leg(l.edgeId(), f.getKey(), l.t()));
                 }

@@ -5,7 +5,6 @@ import com.gamma.entitystore.LaLimitValues;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.LinkTemporalDetector;
 import com.gamma.la.storage.IndexReader.LinkTime;
-import com.gamma.la.core.BranchingPatternEngine;
 import com.gamma.la.core.PatternQueryCompiler;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
@@ -16,7 +15,8 @@ import com.gamma.spi.http.RouteModule;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
-import com.gamma.la.core.BranchingPatternEngine.Edge;
+import com.gamma.graph.TemporalMotifMatcher;
+import com.gamma.graph.TemporalMotifMatcher.Edge;
 import com.gamma.la.core.PatternQueryCompiler.Compiled;
 import com.gamma.la.core.PatternQueryCompiler.Stage;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -401,11 +401,11 @@ public final class PatternRoutes implements RouteModule {
                 Object ts = row.get("ts");
                 byStage.get(stage).add(new Edge(id, s, t, ts instanceof Number n ? n.longValue() : null));
             }
-            BranchingPatternEngine.Result res = BranchingPatternEngine.match(stages, byStage, limit);
+            TemporalMotifMatcher.Result res = TemporalMotifMatcher.match(stages.stream().map(Stage::motif).toList(), byStage, limit);
 
             List<Map<String, Object>> matches = new ArrayList<>();
             Set<String> usedLegs = new LinkedHashSet<>();
-            for (BranchingPatternEngine.Match mt : res.matches()) {
+            for (TemporalMotifMatcher.Match mt : res.matches()) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("nodeIds", mt.nodeIds().stream().map(label::get).toList());
                 m.put("edgeIds", mt.edgeIds());
@@ -484,7 +484,7 @@ public final class PatternRoutes implements RouteModule {
     private static Map<String, Object> fences(LaLimitValues lim) {
         Map<String, Object> f = new LinkedHashMap<>();
         f.put("maxLegs", SpaceLimits.get(lim, LaLimit.PATTERN_MAX_LEGS));
-        f.put("workBudget", BranchingPatternEngine.WORK_BUDGET);
+        f.put("workBudget", TemporalMotifMatcher.WORK_BUDGET);
         f.put("timeoutMs", SpaceLimits.get(lim, LaLimit.PATTERN_TIMEOUT_S) * 1000);
         return f;
     }
