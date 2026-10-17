@@ -1,9 +1,7 @@
 package com.gamma.analytics.split;
 
+import com.gamma.analytics.Md5Bucket;
 import com.gamma.util.SqlIdent;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
 /**
@@ -24,8 +22,8 @@ import java.util.Objects;
  * <p>Why MD5 and not DuckDB's {@code hash()}: {@code hash()} is DuckDB's internal hash, with no published definition
  * and no promise to stay the same across versions, so the JVM cannot reproduce it and a DuckDB upgrade could move
  * entities between roles. {@code md5_number_lower(VARCHAR)} is the lower 64 bits of the MD5 of the UTF-8 bytes (digest
- * bytes 8..15, little-endian, unsigned) — a fixed algorithm the JVM computes exactly; the same reading the LA index's
- * {@code BucketFunction} uses.
+ * bytes 8..15, little-endian, unsigned) — a fixed algorithm the JVM computes exactly. Both forms are {@link Md5Bucket}'s,
+ * the one definition the LA index's {@code BucketFunction} also uses.
  */
 public final class HoldoutSplit {
 
@@ -138,15 +136,7 @@ public final class HoldoutSplit {
 
         /** {@code md5_number_lower(seed ':' key) mod 10000} — in [0, 10000). */
         public int bucket(String key) {
-            byte[] d;
-            try {
-                d = MessageDigest.getInstance("MD5").digest(hashed(key).getBytes(StandardCharsets.UTF_8));
-            } catch (NoSuchAlgorithmException e) {
-                throw new IllegalStateException(e);
-            }
-            long lower = 0;
-            for (int i = 15; i >= 8; i--) lower = (lower << 8) | (d[i] & 0xFFL);
-            return (int) Long.remainderUnsigned(lower, WHOLE);
+            return Md5Bucket.of(hashed(key), WHOLE);
         }
 
         public Role role(String key) {
@@ -156,8 +146,7 @@ public final class HoldoutSplit {
 
         /** DuckDB SQL for {@link #bucket} of {@code keyColumn} read as VARCHAR; NULL for a NULL key. */
         public String bucketSql(String keyColumn) {
-            return "CAST(md5_number_lower(" + SqlIdent.sqlStr(seed + ":") + " || CAST(" + SqlIdent.q(keyColumn)
-                    + " AS VARCHAR)) % " + WHOLE + " AS INTEGER)";
+            return Md5Bucket.sql(SqlIdent.sqlStr(seed + ":") + " || CAST(" + SqlIdent.q(keyColumn) + " AS VARCHAR)", WHOLE);
         }
 
         /** DuckDB SQL for {@link #role} as {@code 'train'}, {@code 'validation'} or {@code 'test'}; NULL for a NULL key. */

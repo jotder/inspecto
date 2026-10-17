@@ -38,7 +38,7 @@ feature. It ships as its own thin jar beside `inspecto.jar`
 Packages:
 
 * `com.gamma.analytics` — `Stats` (the definitions below), `MedianMode`, `QuantileMode`, `ColumnProfiler`
-  (§ Column profiler).
+  (§ Column profiler), `Md5Bucket` (§ [Holdout split](#holdout-split)).
 * `com.gamma.analytics.score` — the score output contract (M7, below).
 * `com.gamma.analytics.accuracy` — `Accuracy`, `AccuracySql`, `Backtest` (S5b, § [Accuracy and backtest](#accuracy-and-backtest)).
 * `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
@@ -487,7 +487,10 @@ read as `VARCHAR` (an integer key hashes as its decimal text; a NULL key has no 
 **Why MD5, not DuckDB's `hash()`.** `hash()` is DuckDB's internal hash, with no published definition and no promise to
 stay the same across versions: the JVM cannot reproduce it, and an upgrade could move entities between roles.
 `md5_number_lower` is the lower 64 bits of the MD5 of the UTF-8 bytes (digest bytes 8..15, little-endian, unsigned) —
-a fixed algorithm the JVM computes exactly, the same reading LA's index `BucketFunction` relies on.
+a fixed algorithm the JVM computes exactly. **One definition, `Md5Bucket`** (`of(text, n)`, `sql(expr, n)`, `lower64`):
+`HashSplit` and LA's index `BucketFunction` (`la-storage`) both delegate to it — before the cleanup each held its own
+copy of the digest reading. `Md5BucketTest` and `BucketFunctionTest#goldenBuckets` pin figures computed outside Java;
+neither caller's buckets moved.
 
 ### Tests (S5 b, c, d)
 

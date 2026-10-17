@@ -386,7 +386,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
   `in/` (the same edges keyed by dst — **both directions stored**, data doubles) and `nodes/`. Columns
   `src, dst, kind, ts, w, a0..ak`; NULL endpoints are dropped and counted; `ts` is naive UTC (session zone pinned).
 * **Bucket:** `BucketFunction` = `md5_number_lower(id) % N` (fixed MD5 bytes, golden-tested, Java and SQL
-  renderings), `N = clamp(pow2(ceil(edges / 4e6)), 16, 1024)`. DuckDB cannot derive the partition from a key
+  renderings, both the Analytics Kernel's `Md5Bucket` — the one definition, shared with the holdout split), `N = clamp(pow2(ceil(edges / 4e6)), 16, 1024)`. DuckDB cannot derive the partition from a key
   equality, so **the reader computes the bucket in Java and writes it as a literal** — without that the layout does
   not prune.
 * **Modes** (`IndexPlan.classify`, shared by `GET /inv/index`, the submit gate and the builder's own defence):
