@@ -114,6 +114,17 @@ describe('JobDetailComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('shows a structured parameter as JSON, not [object Object]', () => {
+        const fixture = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.job.set({ ...JOB, params: { day: '$yesterday', incremental: { by: 'day', lookback: 1 } } } as never);
+        expect(c.paramRows()).toEqual([
+            { key: 'day', value: '$yesterday' },
+            { key: 'incremental', value: '{"by":"day","lookback":1}' },
+        ]);
+    });
+
     it('renders with no a11y violations', async () => {
         const fixture = create();
         fixture.detectChanges();

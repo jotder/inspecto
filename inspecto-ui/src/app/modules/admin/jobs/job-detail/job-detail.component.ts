@@ -97,7 +97,11 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     readonly whatScheduled = computed(() => (this.job() ? whatScheduled(this.job()!) : ''));
     readonly scheduleSummary = computed(() => (this.job() ? scheduleSummary(this.job()!) : ''));
     readonly paramRows = computed(() =>
-        Object.entries(this.job()?.params ?? {}).map(([key, value]) => ({ key, value: String(value) })),
+        Object.entries(this.job()?.params ?? {}).map(([key, value]) => ({
+            key,
+            // A structured value (`incremental: {by: day, ...}`) is JSON, never "[object Object]".
+            value: value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value),
+        })),
     );
     readonly selectedRun = computed(() => this.runs().find((r) => r.runId === this.selectedRunId()) ?? null);
 
