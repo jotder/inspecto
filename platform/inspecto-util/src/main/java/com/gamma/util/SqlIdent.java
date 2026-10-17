@@ -41,6 +41,15 @@ public final class SqlIdent {
      * (ANALYTICS-CORE-1 M9 retired five private copies of it).
      */
     public static String pathStr(java.nio.file.Path p) {
-        return sqlStr(p.toAbsolutePath().toString().replace('\\', '/'));
+        return pathStr(p, "");
+    }
+
+    /**
+     * {@link #pathStr(java.nio.file.Path)} of a directory with a glob appended inside the same literal —
+     * {@code pathStr(dir, "/*}{@code /*.parquet")}. A glob cannot go through {@code Path.resolve}: {@code *} is
+     * not a legal path character on Windows.
+     */
+    public static String pathStr(java.nio.file.Path dir, String globSuffix) {
+        return sqlStr(dir.toAbsolutePath().toString().replace('\\', '/') + globSuffix);
     }
 }

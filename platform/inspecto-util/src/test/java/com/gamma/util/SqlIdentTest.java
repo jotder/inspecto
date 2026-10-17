@@ -78,6 +78,9 @@ class SqlIdentTest {
         assertEquals("'" + abs.replace('\\', '/').replace("'", "''") + "'", SqlIdent.pathStr(p));
         org.junit.jupiter.api.Assertions.assertFalse(SqlIdent.pathStr(p).contains("\\"));
         org.junit.jupiter.api.Assertions.assertTrue(SqlIdent.pathStr(p).contains("O''Brien/f.parquet'"));
+        java.nio.file.Path dir = java.nio.file.Path.of("d'x");
+        assertEquals("'" + dir.toAbsolutePath().toString().replace('\\', '/').replace("'", "''") + "/*/*.parquet'",
+                SqlIdent.pathStr(dir, "/*/*.parquet"));
     }
 
     /** With a parameter list the value is BOUND (never inlined); without one it is the escaped literal. */
