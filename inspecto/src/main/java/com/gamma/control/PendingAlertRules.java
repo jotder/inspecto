@@ -11,6 +11,7 @@ import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.alert.AnomalyScoreOutputs;
 import com.gamma.alert.RiskScoreOutputs;
+import com.gamma.analytics.score.ScoreKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,20 +63,10 @@ public final class PendingAlertRules {
     /** The key naming the score model whose first run releases the rule: {@code {kind, model}} (D-AD7). */
     public static final String AFTER = "afterScore";
 
-    /** A score kind whose {@code _latest} output a pending rule may read: its prefix and ownership marker. */
-    record ScoreKind(String kind, String scoresPrefix, String latestSuffix, String ownerMarker) {
-        String latest(String model) { return scoresPrefix + model + latestSuffix; }
-        boolean ownedBy(Path dir, String model) {
-            return com.gamma.alert.ScoreOutputDirs.ownedBy(dir, ownerMarker, model);
-        }
-    }
-
-    /** Every score kind a pending rule can wait for, by component kind. */
+    /** Every score kind a pending rule can wait for, by component kind (the score output contract's {@link ScoreKind}). */
     static final Map<String, ScoreKind> KINDS = Map.of(
-            RiskScoreOutputs.KIND, new ScoreKind(RiskScoreOutputs.KIND, RiskScoreOutputs.SCORES_PREFIX,
-                    RiskScoreOutputs.LATEST_SUFFIX, RiskScoreOutputs.OWNER_MARKER),
-            AnomalyScoreOutputs.KIND, new ScoreKind(AnomalyScoreOutputs.KIND, AnomalyScoreOutputs.SCORES_PREFIX,
-                    AnomalyScoreOutputs.LATEST_SUFFIX, AnomalyScoreOutputs.OWNER_MARKER));
+            RiskScoreOutputs.KIND, RiskScoreOutputs.SCORE_KIND,
+            AnomalyScoreOutputs.KIND, AnomalyScoreOutputs.SCORE_KIND);
 
     /** A parsed {@code afterScore}: the score kind and model id. */
     record After(ScoreKind kind, String model) {}
@@ -209,7 +200,8 @@ public final class PendingAlertRules {
         if (store.exists("dataset", latest)) return;
         Map<String, Object> ds = new LinkedHashMap<>(Map.of("physicalRef", latest));
         ComponentRoutes.validateKind(configRoot, dataRoot, "dataset", latest, ds);
-        if (dataRoot.get() == null || !kind.ownedBy(dataRoot.get().resolve(latest), modelId))
+        if (dataRoot.get() == null
+                || !com.gamma.alert.ScoreOutputDirs.ownedBy(dataRoot.get().resolve(latest), kind.ownerMarker(), modelId))
             throw new IllegalArgumentException(kind.kind() + " '" + modelId + "' has not written '" + latest + "' yet");
         store.write("dataset", latest, ds);
     }

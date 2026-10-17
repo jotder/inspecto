@@ -13,7 +13,9 @@ timestamp: 2026-10-10T00:00:00Z
 > `com.gamma.anomaly`, add-on `anomalyDetection` `status: built` in `offerings/professional.toon`, so
 > Professional, Enterprise and Preview; not Personal — D-AD4). It depends on `inspecto-entity-list`
 > (`requires.modules: entity-list`) and **not** on `inspecto-scoring`: the pieces it shares with
-> [Risk Scores](risk-scores.md) live in the engine (D-AD5). Without the module `/anomaly-scores*` answers 503
+> [Risk Scores](risk-scores.md) are extracted, never copied (D-AD5, fulfilled 2026-10-17 by ANALYTICS-CORE-1 M7):
+> the score output contract is in the Analytics Kernel (D-AN6, [Score output contract](../analytics-kernel.md#score-output-contract))
+> and its writer `com.gamma.alert.ScoreOutputWriter` in the engine. Without the module `/anomaly-scores*` answers 503
 > and an `anomaly-model` component is unknown to the SPA, which then hides every anomaly surface.
 > Built 2026-10-10 in slices S1..S5 (`ANOMALY-DETECTION-1`); the design and its lane notes are archived at
 > [`anomaly-detection-design.md`](../../../archived-documents/plans-archive/anomaly-detection-design.md).
@@ -159,9 +161,9 @@ DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus
   scored day's slot (weekday seasonality = that weekday's median), a reference not a per-day forecast. The pane draws
   one `<inspecto-chart>` per feature (`inspecto/anomaly/anomaly-day-series.ts`). Pinned by `ControlApiAnomalyScoreTest`
   and the pane spec (incl. the older-server no-`series` case).
-- **Writes:** history parquet + `_latest` swap (`*.tmp` + atomic move), columns `model, entity_type,
+- **Writes** through the shared score output contract (`ScoreOutputWriter`, no retention): history parquet + `_latest` swap (`*.tmp` + atomic move), columns `model, entity_type,
   entity_key, period_start, score, band, raw, features (JSON), insufficient_count, model_version, run_id,
-  scored_at`; then the watch-list feed (`high` entities, `job:anomaly.score:<id>`); then the Signal
+  scored_at`; then the watch-list feed (`high` entities, `job:anomaly.score:<id>`, `WatchListFeed.feedScored`); then the Signal
   `SignalType.ANOMALY_SCORE_PRODUCED` (core; `AnomalySignals` aliases it). A query failure rethrows with
   model, Feature, Dataset and error class only — never the DuckDB message. `AnomalyScorer.recompute` re-derives
   score and band (both z) from the stored numbers; tests assert equality.
@@ -277,7 +279,7 @@ What remains of `ANOMALY-UI-FINDINGS-1` is the live visual check of the layout a
 
 D-AD1 names (Anomaly Model / Anomaly Score / Feature / Peer Group) · D-AD2 robust z + seasonality + peers,
 weighted RMS · D-AD3 a new kind, not a Risk Score factor type · D-AD4 optional module, Professional+ · D-AD5
-shared pieces extracted to the engine · D-AD6 0–100 via `1 − exp(−raw/3)` · D-AD7 `afterScore: {kind, model}` ·
+shared pieces extracted, never copied (fulfilled by D-AN6: the contract in the Analytics Kernel, the writer in the engine) · D-AD6 0–100 via `1 − exp(−raw/3)` · D-AD7 `afterScore: {kind, model}` ·
 D-AD8 missing = 0 for count/sum, absent for avg/ratio · D-AD9 full recompute now, incremental when measured
 slow (**measured 2026-10-11**, below) · D-AD10 cap + fail · D-AD11 small cohort `insufficient`, opt-in `fallback: population` · D-AD12 peer-only
 score for entities without self history, flagged.

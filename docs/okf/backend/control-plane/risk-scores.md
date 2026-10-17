@@ -19,6 +19,12 @@ centrality composite. Keep the two apart.
 An **Anomaly Score** ("unusual for itself or its peers") is a third, separate concept: [Anomaly Scores](anomaly-scores.md).
 Its `_latest` Dataset can be a Risk Score factor (`measure: max(score)`).
 
+**Shared with Anomaly Scores (ANALYTICS-CORE-1 M7, D-AN6; fulfils D-AD5):** the output names, column head and tail,
+0–100 clamp and inclusive `high`, entity cap, run files and retention, and the explanation part are the score output
+contract in the Analytics Kernel ([Score output contract](../analytics-kernel.md#score-output-contract)); the run is
+written by `com.gamma.alert.ScoreOutputWriter` (engine) and the watch list fed by `WatchListFeed.feedScored`. The
+factor arithmetic, `recompute`, the model spec and the wording stay in `com.gamma.risk`.
+
 ## The model — the `risk-score` component kind
 
 It is stored at `registry/risk-scores/<id>.toon` through `ComponentStore` / `ComponentRoutes`, so history,
@@ -316,7 +322,7 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 - ✅ **Opt-in history retention (2026-10-04).** Optional model key `retainDays` or `retainRuns` (whole number
   >= 1; not both; fail closed at save). OFF by default: with neither set, every run is kept. After each write the
   Job deletes whole older run files from `risk_scores_<id>` (by the file's run timestamp, or all but the newest N)
-  and never touches `_latest` or the run just written (`RiskScoreEvaluator.prune`).
+  and never touches `_latest` or the run just written (`ScoreRunFiles.Retention`, applied by `ScoreOutputWriter.write`).
   ⚠ **Audit vs storage.** A pruned run's factors are gone, so that score is no longer reproducible. That loss
   happens only when the operator opts in, and the default is to keep everything.
 - A row written before a column was classified stays raw: **by design, won't fix** (history is never rewritten).

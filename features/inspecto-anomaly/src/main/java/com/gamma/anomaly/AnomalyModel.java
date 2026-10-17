@@ -53,7 +53,7 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     public static final String OWNER_MARKER = com.gamma.alert.AnomalyScoreOutputs.OWNER_MARKER;
     public static final int MAX_FEATURES = 16;
     public static final int MAX_WINDOW_DAYS = 90;
-    public static final int MAX_ENTITIES_CEILING = 2_000_000;
+    public static final int MAX_ENTITIES_CEILING = com.gamma.analytics.score.EntityCap.CEILING;
     public static final Set<String> ENVELOPE_KEYS = Set.of("name", "owner", "shares");
     /** Aggregations whose empty bucket is a real 0 (D-AD8); every other one leaves it absent. */
     public static final Set<String> ZERO_FILLED_AGGS = Set.of("count", "sum", "countDistinct");
@@ -201,7 +201,7 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     }
 
     public String band(double score) {
-        return score >= highThreshold ? "high" : score >= elevatedThreshold ? "elevated" : "normal";
+        return com.gamma.analytics.score.ScoreScale.band(score, elevatedThreshold, highThreshold);
     }
 
     public static AnomalyModel fromMap(String id, Map<String, Object> m) {
