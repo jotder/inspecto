@@ -639,6 +639,9 @@ Plan archived: [`la-entity-profile-plan`](../../../archived-documents/plans-arch
 * **A raw identifier never travels in a URL.** The SPA resolves a typed value with the POST and navigates by the key it returns; for a masked type
   the GET is alias-only (`masked:<16 hex>`) and answers 422 to a raw key. Type pages are aggregates only (D-EP3): a dominant value is reported as
   `kind:"dominant"`, `value:null`; only the built-in sentinels (`''`, `-99`, `0`, `NULL`, `null`, `unknown`, `n/a`) are shown by value.
+  **Dominance counts a value the normaliser rejects by its raw (trimmed) text (2026-10-18)**, so a name filling a number column still
+  raises the sentinel (seen on the IMS Space); built-in sentinels and blanks never dominate. The SPA never rounds a share short of
+  all up to 100 % (`percent()` caps it at 99.9 %: a 99.95 % one-to-one share sat beside a maximum of 15 per Entity).
 * **Bindings** (`EntityTypeBindings`): every Dataset column the caller can view whose classification an Entity Type claims; `role` is `source` /
   `target` when a saved view or index mapping names it as a link end, else `attribute`. One Entity is the normalised typed key (`EntityKeySql`, D-EP5).
   **Parties (2026-10-16):** a Dataset column may carry `party` (free text, trimmed, lower-case; the binding shows it). Relationships
