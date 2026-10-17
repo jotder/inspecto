@@ -27,6 +27,7 @@ import {
     JobRun,
     JobRunLogs,
     JobsService,
+    LensService,
     visibleInterval,
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -71,6 +72,7 @@ const LIVE_TAIL_MS = 5000;
 })
 export class JobDetailComponent implements OnInit, OnDestroy {
     private api = inject(JobsService);
+    protected lens = inject(LensService);
     private route = inject(ActivatedRoute);
     private router = inject(Router);
     private dialog = inject(MatDialog);
