@@ -702,9 +702,9 @@ interface ConsignmentIngestStrategy {
                 + "now()::TIMESTAMP AS __valid_from, "
                 + opExpr + " AS __op, "
                 + SqlIdent.sqlStr(batchId) + " AS __batch_id "
-                + "FROM \"" + src + "\" "
+                + "FROM " + SqlIdent.q(src) + " "
                 + "QUALIFY row_number() OVER (PARTITION BY " + keyHash + order + ") = 1";
-        String sql = "CREATE TABLE \"" + dst + "\" AS SELECT * FROM (" + staged + ") AS _staged";
+        String sql = "CREATE TABLE " + SqlIdent.q(dst) + " AS SELECT * FROM (" + staged + ") AS _staged";
         if (existingStoreReader == null)
             sql += " WHERE __op != 'delete'";   // an empty store has no live key for a delete to remove
         else {
@@ -720,7 +720,7 @@ interface ConsignmentIngestStrategy {
                     + " OR (__op = 'delete' AND __key_hash IN (SELECT __key_hash FROM " + live + "))";
         }
         try (Statement st = conn.createStatement()) {
-            st.execute("DROP TABLE IF EXISTS \"" + dst + "\"");
+            st.execute("DROP TABLE IF EXISTS " + SqlIdent.q(dst));
             st.execute(sql);
         }
     }
@@ -741,7 +741,7 @@ interface ConsignmentIngestStrategy {
     private static List<String> payloadColumns(Connection conn, String src) throws SQLException {
         List<String> cols = new java.util.ArrayList<>();
         try (Statement st = conn.createStatement();
-             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM \"" + src + "\" LIMIT 0")) {
+             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM " + SqlIdent.q(src) + " LIMIT 0")) {
             java.sql.ResultSetMetaData md = rs.getMetaData();
             for (int i = 1; i <= md.getColumnCount(); i++) {
                 String c = md.getColumnName(i);
