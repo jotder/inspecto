@@ -1,11 +1,11 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Edge;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Node;
-import com.gamma.la.graph.GraphPropagation.Factor;
-import com.gamma.la.graph.GraphPropagation.Risk;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Edge;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Node;
+import com.gamma.graph.GraphPropagation.Factor;
+import com.gamma.graph.GraphPropagation.Risk;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

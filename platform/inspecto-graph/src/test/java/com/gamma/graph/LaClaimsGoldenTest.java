@@ -1,11 +1,11 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
-import com.gamma.la.graph.ClaimsCorpus.Accident;
-import com.gamma.la.graph.ClaimsCorpus.Claim;
-import com.gamma.la.graph.ClaimsCorpus.Party;
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Score;
+import com.gamma.graph.ClaimsCorpus.Accident;
+import com.gamma.graph.ClaimsCorpus.Claim;
+import com.gamma.graph.ClaimsCorpus.Party;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Score;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

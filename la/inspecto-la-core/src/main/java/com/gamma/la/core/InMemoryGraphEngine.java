@@ -1,16 +1,16 @@
 package com.gamma.la.core;
 
 import com.gamma.la.core.GraphResult.Payload;
-import com.gamma.la.graph.GraphAlgorithms;
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphCentrality;
-import com.gamma.la.graph.GraphIterative;
-import com.gamma.la.graph.GraphPaths;
-import com.gamma.la.graph.GraphPropagation;
-import com.gamma.la.graph.GraphStructure;
-import com.gamma.la.graph.GraphSuspicion;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.GraphAlgorithms;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphCentrality;
+import com.gamma.graph.GraphIterative;
+import com.gamma.graph.GraphPaths;
+import com.gamma.graph.GraphPropagation;
+import com.gamma.graph.GraphStructure;
+import com.gamma.graph.GraphSuspicion;
+import com.gamma.graph.RunControl;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -18,11 +18,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The whole of D-4's engine: dispatches each {@link Algorithm} to its {@code inspecto-la-graph} port over the
+ * The whole of D-4's engine: dispatches each {@link Algorithm} to its {@code inspecto-graph} port over the
  * {@link GraphInput} materialised as a {@code Graph}. The dispatch is an exhaustive switch with no {@code default}, so a
  * constant added to {@link Algorithm} without an implementation here does not compile.
  *
- * <p>Results come back in la-graph's order, which is canonical-v1 already; nothing is re-sorted here. Stateless and
+ * <p>Results come back in inspecto-graph's order, which is canonical-v1 already; nothing is re-sorted here. Stateless and
  * thread-safe — one instance serves every run.
  */
 public final class InMemoryGraphEngine implements GraphEngine {

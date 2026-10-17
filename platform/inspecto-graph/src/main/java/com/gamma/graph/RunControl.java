@@ -1,4 +1,4 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
 import java.util.concurrent.atomic.AtomicLong;
 

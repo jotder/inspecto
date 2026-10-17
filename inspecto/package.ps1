@@ -267,7 +267,8 @@ if (-not $NoBuild) {
     Push-Location $sandboxRoot
     # CONNECTORS-BUNDLE-1: `inspecto-connectors` is NOT upstream of `inspecto`, so `-am` (which walks
     # upstream only) never reaches it - it has to be named explicitly or the sidecar is silently absent.
-    & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,:inspecto-connectors -am -DskipTests -q
+    # D-AN2: the same holds for the core thin jar `inspecto-graph` (nothing in the processor depends on it).
+    & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,:inspecto-connectors,:inspecto-graph -am -DskipTests -q
     if ($LASTEXITCODE -ne 0) { throw "mvn build failed" }
     Pop-Location
     Write-Host "Build complete." -ForegroundColor Green
@@ -341,7 +342,6 @@ $intelligenceJarSrc = $null
 $kafkaJarSrc = $null
 $asn1JarSrc = $null
 $entityListJarSrc = $null
-$laGraphJarSrc = $null
 $laStorageJarSrc = $null
 $laCoreJarSrc = $null
 $laApiJarSrc = $null
@@ -453,17 +453,7 @@ if ($Edition -ne 'Personal') {
     }
     # LA separation D-1 step 5b: inspecto-la-core (host-free model + the Dataset/Case ports) and inspecto-la-api (the Link
     # Analysis routes) ride beside inspecto-geo-link (the bridge that implements the ports). THIN, optional jars.
-    # D-4 step 4: inspecto-la-graph (the ported graph algorithms, JDK only) is la-core's runtime dependency - InMemoryGraphEngine
-    # calls it - so it is staged beside it and MUST be on the explicit launcher classpath (a staged jar missing from the
-    # classpath is a Link Analysis engine that fails with NoClassDefFoundError the first time a graph run is asked for).
-    $laGraphTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-graph\target'
-    $laGraphJarSrc = Get-ChildItem -Path $laGraphTargetDir -Filter 'inspecto-la-graph-*.jar' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $laGraphJarSrc -or -not (Test-Path $laGraphJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $laGraphTargetDir\inspecto-la-graph-*.jar."
-    }
-    # D-3 step 2: inspecto-la-storage (the index store skeleton) is staged like la-graph; la-api depends on it from a later step.
+    # D-3 step 2: inspecto-la-storage (the index store skeleton); la-api depends on it from a later step.
     $laStorageTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-storage\target'
     $laStorageJarSrc = Get-ChildItem -Path $laStorageTargetDir -Filter 'inspecto-la-storage-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -634,7 +624,7 @@ Copy-Item $jarSrc "$bundleDir\inspecto.jar"
 
 # ── step 3-core: the first-party CORE libraries as THIN jars (MODULE-REORG-P3d stage 2, 2026-10-08) ───────────
 # inspecto.jar is no longer one fat jar of everything: inspecto/pom.xml's shade now carries only the processor's own classes plus
-# the THIRD-PARTY libraries. api, util, config, sql, etl, the three SPIs, access, entity-store, event, workflow, acquire and engine
+# the THIRD-PARTY libraries. api, util, config, sql, etl, the three SPIs, access, entity-store, event, workflow, acquire, engine and graph
 # (tools/bundle-modules.mjs CORE_MODULES, printed by `offering-classpath.mjs --list-core`) ship as their own thin jars, named by
 # artifactId, in the bundle root and on modules.list right behind inspecto.jar - so each can be signed and SBOM'd on its own and
 # the module.toon / ServiceLoader merge hacks of the shade are gone. Never the `-tests` jar (etl and engine attach one).
@@ -840,10 +830,6 @@ if ($entityListJarSrc) {
         if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.entitylist.WatchListFeed - watch lists would never feed the risk score." }
         Write-Host "  verified: RouteModule and WatchListFeed registrations present in the Entity List module" -ForegroundColor DarkGray
     } finally { $elZip.Dispose() }
-}
-if ($laGraphJarSrc) {
-    Copy-Item $laGraphJarSrc "$bundleDir\inspecto-la-graph.jar"
-    Write-Host "Bundled Link Analysis graph algorithms -> inspecto-la-graph.jar" -ForegroundColor Green
 }
 if ($laStorageJarSrc) {
     Copy-Item $laStorageJarSrc "$bundleDir\inspecto-la-storage.jar"

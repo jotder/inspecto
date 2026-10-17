@@ -1,8 +1,8 @@
 package com.gamma.la.core;
 
 import com.gamma.la.core.InvalidGraphRequest.Reason;
-import com.gamma.la.graph.GraphAborted;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.GraphAborted;
+import com.gamma.graph.RunControl;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

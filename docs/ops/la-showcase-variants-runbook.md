@@ -58,7 +58,7 @@ once: a change needs a restart. A Space that switches backend starts empty (no i
 
 Truth, from code and config: **Personal does not include Link Analysis or the geo map.**
 
-- `pom.xml` lists `la/inspecto-la-core`, `-la-api`, `-geo-link`, `-la-graph`, `-la-storage` only inside the
+- `pom.xml` lists `la/inspecto-la-core`, `-la-api`, `-geo-link`, `-la-storage` only inside the
   `edition-professional`, `-standard`, `-preview` and `-enterprise` profiles; Personal is the default reactor
   (`docs/okf/capabilities/editions/editions.md`: "There is no `edition-personal` profile").
 - `offerings/personal.toon` declares `modules[1]: connectors` and no Link Analysis addon.

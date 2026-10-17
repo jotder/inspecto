@@ -1,13 +1,13 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Edge;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Node;
-import com.gamma.la.graph.GraphAlgorithms.Selection;
-import com.gamma.la.graph.GraphPaths.MaxFlowResult;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Edge;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Node;
+import com.gamma.graph.GraphAlgorithms.Selection;
+import com.gamma.graph.GraphPaths.MaxFlowResult;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
@@ -34,21 +34,18 @@ class GraphPathsParityTest {
     private static Graph graph;
     private static Map<String, Double> weights;
 
-    private static Double count(JsonNode n) {
-        return n.isNull() ? null : n.asDouble();
-    }
-
     private static void load() throws Exception {
         if (fx != null) return;
         fx = new ObjectMapper().readTree(Files.readString(FIXTURE));
         List<Node> nodes = new ArrayList<>();
         fx.get("graph").get("nodes").forEach(n -> nodes.add(new Node(n.asText(), n.asText())));
         List<Edge> edges = new ArrayList<>();
+        fx.get("graph").get("edges").forEach(e -> edges.add(new Edge(e.get(0).asText(), e.get(1).asText(), e.get(2).asText())));
+        // The weights are the fixture's hand-derived expected.edgeWeight table: reading them off the "kind · N" labels is
+        // Link Analysis' convention (WorkingSetGraphInput.edgeWeight in inspecto-la-core, pinned by EdgeWeightParityTest
+        // against this same table), not this library's (D-AN2).
         Map<String, Double> w = new LinkedHashMap<>();
-        fx.get("graph").get("edges").forEach(e -> {
-            edges.add(new Edge(e.get(0).asText(), e.get(1).asText(), e.get(2).asText()));
-            w.put(e.get(0).asText(), GraphPaths.edgeWeight(count(e.get(3)), e.get(4).asText()));
-        });
+        fx.get("expected").get("edgeWeight").forEach(x -> w.put(x.get(0).asText(), x.get(1).asDouble()));
         graph = new Graph(nodes, edges);
         weights = w;
     }
@@ -61,22 +58,6 @@ class GraphPathsParityTest {
 
     private static Direction dir(String s) {
         return Direction.valueOf(s.toUpperCase());
-    }
-
-    @Test
-    void edgeWeight() throws Exception {
-        load();
-        JsonNode expected = fx.get("expected").get("edgeWeight");
-        assertEquals(expected.size(), graph.edges().size());
-        for (int i = 0; i < expected.size(); i++) {
-            String id = expected.get(i).get(0).asText();
-            assertEquals(id, graph.edges().get(i).id());
-            assertEquals(expected.get(i).get(1).asDouble(), weights.get(id), 0.0, "weight of " + id);
-        }
-        for (JsonNode c : fx.get("expected").get("edgeWeightExtra")) {
-            assertEquals(c.get("weight").asDouble(), GraphPaths.edgeWeight(count(c.get("count")), c.get("kind").asText()),
-                    0.0, c.get("kind").asText());
-        }
     }
 
     @Test

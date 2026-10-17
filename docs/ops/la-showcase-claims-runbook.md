@@ -123,7 +123,7 @@ presenter shows that **centrality alone is not guilt** and the ring is found by 
 | What | Test |
 |---|---|
 | Generator is byte-identical on regeneration, six feeds, under 1 MB | `node --test tools/gen-la-claims-data.test.mjs` |
-| Every plant, Louvain and Label-propagation, cliques, HITS, PageRank, eigenvector, Katz, closeness, triangles, identity resolution, benign look-alikes | `LaClaimsGoldenTest` (`-pl la/inspecto-la-graph`) |
+| Every plant, Louvain and Label-propagation, cliques, HITS, PageRank, eigenvector, Katz, closeness, triangles, identity resolution, benign look-alikes | `LaClaimsGoldenTest` (`-pl :inspecto-graph`) |
 | Real Pipelines and the `claims_links` SQL: contract columns, 7 kinds with their rows, de-duplication, placeholders, event day, early-claim policies | `LaClaimsLinksJobTest` (`-pl platform/inspecto-engine`) |
 | Settings, Jobs, personas, Datasets, saved views | `LaClaimsTemplateTest` (`-pl inspecto`) |
 | Geo Views over the real `POST /geo/projection` (11 on the junction) | `ControlApiLaClaimsGeoSceneTest` (`-pl la/inspecto-geo-link -am`) |

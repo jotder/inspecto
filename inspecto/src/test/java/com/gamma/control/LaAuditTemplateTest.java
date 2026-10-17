@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The {@code la-audit} Space Template (vertical B of the multi-vertical showcase plan): settings, Jobs, personas,
  * Datasets and saved views, read with the REAL loaders. The planted stories are pinned by {@code LaAuditGoldenTest}
- * in inspecto-la-graph.
+ * in inspecto-graph.
  */
 class LaAuditTemplateTest {
 

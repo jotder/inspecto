@@ -1,4 +1,4 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +39,7 @@ public final class GraphAlgorithms {
 
     public enum Direction { OUT, IN, BOTH }
 
-    /* Package-private on purpose: the later D-S4 slices live in sibling classes and share these four helpers. */
+    /* Package-private on purpose: the later D-S4 slices live in sibling classes and share these helpers. */
 
     /** An adjacency entry: the neighbour and the edge that reaches it. */
     record Hop(String node, String edge) {}
@@ -74,6 +74,18 @@ public final class GraphAlgorithms {
                 yield both;
             }
         };
+    }
+
+    /** TS {@code neighborsOf(adj, id, 'both')} for every node: out-hops then in-hops, parallel edges and self-loops kept. */
+    static Map<String, List<String>> bothNeighbors(Graph g) {
+        Adjacency adj = adjacency(g);
+        Map<String, List<String>> both = new LinkedHashMap<>();
+        for (Node n : g.nodes()) {
+            List<String> l = new ArrayList<>();
+            for (Hop h : neighborsOf(adj, n.id(), Direction.BOTH)) l.add(h.node());
+            both.put(n.id(), l);
+        }
+        return both;
     }
 
     /** Undirected simple-graph neighbours: self-loops dropped, parallel edges collapsed. */

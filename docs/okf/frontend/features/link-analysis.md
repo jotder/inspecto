@@ -1130,12 +1130,12 @@ per-Space node caps; a Graph Run is the way past those caps. Both implementation
 
 | Module | Holds |
 |---|---|
-| `inspecto-la-graph` (pure JDK) | the 29 ported algorithms (six `Graph*` classes) plus `RunControl` / `GraphAborted` (`checkpoint()`, progress, deadline). The old signatures delegate with a no-op `RunControl`, so the parity fixtures are untouched. 17 algorithms are instrumented; the 11 without a `RunControl` overload (paths, ego, neighborhood, components, degree, structure, forest) cannot be cancelled mid-run |
+| `inspecto-graph` (pure JDK; `la/inspecto-la-graph` until D-AN2 moved it to `platform/` as a Base module, 2026-10-17) | the 29 ported algorithms (six `Graph*` classes) plus `RunControl` / `GraphAborted` (`checkpoint()`, progress, deadline). The old signatures delegate with a no-op `RunControl`, so the parity fixtures are untouched. 17 algorithms are instrumented; the 11 without a `RunControl` overload (paths, ego, neighborhood, components, degree, structure, forest) cannot be cancelled mid-run |
 | `inspecto-la-core` (`com.gamma.la.core`) | `Algorithm` (the catalogue: id = the TS export name, `cost` SYNC/JOB as a hint, `inlineNodeCeiling`, typed `params`, `needsWeights` / `needsSource` / `needsTarget` / `needsNode`, `resultKind`, `resolve(params)`), the `GraphEngine` SPI (`engineId`, `supported`, `run`), `InMemoryGraphEngine` (exhaustive switch, no `default`), `GraphInput`, `WorkingSetGraphInput`, `GraphResult`, `InvalidGraphRequest`, `GraphBudget`, `GraphRunException`, `GraphRunService` |
 | `inspecto-la-api` (`com.gamma.la.api`) | `GraphRunRoutes`, `GraphResultJson` (the one serializer: an exhaustive `switch` over the sealed `Payload`, so a 13th result shape does not compile) |
 
-`la-core` depends on `la-graph` (allowlisted in `tools/check-module-deps.mjs` and both enforcer lists; `inspecto-la-graph.jar` is staged
-in the bundle). The SPI does not mention memory: an index-backed engine is a later phase (D-3), not built.
+`la-core` depends on `graph` (allowlisted in `tools/check-module-deps.mjs` and both enforcer lists; `inspecto-graph.jar` is a core thin jar
+in every bundle since D-AN2). The SPI does not mention memory: an index-backed engine is a later phase (D-3), not built.
 
 **Routes** (all `/api/v1`). `GET /inv/graph/algorithms` (catalogue, `ceilings`, `defaults{maxNodes,maxEdges,timeoutMs,clamped}`,
 `pool{threads,queue}`, `inlineWaitMs`; a read, no capability) · `POST /inv/graph/runs` (`{investigationId, at?, algorithm, params?,
@@ -1169,7 +1169,7 @@ finished uncancellable algorithm is `CANCELLED` and discarded. **A `result` (and
 Working Set at `at` MINUS entities a `hide` op hid and the links touching them (counted in `input.hiddenEntities`); `resolve` identity
 groups are NOT merged. Links with an endpoint that is no `entities` row are dropped and counted (`droppedDangling`), never silently.
 Edge id = the wire `LinkIds.encode(source,target,kind)`, the `linkId` the links relation serves (NOT the SPA's canvas id). Weight =
-`GraphPaths.edgeWeight(count, kind)`: a positive `count`, else 1; `weights: "none"` is unweighted. Parallel edges of one
+`WorkingSetGraphInput.edgeWeight(count, kind)` (la-core; was `GraphPaths.edgeWeight` until D-AN2): a positive `count`, else 1; `weights: "none"` is unweighted. Parallel edges of one
 `(source,target,kind)` fold into one Link, so an edge-counting figure (`degree`) legitimately differs from a browser graph that kept them.
 
 **Masking after the cache.** Results are computed on RAW ids and cached once per Working Set, then masked on the way out
@@ -1653,7 +1653,7 @@ its execution order in [`la-separation-execution-plan.md`](../../../archived-doc
 | `inspecto-audit-spi` | `Event` `EventLog` `EventType` (+ `MetricRegistry`, which `EventLog` calls back); cuts the old `inspecto-event` → `inspecto-etl` edge (`ParquetEventStore` stays in `inspecto-event`) |
 | `inspecto-auth-spi` | the LOWER half of the control contract: `RequestAttrs` `WriteRootProvider` `ApiException` `ErrorCodes` `SpiSlot` `WriteGates` `Subject` `Roles` `ComponentAccess` `RowScope` `AccessDecider(s)` `AccessPolicies` `AuditTrail` `AccessGrants` `Authenticator(s)` `CapabilityManifest` `GeoCountryResolver(s)`, plus the OIDC helpers of `inspecto-oidc` |
 | `inspecto-http-spi` | the UPPER half, depends on auth-spi: `ApiContext` (extends `WriteRootProvider`) `RouteModule` `Handler` `Envelope` `Idempotency` |
-| `inspecto-la-graph` | the six `Graph*` algorithm classes — JDK only |
+| `inspecto-la-graph` (now `platform/inspecto-graph`, D-AN2) | the six `Graph*` algorithm classes — JDK only |
 | `inspecto-la-core` | model, evaluator, pattern engine, Snapshot store, `LinkEventTypes`, and the ports `DatasetProvider` / `CasePort` |
 | `inspecto-la-api` | the LA routes over http-spi/auth-spi, plus `GraphDossierBuilder` `ValueMeasures` `EntityMasking` (they call route statics) |
 | `inspecto-geo-link` | the **bridge** (artifactId unchanged): `EngineDatasetProvider`, `HostCasePort`, and the Alert-Rule-bound `InvestigationMeasureRoutes` / `WorkingSetMeasures` |

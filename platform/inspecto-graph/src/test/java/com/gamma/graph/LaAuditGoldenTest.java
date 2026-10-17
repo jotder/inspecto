@@ -1,11 +1,11 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
-import com.gamma.la.graph.GraphAlgorithms.Edge;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Node;
-import com.gamma.la.graph.GraphAlgorithms.Score;
-import com.gamma.la.graph.GraphCentrality.Method;
-import com.gamma.la.graph.GraphCentrality.PredictedLink;
+import com.gamma.graph.GraphAlgorithms.Edge;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Node;
+import com.gamma.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphCentrality.Method;
+import com.gamma.graph.GraphCentrality.PredictedLink;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;

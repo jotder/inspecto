@@ -15,7 +15,7 @@
 //   * a module whose manifest has offeringRole base or internal is ALWAYS PRESENT — never required in `modules`, and
 //     ignored on both sides of the comparison with the bundle;
 //   * every other module (optional, provider) must be listed, directly or via includes, exactly when the bundle ships it.
-// (A platform/foundation module that is offeringRole optional — la-core, la-graph — is listed; its role is not "base".)
+// (A platform/foundation module that is offeringRole optional — la-core, la-storage — is listed; its role is not "base".)
 //
 // CHECKS  1 every module id named has a manifest   2 resolved module set == bundleModules(edition) == the edition pom profile
 //         (profile modules = bundle set minus the default-reactor modules)   3 requires.modules closure of the resolved set

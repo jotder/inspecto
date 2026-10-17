@@ -1,7 +1,5 @@
 package com.gamma.la.core;
 
-import com.gamma.la.graph.GraphPaths;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -23,7 +21,7 @@ import java.util.Set;
  *       returned edge id names the link the analyst sees. (The SPA's own canvas ids, {@code sid->tid:kind}, depend on its
  *       client-side projection and are not reproducible here; step 7 maps {@code linkId} to the canvas edge.) These are the
  *       RAW ids — the rows are the evaluator's unmasked cache; masking a result (D-U6) is the route's job.</li>
- *   <li><b>Weights</b> — the link {@code count} through {@link GraphPaths#edgeWeight}, the port of {@code edgeWeight()}
+ *   <li><b>Weights</b> — the link {@code count} through {@link #edgeWeight}, the port of {@code edgeWeight()}
  *       in {@code graph-analysis.ts}: a positive count, else 1.</li>
  *   <li><b>Kinds</b> — {@code kinds} (null or empty = all) keeps only links of those kinds; a filtered link is not
  *       "dropped", it was never asked for.</li>
@@ -36,6 +34,27 @@ import java.util.Set;
 public final class WorkingSetGraphInput {
 
     private WorkingSetGraphInput() {}
+
+    /**
+     * TS {@code edgeWeight}: a positive numeric {@code count}, else the {@code kind} suffix after {@code " · "}, else 1.
+     * The {@code "kind · N"} label is a Link Analysis convention, so the parse lives here, not in the platform graph
+     * library (D-AN2), whose weighted algorithms take an edge-id-to-weight map. Pinned by {@code EdgeWeightParityTest}
+     * against {@code graph-paths-parity.fixture.json}, the fixture the browser twin reads.
+     */
+    public static double edgeWeight(Double count, String kind) {
+        if (count != null && count > 0) return count;
+        String[] parts = kind.split(" · ", -1);
+        String suffix = parts.length > 1 ? parts[1] : null;
+        double n = Double.NaN;
+        if (suffix != null && !suffix.isEmpty()) {
+            try {
+                n = Double.parseDouble(suffix.trim());
+            } catch (NumberFormatException ex) {
+                n = Double.NaN;
+            }
+        }
+        return Double.isFinite(n) && n > 0 ? n : 1;
+    }
 
     public static GraphInput.Materialised from(List<Map<String, Object>> entityRows, List<Map<String, Object>> linkRows,
                                   Collection<String> kinds) {
@@ -54,7 +73,7 @@ public final class WorkingSetGraphInput {
             String id = LinkIds.encode(source, target, kind);
             edges.add(new GraphInput.Edge(id, source, target));
             Double count = r.get("count") instanceof Number n ? n.doubleValue() : null;
-            weights.put(id, GraphPaths.edgeWeight(count, kind));
+            weights.put(id, edgeWeight(count, kind));
         }
         return GraphInput.of(nodes, edges, weights);
     }

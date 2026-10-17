@@ -1,12 +1,12 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
-import com.gamma.la.graph.GraphAlgorithms.Edge;
-import com.gamma.la.graph.GraphAlgorithms.Adjacency;
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Hop;
-import com.gamma.la.graph.GraphAlgorithms.Node;
-import com.gamma.la.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Edge;
+import com.gamma.graph.GraphAlgorithms.Adjacency;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Hop;
+import com.gamma.graph.GraphAlgorithms.Node;
+import com.gamma.graph.GraphAlgorithms.Score;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,7 +23,7 @@ import java.util.TreeMap;
  * ({@code graph-iterative-parity.fixture.json}), scores to 1e-9.
  *
  * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap, closed graphs (the tie-break is the shared {@code canonical-v1}).
- * The few helpers it needs are private copies — this class does not depend on {@code GraphAlgorithms}' internals.
+ * Its small id/map helpers are private here; the neighbour helpers are {@code GraphAlgorithms}' own (package-private).
  * Float arithmetic keeps the TS operation order exactly (summation order matters at the last ulp).
  */
 public final class GraphIterative {

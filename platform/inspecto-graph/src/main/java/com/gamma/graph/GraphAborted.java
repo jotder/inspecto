@@ -1,4 +1,4 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
 /**
  * Thrown by {@link RunControl#checkpoint()} to stop a running algorithm. Unchecked, carries no partial result

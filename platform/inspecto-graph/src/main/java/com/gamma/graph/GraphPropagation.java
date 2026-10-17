@@ -1,10 +1,10 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
-import com.gamma.la.graph.GraphAlgorithms.Adjacency;
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Hop;
-import com.gamma.la.graph.GraphAlgorithms.Node;
+import com.gamma.graph.GraphAlgorithms.Adjacency;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Hop;
+import com.gamma.graph.GraphAlgorithms.Node;
 
 import java.util.ArrayList;
 import java.util.Collection;

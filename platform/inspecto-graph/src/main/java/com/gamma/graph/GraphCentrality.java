@@ -1,9 +1,8 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
-import com.gamma.la.graph.GraphAlgorithms.Edge;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Node;
-import com.gamma.la.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Node;
+import com.gamma.graph.GraphAlgorithms.Score;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -24,7 +23,7 @@ import java.util.Set;
  * <p>NOT ported: {@code suspicionScore} — it blends {@code pageRank}, {@code kCore} and {@code triangleCount},
  * which live outside this lane.
  *
- * <p>The few helpers below are private copies of {@link GraphAlgorithms}' (its own are private there).
+ * <p>Its neighbour helpers are {@link GraphAlgorithms}' own (package-private there), not copies.
  */
 public final class GraphCentrality {
 
@@ -35,29 +34,6 @@ public final class GraphCentrality {
     /** A predicted (not-yet-present) link between two nodes, with a likelihood score. */
     public record PredictedLink(String source, String target, String sourceLabel, String targetLabel, double score) {}
 
-    /** TS {@code neighborsOf(adj, id, 'both')}: out-hops then in-hops, parallel edges and self-loops kept. */
-    private static Map<String, List<String>> bothNeighbors(Graph g) {
-        Map<String, List<String>> out = new LinkedHashMap<>();
-        Map<String, List<String>> in = new LinkedHashMap<>();
-        for (Node n : g.nodes()) {
-            out.put(n.id(), new ArrayList<>());
-            in.put(n.id(), new ArrayList<>());
-        }
-        for (Edge e : g.edges()) {
-            List<String> o = out.get(e.source());
-            if (o != null) o.add(e.target());
-            List<String> i = in.get(e.target());
-            if (i != null) i.add(e.source());
-        }
-        Map<String, List<String>> both = new LinkedHashMap<>();
-        for (Node n : g.nodes()) {
-            List<String> l = new ArrayList<>(out.get(n.id()));
-            l.addAll(in.get(n.id()));
-            both.put(n.id(), l);
-        }
-        return both;
-    }
-
     /** TS {@code betweennessCentrality}: Brandes, unweighted, undirected, descending. */
     public static List<Score> betweennessCentrality(Graph g) {
         return betweennessCentrality(g, RunControl.NONE);
@@ -65,7 +41,7 @@ public final class GraphCentrality {
 
     /** As {@link #betweennessCentrality(Graph)}, with a checkpoint per Brandes source. */
     public static List<Score> betweennessCentrality(Graph g, RunControl ctl) {
-        Map<String, List<String>> adj = bothNeighbors(g);
+        Map<String, List<String>> adj = GraphAlgorithms.bothNeighbors(g);
         Map<String, Double> bc = new LinkedHashMap<>();
         for (Node n : g.nodes()) bc.put(n.id(), 0.0);
         int total = g.nodes().size(), done = 0;
@@ -115,7 +91,7 @@ public final class GraphCentrality {
 
     /** As {@link #closenessCentrality(Graph)}, with a checkpoint per source. */
     public static List<Score> closenessCentrality(Graph g, RunControl ctl) {
-        Map<String, List<String>> adj = bothNeighbors(g);
+        Map<String, List<String>> adj = GraphAlgorithms.bothNeighbors(g);
         List<String> ids = g.nodes().stream().map(Node::id).toList();
         int n = ids.size();
         Map<String, Double> close = new LinkedHashMap<>();

@@ -47,7 +47,7 @@ import java.util.TreeSet;
 
 /**
  * Server-side graph analysis over an Investigation's Working Set (LA separation D-4 step 6, design §3.3): the 29
- * {@code inspecto-la-graph} algorithms behind {@link GraphRunService}, over HTTP.
+ * {@code inspecto-graph} algorithms behind {@link GraphRunService}, over HTTP.
  *
  * <ul>
  *   <li>{@code GET /inv/graph/algorithms} - the catalogue, the server's hard ceilings and the budget a run takes when

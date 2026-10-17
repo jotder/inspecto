@@ -1,14 +1,14 @@
 package com.gamma.la.core;
 
-import com.gamma.la.graph.GraphAborted;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.GraphAborted;
+import com.gamma.graph.RunControl;
 
 import java.util.Map;
 import java.util.Set;
 
 /**
  * The graph-engine SPI (LA separation D-4, design §2.1): one implementation per backing store. {@link InMemoryGraphEngine}
- * runs the {@code inspecto-la-graph} ports over a materialised graph and is the whole of D-4; an index-backed engine
+ * runs the {@code inspecto-graph} ports over a materialised graph and is the whole of D-4; an index-backed engine
  * (D-3) would implement the same interface. Nothing here mentions memory.
  */
 public interface GraphEngine {

@@ -1,9 +1,9 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Edge;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Selection;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Edge;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Selection;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -24,7 +24,9 @@ import java.util.Set;
  *
  * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap, closed
  * graphs (id compares are UTF-16 code-unit order, the same {@code canonical-v1} as the browser). The browser reads an edge's weight from its {@code data}; {@link GraphAlgorithms.Edge} carries none, so the
- * weighted functions take {@code weights} (edge id to {@link #edgeWeight}), a missing id counting as 1.
+ * weighted functions take {@code weights} (edge id to weight), a missing id counting as 1. How a weight is read off an
+ * edge is the caller's convention: Link Analysis parses its {@code "kind · N"} labels in {@code WorkingSetGraphInput.edgeWeight}
+ * (inspecto-la-core), which stays out of this library (D-AN2).
  */
 public final class GraphPaths {
 
@@ -32,22 +34,6 @@ public final class GraphPaths {
 
     /** TS {@code MaxFlowResult}: the flow value and the saturated min-cut edges with their endpoints. */
     public record MaxFlowResult(double value, Selection minCut) {}
-
-    /** TS {@code edgeWeight}: a positive numeric {@code count}, else the {@code kind} suffix after {@code " · "}, else 1. */
-    public static double edgeWeight(Double count, String kind) {
-        if (count != null && count > 0) return count;
-        String[] parts = kind.split(" · ", -1);
-        String suffix = parts.length > 1 ? parts[1] : null;
-        double n = Double.NaN;
-        if (suffix != null && !suffix.isEmpty()) {
-            try {
-                n = Double.parseDouble(suffix.trim());
-            } catch (NumberFormatException ex) {
-                n = Double.NaN;
-            }
-        }
-        return Double.isFinite(n) && n > 0 ? n : 1;
-    }
 
     /** The DFS state of {@link #allPaths} (the browser's closure over {@code walk}). */
     private static final class PathWalk {
@@ -255,34 +241,18 @@ public final class GraphPaths {
 
     /** TS {@code maximumSpanningForest}: Kruskal + union-find over the undirected graph, heaviest first, ties by id. */
     public static Selection maximumSpanningForest(Graph g, Map<String, Double> weights) {
-        Map<String, String> parent = new LinkedHashMap<>();
-        g.nodes().forEach(n -> parent.put(n.id(), n.id()));
+        UnionFind sets = new UnionFind();
         List<Edge> sorted = new ArrayList<>(g.edges().stream().filter(e -> !e.source().equals(e.target())).toList());
         sorted.sort(Comparator.comparingDouble((Edge e) -> weights.getOrDefault(e.id(), 1.0)).reversed()
                 .thenComparing(Edge::id));
         List<String> edgeIds = new ArrayList<>();
         Set<String> nodeIds = new LinkedHashSet<>();
         for (Edge e : sorted) {
-            String rs = find(parent, e.source());
-            String rt = find(parent, e.target());
-            if (rs.equals(rt)) continue;
-            parent.put(rs, rt);
+            if (!sets.union(e.source(), e.target())) continue;
             edgeIds.add(e.id());
             nodeIds.add(e.source());
             nodeIds.add(e.target());
         }
         return new Selection(new ArrayList<>(nodeIds), edgeIds);
-    }
-
-    private static String find(Map<String, String> parent, String start) {
-        String x = start;
-        String r = x;
-        while (!parent.get(r).equals(r)) r = parent.get(r);
-        while (!parent.get(x).equals(r)) {
-            String nx = parent.get(x);
-            parent.put(x, r);
-            x = nx;
-        }
-        return r;
     }
 }

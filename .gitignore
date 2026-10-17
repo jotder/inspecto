@@ -22,7 +22,7 @@
 /spi/inspecto-auth-spi/target/
 /spi/inspecto-http-spi/target/
 /platform/inspecto-entity-store/target/
-/la/inspecto-la-graph/target/
+/platform/inspecto-graph/target/
 /la/inspecto-la-storage/target/
 /la/inspecto-la-store-pg/target/
 /platform/inspecto-event/target/

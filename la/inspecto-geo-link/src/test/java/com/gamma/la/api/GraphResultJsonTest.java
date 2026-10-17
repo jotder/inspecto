@@ -6,8 +6,8 @@ import com.gamma.la.core.GraphResult;
 import com.gamma.la.core.InMemoryGraphEngine;
 import com.gamma.la.core.LinkIds;
 import com.gamma.la.core.InvestigationStores;
-import com.gamma.la.graph.GraphAlgorithms.Score;
-import com.gamma.la.graph.GraphAlgorithms.Selection;
+import com.gamma.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Selection;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -233,12 +233,12 @@ class GraphResultJsonTest {
 
     @Test
     void aCutSubGraphReturnsNoEdgeWhoseNodeWasCutAndSaysSo() {
-        var g = new com.gamma.la.graph.GraphAlgorithms.Graph(
-                List.of(new com.gamma.la.graph.GraphAlgorithms.Node("a", "a"), new com.gamma.la.graph.GraphAlgorithms.Node("b", "b"),
-                        new com.gamma.la.graph.GraphAlgorithms.Node("c", "c")),
-                List.of(new com.gamma.la.graph.GraphAlgorithms.Edge(LinkIds.encode("a", "b", "k"), "a", "b"),
-                        new com.gamma.la.graph.GraphAlgorithms.Edge(LinkIds.encode("b", "c", "k"), "b", "c"),
-                        new com.gamma.la.graph.GraphAlgorithms.Edge(LinkIds.encode("c", "a", "k"), "c", "a")));
+        var g = new com.gamma.graph.GraphAlgorithms.Graph(
+                List.of(new com.gamma.graph.GraphAlgorithms.Node("a", "a"), new com.gamma.graph.GraphAlgorithms.Node("b", "b"),
+                        new com.gamma.graph.GraphAlgorithms.Node("c", "c")),
+                List.of(new com.gamma.graph.GraphAlgorithms.Edge(LinkIds.encode("a", "b", "k"), "a", "b"),
+                        new com.gamma.graph.GraphAlgorithms.Edge(LinkIds.encode("b", "c", "k"), "b", "c"),
+                        new com.gamma.graph.GraphAlgorithms.Edge(LinkIds.encode("c", "a", "k"), "c", "a")));
         GraphResult r = new GraphResult(Algorithm.MAXIMUM_SPANNING_FOREST, new GraphResult.SubGraph(g), 0, 1);
         Map<String, Object> out = GraphResultJson.of(r, GraphResultJson.Ids.NONE, 2);
         @SuppressWarnings("unchecked") List<Map<String, Object>> edges = (List<Map<String, Object>>) out.get("edges");

@@ -7,7 +7,7 @@ import com.gamma.la.core.InMemoryGraphEngine;
 import com.gamma.la.core.IndexCapExceeded;
 import com.gamma.la.core.InvalidGraphRequest;
 import com.gamma.la.core.LinkIds;
-import com.gamma.la.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Score;
 import com.gamma.sql.SqlSandboxPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

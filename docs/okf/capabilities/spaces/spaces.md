@@ -916,7 +916,7 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   (`la-viewer`: no capability at all). The Dataset carries explicit `user` shares for all five (standing detection refuses a role-only share).
 - **Data tuning (DR-S10).** The ordinary traffic is acyclic and triangle-free (first half of the accounts pays the second half) and small, so the Suspicion
   score ranks `MULE-HUB-01` first (top 3 asserted) and `SHELL-A->B->C->D->A` is the only directed cycle. Pinned by `LaShowcaseGoldenTest`
-  (inspecto-la-graph, reads the shipped CSVs); regenerate with `tools/gen-la-showcase-data.py`. Trade-off: the ordinary traffic is less realistic than the
+  (inspecto-graph, reads the shipped CSVs); regenerate with `tools/gen-la-showcase-data.py`. Trade-off: the ordinary traffic is less realistic than the
   `demo` Space's, and the manual's section 10 figures that depend on the old noise (170 nodes, 13 pass-through accounts) differ here.
 - **Runtime state has NO template home** (checked 2026-10-10: no registry kind, `case-link.json` is import-reserved, `TemplateSeedGate` seeds registry
   components only). `tools/seed-la-showcase.mjs` seeds it over HTTP as the right personas: the Investigation `mule-hub-case` (8 ops, owner `fm.analyst`),

@@ -6,7 +6,7 @@ import com.gamma.la.core.GraphRunService.Limits;
 import com.gamma.la.core.GraphRunService.Request;
 import com.gamma.la.core.GraphRunService.RunView;
 import com.gamma.la.core.GraphRunService.Status;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.RunControl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -682,11 +682,11 @@ class GraphRunServiceTest {
     }
 
     private static GraphResult subGraph(int nodes, int edges) {
-        List<com.gamma.la.graph.GraphAlgorithms.Node> ns = new ArrayList<>();
-        List<com.gamma.la.graph.GraphAlgorithms.Edge> es = new ArrayList<>();
-        for (int i = 0; i < nodes; i++) ns.add(new com.gamma.la.graph.GraphAlgorithms.Node("n" + i, "n" + i));
-        for (int i = 0; i < edges; i++) es.add(new com.gamma.la.graph.GraphAlgorithms.Edge("e" + i, "n0", "n0"));
-        return new GraphResult(Algorithm.NEIGHBORHOOD, new GraphResult.SubGraph(new com.gamma.la.graph.GraphAlgorithms.Graph(ns, es)), 0, 1);
+        List<com.gamma.graph.GraphAlgorithms.Node> ns = new ArrayList<>();
+        List<com.gamma.graph.GraphAlgorithms.Edge> es = new ArrayList<>();
+        for (int i = 0; i < nodes; i++) ns.add(new com.gamma.graph.GraphAlgorithms.Node("n" + i, "n" + i));
+        for (int i = 0; i < edges; i++) es.add(new com.gamma.graph.GraphAlgorithms.Edge("e" + i, "n0", "n0"));
+        return new GraphResult(Algorithm.NEIGHBORHOOD, new GraphResult.SubGraph(new com.gamma.graph.GraphAlgorithms.Graph(ns, es)), 0, 1);
     }
 
     private static Request indexReq(GraphInput in) {

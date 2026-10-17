@@ -8,7 +8,7 @@ import com.gamma.la.core.GraphInput;
 import com.gamma.la.core.GraphResult;
 import com.gamma.la.core.GraphRunService;
 import com.gamma.la.core.InMemoryGraphEngine;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.RunControl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;

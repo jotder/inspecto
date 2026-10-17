@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The {@code la-claims} Space Template's settings, Jobs, personas, Datasets and saved views, read with the REAL loaders
  * ({@link LinkAnalysisSettings}, {@link JobConfig}, {@link Roles}). The corpus plants are pinned by {@code LaClaimsGoldenTest}
- * (inspecto-la-graph) and the Job SQL by {@code LaClaimsLinksJobTest} (inspecto-engine).
+ * (inspecto-graph) and the Job SQL by {@code LaClaimsLinksJobTest} (inspecto-engine).
  */
 class LaClaimsTemplateTest {
 

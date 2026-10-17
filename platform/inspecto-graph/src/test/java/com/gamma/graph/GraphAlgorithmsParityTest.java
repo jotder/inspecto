@@ -1,13 +1,13 @@
-package com.gamma.la.graph;
+package com.gamma.graph;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.la.graph.GraphAlgorithms.Direction;
-import com.gamma.la.graph.GraphAlgorithms.Edge;
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Node;
-import com.gamma.la.graph.GraphAlgorithms.Score;
-import com.gamma.la.graph.GraphAlgorithms.Selection;
+import com.gamma.graph.GraphAlgorithms.Direction;
+import com.gamma.graph.GraphAlgorithms.Edge;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Node;
+import com.gamma.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Selection;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;

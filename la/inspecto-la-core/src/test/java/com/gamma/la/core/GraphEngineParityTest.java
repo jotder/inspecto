@@ -2,11 +2,10 @@ package com.gamma.la.core;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.la.graph.GraphAlgorithms.Score;
-import com.gamma.la.graph.GraphAlgorithms.Selection;
-import com.gamma.la.graph.GraphCentrality.PredictedLink;
-import com.gamma.la.graph.GraphPaths;
-import com.gamma.la.graph.GraphSuspicion.Suspicion;
+import com.gamma.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Selection;
+import com.gamma.graph.GraphCentrality.PredictedLink;
+import com.gamma.graph.GraphSuspicion.Suspicion;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
@@ -25,12 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D-4 step 4, engine == la-graph == the browser. Every one of the 29 algorithms is run THROUGH {@link InMemoryGraphEngine}
+ * D-4 step 4, engine == inspecto-graph == the browser. Every one of the 29 algorithms is run THROUGH {@link InMemoryGraphEngine}
  * (never the static port) on the graphs of the six parity fixtures {@code graph-*-parity.fixture.json} — the SAME files the
- * TypeScript specs and la-graph's own parity tests read — and asserted against the fixture's hand-derived {@code expected}
+ * TypeScript specs and inspecto-graph's own parity tests read — and asserted against the fixture's hand-derived {@code expected}
  * (exact for discrete answers, the fixture's own tolerance for floats). {@link #everyAlgorithmWasExercised} fails if one of
  * the 28 never went through {@code engine.run} here. The server-only {@code propagatedRisk} has no fixture; it is checked
- * engine == la-graph.
+ * engine == inspecto-graph.
  */
 class GraphEngineParityTest {
 
@@ -53,7 +52,7 @@ class GraphEngineParityTest {
         Map<String, Double> weights = new LinkedHashMap<>();
         g.get("edges").forEach(e -> {
             edges.add(new GraphInput.Edge(e.get(0).asText(), e.get(1).asText(), e.get(2).asText()));
-            if (e.size() > 4) weights.put(e.get(0).asText(), GraphPaths.edgeWeight(e.get(3).isNull() ? null : e.get(3).asDouble(), e.get(4).asText()));
+            if (e.size() > 4) weights.put(e.get(0).asText(), WorkingSetGraphInput.edgeWeight(e.get(3).isNull() ? null : e.get(3).asDouble(), e.get(4).asText()));
         });
         return GraphInput.of(nodes, edges, weights);
     }
@@ -339,7 +338,7 @@ class GraphEngineParityTest {
         }
     }
 
-    // ── propagatedRisk: server-side only, so engine == la-graph (no browser twin, no fixture) ──────────────────────
+    // ── propagatedRisk: server-side only, so engine == inspecto-graph (no browser twin, no fixture) ──────────────────────
 
     @Test
     void propagatedRiskThroughTheEngineIsTheLaGraphFunction() {
@@ -350,15 +349,15 @@ class GraphEngineParityTest {
                 Map.of());
         var viaEngine = ((GraphResult.PropagatedRisks) run(Algorithm.PROPAGATED_RISK, in,
                 "nodeScores", Map.of("A", 60, "D", 20), "direction", "out")).risks();
-        var direct = com.gamma.la.graph.GraphPropagation.propagatedRisk(
-                new com.gamma.la.graph.GraphAlgorithms.Graph(
-                        List.of(new com.gamma.la.graph.GraphAlgorithms.Node("A", "A"), new com.gamma.la.graph.GraphAlgorithms.Node("B", "B"),
-                                new com.gamma.la.graph.GraphAlgorithms.Node("C", "C"), new com.gamma.la.graph.GraphAlgorithms.Node("D", "D")),
-                        List.of(new com.gamma.la.graph.GraphAlgorithms.Edge("e1", "A", "B"),
-                                new com.gamma.la.graph.GraphAlgorithms.Edge("e2", "B", "C"),
-                                new com.gamma.la.graph.GraphAlgorithms.Edge("e3", "C", "D"))),
+        var direct = com.gamma.graph.GraphPropagation.propagatedRisk(
+                new com.gamma.graph.GraphAlgorithms.Graph(
+                        List.of(new com.gamma.graph.GraphAlgorithms.Node("A", "A"), new com.gamma.graph.GraphAlgorithms.Node("B", "B"),
+                                new com.gamma.graph.GraphAlgorithms.Node("C", "C"), new com.gamma.graph.GraphAlgorithms.Node("D", "D")),
+                        List.of(new com.gamma.graph.GraphAlgorithms.Edge("e1", "A", "B"),
+                                new com.gamma.graph.GraphAlgorithms.Edge("e2", "B", "C"),
+                                new com.gamma.graph.GraphAlgorithms.Edge("e3", "C", "D"))),
                 Map.of("A", 60.0, "D", 20.0), List.of(), List.of(1.0, 0.6, 0.35, 0.15),
-                com.gamma.la.graph.GraphAlgorithms.Direction.OUT, com.gamma.la.graph.RunControl.NONE);
+                com.gamma.graph.GraphAlgorithms.Direction.OUT, com.gamma.graph.RunControl.NONE);
         assertEquals(direct, viaEngine);
         assertEquals(60 * 0.35 + 20, viaEngine.stream().filter(r -> r.id().equals("D")).findFirst().orElseThrow().raw(), 1e-9);
     }

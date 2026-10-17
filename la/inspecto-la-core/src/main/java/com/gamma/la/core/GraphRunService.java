@@ -3,8 +3,8 @@ package com.gamma.la.core;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LaLimits;
-import com.gamma.la.graph.GraphAborted;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.GraphAborted;
+import com.gamma.graph.RunControl;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

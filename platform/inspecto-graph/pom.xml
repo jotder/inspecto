@@ -11,20 +11,20 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>inspecto-la-graph</artifactId>
+    <artifactId>inspecto-graph</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Link Analysis graph algorithms (la-graph, optional)</name>
+    <name>Inspecto — Graph algorithms (graph, base)</name>
     <description>
-        The server-side port of the SPA's graph algorithms (shortest path, centrality, PageRank, Louvain,
-        suspicion score, ...), carved out of inspecto-geo-link as D-1 step 1 of the Link Analysis separation
-        (docs/archived-documents/plans-archive/la-separation-d1-design.md). Plain JDK: NO dependency on any platform module, by
-        design — that is what lets it be extracted before any SPI exists. Since D-4 step 4 inspecto-la-core's
-        InMemoryGraphEngine calls it, so it is staged in the bundles beside inspecto-la-core.jar.
+        The platform graph library: shortest and weighted paths, centrality, PageRank, Louvain, k-core, cliques, link
+        prediction, max-flow, propagated risk, the suspicion blend and RunControl, over plain node and edge ids. A
+        server-side port of the Link Analysis SPA's graph algorithms, carved out of inspecto-geo-link (LA separation D-1)
+        and moved out of the la/ family into the platform by the analytics core plan (D-AN2, M8) so Fraud, AML and
+        Case Management can use it without depending on Link Analysis. Plain JDK: NO dependency on any inspecto module.
+        Link Analysis keeps its algorithm catalogue, cost ceilings and the "kind · N" edge-label weight parse (la-core).
 
-        Built only under the edition profiles (see the parent pom's profile-scoped modules), alongside
-        inspecto-geo-link. The parity tests read their fixtures from ../inspecto-ui/projects/link-analysis/src/graph,
-        where the TypeScript specs read them too (D-5 step 3 moved them with the library).
+        A core thin jar in every edition (tools/bundle-modules.mjs CORE_MODULES). The parity tests read their fixtures
+        from ../../inspecto-ui/projects/link-analysis/src/graph, where the TypeScript twins read them too.
     </description>
 
     <dependencies>
@@ -43,7 +43,7 @@
 
     <build>
         <plugins>
-            <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
+            <!-- LA separation D-1 (Decision 5), kept by D-AN2: this module may reach ONLY the inspecto-* modules below, directly or
                  transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
                  poms and fails if this list drifts from its ALLOWED table. -->
             <plugin>
@@ -66,7 +66,7 @@
                                     <includes>
 
                                     </includes>
-                                    <message>inspecto-la-graph may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
+                                    <message>inspecto-graph may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (none: it is the JDK only). A host module here silently undoes the extraction.</message>
                                 </bannedDependencies>
                             </rules>
                         </configuration>

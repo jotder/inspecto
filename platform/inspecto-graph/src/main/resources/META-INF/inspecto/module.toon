@@ -1,6 +1,6 @@
 ---
-id: la-graph
-title: Link analysis graph algorithms
+id: graph
+title: Graph algorithms
 buildRole: platform
-offeringRole: optional
+offeringRole: base
 bindingTime: build

@@ -70,7 +70,7 @@ nothing to show) · **UI** (backend exists, no UI) · **ROUGH** (works but a sta
 | 13 | Live detection: bound rule, standing detection, `la.detect`, refusal codes (§7) | UI: Value Measures, *Watch*, standing detection, Monitoring | DATA; ROUGH | DR-S3, DR-S5, DR-D6, DR-U9 |
 | 14 | Resource bounds: rate limit 20 + 1/3 s, pool 2/16, builds 1/4, Drafts 50 (§9) | API numbers; UI has no 429/413 wording | API; UI missing | DR-D6, DR-T7 |
 | 15 | Scale: proven to 10^8 edges, 10^9 extrapolated (§10) | Roadmap measurements (synthetic corpus) | EVIDENCE | slide only; DR-T9 |
-| 16 | Architecture fences: ports inward, la-graph leaf, engine names no la-* class (§2) | `tools/check-module-deps.mjs`, maven-enforcer | EVIDENCE; engine rule unguarded | DR-T3 |
+| 16 | Architecture fences: ports inward, graph leaf (`inspecto-graph`, platform since D-AN2), engine names no la-* class (§2) | `tools/check-module-deps.mjs`, maven-enforcer | EVIDENCE; engine rule unguarded | DR-T3 |
 
 ## 3. Requirements
 

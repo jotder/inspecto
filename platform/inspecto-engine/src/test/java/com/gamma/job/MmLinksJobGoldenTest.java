@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * extracts, then the {@code mm_links} {@code sql.template} Job folds them into the link Dataset. Pins the Job's contract:
  * the columns, the six link kinds, one link per transaction, the shared_device / shared_id pairs (one direction, the
  * placeholders excluded) and the event-day column. The planted stories over the same corpus are pinned by
- * {@code LaMobileMoneyGoldenTest} in inspecto-la-graph.
+ * {@code LaMobileMoneyGoldenTest} in inspecto-graph.
  */
 class MmLinksJobGoldenTest {
 

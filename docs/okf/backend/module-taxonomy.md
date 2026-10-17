@@ -62,9 +62,9 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
 | Directory | Modules |
 |---|---|
 | `spi/` | inspecto-audit-spi, inspecto-auth-spi, inspecto-http-spi |
-| `platform/` | inspecto-api, -util, -config, -sql, -etl, -event, -workflow, -acquire, -entity-store, -engine |
+| `platform/` | inspecto-api, -util, -config, -sql, -etl, -event, -workflow, -acquire, -entity-store, -engine, -graph (moved from `la/` as `inspecto-la-graph` by D-AN2, 2026-10-17) |
 | `features/` | inspecto-agent, -backup, -entity-list, -exchange, -intelligence, -observability, -ops, -reconciliation, -scoring |
-| `la/` | inspecto-la-core, -la-api, -la-graph, -la-storage, -la-store-pg, -geo-link |
+| `la/` | inspecto-la-core, -la-api, -la-storage, -la-store-pg, -geo-link |
 | `providers/` | inspecto-agent-hosted, -connectors, -connectors-kafka, -demo-auth, -geo-country, -notify-channels, -oidc, -policy, -secrets, -telecom-asn1, asn-parser (nested reactor, moves as a unit) |
 `tools/regroup-modules.mjs` did the move (spent; kept as the record of what changed).
 
@@ -116,11 +116,11 @@ id: professional
 title: Professional
 tier: professional
 includes[1]: personal
-modules[21]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,case-management,action-requests,reconciliation,scoring,agent
+modules[20]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-storage,la-core,la-api,geo-link,exchange,observability,ops,case-management,action-requests,reconciliation,scoring,agent
 addons:
   linkAnalysis:
     status: built
-    modules[5]: la-graph,la-storage,la-core,la-api,geo-link
+    modules[4]: la-storage,la-core,la-api,geo-link
   incidents:
     status: planned
     hostedBy[2]: engine,ops
