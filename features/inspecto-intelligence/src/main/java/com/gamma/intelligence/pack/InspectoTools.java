@@ -588,8 +588,8 @@ final class InspectoTools {
             if (!METRIC_STORES.contains(store.browseId()))
                 return error("table '" + table + "' holds entity keys or free-form attributes; "
                         + "only run/ingest/provenance metric stores can be scanned");
-            String t = sqlIdent(table);
-            String c = sqlIdent(column);
+            String t = SqlIdent.q(table);
+            String c = SqlIdent.q(column);
             try {
                 String statsSql = "SELECT avg(" + c + ") AS __mean, stddev_pop(" + c + ") AS __sd, "
                         + "count(" + c + ") AS __n FROM " + t;
@@ -674,8 +674,8 @@ final class InspectoTools {
             if (!METRIC_STORES.contains(store.browseId()))
                 return error("table '" + table + "' holds entity keys or free-form attributes; "
                         + "only run/ingest/provenance metric stores can be scanned");
-            String t = sqlIdent(table);
-            String c = sqlIdent(column);
+            String t = SqlIdent.q(table);
+            String c = SqlIdent.q(column);
             try {
                 String profileSql = "SELECT count(*) AS __n, count(" + c + ") AS __nonnull, "
                         + "count(DISTINCT " + c + ") AS __distinct, "
@@ -1616,11 +1616,6 @@ final class InspectoTools {
         m.put("truncated", truncated);
         m.put("rows", rows);
         return m;
-    }
-
-    /** Double-quote an identifier for server-built SQL — delegates to {@link SqlIdent#q}. */
-    private static String sqlIdent(String ident) {
-        return SqlIdent.q(ident);
     }
 
     /** Missing → null; a number or numeric string → its double value; anything else → {@code NaN}. */
