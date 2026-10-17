@@ -11,6 +11,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.signal.Severity;
 import com.gamma.util.AtomicFiles;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -380,9 +381,7 @@ final class BackupTask {
                     ps.executeUpdate();
                 }
                 try (Statement st = conn.createStatement()) {
-                    st.execute("COPY catalog_row TO '"
-                            + parquet.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                            + "' (FORMAT PARQUET)");
+                    st.execute("COPY catalog_row TO " + SqlIdent.pathStr(parquet) + " (FORMAT PARQUET)");
                 }
             }
             ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
