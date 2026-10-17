@@ -1,7 +1,7 @@
-# Link Analysis — End User Guide
+# Inspecto LA (Link Analysis) — End User Guide
 
 *For analysts who investigate fraud, revenue leakage, money laundering or telecom abuse. Written 2026-10-15 from a
-hands-on run of the standalone Link Analysis application as five Demo Users. It is the short, task-by-task guide;
+hands-on run of the standalone Inspecto LA application as five Demo Users. It is the short, task-by-task guide;
 the full reference (every control, limit and capability) is the [user manual](link-analysis-user-manual.md).
 Every control named here is a label you see on screen.*
 

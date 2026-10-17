@@ -358,6 +358,71 @@ const SOURCE_GLOBS = [
 /** `*.spec.ts` is the TS half of the "test names are prose" exclusion above — `src/main/**` does it for Java. */
 const SOURCE_SKIP = /\.spec\.ts$/;
 
+// ── industry-pack terms (LA-EDITIONS-1 §3, data-prep acceptance AC-09) ───────────────────────────
+//
+// An Industry pack RELABELS the neutral Link Analysis concepts (MSISDN for the phone-number Entity Type, Wallet
+// for the stored-value account, ...); the core holds none of those words. The banned list is DERIVED from the
+// shipped packs' term files - every `label` and `abbreviation` - never hand-kept (the hand-kept mirror has drifted
+// four times in this repo). A pack term is therefore allowed ONLY inside a pack's own label files
+// (`META-INF/inspecto/industry-packs/<id>/*.toon`, which this pass never reads) and banned in the text a user
+// reads in core Link Analysis (CORE_LA_SCOPE). Outside that scope the words are ordinary product content (the
+// telco-fraud Space Templates, the console's attribute catalogues) and this rule does not look.
+const PACK_TERM_FILES = trackedFiles('*META-INF/inspecto/industry-packs/*/industry-pack-terms.toon') ?? [];
+
+/** One `terms[n]{key,label,abbreviation,definition}` row's fields, quotes honoured. */
+function toonRow(line) {
+    const out = [];
+    let cur = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (quoted) {
+            if (c === '\\' && i + 1 < line.length) cur += line[++i];
+            else if (c === '"') quoted = false;
+            else cur += c;
+        } else if (c === '"') quoted = true;
+        else if (c === ',') { out.push(cur.trim()); cur = ''; }
+        else cur += c;
+    }
+    out.push(cur.trim());
+    return out;
+}
+
+/** Every pack label and abbreviation (an abbreviation like `CDR / XDR` yields both halves), longest first. */
+const PACK_TERMS = (() => {
+    const terms = new Set();
+    for (const rel of PACK_TERM_FILES) {
+        const rows = readFileSync(join(repoRoot, rel), 'utf8').split(/\r?\n/).filter((l) => /^\s{2}\S/.test(l));
+        for (const row of rows) {
+            const [, label, abbreviation] = toonRow(row.trim());
+            for (const t of [label, ...(abbreviation ?? '').split('/')]) if (t && t.trim()) terms.add(t.trim());
+        }
+    }
+    return [...terms].sort((a, b) => b.length - a.length);
+})();
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Matched as written (a single-token literal such as `'MSISDN'` is a label; `'msisdn'` is an id, a data contract, and
+ * passes). A sentence or template text is first folded onto the terms' own spelling (PACK_TERM_FOLD), so "the
+ * cash-out agent" is caught too.
+ */
+const PACK_TERM_ALTERNATION = PACK_TERMS.map(escapeRe).join('|');
+const PACK_TERM_RE = PACK_TERMS.length
+    ? new RegExp(`(?<![A-Za-z0-9_-])(?:${PACK_TERM_ALTERNATION})(?![A-Za-z0-9_-])`, 'g')
+    : /(?!)/g;
+const PACK_TERM_FOLD = PACK_TERMS.length
+    ? new RegExp(`(?<![A-Za-z0-9_-])(?:${PACK_TERM_ALTERNATION})(?![A-Za-z0-9_-])`, 'gi')
+    : /(?!)/g;
+const PACK_TERM_CANON = new Map(PACK_TERMS.map((t) => [t.toLowerCase(), t]));
+
+/** Core Link Analysis: the SPA library and app, and the server modules. A pack's label files are never scanned (not source). */
+const CORE_LA_SCOPE = [
+    'inspecto-ui/projects/link-analysis/src/',
+    'inspecto-ui/projects/la-app/src/',
+    'la/',
+    'platform/inspecto-entity-store/src/main/java/',
+];
+
 const SOURCE_RULES = [
     {
         id: 'flow-identifier',
@@ -431,6 +496,24 @@ const SOURCE_RULES = [
         ).join('\n'),
         re: /\bsource\.[a-z][a-z0-9_]*\b/gi,
         msg: 'A message the operator READS must name the canonical config root **`collector.`**, never the pre-rename `source.` (GLOSSARY §2/§3, Source→Collector flipped 2026-07-14) — an operator who greps for the key you printed must find it. If the literal really is a CONTRACT (a Signal payload key, a stored attribute path), put `vocab-allow` on the line naming the contract, or allowlist the file.',
+    },
+    {
+        // AC-09: no Industry pack word in the text a user reads in core Link Analysis — see PACK_TERMS above.
+        // A single-token literal (`label: 'MSISDN'`) is matched as written, so an id (`'msisdn'`) passes as the
+        // data contract it is; a sentence, or template text, is folded onto the terms' spelling first, so "the cash-out agent"
+        // is caught too. Code inside `${…}` and bindings is stripped first, as for the rules above.
+        id: 'industry-pack-term',
+        scope: (rel) => CORE_LA_SCOPE.some((p) => rel.startsWith(p)),
+        prepare: (raw, rel) => {
+            const fragments = rel.endsWith('.html')
+                ? [templateText(raw)]
+                : stringLiterals(raw.replace(BINDINGS_RE, '')).map((lit) => lit.replace(INTERPOLATION_RE, ' '));
+            return fragments.map((f) => (rel.endsWith('.html') || isSentence(f)
+                ? f.replace(PACK_TERM_FOLD, (m) => PACK_TERM_CANON.get(m.toLowerCase()) ?? m)
+                : f)).join('\n');
+        },
+        re: PACK_TERM_RE,
+        msg: 'An Industry pack word in core Link Analysis (AC-09). The core says the NEUTRAL word; the pack relabels it through its term files (`META-INF/inspecto/industry-packs/<id>/industry-pack-terms.toon`, keyed by a canonical concept key) and the UI reads the Space\'s Domain Profile. Use the neutral label here, or look the term up from the active profile.',
     },
 ];
 
@@ -722,6 +805,7 @@ for (const rel of sourceFiles ?? []) {
     lines.forEach((raw, i) => {
         if (raw.includes('vocab-allow')) return;
         for (const rule of SOURCE_RULES) {
+            if (rule.scope && !rule.scope(rel)) continue;   // a rule may narrow WHERE it reads (industry-pack-term)
             // A rule may narrow WHAT it reads on the line — `flow-message` reads only the text a user can
             // see (string literals, template text); `flow-identifier` reads the line exactly as authored.
             const scanned = rule.prepare ? rule.prepare(masked[i] ?? raw, rel) : raw;

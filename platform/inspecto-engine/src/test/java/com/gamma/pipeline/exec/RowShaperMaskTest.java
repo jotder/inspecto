@@ -168,7 +168,7 @@ class RowShaperMaskTest {
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> run(Map.of("columns", List.of("msisdn"))));
         assertTrue(e.getMessage().startsWith(EditionFeatures.CODE), e.getMessage());
-        assertTrue(e.getMessage().contains("Enterprise"), e.getMessage());
+        assertTrue(e.getMessage().contains("Advanced"), e.getMessage());
         assertEquals(List.of("src"), tables(), "nothing was written");
     }
 

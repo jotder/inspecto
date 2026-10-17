@@ -57,10 +57,10 @@ import java.util.TreeMap;
  */
 public final class InvestigationCoverageRoutes implements RouteModule {
 
-    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    /** Gated by the geoLink feature (404 MODULE_DISABLED where a Space switches it off) and the investigations edition feature (503 CAPABILITY_UNAVAILABLE on Basic, LA-EDITIONS-1). */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     /** Ten years of days — a bound on the expected-day list, not a property of the data. */

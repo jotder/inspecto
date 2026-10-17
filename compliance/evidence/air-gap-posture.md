@@ -30,7 +30,7 @@ Network-level isolation remains the operator's deployment responsibility.
 | Hosted-provider SDK classes are **absent from the classpath**, proven by test | `features/inspecto-agent/src/test/java/com/gamma/agent/EgressGuardTest.java:14-30` asserts `ClassNotFoundException` for `dev.langchain4j.model.openai.OpenAiChatModel`, the Anthropic / Google / Vertex models, and `com.openai.client.OpenAIClient` |
 | `inspecto-agent` ships **local-only** model support and excludes the hosted SDK transitively | `features/inspecto-agent/pom.xml:46-58` — `langchain4j-core` + `langchain4j-ollama` only, with `langchain4j-open-ai` explicitly excluded; the comment states the intent: *the air-gapped guarantee stays a packaging fact* |
 | Hosted providers live in a **separate optional module** behind an SPI | `inspecto-agent-hosted`, via `HostedProviderPlugin` (`features/inspecto-agent/src/main/java/com/gamma/agent/model/HostedProviderPlugin.java:8-13`); absent that jar, `ModelProviderFactory` finds no plugin |
-| Both AI modules are optional and edition-scoped | root `pom.xml:19-25, 54-57, 66-82` (`edition-standard` / `edition-enterprise` profiles) |
+| Both AI modules are optional and edition-scoped | root `pom.xml:19-25, 54-57, 66-82` (`edition-standard` / `edition-advanced` profiles) |
 | The RAG embedding model runs **in-JVM with weights bundled in the jar** — no network at ingest | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoKnowledgeSources.java:11-17`; corpus is one local file, `docs/GLOSSARY.md` |
 
 **This is the differentiator worth stating to an auditor:** absence-by-packaging is a stronger control

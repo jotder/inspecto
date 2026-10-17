@@ -96,7 +96,7 @@ public final class AnnotationTargets {
         com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null)
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "Operational objects are not installed in this bundle - they are "
-                    + "provided by the optional inspecto-ops module (Professional edition and above).");
+                    + "provided by the optional inspecto-ops module (Standard edition and above).");
         Map<String, Object> o = objects.summary(id).orElse(null);
         if (o == null) return null;
         if (!objectVisibleTo(ex, o)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");

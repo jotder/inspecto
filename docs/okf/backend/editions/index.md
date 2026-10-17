@@ -1,12 +1,12 @@
 ---
 type: Concept
 title: Editions — index
-description: How Inspecto ships as Personal / Standard / Enterprise, and the binding branch and release policy.
+description: How Inspecto ships as Basic / Standard / Advanced, and the binding branch and release policy.
 ---
 
 # Editions
 
-How Inspecto ships as Personal / Standard / Enterprise — and the binding branch & release policy. The key
+How Inspecto ships as Basic / Standard / Advanced — and the binding branch & release policy. The key
 idea: **editions are build flavors, never git branches.**
 
 > ⚠ **The capability spec is the requirement-of-record for this area:**
@@ -16,6 +16,6 @@ idea: **editions are build flavors, never git branches.**
 ## Concepts
 
 * [Editions model](editions-model.md) - build flavors via Maven profiles + ServiceLoader + -D flags.
-* [Auth & security](auth-security.md) - auth-free core; the Authenticator/Subject/AccessDecider SPIs; Standard RBAC (data-driven roles, Access-Profile + sharing enforcement, OIDC/gateway); the Enterprise `inspecto-policy` ABAC engine (authored Access Policies, space isolation, decision audit); the separate write-gate.
+* [Auth & security](auth-security.md) - auth-free core; the Authenticator/Subject/AccessDecider SPIs; Standard RBAC (data-driven roles, Access-Profile + sharing enforcement, OIDC/gateway); the Advanced `inspecto-policy` ABAC engine (authored Access Policies, space isolation, decision audit); the separate write-gate.
 * [Branching & release](branching-release.md) - versions=branches, merge-forward propagation, SemVer + Conventional Commits.
-* [Local testing without a real IAM or Postgres](local-testing-without-iam.md) - Demo User sign-in, the offline demo build (`inspecto-demo-auth` + `package.ps1 -Edition Enterprise -DemoAuth`: named users with real roles, loopback only, zero external dependencies) vs. the real Professional/Enterprise release path (genuine OIDC provider, optional Postgres).
+* [Local testing without a real IAM or Postgres](local-testing-without-iam.md) - Demo User sign-in, the offline demo build (`inspecto-demo-auth` + `package.ps1 -Edition Advanced -DemoAuth`: named users with real roles, loopback only, zero external dependencies) vs. the real Standard/Advanced release path (genuine OIDC provider, optional Postgres).

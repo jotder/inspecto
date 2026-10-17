@@ -26,8 +26,8 @@
 
         Dependency rule (Decision 5): this module may reach ONLY the inspecto-* modules listed in
         tools/check-module-deps.mjs (the maven-enforcer rule below and the Node guard both derive from that table).
-        Bundled in exactly the editions that ship inspecto-geo-link; staged as an optional jar, not part of the fat jar.
-        Built only under the edition profiles (see the parent pom's profile-scoped &lt;modules&gt;).
+        Bundled in exactly the editions that ship inspecto-geo-link (every edition since LA-EDITIONS-1 phase 3); staged as an
+        optional jar, not part of the fat jar. A default-reactor module.
     </description>
 
     <dependencies>

@@ -130,7 +130,7 @@ and the server's render refusal shown in the dialog, which stays open. Picker er
 **Report Templates** section (same pane): the templates with origin, and - with `canApproveChanges` - **New template** / Edit / Delete (a built-in is editable, saved as the Space override, but not deletable). `report-template.dialog.ts` edits the template as JSON beside its id (create only); client-side JSON check, then the server's 422 / 403 / 409 text shown verbatim.
 
 ## Demo rehearsal 2026-10-14 (`REGULATORY-REPORTING-1`, no code row)
-A fresh `package.ps1 -Edition Enterprise -DemoAuth -Ui gamma -NoBakeDemo` bundle (the module jar is in `modules.list`;
+A fresh `package.ps1 -Edition Advanced -DemoAuth -Ui gamma -NoBakeDemo` bundle (the module jar is in `modules.list`;
 `/bootstrap` reports `features.regulatoryReporting: true`), the `telco-fraud` Space (`node tools/seed-telco-fraud-demo.mjs`, 15 Jobs
 triggered, `POST /alerts/evaluate` -> 30 CRITICAL Incidents), one synthetic Case (`POST /objects {type: CASE, links: [{to, relationship: CONTAINS}]}`
 over three staff-fraud Incidents, two `ATTACHMENT` notes, an `impact` set with `PUT /objects/{id}/impact {impact: {...}}`), driven as `fm.analyst`

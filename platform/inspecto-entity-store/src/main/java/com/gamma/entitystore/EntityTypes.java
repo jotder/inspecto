@@ -38,17 +38,21 @@ public final class EntityTypes {
     /** The closed normaliser set, in declaration order. */
     public static final List<String> NORMALISERS = List.of("default", "digits", "e164", "upper-trim");
 
-    /** The seeded types a space inherits until it states its own (design §2.6). */
+    /**
+     * The seeded types a space inherits until it states its own (design §2.6). ⛔ The labels are NEUTRAL (AC-09): an
+     * industry word ("MSISDN", "Wallet") is the Space's {@link IndustryPack} relabelling the type, never the core's.
+     * The ids and classifications are data contracts and stay as they are.
+     */
     public static final List<EntityType> DEFAULTS = List.of(
             new EntityType("subscriber", "Subscriber", "default", true, List.of("SUBSCRIBER")),
-            new EntityType("imsi", "IMSI", "digits", true, List.of("IMSI")),
-            new EntityType("imei", "IMEI", "digits", true, List.of("IMEI")),
-            new EntityType("msisdn", "MSISDN", "e164", true, List.of("MSISDN")),
-            new EntityType("wallet", "Wallet", "upper-trim", true, List.of("WALLET")),
+            new EntityType("imsi", "Subscriber identity", "digits", true, List.of("IMSI")), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
+            new EntityType("imei", "Device identity", "digits", true, List.of("IMEI")), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
+            new EntityType("msisdn", "Phone number", "e164", true, List.of("MSISDN")), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
+            new EntityType("wallet", "Stored-value account", "upper-trim", true, List.of("WALLET")),
             new EntityType("account", "Account", "upper-trim", true, List.of("ACCOUNT")),
-            new EntityType("agent", "Agent / till", "upper-trim", false, List.of("AGENT", "TILL")),
-            new EntityType("handset", "Handset", "default", false, List.of("HANDSET")),
-            new EntityType("cell", "Cell", "upper-trim", false, List.of("CELL", "CELL_ID")));
+            new EntityType("agent", "Intermediary / till", "upper-trim", false, List.of("AGENT", "TILL")),
+            new EntityType("handset", "Device", "default", false, List.of("HANDSET")),
+            new EntityType("cell", "Location", "upper-trim", false, List.of("CELL", "CELL_ID")));
 
     /** The JavaScript {@code \s} set as an explicit class (see the class note — never Java's {@code \s}). */
     static final String WS = "[\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]";

@@ -37,7 +37,7 @@ test('RED (static): serve.* guess the edition again (no edition.properties read)
 });
 
 test('RED (static): the serve.bat self-referential-set-in-a-block rule, and delayed expansion, still fire', () => {
-    const block = mutate('if "%EDITION%"=="Enterprise" set "OPTS=%OPTS% -Dobjects.backend=postgres"', 'if defined X (\nset "OPTS=%OPTS% -Da=b"\nset "OPTS=%OPTS% -Dc=d"\n)');
+    const block = mutate('if "%EDITION%"=="Advanced" set "OPTS=%OPTS% -Dobjects.backend=postgres"', 'if defined X (\nset "OPTS=%OPTS% -Da=b"\nset "OPTS=%OPTS% -Dc=d"\n)');
     assert.match(statics(block), /re-expands a variable inside a parenthesised block/);
     assert.match(statics(mutate('setlocal\ncd /d "%~dp0"\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="', 'setlocal EnableDelayedExpansion\ncd /d "%~dp0"\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="')), /enables delayed expansion/);
 });
@@ -64,16 +64,16 @@ test('RED (executed): a serve.sh that ignores modules.list (falls to the *.jar g
 
 test('RED (executed): a serve.sh that sniffs jar presence instead of reading the marker lets a stray jar change the edition', () => {
     const t = mutate('if [ -f edition.properties ]; then\n    EDITION=', 'if false; then\n    EDITION=');
-    assert.match(scenarios(t), /stray inspecto-oidc\.jar[\s\S]*printed `edition: Enterprise`, expected `Personal`/);
+    assert.match(scenarios(t), /stray inspecto-oidc\.jar[\s\S]*printed `edition: Advanced`, expected `Basic`/);
 });
 
 test('RED (executed): a serve.sh that accepts an unknown edition marker is caught', () => {
-    const t = mutate('    Personal|Professional|Enterprise|Preview) ;;\n    *) echo', '    *) ;;\n    xx) echo');
+    const t = mutate('    Basic|Standard|Advanced|Preview) ;;\n    *) echo', '    *) ;;\n    xx) echo');
     assert.match(scenarios(t), /UNKNOWN edition in edition\.properties[\s\S]*the launcher started although/);
 });
 
-test('RED (executed): Preview patched back to Enterprise\'s behaviour (postgres objects backend) is caught', () => {
-    const t = mutate('[ "${EDITION}" = "Enterprise" ] && JAVA_OPTS+=', '[ "${EDITION}" != "Personal" ] && JAVA_OPTS+=');
+test('RED (executed): Preview patched back to Advanced\'s behaviour (postgres objects backend) is caught', () => {
+    const t = mutate('[ "${EDITION}" = "Advanced" ] && JAVA_OPTS+=', '[ "${EDITION}" != "Basic" ] && JAVA_OPTS+=');
     assert.match(scenarios(t), /Preview[\s\S]*forbidden flag {2}-Dobjects\.backend=postgres/);
 });
 
@@ -83,5 +83,5 @@ test('the real run.sh/run.bat, EXECUTED, put exactly modules.list on -cp', () =>
 
 test('RED (executed): a run.sh that ignores modules.list (the *.jar glob) puts the jars in the WRONG ORDER', () => {
     const t = mutate('if [ -f modules.list ]; then\n    CP="$(tr -d \'\\r\' < modules.list | tr \'\\n\' \':\')"; CP="${CP%:}"\nelse\n    echo "[run.sh] modules.list', 'if false; then\n    CP=x\nelse\n    echo "[run.sh] modules.list');
-    assert.match(runOneShot(t).findings.join('\n'), /run\.sh · Professional: classpath is[\s\S]*expected exactly the Offering's modules\.list/);
+    assert.match(runOneShot(t).findings.join('\n'), /run\.sh · Standard: classpath is[\s\S]*expected exactly the Offering's modules\.list/);
 });

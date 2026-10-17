@@ -51,6 +51,14 @@ public final class CapabilityManifest {
             new Entry("DELETE", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationReferenceRoutes (D-6) — an external reference is appended beside the op log, so it is Case work too.
             new Entry("POST", "/inv/investigations/([^/]+)/references", Roles.CAN_MANAGE_INCIDENTS),
+            // InvestigationInboundRoutes (LA-EDITIONS-1 §4) — a third-party product opens a seeded Investigation; it composes the
+            // create, seed and reference writes above, so it is Case work like them. The deep-link resolve is read-shaped.
+            new Entry("POST", "/inv/inbound/investigations", Roles.CAN_MANAGE_INCIDENTS),
+            // IntegrationRoutes (LA-EDITIONS-1 phase 6) - the settings decide where evidence and events leave the
+            // installation, so reading or changing them is administration; a hand-off is Case work on one Investigation.
+            new Entry("GET", "/inv/integration", Roles.CAN_ADMINISTER),
+            new Entry("PUT", "/inv/integration", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/inv/investigations/([^/]+)/handoff", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationMemberRoutes (D7-1) — granting or revoking a member changes who may act on the evidence, so it is
             // Case work like every Investigation write; the real gate is the handler's LEAD check (403 for a non-lead member).
             new Entry("POST", "/inv/investigations/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
@@ -404,6 +412,9 @@ public final class CapabilityManifest {
             // Link Analysis settings; the install-wide (host resource) limits are administration.
             new Entry("PUT", "/settings/link-analysis/limits", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/system/link-analysis/limits", Roles.CAN_ADMINISTER),
+            // DomainProfileRoutes (LA-EDITIONS-1) — choosing the Space's Industry pack is authored like its other
+            // Link Analysis settings.
+            new Entry("PUT", "/settings/link-analysis/domain-profile", Roles.CAN_AUTHOR_WORKBENCH),
             // SchedulerRoutes — tuning the live Consignment concurrency caps is runtime operation,
             // not workbench authoring.
             new Entry("PUT", "/system/scheduler", Roles.CAN_OPERATE_RUNS),
@@ -469,7 +480,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/notifications/([^/]+)/read", "self-service", "marks one notification read in the CALLER's own NotificationReadState only — pinned by ControlApiNotificationsTest.readStateIsPerSubject"),
             new Exemption("POST", "/notifications/([^/]+)/unread", "self-service", "marks one notification unread in the CALLER's own NotificationReadState only — pinned by ControlApiNotificationsTest.readStateIsPerSubject"),
             new Exemption("POST", "/pending-changes/([^/]+)/withdraw", "self-service", "only the AUTHOR of a Pending Change may withdraw it — the handler's author check is the gate (403 for anyone else, 403 with no Subject), so no capability could add anything; ASSURE-MAKER-CHECKER-RESIDUALS-1 (2) — pinned by ControlApiPendingChangesTest.onlyTheAuthorWithdrawsTheirOwnPendingChange"),
-            new Exemption("PUT", "/notifications/preferences", "self-service", "writes the CALLER's own override in NotificationPreferenceOverrides, keyed by Subject id (the default is PUT /notifications/preferences/default, canAdminister); on Personal there is one user and it writes the single grid — pinned by ControlApiSubjectPreferencesTest.oneSubjectsPutNeverChangesAnotherSubjectsEffectiveGrid"),
+            new Exemption("PUT", "/notifications/preferences", "self-service", "writes the CALLER's own override in NotificationPreferenceOverrides, keyed by Subject id (the default is PUT /notifications/preferences/default, canAdminister); on Basic there is one user and it writes the single grid — pinned by ControlApiSubjectPreferencesTest.oneSubjectsPutNeverChangesAnotherSubjectsEffectiveGrid"),
             new Exemption("POST", "/inv/graph/runs/([^/]+)/cancel", "self-service", "stops a graph run only for its STARTER or an administrator - the route answers 404 (the same as an unknown run) to anyone else or to a caller who can no longer read the run's Investigation, 409 once finished, so no capability could add anything; a cancel frees compute and returns no data - pinned by ControlApiGraphRunTest.theStarterAndAnAdministratorCanCancelARunningJobAnd409AfterItFinished and anotherSubjectCannotStartReadListOrCancelYourRun"),
             new Exemption("POST", "/inv/index/builds/([^/]+)/cancel", "self-service", "stops an index build only for its STARTER or an administrator - IndexBuildService.cancel is the gate (403 for anyone else, 409 once finished), and a build the caller cannot see (another starter's, or one whose Dataset is no longer viewable) is the 404 of an unknown id, so no capability could add anything; a cancel frees compute and disk and returns no data - pinned by ControlApiIndexTest.onlyTheStarterOrAnAdministratorCancelsAndANonStarterSeesTheNotFoundOfAnUnknownBuild"),
             // §4 read-shaped POST — a POST because the request carries a body, persists nothing. Reads are
@@ -513,6 +524,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing"),
             new Exemption("POST", "/inv/case-history", "read-shaped", "reads one Entity's Incident / Case history, resolving a masked key server-side; persists nothing"),
             new Exemption("POST", "/inv/entities/([^/]+)/resolve", "read-shaped", "resolves one Entity key (raw value in the body) to the alias its Entity page takes; reads no Dataset, persists nothing"),
+            new Exemption("POST", "/inv/deep-links/resolve", "read-shaped", "validates an Open in Inspecto LA link's entity, window and Investigation (LA-EDITIONS-1 section 4); reads no Dataset, persists nothing; an Investigation the caller cannot read is 404, and reveal:true demands canRevealLinkEntities in the handler"),
             new Exemption("POST", "/inv/traversal/recursive-paths", "read-shaped", "walks paths over a Dataset (LA-11); persists nothing"),
             new Exemption("POST", "/inv/pattern/branching", "read-shaped", "matches a branching motif over a Dataset (LA-14b); persists nothing"),
             new Exemption("POST", "/inv/pattern/temporal", "read-shaped", "burst / periodicity over a Dataset's link event times; persists nothing"),

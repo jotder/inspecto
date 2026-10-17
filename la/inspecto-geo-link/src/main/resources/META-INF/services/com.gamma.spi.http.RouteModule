@@ -1,3 +1,4 @@
 com.gamma.geolink.InvestigationMeasureRoutes
 com.gamma.geolink.EmbedExpirySweepModule
 com.gamma.geolink.InvestigationDataChangesRoutes
+com.gamma.geolink.IntegrationWebhooks

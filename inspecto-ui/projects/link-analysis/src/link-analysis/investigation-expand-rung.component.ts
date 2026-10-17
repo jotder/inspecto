@@ -76,7 +76,7 @@ import {
             <inspecto-pen-field
                 label="Link kinds"
                 formControlName="linkKinds"
-                placeholder="call, sms"
+                placeholder="kind_a, kind_b"
                 [error]="form.controls.linkKinds.invalid ? 'At most ' + (maxKinds()) + ' kinds.' : ''"
             />
             <p class="text-secondary m-0 text-xs">Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</p>

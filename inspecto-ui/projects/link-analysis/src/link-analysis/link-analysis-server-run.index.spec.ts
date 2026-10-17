@@ -1,3 +1,4 @@
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -14,6 +15,14 @@ import {
     LinkIndexList,
 } from '@inspecto/link-analysis/api/graph-runs.service';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
+
+/** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
+const STANDARD_EDITION_FEATURES = {
+    ops: signal(false),
+    exchange: signal(false),
+    geoLink: signal(true),
+    investigations: signal(true),
+};
 
 const CATALOGUE = {
     ceilings: { maxNodes: 100000, maxEdges: 1000000, timeoutMs: 600000 },
@@ -86,7 +95,11 @@ function make(
     };
     TestBed.configureTestingModule({
         imports: [LinkAnalysisServerRunComponent],
-        providers: [provideNoopAnimations(), { provide: GraphRunsService, useValue: runs }],
+        providers: [
+            { provide: LA_FEATURES, useValue: STANDARD_EDITION_FEATURES },
+            provideNoopAnimations(),
+            { provide: GraphRunsService, useValue: runs },
+        ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisServerRunComponent);
     fixture.componentRef.setInput('algorithm', opts.algorithm ?? 'neighborhood');

@@ -28,9 +28,9 @@
         so IN-APP delivery -- which is intrinsic to NotificationService and not a channel -- is the only
         delivery it has, exactly as NotificationChannel's own Javadoc has always claimed.
 
-        Built only under the "edition-professional"/"edition-enterprise" profiles (see the parent pom's
+        Built only under the "edition-standard"/"edition-advanced" profiles (see the parent pom's
         profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal, the DEFAULT build --
-        there is no -Pedition-personal) never compiles it and never resolves javax.mail.
+        there is no -Pedition-basic) never compiles it and never resolves javax.mail.
     </description>
 
     <properties>

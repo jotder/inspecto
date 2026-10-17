@@ -318,4 +318,25 @@ public final class LinkEventTypes {
      *  was attempted or refused. Adds {@code dataset}, {@code result} (BUILT | UP_TO_DATE | REFUSED | FAILED | RUNNING),
      *  {@code mode} and, on a refusal, the stable {@code code}. Never a column name or a row value. */
     public static final String LINK_INDEX_SCHEDULED_RUN = "LINK_INDEX_SCHEDULED_RUN";
+
+    /** An Investigation's Dossier bundle and findings were handed off to the Space's external case manager
+     *  ({@code POST /inv/investigations/{id}/handoff}, LA-EDITIONS-1 phase 6). {@code investigationId}, {@code system},
+     *  {@code externalCaseId}, {@code connection}, {@code status}, {@code attempts}, {@code masking} (the mode that left,
+     *  {@code revealed} when the caller lifted it) and {@code seal}. Never the payload. */
+    public static final String LINK_INVESTIGATION_HANDED_OFF = "LINK_INVESTIGATION_HANDED_OFF";
+
+    /** A hand-off did not complete: refused before anything was sent, failed after its retries, or delivered without a
+     *  case id to link. {@code investigationId}, {@code connection}, {@code reason}, {@code status}, {@code attempts}. */
+    public static final String LINK_INVESTIGATION_HANDOFF_FAILED = "LINK_INVESTIGATION_HANDOFF_FAILED";
+
+    /** A Space's third-party integration settings were replaced ({@code PUT /inv/integration}). {@code before} and
+     *  {@code after} (secret REFERENCES only - the document never holds a secret). */
+    public static final String LINK_INTEGRATION_CHANGED = "LINK_INTEGRATION_CHANGED";
+
+    /** A signed webhook was delivered to the Space's integration Connection. {@code event} (the webhook event name),
+     *  {@code deliveryId} (the source event's id), {@code investigationId}, {@code status}, {@code attempts}. */
+    public static final String LINK_WEBHOOK_DELIVERED = "LINK_WEBHOOK_DELIVERED";
+
+    /** A webhook was refused or failed after its retries; same attributes as {@link #LINK_WEBHOOK_DELIVERED} plus {@code reason}. */
+    public static final String LINK_WEBHOOK_FAILED = "LINK_WEBHOOK_FAILED";
 }

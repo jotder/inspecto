@@ -1,3 +1,7 @@
+import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile.service';
+import { installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
+import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profile.testing';
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -27,6 +31,14 @@ import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { SessionService } from 'app/inspecto/auth/session.service';
+
+/** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
+const STANDARD_EDITION_FEATURES = {
+    ops: signal(false),
+    exchange: signal(false),
+    geoLink: signal(true),
+    investigations: signal(true),
+};
 
 const DS: Dataset = {
     id: 'links-ds',
@@ -90,6 +102,8 @@ function create(
         stubGraph?: boolean;
         /** "Investigate a number": a stand-in for the Dataset reads (latest event time, column probe). */
         rows?: Partial<DatasetRowsService>;
+        /** The host's module flags (default: Standard and above - the Investigation surface present). */
+        features?: typeof STANDARD_EDITION_FEATURES;
     } = {},
 ) {
     const queried: unknown[] = [];
@@ -109,8 +123,11 @@ function create(
         imports: [LinkAnalysisComponent],
         providers: [
             ...provideLaHostServices(),
+            { provide: LA_FEATURES, useValue: opts.features ?? STANDARD_EDITION_FEATURES },
             provideNoopAnimations(),
             provideRouter([]),
+            // the packs are installed above; the real service would read the server and fall back to generic
+            { provide: DomainProfileService, useValue: { state: signal(null), ready: () => Promise.resolve() } },
             { provide: GraphSourcesService, useValue: { sources: [fakeSource], byId: () => fakeSource } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: PipelinesService, useValue: { list: () => of([]) } },
@@ -157,6 +174,24 @@ async function runQuery(fixture: ReturnType<typeof create>['fixture']): Promise<
     panel.queryForm.patchValue({ datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' });
     await c.run();
 }
+
+// The SPA holds no industry profile of its own (LA-EDITIONS-1): the server's packs, as the specs need them.
+installDomainProfiles(
+    [
+        profileFromPack(TELECOM_PACK_FIXTURE),
+        profileFromPack({
+            ...TELECOM_PACK_FIXTURE,
+            id: 'mobile-money',
+            name: 'Mobile Money',
+            profile: { measureHints: ['amount'], timeHints: [], suggestedTools: ['scoring'] },
+            terms: [
+                { key: 'concept.node', label: 'Accounts', abbreviation: '', definition: '' },
+                { key: 'concept.link', label: 'Transfers', abbreviation: '', definition: '' },
+            ],
+        }),
+    ],
+    null,
+);
 
 describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {
@@ -982,16 +1017,16 @@ describe('LinkAnalysisComponent', () => {
         expect(c.workingSet().map((s) => s.label)).toEqual(['Nodes', 'Links']); // generic: no counts/attrs in GRAPH
         expect(c.profile().suggestedTools).toEqual([]);
 
-        c.profileControl.setValue('finance');
+        c.profileControl.setValue('mobile-money');
         expect(c.workingSet().map((s) => s.label)).toEqual(['Accounts', 'Transfers']);
         expect(c.profile().suggestedTools).toContain('scoring');
 
         c.saveForm.setValue({ name: 'Falcon', description: '' });
         await c.saveView();
-        expect(save).toHaveBeenCalledWith(expect.objectContaining({ profile: 'finance' }), expect.anything());
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ profile: 'mobile-money' }), expect.anything());
 
         await c.loadView({ id: 'x', name: 'x', sourceId: 'entity-projection', query: c.lastRun()!.query });
-        expect(c.profileId()).toBe('generic'); // a view without a profile resets to generic
+        expect(c.profileId()).toBe('generic'); // a view without a profile reads the Space's profile: generic here
     });
     it('two-stage loop: a local predicate narrows the canvas for free; a push marks stranded nodes, never drops them', async () => {
         const FILTERED: G6GraphData = { nodes: GRAPH.nodes.slice(0, 3), edges: GRAPH.edges.slice(0, 2) }; // a–b–c only
@@ -1872,6 +1907,43 @@ describe('LinkAnalysisComponent', () => {
             await fixture.componentInstance.sealTemporal();
             expect(apply).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe('LinkAnalysisComponent - Basic edition: the explorer without Investigations (LA-EDITIONS-1 ED-4)', () => {
+    const BASIC = { ...STANDARD_EDITION_FEATURES, investigations: signal(false) };
+
+    it('offers no Investigation tab, button or opener - an affordance that can only 503 is worse than none', () => {
+        const { fixture } = create({ features: BASIC });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const c = fixture.componentInstance;
+        const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]')).map((t) => t.textContent?.trim());
+        expect(tabs).toEqual(['Analysis', 'View']);
+        expect(el.querySelector('[aria-label="Open the Investigation"]')).toBeNull();
+        c.openInvestigation();
+        fixture.detectChanges();
+        expect(c.toolboxTab()).not.toBe('investigation');
+        expect(el.querySelector('inspecto-link-analysis-investigation')).toBeNull();
+    });
+
+    it('a ?seed= deep link says Investigations are a Standard feature and starts nothing', async () => {
+        const { fixture } = create({ features: BASIC, queryParams: { seed: '+254700000001', entityType: 'msisdn' } });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const c = fixture.componentInstance;
+        expect(c.investigateIssue()).toContain('available in Standard and above');
+        expect(c.pendingInvestigation()).toBeNull();
+        expect(c.toolboxTab()).not.toBe('investigation');
+    });
+
+    it('Standard (the flag on) keeps the three tabs', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const tabs = Array.from(
+            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
+        ).map((t) => t.textContent?.trim());
+        expect(tabs).toEqual(['Analysis', 'View', 'Investigation']);
     });
 });
 

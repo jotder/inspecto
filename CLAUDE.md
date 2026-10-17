@@ -139,7 +139,7 @@ shift gets the identical environment.
   `verification` subagent PASS before reporting done — own checks and self-reports don't substitute.
 - **Test at the UNIT level per change (operator, 2026-09-17).** Run the affected test classes
   (`-pl <module> -Dtest=A,B` — commas, never `+`) and move on. The FULL reactor gate
-  (`mvn -o clean test -Pedition-enterprise`, ~10 min) runs only when the operator asks for it
+  (`mvn -o clean test -Pedition-advanced`, ~10 min) runs only when the operator asks for it
   (GAUNTLET), before a push that touched shared seams, or at handoff — never once per edit.
 
 ## CodeGraph (code knowledge graph)

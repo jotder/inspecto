@@ -117,10 +117,10 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  */
 public final class InvestigationRoutes implements RouteModule {
 
-    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    /** Gated by the geoLink feature (404 MODULE_DISABLED where a Space switches it off) and the investigations edition feature (503 CAPABILITY_UNAVAILABLE on Basic, LA-EDITIONS-1). */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
@@ -229,7 +229,7 @@ public final class InvestigationRoutes implements RouteModule {
      * relation lacks, a time column that is not a timestamp, or a bad zone 422 → id escaping the store 403 → id
      * taken 409 → write the header CREATE_NEW.
      */
-    private Object create(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+    Object create(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation create");
         String given = ApiContext.str(body, "id");
         String id = given != null ? given : "inv-" + UUID.randomUUID();

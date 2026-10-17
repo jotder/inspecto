@@ -31,9 +31,9 @@ param(
     [string]$WriteRoot,
     [string]$UiDir,
     # SIGNIN-PREVIEW-1 (2026-09-15): -AuthMode oidc makes the CORE report authMode:'oidc' on /bootstrap, so
-    # the SPA renders its Professional-edition guest routes (/sign-in, /session/callback) against an auth-free
+    # the SPA renders its Standard-edition guest routes (/sign-in, /session/callback) against an auth-free
     # backend. It is a PREVIEW switch: nothing authenticates — the core has no Authenticator, and the
-    # sign-in button's redirect will not complete. For a real OIDC session run the Professional bundle,
+    # sign-in button's redirect will not complete. For a real OIDC session run the Standard bundle,
     # OR (2026-10-13) give the -Oidc* parameters below: with -AuthMode oidc they also put providers/inspecto-oidc
     # on the classpath, so the working tree boots a real session against the provider you name.
     [string]$AuthMode,
@@ -58,9 +58,9 @@ if (-not $UiDir)      { $UiDir      = Join-Path $repo 'inspecto-ui/dist/gamma/br
 
 if ($Rebuild) {
     Write-Host "Compiling reactor (-pl inspecto -am)..." -ForegroundColor Cyan
-    # providers/inspecto-oidc is a module of the Professional+ editions only, so its profile must be named.
+    # providers/inspecto-oidc is a module of the Standard+ editions only, so its profile must be named.
     $rebuildPl = if ($AuthMode -eq 'oidc') { 'inspecto,providers/inspecto-oidc' } else { 'inspecto' }
-    $rebuildProfile = if ($AuthMode -eq 'oidc') { @('-Pedition-professional') } else { @() }
+    $rebuildProfile = if ($AuthMode -eq 'oidc') { @('-Pedition-standard') } else { @() }
     & $mvn -o -q -f (Join-Path $repo 'pom.xml') @rebuildProfile -pl $rebuildPl -am -DskipTests compile
     if ($LASTEXITCODE -ne 0) { throw "reactor compile failed" }
 }
@@ -85,7 +85,7 @@ $extraModules = @()
 if ($AuthMode -eq 'oidc') {
     $oidcCpFile = Join-Path $repo 'target/backend-oidc-cp.txt'
     Write-Host "Deriving inspecto-oidc classpath..." -ForegroundColor Cyan
-    & $mvn -o -q -f (Join-Path $repo 'pom.xml') "-Pedition-professional" -pl providers/inspecto-oidc dependency:build-classpath `
+    & $mvn -o -q -f (Join-Path $repo 'pom.xml') "-Pedition-standard" -pl providers/inspecto-oidc dependency:build-classpath `
            "-Dmdep.outputFile=$oidcCpFile" "-Dmdep.includeScope=runtime"
     if ($LASTEXITCODE -ne 0) { throw "dependency:build-classpath for providers/inspecto-oidc failed" }
     $entries = @($entries) + @((Get-Content $oidcCpFile -Raw).Trim() -split ';' | Where-Object { $_ -and ($entries -notcontains $_) })
@@ -123,7 +123,7 @@ Write-Host "Classpath: $($moduleDirs.Count) module classes dirs + $($entries.Cou
 # ⛔ -Dcontrol.token=dev and -Dassist.read.token=dev were passed here and were REMOVED 2026-09-14
 # (DOC-DEADTOKEN-1): both have ZERO Java readers, so they authenticated nothing while reading exactly
 # as though they did. The core is auth-free by design; Authorization is enforced by the
-# Professional/Enterprise security module via AUTH_OIDC_*. ⛔ Do not re-add them.
+# Standard/Advanced security module via AUTH_OIDC_*. ⛔ Do not re-add them.
 # ⚠ Keep this note ABOVE the call: a `#` line between backtick continuations breaks the parse —
 # the first attempt at this comment did exactly that, and `Parser::ParseFile` caught it.
 $authArgs = @()

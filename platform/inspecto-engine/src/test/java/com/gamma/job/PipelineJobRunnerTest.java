@@ -1876,7 +1876,7 @@ class PipelineJobRunnerTest {
 
         assertTrue(res.success(), res.message());
         assertEquals(List.of(1, 3), readIds(dataDir, "rollup"),
-                "Personal and single-node Standard have no shared lakehouse; the run must be untouched");
+                "Basic and single-node Standard have no shared lakehouse; the run must be untouched");
     }
 
     @Test

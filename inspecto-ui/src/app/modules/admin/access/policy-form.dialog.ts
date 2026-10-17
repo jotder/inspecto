@@ -163,7 +163,7 @@ interface MatrixColumn {
                     @if (preview(); as p) {
                         @if (!p.enabled) {
                             <inspecto-alert variant="info" title="Policy engine not active">
-                                {{ p.reason || 'Access policies are enforced only on the Enterprise edition.' }}
+                                {{ p.reason || 'Access policies are enforced only on the Advanced edition.' }}
                             </inspecto-alert>
                         } @else {
                             <p class="text-secondary text-sm" role="status">

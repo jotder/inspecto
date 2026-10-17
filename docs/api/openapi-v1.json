@@ -8320,6 +8320,30 @@
         "x-generated" : true
       }
     },
+    "/settings/link-analysis/domain-profile" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "The Space's Domain Profile: the active Industry pack's terminology and the installed packs",
+        "operationId" : "getSettingsLinkAnalysisDomainProfile",
+        "description" : "Answers {active, stated, profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. A pack that failed validation at load is listed under refused, never installed.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "Select the Space's Domain Profile (canAuthorWorkbench)",
+        "operationId" : "putSettingsLinkAnalysisDomainProfile",
+        "description" : "Body {domainProfile: pack id | generic | null}. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack; 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and answers the GET shape.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      }
+    },
     "/settings/pipeline-history" : {
       "get" : {
         "tags" : [ "settings" ],
@@ -12225,6 +12249,35 @@
         "x-optional-module" : true
       }
     },
+    "/inv/deep-links/resolve" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Validate an Open in Inspecto LA link's parameters",
+        "operationId" : "postInvDeepLinksResolve",
+        "description" : "LA-EDITIONS-1 section 4 (roadmap I5). The SPA's /open page sends the link's parameters in the BODY: {entity?: \"<type>:<key>\", investigation?: id, window?: {from?, to?}, reveal?: boolean}. For a type masked under the Space's maskingMode the key must be the exploration alias (masked:<16 hex>): a raw value is refused 422 without being repeated (get the alias from POST /inv/entities/{type}/resolve). Answers {entity?: {type, key (alias or normalised value), masked, revealed?}, investigation?: {id, title}, window?}. reveal:true on a masked entity returns its raw value only to a holder of canRevealLinkEntities (403 otherwise), audited as LINK_ENTITY_REVEALED naming the alias. Reads no Dataset and persists nothing; no capability for the read itself.",
+        "responses" : {
+          "200" : {
+            "description" : "{entity?, investigation?, window?}."
+          },
+          "403" : {
+            "description" : "reveal requested without canRevealLinkEntities."
+          },
+          "404" : {
+            "description" : "The Investigation does not exist or the caller cannot read it (one answer)."
+          },
+          "422" : {
+            "description" : "Neither entity nor investigation; a malformed entity; an unknown Entity Type; a raw key of a masked type; an alias this server never minted; a bad window."
+          },
+          "429" : {
+            "description" : "Rate limit exceeded."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/entities/{entityType}/resolve" : {
       "post" : {
         "tags" : [ "inv" ],
@@ -12352,6 +12405,118 @@
         "x-optional-module" : true
       }
     },
+    "/inv/inbound/investigations" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Third-party integration (inbound): open a seeded Investigation for an external record",
+        "operationId" : "postInvInboundInvestigations",
+        "description" : "LA-EDITIONS-1 section 4, phase 5. A fraud product or case manager hands over its own record and the entities it is about. Body {reference: {system, type? (default alert), id, url?, label?}, entities: [\"<type>:<key>\" ...], purpose, title?, window?: {from?, to?, ...}, binding?: {dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?}}. Each entity is typed by an Entity Type in force; its key is a raw value (sent in the body) or an exploration alias, normalised by the type's normaliser. Without a binding, the first saved Link Analysis view or published index that links a column of the first entity's type is used (its kind and time columns come along). Composes the existing writes: POST /inv/investigations (purpose, R3 Dataset gate), one seed op per Entity Type, an optional window op, and an external reference (trusted:false). Idempotent on (reference.system, reference.id): the Investigation id is derived from them (ext-<32 hex>), so a repeat - or a racing duplicate on any node - answers the SAME Investigation with created:false and adds nothing. Answers {investigationId, created, seeded, reference, link: \"/open?investigation=<id>\" (the la-app route; the console mounts it at /studio/open), note}. Gated on canManageIncidents; the caller authenticates as any Subject (an OIDC service-account token works). Rate-limited with the expensive Link Analysis class (429: retry, it is idempotent).",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "reference", "entities", "purpose" ],
+                "properties" : {
+                  "reference" : {
+                    "type" : "object",
+                    "required" : [ "system", "id" ],
+                    "properties" : {
+                      "system" : { "type" : "string", "description" : "The calling system's name, [A-Za-z0-9][A-Za-z0-9._-]{0,63}." },
+                      "type" : { "type" : "string", "description" : "What the record is in that system (default alert)." },
+                      "id" : { "type" : "string", "description" : "The record's id in that system." },
+                      "url" : { "type" : "string", "description" : "An absolute http(s) URL to the record; never fetched." },
+                      "label" : { "type" : "string" }
+                    }
+                  },
+                  "entities" : {
+                    "type" : "array",
+                    "items" : { "type" : "string", "description" : "<Entity Type id>:<key>, e.g. msisdn:+249912000001." }
+                  },
+                  "purpose" : { "type" : "string", "description" : "The stated purpose / legal basis (D-U5)." },
+                  "title" : { "type" : "string" },
+                  "window" : { "type" : "object", "description" : "An Investigation window {from?, to?, ...}; needs a time column." },
+                  "binding" : { "type" : "object", "description" : "The Dataset and link columns, when the Space's views and indexes do not say." }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "{investigationId, created, seeded, reference, link, note}."
+          },
+          "403" : {
+            "description" : "The caller lacks canManageIncidents."
+          },
+          "404" : {
+            "description" : "The binding's Dataset is unknown or not viewable by the caller."
+          },
+          "409" : {
+            "description" : "This external reference already opened an Investigation the caller cannot change."
+          },
+          "422" : {
+            "description" : "A malformed reference, entity, window or binding; an unknown Entity Type; no view or index links the entity's type; no purpose."
+          },
+          "429" : {
+            "description" : "Rate limit exceeded."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/integration" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "The Space's third-party integration settings (outbound)",
+        "operationId" : "getInvIntegration",
+        "description" : "LA-EDITIONS-1 phase 6. canAdminister. Answers {handoffConfigured, webhooksConfigured, installed, settings, events, placeholders, note}. settings is la-integration.json as stored: handoff {connection, system, authHeader?, template?, caseIdPointer, caseUrlPointer?}, webhooks {connection, signingSecret (a ${...} reference), events}, retry {count, backoff, initialDelayMillis, maxDelayMillis}. It never holds a secret.",
+        "responses" : {
+          "200" : {
+            "description" : "The settings."
+          },
+          "403" : {
+            "description" : "Missing canAdminister."
+          }
+        },
+        "x-optional-module" : true
+      },
+      "put" : {
+        "tags" : [ "inv" ],
+        "summary" : "Replace the Space's third-party integration settings",
+        "operationId" : "putInvIntegration",
+        "description" : "LA-EDITIONS-1 phase 6. canAdminister. Gates: 403 -> write root 503 -> 422 (unknown key, a connection or system name that is not a safe name, an authHeader the transport or the signature sets, a template placeholder outside the published list, a template over 64 KiB, a signingSecret that is not a ${...} reference, an unknown event, a retry value out of range) -> atomic write. Audited as LINK_INTEGRATION_CHANGED with before/after.",
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The settings now in force."
+          },
+          "403" : {
+            "description" : "Missing canAdminister."
+          },
+          "422" : {
+            "description" : "Invalid settings; nothing was written."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/investigations/{investigationId}/embeds" : {
       "get" : {
         "tags" : [ "inv" ],
@@ -12448,6 +12613,56 @@
           },
           "503" : {
             "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/investigations/{investigationId}/handoff" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Hand an Investigation's Dossier bundle and findings off to the external case manager",
+        "operationId" : "postInvInvestigationsByInvestigationIdHandoff",
+        "description" : "LA-EDITIONS-1 phase 6. canManageIncidents, lead only. Body {reveal?}; ?at=&snapshots= as the bundle export. Builds the Dossier bundle (masked per the Space's maskingMode unless reveal:true by a holder of canRevealLinkEntities, then masking.mode is revealed), renders the Space's field-mapping template, and POSTs it through the platform egress (registered https Connection, egress allowlist, pinned address, no redirects, Collector retry on I/O, 5xx, 408, 429 under one Idempotency-Key). The case id at handoff.caseIdPointer of the answer is linked as an external reference {system, type case}. Answers {investigationId, delivered, system, externalCaseId, url, linked, status, attempts, masking, seal}.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Delivered and linked."
+          },
+          "403" : {
+            "description" : "Missing canManageIncidents, not a lead, or reveal without canRevealLinkEntities."
+          },
+          "404" : {
+            "description" : "No such Investigation (or not visible)."
+          },
+          "409" : {
+            "description" : "No hand-off configured, or the reference list is full."
+          },
+          "422" : {
+            "description" : "Refused before sending (egress denied, unusable Connection, literal token); nothing was sent."
+          },
+          "502" : {
+            "description" : "The case manager failed after the retries, or answered without a usable case id; nothing was linked."
+          },
+          "503" : {
+            "description" : "No write root, or outbound integration not installed."
           }
         },
         "x-optional-module" : true
@@ -13575,7 +13790,8 @@
         "properties" : {
           "edition" : {
             "type" : "string",
-            "enum" : [ "personal", "professional" ]
+            "enum" : [ "basic", "standard", "advanced" ],
+            "description" : "The edition (LA-EDITIONS-1 ED-2): basic (auth-free), standard (an Authenticator), advanced (+ the policy engine). Preview reports as advanced."
           },
           "version" : {
             "type" : "string",
@@ -13589,6 +13805,10 @@
               },
               "multiSpace" : {
                 "type" : "boolean"
+              },
+              "investigations" : {
+                "type" : "boolean",
+                "description" : "True only when the Link Analysis Investigation surface is installed AND included in this edition (false on Basic, the Link Analysis explorer: its Investigation routes answer 503 CAPABILITY_UNAVAILABLE). LA-EDITIONS-1 phase 3."
               },
               "authMode" : {
                 "type" : "string"

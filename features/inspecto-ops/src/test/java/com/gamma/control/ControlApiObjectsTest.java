@@ -256,7 +256,7 @@ class ControlApiObjectsTest {
                     "{\"body\":\"starting\",\"author\":\"alice\"}"));
             assertEquals("COMMENT", comment.get("kind").asText());
             assertEquals("starting", comment.get("body").asText());
-            assertEquals("alice", comment.get("author").asText(), "no one signed in: the body's author counts (Personal)");
+            assertEquals("alice", comment.get("author").asText(), "no one signed in: the body's author counts (Basic)");
 
             // attachment (evidence reference — metadata only)
             JsonNode att = json(send(c.port, "POST", "/objects/" + caseObj.id() + "/attachments",

@@ -8,9 +8,9 @@
 //
 // WHY PER BUNDLE, NOT PER REACTOR: the reactor resolves ~94 third-party artifacts dominated by the
 // optional AI stack (controls-matrix CC9). A reactor SBOM attests a set no customer installs. The
-// bundle set is enumerated ONCE in tools/bundle-modules.mjs — 2 first-party modules for Personal, 10
-// for Standard, 11 for Enterprise — plus the postgresql.jar sidecar package.ps1 stages for the
-// non-Personal editions. tools/check-sbom-modules.mjs holds that enumeration against package.ps1.
+// bundle set is enumerated ONCE in tools/bundle-modules.mjs — 2 first-party modules for Basic, 10
+// for Standard, 11 for Advanced — plus the postgresql.jar sidecar package.ps1 stages for the
+// non-Basic editions. tools/check-sbom-modules.mjs holds that enumeration against package.ps1.
 //
 // ⛔ WHAT IT IS NOT: tools/dependencies.lock. That is the REVIEW baseline (coordinates only, every
 // reactor module, diffed in CI). This carries what an SBOM must: per-component SHA-256 of the
@@ -20,7 +20,7 @@
 // Zero dependencies (pure Node), like tools/check-dependencies.mjs — whose `dependency:list`
 // parsing this mirrors on purpose (one grammar for reading Maven's output).
 //
-//   node tools/sbom.mjs --edition Personal|Professional|Enterprise --bundle <dir> [--version X.Y.Z]
+//   node tools/sbom.mjs --edition Basic|Standard|Advanced --bundle <dir> [--version X.Y.Z]
 //
 // Writes <bundle>/sbom/inspecto-<edition>.cdx.json and <bundle>/sbom/inspecto-<edition>.spdx.json, plus (P3f) one
 // <bundle>/sbom/<jar-basename>.sbom.cdx.json per shipped jar (tools/sbom-modules.mjs). Optional: --build-id <id> is recorded on each root.
@@ -40,11 +40,10 @@ function arg(name, dflt) {
     const i = process.argv.indexOf(name);
     return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 }
-let edition = arg('--edition', 'Personal');
-if (edition === 'Standard') edition = 'Professional';
+let edition = arg('--edition', 'Basic');
 const bundleDir = arg('--bundle', null);
 if (!bundleDir) {
-    console.error('usage: node tools/sbom.mjs --edition <Personal|Professional|Enterprise|Preview> --bundle <dir>');
+    console.error('usage: node tools/sbom.mjs --edition <Basic|Standard|Advanced|Preview> --bundle <dir>');
     process.exit(2);
 }
 if (!EDITIONS.includes(edition)) {
@@ -196,17 +195,17 @@ function purl(c) {
 }
 
 const thirdParty = resolve();
-// the PostgreSQL sidecar rides the Standard/Enterprise bundle from package.ps1, test-scoped in the
+// the PostgreSQL sidecar rides the Standard/Advanced bundle from package.ps1, test-scoped in the
 // CORE reactor — so dependency:list (runtime scope) does not list it there; add it from the same pom
 // property package.ps1 reads, and only when the sidecar is actually there.
 //
 // ⚠ It may ALREADY be in the resolved set: inspecto-connectors declares the driver at COMPILE scope for
 // its db collector and shades it (514 org/postgresql/* entries), and that sidecar ships in every edition
 // since CONNECTORS-BUNDLE-1. Pushing unconditionally therefore emitted the component TWICE for
-// Standard/Enterprise — a duplicate `bom-ref` and a duplicate SPDXID, both of which their schemas forbid,
+// Standard/Advanced — a duplicate `bom-ref` and a duplicate SPDXID, both of which their schemas forbid,
 // in a document whose whole purpose is to be machine-validated by an auditor.
 const hasPg = (c) => c.group === 'org.postgresql' && c.artifact === 'postgresql';
-if (edition !== 'Personal' && pgVersion && existsSync(join(bundleDir, 'postgresql.jar')) && !thirdParty.some(hasPg)) {
+if (edition !== 'Basic' && pgVersion && existsSync(join(bundleDir, 'postgresql.jar')) && !thirdParty.some(hasPg)) {
     thirdParty.push({ group: 'org.postgresql', artifact: 'postgresql', type: 'jar', classifier: null, version: pgVersion, scope: 'runtime' });
 }
 
@@ -320,7 +319,7 @@ console.log(`✓ SBOM (${edition}): ${third} third-party + ${components.length -
 console.log(`  ${cdxPath}\n  ${spdxPath}`);
 // GUARD-SWEEP-1f (2026-09-07): these were WARN-ONLY with no ceiling, so an SBOM in which every component
 // was unhashed and unlicensed exited 0 and shipped to an auditor. A document whose integrity and licence
-// columns are empty is not evidence of anything. Measured on the Enterprise bundle that day: 45 components,
+// columns are empty is not evidence of anything. Measured on the Advanced bundle that day: 45 components,
 // 0 unhashed, 4 unlicensed — and all four unlicensed are OUR OWN modules, whose poms declare no licence.
 // So the honest gate is a RULE, not a count: no component may be unhashed, and only first-party components
 // may be unlicensed.

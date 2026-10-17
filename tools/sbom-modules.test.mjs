@@ -19,7 +19,7 @@ function fixture() {
     const jars = { 'inspecto.jar': 'proc', 'inspecto-util.jar': 'util', 'inspecto-connectors.jar': 'conn', 'postgresql.jar': 'pg' };
     for (const [f, body] of Object.entries(jars)) writeFileSync(join(dir, f), body);
     writeFileSync(join(dir, 'modules.list'), Object.keys(jars).join('\n') + '\n');
-    writeFileSync(join(dir, 'edition.properties'), 'edition=Professional\n');
+    writeFileSync(join(dir, 'edition.properties'), 'edition=Standard\n');
     const a = comp('a'), b = comp('b'), c = comp('c');
     const pg = comp('postgresql', { group: 'org.postgresql', purl: 'pkg:maven/org.postgresql/postgresql@42.0' , version: '42.0', sha256: sha('pg') });
     const byPurl = new Map([a, b, c, pg].map((x) => [x.purl, x]));
@@ -36,7 +36,7 @@ function fixture() {
     const combined = {
         components: [...byPurl.values()].map((x) => ({ purl: x.purl, hashes: [{ alg: 'SHA-256', content: x.sha256 }] })),
     };
-    writeFileSync(join(dir, 'sbom', 'inspecto-professional.cdx.json'), JSON.stringify(combined));
+    writeFileSync(join(dir, 'sbom', 'inspecto-standard.cdx.json'), JSON.stringify(combined));
     return { dir, a, b, c };
 }
 const read = (dir, jar) => JSON.parse(readFileSync(join(dir, 'sbom', sbomName(jar)), 'utf8'));
@@ -104,12 +104,12 @@ test('the demo variant needs no SBOM for the swapped-in demo jar', () => withFix
     writeFileSync(join(dir, 'inspecto-demo-auth.jar'), 'demo');
     writeFileSync(join(dir, 'modules.list'), readFileSync(join(dir, 'modules.list'), 'utf8') + 'inspecto-demo-auth.jar\n');
     assert.match(verifyPerModule(dir).join('\n'), /inspecto-demo-auth\.jar is on modules\.list but has no per-module SBOM/);
-    writeFileSync(join(dir, 'edition.properties'), 'edition=Professional\nvariant=demo\n');
+    writeFileSync(join(dir, 'edition.properties'), 'edition=Standard\nvariant=demo\n');
     assert.deepEqual(verifyPerModule(dir), []);
 }));
 
 test('RED: modules.list or the combined SBOM is missing', () => withFixture(({ dir }) => {
-    rmSync(join(dir, 'sbom', 'inspecto-professional.cdx.json'));
+    rmSync(join(dir, 'sbom', 'inspecto-standard.cdx.json'));
     assert.match(verifyPerModule(dir).join('\n'), /combined SBOM .* is missing/);
     rmSync(join(dir, 'modules.list'));
     assert.match(verifyPerModule(dir).join('\n'), /modules\.list is missing/);

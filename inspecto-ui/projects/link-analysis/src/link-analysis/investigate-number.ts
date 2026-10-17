@@ -8,7 +8,7 @@ import type {
 } from '@inspecto/link-analysis/api/inv.service';
 import {
     DEFAULT_MAX_DEGREE,
-    DOMAIN_PROFILES,
+    domainProfiles,
     DegreePresets,
     DomainProfileId,
     profileForEntityType,
@@ -65,7 +65,7 @@ export function investigableEntityOf(
     for (const [k, v] of Object.entries(attributes ?? {})) {
         if (!k.startsWith('key.') || !v?.trim() || v === 'NULL') continue;
         const column = k.slice(4).toLowerCase();
-        const type = DOMAIN_PROFILES.map((p) => p.investigate?.entityType).find((t) => !!t && column.includes(t));
+        const type = domainProfiles().map((p) => p.investigate?.entityType).find((t) => !!t && column.includes(t));
         if (type) return { seed: v.trim(), entityType: type };
     }
     return null;
@@ -129,7 +129,7 @@ export function investigateBinding(req: InvestigateRequest): PendingInvestigatio
 
 /** The profile whose default mapping binds this Dataset (what a reopened Investigation restores); null = none. */
 export function profileForDataset(datasetId: string | null | undefined): DomainProfileId | null {
-    return (datasetId && DOMAIN_PROFILES.find((p) => p.investigate?.mapping.dataset === datasetId)?.id) || null;
+    return (datasetId && domainProfiles().find((p) => p.investigate?.mapping.dataset === datasetId)?.id) || null;
 }
 
 const plural = (n: number, one: string, many = `${one}s`): string =>

@@ -637,7 +637,7 @@ class ControlApiSettingsTest {
             assertEquals(9, def.get("entityTypesInForce").size());
             JsonNode agent = def.get("entityTypesInForce").get(6);
             assertEquals("agent", agent.get("id").asText());
-            assertEquals("Agent / till", agent.get("label").asText());
+            assertEquals("Intermediary / till", agent.get("label").asText());
             assertEquals("upper-trim", agent.get("normaliser").asText());
             assertFalse(agent.get("masked").asBoolean());
             assertEquals("[\"AGENT\",\"TILL\"]", agent.get("classifications").toString());

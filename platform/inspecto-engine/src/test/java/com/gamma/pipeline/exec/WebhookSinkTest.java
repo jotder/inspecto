@@ -167,7 +167,7 @@ class WebhookSinkTest {
     void withNoTransportTheWriteRefusesNamingTheEdition() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> WebhookSink.plan(node(Map.of("connection", "hook")), null));
-        assertTrue(e.getMessage().contains("Professional"), e.getMessage());
+        assertTrue(e.getMessage().contains("Standard"), e.getMessage());
     }
 
     @Test
@@ -228,7 +228,7 @@ class WebhookSinkTest {
         PartitionSinkWriter w = new PartitionSinkWriter(conn, db.getParent(), "base", "c-9", "r-1", "p");
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> w.write(node(Map.of("connection", "hook")), "rows_in"));
-        assertTrue(e.getMessage().contains("Professional"),
+        assertTrue(e.getMessage().contains("Standard"),
                 "reached WebhookSink (not the 'declares no store' refusal): " + e.getMessage());
         assertTrue(w.outputs().isEmpty());
     }
@@ -239,6 +239,6 @@ class WebhookSinkTest {
         DryRunSinkWriter w = new DryRunSinkWriter(conn, null, null, "p");
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> w.write(node(Map.of("connection", "hook")), "rows_in"));
-        assertTrue(e.getMessage().contains("Professional"), e.getMessage());
+        assertTrue(e.getMessage().contains("Standard"), e.getMessage());
     }
 }

@@ -152,9 +152,9 @@ export function main(argv) {
         console.log(problems.length ? `FAIL (${problems.length})` : `OK (lock sections: ${Object.keys(lock).join(', ') || 'none'})`);
         return problems.length ? 1 : 0;
     }
-    const edition = arg(argv, '--edition') === 'Standard' ? 'Professional' : arg(argv, '--edition');
+    const edition = arg(argv, '--edition');
     const stagedDir = arg(argv, '--staged-dir');
-    if (!EDITIONS.includes(edition) || !stagedDir) { console.error('usage: --edition <Personal|Professional|Enterprise|Preview> --staged-dir <dir> [--write-lock|--runtime-modules a,b|--emit]  |  --check'); return 2; }
+    if (!EDITIONS.includes(edition) || !stagedDir) { console.error('usage: --edition <Basic|Standard|Advanced|Preview> --staged-dir <dir> [--write-lock|--runtime-modules a,b|--emit]  |  --check'); return 2; }
     const r = computeSet({ edition, stagedDir, extraText });
     console.log(`jdeps over ${r.jars.length} jars: ${r.jdeps.join(',')}`);
     console.log(`extra (hand, with WHY): ${r.extra.join(',')}`);

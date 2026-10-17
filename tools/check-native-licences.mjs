@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Every native library (.dll, .so, .dylib, .jnilib) the Enterprise intelligence sidecar carries must have its licence accounted for.
+// Every native library (.dll, .so, .dylib, .jnilib) the Advanced intelligence sidecar carries must have its licence accounted for.
 //
 // WHY (`NATIVE-LICENCE-TEXTS-1`, 2026-10-03). The DJL tokenizers artifact embeds the MinGW-w64 GCC runtime
 // (libstdc++-6.dll, libgcc_s_seh-1.dll) and winpthreads (libwinpthread-1.dll) with NO licence text. The

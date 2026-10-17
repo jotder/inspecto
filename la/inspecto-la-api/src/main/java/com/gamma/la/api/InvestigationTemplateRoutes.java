@@ -84,10 +84,10 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  */
 public final class InvestigationTemplateRoutes implements RouteModule {
 
-    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    /** Gated by the geoLink feature (404 MODULE_DISABLED where a Space switches it off) and the investigations edition feature (503 CAPABILITY_UNAVAILABLE on Basic, LA-EDITIONS-1). */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     /** Extensional ops that name entities of one graph with an analyst's judgement — they stay with the case. */

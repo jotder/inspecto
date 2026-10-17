@@ -49,7 +49,7 @@ class PersonalAlertHistoryTest {
 
     private CollectorService boot(SpaceRoot root) throws Exception {
         CollectorService svc = ServiceBootstrap.buildFrom(root, new String[0], false);
-        assertTrue(svc.objects().isEmpty(), "the Personal shape: no operational objects on this classpath");
+        assertTrue(svc.objects().isEmpty(), "the Basic shape: no operational objects on this classpath");
         svc.alertService().orElseThrow().measureProbe((d, m) -> OptionalDouble.of(750));
         return svc;
     }
@@ -75,7 +75,7 @@ class PersonalAlertHistoryTest {
             first = getAlerts(svc);
         }
         assertTrue(Files.isRegularFile(dir.resolve("duckdb").resolve("inspecto-alerts.db")),
-                "the Alert store is the Space's own DuckDB file, on Personal too");
+                "the Alert store is the Space's own DuckDB file, on Basic too");
 
         // "restart": a brand-new service over the same Space directory.
         try (CollectorService svc = boot(root)) {

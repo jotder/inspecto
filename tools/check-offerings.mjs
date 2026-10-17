@@ -71,8 +71,8 @@ export const POSTURE = {
 /** artifactId or module directory -> manifest id (`inspecto-processor` -> processor, `inspecto-ops` -> ops). */
 export const idOf = (artifactId) => artifactId.replace(/^inspecto-/, '');
 
-const EDITION_OF = { personal: 'Personal', professional: 'Professional', enterprise: 'Enterprise', preview: 'Preview' };
-const PROFILE_OF = { professional: 'edition-professional', enterprise: 'edition-enterprise', preview: 'edition-preview' };
+const EDITION_OF = { basic: 'Basic', standard: 'Standard', advanced: 'Advanced', preview: 'Preview' };
+const PROFILE_OF = { standard: 'edition-standard', advanced: 'edition-advanced', preview: 'edition-preview' };
 
 /** pom.xml -> { defaults: [ids], profiles: { profileId: [ids] } }. */
 export function parsePom(xml) {

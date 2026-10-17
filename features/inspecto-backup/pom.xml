@@ -29,9 +29,9 @@
         THIN, like inspecto-policy: it needs nothing beyond what the core already supplies (Jackson, slf4j,
         Checksums, PathJail, ComponentStore), so there is no shade and no sidecar classifier.
 
-        Built only under the "edition-professional"/"edition-enterprise" profiles (see the parent pom's
+        Built only under the "edition-standard"/"edition-advanced" profiles (see the parent pom's
         profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal, the DEFAULT build --
-        there is no -Pedition-personal) never compiles or tests it.
+        there is no -Pedition-basic) never compiles or tests it.
     </description>
 
     <dependencies>

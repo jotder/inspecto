@@ -7,7 +7,7 @@
                 <p class="text-secondary max-w-3xl text-sm">
                     Authored policies plus the engine's built-in denies (space isolation), which are never in the
                     authored document. Saving checks each policy for the mistakes that fail silently and refuses a
-                    change that would lock you out. Policies are enforced only on the Enterprise edition.
+                    change that would lock you out. Policies are enforced only on the Advanced edition.
                 </p>
             </div>
             @if (canEdit()) {
@@ -171,7 +171,7 @@
         @if (result(); as r) {
             @if (!r.enabled) {
                 <inspecto-alert variant="info" title="Policy engine not active">
-                    {{ r.reason || 'Access policies are enforced only on the Enterprise edition.' }}
+                    {{ r.reason || 'Access policies are enforced only on the Advanced edition.' }}
                 </inspecto-alert>
             } @else {
                 <inspecto-alert [variant]="decisionVariant(r.decision)" [title]="'Decision: ' + r.decision">

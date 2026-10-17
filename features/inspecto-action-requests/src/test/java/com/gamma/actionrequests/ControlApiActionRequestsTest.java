@@ -229,7 +229,7 @@ class ControlApiActionRequestsTest {
             JsonNode rec = data(send(c, "POST", "/action-requests", body(inc), null), 200);
             assertEquals("none-eligible", rec.get("approverCheck").asText());
             assertEquals(403, send(c, "POST", "/action-requests/" + rec.get("id").asText() + "/approve", "{}", null).statusCode(),
-                    "Personal: deciding always needs a Subject");
+                    "Basic: deciding always needs a Subject");
         }
     }
 
@@ -1179,7 +1179,7 @@ class ControlApiActionRequestsTest {
                     "{\"connection\":\"hook\",\"payloadTemplate\":{}}", AUTHOR).statusCode(), "no linked Incident / Case");
             assertEquals(404, send(c, "POST", "/action-requests", body("INCIDENT-missing"), AUTHOR).statusCode());
             ActionDispatcher.transport = () -> null;
-            assertEquals(503, send(c, "POST", "/action-requests", body(inc), AUTHOR).statusCode(), "no transport (Personal)");
+            assertEquals(503, send(c, "POST", "/action-requests", body(inc), AUTHOR).statusCode(), "no transport (Basic)");
             assertEquals(0, data(send(c, "GET", "/action-requests", null, AUTHOR), 200).get("total").asInt());
         }
     }

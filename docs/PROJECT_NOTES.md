@@ -53,8 +53,8 @@ Authoritative shape, version management, and the module-extraction playbook:
 | `features/inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
 | `providers/inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
 | `features/inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `inspecto-intelligence` |
-| `providers/inspecto-oidc/` | Professional/Enterprise OIDC auth, `-Pedition-professional` only (not in default `<modules>`) | `inspecto-oidc` |
-| `providers/inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= professional + this) | `inspecto-policy` |
+| `providers/inspecto-oidc/` | Professional/Enterprise OIDC auth, `-Pedition-standard` only (not in default `<modules>`) | `inspecto-oidc` |
+| `providers/inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-advanced` only (= professional + this) | `inspecto-policy` |
 | `inspecto-ui/` | Angular SPA (gamma/Fuse template), serves from the engine | — (npm; dev :4204) |
 
 agent-kernel is GONE (discontinued upstream, replaced 2026-07-07): its reasoning layer is vendored at
@@ -101,7 +101,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - **All auth removed from `master`/common core (2026-06-16).** Personal is genuinely auth-free (every
   ControlApi route open; SPA boots to `/dashboard`; no token paste/guards). Professional re-adds auth out-of-band
   via the **`inspecto-oidc` module (BUILT, W6 2026-07-06** — `OidcAuthenticator` Nimbus+JWKS, `RoleMapper`,
-  `OidcTokenRelay` (renamed from `KeycloakTokenRelay` 2026-07-25, D15); reactor-gated behind the `edition-professional` profile) behind the
+  `OidcTokenRelay` (renamed from `KeycloakTokenRelay` 2026-07-25, D15); reactor-gated behind the `edition-standard` profile) behind the
   `Authenticator`/`Subject`/`TokenRelay` SPIs (`com.gamma.control`), plus HTTPS (`HttpsServer`) and the BFF
   `/auth/exchange|refresh|logout` routes; Angular uses OIDC Auth-Code+PKCE driven by `bootstrap.features.authMode`
   (no-op on Personal). **The `-Dassist.write.root` 503 write-gate is SEPARATE from auth and stays.**
@@ -145,11 +145,11 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 - 🔴 **The MAIN checkout cannot build, serve or pass the pre-push link guard on the `User` Windows profile; do all
   three from a clean worktree** (2026-10-11). `inspecto-demo/runtime-natives` is ACL-locked to the other Windows user
-  (the profile that created it), so the `known-modules` exec step of `package.ps1` / any `-Pedition-enterprise` reactor
+  (the profile that created it), so the `known-modules` exec step of `package.ps1` / any `-Pedition-advanced` reactor
   build, `check-doc-links.mjs` (pre-push) and `serve-demo` (DuckDB native unpack) all die with `AccessDenied`. A fresh
   `git worktree add` has no such folder: build, serve and `git push origin HEAD:master` from it (every guard still runs
   there). A `-NoRuntime` bundle needs a junction to the main `inspecto-demo/runtime`. `tools/run-backend.ps1` resolves
-  sibling modules from `.m2`, so run `mvn -o -Pedition-enterprise -pl inspecto -am -DskipTests install` from the
+  sibling modules from `.m2`, so run `mvn -o -Pedition-advanced -pl inspecto -am -DskipTests install` from the
   worktree first, and add `-Dcontrol.bind=127.0.0.1` (via `JAVA_TOOL_OPTIONS`; the script has no bind switch, so it
   listens on every interface with no sign-in). Agent `isolation: "worktree"` is refused here: create worktrees by hand.
 - **A peer session may be mid-merge in the main checkout** (`.git/MERGE_HEAD`): never run `git merge`/`pull` there.
@@ -164,7 +164,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   modules SKIPPED with 136 STALE surefire reports** on disk; summing those would have read as a
   comfortable green. ⇒ The route checklist is **register → `CapabilityManifest` if gated →
   `openapi-v1.json` → `route-gating-report.mjs` if mutating**. Regenerate, never hand-edit:
-  `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false -Pedition-professional`.
+  `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false -Pedition-standard`.
   Two of this repo's three route contracts fail in a module you did not touch — so **"my targeted tests
   are green" is not a verdict on a route.** Now in `.claude/skills/endpoint/SKILL.md`.
 - ✅ **The doc guards no longer read UNTRACKED markdown** (2026-09-22, `DOC-GUARDS-SCAN-IGNORED-SOURCES-1`
@@ -220,7 +220,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `-Dsurefire.failIfNoSpecifiedTests=false`, and without it a filtered `-am` run dies at `asn-core` for the
   wrong reason. (3) **`-Dtest=A+B+C` runs ZERO tests and reports BUILD SUCCESS** — `+` is Surefire's *method*
   separator, so the whole thing is one literal pattern matching nothing. Commas are required. (4) A subagent
-  reporting **"Verdict: PASS" from the wrong tree and without `-Pedition-enterprise`** — 23 modules instead
+  reporting **"Verdict: PASS" from the wrong tree and without `-Pedition-advanced`** — 23 modules instead
   of 32, so every edition-gated module was skipped, with the verdict read off the log rather than from
   `check-reactor-verdict.mjs`. ⇒ **Re-derive every verdict with the tool, on the tree you are about to
   commit.**
@@ -292,7 +292,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   edition-gated, so no lane's `mvn -o -pl inspecto -am test` compiles it — it failed a combined run every
   lane had passed. A cross-field rule change in `inspecto-config` went red three modules downstream in
   `inspecto-intelligence`. ⛔ `mvn -o -pl :inspecto-ops -am` does not even RESOLVE without
-  `-Pedition-professional`, which is why the repo's only sweep over every committed Space config never ran in
+  `-Pedition-standard`, which is why the repo's only sweep over every committed Space config never ran in
   a default build. ⇒ Gate on `tools/check-reactor-verdict.mjs`, never on a sum of surefire reports.
 
 - 🔴 **WRITING A FILE THROUGH A PYTHON/HEREDOC LAYER CORRUPTED THREE FILES IN ONE SHIFT** (2026-09-16).
@@ -354,7 +354,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   and was wrong by 17 rows — **recount on the way out of any shift that files one.**
 
 - 🔴 **A RED REACTOR IN THE SHARED TREE IS NOT EVIDENCE UNTIL `git status` SAYS WHOSE CHANGES IT COMPILED**
-  (2026-09-15, eleventh shift). A full `-Pedition-enterprise` run went red in 41 tests across
+  (2026-09-15, eleventh shift). A full `-Pedition-advanced` run went red in 41 tests across
   `DbStatusStoreTest`, `CollectorServiceTest`, `RunLeaseContractTest`, `ControlApiTest` — none touched by the
   change under test. No concurrent build, no contention in the log. `git status` showed **nine uncommitted
   engine files belonging to the other session**: half-finished work on three board rows, compiled and tested
@@ -436,7 +436,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - ⚠ **A CAPABILITY-GATED ROUTE NEEDS A `CapabilityManifest` ENTRY TOO**, and the guard that says so fails in
   a **different module** (`inspecto-processor`), nowhere near the route. Because the reactor is fail-fast,
   that one failure left **13 modules SKIPPED — unverified, not passing**, including both edition modules the
-  `-Pedition-enterprise` profile exists to reach. ⛔ `CapabilityManifestTest` compares the manifest against
+  `-Pedition-advanced` profile exists to reach. ⛔ `CapabilityManifestTest` compares the manifest against
   the `withCapability` sites **bidirectionally** — a route in NEITHER is a third case it cannot see, which is
   how 83 ungated mutating routes accumulated (`ROUTE-UNGATED-DEFAULT-1`).
 
@@ -956,12 +956,12 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 - **A profile-scoped module is invisible to the verify loop that everyone actually runs.**
   `inspecto-oidc` / `inspecto-policy` live in the parent's *profile-scoped* `<modules>`
-  (`-Pedition-professional` / `-Pedition-enterprise`), not the default list — so `mvn -o clean test`
+  (`-Pedition-standard` / `-Pedition-advanced`), not the default list — so `mvn -o clean test`
   reports **BUILD SUCCESS while both edition builds are broken**. The 2026-08-10 artifactId rename
   proved it: the two poms still declared `file-processor-parent`, which is a *non-resolvable parent*,
   and nothing caught it because the routine loop never loads them. **Any change to the parent pom, a
   shared artifactId, or a managed dependency must be verified with
-  `mvn -o clean test -Pedition-enterprise`** — that profile is the only one that pulls every module in.
+  `mvn -o clean test -Pedition-advanced`** — that profile is the only one that pulls every module in.
   Grepping `*/pom.xml` for the old name finds these two instantly; the reactor never will.
 
 - **A change to a SERVED catalog is not verifiable from the module that computes it**, and
@@ -1063,7 +1063,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `kill $PID` left `ControlApi` serving on :8080 while the wait loop hung (2026-09-13). Take the pid from
   `jps -l | grep ControlApi`.
 
-- **Ask a verify agent for the MODULE COUNT, not just the total.** Two `-Pedition-enterprise -fae` runs on
+- **Ask a verify agent for the MODULE COUNT, not just the total.** Two `-Pedition-advanced -fae` runs on
   the same tree reported 3355 and 3458 (2026-08-18); nothing had changed but the summariser, which dropped a
   module. The known cause is Maven logging `Tests run:` at `[WARNING]` for any module with skips, so a grep
   filtered on `[INFO]` silently loses whole modules — but the *total alone cannot reveal that*, because a
@@ -1403,7 +1403,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   seed-before-boot rule: `e5e4ee8f`; mechanism in `okf/backend/build-run/operations-reference.md`
   § "Status backend".
 - **⚠ A full reactor build can fail TRANSIENTLY in an untouched module on Windows — re-run before
-  believing it.** *(Kept for the diagnosis technique; the CAUSE is the entry above, not staleness.)* Twice on 2026-09-12 `mvn -o clean test -Pedition-enterprise` died in the `asn-*` subtree
+  believing it.** *(Kept for the diagnosis technique; the CAUSE is the entry above, not staleness.)* Twice on 2026-09-12 `mvn -o clean test -Pedition-advanced` died in the `asn-*` subtree
   on sources nobody had edited: once as `asn-golden` test-compile errors (*"package com.gamma.asn.schema
   does not exist"*), once as `asn-schema` failing at test execution with `NoClassDefFoundError` for **its
   own just-compiled classes**. Both vanished on a clean re-run that then went fully green. The signature
@@ -1413,7 +1413,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   a **stale `java.exe`** — a leftover JVM holding file locks is the likeliest cause on this platform.
   ⛔ Do not "fix" the untouched module, and do not commit over a red build without establishing which of
   the two it is.
-- **⚠ `-pl` on the `asn-*` subtree SILENTLY DROPS `-Pedition-enterprise`** — Maven warns *"The requested
+- **⚠ `-pl` on the `asn-*` subtree SILENTLY DROPS `-Pedition-advanced`** — Maven warns *"The requested
   profile could not be activated because it does not exist"* and carries on with the default profile set,
   because the profile is declared at the Inspecto root, not in that subtree's poms. So a narrow `-pl`
   re-run **does not exercise the same build as the gauntlet** and cannot, on its own, clear a failure the

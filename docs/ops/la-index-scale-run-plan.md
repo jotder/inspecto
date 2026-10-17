@@ -73,7 +73,7 @@ run commits.
 
 Prerequisites: JDK 27 (`JAVA_HOME` must be JDK 27 **and** the first `java` on `PATH` must be 27; a mismatch fails Maven with
 "release version 27 not supported"), Maven, the repo checked out at `29e320dfd` or later, and a populated `~/.m2` (first run on a
-new box: drop `-o`, or run `mvn -Pedition-professional -am -pl :inspecto-la-storage dependency:go-offline`). The DuckDB JNI
+new box: drop `-o`, or run `mvn -Pedition-standard -am -pl :inspecto-la-storage dependency:go-offline`). The DuckDB JNI
 flag `--enable-native-access=ALL-UNNAMED` is already in the surefire `argLine` (root `pom.xml`), so the Maven route needs nothing
 extra; it is required only if you launch `java` by hand. `-D` properties on the Maven command line reach the forked test JVM.
 
@@ -102,13 +102,13 @@ export JAVA_HOME=/opt/jdk-27 PATH=/opt/jdk-27/bin:$PATH
 export B=/data/la-bench            # NVMe, >= 250 GB free
 mkdir -p $B/idx && df -h $B
 # smoke first (about 2 min after compile): proves the commands before the long run
-mvn -o -Pedition-professional -am -pl :inspecto-la-storage test -Dtest=IndexScaleBench \
+mvn -o -Pedition-standard -am -pl :inspecto-la-storage test -Dtest=IndexScaleBench \
   -Dinspecto.bench.dir=$B -Dinspecto.bench.idxDir=$B/idx -Dinspecto.bench.edges=1000000 \
   -Dinspecto.bench.samples=20 -Dinspecto.bench.maxDeltas=2 -Dsurefire.failIfNoSpecifiedTests=false 2>&1 | tee $B/smoke.log | grep -E "SCALE|Tests run|BUILD"
 rm -rf $B/data-1000000 $B/idx/idx-1000000
 # the series (each is a separate invocation; run in this order)
 for N in 500000000 1000000000; do
-  nohup mvn -o -Pedition-professional -am -pl :inspecto-la-storage test -Dtest=IndexScaleBench \
+  nohup mvn -o -Pedition-standard -am -pl :inspecto-la-storage test -Dtest=IndexScaleBench \
     -Dinspecto.bench.dir=$B -Dinspecto.bench.idxDir=$B/idx -Dinspecto.bench.edges=$N \
     -Dinspecto.bench.buildMemory=$([ $N = 500000000 ] && echo 24GB || echo 48GB) -Dinspecto.bench.threads=16 \
     -Dsurefire.failIfNoSpecifiedTests=false > $B/run-$N.log 2>&1
@@ -123,7 +123,7 @@ $env:JAVA_HOME = 'C:\sandbox\.graalvm-cache\jdk-27-win'; $env:PATH = "$env:JAVA_
 $B = 'D:\la-bench'; New-Item -ItemType Directory -Force "$B\idx" | Out-Null
 foreach ($N in 500000000, 1000000000) {
   $mem = if ($N -eq 500000000) { '24GB' } else { '48GB' }
-  mvn -o -Pedition-professional -am -pl :inspecto-la-storage test -Dtest=IndexScaleBench `
+  mvn -o -Pedition-standard -am -pl :inspecto-la-storage test -Dtest=IndexScaleBench `
     "-Dinspecto.bench.dir=$B" "-Dinspecto.bench.idxDir=$B\idx" "-Dinspecto.bench.edges=$N" `
     "-Dinspecto.bench.buildMemory=$mem" "-Dinspecto.bench.threads=16" -Dsurefire.failIfNoSpecifiedTests=false 2>&1 |
     Tee-Object "$B\run-$N.log" | Select-String 'SCALE|Tests run|BUILD'

@@ -252,9 +252,9 @@ public final class ValueMeasures {
             case "passThrough" -> "out ÷ in ≥ " + js(t.get("minRatio")) + " with inbound ≥ " + js(t.get("minInbound"));
             case "velocity" -> "median hours from inbound to next outbound ≤ " + js(t.get("maxHours"))
                     + " with inbound ≥ " + js(t.get("minInbound"));
-            case "timeToCashOut" -> "median hours from inbound to next cash-out " + s.kinds() + " ≤ "
+            case "timeToCashOut" -> "median hours from inbound to next withdrawal " + s.kinds() + " ≤ "
                     + js(t.get("maxHours")) + " with inbound ≥ " + js(t.get("minInbound"));
-            case "cashOutConcentration" -> "share of all cash-out " + s.kinds() + " ≥ " + js(t.get("minShare"))
+            case "cashOutConcentration" -> "share of all withdrawals " + s.kinds() + " ≥ " + js(t.get("minShare"))
                     + " from ≥ " + js(t.get("minPayers")) + " payers"
                     + (s.agentList() == null ? "" : ", agents in Entity List " + s.agentList());
             case "structuring" -> "≥ " + js(t.get("minLegs")) + " legs " + js(t.get("min")) + " ≤ " + s.valueCol()
@@ -426,7 +426,7 @@ public final class ValueMeasures {
                 cte + " SELECT DISTINCT t AS p FROM __c", maxEntities, 0, List.of(), List.of(), List.copyOf(binds)),
                 policy, UTC);
         if (payees.truncated())
-            throw new IllegalArgumentException("more than " + maxEntities + " distinct cash-out payees in the window — "
+            throw new IllegalArgumentException("more than " + maxEntities + " distinct withdrawal receivers in the window — "
                     + "never a silent sample; narrow the window");
         List<String> raw = new ArrayList<>();
         for (Map<String, Object> row : payees.rows()) {

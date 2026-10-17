@@ -50,7 +50,7 @@ public final class PublicInvestigationRoutes implements RouteModule {
      */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     /** The one 404 every failure answers. */

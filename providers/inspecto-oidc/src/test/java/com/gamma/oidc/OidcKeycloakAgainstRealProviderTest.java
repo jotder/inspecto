@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <pre>{@code
  * docker compose -f dev-infra/docker-compose.yml up -d keycloak      # imports dev-infra/keycloak/inspecto-realm.json
- * mvn -o test -Pedition-professional -pl providers/inspecto-oidc -am -Dsurefire.failIfNoSpecifiedTests=false \
+ * mvn -o test -Pedition-standard -pl providers/inspecto-oidc -am -Dsurefire.failIfNoSpecifiedTests=false \
  *     -Dtest=OidcKeycloakAgainstRealProviderTest -Dkeycloak.issuer=http://localhost:8180/realms/inspecto
  * }</pre>
  *

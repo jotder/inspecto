@@ -1,0 +1,13 @@
+entity_types[3]:
+  - id: wallet
+    normaliser: upper-trim
+    masked: true
+    classifications[1]: WALLET
+  - id: agent
+    normaliser: upper-trim
+    masked: false
+    classifications[2]: AGENT,TILL
+  - id: msisdn
+    normaliser: e164
+    masked: true
+    classifications[1]: MSISDN

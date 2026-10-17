@@ -1,4 +1,4 @@
-# Link Analysis claims showcase runbook (insurance, Special Investigations Unit)
+# Inspecto LA (Link Analysis) claims showcase runbook (insurance, Special Investigations Unit)
 
 *Status: written 2026-10-16 with the build of the `la-claims` Space Template and **rehearsed live the same day** on an Enterprise Demo Auth bundle
 (port 8142, `-Dla.embed.enabled=true`): `tools/la-claims-smoke.mjs --embed` passed 29 of 29 and the scenes marked **verified** below were driven in the

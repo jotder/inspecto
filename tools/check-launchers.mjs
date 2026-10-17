@@ -3,12 +3,12 @@
 // RUNNING them, not by reading them.
 //
 // WHY THIS EXISTS (`LAUNCHER-GUARD-1`, filed 2026-09-11). `serve.bat` spent its life dropping
-// `-Dauth.mode=oidc` on every Windows Standard/Enterprise bundle. The edition branch was a
+// `-Dauth.mode=oidc` on every Windows Standard/Advanced bundle. The edition branch was a
 // parenthesised `if exist inspecto-oidc.jar ( ... )` block, and cmd.exe expands every `%OPTS%`
 // inside a parenthesised block ONCE, when the block is PARSED — so N successive
 // `set "OPTS=%OPTS% ..."` statements all expand to the value OPTS held BEFORE the block and only the
 // last one survives. Five of six were discarded. The service booted AUTH-FREE while printing
-// `edition: Enterprise`. It was fixed on 2026-09-11 by flattening the branch to one statement per
+// `edition: Advanced`. It was fixed on 2026-09-11 by flattening the branch to one statement per
 // line; the GAP was not fixed. Nothing in this repository had ever executed an emitted launcher, so
 // `security.md` §8.7's long-standing "`authMode` ↔ enforcement coupling has no test" still held, the
 // only evidence was a by-hand `cmd.exe` run, and an identical regression would be just as silent —
@@ -24,7 +24,7 @@
 // that edition, compared IN ORDER: the launcher's output must equal `classpath(edition)`, and a launcher that
 // ignores the list (or sniffs jar presence again) goes red here. Scenarios also prove: a stray jar that is not on the
 // list stays OFF the classpath and cannot change the edition (the drop-in); the documented fallbacks (no list ⇒ every
-// *.jar; no marker ⇒ the old heuristic); an unknown edition is refused; Preview prints Preview and is NOT Enterprise.
+// *.jar; no marker ⇒ the old heuristic); an unknown edition is refused; Preview prints Preview and is NOT Advanced.
 //
 // ⚠ THE STUB IS ON PATH, NOT A TEXT SUBSTITUTION. Nothing edits the launcher: it runs verbatim,
 // including its own `exec` / launch line. A guard that rewrote the launch line would stop proving
@@ -144,9 +144,9 @@ function observe(out) {
 
 // ── scenarios ─────────────────────────────────────────────────────────────────────────────────
 // `expect` / `reject` match an argv entry exactly; a `reject` PREFIX is written with a trailing `=`
-// removed so `-Dauth.mode` catches any value at all, which is the assertion Personal needs.
+// removed so `-Dauth.mode` catches any value at all, which is the assertion Basic needs.
 // The jar lists are the GENERATOR's (tools/offering-classpath.mjs), i.e. exactly what a packaged bundle's modules.list holds.
-const CP = { Personal: classpath('Personal'), Professional: classpath('Professional'), Enterprise: classpath('Enterprise'), Preview: classpath('Preview') };
+const CP = { Basic: classpath('Basic'), Standard: classpath('Standard'), Advanced: classpath('Advanced'), Preview: classpath('Preview') };
 const OIDC_ENV = {
   AUTH_OIDC_ISSUER: 'https://idp.example/realms/x',
   AUTH_OIDC_JWKS_URI: 'https://idp.example/realms/x/jwks',
@@ -163,24 +163,24 @@ const ALWAYS = ['--enable-native-access=ALL-UNNAMED', '-Dcontrol.port=8080', '-D
 const ed = (edition, extra) => ({ edition, jars: CP[edition], list: CP[edition], jarsOnCp: CP[edition], ...extra });
 
 export const SCENARIOS = [
-  ed('Personal', {
-    name: 'Personal — no OIDC jar',
+  ed('Basic', {
+    name: 'Basic — no OIDC jar',
     env: {},
     expect: ALWAYS,
-    // The whole point of the edition seam: Personal is byte-for-byte the historic auth-free bundle.
+    // The whole point of the edition seam: Basic is byte-for-byte the historic auth-free bundle.
     rejectPrefix: ['-Dauth.mode', '-Devents.backend', '-Dauth.oidc.', '-Dobjects.backend'],
   }),
-  ed('Professional', {
-    name: 'Professional — OIDC + secrets + geo jars, no OIDC env',
+  ed('Standard', {
+    name: 'Standard — OIDC + secrets + geo jars, no OIDC env',
     env: {},
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet'],
-    // OBJECTS-BACKEND-DEFAULT-MEMORY-1: Professional runs the engine default (`db`); only Enterprise pins one.
+    // OBJECTS-BACKEND-DEFAULT-MEMORY-1: Standard runs the engine default (`db`); only Advanced pins one.
     rejectPrefix: ['-Dauth.oidc.', '-Dobjects.backend'],
   }),
   // 🔴 THE REGRESSION TEST. SERVEBAT-OPTS-1 lost five of these six flags and kept the last. Any
   // future rewrite that reintroduces a parse-time-expanded block fails HERE, with the flag named.
-  ed('Professional', {
-    name: 'Professional — OIDC + secrets + geo jars + every OIDC variable set',
+  ed('Standard', {
+    name: 'Standard — OIDC + secrets + geo jars + every OIDC variable set',
     env: OIDC_ENV,
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet',
       `-Dauth.oidc.issuer=${OIDC_ENV.AUTH_OIDC_ISSUER}`,
@@ -194,49 +194,49 @@ export const SCENARIOS = [
       '-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}'],
     reject: [`-Dauth.oidc.clientSecret=${OIDC_ENV.AUTH_OIDC_CLIENT_SECRET}`],
   }),
-  ed('Enterprise', {
-    name: 'Enterprise — OIDC + secrets + geo + policy jar',
+  ed('Advanced', {
+    name: 'Advanced — OIDC + secrets + geo + policy jar',
     env: OIDC_ENV,
     // OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): PostgreSQL is MANDATORY for the operational objects.
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet', '-Dobjects.backend=postgres'],
   }),
   // Operator flags are appended LAST on purpose, so they cannot clobber the required ones.
-  ed('Professional', {
-    name: 'Professional — operator INSPECTO_JAVA_OPTS',
+  ed('Standard', {
+    name: 'Standard — operator INSPECTO_JAVA_OPTS',
     env: { INSPECTO_JAVA_OPTS: '-Xmx4g -Dui.static.log=DEBUG' },
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Xmx4g', '-Dui.static.log=DEBUG'],
     lastAfter: { after: '-Dauth.mode=oidc', these: ['-Xmx4g', '-Dui.static.log=DEBUG'] },
   }),
-  // Preview carries Enterprise's exact jars but is NOT Enterprise: it keeps the operational objects on DuckDB (operator
+  // Preview carries Advanced's exact jars but is NOT Advanced: it keeps the operational objects on DuckDB (operator
   // decision 2026-09-25). Before P3d the package step patched the launcher TEXT to say so; now the marker says it.
   ed('Preview', {
-    name: 'Preview — Enterprise\'s jars, but edition Preview (no PostgreSQL objects backend)',
+    name: 'Preview — Advanced\'s jars, but edition Preview (no PostgreSQL objects backend)',
     env: OIDC_ENV,
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet'],
     rejectPrefix: ['-Dobjects.backend'],
   }),
   // THE DROP-IN. A jar that is merely PRESENT must neither join the classpath nor change the edition: the list and the marker decide.
-  ed('Personal', {
-    name: 'Personal — stray inspecto-oidc.jar + inspecto-policy.jar beside it are NOT on the classpath and do not make it Enterprise',
-    jars: [...CP.Personal, 'inspecto-oidc.jar', 'inspecto-policy.jar'],
+  ed('Basic', {
+    name: 'Basic — stray inspecto-oidc.jar + inspecto-policy.jar beside it are NOT on the classpath and do not make it Advanced',
+    jars: [...CP.Basic, 'inspecto-oidc.jar', 'inspecto-policy.jar'],
     env: OIDC_ENV,
     expect: ALWAYS,
     rejectPrefix: ['-Dauth.mode', '-Devents.backend', '-Dauth.oidc.', '-Dobjects.backend'],
   }),
   // FALLBACKS (documented in package.ps1): hand-assembled directories keep booting.
-  ed('Professional', {
-    name: 'Professional — NO modules.list: falls back to inspecto.jar first, then every *.jar',
+  ed('Standard', {
+    name: 'Standard — NO modules.list: falls back to inspecto.jar first, then every *.jar',
     noList: true, jarsOnCpSet: true,
     env: {},
     expect: [...ALWAYS, '-Dauth.mode=oidc'],
   }),
-  ed('Enterprise', {
-    name: 'Enterprise — NO edition.properties: falls back to the old heuristic (oidc + policy jars present)',
-    noMarker: true, edition: 'Enterprise',
+  ed('Advanced', {
+    name: 'Advanced — NO edition.properties: falls back to the old heuristic (oidc + policy jars present)',
+    noMarker: true, edition: 'Advanced',
     env: OIDC_ENV,
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Dobjects.backend=postgres'],
   }),
-  ed('Professional', {
+  ed('Standard', {
     name: 'an UNKNOWN edition in edition.properties is refused (exit non-zero, nothing launched)',
     markerText: 'edition=Gold\n',
     env: {},
@@ -382,7 +382,7 @@ export function runScenarios(ps1src, scenarios = SCENARIOS) {
  * of their own and no inspecto-policy; this is what proves they now read the list.) A throwaway Space holds a dummy pipeline file
  * so the launcher gets as far as the stub java.
  */
-export function runOneShot(ps1src, editions = ['Personal', 'Professional', 'Enterprise']) {
+export function runOneShot(ps1src, editions = ['Basic', 'Standard', 'Advanced']) {
   const ps1 = toLf(ps1src);
   const runSh = hereString(ps1, 'runShContent');
   const runBat = hereString(ps1, 'runBatContent');

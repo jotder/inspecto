@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * EDG-01 cell 1 — the assertion that makes the gating REAL rather than claimed.
  *
  * <p>This test runs in the DEFAULT reactor, which is the **Personal** build (⚠ there is no
- * {@code -Pedition-personal}; Personal is "no profile"). On that classpath
+ * {@code -Pedition-basic}; Personal is "no profile"). On that classpath
  * {@link ServiceLoader#load(Class)} over {@link NotificationChannel} must find **nothing**, because
  * `EDITIONS.md` `CP-15` says delivery channels are not in the edition and — since 2026-09-07 — the build
  * finally agrees.
@@ -41,7 +41,7 @@ class NoChannelShipsInThePersonalBuildTest {
             found.add(ch.getClass().getName());
         }
         assertTrue(found.isEmpty(),
-                "the default (Personal) build must register NO NotificationChannel — EDITIONS CP-15. "
+                "the default (Basic) build must register NO NotificationChannel — EDITIONS CP-15. "
                         + "Found: " + found + ". A channel here ships an external delivery transport in "
                         + "an edition whose matrix cell says it has none; move it to "
                         + "inspecto-notify-channels rather than relaxing this assertion.");

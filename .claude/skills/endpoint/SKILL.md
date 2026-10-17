@@ -38,7 +38,7 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
   `ContractFragmentsTest` and `ApiContractTest` fail when the document and the fragments disagree.
   `OpenApiPathsContractTest.everyLiveRouteHasAnOperationInTheContract` still fails the build otherwise, naming
   the routes it could not find. To get a skeleton to paste into the fragment:
-  `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false -Pedition-professional`
+  `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false -Pedition-standard`
   ⚠ that run WRITES `docs/api/openapi-v1.json` (and reformats its hand-kept schema parts): copy the new path
   block from `git diff docs/api/openapi-v1.json` into the fragment, `git checkout docs/api/openapi-v1.json`,
   then merge. Fill in schemas by hand afterwards if the route deserves them.
@@ -51,10 +51,10 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
   `tools/route-gating-report.mjs` if mutating.
 - 🔴 **A route in an OPTIONAL edition module must ALSO be listed in that module's absent-module stub**
   (`AbsentGeoLinkRoutes.SURFACE` for `inspecto-geo-link`). The core declares no dependency on these
-  modules — deliberately, since Personal must not ship them — so **that hand-kept table is the ONLY
-  thing the core can see**, and TWO mechanisms read it: the 503 "not installed" stubs a Personal build
+  modules — deliberately, since Basic must not ship them — so **that hand-kept table is the ONLY
+  thing the core can see**, and TWO mechanisms read it: the 503 "not installed" stubs a Basic build
   serves, and the OpenAPI skeleton generator. ⛔ **Omit it and you get two silent failures from one
-  mistake**: the path **404s instead of 503ing** on Personal (a 404 reads as "wrong URL" and sends the
+  mistake**: the path **404s instead of 503ing** on Basic (a 404 reads as "wrong URL" and sends the
   operator hunting a typo), and it is **missing from `openapi-v1.json` while the contract guard still
   reports GREEN** — that guard enforces "every LIVE route has an operation" where *live* means *what it
   can see*. Measured 2026-09-22: four routes had drifted this way — `/inv/schema/overlap-profile`

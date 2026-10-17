@@ -47,7 +47,7 @@ class ObjectFamiliesOperationalDbTest {
         assertEquals(12, OperationalDb.core().size());
         assertEquals(List.of("OBJECTS", "LINKS", "NOTES", "TAGS"),
                 OperationalDb.loaded().stream().map(StoreFamily::name).toList());
-        assertEquals(16, OperationalDb.all().size(), "core + the ops families = the Enterprise roster of sixteen");
+        assertEquals(16, OperationalDb.all().size(), "core + the ops families = the Advanced roster of sixteen");
         assertEquals(OperationalDb.core(), OperationalDb.all().subList(0, 12), "core first, contributed after");
     }
 

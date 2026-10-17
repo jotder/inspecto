@@ -7,10 +7,10 @@
 // bundle's classpath carries and in what order; package.ps1 writes its output into the bundle as `modules.list`
 // + `edition.properties`, and every launcher READS them.
 //
-//   node tools/offering-classpath.mjs --edition professional [--demo] --print          modules.list to stdout
-//   node tools/offering-classpath.mjs --edition professional --list-mvn                the `-pl` string for package.ps1
+//   node tools/offering-classpath.mjs --edition standard [--demo] --print          modules.list to stdout
+//   node tools/offering-classpath.mjs --edition standard --list-mvn                the `-pl` string for package.ps1
 //   node tools/offering-classpath.mjs --list-core                                      the core thin jars (artifactId<TAB>dir) package.ps1 stages
-//   node tools/offering-classpath.mjs --edition professional [--demo] --bundle <dir>   write modules.list +
+//   node tools/offering-classpath.mjs --edition standard [--demo] --bundle <dir>   write modules.list +
 //                                                                                      edition.properties into <dir>
 //                                                                                      after verifying the staged jars
 //
@@ -27,7 +27,7 @@
 // multi-provider SPIs could notice - there is none today; tools/offering-classpath.test.mjs freezes the old strings).
 //
 // DEMO. -DemoAuth's build swaps the OIDC trio (oidc, secrets, geo-country) for inspecto-demo-auth.jar, which takes the
-// OIDC jar's place (second on the classpath). The edition stays Enterprise; `variant=demo` is recorded beside it.
+// OIDC jar's place (second on the classpath). The edition stays Advanced; `variant=demo` is recorded beside it.
 
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -60,10 +60,10 @@ export const CLASSPATH_ORDER = [
     'inspecto-agent', 'inspecto-intelligence',
 ];
 
-/** 'professional' | 'Professional' | 'Standard' -> the EDITIONS spelling. */
+/** 'standard' | 'Standard' | 'STANDARD' -> the EDITIONS spelling (case-insensitive). */
 export function normalizeEdition(e) {
     const s = String(e ?? '').trim();
-    const hit = EDITIONS.find((x) => x.toLowerCase() === s.toLowerCase()) ?? (s.toLowerCase() === 'standard' ? 'Professional' : null);
+    const hit = EDITIONS.find((x) => x.toLowerCase() === s.toLowerCase()) ?? null;
     if (!hit) throw new Error(`unknown edition '${e}' (expected ${EDITIONS.join('|')})`);
     return hit;
 }
@@ -105,7 +105,8 @@ export function assertOfferingEqualsBundle(edition, g) {
 /** The bundle's classpath as jar file names, in launcher order. `g` defaults to the repo (gather). */
 export function classpath(edition, { demo = false, g = gather(join(dirname(fileURLToPath(import.meta.url)), '..')) } = {}) {
     const ed = normalizeEdition(edition);
-    if (demo && ed !== 'Enterprise') throw new Error(`the demo build is an Enterprise-capability build (got ${ed})`);
+    // LA-EDITIONS-1 ED-3: Preview (everything, demo sign-in) takes the demo swap as Advanced does.
+    if (demo && ed !== 'Advanced' && ed !== 'Preview') throw new Error(`the demo build is an Advanced-capability build (got ${ed})`);
     assertOfferingEqualsBundle(ed, g);
     const shipped = new Map([...bundleModules(ed), ...coreModules()].map((m) => [m.artifactId, m.bundleFile]));
     const known = [...bundleModules('Preview'), ...coreModules()];
@@ -117,7 +118,7 @@ export function classpath(edition, { demo = false, g = gather(join(dirname(fileU
         if (demo && DEMO_REPLACES.includes(a)) { if (a === 'inspecto-oidc') jars.push(DEMO_JAR); continue; }
         jars.push(shipped.get(a));
     }
-    if (ed !== 'Personal') jars.push(PG_SIDECAR);
+    if (ed !== 'Basic') jars.push(PG_SIDECAR);
     return jars;
 }
 
@@ -154,7 +155,7 @@ function main() {
     try {
         if (a.includes('--list-core')) { process.stdout.write(coreList()); return; }
         const edition = val('--edition');
-        if (!edition) throw new Error('--edition <personal|professional|enterprise|preview> is required');
+        if (!edition) throw new Error('--edition <basic|standard|advanced|preview> is required');
         const demo = a.includes('--demo');
         const g = gather(join(dirname(fileURLToPath(import.meta.url)), '..'));
         if (a.includes('--list-mvn')) { process.stdout.write(mvnModules(edition, g) + '\n'); return; }

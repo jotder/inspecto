@@ -34,7 +34,7 @@ supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (t
 >
 > ✅ **The loudest finding in this area was not about editions at all — and is now fixed (2026-09-09).**
 > The bill of materials that ships inside every signed bundle **declared the wrong module set** — four
-> first-party jars where a Professional bundle carries ten and an Enterprise one eleven (§3.7). It was a
+> first-party jars where a Standard bundle carries ten and an Advanced one eleven (§3.7). It was a
 > compliance artifact wrong on the wire, and nothing in the repository could catch it. The set now lives
 > once in `tools/bundle-modules.mjs`, and `tools/check-sbom-modules.mjs` fails CI when it drifts from what
 > the packaging script stages.
@@ -52,9 +52,9 @@ The organising rule is one sentence, and it is the most load-bearing sentence in
 
 **In scope**
 
-* **The three editions** — Personal, Professional, Enterprise — as build flavours of one commit, and the five
+* **The three editions** — Basic, Standard, Advanced — as build flavours of one commit, and the five
   mechanisms that assemble them.
-* **The 26**<!--count:optional-modules--> **optional modules**, the 28<!--count:enterprise-first-party-jars--> first-party jars an Enterprise bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
+* **The 21**<!--count:optional-modules--> **optional modules**, the 28<!--count:advanced-first-party-jars--> first-party jars an Advanced bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
   jar can do its job.
 * **The absence contract** — the provider seams, the five stub route groups, and the requirement that a
   missing module answers with an explanation rather than a not-found.
@@ -85,13 +85,13 @@ files. The corrections below are the requirement of record.
 
 | Row | Register says | Correction of record |
 |---|---|---|
-| **PKG-1** | One fat JAR + trimmed runtime; per-edition bundles via the packaging script — `SHIPPED`, all editions | 🟡 **Bundles three of three since 2026-09-10** (`STANDARD-BUNDLE-1` — the release pipeline gained the Professional step, §3.7); until then no Professional artifact was produced by any automated path. Still open for the runtime: **no released artifact contains the trimmed runtime yet** — but the blocker is FIXED (2026-09-14) and it was never the one recorded. 🔴 The stated cause, "the runner has no module cache", is wrong twice over: `package.ps1` hardcoded **`jlink.exe`** in all three probes, which cannot exist on the `ubuntu-latest` runner, so the step could only throw; and measured inside `eclipse-temurin:25-jdk` (what `setup-java` installs there) that JDK ships **zero** jmods yet `jlink` still links a working ~64 MB runtime **from the run-time image itself** (JEP 493). ⛛ Do not provision a module cache — that is not what was missing. The lookup is now platform-aware and `release.yml` no longer passes `-NoRuntime`; the claim turns true on the first `v*` tag. |
-| **PKG-2** | Lean bill of materials: framework-free core, network dependencies isolated in the connector module — `SHIPPED`, all editions | ✅ **Corrected 2026-09-09.** The generator had declared **four** first-party jars against the **ten** a Professional bundle carries and the eleven an Enterprise one does, knowing none of the seven gating modules; the mail dependency consequently appeared in **no** bill of materials (§3.7). The set now lives once in `tools/bundle-modules.mjs` and a CI guard holds it against the staging script.
+| **PKG-1** | One fat JAR + trimmed runtime; per-edition bundles via the packaging script — `SHIPPED`, all editions | 🟡 **Bundles three of three since 2026-09-10** (`STANDARD-BUNDLE-1` — the release pipeline gained the Standard step, §3.7); until then no Standard artifact was produced by any automated path. Still open for the runtime: **no released artifact contains the trimmed runtime yet** — but the blocker is FIXED (2026-09-14) and it was never the one recorded. 🔴 The stated cause, "the runner has no module cache", is wrong twice over: `package.ps1` hardcoded **`jlink.exe`** in all three probes, which cannot exist on the `ubuntu-latest` runner, so the step could only throw; and measured inside `eclipse-temurin:25-jdk` (what `setup-java` installs there) that JDK ships **zero** jmods yet `jlink` still links a working ~64 MB runtime **from the run-time image itself** (JEP 493). ⛛ Do not provision a module cache — that is not what was missing. The lookup is now platform-aware and `release.yml` no longer passes `-NoRuntime`; the claim turns true on the first `v*` tag. |
+| **PKG-2** | Lean bill of materials: framework-free core, network dependencies isolated in the connector module — `SHIPPED`, all editions | ✅ **Corrected 2026-09-09.** The generator had declared **four** first-party jars against the **ten** a Standard bundle carries and the eleven an Advanced one does, knowing none of the seven gating modules; the mail dependency consequently appeared in **no** bill of materials (§3.7). The set now lives once in `tools/bundle-modules.mjs` and a CI guard holds it against the staging script.
 A **duplicate `postgresql` component**, carrying an invalid `bom-ref` / `SPDXID`, was fixed in the same pass. The isolation half still does not hold as written: the connector sidecar ships in **every** edition by a 2026-09-07 decision, and the mail dependency **left** it for `inspecto-notify-channels` in gating cell 1. "Lean" was measured and belongs to the *bundle*, not the reactor (§3.7). |
 | **PKG-3** | Runnable, self-contained example suite — `SHIPPED` (should), all editions | 🟡 **Shipped and largely unexercised.** Thirty examples in seven categories are tracked and staged into every bundle. **One** of the thirty runs in any pipeline, and only on a tag. "Runnable" is proven for one example and asserted for twenty-nine. |
-| **PKG-4** | Verify the Professional bundle's runtime module set against the token library — `SHIPPED` (must, Professional), verified 2026-07-07 | ⚠ **The evidence covers five of the twelve modules.** The recorded verification names the four the token library needs plus the elliptic-curve provider; the remaining seven in the image are unattributed by it. The status is then stated three ways: the register says resolved, the backlog says not re-verified, and the build concept page says the runtime step is unproven. All three are moot for shipped artifacts, which contain no runtime at all. |
+| **PKG-4** | Verify the Standard bundle's runtime module set against the token library — `SHIPPED` (must, Standard), verified 2026-07-07 | ⚠ **The evidence covers five of the twelve modules.** The recorded verification names the four the token library needs plus the elliptic-curve provider; the remaining seven in the image are unattributed by it. The status is then stated three ways: the register says resolved, the backlog says not re-verified, and the build concept page says the runtime step is unproven. All three are moot for shipped artifacts, which contain no runtime at all. |
 | **OPS-07** (`EDITIONS.md`) | Embedded trimmed JVM runtime in the bundle — ✅ in all three editions | 🟡 **Blocker fixed 2026-09-14; no shipped artifact contains it until the next tag.** Same root cause as PKG-1 — and that cause was misdiagnosed: a hardcoded `jlink.exe`, not a missing module cache. The row still describes a capability of the script rather than a property of the bundle a customer receives, and stays amber until a release proves otherwise (marking it green now would be a fresh `SPEC-GREENCELL-1`). |
-| **§Matrix packaging row** and **§Assembly module list** (`EDITIONS.md`) | Professional = core plus six named modules | ⚠ **Understated, and the two lists are different sixes.** The build stages **eight** optional modules for Professional and nine for Enterprise. The prose in `build-run/build-test.md` has the correct set; the two board sites do not (§3.3). |
+| **§Matrix packaging row** and **§Assembly module list** (`EDITIONS.md`) | Standard = core plus six named modules | ⚠ **Understated, and the two lists are different sixes.** The build stages **eight** optional modules for Standard and nine for Advanced. The prose in `build-run/build-test.md` has the correct set; the two board sites do not (§3.3). |
 
 **On the Edition column.** `docs/EDITIONS.md` is authoritative for which edition carries a feature, and
 `docs/REQUIREMENTS.md` §3 mirrors it — that direction was settled 2026-09-08 and this spec keeps it. For
@@ -124,7 +124,7 @@ it is why the preflight has a working-directory check (§3.12).
 Five mechanisms, in the order the build applies them:
 
 1. **A separate Maven module.** The primary mechanism. Nine of them (§3.3).
-2. **A Maven profile** naming that module set — `edition-professional` (with `edition-standard` alias) and `edition-enterprise`. Both are
+2. **A Maven profile** naming that module set — `edition-standard` and `edition-advanced`. Both are
    **module lists and nothing else**: no properties, no dependencies, no compilation change. No child
    module declares a profile at all.
 3. **A provider seam.** The core loads an interface; the module supplies the implementation; core
@@ -137,7 +137,7 @@ The core contains **no** edition conditional. That is a standing ban, not a conv
 
 ⛔ **Two documented mechanisms are not real.**
 
-* **There is no `edition-personal` profile.** Personal is the default reactor. The correction matters
+* **There is no `edition-basic` profile.** Basic is the default reactor. The correction matters
   because of *how* the old instruction failed: an unknown profile makes Maven **warn and then build the
   default**, so the wrong command produced the right bundle and nobody noticed. Corrected 2026-09-07.
 * 🔴 **The profiles do not vary the fat JAR's shaded content.** Two concept pages say they control "which
@@ -149,31 +149,34 @@ Both pages also cite the parent build file at two line numbers for the profile i
 comments, and the identifiers moved when the gating modules were inserted. **Cite the identifier, not the
 line** — the same lesson the compliance area recorded about its own citations.
 
-### 3.3 Optional modules and staged jars — 26<!--count:optional-modules--> modules, 28<!--count:enterprise-first-party-jars--> first-party jars (+ the postgresql sidecar)
+### 3.3 Optional modules and staged jars — 21<!--count:optional-modules--> modules, 28<!--count:advanced-first-party-jars--> first-party jars (+ the postgresql sidecar)
 
 | Edition | Optional modules compiled | Jars staged into the bundle |
 |---|---|---|
-| Personal | none (default reactor) | 2 — the fat JAR and the connector sidecar |
-| Professional | 10 (the assist agent is a default-reactor module) | 13 — those two, the ten, and the database driver |
-| Enterprise | 12 (the intelligence agent is a default-reactor module) | 15 — the thirteen plus the policy engine and the intelligence agent (`ASSURE-INTELLIGENCE-BUNDLE-1`, 2026-09-29) |
+| Basic | none (default reactor) | 2 — the fat JAR and the connector sidecar |
+| Standard | 10 (the assist agent is a default-reactor module) | 13 — those two, the ten, and the database driver |
+| Advanced | 12 (the intelligence agent is a default-reactor module) | 15 — the thirteen plus the policy engine and the intelligence agent (`ASSURE-INTELLIGENCE-BUNDLE-1`, 2026-09-29) |
 
 🔴 **Staged is not the same as first-party, and the difference is exactly one jar.** The database driver
-is `postgresql.jar`, which is **third-party**: Professional stages **13** jars of which **12** are first-party,
-and Enterprise stages **15** of which **14** are. Conflating the two counts is what made the
+is `postgresql.jar`, which is **third-party**: Standard stages **13** jars of which **12** are first-party,
+and Advanced stages **15** of which **14** are. Conflating the two counts is what made the
 bill-of-materials correction hard to state (§2 `PKG-2`) — quote the staged count or the first-party count,
 never one as the other. Until 2026-09-09 this file described the jar only as "the database driver", so the
 name a reader would grep for lived solely in `REQUIREMENTS.md`.
 
-The nine Professional modules are the authentication module, the Entity List module (SEP-08, 2026-10-01 — Entity Lists and the shared entity fact log, split out of the geographic and link module) plus the seven produced by the edition-gating
+The nine Standard modules are the authentication module, the Entity List module (SEP-08, 2026-10-01 — Entity Lists and the shared entity fact log, split out of the geographic and link module) plus the seven produced by the edition-gating
 work: notification channels, backup tasks, geographic and link analysis, exchange and sharing, the metrics
-exposition, the events feed, and operational objects. Enterprise adds the policy engine and the intelligence agent (a shaded jar carrying onnxruntime natives, ~148 MB), and the profile
+exposition, the events feed, and operational objects. Advanced adds the policy engine and the intelligence agent (a shaded jar carrying onnxruntime natives, ~148 MB), and the profile
 lists all nine **literally** — Maven profiles do not inherit, so there is no superset relation in the build
-file even though there is one in the module set.
+file even though there is one in the module set. ⚠ **Since `LA-EDITIONS-1` phase 3 (2026-10-17) the Entity List module
+and the Link Analysis modules (`la-core`, `la-storage`, `la-api`, `geo-link`) ship in Basic too** — the Link Analysis
+explorer — and only the Investigation surface stays Standard and up, withheld by the `investigations` edition feature
+(`docs/EDITIONS.md`, *Basic — the Link Analysis explorer*).
 
 Two of the eight stage a **shaded** jar rather than the thin one, because the thin artifact cannot run:
 the authentication module needs its token library, and the channels module needs its mail library. That
-distinction was learned the hard way — a 16 KB thin jar carried no token library and **every** Professional and
-Enterprise bundle failed to boot (§4, 2026-09-07).
+distinction was learned the hard way — a 16 KB thin jar carried no token library and **every** Standard and
+Advanced bundle failed to boot (§4, 2026-09-07).
 
 **Each staged jar is asserted for shape**, by opening the zip and reading it — not "the file exists" but the
 classes and provider registrations it must contain. The operational-objects jar is asserted for **two**
@@ -188,11 +191,11 @@ two, the build page's *table* omits everything the same page's *prose* gets righ
 **code that ships as a compliance artifact** (§3.7).
 
 ✅ **`PKG-5` RESOLVED 2026-09-12 — the assistant now ships.** `inspecto-agent` is staged as
-`inspecto-agent.jar` in **Professional and Enterprise** bundles and wired into all four launchers
+`inspecto-agent.jar` in **Standard and Advanced** bundles and wired into all four launchers
 (`serve.sh`/`serve.bat`/`run.sh`/`run.bat`) through the bundle's `modules.list` (by jar presence until P3d, 2026-10-08), like every other optional module. Operator
-decision, taken as "all editions, optional" and narrowed the same day to **Professional and above** once the
-sidecar's weight was measured — Personal already carries the ~32 MB connector sidecar and is not sold on
-the assistant. Verified by BUILDING both bundles: Professional carries the jar, Personal does not.
+decision, taken as "all editions, optional" and narrowed the same day to **Standard and above** once the
+sidecar's weight was measured — Basic already carries the ~32 MB connector sidecar and is not sold on
+the assistant. Verified by BUILDING both bundles: Standard carries the jar, Basic does not.
 
 ⚠ **`inspecto-agent-hosted` and `inspecto-intelligence` still build on every run and ship in nothing.**
 That remains deliberate — plain reactor modules, not gated ones, compiled and tested continuously — but
@@ -219,9 +222,9 @@ could not be determined from the repository (§5).
 ⚠ **One seam has no implementation at all** — an expression provider interface with no registration in any
 module. Harmless today; it is a seam declared for work that never came.
 
-✅ **Professional jlink runtime vs Nimbus — RE-VERIFIED 2026-09-15.** `pwsh inspecto/package.ps1 -Edition Professional -NoUi`
+✅ **Standard jlink runtime vs Nimbus — RE-VERIFIED 2026-09-15.** `pwsh inspecto/package.ps1 -Edition Standard -NoUi`
 (runtime embedded, boot smoke ON): *"verified: Nimbus classes + 3 SPI registrations present in the security
-sidecar"*, both trimmed runtimes built (Windows 91.5 MB, Linux 105.5 MB), and *"the staged Professional bundle boots
+sidecar"*, both trimmed runtimes built (Windows 91.5 MB, Linux 105.5 MB), and *"the staged Standard bundle boots
 and answers /health"* on the embedded Windows runtime — exit 0. The `-NoRuntime until confirmed` caveat on the
 API v1 row is discharged.
 
@@ -232,7 +235,7 @@ answers differ by design:
 
 | Shape | Behaviour when absent | Examples |
 |---|---|---|
-| **Silent skip** | The check does not happen. Personal is byte-for-byte unchanged. | Authentication, access decisions, the assistant seams |
+| **Silent skip** | The check does not happen. Basic is byte-for-byte unchanged. | Authentication, access decisions, the assistant seams |
 | **Explained refusal at the route** | 503 naming the capability, never 404 | The session broker, and all five stub route groups |
 | **Loud throw at use** | An exception naming the missing module | Maintenance tasks, secret schemes, connector factories |
 | **Empty list, feature degrades** | The remaining implementations carry on | Notification channels — in-app delivery is intrinsic and unaffected |
@@ -255,27 +258,27 @@ Two messages are worth quoting for their precision, because they distinguish *re
 
 That distinction is why the audit read deliberately **stayed in the core** as a narrow pair of routes,
 fail-closed to audit and access-denied types so it cannot become the events feed by another name. The
-board promises Personal a readable append-only log, and gating the whole feed would have broken that
+board promises Basic a readable append-only log, and gating the whole feed would have broken that
 promise (§4, 2026-09-08).
 
 The largest group stubs **44 paths** across four route families. ⚠ **Nothing keeps these lists in sync with
 the real modules' routes** — the board says roughly fifty. A stub list that drifts short means a real
-route 404s in Personal instead of explaining itself (§5).
+route 404s in Basic instead of explaining itself (§5).
 
 ### 3.5 What the running system says it is
 
-🔴 **The edition string cannot report Enterprise.** The bootstrap route derives it from **one launch flag**,
-returning `personal` when authentication mode is unset and `professional` otherwise. Three consequences, all
+🔴 **The edition string cannot report Advanced.** The bootstrap route derives it from **one launch flag**,
+returning `basic` when authentication mode is unset and `standard` otherwise. Three consequences, all
 mechanical:
 
-* An **Enterprise** bundle reports `professional`, while carrying the policy engine.
-* A **Personal** bundle started with the flag reports `professional`, while carrying no authenticator.
-* A **Professional** bundle started without it reports `personal`, while carrying all eight modules.
+* An **Advanced** bundle reports `standard`, while carrying the policy engine.
+* A **Basic** bundle started with the flag reports `standard`, while carrying no authenticator.
+* A **Standard** bundle started without it reports `basic`, while carrying all eight modules.
 
 In practice the launchers set the flag when they detect the authentication jar, so the string is usually
 right — **by launcher convention, not by derivation**. And the defect has already propagated into the
 acceptance contract: the deployment plan's edition probe checks that the reported value "matches intent
-(`personal` vs `professional`)", so the check as written **cannot verify an Enterprise deployment** (§3.12).
+(`basic` vs `standard`)", so the check as written **cannot verify an Advanced deployment** (§3.12).
 
 The **feature flags** on the same route are the opposite, and are the model to copy: each is derived from
 what actually registered, using literal paths, with a *write* path probed for operational objects so it
@@ -284,15 +287,15 @@ is incomplete — **four of the nine optional modules have no flag**, so channel
 exposition and the policy engine are invisible to a client asking what is installed.
 
 🔴 **The launcher's edition detection is a commercial exposure, not just a reporting defect.** The
-launchers infer the edition from **jar presence**: the authentication jar means Professional and turns on
-delegated authentication; the policy jar as well means Enterprise. The release pipeline builds Personal and
-Enterprise only, labelling the Enterprise step "superset of Professional". That label is true at the module
-level and **false at runtime identity** — hand that bundle to a Professional customer and it self-identifies as
-Enterprise and enables attribute-based access control, a tier they have not purchased. ✅ **Closed 2026-09-10
+launchers infer the edition from **jar presence**: the authentication jar means Standard and turns on
+delegated authentication; the policy jar as well means Advanced. The release pipeline builds Basic and
+Advanced only, labelling the Advanced step "superset of Standard". That label is true at the module
+level and **false at runtime identity** — hand that bundle to a Standard customer and it self-identifies as
+Advanced and enables attribute-based access control, a tier they have not purchased. ✅ **Closed 2026-09-10
 (`STANDARD-BUNDLE-1`):** the release pipeline packages, signs and publishes a distinct
-`inspecto-deploy-professional.zip` built by `-Edition Professional` (no policy jar), and the collect step **fails the
-release** if a policy jar is found inside it — so a Professional customer receives a bundle whose jar presence
-yields `professional`. The reporting defect (the two-valued edition string) is untouched by this and stays open.
+`inspecto-deploy-standard.zip` built by `-Edition Standard` (no policy jar), and the collect step **fails the
+release** if a policy jar is found inside it — so a Standard customer receives a bundle whose jar presence
+yields `standard`. The reporting defect (the two-valued edition string) is untouched by this and stays open.
 
 ### 3.6 The runtime image and the Java floor
 
@@ -329,7 +332,7 @@ the floor.
 bundle's floor from 24 to 25" assumes the floor is a property of the BUNDLE. It is a property of the
 **module**, and it binds only a host that actually loads it. Since 2026-09-12 an optional module that
 cannot link is skipped with a warning (`com.gamma.spi.OptionalSpi`) and its routes answer 503 — the
-ordinary absence contract. So the assistant ships in Professional and Enterprise, the bundle's **stated system
+ordinary absence contract. So the assistant ships in Standard and Advanced, the bundle's **stated system
 requirement stays 24**, and a customer on 24 gets the product without the assistant instead of a product
 that will not start. ⛔ Do not re-refuse this on floor grounds.
 
@@ -347,11 +350,11 @@ its bill of materials or not at all. Generating it per bundle rather than per re
 and a good one — the reactor attests a set no customer installs.
 
 ✅ **The generator declared the wrong set — fixed 2026-09-09.** Its first-party table held **four**
-artifacts: the processor, the connectors, the authentication module for non-Personal, and the policy engine
-for Enterprise. It knew **none** of the seven gating modules. So, until the fix:
+artifacts: the processor, the connectors, the authentication module for non-Basic, and the policy engine
+for Advanced. It knew **none** of the seven gating modules. So, until the fix:
 
-* Every Professional bill of materials declared 4 first-party jars where the bundle carries **10** (11 staged
-  jars, counting the driver sidecar); every Enterprise one declared 4 where the bundle carries **11** (12).
+* Every Standard bill of materials declared 4 first-party jars where the bundle carries **10** (11 staged
+  jars, counting the driver sidecar); every Advanced one declared 4 where the bundle carries **11** (12).
 * The **mail dependency appeared in no bill of materials at all**. It left the connector sidecar for the
   channels module in gating cell 1, and the generator's own comment still credited the sidecar with
   bringing it.
@@ -368,33 +371,33 @@ generator and a new CI guard, `tools/check-sbom-modules.mjs`. The guard parses t
 requires them to agree with each other and with that file, and checks each module's declared artifact
 identifier, because a wrong directory-to-identifier pair contributes **zero** components for that module
 without saying so. It was falsified in both directions before being wired in, including against the
-original four-module table. Measured after the fix: Personal 2 first-party, Professional 10, Enterprise 11,
-with the mail dependency present in the latter two and absent from Personal, where no channels module
+original four-module table. Measured after the fix: Basic 2 first-party, Standard 10, Advanced 11,
+with the mail dependency present in the latter two and absent from Basic, where no channels module
 ships. A second defect surfaced in the same pass and was fixed with it: the driver sidecar was appended
 unconditionally although the connector module already resolves it at compile scope, so every
-Professional and Enterprise document carried a **duplicate** component identifier — invalid under both
+Standard and Advanced document carried a **duplicate** component identifier — invalid under both
 schemas, in a document whose purpose is to be machine-validated.
 
 ⚠ **One thing the fix does not close.** The generator resolves through the build tool, which cannot see a
 sibling module's previously-built jar across separate invocations — so it needs the reactor **installed**,
-and the release pipeline installs only the agent dependency, never this reactor. Enterprise is the first
+and the release pipeline installs only the agent dependency, never this reactor. Advanced is the first
 edition to expose it, because the policy module gained a test-scoped edge to the operational-objects module
 in gating cell 7 and resolution covers every scope. Tracked in §5.3.
 
 ✅ **CLOSED 2026-09-10 (`STANDARD-BUNDLE-1`) — the release pipeline packages, checksums, signs, SBOMs and
-publishes all three editions:** `inspecto-deploy-{personal,professional,enterprise}.zip` + `.sha256` + `.asc` and
-`inspecto-<edition>.{cdx,spdx}.json`, with the Professional collect step refusing a bundle that carries the policy
-jar. Until then the pipeline packaged **Personal and Enterprise** only — no Professional step, no Professional
+publishes all three editions:** `inspecto-deploy-{basic,standard,advanced}.zip` + `.sha256` + `.asc` and
+`inspecto-<edition>.{cdx,spdx}.json`, with the Standard collect step refusing a bundle that carries the policy
+jar. Until then the pipeline packaged **Basic and Advanced** only — no Standard step, no Standard
 artifact — while four documents disagreed about it (kept as the record of what each said):
 
 | Where | What it says |
 |---|---|
-| The board's packaging row | Describes a Professional package in detail |
-| The board's assembly note | Names `-personal` and `-professional` **classifiers** — and no `-enterprise` one, for the flavour that *is* released |
-| The branching policy's manual fallback | Uploads Personal and **Professional** jars |
+| The board's packaging row | Describes a Standard package in detail |
+| The board's assembly note | Names `-basic` and `-standard` **classifiers** — and no `-advanced` one, for the flavour that *is* released |
+| The branching policy's manual fallback | Uploads Basic and **Standard** jars |
 | The board's status note | "The script builds and bundles it" — true of the script, false of any release |
 
-No two of the four agreed, and the editions board marked both supply-chain controls green for Professional — a
+No two of the four agreed, and the editions board marked both supply-chain controls green for Standard — a
 column with **no artifact behind it**, the same hole the compliance area found from its side. With the step
 in place the column is backed; `BRANCHING.md`'s classifier note now names all three flavours.
 
@@ -421,11 +424,11 @@ deployment plan; the plan itself remains the build plan for what is unbuilt.
 
 | Tier | Shape | Edition | Identity | State |
 |---|---|---|---|---|
-| **T1** | Single workstation, unzip and run | Personal | none — the core is authentication-free | Local tree; the embedded runtime means no host Java is needed |
-| **T2** | Single server, behind a proxy or with in-process transport security | Professional | Delegated to the customer's identity provider; the product is a resource server | Local tree, optionally database-backed |
-| **T3** | Gateway-fronted, multi-team or multi-tenant | Enterprise | Same, plus gateway assertion trust as a second anchor | Database-backed; per-tenant spaces |
-| **T4** | Active/passive warm standby — **fault-tolerant DR** | **Professional** *(was Enterprise until 2026-09-10 — operator decision, §4)* | As T2/T3 | Database-backed and replicated; ⚠ DR **requires** the Postgres-backed state, so "optionally database-backed" (T2) becomes "database-backed" here |
-| **T5** | Partitioned scale-out on Kubernetes — **the cluster** | **Enterprise** *(operator decision 2026-09-10; design **SIGNED 2026-09-10**, D1′–D13: `superpower/enterprise-scale-out-plan.md` §9)* | As T3, plus gateway assertion trust | Postgres + object store; N pods, each owning Spaces; one DuckLake catalog |
+| **T1** | Single workstation, unzip and run | Basic | none — the core is authentication-free | Local tree; the embedded runtime means no host Java is needed |
+| **T2** | Single server, behind a proxy or with in-process transport security | Standard | Delegated to the customer's identity provider; the product is a resource server | Local tree, optionally database-backed |
+| **T3** | Gateway-fronted, multi-team or multi-tenant | Advanced | Same, plus gateway assertion trust as a second anchor | Database-backed; per-tenant spaces |
+| **T4** | Active/passive warm standby — **fault-tolerant DR** | **Standard** *(was Advanced until 2026-09-10 — operator decision, §4)* | As T2/T3 | Database-backed and replicated; ⚠ DR **requires** the Postgres-backed state, so "optionally database-backed" (T2) becomes "database-backed" here |
+| **T5** | Partitioned scale-out on Kubernetes — **the cluster** | **Advanced** *(operator decision 2026-09-10; design **SIGNED 2026-09-10**, D1′–D13: `superpower/enterprise-scale-out-plan.md` §9)* | As T3, plus gateway assertion trust | Postgres + object store; N pods, each owning Spaces; one DuckLake catalog |
 
 Three properties of this ladder are worth stating because they are decisions, not consequences:
 
@@ -434,7 +437,7 @@ Three properties of this ladder are worth stating because they are decisions, no
 * **Identity federation happens at the identity tier, never in the product.** Kerberos, directory
   federation and assertion brokering are the identity provider's job; the product only ever validates the
   resulting token. That is what keeps the dependency tree small, which is itself a compliance asset.
-* **A misconfigured identity provider fails the boot** rather than serving open. A Professional or Enterprise
+* **A misconfigured identity provider fails the boot** rather than serving open. A Standard or Advanced
   bundle cannot construct its authenticator without configuration — which is why the build's own boot
   smoke has to inject placeholders, with a warning in the script never to mistake them for a working
   configuration.
@@ -442,7 +445,7 @@ Three properties of this ladder are worth stating because they are decisions, no
 **T1's exposure note is the one every tier inherits.** The control plane **binds every interface by
 default, in every edition**. A flag restricts it, and an unresolvable value fails the boot rather than
 widening. The default is deliberate: narrowing it would make deployed installs unreachable on upgrade. So
-loopback-only is an *operator action* plus a firewall, not a property of the Personal edition — and the
+loopback-only is an *operator action* plus a firewall, not a property of the Basic edition — and the
 board's old "binds localhost only" claim was the defect, not the behaviour.
 
 **T4 replicates the whole tree** after a checkpoint, so the embedded database files are crash-consistent,
@@ -494,7 +497,7 @@ environment-clone mechanic. The embedded-database requirement is absolute: **che
 a named deliverable, and it is the difference between a backup and a recovery plan.
 
 The verify step's critical signal **needs an Alert Rule and a channel wired** — an unwired verification
-failure is a silent one, and on Personal the channels module is not even bundled.
+failure is a silent one, and on Basic the channels module is not even bundled.
 
 ### 3.12 The deployment shape, preflight and acceptance
 
@@ -507,8 +510,8 @@ definition import and the tenant isolation evidence.
 lesson rather than a system requirement:
 
 * **Working directory equals bundle root** — the path-resolution gotcha from §3.1.
-* **Clock synchronisation** — token expiry tolerance is sixty seconds, so skew breaks Professional and
-  Enterprise authentication and looks like a credential problem.
+* **Clock synchronisation** — token expiry tolerance is sixty seconds, so skew breaks Standard and
+  Advanced authentication and looks like a credential problem.
 * **Native access smoke** — the embedded database must open in-process, which catches a stripped
   native-access flag before it becomes a runtime failure.
 * **Identity provider reachable *before* first boot** — because misconfiguration is a deliberate boot
@@ -516,17 +519,17 @@ lesson rather than a system requirement:
 * **Firewall rule present** — the operator half of the bind-everything default.
 
 ⚠ Two preflight rows describe a manual step the build already performs: the database driver is staged
-automatically for Professional and Enterprise, so "driver in the library directory" is a check against a design
+automatically for Standard and Advanced, so "driver in the library directory" is a check against a design
 that was superseded (§5).
 
-**Twelve acceptance rows**, in three blocks — a basic block every tier runs, a professional block adding
-authentication, transport, durability and the backup chain, and an enterprise block adding the gateway
+**Twelve acceptance rows**, in three blocks — a basic block every tier runs, a standard block adding
+authentication, transport, durability and the backup chain, and an advanced block adding the gateway
 path, tenant isolation and the failover drill. Sign-off is every applicable row green with evidence
 archived against the deployment record.
 
 The two rows that carry the most weight are the ones derived from this area's own defects: the **backend
 assertion**, which is the counter-check to graceful degradation (§3.11), and the **edition probe** — which
-🔴 **cannot pass for Enterprise as written**, because the value it checks is two-valued (§3.5). Fixing the
+🔴 **cannot pass for Advanced as written**, because the value it checks is two-valued (§3.5). Fixing the
 reported string fixes the check.
 
 ### 3.13 Environments, promotion, upgrade and rollback
@@ -575,7 +578,7 @@ Scheduler); the divisor is fixed, not live. Reasoning and scope: `okf/backend/en
 |---|---|
 | Process crash | Service wrapper auto-restart; `/ready` gates traffic; the in-flight run resumes or re-runs idempotently |
 | Disk loss | Restore the last verified backup; Datasets rebuild from re-ingest where retained |
-| Postgres down | 🔴 Stores **degrade to memory (alert!)**; reconnect means a restart after DB recovery. ⛔ **Except the operational objects on Enterprise** (Incidents, Cases, notes, links, tags — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`, 2026-09-25): `-Dobjects.backend=postgres` (set by the Enterprise `serve.*`) never degrades — boot refuses without a PostgreSQL URL, and a store that will not open stops its Space |
+| Postgres down | 🔴 Stores **degrade to memory (alert!)**; reconnect means a restart after DB recovery. ⛔ **Except the operational objects on Advanced** (Incidents, Cases, notes, links, tags — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`, 2026-09-25): `-Dobjects.backend=postgres` (set by the Advanced `serve.*`) never degrades — boot refuses without a PostgreSQL URL, and a store that will not open stops its Space |
 | Node loss | T2/T3: rebuild from bundle + restore, within the RTO below. T4: promote the standby |
 | Site loss | T4 only: DNS/LB failover to site B |
 
@@ -626,17 +629,17 @@ acceptance is "§9's acceptance block as a script".
 | Row | Block | Assertion |
 |---|---|---|
 | **VER-1** | basic | `/health` = 200 `{"status":"UP"}`; `/ready` reports the expected pipeline count |
-| **VER-2** | basic | `/api/v1/bootstrap` `data.edition` matches intent. 🔴 **Cannot pass for Enterprise** — the value is two-valued (§3.5); probe `data.features` instead, noting four of nine optional modules have no flag |
+| **VER-2** | basic | `/api/v1/bootstrap` `data.edition` matches intent. 🔴 **Cannot pass for Advanced** — the value is two-valued (§3.5); probe `data.features` instead, noting four of nine optional modules have no flag |
 | **VER-3** | basic | `/api/v1/health/details` shows every intended subsystem `UP` — **not** silently `NOT_CONFIGURED` or an in-memory fallback. The counter-check to graceful degradation |
 | **VER-4** | basic | `/metrics` scrapes and parses (Prometheus text 0.0.4) |
 | **VER-5** | basic | functional round-trip: `seed-inbox` → poll → Dataset partitions written → run + events visible; UI loads with client-side route fallback |
-| **VER-6** | professional | unauthenticated call → 401; valid IAM token → 200 with `permissions[]`; expired token rejected |
-| **VER-7** | professional | handshake pins TLS 1.3 (T2b) or proxy chain + HSTS (T2a); `/metrics` unreachable from a non-monitoring address |
-| **VER-8** | professional | incident round-trip via `seed-ops` with `objects.backend=db`, still present after a service restart |
-| **VER-9** | professional | `config_backup` (`dryRun=true`, then real) → `backup_verify` green → restore dry-run into a scratch space |
-| **VER-10** | enterprise | request via the gateway with Backend-JWT only → accepted; tampered or unsigned assertion → rejected |
-| **VER-11** | enterprise | tenant-A subject reading a tenant-B space → deny + an `access.denied` event present (decision-audit evidence) |
-| **VER-12** | enterprise (T4) | failover drill: promote the standby per runbook **inside the RTO target**, then fail back |
+| **VER-6** | standard | unauthenticated call → 401; valid IAM token → 200 with `permissions[]`; expired token rejected |
+| **VER-7** | standard | handshake pins TLS 1.3 (T2b) or proxy chain + HSTS (T2a); `/metrics` unreachable from a non-monitoring address |
+| **VER-8** | standard | incident round-trip via `seed-ops` with `objects.backend=db`, still present after a service restart |
+| **VER-9** | standard | `config_backup` (`dryRun=true`, then real) → `backup_verify` green → restore dry-run into a scratch space |
+| **VER-10** | advanced | request via the gateway with Backend-JWT only → accepted; tampered or unsigned assertion → rejected |
+| **VER-11** | advanced | tenant-A subject reading a tenant-B space → deny + an `access.denied` event present (decision-audit evidence) |
+| **VER-12** | advanced (T4) | failover drill: promote the standby per runbook **inside the RTO target**, then fail back |
 
 #### Phase sequencing, and the T4 mechanics (§6, §11)
 
@@ -668,35 +671,35 @@ states; see the `SCR-3` row in §3.14). The systemd side was always settled (`Re
 
 | Date | Decision | Who |
 |---|---|---|
-| 2026-09-10 | **Professional ships as its own release artifact** — the pipeline packages, signs and publishes three bundles and refuses a Professional bundle that carries the policy jar; a Professional customer never receives Enterprise identity (`STANDARD-BUNDLE-1`, chosen over licence-key gating and "document the exposure") | operator |
-| 2026-06-16 | **Hand-rolled bearer-token authentication removed from the common core.** Personal is genuinely authentication-free and authentication becomes an edition concern behind a seam — so fixes land once, and the code matches "editions add modules, never branches" | engineering |
+| 2026-09-10 | **Standard ships as its own release artifact** — the pipeline packages, signs and publishes three bundles and refuses a Standard bundle that carries the policy jar; a Standard customer never receives Advanced identity (`STANDARD-BUNDLE-1`, chosen over licence-key gating and "document the exposure") | operator |
+| 2026-06-16 | **Hand-rolled bearer-token authentication removed from the common core.** Basic is genuinely authentication-free and authentication becomes an edition concern behind a seam — so fixes land once, and the code matches "editions add modules, never branches" | engineering |
 | 2026-07-06 | **The authenticator seam and its gate ship in the core, edition-neutral** and no-op when absent; the authentication module supplies the implementation, profile-gated | engineering |
 | 2026-07-07 | **The trimmed runtime's module set is sufficient for the token library** — dependency analysis, a library probe, and a boot on the exact image. The skip-runtime switch is demoted from requirement to option | engineering |
-| 2026-07-23 | **The policy engine ships as the Enterprise profile** = Professional plus one module, on a decision seam, enforcing at the route and at the row | engineering |
+| 2026-07-23 | **The policy engine ships as the Advanced profile** = Standard plus one module, on a decision seam, enforcing at the route and at the row | engineering |
 | 2026-07-24 | **Per-tenant space isolation ships as two engine-resident seeded policies**, engaging only once a space claim is mapped, exempting access configuration, and tailorable by authoring same-named policies | engineering |
-| 2026-07-25 | **Enterprise becomes a real packaging flavour with no new runtime flag** — the presence of the decision provider's registration *is* the switch, the launchers auto-detect from bundle contents, and Personal bundles stay byte-for-byte unchanged | engineering |
+| 2026-07-25 | **Advanced becomes a real packaging flavour with no new runtime flag** — the presence of the decision provider's registration *is* the switch, the launchers auto-detect from bundle contents, and Basic bundles stay byte-for-byte unchanged | engineering |
 | 2026-08-29 | **Binding every interface stays the default in every edition**; a flag lets a deployment restrict itself, and an unresolvable value fails the boot. Narrowing the default would silently make deployed installs unreachable on upgrade | operator |
-| 2026-09-02 | **Six features declared not for Personal**, opening the feature board and the edition-gating debt row | operator |
+| 2026-09-02 | **Six features declared not for Basic**, opening the feature board and the edition-gating debt row | operator |
 | 2026-09-02 | **The bill of materials is generated per packaged bundle, not per reactor** — the reactor attests a set no customer installs | engineering |
 | 2026-09-02 | **A checksum always; a signature on request, and requesting it is fail-closed** — a missing binary, a missing key or a non-zero exit all throw rather than warn | engineering |
-| 2026-09-06 | **Secret schemes are tiered by edition**: environment and system every edition, file and keystore Professional and up, vault and cloud key management Enterprise **and only when a client policy requires it**. A Personal bundle refuses the gated schemes with a message naming the edition | operator |
+| 2026-09-06 | **Secret schemes are tiered by edition**: environment and system every edition, file and keystore Standard and up, vault and cloud key management Advanced **and only when a client policy requires it**. A Basic bundle refuses the gated schemes with a message naming the edition | operator |
 | 2026-09-06 | **The eight deployment decisions signed** — a container image as a convenience with orchestration out of scope; bundle the database driver; vault and key management gated on the first client policy that needs them; a committed platform list; recovery targets as contract service levels; a government cryptographic variant only against a concrete opportunity; and the reference identity and gateway pair | operator |
-| 2026-09-07 | **The gating mechanism is provider modules for every cell** — ⛔ explicitly **not** launch-flag capability switches, because a switch leaves the code in the Personal bundle. Personal has no authenticator and binds every interface, so a mis-set flag would re-expose an unauthenticated surface. A module is a packaging boundary; a flag is only a policy one | operator |
+| 2026-09-07 | **The gating mechanism is provider modules for every cell** — ⛔ explicitly **not** launch-flag capability switches, because a switch leaves the code in the Basic bundle. Basic has no authenticator and binds every interface, so a mis-set flag would re-expose an unauthenticated surface. A module is a packaging boundary; a flag is only a policy one | operator |
 | 2026-09-07 | **The route-module interface becomes public.** Core registers its own ordered list first and **appends** discovered modules; discovery order is unspecified, and a duplicate method-and-path **fails the boot** rather than resolving silently | engineering |
-| 2026-09-07 | **There is no Personal profile** — Personal is the default reactor. Corrected because an unknown profile only warns, so the wrong command had been producing the right bundle | engineering |
-| 2026-09-07 | **The authentication module must ship shaded**, and the script verifies the *staged* artifact for its token library and all three registrations — the thin jar carried none of it and every Professional and Enterprise bundle failed to boot | engineering |
+| 2026-09-07 | **There is no Basic profile** — Basic is the default reactor. Corrected because an unknown profile only warns, so the wrong command had been producing the right bundle | engineering |
+| 2026-09-07 | **The authentication module must ship shaded**, and the script verifies the *staged* artifact for its token library and all three registrations — the thin jar carried none of it and every Standard and Advanced bundle failed to boot | engineering |
 | 2026-09-07 | **The connector module is bundled in every edition** and deliberately **not** gated: remote acquisition is a core capability, and gating it would mean correcting the acquisition rows | engineering |
 | 2026-09-07 | **All four launchers use an explicit classpath**, never the jar switch — the jar switch ignores the classpath, and the fat JAR declares none, so a launcher could reach no sidecar | engineering |
 | 2026-09-07 | **Only the metrics HTTP exposition is gated; the registry stays in the core**, because nine classes across three modules call it and it cannot be a module. The exposition is the whole of the exposure | engineering |
 | 2026-09-08 | **The events surface moves whole**, because the audit export is a query-parameter branch inside one route — gating it alone would need a conditional inside a core route, the one mechanism the assembly model bans | operator |
-| 2026-09-08 | **The audit read deliberately stays in the core** as a narrow pair of routes, fail-closed to audit and access-denied types so it cannot become the events feed by another name — because the board promises Personal a readable append-only log | engineering |
-| 2026-09-08 | **Two board rows amended rather than left contradicting the build** — object stores leave Personal, and the gap watchdog is partial there | operator |
+| 2026-09-08 | **The audit read deliberately stays in the core** as a narrow pair of routes, fail-closed to audit and access-denied types so it cannot become the events feed by another name — because the board promises Basic a readable append-only log | engineering |
+| 2026-09-08 | **Two board rows amended rather than left contradicting the build** — object stores leave Basic, and the gap watchdog is partial there | operator |
 | 2026-09-08 | **The object engine provider is declared in the host module, not beside its seam**, because opening the stores needs host types and that dependency may not be inverted | engineering |
-| 2026-09-08 | **The grantable capability vocabulary stays static across editions** — ⛔ not derived from registered routes, because a role file authored on Professional would then fail validation on Personal. Dead vocabulary has no route behind it and is harmless | engineering |
+| 2026-09-08 | **The grantable capability vocabulary stays static across editions** — ⛔ not derived from registered routes, because a role file authored on Standard would then fail validation on Basic. Dead vocabulary has no route behind it and is harmless | engineering |
 | 2026-09-08 | **The area is named "Editions & packaging"**, concept first and mechanism second, because *Edition* had no glossary entry until then | engineering |
 | 2026-09-08 | **The board's matrix is authoritative for the Edition column**; the requirements register mirrors it and is the one to correct on disagreement | engineering |
-| 2026-09-10 | **Fault-tolerant DR is a PROFESSIONAL capability; the Kubernetes cluster is ENTERPRISE.** T4 (active/passive warm standby) moves from Enterprise to **Professional**; T5 (partitioned scale-out on Kubernetes) is added as **Enterprise**. ⚠ Consequence: the run lease and the fully-Postgres-backed state that make standby automatic (`superpower/enterprise-scale-out-plan.md` phases A–B) must ship in the **Professional** bundle, not behind `inspecto-policy`. T4 needs Postgres, so Professional DR is "database-backed", not "optionally". The scale-out DESIGN itself is still pending signature (plan §9) | operator |
-| 2026-09-10 | **The Enterprise scale-out design is SIGNED (D1′–D13)** — D1 REVISED: the container image is the **Enterprise unit of deployment** and orchestration is IN SCOPE for Enterprise only (Personal/Professional stay single-artifact, no orchestrator); shared-nothing partitioning **by Space** (D2/D3, the distributed engine REFUSED); object store + **DuckLake catalog commit as visibility** with a POSIX-volume fallback (D4); a **TTL lease table** — never advisory locks, never the Kubernetes Lease API (D5); `events.backend=db` (D6); the connection pool un-parked as phase A (D7); the dependency claim per edition — Personal zero, Professional zero unless DR, Enterprise Postgres + object store (D9); registrar failure **fatal** in partitioned mode (D10); rebalancing phase C+1 (D11); the switch is `-Dinspecto.topology=partitioned` (D12); Postgres views over the Parquet via the DuckDB extension as the **external query surface**, gated on spike S5 (D13). ⚠ Per D8, phases A–B (shared Postgres state + the lease) are the **Professional** T4 DR deliverable and ship in the Professional bundle. → `superpower/enterprise-scale-out-plan.md` §9 | operator |
+| 2026-09-10 | **Fault-tolerant DR is a STANDARD capability; the Kubernetes cluster is ADVANCED.** T4 (active/passive warm standby) moves from Advanced to **Standard**; T5 (partitioned scale-out on Kubernetes) is added as **Advanced**. ⚠ Consequence: the run lease and the fully-Postgres-backed state that make standby automatic (`superpower/enterprise-scale-out-plan.md` phases A–B) must ship in the **Standard** bundle, not behind `inspecto-policy`. T4 needs Postgres, so Standard DR is "database-backed", not "optionally". The scale-out DESIGN itself is still pending signature (plan §9) | operator |
+| 2026-09-10 | **The Advanced scale-out design is SIGNED (D1′–D13)** — D1 REVISED: the container image is the **Advanced unit of deployment** and orchestration is IN SCOPE for Advanced only (Basic/Standard stay single-artifact, no orchestrator); shared-nothing partitioning **by Space** (D2/D3, the distributed engine REFUSED); object store + **DuckLake catalog commit as visibility** with a POSIX-volume fallback (D4); a **TTL lease table** — never advisory locks, never the Kubernetes Lease API (D5); `events.backend=db` (D6); the connection pool un-parked as phase A (D7); the dependency claim per edition — Basic zero, Standard zero unless DR, Advanced Postgres + object store (D9); registrar failure **fatal** in partitioned mode (D10); rebalancing phase C+1 (D11); the switch is `-Dinspecto.topology=partitioned` (D12); Postgres views over the Parquet via the DuckDB extension as the **external query surface**, gated on spike S5 (D13). ⚠ Per D8, phases A–B (shared Postgres state + the lease) are the **Standard** T4 DR deliverable and ship in the Standard bundle. → `superpower/enterprise-scale-out-plan.md` §9 | operator |
 
 ## 5. Not built
 
@@ -736,10 +739,10 @@ definition of "done" for every unbuilt script. Board rows: `SPEC-DEPLOY-ROWS-1` 
 | `SCR-7` | `upgrade` / `rollback` | T2+ | §6's procedure automated including N-1 retention; drilled in **both** directions on a reference deploy |
 | ~~`SCR-9`~~ | ~~Launcher hygiene~~ | all | ✅ **SHIPPED 2026-09-09.** The dead `CONTROL_TOKEN` / `ASSIST_TOKEN` lines are gone from the generated `serve.sh`, `serve.bat` and `Dockerfile`. 🔴 Worse than debris: the scripts told the operator `CONTROL_TOKEN` was *"required to use the control plane"* and printed `CONTROL_TOKEN=secret bash serve.sh` as the way to start it — so anyone following the printed instruction would believe they had secured an **auth-free** service. Acceptance met: zero token mentions in all three generated bodies, verified by extracting the here-strings rather than grepping the generator |
 | `SCR-10` | Bundle-docs ACL fix | — | thirteen files under `archived-documents/plans-archive/` carry a broken deny-ACL and are **silently skipped from every bundle**; needs an Administrator `takeown` + `icacls` pass |
-| ~~`SCR-2`~~ | ~~Launcher `lib/` support~~ | — | ✅ **SUPERSEDED by PG-1**: `postgresql.jar` is staged into every Professional and Enterprise bundle and auto-detected |
-| ~~`SCR-8`~~ | ~~`package.ps1 -Edition Enterprise`~~ | — | ✅ **SHIPPED as EDG-01.** The row named a blocker that was already gone |
+| ~~`SCR-2`~~ | ~~Launcher `lib/` support~~ | — | ✅ **SUPERSEDED by PG-1**: `postgresql.jar` is staged into every Standard and Advanced bundle and auto-detected |
+| ~~`SCR-8`~~ | ~~`package.ps1 -Edition Advanced`~~ | — | ✅ **SHIPPED as EDG-01.** The row named a blocker that was already gone |
 | ~~`SCR-11`~~ | ~~Container image~~ | — | ✅ **SHIPPED as PKG-3** — the Dockerfile is generated at `package.ps1:1041-1065`. ⛔ Kubernetes stays out of scope until decision D1 says otherwise |
-* **The Professional runtime not re-verified against the token library** — skip-runtime until confirmed.
+* **The Standard runtime not re-verified against the token library** — skip-runtime until confirmed.
 * **Multi-user relational deployment** — parked until a multi-operator install exists.
 * **Step-processor gaps** — eighteen partial and sixty-seven planned rows on the board.
 * **Policy-authoring experience** — hand-authored files only today.
@@ -770,14 +773,14 @@ citations elsewhere in this spec still resolve.
    ✅ **The second half — `SBOM-RESOLVE-1` — SHIPPED 2026-09-09.** Generating the document at all required
    the reactor to be **installed** in the local repository, because the build tool will not resolve a
    sibling module from a jar built in an earlier invocation, and the release pipeline installed only the
-   agent dependency. Enterprise failed first — the policy module's cell-7 test-scoped edge to the
+   agent dependency. Advanced failed first — the policy module's cell-7 test-scoped edge to the
    operational-objects module must resolve even though the document lists runtime scope only — and on a
    clean runner every edition would.
-   **As built:** `release.yml` gained a reactor `mvn -DskipTests -Pedition-enterprise install` before the
+   **As built:** `release.yml` gained a reactor `mvn -DskipTests -Pedition-advanced install` before the
    packaging steps. ⚠ **The profile matters**: the nine edition modules are profile-scoped and a plain
-   install leaves `inspecto-ops` absent, which is the artifact Enterprise fails on. Enterprise is the
-   superset (9 vs Professional's 8), so one pass covers every edition packaged below. Verified
-   `mvn -o -DskipTests -Pedition-enterprise install` BUILD SUCCESS over 32 modules, with `inspecto-ops`
+   install leaves `inspecto-ops` absent, which is the artifact Advanced fails on. Advanced is the
+   superset (9 vs Standard's 8), so one pass covers every edition packaged below. Verified
+   `mvn -o -DskipTests -Pedition-advanced install` BUILD SUCCESS over 32 modules, with `inspecto-ops`
    and `inspecto-policy` jars refreshed in `~/.m2`.
    ⛔ **Do not "fix" a recurrence by narrowing the scope filter**: the failure is in **resolution**, which
    precedes filtering.
@@ -785,27 +788,27 @@ citations elsewhere in this spec still resolve.
    no second staging gap here; that was checked and refuted.
    ⚠ A truly clean BEFORE could not be reproduced on the sandbox (a prior build had primed `~/.m2`); the
    clean-runner failure is the one recorded when the row was filed.
-2. ✅ **SHIPPED 2026-09-10** — the release pipeline gained the Professional step (`STANDARD-BUNDLE-1`, §3.7); the
-   Professional supply-chain columns now have an artifact behind them. *(Was: no Professional artifact is built,
+2. ✅ **SHIPPED 2026-09-10** — the release pipeline gained the Standard step (`STANDARD-BUNDLE-1`, §3.7); the
+   Standard supply-chain columns now have an artifact behind them. *(Was: no Standard artifact is built,
    checksummed, signed, given a bill of materials, or published; four documents described one that did not exist.)*
-3. 🔴 **An Enterprise bundle handed to a Professional customer self-identifies as Enterprise and enables
+3. 🔴 **An Advanced bundle handed to a Standard customer self-identifies as Advanced and enables
    attribute-based access control** (§3.5) — because the launchers detect the edition from jar presence and
-   the pipeline builds Enterprise as a "superset of Professional". One added packaging step closes it; until
+   the pipeline builds Advanced as a "superset of Standard". One added packaging step closes it; until
    then the superset label is a commercial exposure, not a convenience. ⛔ Decided 2026-09-10: build the
-   distinct Professional bundle — not licence-key gating, not "document it". ✅ **CLOSED the same day** (§3.5,
-   §3.7): the Professional collect step fails the release if `inspecto-policy` is inside the bundle.
-4. 🔴 **The reported edition string is two-valued and derived from a launch flag** (§3.5) — Enterprise is
+   distinct Standard bundle — not licence-key gating, not "document it". ✅ **CLOSED the same day** (§3.5,
+   §3.7): the Standard collect step fails the release if `inspecto-policy` is inside the bundle.
+4. 🔴 **The reported edition string is two-valued and derived from a launch flag** (§3.5) — Advanced is
    unreportable, and the deployment plan's edition probe inherited the defect, so the acceptance contract
-   cannot verify an Enterprise deployment. Derive it from what registered, the way the feature flags
+   cannot verify an Advanced deployment. Derive it from what registered, the way the feature flags
    already do, and add flags for the four optional modules that have none.
-5. 🔴 **Gating cell 7 has no Personal-side test** — the largest extraction, forty-four stubbed paths, and
+5. 🔴 **Gating cell 7 has no Basic-side test** — the largest extraction, forty-four stubbed paths, and
    the only one of the seven cells without a falsification test. The seam is exercised in engine tests; the
    absent-module HTTP behaviour is not.
 6. 🔴 **The trimmed runtime ships in nothing** while a board row marks it green in all three editions
    (§2). Either the release pipeline builds it, or the row and the requirement say "buildable, not
    shipped".
 7. ⚠ **Nothing keeps the five stub path lists in sync with the real modules' routes** (§3.4). A list that
-   drifts short turns an explained 503 into a bare 404 in Personal — the exact outcome the contract exists
+   drifts short turns an explained 503 into a bare 404 in Basic — the exact outcome the contract exists
    to prevent.
 8. ⚠ **The staged-jar set is stated in eight places and five are wrong** (§3.3), one of them being code
    that ships as a compliance artifact. One generated table, or one test, would collapse the whole class.
@@ -827,9 +830,9 @@ citations elsewhere in this spec still resolve.
     31 and 37 files inside the same row. The measured count is 32 domain files, 42 in the module.
 14. ⚠ **The reactor page's decomposition is wrong** — "23 today: 14 default plus 9 profile-scoped" adds up
     by coincidence. 23 is the *default build* (the root, the decoder aggregator, its eight children, and
-    thirteen modules); the nine profile-scoped modules take Professional to 31 and Enterprise to 32.
-15. ⚠ **No pipeline builds Personal alone with tests, or Professional alone at all.** One pass runs the
-    Enterprise profile, justified as the superset. The build page explicitly warns that Professional is **the
+    thirteen modules); the nine profile-scoped modules take Standard to 31 and Advanced to 32.
+15. ⚠ **No pipeline builds Basic alone with tests, or Standard alone at all.** One pass runs the
+    Advanced profile, justified as the superset. The build page explicitly warns that Standard is **the
     only profile that proves an optional module is self-contained**, and that the wrong dependency
     direction once passed locally off a stale local repository. The falsification tests do stay valid —
     every optional module depends on the core, so a core-side test never sees one on its classpath — but
@@ -843,10 +846,10 @@ citations elsewhere in this spec still resolve.
     call". The gap note is the correct one. **A signed decision currently describes a default that does not
     exist**, which makes the signature undischarged work rather than a settled question. ✅ Discharged
     2026-09-26: GAP-4 shipped a computed default (40 % RAM ÷ 4, ≥ 1 GiB), not the 2 GB the row names.
-19. ⚠ **The deployment plan's Enterprise topology still calls the packaging flavour pending**, and its
+19. ⚠ **The deployment plan's Advanced topology still calls the packaging flavour pending**, and its
     deliverable row still names a blocker that is gone; the same file's gap ledger records it shipped.
 20. ⚠ **Two preflight rows and one deliverable describe dropping the database driver into a library
-    directory** (§3.12). The build stages it automatically for Professional and Enterprise, so the design was
+    directory** (§3.12). The build stages it automatically for Standard and Advanced, so the design was
     superseded and the checks now verify a step nobody performs.
 21. ⚠ **Two board rows have no backlog home** — distributed scheduler coordination and the shared object
     store — despite the board's closing claim that everything planned has one. Both cite only a
@@ -863,18 +866,18 @@ citations elsewhere in this spec still resolve.
 
 | Item | Verdict | Why |
 |---|---|---|
-| **Launch-flag capability switches** as the gating mechanism | ⛔ **REFUSED** 2026-09-07 | A switch leaves the code in the Personal bundle. Personal has no authenticator and binds every interface, so a mis-set flag re-exposes an unauthenticated surface. Packaging boundary, not policy boundary |
+| **Launch-flag capability switches** as the gating mechanism | ⛔ **REFUSED** 2026-09-07 | A switch leaves the code in the Basic bundle. Basic has no authenticator and binds every interface, so a mis-set flag re-exposes an unauthenticated surface. Packaging boundary, not policy boundary |
 | **Edition conditionals in the core** | ⛔ **BANNED**, standing | An edition difference is a build decision — a module or a flag — never core logic. This is what forced the events surface to move whole (§4) |
-| **Edition git branches** | ⛔ **REFUSED**, standing | Versions are branches; editions are flavours of one commit. There is no Personal or Professional branch and never will be |
-| **A Personal Maven profile** | **NEVER EXISTED** — corrected 2026-09-07 | The parent declares exactly two profiles. Maven warns on an unknown one and builds the default, so the wrong instruction produced the right result |
-| **"Personal binds localhost only"** | **SUPERSEDED** 2026-08-29 | The code never enforced it. The claim was the defect, not the behaviour |
+| **Edition git branches** | ⛔ **REFUSED**, standing | Versions are branches; editions are flavours of one commit. There is no Basic or Standard branch and never will be |
+| **A Basic Maven profile** | **NEVER EXISTED** — corrected 2026-09-07 | The parent declares exactly two profiles. Maven warns on an unknown one and builds the default, so the wrong instruction produced the right result |
+| **"Basic binds localhost only"** | **SUPERSEDED** 2026-08-29 | The code never enforced it. The claim was the defect, not the behaviour |
 | **A framework migration** | ⛔ **REFUSED** | At five to fifteen users a framework buys nothing the identity provider and a few small libraries do not, and a lean dependency tree is a compliance asset |
 | **In-app login, user management, directory or assertion integration** | ⛔ **REFUSED** | Identity is delegated to the customer's provider; the product only validates the resulting token (§3.9) |
-| **Bundling the assistant modules** (`PKG-5`) | ✅ **REVERSED and SHIPPED 2026-09-12** | The refusal rested on "bundling would raise the bundle's Java floor". It does not: the floor only binds a host that actually loads the module, and `OptionalSpi` now makes an unloadable optional module an ABSENCE rather than a boot failure. Staged in Professional and Enterprise; the stated requirement stays Java 24 (§2, §3.6) |
+| **Bundling the assistant modules** (`PKG-5`) | ✅ **REVERSED and SHIPPED 2026-09-12** | The refusal rested on "bundling would raise the bundle's Java floor". It does not: the floor only binds a host that actually loads the module, and `OptionalSpi` now makes an unloadable optional module an ABSENCE rather than a boot failure. Staged in Standard and Advanced; the stated requirement stays Java 24 (§2, §3.6) |
 | **Gating the connector module** | ⛔ **REFUSED** 2026-09-07 | Remote acquisition is a core capability, and the board marks it shipped in all three editions; gating it would mean correcting the acquisition rows |
-| **A per-edition capability-vocabulary validator** | ⛔ **REFUSED** | It would break role-file portability — a file authored on Professional would fail validation on Personal — and dead vocabulary has no route behind it |
-| **Active/active deployment** | ⚠ **SUPERSEDED 2026-09-10** for Enterprise | Active/active becomes **partitioned scale-out** (shared-nothing by Space — a pod owns Spaces; no replicated active/active), per the signed `superpower/enterprise-scale-out-plan.md` §4. Personal/Professional: still not offered; Professional gets the T4 active/**passive** standby instead (§3.9) |
-| **Orchestration platform support** | ⚠ **That decision changed 2026-09-10** | Kubernetes is the **Enterprise** orchestrator (T5, §3.9); the container image is the Enterprise unit of deployment. Personal/Professional remain orchestrator-free single artifacts. → `superpower/enterprise-scale-out-plan.md` §4, §9 D1′ |
+| **A per-edition capability-vocabulary validator** | ⛔ **REFUSED** | It would break role-file portability — a file authored on Standard would fail validation on Basic — and dead vocabulary has no route behind it |
+| **Active/active deployment** | ⚠ **SUPERSEDED 2026-09-10** for Advanced | Active/active becomes **partitioned scale-out** (shared-nothing by Space — a pod owns Spaces; no replicated active/active), per the signed `superpower/enterprise-scale-out-plan.md` §4. Basic/Standard: still not offered; Standard gets the T4 active/**passive** standby instead (§3.9) |
+| **Orchestration platform support** | ⚠ **That decision changed 2026-09-10** | Kubernetes is the **Advanced** orchestrator (T5, §3.9); the container image is the Advanced unit of deployment. Basic/Standard remain orchestrator-free single artifacts. → `superpower/enterprise-scale-out-plan.md` §4, §9 D1′ |
 | **A government cryptographic variant** | 🔭 **DEFERRED**, demand-gated | The pattern is documented against the same transport seam; the work starts only against a concrete opportunity |
 | **Multi-user relational deployment** | ⛔ **PARKED** 2026-09-06 | Until a multi-operator install exists. The plan is written |
 | **The profiles varying the shaded fat JAR** | **NEVER TRUE** — corrected in this commit | One unconditional shade configuration, no child profiles; optional modules ship as sidecars (§3.2) |
@@ -906,8 +909,8 @@ this area has three sites whose line citations drifted (§3.2).
 | The bill of materials | `tools/sbom.mjs`, over the set in `tools/bundle-modules.mjs` | ⚠ Needs the reactor installed to resolve (§5.3 item 1) |
 | Its drift guard | `tools/check-sbom-modules.mjs`, wired into `ci.yml` | — |
 | The dependency lock | `tools/dependencies.lock`, written by `tools/check-dependencies.mjs` | ⚠ **89**<!--count:locked-dependencies--> locked coordinates (this cell read 95 until 2026-09-15 — the lock had moved and nothing derived the prose); originally 95 across 25 modules against four prose sites saying 94 |
-| The release pipeline | `.github/workflows/release.yml` | 🔴 No Professional step; every bundle skips the runtime |
-| The test pipeline | `.github/workflows/ci.yml` | ⚠ One profile pass; no Personal-with-tests, no Professional |
+| The release pipeline | `.github/workflows/release.yml` | 🔴 No Standard step; every bundle skips the runtime |
+| The test pipeline | `.github/workflows/ci.yml` | ⚠ One profile pass; no Basic-with-tests, no Standard |
 | The reported edition and feature flags | `BootstrapRoutes` | 🔴 Two-valued edition string; four modules with no flag (§3.5) |
 | Absence at the route | the five `Absent*Routes` classes in the control package | ⚠ No drift guard over their path lists |
 | The singular seam helper | `SpiSlot` in the control package | — |
@@ -929,7 +932,7 @@ this area has three sites whose line citations drifted (§3.2).
 
 **What is actually enforced today**
 
-* **The Personal-side refusal of cell 7's extraction** — `NoOperationalObjectsShipInThePersonalBuildTest`
+* **The Basic-side refusal of cell 7's extraction** — `NoOperationalObjectsShipInThePersonalBuildTest`
   (added 2026-09-09, closing part of `SPEC-NOPROOF-1`). All **49** stubbed operational-object paths answer
   **503 naming `inspecto-ops`** rather than 404, `features.ops` stays present-and-false, and a source
   cross-check pins the stub surface against the test's own list. ⚠ That cross-check is not redundant: a
@@ -952,16 +955,16 @@ this area has three sites whose line citations drifted (§3.2).
 
 **Falsify, don't read — five probes worth running**
 
-1. **Unzip a Professional bundle's bill of materials and count its first-party entries.** Four means the defect
-   is live; **ten** means it was fixed (eleven for Enterprise). Counting *staged jars* instead gives 11 and
+1. **Unzip a Standard bundle's bill of materials and count its first-party entries.** Four means the defect
+   is live; **ten** means it was fixed (eleven for Advanced). Counting *staged jars* instead gives 11 and
    12 — the driver sidecar is third-party, and conflating the two is what made the original counts confusing.
-2. **Grep a released Enterprise bundle's launcher for the policy jar**, then start it and read the reported
-   edition. It will say `professional` while enabling Enterprise policy.
-3. **Ask a Personal build for a gated path** — an object route, say. A 503 naming the module is correct; a
+2. **Grep a released Advanced bundle's launcher for the policy jar**, then start it and read the reported
+   edition. It will say `standard` while enabling Advanced policy.
+3. **Ask a Basic build for a gated path** — an object route, say. A 503 naming the module is correct; a
    404 means the stub list drifted.
 4. **Look for `runtime/` in any published artifact.** Its absence falsifies the runtime row in all three
    editions.
-5. **Build with the Professional profile alone.** It is the only profile that proves an optional module is
+5. **Build with the Standard profile alone.** It is the only profile that proves an optional module is
    self-contained, and no pipeline runs it.
 
 **A capability-pointer check over this file** — it is **`tools/check-doc-citations.mjs`, committed 2026-09-09**
@@ -977,16 +980,16 @@ class names against `git ls-files` and the module tree.
 
 The work-queue family was retired on 2026-09-14 (created `a5b89a89`, moved to `inspecto-ops` `e8d98918`,
 deleted `519673a7`), and EDG-01 cell 7 is now **three** route families, not four. Three shipped strings still
-promise it, and none is test-asserted: `AbsentModuleRoutes.java` — the Personal-edition **503 body** — plus
+promise it, and none is test-asserted: `AbsentModuleRoutes.java` — the Basic-edition **503 body** — plus
 `inspecto-ui/.../admin/objects/object-mail.component.html:4` and `.../admin/tags/tags.component.html:4`, each
 reading "notes, links, tags **and queues** are provided by the…".
 
-⚠ A 503 telling an operator that a deleted feature is available in Professional is a small but real defect. It was
+⚠ A 503 telling an operator that a deleted feature is available in Standard is a small but real defect. It was
 kept out of the comment-correcting change deliberately: shipped copy plus two Angular templates is a different
 change class and needs the `angular-ui` skill.
 
 **As-built (closed 2026-09-24).** All three strings had **already** been corrected the day after filing, inside
-`ec49b7bda` (the Standard→Professional rename, 2026-09-18), which rewrote each sentence and dropped "and queues" in
+`ec49b7bda` (the Standard→Professional rename, 2026-09-18 — itself superseded by LA-EDITIONS-1's Basic / Standard / Advanced, 2026-10-17), which rewrote each sentence and dropped "and queues" in
 passing — so the row sat open over fixed copy for six days. They now read "…notes, links and tags are provided by
 the…". A repo-wide grep for "and queues" finds no other shipped copy. The closing change fixed the one leftover:
 the `SURFACE` array's Javadoc in `AbsentModuleRoutes.java` still said "four moved route families"; it lists three

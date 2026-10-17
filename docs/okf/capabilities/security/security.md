@@ -162,7 +162,7 @@ exposes `active()` (empty on Personal) and a `forTest(...)` seam. ⚠ `Subject` 
 
 **Editions** (`GLOSSARY.md` §14 *Edition*): Personal bundles neither module; Standard adds
 `inspecto-oidc` (Maven profile `edition-standard`, `pom.xml:73-77`); Enterprise adds `inspecto-policy` on
-top (`edition-enterprise`, `pom.xml:112-116`). `package.ps1 -Edition Standard|Enterprise` bundles the
+top (`edition-advanced`, `pom.xml:112-116`). `package.ps1 -Edition Standard|Enterprise` bundles the
 **shaded** `inspecto-oidc-*-sidecar.jar` (Nimbus classes verified present at package time — the
 `SEC-SIDECAR-BOOT-1` lesson). No runtime flag selects a module: the classpath entry is the switch, and the
 default `mvn -o clean test` reactor **never compiles either module** — see §8.
@@ -689,7 +689,7 @@ These run in every build because they exercise the *core* seams through `Authent
 
 ⚠ **The default `mvn -o clean test` compiles neither module.** A green default build says nothing about the
 34 + 20 tests below; run `mvn -o clean test -Pedition-standard` (31 modules, 4106 tests at HEAD) or
-`-Pedition-enterprise` (32 modules, 4126). `Roles.SEED`'s equality assertion was red on `master` for weeks
+`-Pedition-advanced` (32 modules, 4126). `Roles.SEED`'s equality assertion was red on `master` for weeks
 once because of exactly this.
 
 | Module | Class | `@Test` | Proves |

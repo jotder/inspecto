@@ -59,7 +59,7 @@ class SecretResolverTest {
             IllegalStateException e = assertThrows(IllegalStateException.class,
                     () -> SecretResolver.resolve("${FILE:" + secret + "}"),
                     "a readable file must NOT resolve without the provider — that is the whole gate");
-            assertTrue(e.getMessage().contains("FILE") && e.getMessage().contains("Standard and Enterprise")
+            assertTrue(e.getMessage().contains("FILE") && e.getMessage().contains("Standard and Advanced")
                     && e.getMessage().contains("${ENV:NAME}"), e.getMessage());
             assertThrows(IllegalStateException.class, () -> SecretResolver.isResolvable("${KEYSTORE:db-pass}"),
                     "a connection test surfaces the refusal rather than a bland 'unresolved'");

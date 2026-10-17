@@ -230,7 +230,7 @@ class AlertRecordsParityTest {
             AlertStore.Row row = w.alerts.allActive().get(0);
             if (w.wiring == Wiring.PERSONAL) {
                 assertTrue(w.objects.opened.isEmpty() && w.objects.linked.isEmpty() && w.objects.subjectLinked.isEmpty(),
-                        label + ": Personal has Alerts and NO Incidents - nothing touched ops");
+                        label + ": Basic has Alerts and NO Incidents - nothing touched ops");
                 assertNull(row.incidentId(), label);
             } else {
                 assertEquals(1, count(w.objects, ObjectType.INCIDENT), label + ": the probe is live: with ops a critical opens an Incident");
@@ -469,7 +469,7 @@ class AlertRecordsParityTest {
         CountingRecords personal = new CountingRecords(AlertRecords.of(new InMemoryAlertStore(), Optional.empty()));
         AlertService quiet = new AlertService(List.of(ledgerRule("critical")), configs(cfg), store(failedLedger()),
                 personal, AlertRecords.NO_INCIDENTS);
-        assertEquals(1, quiet.evaluateAll().size(), "Personal still fires");
+        assertEquals(1, quiet.evaluateAll().size(), "Basic still fires");
         assertTrue(personal.calls > 0, "...and records the Alert through the port");
     }
 }

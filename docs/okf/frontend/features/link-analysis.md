@@ -9,10 +9,18 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Link Analysis
 
+> **Product vs capability (`ED-1`, 2026-10-17).** The product is **Inspecto LA (Link Analysis)**: the standalone `la-app`
+> (browser tab, rail brand, landing heading, sign-in screen) says *Inspecto LA*. The capability on this page keeps the
+> name **Link Analysis** everywhere else: the console nav, the app's own *Link Analysis* area, routes, keys and modules
+> (GLOSSARY §11 *Inspecto LA*). The sign-in screen is the core's, shared with the console; it reads the product name from
+> `AppEnvironment.productName`, which `la-app` sets to `LA_PRODUCT_NAME` (`la-brand.ts`) and the console leaves unset (*Inspecto*).
+
 > **Backend structure** (modules, store backends, index layout, gate order, host wiring): [`okf/backend/modules/link-analysis.md`](../../backend/modules/link-analysis.md).
 
 > **Edition (2026-09-07, EDG-01 cell 3b).** Link analysis's backend routes live in the optional `inspecto-geo-link` module —
-> Standard and Enterprise only (EDITIONS `CP-09`). `SessionService.geoLinkEnabled` mirrors `/bootstrap`
+> since LA-EDITIONS-1 phase 3 (2026-10-17) in every edition, Basic included (EDITIONS `CP-09`); on Basic the Investigation surface is
+> withheld and `LA_FEATURES.investigations` (`SessionService.investigationsEnabled`, `/bootstrap` `features.investigations`) hides
+> the Investigation tab, buttons, deep-link openers, Graph Run controls and the `/open` page's actions. `SessionService.geoLinkEnabled` mirrors `/bootstrap`
 > `features.geoLink`; when false the nav entry and the Menu-Builder widget offer are **hidden**, and a deep link
 > that still reaches the page gets a 503 from the core stub, which the component renders as an edition message
 > rather than a generic query failure. ⚠ The flag is derived server-side from what actually registered, never
@@ -1585,7 +1593,7 @@ As-built facts are in the two blockquotes at the top of this concept; the retire
 
   A STRING asset entry in `angular.json` resolves against the PROJECT root and silently copied nothing for la-app: use `{glob, input, output}`.
   The Entity Lists page must provide the empty `InvestigationSessionStore` (NG0201 found only by driving the route).
-* **Packaging proof.** `-Ui la-app` and `-Ui gamma`, each with `-Edition Professional`, exited 0 with the boot smoke; the la-app zip's
+* **Packaging proof.** `-Ui la-app` and `-Ui gamma`, each with `-Edition Standard`, exited 0 with the boot smoke; the la-app zip's
   index page is titled `Inspecto Link Analysis`, the gamma zip's UI folder is file-for-file `dist/gamma/browser`. `check-sbom-modules`,
   `check-launchers`, `check-bundle-platform` and `bundle-modules.mjs` needed no change (none names the UI folder). The IAM client id for
   la-app (`AUTH_OIDC_CLIENT_ID`; the launchers default to `inspecto-ui`) is a deployment decision, written in `docs/EDITIONS.md`.
@@ -2184,3 +2192,36 @@ Plan archived: [`la-entity-profile-plan`](../../../archived-documents/plans-arch
 - **Open an Entity** is a pen row: Enter in the editor (or Open) POSTs the value to `resolve` and navigates by the returned key, so the URL holds an alias for a masked type, never the raw value. ⚠ The pen field takes Enter to commit and so the form never submits; the lookup listens for Enter on the host, from the INPUT only (Enter on the closed row just starts editing).
 - **Honesty rules on screen:** an approximate count says `approx.`; a section the server could not read says *Not assessed* with its reason and is listed again under *What is not here*; a type nobody profiled yet reads *Not assessed: not computed yet* on its card.
 - **Driven live** (IMS Space, Enterprise demo bundle, Demo FM Analyst): the 15-SIM device shows as IMEI to IMSI, most per Entity 15; the lookup of the burst number lands on `/entities/msisdn/masked:...` with no raw identifier in the page or the URL.
+
+## Open in Inspecto LA page (as built 2026-10-17)
+
+The SPA half of the inbound deep link; the wire contract and the server rules are in [`okf/backend/modules/link-analysis.md`](../../backend/modules/link-analysis.md) §6.4.
+
+- **Where:** `projects/link-analysis/src/open/*` in the shared library (`open.routes.ts`, `OpenInLaComponent`, `open-link.ts` with `parseOpenLink` and `DeepLinkService`), mounted by la-app at `/open` (inside the signed-in shell, not a nav entry) and by the full SPA at `/studio/open`. The page reads its base from the route, so its links are its siblings (`link-analysis?investigation=`, `entities/<type>/<key>`).
+- **Two checks:** `parseOpenLink` refuses an unknown parameter, a missing entity and Investigation, a malformed `<type>:<key>`, a bad id or a zone-less / inverted window with a readable sentence, without calling the server; then `POST /inv/deep-links/resolve` re-checks it, and its refusal (a raw value of a masked type, an unreadable Investigation) is shown the same way.
+- **Masking:** the entity is shown by the key the server returns (the alias for a masked type). **Reveal the value** shows only for `canRevealLinkEntities` and asks the server once (audited); the raw value stays on the page and never enters a URL. The page does not navigate on its own: the user picks *Open the Investigation* or *Open the Entity*.
+
+## Domain Profile and Industry packs (LA-EDITIONS-1 phase 4, as built 2026-10-17)
+
+- **Server-owned.** The SPA no longer ships industry profiles: `projects/link-analysis/src/graph/domain-profile.ts`
+  holds only the neutral `GENERIC_PROFILE` and a registry (module-level signals) that `DomainProfileService`
+  (`projects/link-analysis/src/api/domain-profile.service.ts`) fills from `GET /settings/link-analysis/domain-profile`
+  once per Space (and after a save). `domainProfiles()`, `domainProfile(id)`, `profileForEntityType(type)` and
+  `activeDomainProfileId()` are reactive, so a `computed` re-runs when the packs arrive. Until then, and when the read
+  fails, everything reads `generic`. The old SPA-only finance, supply-chain and cyber profiles are gone; a view saved
+  under one of them reads `generic`.
+- **What switches with the pack.** The working-set tiles (`concept.node|link|row`), the Entity Type labels (the
+  server relabels `entityTypesInForce`), the Value Measure names in the measures form (`measure.<id>`, read when the
+  panel opens), and the starter card's number field (`entity_type.msisdn`, neutral *Phone number*).
+  `termLabel(profile, key, neutral)` is the one lookup.
+- **Default reading.** The graph page applies the Space's selected profile once, when the packs arrive, unless a
+  view, a case or an Investigation has already chosen one; a view without a profile opens under the Space's. A deep
+  link (`?seed=&entityType=`) whose type no installed pack investigates waits for the first answer before binding.
+- **Settings.** `LinkAnalysisDomainProfileComponent` (`link-analysis-domain-profile.component.ts`) sits in Settings ▸
+  Link Analysis (console and la-app): a picker of *Generic* plus every installed pack, **Apply** for
+  `canAuthorWorkbench`, the active pack's terms (concept key, label, abbreviation, definition), a warning when the
+  stated pack is not installed and an error per refused pack.
+- **Neutral core words** (AC-09, enforced by `check-vocabulary.mjs` rule `industry-pack-term`): the built-in
+  `forwarding-relay` pattern pack is *Relay chain (any link kind)*; the Value Measures read *Time to withdrawal* and
+  *Withdrawal concentration*; the measures form says sender / receiver and *Intermediary list*. Specs that need the
+  telecom binding install `TELECOM_PACK_FIXTURE` (`graph/domain-profile.testing.ts`).

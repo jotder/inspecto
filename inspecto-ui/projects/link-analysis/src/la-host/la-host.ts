@@ -223,11 +223,15 @@ export const LA_CASES = hostToken<LaCases>('LA_CASES', 'Case management');
  * - `ops` - Case management (`inspecto-ops`) is installed: Case actions are real, not placeholders.
  * - `exchange` - the multi-Space runtime hosts the cross-Space Exchange: an Investigation can be shared.
  * - `geoLink` - the Link Analysis / Geo routes are registered in this bundle (server-side Entity Lists, Identity groups).
+ * - `investigations` - the Investigation surface is included in this edition (Investigations, Drafts, Dossier, templates,
+ *   members, embed links, data trust, Graph Run, index builds, Alert Rules on Investigations). False on Basic, the Link
+ *   Analysis explorer (LA-EDITIONS-1 ED-4), where those routes answer 503: the affordances are hidden, never left to 503.
  */
 export interface LaFeatures {
     readonly ops: Signal<boolean>;
     readonly exchange: Signal<boolean>;
     readonly geoLink: Signal<boolean>;
+    readonly investigations: Signal<boolean>;
 }
 
 /**
@@ -236,5 +240,10 @@ export interface LaFeatures {
  */
 export const LA_FEATURES = new InjectionToken<LaFeatures>('LA_FEATURES', {
     providedIn: 'root',
-    factory: () => ({ ops: signal(false), exchange: signal(false), geoLink: signal(false) }),
+    factory: () => ({
+        ops: signal(false),
+        exchange: signal(false),
+        geoLink: signal(false),
+        investigations: signal(false),
+    }),
 });

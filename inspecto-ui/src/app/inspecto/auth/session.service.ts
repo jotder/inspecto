@@ -58,6 +58,7 @@ interface Bootstrap {
         loopbackOnly?: boolean;
         exchange?: boolean;
         geoLink?: boolean;
+        investigations?: boolean;
         events?: boolean;
         ops?: boolean;
         [feature: string]: string | boolean | undefined;
@@ -115,7 +116,7 @@ export class SessionService {
 
     /** 'none' (Personal / offline) or 'oidc' (Professional). Drives {@link loginRequired} + {@link authGuard}. */
     readonly authMode = signal<'none' | 'oidc'>('none');
-    readonly edition = signal<string>('personal');
+    readonly edition = signal<string>('basic');
     /** The running product's version as `GET /bootstrap` reported it; null until the bootstrap read lands. */
     readonly version = signal<string | null>(null);
     readonly authenticated = signal(false);
@@ -152,6 +153,12 @@ export class SessionService {
     /** Every boolean `/bootstrap` feature, by id — what `navFeature` on a nav entry is checked against. */
     readonly features = signal<Record<string, boolean>>({});
     readonly geoLinkEnabled = signal(false);
+    /**
+     * `bootstrap.features.investigations` — the Link Analysis Investigation surface is installed AND included in this
+     * edition. False on Basic (LA-EDITIONS-1 ED-4: the Link Analysis explorer, `geoLink` true), whose Investigation
+     * routes answer 503; Link Analysis hides every Investigation affordance on false.
+     */
+    readonly investigationsEnabled = signal(false);
     /**
      * `bootstrap.features.events` — the operational events FEED is registered in this bundle (EDITIONS
      * CP-13: the optional `inspecto-events` module, Professional and above; EDG-01 cell 6).
@@ -251,7 +258,7 @@ export class SessionService {
         const boot = await firstValueFrom(
             this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError((e: unknown) => this.bootstrapFailed(e))),
         );
-        this.edition.set(boot.edition ?? 'personal');
+        this.edition.set(boot.edition ?? 'basic');
         this.version.set(boot.version?.trim() ? boot.version.trim() : null);
         // DEMO-AUTH-1: the demo build signs in through the same backend session routes as OIDC, so it IS the
         // 'oidc' path here — only the code comes from the Demo User picker instead of an IAM redirect.
@@ -271,6 +278,7 @@ export class SessionService {
         );
         this.exchangeEnabled.set(boot.features?.exchange === true);
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
+        this.investigationsEnabled.set(boot.features?.investigations === true);
         this.eventsEnabled.set(boot.features?.events === true);
         this.opsEnabled.set(boot.features?.ops === true);
         this.loopbackOnly.set(boot.features?.loopbackOnly === true);
@@ -314,6 +322,7 @@ export class SessionService {
         );
         this.exchangeEnabled.set(boot.features.exchange === true);
         this.geoLinkEnabled.set(boot.features.geoLink === true);
+        this.investigationsEnabled.set(boot.features.investigations === true);
         this.eventsEnabled.set(boot.features.events === true);
         this.opsEnabled.set(boot.features.ops === true);
     }

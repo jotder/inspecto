@@ -48,8 +48,8 @@ main context.
 ### ✅ THE VERDICT STEP — run the guard, don't eyeball anything
 
 ```powershell
-mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
-node tools/check-reactor-verdict.mjs build.log --expect-modules 42   # the enterprise reactor has 42 modules (inspecto-la-storage added 2026-10-02); the count moves with every new module
+mvn -o clean test -Pedition-advanced -B > build.log 2>&1     # -B, NEVER -q
+node tools/check-reactor-verdict.mjs build.log --expect-modules 42   # the advanced reactor has 42 modules (inspecto-la-storage added 2026-10-02); the count moves with every new module
 ```
 
 `tools/check-reactor-verdict.mjs` is the only thing in this file that can actually *refuse* a verdict.
@@ -113,7 +113,7 @@ That is **763 tests and all 16 skips** — so an `[INFO]`-only sum is short by e
 skip counts summing to 16 is a cheap check that you caught all four.
 
 **Baselines as of 2026-09-11** (⚠ these move most shifts — re-derive, never quote):
-- reactor **4243 / 0 / 0 / 16 over 26 test-bearing modules** (`-Pedition-enterprise`; 32 reactor modules)
+- reactor **4243 / 0 / 0 / 16 over 26 test-bearing modules** (`-Pedition-advanced`; 32 reactor modules)
 - UI **2914 passed / 5 skipped over 338 files, exit 0**
 - dependency guard **95 third-party artifacts across 32 reactor modules**
 
@@ -138,36 +138,36 @@ gains a member in your working tree. Observed 2026-08-04 — `-pl :inspecto-engi
 ### ⚠ …and `mvn -o clean test` alone is a false green for the edition modules
 
 `inspecto-oidc` and `inspecto-policy` enter the reactor **only** under `-Pedition-standard` /
-`-Pedition-enterprise` (root `pom.xml`, the profile-gated `<modules>`). So a plain `mvn -o clean test`
+`-Pedition-advanced` (root `pom.xml`, the profile-gated `<modules>`). So a plain `mvn -o clean test`
 does not compile or run them at all and still reports **BUILD SUCCESS** — the module-level analogue of
 the `-Dtest` trap above. **If a change touches auth, roles/capabilities, OIDC, or ABAC policy, the
 default-profile green means nothing:**
 
 ```powershell
-mvn -o clean test -Pedition-enterprise   # superset: pulls in BOTH security and policy
+mvn -o clean test -Pedition-advanced   # superset: pulls in BOTH security and policy
 ```
 
 Observed 2026-07-25: `OidcAuthenticatorTest.adminRoleGrantsOnboardConnectionsAndNotWorkbench` had been
 **failing on `master` since 63a556f8 (2026-07-24)** — that commit added `canTriageRequirements` to
 `admin`'s seed without updating the test's *equality* assertion, and nobody saw it because every
-default-profile run skipped the module. Two lessons: run the enterprise profile for any
+default-profile run skipped the module. Two lessons: run the advanced profile for any
 `Roles.SEED` change, and remember the reactor is **fail-fast** — a failure in `inspecto-oidc`
 leaves `inspecto-policy` **SKIPPED**, i.e. unverified, not passing.
 
 ⚠ **The same hole is in `package`, and it bites harder** (2026-09-11). `mvn -o clean package` with no
 profile cannot produce `inspecto-oidc.jar`, `inspecto-policy.jar` or `inspecto-notify-channels.jar` —
 those modules are not in the reactor at all — yet it reports BUILD SUCCESS. So "the bundle packages" from a
-default-profile run is a claim about the **Personal** flavor only. Prove Standard/Enterprise separately:
+default-profile run is a claim about the **Basic** flavor only. Prove Standard/Advanced separately:
 
 ```powershell
-mvn -o clean package -DskipTests -Pedition-enterprise -B
+mvn -o clean package -DskipTests -Pedition-advanced -B
 ```
 
 🔴 **And do NOT infer reactor membership from `<module>/target/` existence or mtimes.** `mvn clean` only
 cleans modules **in the current reactor**, so a profile-excluded module keeps stale output from an earlier
 run — and if that earlier run was minutes ago, its mtimes fall inside your build window and read as
 "rebuilt just now". Observed 2026-09-11: a default-profile `package` was reported as having recompiled all
-22 modules *including* security and policy, purely from `target/classes` timestamps left by an enterprise
+22 modules *including* security and policy, purely from `target/classes` timestamps left by an advanced
 **test** run three minutes earlier. ⇒ Read membership from **Maven's own** "Reactor Build Order" /
 "Reactor Summary". `-q` suppresses those, so drop it (or add `-B`) when the module list is the thing you
 are checking.
@@ -236,11 +236,11 @@ the narrow command cost a full run and still under-reported.
 done", run the whole reactor:
 
 ```powershell
-mvn -o clean test -Pedition-enterprise          # the verdict
-mvn -o clean test -Pedition-enterprise -fae     # add -fae to see EVERY module's failures in one pass
+mvn -o clean test -Pedition-advanced          # the verdict
+mvn -o clean test -Pedition-advanced -fae     # add -fae to see EVERY module's failures in one pass
 ```
 
-Plain `-Pedition-enterprise` is fail-fast, so a single broken module hides the rest; `-fae`
+Plain `-Pedition-advanced` is fail-fast, so a single broken module hides the rest; `-fae`
 (`--fail-at-end`) is what you want while draining a multi-module breakage. Note `-fae` still skips
 modules that *depend* on a failed one — those are unverified, not passing.
 
@@ -277,17 +277,17 @@ pwsh -File inspecto\package.ps1 -NoRuntime      # skip embedded JVM (target must
 (its `runtime\bin\java.exe`, or a command line naming the folder) — in this shared sandbox that server may be another
 session's. Stop it first; never kill a server you did not start. (2026-10-11: a rebuild wiped a live demo bundle.)
 
-Editions are build flavors (Personal HTTP/no-auth · Standard HTTPS/OIDC · Enterprise = Standard + ABAC
+Editions are build flavors (Basic HTTP/no-auth · Standard HTTPS/OIDC · Advanced = Standard + ABAC
 policy) — see [docs/EDITIONS.md](../../../docs/EDITIONS.md). All three flavors exist today:
 
 ```powershell
 pwsh -File inspecto\package.ps1 -Edition Standard    # + inspecto-oidc.jar (OIDC)
-pwsh -File inspecto\package.ps1 -Edition Enterprise  # + security AND inspecto-policy.jar (ABAC)
+pwsh -File inspecto\package.ps1 -Edition Advanced  # + security AND inspecto-policy.jar (ABAC)
 ```
 
-Enterprise is a **superset** of Standard, matching `-Pedition-enterprise` = `edition-standard` + policy;
+Advanced is a **superset** of Standard, matching `-Pedition-advanced` = `edition-standard` + policy;
 `serve.sh`/`serve.bat` auto-detect the edition from which jars are in the bundle. Default build (no
-`-Edition`) is Personal-equivalent.
+`-Edition`) is Basic-equivalent.
 
 ### Two-target (Windows + Linux) embedded runtime — GraalVM cache location matters
 

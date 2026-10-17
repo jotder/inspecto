@@ -18,6 +18,7 @@ import {
     untracked,
     viewChild,
 } from '@angular/core';
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -391,7 +392,18 @@ export class LinkAnalysisToolboxComponent {
     readonly runPatternOnServer = output<ServerPatternRequest>();
 
     /** The analysis tool groups (the accordion = the graph-algorithms toolbox). */
-    readonly tools: { id: AnalysisTab; label: string; icon: string; hint?: string }[] = [
+    /**
+     * LA-EDITIONS-1 ED-4: Graph Run (server algorithms, the edge index, "start an Investigation from the top results") is
+     * part of the Investigation surface, which Basic does not include - those tools and run buttons are hidden there.
+     */
+    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
+    /** The tool groups this edition offers ({@link allTools} minus the server-run ones on Basic). */
+    get tools(): { id: AnalysisTab; label: string; icon: string; hint?: string }[] {
+        return this.investigationsEnabled()
+            ? this.allTools
+            : this.allTools.filter((t) => t.id !== 'index-build' && t.id !== 'server-algorithms');
+    }
+    private readonly allTools: { id: AnalysisTab; label: string; icon: string; hint?: string }[] = [
         { id: 'path', label: 'Shortest path', icon: 'heroicons_outline:arrows-right-left' },
         { id: 'all-paths', label: 'All paths', icon: 'heroicons_outline:share' },
         { id: 'server-paths', label: 'Find paths (server)', icon: 'heroicons_outline:server-stack' },
@@ -409,7 +421,7 @@ export class LinkAnalysisToolboxComponent {
             id: 'value-measures',
             label: 'Value Measures',
             icon: 'heroicons_outline:banknotes',
-            hint: 'Find entities by money flow: pass-through ratio, cash-out concentration, structuring, benefit transfer',
+            hint: 'Find entities by money flow: pass-through ratio, withdrawal concentration, structuring, benefit transfer',
         },
         { id: 'pattern', label: 'Pattern match', icon: 'heroicons_outline:magnifying-glass-circle' },
         { id: 'index-build', label: 'Edge index', icon: 'heroicons_outline:server-stack' },

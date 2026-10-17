@@ -1,3 +1,4 @@
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -19,6 +20,14 @@ import { buildServerIdMap } from './graph-run-apply';
 import { workingSetToGraph } from './investigation-state';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LA_LIMIT_FALLBACKS, configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
+
+/** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
+const STANDARD_EDITION_FEATURES = {
+    ops: signal(false),
+    exchange: signal(false),
+    geoLink: signal(true),
+    investigations: signal(true),
+};
 
 /** Every browser cap at `n`: the general one, suspicion score's and each algorithm's own (CL-3). */
 function capAll(n: number): void {
@@ -100,12 +109,15 @@ function make(
         serverCeilings?: Record<string, number> | null;
         graph?: typeof CANVAS | null;
         answer?: (r: GraphRunRequest) => Observable<GraphRunView>;
+        /** The host's module flags (default: Standard and above). */
+        features?: typeof STANDARD_EDITION_FEATURES;
     } = {},
 ) {
     const run = vi.fn(opts.answer ?? (() => of(view('COMPLETED'))));
     TestBed.configureTestingModule({
         imports: [LinkAnalysisToolboxComponent],
         providers: [
+            { provide: LA_FEATURES, useValue: opts.features ?? STANDARD_EDITION_FEATURES },
             provideNoopAnimations(),
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             { provide: ComponentsService, useValue: { list: () => of([]) } },
@@ -144,6 +156,26 @@ function make(
         [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => text.test(b.textContent ?? ''));
     return { fixture, c, run, emphases, el, button, last: () => emphases[emphases.length - 1] };
 }
+
+describe('LinkAnalysisToolboxComponent - Basic edition (LA-EDITIONS-1 ED-4: Graph Run is Standard and above)', () => {
+    afterEach(() => resetLaLimits());
+
+    it('offers no server-algorithm or edge-index tool and no Run on server control; the browser tools stay', () => {
+        const { fixture, c, el } = make({ features: { ...STANDARD_EDITION_FEATURES, investigations: signal(false) } });
+        fixture.detectChanges();
+        const ids = c.tools.map((t) => t.id);
+        expect(ids).not.toContain('server-algorithms');
+        expect(ids).not.toContain('index-build');
+        expect(ids).toContain('path');
+        expect(ids).toContain('value-measures');
+        expect(el.querySelector('inspecto-link-analysis-server-run button')).toBeNull();
+    });
+
+    it('Standard keeps both server tools', () => {
+        const { c } = make();
+        expect(c.tools.map((t) => t.id)).toEqual(expect.arrayContaining(['server-algorithms', 'index-build']));
+    });
+});
 
 describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     afterEach(() => resetLaLimits());

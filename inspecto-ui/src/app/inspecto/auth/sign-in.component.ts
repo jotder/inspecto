@@ -26,7 +26,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
             <div class="bg-default flex flex-col justify-between gap-10 p-8 md:w-1/2 md:p-12 lg:p-16">
                 <div class="flex items-center gap-3">
                     <img class="h-8" src="assets/images/logo/inspecto-logo.svg" alt="" />
-                    <span class="text-lg font-semibold">Inspecto</span>
+                    <span class="text-lg font-semibold">{{ product }}</span>
                 </div>
 
                 <div class="flex flex-col gap-6">
@@ -43,10 +43,10 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     <!-- R2-17: a demo build is shown to business audiences — neutral copy, no builder jargon. -->
                     @if (demo()) {
                         <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-                            Inspecto demonstration
+                            {{ product }} demonstration
                         </h1>
                         <p class="text-secondary max-w-md text-lg">
-                            A demonstration running on this computer only. Choose a Demo User to see Inspecto as that
+                            A demonstration running on this computer only. Choose a Demo User to see {{ product }} as that
                             person would.
                         </p>
                     } @else {
@@ -186,6 +186,8 @@ export class SignInComponent implements OnInit {
      *  would 401 here. Each falls back to the shipped default when the operator authored none. */
     readonly logo = computed(() => this.session.branding().logoDataUrl);
     readonly caption = computed(() => this.session.branding().caption);
+    /** ED-1: the product this host is ("Inspecto" in the console, "Inspecto LA" in la-app). */
+    readonly product = this.env.productName ?? 'Inspecto';
     readonly footer = computed(() => this.session.branding().footerText ?? this.env.footerText);
     /** HOME-VERSION-1: the version the backend reports — the field a support call reads aloud. Absent until known. */
     readonly version = computed(() => this.session.version());

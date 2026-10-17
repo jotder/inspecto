@@ -182,7 +182,7 @@ class ControlApiSpaceTemplateSeedGateTest {
         try (Ctx c = open(root)) {
             HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"alerting\"}", ADMIN);
             assertEquals(422, r.statusCode(), r.body());
-            assertTrue(r.body().contains("template alert-rule 'errors' is refused") && !r.body().contains("Professional"), r.body());
+            assertTrue(r.body().contains("template alert-rule 'errors' is refused") && !r.body().contains("Standard"), r.body());
             assertFalse(Files.exists(root.resolve("acme")), "a refused template leaves no Space directory");
             assertFalse(send(c, "GET", "/spaces", null, ADMIN).body().contains("\"acme\""));
         }

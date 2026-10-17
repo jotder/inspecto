@@ -247,7 +247,7 @@ class ControlApiHealthDetailsTest {
             assertEquals("NOT_CONFIGURED", events.get("status").asText(),
                     "-Devents.backend defaults to memory: " + subs);
             assertEquals("UP", body.get("status").asText(),
-                    "an unconfigured family is not a failure — Personal configures none of them: " + body);
+                    "an unconfigured family is not a failure — Basic configures none of them: " + body);
         }
     }
 

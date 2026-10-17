@@ -16,7 +16,7 @@ test('the real package.ps1 is GREEN', () => {
 });
 
 test('RED: a variable assigned only in another branch then read', () => {
-    const r = analyze(fixture("Set-StrictMode -Version Latest\n$e = 'Personal'\nif ($e -ne 'Personal') { $kafkaJarSrc = 'a' }\nif ($kafkaJarSrc) { Write-Host x }\n"));
+    const r = analyze(fixture("Set-StrictMode -Version Latest\n$e = 'Basic'\nif ($e -ne 'Basic') { $kafkaJarSrc = 'a' }\nif ($kafkaJarSrc) { Write-Host x }\n"));
     assert.equal(r.ok, false);
     assert.match(r.unset.join('\n'), /\$kafkajarsrc/);
 });

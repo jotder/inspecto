@@ -1,4 +1,4 @@
-# Link Analysis showcase A: mobile money (runbook, synthetic data)
+# Inspecto LA (Link Analysis) showcase A: mobile money (runbook, synthetic data)
 
 *Status: written 2026-10-16 from the code, the seed script, the smoke runner and a live pass (a fresh Space from the template on a demo-auth bundle, seed `--apply` clean, smoke 10/10).
 Scenes marked **UNVERIFIED (rehearse first)** have no test or probe behind one of their claims; the browser walk-through of the Graph page is not part of this pass.*

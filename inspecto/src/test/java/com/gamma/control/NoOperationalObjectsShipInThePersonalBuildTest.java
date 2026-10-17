@@ -188,6 +188,6 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
         assertEquals(stubbed, SURFACE.length,
                 "the ops manifest stubs " + stubbed + " path(s) and this test exercises " + SURFACE.length
                         + ". A path added to the stub without a case here is untested; one removed from the "
-                        + "stub turns into a 404 on Personal. Update both.");
+                        + "stub turns into a 404 on Basic. Update both.");
     }
 }

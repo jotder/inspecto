@@ -85,7 +85,7 @@ export function render(root, g = gather(root)) {
     const first = (e) => bundleModules(e).length + coreModules().length;
     L.push(`| First-party jars (processor + connectors + optional + core thin) | ${EDITIONS.map(first).join(' | ')} |`);
     L.push(`| of which core thin jars | ${EDITIONS.map(() => coreModules().length).join(' | ')} |`);
-    L.push(`| Optional modules beyond Personal | ${EDITIONS.map((e) => bundleModules(e).length - bundleModules('Personal').length).join(' | ')} |`);
+    L.push(`| Optional modules beyond Basic | ${EDITIONS.map((e) => bundleModules(e).length - bundleModules('Basic').length).join(' | ')} |`);
     L.push(`| Total on the classpath (+ third-party sidecars) | ${EDITIONS.map((e) => classpath(e, { g }).length).join(' | ')} |`);
     return L.join('\n');
 }

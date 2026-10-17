@@ -73,14 +73,14 @@ class EditionFeatureGateTest {
         assertEquals("CONFIG_VALIDATION_FAILED", err.get("errorCode").asText(), r.body());
         JsonNode finding = err.get("details").get("findings").get(0);
         assertEquals(FindingCodes.ERR_EDITION_FEATURE, finding.get("code").asText(), r.body());
-        assertTrue(finding.get("message").asText().contains("Professional+"), r.body());
+        assertTrue(finding.get("message").asText().contains("Standard+"), r.body());
         assertTrue(finding.get("message").asText().contains(feature), r.body());
     }
 
     @Test
     void thisModuleIsThePersonalBuild() {
         for (String f : List.of(EditionFeatures.ALERT_DISPATCH, EditionFeatures.SINK_ARCHIVE, EditionFeatures.SINK_DUCKLAKE))
-            assertFalse(EditionFeatures.present(f), f + " must be absent without a Professional module");
+            assertFalse(EditionFeatures.present(f), f + " must be absent without a Standard module");
     }
 
     @Test
@@ -94,7 +94,7 @@ class EditionFeatureGateTest {
                     + "\"comparator\":\"gt\",\"threshold\":0.1,\"window\":\"1h\"}}]}");
             String detail = V1Body.of(send(c.port, "POST", "/decision-rules/breach/apply", null).body())
                     .get("executed").get(0).get("detail").asText();
-            assertTrue(detail.contains("could not author") && detail.contains("Professional+"), detail);
+            assertTrue(detail.contains("could not author") && detail.contains("Standard+"), detail);
             assertEquals("[]", V1Body.of(send(c.port, "GET", "/alerts/rules", null).body()).toString(),
                     "nothing armed");
             assertFalse(Files.exists(wr.resolve("registry/alert-rules")), "nothing persisted");

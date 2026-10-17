@@ -199,7 +199,7 @@ class DuckLakeRegistrarTest {
         assertDoesNotThrow(() -> DuckLakeRegistrar.onRegistrationFailure(
                         new java.sql.SQLException("catalog unreachable"), "postgres://lake/catalog"),
                 "the default topology is single — D10 must not change behaviour for anyone who never set "
-                        + "the flag, which is every Personal and Standard install");
+                        + "the flag, which is every Basic and Standard install");
     }
 
     // -- 4. D4/phase C: a partitioned pod must not get a PRIVATE catalog ---------------------------------
@@ -392,6 +392,6 @@ class DuckLakeRegistrarTest {
 
         assertDoesNotThrow(() -> DuckLakeRegistrar.requireRegistrationConfigured(null),
                 "the default topology is single — this must not change behaviour for anyone who never set "
-                        + "the flag, which is every Personal and Standard install");
+                        + "the flag, which is every Basic and Standard install");
     }
 }

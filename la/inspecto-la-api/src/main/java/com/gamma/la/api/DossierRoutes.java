@@ -59,10 +59,10 @@ import java.util.function.UnaryOperator;
  */
 public final class DossierRoutes implements RouteModule {
 
-    /** Gated by the geoLink feature: a Space whose modules.toon disables it answers 404 MODULE_DISABLED here. */
+    /** Gated by the geoLink feature (404 MODULE_DISABLED where a Space switches it off) and the investigations edition feature (503 CAPABILITY_UNAVAILABLE on Basic, LA-EDITIONS-1). */
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        return java.util.Set.of("geoLink", "investigations");
     }
 
     // A dossier covers at most the Space's dossier.max_steps log steps and dossier.max_snapshots snapshots (LaLimit).
@@ -110,14 +110,21 @@ public final class DossierRoutes implements RouteModule {
     }
 
     /** Build the Dossier at {@code at} over the given snapshots and mask it per the Space's {@code maskingMode} (D-U6). */
-    @SuppressWarnings("unchecked")
     static Masked maskedDossier(HttpExchange ex, Opened inv, List<String> log, int at, List<String> snapshotIds)
+            throws IOException {
+        return maskedDossier(ex, inv, log, at, snapshotIds, false);
+    }
+
+    /** As above; {@code reveal} (a hand-off by a holder of {@code canRevealLinkEntities}) applies no masking and says so. */
+    @SuppressWarnings("unchecked")
+    static Masked maskedDossier(HttpExchange ex, Opened inv, List<String> log, int at, List<String> snapshotIds, boolean reveal)
             throws IOException {
         GraphDossierBuilder.Input in = input(inv, log, at, snapshots(ex, inv, snapshotIds, true));
         Map<String, Object> built = GraphDossierBuilder.build(in);
         // D-U6: the dossier is masked as it leaves — the manifest (hashes only) is unaffected, and custody is
         // verified against the store by /dossier/verify, which never sees a pseudonym.
-        EntityMasking mask = EntityMasking.of(inv.inv(), snapshotEntityIds(in.snapshots()));
+        EntityMasking mask = reveal ? EntityMasking.revealed(com.gamma.spi.http.ApiContext.actor(ex))
+                : EntityMasking.of(inv.inv(), snapshotEntityIds(in.snapshots()));
         Map<String, Object> dossier = (Map<String, Object>) LinkIds.stamp(mask.apply(built));   // D-U9: link ids minted from what the caller sees
         return new Masked(dossier, mask);
     }
@@ -282,6 +289,14 @@ public final class DossierRoutes implements RouteModule {
      *  not the owner, R3 or an Enterprise policy DENY), keeping the header's raw bytes for the manifest. */
     static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
+        String raw = inv.store().header(id).orElse(null);
+        if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
+        return new Opened(inv, inv.store(), inv.writeRoot(), id, raw);
+    }
+
+    /** As {@link #open}, but a LEAD only ({@link InvestigationRoutes#open}): what hands the evidence outside is a write-level act. */
+    static Opened openAsLead(ApiContext api, HttpExchange ex, String id) throws IOException {
+        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         String raw = inv.store().header(id).orElse(null);
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         return new Opened(inv, inv.store(), inv.writeRoot(), id, raw);

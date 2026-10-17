@@ -77,7 +77,7 @@ class LaShowcaseTemplateTest {
         assertTrue(analyst.containsAll(Set.of(Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,
                 Roles.CAN_BUILD_LINK_INDEX, Roles.CAN_AUTHOR_ALERT_RULES)), analyst.toString());
         assertFalse(analyst.contains(Roles.CAN_APPROVE_LINK_EXPANSIONS), "the requester cannot also be the approver");
-        assertFalse(analyst.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
+        assertTrue(analyst.contains(Roles.CAN_REVEAL_LINK_ENTITIES), "the analyst may reveal (91a03666c, 2026-10-16: Preview LA demo); each reveal is audited");
 
         Set<String> manager = caps.get("fm.manager");
         assertTrue(manager.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_MANAGE_INCIDENTS)), manager.toString());

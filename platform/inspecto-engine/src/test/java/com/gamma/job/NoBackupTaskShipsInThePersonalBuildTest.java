@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * EDG-01 cell 2 — the assertion that makes the OPS-06 gating REAL rather than claimed.
  *
  * <p>This runs in the DEFAULT reactor, which is the **Personal** build (there is no
- * {@code -Pedition-personal}). On that classpath {@code task: backup} must be an UNKNOWN maintenance task,
+ * {@code -Pedition-basic}). On that classpath {@code task: backup} must be an UNKNOWN maintenance task,
  * because `EDITIONS.md` `OPS-06` says backup/restore is not in the edition and — since 2026-09-07 — the
  * build finally agrees: `BackupTask` lives in `inspecto-backup`, a Standard+/Enterprise-only module that
  * reaches `MaintenanceJob` only through the {@link MaintenanceTaskProvider} seam.
@@ -35,7 +35,7 @@ class NoBackupTaskShipsInThePersonalBuildTest {
         for (String task : new String[]{"backup", "backup_verify", "restore"}) {
             IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                     () -> new MaintenanceJob(job(task)).run(),
-                    "'" + task + "' must NOT resolve in the default (Personal) build — EDITIONS OPS-06");
+                    "'" + task + "' must NOT resolve in the default (Basic) build — EDITIONS OPS-06");
             assertTrue(e.getMessage().contains("unknown maintenance task '" + task + "'"), e.getMessage());
             // …and the message says WHY, so an operator reading a failed run is not left guessing.
             assertTrue(e.getMessage().contains("optional edition module"), e.getMessage());
@@ -53,6 +53,6 @@ class NoBackupTaskShipsInThePersonalBuildTest {
     @Test
     void noMaintenanceTaskProviderIsOnThePersonalClasspath() {
         assertFalse(java.util.ServiceLoader.load(MaintenanceTaskProvider.class).iterator().hasNext(),
-                "a MaintenanceTaskProvider on the default classpath means an optional module leaked into Personal");
+                "a MaintenanceTaskProvider on the default classpath means an optional module leaked into Basic");
     }
 }

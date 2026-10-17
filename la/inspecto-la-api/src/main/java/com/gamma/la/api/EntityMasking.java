@@ -109,6 +109,15 @@ final class EntityMasking {
         };
     }
 
+    /**
+     * NO masking, recorded as such: a hand-off whose caller holds {@code canRevealLinkEntities} and asked for raw ids
+     * (LA-EDITIONS-1 phase 6). The mode reads {@code revealed} so the payload and the audit say what left.
+     */
+    static EntityMasking revealed(String actor) {
+        return new EntityMasking("revealed", "masking lifted for this hand-off by " + actor
+                + " (canRevealLinkEntities) - the bundle carries raw entity ids", Map.of());
+    }
+
     /** The masking in force for one Investigation, from its sealed log (read here) plus any {@code extraIds}. */
     static EntityMasking of(InvestigationRoutes.Inv inv, Collection<String> extraIds) throws IOException {
         List<Map<String, Object>> log = new ArrayList<>();

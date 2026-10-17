@@ -6,6 +6,7 @@ import { DemoUser, SessionService } from './session.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignInComponent } from './sign-in.component';
+import { APP_ENVIRONMENT, appEnvironment } from '../api/app-environment';
 
 const FAILED_KEY = 'inspecto.signInFailed';
 
@@ -20,7 +21,7 @@ const FAILED_KEY = 'inspecto.signInFailed';
  * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
-function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean } = {}) {
+function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean; productName?: string } = {}) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => opts.loginRequired ?? true,
@@ -39,6 +40,7 @@ function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstr
             provideNoopAnimations(),
             { provide: SessionService, useValue: session },
             { provide: Router, useValue: router },
+            ...(opts.productName ? [{ provide: APP_ENVIRONMENT, useValue: { ...appEnvironment(), productName: opts.productName } }] : []),
         ],
     });
     const fixture = TestBed.createComponent(SignInComponent);
@@ -183,6 +185,20 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
             expect(el.querySelector('mat-icon')?.getAttribute('data-mat-icon-name')).toBe('user-circle');
             expect(text(el.querySelector('inspecto-alert'))).toContain(
                 'Not secure, local only. Pick who you are for this demo.',
+            );
+            await expectNoA11yViolations(el);
+        });
+
+        // ED-1 (LA-EDITIONS-1): the screen is shared by the console and la-app; each host names its own product.
+        it('names the host product: "Inspecto" by default, the provided product name in la-app', async () => {
+            const brand = (el: HTMLElement) => text(el.querySelector('main span.text-lg'));
+            expect(brand(create().el)).toBe('Inspecto');
+
+            const { el } = create({ demoUsers: DEMO, productName: 'Inspecto LA' });
+            expect(brand(el)).toBe('Inspecto LA');
+            expect(text(el.querySelector('h1'))).toBe('Inspecto LA demonstration');
+            expect(text(el.querySelector('h1 + p'))).toBe(
+                'A demonstration running on this computer only. Choose a Demo User to see Inspecto LA as that person would.',
             );
             await expectNoA11yViolations(el);
         });

@@ -3,8 +3,8 @@
 //
 // WHY THIS EXISTS (`CONTROL-AUTHGATE-TESTCOVERAGE-1`, docs/BACKLOG.md). `ApiContext.requireCapability`
 // is a no-op unless a `Subject` is attached to the exchange, and no test attaches one unless it calls
-// `Authenticators.forTest(...)` to install a fake authenticator (W6: Personal edition never attaches a
-// Subject at all). A route test that never arms an Authenticator runs Personal-shaped, so adding or
+// `Authenticators.forTest(...)` to install a fake authenticator (W6: Basic edition never attaches a
+// Subject at all). A route test that never arms an Authenticator runs Basic-shaped, so adding or
 // removing a `withCapability` gate on it changes NO test's outcome — the gate is asserted only by the
 // source reading correctly, never by an HTTP round trip. Building an armed-Authenticator test for every
 // one of the ~130 route-test files is out of scope for one change; this guard instead stops the gap

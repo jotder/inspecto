@@ -311,6 +311,7 @@
     "/assist/skills",
     "/settings/link-analysis",
     "/settings/link-analysis/limits",
+    "/settings/link-analysis/domain-profile",
     "/settings/pipeline-history",
     "/settings/timezone",
     "/inv/schema/overlap-profile",
@@ -6651,6 +6652,30 @@
         "x-generated" : true
       }
     },
+    "/settings/link-analysis/domain-profile" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "The Space's Domain Profile: the active Industry pack's terminology and the installed packs",
+        "operationId" : "getSettingsLinkAnalysisDomainProfile",
+        "description" : "Answers {active, stated, profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. A pack that failed validation at load is listed under refused, never installed.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "Select the Space's Domain Profile (canAuthorWorkbench)",
+        "operationId" : "putSettingsLinkAnalysisDomainProfile",
+        "description" : "Body {domainProfile: pack id | generic | null}. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack; 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and answers the GET shape.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      }
+    },
     "/settings/pipeline-history" : {
       "get" : {
         "tags" : [ "settings" ],
@@ -8946,7 +8971,8 @@
         "properties" : {
           "edition" : {
             "type" : "string",
-            "enum" : [ "personal", "professional" ]
+            "enum" : [ "basic", "standard", "advanced" ],
+            "description" : "The edition (LA-EDITIONS-1 ED-2): basic (auth-free), standard (an Authenticator), advanced (+ the policy engine). Preview reports as advanced."
           },
           "version" : {
             "type" : "string",
@@ -8960,6 +8986,10 @@
               },
               "multiSpace" : {
                 "type" : "boolean"
+              },
+              "investigations" : {
+                "type" : "boolean",
+                "description" : "True only when the Link Analysis Investigation surface is installed AND included in this edition (false on Basic, the Link Analysis explorer: its Investigation routes answer 503 CAPABILITY_UNAVAILABLE). LA-EDITIONS-1 phase 3."
               },
               "authMode" : {
                 "type" : "string"

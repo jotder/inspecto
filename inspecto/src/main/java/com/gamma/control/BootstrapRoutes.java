@@ -93,12 +93,12 @@ final class BootstrapRoutes implements RouteModule {
     }
 
     /**
-     * Auth-free core = Personal; an authenticated build reports Professional, or Enterprise when an
-     * {@link AccessDecider} (the policy module) is installed — the edition's defining extra, not a property guess.
+     * Auth-free core = Basic; an authenticated build reports Standard, or Advanced when an {@link AccessDecider} (the
+     * policy module) is installed — the edition's defining extra, not a property guess (edition names: LA-EDITIONS-1 ED-2).
      */
     static String edition() {
-        if ("none".equalsIgnoreCase(System.getProperty("auth.mode", "none"))) return "personal";
-        return AccessDeciders.active().isPresent() ? "enterprise" : "professional";
+        if ("none".equalsIgnoreCase(System.getProperty("auth.mode", "none"))) return "basic";
+        return AccessDeciders.active().isPresent() ? "advanced" : "standard";
     }
 
     private static Map<String, Object> features(ApiContext api) {
@@ -112,11 +112,17 @@ final class BootstrapRoutes implements RouteModule {
         // registered, never guessed; the stub does not count (ApiContext.hasRoute excludes stubs).
         java.util.Set<String> on = new java.util.HashSet<>(api.registeredFeatures());
         on.removeAll(api.disabledFeatures());   // MODULE-REORG-1 P2b: installed AND enabled in the current Space
+        // LA-EDITIONS-1 phase 3: AND included in this edition - a route feature the edition withholds (EditionFeatures.gatesRoutes,
+        // the Link Analysis Investigation surface on Basic) is registered but answers 503, so it is reported false.
+        on.removeIf(id -> com.gamma.etl.EditionFeatures.gatesRoutes(id) && !com.gamma.etl.EditionFeatures.present(id));
         f.put("exchange", HostContext.of(api).spaces().containerRoot() != null && on.contains("exchange"));
         // EDITIONS CP-09 (EDG-01 cell 3b): true only when the optional inspecto-geo-link module actually
         // registered its routes — derived, never an edition guess. The SPA hides the two nav entries and
         // the two widget offers on it.
         f.put("geoLink", on.contains("geoLink"));
+        // LA-EDITIONS-1 phase 3 (ED-4): the Link Analysis Investigation surface. False on Basic (the explorer: geoLink true,
+        // investigations false) and wherever geo-link is absent; the SPA hides Investigation affordances on false.
+        f.put("investigations", on.contains("investigations"));
         // SEP-08: true only when the optional inspecto-entity-list module registered its routes — derived from
         // what registered, never an edition guess, and never from the stub (hasRoute excludes stubs). Probed on
         // POST /entity-lists, a LITERAL write, not on the GET /entity-lists/([^/]+) catch-all shape.

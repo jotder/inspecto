@@ -209,7 +209,7 @@ class NoExchangeShipsInThePersonalBuildTest {
             boolean audited = c.svc.events().page(200, null, null).stream()
                     .anyMatch(e -> "ACCESS_DENIED".equals(e.type())
                             && e.attributes().getOrDefault("http_path", "").contains("nonexistent-secret-route"));
-            assertTrue(audited, "a mutating request must still be RECORDED on Personal - only READING is gated");
+            assertTrue(audited, "a mutating request must still be RECORDED on Basic - only READING is gated");
         }
     }
 

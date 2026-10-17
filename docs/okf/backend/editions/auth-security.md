@@ -1,31 +1,31 @@
 ---
 type: Concept
 title: Auth & Security
-description: Auth-free core; the Authenticator/Subject/TokenRelay/AccessDecider SPIs; the shipped inspecto-oidc module (split into inspecto-oidc, inspecto-secrets, inspecto-geo-country by D-MR6) (Professional, OIDC via Keycloak/WSO2, data-driven roles, Access-Profile + sharing enforcement); the Enterprise inspecto-policy ABAC engine (authored Access Policies, space isolation, decision audit); the separate -Dassist.write.root write-gate.
+description: Auth-free core; the Authenticator/Subject/TokenRelay/AccessDecider SPIs; the shipped inspecto-oidc module (split into inspecto-oidc, inspecto-secrets, inspecto-geo-country by D-MR6) (Standard, OIDC via Keycloak/WSO2, data-driven roles, Access-Profile + sharing enforcement); the Advanced inspecto-policy ABAC engine (authored Access Policies, space isolation, decision audit); the separate -Dassist.write.root write-gate.
 resource: providers/inspecto-oidc/, providers/inspecto-policy/
-tags: [auth, security, spi, oidc, keycloak, wso2, bff, write-gate, rbac, abac, policy-engine, edition-professional, edition-enterprise]
+tags: [auth, security, spi, oidc, keycloak, wso2, bff, write-gate, rbac, abac, policy-engine, edition-standard, edition-advanced]
 timestamp: 2026-07-24T00:00:00Z
 ---
 
 # Auth & Security
 
-**All auth was removed from `master`/the common core on 2026-06-16.** Personal is genuinely auth-free: every
+**All auth was removed from `master`/the common core on 2026-06-16.** Basic is genuinely auth-free: every
 [`ControlApi`](../control-plane/control-api.md) route is open, the SPA boots straight to `/dashboard`, and there
 is no token paste / guard / interceptor. The removed hand-rolled bearer-token plane (per-route `Scope`,
 `-Dcontrol.token`, the Angular token screen) is gone.
 
-**Professional re-adds auth via SPIs + the shipped `inspecto-oidc` module.** The core defines three SPIs in
+**Standard re-adds auth via SPIs + the shipped `inspecto-oidc` module.** The core defines three SPIs in
 `com.gamma.control`: **`Authenticator`** (validates a request, yields a subject), **`Subject`** (a record of
 `id` + capabilities), and **`TokenRelay`**. `providers/inspecto-oidc/` (artifactId `inspecto-oidc`, **34**
 tests — measured 2026-09-08: 24 + 7 + 3; an earlier "41" was never true of the tree) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
-`OidcTokenRelay`. It joins the reactor **only under the `edition-professional` Maven profile** (with `edition-standard` retained as an alias) — the default
-build never compiles it (verify with `-Pedition-professional`); because it's a
+`OidcTokenRelay`. It joins the reactor **only under the `edition-standard` Maven profile** — the default
+build never compiles it (verify with `-Pedition-standard`); because it's a
 [build flavor](editions-model.md), the core still carries zero auth code.
 
 **BFF session shape.** The browser never holds tokens: `POST /auth/exchange|refresh|logout` run the OIDC
 exchange server-side and keep the refresh token in an **httpOnly `inspecto_rt` cookie**
 (`SameSite=Strict`, plus an `Origin` check for CSRF). HTTPS is served by the pure-JDK `HttpsServer`. The UI
-discovers the mode via `GET /bootstrap` → `features.authMode` and its OIDC flow is a no-op on Personal.
+discovers the mode via `GET /bootstrap` → `features.authMode` and its OIDC flow is a no-op on Basic.
 
 **Sign-out is three layers, and all three have to fire** (fixed 2026-07-26; BACKLOG §5 tracked only the
 third). `SessionService.logout()` (1) POSTs `/auth/logout` so the backend revokes and clears the
@@ -44,7 +44,7 @@ as the RP identifier instead.
 - **`SessionService.redirect()` is the single seam that leaves the SPA** (authorize + end-session). It exists
   because jsdom makes `window.location.assign` non-configurable, so it is the only way to unit-test either
   redirect.
-- **Personal renders no user menu at all.** The auth-free shell has no principal to name and no session to
+- **Basic renders no user menu at all.** The auth-free shell has no principal to name and no session to
   end; showing the menu meant a blank "Signed in as" over a Sign out that could not work.
 - **Under OIDC the menu now NAMES the subject** (2026-09-15). `bootstrap.session.actor` was parsed by
   `SessionService` and thrown away, while the menu rendered a hardcoded empty string fed by a
@@ -57,7 +57,7 @@ as the RP identifier instead.
 Authorization questions are always asked as **named capabilities** (`canAuthorWorkbench`, `canOperateRuns`,
 `canTriageRequirements`, `canOnboardConnections`, …) — never "which lens is active?". A **Lens** is a
 self-selected *view* (UX shaping, honor system); a **Role** is an admin-*assigned* authorization enforced
-server-side (GLOSSARY §1-A, binding). On Professional, `RoleMapper` resolves IAM claims → roles → capabilities
+server-side (GLOSSARY §1-A, binding). On Standard, `RoleMapper` resolves IAM claims → roles → capabilities
 per the planned taxonomy (Business / Pipeline Developer / Operations / Power / Admin / Super); the UI
 re-derives its capability signals from the subject's grants in one file — no pane changes. Rules for
 extending: one new named capability per distinct authorization question; never reuse one because its current
@@ -126,12 +126,12 @@ server-side authorization system, all behind the existing SPIs (core stays auth-
   a gateway-signed `X-JWT-Assertion` header (WSO2 APIM), consulted only when no valid `Bearer` resolves;
   unsigned header identity is never trusted. Opt-in via `-Dauth.oidc.gateway.issuer/.jwksUri`.
 
-## Enterprise ABAC — the Access Policy engine (`inspecto-policy`, workstream A)
+## Advanced ABAC — the Access Policy engine (`inspecto-policy`, workstream A)
 
-The `edition-enterprise` Maven profile = `edition-professional` (or `edition-standard`) + the new **`inspecto-policy`** module
+The `edition-advanced` Maven profile = `edition-standard` + the new **`inspecto-policy`** module
 (artifactId `inspecto-policy`), which registers a `PolicyEngine` on the core's **`AccessDecider`** SPI
-via `META-INF/services`. Personal/Professional never bundle it and behave byte-identically. Build/test with
-`mvn -o -Pedition-enterprise clean test` ([build & test](../build-run/build-test.md)).
+via `META-INF/services`. Basic/Standard never bundle it and behave byte-identically. Build/test with
+`mvn -o -Pedition-advanced clean test` ([build & test](../build-run/build-test.md)).
 
 - **Attribute model (A1).** `Subject` gained an additive `attributes()` map (empty on every pre-A1 caller).
   `roles.toon` carries an optional `identity: {attributeClaims: […]}` **allowlist**; `OidcAuthenticator`
@@ -152,7 +152,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   context = `subject.{id,capabilities,dataScopes,roles}` + A1 claims, `env.{action,route,space}`,
   `resource.*` (row level, `resource.space` defaulting to the bound space). **A policy allow does NOT bypass
   capability gates** (defense in depth — the plan's §2 order was deliberately tightened); ABSTAIN falls
-  through to the Professional capability/profile/sharing gates.
+  through to the Standard capability/profile/sharing gates.
 - **Space isolation (A4 = SPC-5).** Per-tenant isolation ships as two **engine-resident seed policies**
   (`PolicyEngine.SEED`: `space-isolation`, `space-isolation-rows`) overlaid **per policy name** by the
   authored doc — deny when the subject's mapped `space` home-space claim ≠ the bound space (route + row).
@@ -177,7 +177,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   (`AccessDecider.explain` → decision + matched policy + per-policy `{targeted, conditionHeld, source}`
   trace, enforcing/auditing nothing). It is a GET on purpose — a POST would be a `write` the policy under
   test could 403 at the route PEP, locking the denied subject out of their own explanation. Both are
-  Enterprise-only (the seam is default-empty; Personal/Professional show authored rows only and
+  Advanced-only (the seam is default-empty; Basic/Standard show authored rows only and
   `{enabled:false}`). UI: Settings ▸ Access ▸ **Policies** tab (effective table + explain panel; authoring
   since 2026-09-25, next bullet).
 - **Policy authoring guards (2026-09-25, `archived-documents/plans-archive/policy-authoring-ux-design.md` S1–S4, operator D1 =
@@ -206,7 +206,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   UI: the Policies tab authors (new/edit/delete, built-in "Override…" behind a confirm, full replace with
   `If-Match`, warnings under each row, *Preview impact* in `PolicyFormDialog`).
   ⚠ **Upgrade bites at runtime:** an existing doc with a stray key, or a `subject.<claim>` not
-  allowlisted, is unreadable after upgrade ⇒ deny-all on Enterprise, recoverable only on disk (the PUT is
+  allowlisted, is unreadable after upgrade ⇒ deny-all on Advanced, recoverable only on disk (the PUT is
   itself denied while the doc is unreadable). Pinned by `ControlApiAccessPolicyLintTest`
   (`f8_upgradePath_…`) and `ControlApiPolicyEnforcementTest.d4_upgradePath_…`.
   ⚠ Limits, stated: the preview's role subjects carry no id or claims, so a policy keyed on
@@ -219,7 +219,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   reversible.
   ⚠ **Owed: a browser pass over the Policies-tab editor** (create / edit / delete / override confirm /
   *Preview impact* / 409 and 422 messages). The editor is covered by vitest specs only; it has not been
-  driven in the preview against an Enterprise backend.
+  driven in the preview against an Advanced backend.
 - **Q3 `canTriageRequirements` grant (2026-07-24, product sign-off).** Seeded to Business + Power + Admin +
   Super (`Roles.SEED`) — requirement triage is a business-analyst activity; Pipeline Developer/Operations
   build/run rather than triage.
@@ -281,7 +281,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   `builder` set and `power`, and joined `admin` (`super` holds the whole vocabulary via `KNOWN_CAPABILITIES`).
   ⚠ **`Roles.SEED` is asserted by an *equality* check** in `OidcAuthenticatorTest`
   (`adminRoleGrantsOnboardConnectionsAndNotWorkbench`) — every future grant addition must update that test, and
-  it must be run under **`-Pedition-enterprise`**: the default reactor omits `inspecto-oidc` entirely, so a
+  it must be run under **`-Pedition-advanced`**: the default reactor omits `inspecto-oidc` entirely, so a
   plain `mvn -o clean test` cannot see a failure there. That gap had already left this assertion red on
   `master` since `63a556f8`; see `.claude/skills/build-verify/SKILL.md`.
 - **D4 — `canCurateMenus`, split out of `canAuthorWorkbench`. SHIPPED end-to-end 2026-07-25**
@@ -356,16 +356,16 @@ Three things a future change must not undo:
   + `withCapability`) is the enforcement point. That is *why* dropping the conjunct cannot escalate privilege.
 - **Identity capabilities are still lens-suppressed off OIDC.** The exemption is justified by the subject's
   identity, and in honor-system mode there is none (`granted()` short-circuits true for everyone), so the lens
-  is the only signal. Without that clause Personal mode's Business lens starts showing Connections and
+  is the only signal. Without that clause Basic mode's Business lens starts showing Connections and
   Requirements affordances and the "View as" preview stops meaning anything.
 - **`canTriageRequirements` is identity by operator call** — it is the `business` seed's *only* capability, so
   lens-scoping it revoked the single grant that role has. Consequence, accepted deliberately:
   **"Business lens ⇒ read-only" is no longer a true statement about the product.**
 
-Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): X-Actor is already rejected on Professional (the SEC-7a spoof guard), so only its full removal remains,
+Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): X-Actor is already rejected on Standard (the SEC-7a spoof guard), so only its full removal remains,
 gated on **the next MAJOR tag** (restated 2026-09-07 — the API-v1 sunset apparatus this used to cite was deleted 2026-07-25). The capability spec [`okf/capabilities/security/security.md`](../../capabilities/security/security.md) is the front door for what was required, left and refused; this page stays the mechanism.
 
-`package.ps1 -Edition Enterprise` **shipped 2026-07-25** — a superset of Professional (both the `security` and
+`package.ps1 -Edition Advanced` **shipped 2026-07-25** — a superset of Standard (both the `security` and
 `policy` jars are bundled), with `serve.sh`/`serve.bat` deriving the edition from bundle contents. No
 runtime flag was added: `inspecto-policy` is discovered solely via its `AccessDecider` service file, so the
 classpath entry is the switch. Detail in [EDITIONS.md](../../../EDITIONS.md).
@@ -392,9 +392,9 @@ refuse a boot in a customer's bundle; the boot check is what makes the guarantee
 artifact rather than of the repository.
 
 **Reads are open BY POLICY**, and that is a stated position rather than an omission: confidentiality sits at
-the Space/ABAC layer, where a caller's data scopes decide what a read can see — ⚠ **which exists on Enterprise
+the Space/ABAC layer, where a caller's data scopes decide what a read can see — ⚠ **which exists on Advanced
 only** (`inspecto-policy`, seed `space-isolation`, active only with an IdP `space` claim; `AccessDeciders` reads
-absence as ALLOW), so on Professional an authenticated subject reads every hosted Space (stated 2026-09-17). Affirmed as the **compliance**
+absence as ALLOW), so on Standard an authenticated subject reads every hosted Space (stated 2026-09-17). Affirmed as the **compliance**
 position 2026-09-16 knowing it becomes an auditor-facing claim (`controls-matrix.md` CC6). ⚠ If reads are
 ever gated, that matrix line moves with the code.
 
@@ -424,7 +424,7 @@ for everyone. All four are now `canAdminister` (fail closed; reads stay open), p
 `CapabilityManifestTest.sharedNotificationStateWritesStayAdminGated` and exercised WITH a Subject in
 `ControlApiNotificationsTest`. ⚠ Consequence: a non-admin's bell could no longer mark read or dismiss.
 **Resolved for READ state, 2026-09-25 (operator):** read state is now per reader — `NotificationReadState`,
-keyed by `ApiContext.actor` (the Subject id; on Personal the `appUser` / `X-Actor` fallback) — so `POST
+keyed by `ApiContext.actor` (the Subject id; on Basic the `appUser` / `X-Actor` fallback) — so `POST
 /notifications/read-all`, `POST /notifications/{id}/read` and the new `POST /notifications/{id}/unread` are
 `self-service` exemptions again, this time scoped in the store. Delete (archive) stays `canAdminister`: it
 still writes the one shared feed. See [events-metrics](../control-plane/events-metrics.md) §Notifications
@@ -434,7 +434,7 @@ for the one shared side effect a read keeps (the dedupe acknowledgement).
 (`NotificationPreferenceOverrides`, keyed by the stable Subject id, one per-deployment file) and is a
 `self-service` exemption again; the shared deployment-default grid moved to the new **`PUT
 /notifications/preferences/default`, `canAdminister`** (literal capability). The pin is now "exactly these
-four may be exempt". Personal (no Subject) has no override layer — the PUT keeps writing the one grid.
+four may be exempt". Basic (no Subject) has no override layer — the PUT keeps writing the one grid.
 ⛔ **The notification email address is `Subject.email()` — the IdP's `email` claim ONLY when `email_verified`
 is `true`** (`OidcAuthenticator.verifiedEmail`). It is never taken from a request body and never
 user-editable: an editable address would let any user route notifications, security ones included, to an
@@ -460,7 +460,7 @@ As built: [events & metrics](../control-plane/events-metrics.md) § *Security tr
 `tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the
 code does not. Plan of record: `archived-documents/plans-archive/route-gating-compliance-plan.md`.
 
-## A Professional/Enterprise bundle does not boot without OIDC configuration
+## A Standard/Advanced bundle does not boot without OIDC configuration
 
 Discovered 2026-09-07 by the packaging boot smoke, and worth stating plainly because it is a deployment
 precondition, not a runtime one:
@@ -469,14 +469,14 @@ precondition, not a runtime one:
   `ServiceLoader` **regardless of `-Dauth.mode`**. So the mere PRESENCE of `inspecto-oidc.jar` on the
   classpath makes `OidcAuthenticator`'s constructor mandatory.
 * That constructor requires **`-Dauth.oidc.jwksUri`** and **`-Dauth.oidc.issuer`**, and fails closed with
-  a named message (`inspecto-oidc requires -Dauth.oidc.jwksUri (Professional edition …)`) otherwise.
+  a named message (`inspecto-oidc requires -Dauth.oidc.jwksUri (Standard edition …)`) otherwise.
 
 ⇒ Dropping the security sidecar into a bundle without also supplying the `AUTH_OIDC_*` environment
 variables `serve.sh` reads is not a degraded deployment — it is one that **exits at startup**. The
 message names the missing property, so the failure is legible; it is the *timing* that surprises, since
 nothing about "auth is optional per edition" suggests the process will not start.
 
-⚠ There is no way to run a Professional/Enterprise bundle "with the module present but auth off". If that is
+⚠ There is no way to run a Standard/Advanced bundle "with the module present but auth off". If that is
 ever wanted, it needs a guard around the SPI resolution, not a config flag.
 
 ### 🔴 This guarantee was SILENTLY LOST and restored 2026-09-12
@@ -488,7 +488,7 @@ false by the time anyone relied on it.** `PKG-5` later routed `SpiSlot.active()`
 `LinkageError` so an unloadable OPTIONAL module is an *absence* rather than a boot failure — correct for
 the assistant sidecar compiled against a newer JDK, and the exact opposite of what this SPI needs.
 
-⛔ **The effect: a Professional deployment with a mistyped `-Dauth.oidc.jwksUri` booted WIDE OPEN.**
+⛔ **The effect: a Standard deployment with a mistyped `-Dauth.oidc.jwksUri` booted WIDE OPEN.**
 `ServiceLoader` wraps the constructor's `IllegalStateException` in a `ServiceConfigurationError`;
 `OptionalSpi` caught it, logged *"the product runs without it and its routes answer 503"*, and returned
 empty — and an empty `Authenticator` means `ControlApi.dispatch` skips authentication for **every** route.
@@ -498,7 +498,7 @@ silently accepting traffic"*.
 
 ✅ **Fixed:** `SpiSlot` gained a `failClosed` posture and `Authenticators` is the one slot that uses it
 (`new SpiSlot<>(Authenticator.class, true)`). ⚠ The distinction it draws is **registered-but-broken** vs
-**never-registered** — it has to be, because Personal ships no registration at all and that absence is
+**never-registered** — it has to be, because Basic ships no registration at all and that absence is
 legitimate. `OptionalSpi` itself is unchanged and still fail-soft: the defect was never in that helper,
 it was in the Authenticator sharing it. Pinned by `SpiSlotFailClosedTest` and
 `AuthenticatorDiscoveryFailClosedTest`, mutation-proven both ways.
@@ -529,7 +529,7 @@ The allowed roots every config-path check uses (`SafetyPolicy.defaultPolicy()` �
 every run-time `PathJail`) were the **union** of all hosted Space bases, so on a multi-Space host a job in
 Space `acme` could name `beta`'s data directory by absolute path and pass. Probed live (HTTP 200) and fixed:
 a Space's allowed roots are **its own base plus the operator-declared `-Dassist.safety.roots`**, keyed on the
-thread's Space binding. This is the path-level twin of the Enterprise `space-isolation` policy above — and
+thread's Space binding. This is the path-level twin of the Advanced `space-isolation` policy above — and
 unlike it, it holds in **every** edition. Detail, caveats and pinning tests:
 [Config safety](../config/config-safety.md#a-spaces-allowed-roots-declared--its-own-base-tier-3-2026-08-14-narrowed-2026-09-24).
 
@@ -807,7 +807,7 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   `ASSURE-MAKER-CHECKER-RESIDUALS-1` (2), 2026-09-28). It closes `withdrawn` — terminal, `decidedBy` = the
   author, the optional `reason` as `decisionReason`, MAC-signed and audited as a decline is. No capability on
   the route (a recorded `self-service` exemption in `CapabilityManifest`): the only person who may withdraw is
-  the Subject who proposed it, so the author check IS the gate. Gates: no authenticated Subject 403 (Personal
+  the Subject who proposed it, so the author check IS the gate. Gates: no authenticated Subject 403 (Basic
   is refused, as for decide) → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 →
   integrity 409 → not pending (decided, withdrawn, expired) 409 → not the author 403. It runs under the same
   store lock as decide, so a withdraw racing an approve leaves one outcome (`PendingChangesMultiPodTest`). The

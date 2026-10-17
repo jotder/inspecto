@@ -64,7 +64,7 @@ Collectors, Schemas, Pipelines, Jobs, Datasets, Widgets, Dashboards, Incidents, 
 in one Space is invisible to another, except through a consented Exchange grant.
 
 **Pod** *(added 2026-09-13, `POD-SCOPE-DIVERGENCE-1`)* — One running Inspecto process in a
-horizontally-scaled Enterprise deployment. Under partitioning each Pod **owns a subset of Spaces**, so
+horizontally-scaled Advanced deployment. Under partitioning each Pod **owns a subset of Spaces**, so
 state that is implicitly global on a single installation becomes **per-Pod** once there is more than one.
 ⚠ The census (2026-09-12) found `PUT /system/scheduler` diverges **four** statics — superseding
 `INTAKE-POLICY-SYSTEM-SCOPE-1`, which named one.
@@ -158,12 +158,12 @@ per-subject access grant on that one component. Distinct from the **Exchange** f
 Space, a Share names a Role or user. No `shares` key = the component is unrestricted (legacy
 behavior). *(Added 2026-07-23, RBAC R3 — `okf/backend/editions/auth-security.md`.)*
 
-**Access Policy** — An authorable **allow/deny statement over Attributes** (Enterprise policy engine):
+**Access Policy** — An authorable **allow/deny statement over Attributes** (Advanced policy engine):
 `{name, effect: allow|deny, target: {actions?, resourceKinds?}, when: <condition>}` in a per-space
 `access-policies.toon` (`GET/PUT /access/policies`); the `when` condition is the shared `Conditions`
 grammar over `subject.* / resource.* / env.*`. ⛔ Never bare *Rule* or *Policy Rule* — "Rule" belongs to
 the dataset-side families (Expectation / Alert Rule / Decision Rule). Authoring is core; *evaluation*
-ships only in the Enterprise `inspecto-policy` module. *(Added 2026-07-23, ABAC A2 —
+ships only in the Advanced `inspecto-policy` module. *(Added 2026-07-23, ABAC A2 —
 `okf/backend/editions/auth-security.md`.)*
 
 **Safety Policy** — What a Space's **runs may touch**: filesystem roots, network hosts, Connector schemes,
@@ -310,7 +310,7 @@ free text and nothing enforces it.** There is no enum and no validating `FieldSp
 in `ConfigSpecs` only inside a description string, two lines below a field that *does* use the enum mechanism —
 the UI renders a bare text input, and `SchemaProjection`'s own javadoc says the metadata columns are never read
 by the ETL. Its single consumer copies it to a Catalog node **display** attribute. The two steps that would
-enforce it are `quality.pii.mask` (the Enterprise-only `mask` Step, built 2026-10-06; it acts only where a
+enforce it are `quality.pii.mask` (the Advanced-only `mask` Step, built 2026-10-06; it acts only where a
 pipeline authors it) and `quality.compliance.redact` (`PLANNED`). Dataset-wide masking stays unbuilt
 (`EDITIONS.md` SEC-08). ⛔ So a label alone is a **statement of intent, never a control**. Do not describe it as
 protection unless a `mask` Step reads it. ⛔ And `INTERNAL` here is not the API error code
@@ -884,7 +884,7 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Dossier** *(Link Analysis; `GET /inv/investigations/{id}/dossier`)* — The **evidential report of an Investigation**: summary, chronological ledger, every exclusion with its author and reason, negative space, and a SHA-256 chain of custody that `POST …/dossier/verify` re-checks against the store. Rendered as JSON, numbered steps, a method statement or one printable HTML page, masked per the Space's **Masking mode**. Built only from the promoted Investigation, never from a **Draft**. ⛔ Not a **Case** and not a **Snapshot**; never "report" or "export" for this object.
 
-**Masking mode** *(Link Analysis; Space setting `maskingMode`, `typed` default | `all` | `none`)* — Which entity ids an Investigation response returns **masked** as `masked:<16 hex>`: `typed` masks ids whose **Entity Type** is a masked type (including by Dataset column classification), `all` masks every id, `none` masks none. Unmasking is the audited, per-entity **reveal** (`POST /inv/investigations/{id}/reveal`, capability `canRevealLinkEntities`). ⛔ Not the `quality.pii.mask` Step (`transform.mask`, Enterprise-only pipeline field masking), and not a **Decision Rule** action.
+**Masking mode** *(Link Analysis; Space setting `maskingMode`, `typed` default | `all` | `none`)* — Which entity ids an Investigation response returns **masked** as `masked:<16 hex>`: `typed` masks ids whose **Entity Type** is a masked type (including by Dataset column classification), `all` masks every id, `none` masks none. Unmasking is the audited, per-entity **reveal** (`POST /inv/investigations/{id}/reveal`, capability `canRevealLinkEntities`). ⛔ Not the `quality.pii.mask` Step (`transform.mask`, Advanced-only pipeline field masking), and not a **Decision Rule** action.
 
 **Embed link** *(Link Analysis; `POST /inv/investigations/{id}/embeds`, `GET /public/investigations/{token}`, capability `canShareInvestigation`)* — A **read-only, revocable, expiring URL to ONE Investigation** for someone with no login: a live view of its **Working Set**, notes and references, masked exactly as the Space's **Masking mode** masks an Investigation read, never framed (link-only). Minted by a **lead** of the Investigation; the token is shown once and only its SHA-256 is stored (the **embed grant** record). It stops at its expiry (default 72 h, at most 30 d unless the Space raises its cap (up to 365 d), per-Space knob `embed`), on revoke, or automatically when its minter loses the lead role, the linked **Case** closes, or masking is loosened. ⛔ Not a **Dossier** (the sealed, portable file), not a BI **share token** (dashboards, one secret for all links), not a **Subject** (the holder is an `EmbedGrant` that no capability gate accepts); never "public link" or "share link" for this object.
 
@@ -1016,6 +1016,16 @@ relationships shipped later — V1 is complete, V2+ is open backlog. As built:
 [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md). *(Provenance:
 `archived-documents/plans-archive/link-analysis-and-graphsource.md` and the two studio plans, not maintained.)*
 
+**Inspecto LA** *(the product; named by operator decision `ED-1`, `LA-EDITIONS-1`, 2026-10-17)* — The **product** that
+sells Link Analysis: the standalone `la-app` (title, header, sign-in screen, browser tab) and the documents written
+for its buyers and users. First use in any document reads **"Inspecto LA (Link Analysis)"**; after that, "Inspecto LA".
+**Link Analysis** stays the name of the **capability**: inside the console and the app's own areas, and in routes
+(`/link-analysis`, `/inv/*`), keys (`link-analysis.toon`, `canRunLinkGraphAnalysis`), modules (`@inspecto/link-analysis`,
+`la/`) and Java packages. Rule of thumb: *Inspecto LA* is what a customer buys and opens; *Link Analysis* is what
+it does. ⛔ Never a bare **LA** in UI text or user-facing prose (it stays an internal shorthand in ids and plan
+names, e.g. `LA-EDITIONS-1`, `la-app`); ⛔ never "Inspecto Link Analysis" as the product name; ⛔ never rename a
+route, key or module to `inspecto-la`.
+
 **Link Analysis Studio** — The Builder-lens Studio pane (`/studio/link-analysis`) for graph investigation:
 pick a **GraphSource** + query, render via the shared G6 host, analyze (paths, neighborhood, centrality,
 communities). A saved investigation is a **Link-Analysis View** (Component kind `link-analysis-view`); when
@@ -1035,6 +1045,16 @@ browser-only caps, never above the Space value). Edited at *Settings → Link An
 untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — a classification is a column's free-text
 label (`columns[].classification`); the Entity Type is what that label maps to. Design:
 [`archived-documents/plans-archive/link-analysis-entity-model-design.md`](archived-documents/plans-archive/link-analysis-entity-model-design.md).
+
+**Domain Profile** *(Link Analysis; settles `LDP-D7`; ✅ built 2026-10-17, LA-EDITIONS-1: `domain_profile` in
+`link-analysis.toon`, `GET|PUT /settings/link-analysis/domain-profile`)* — The **Industry pack** a Space reads Link
+Analysis in: which words name the canonical concepts (the working-set tiles, the two ends of a link, Entity Types,
+link kinds, Value Measures, patterns), with an abbreviation and a hover definition for each. None selected = the
+neutral vocabulary (`generic`). A Domain Profile **relabels; it never adds a concept**, so the core holds no industry
+word (AC-09). ⛔ Not a *Persona lens* (§1-A, a UI annotation of a person's role) and not the **Entity Type Profile** /
+**Entity Profile** pages below (facts about the data). ⛔ Never bare *pack* for it: *pack* alone is ambiguous (pattern
+pack, Job Pack, Solution pack); say *Industry pack* (§15). As built:
+[`okf/backend/modules/link-analysis.md`](okf/backend/modules/link-analysis.md) §3.6.
 
 **Entity Type Profile** *(Link Analysis, decided 2026-10-15, D-EP1; plan [`archived-documents/plans-archive/la-entity-profile-plan.md`](archived-documents/plans-archive/la-entity-profile-plan.md))* — What the Space's Datasets say about one **Entity Type**, computed on demand and cached until a new File lands: the Dataset columns bound to it, volume and fill rate, sentinel values, value shapes, time span and per-day timeline, freshness, lineage, link and relationship statistics. Aggregates only: it never names an identifier. Read by `GET /inv/entity-types/{id}/profile`; shown on the **Entities** page. ⛔ Not an *Access Profile* or a *Decode Profile* (different concepts); ⛔ not a Dataset profile (it spans every Dataset the type appears in).
 
@@ -1179,6 +1199,7 @@ routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** —
 | per-vendor *transform config* *(ASN.1 decode settings)* | **Decode Profile** | ✅ **DONE 2026-09-25** (D10, parser-plugins trust design C1). Named before it was built, so there was nothing to rename in code: the config key is `parsing.asn1.profile_file`, the class `com.gamma.etl.DecodeProfile`. The residual old wording is the BACKLOG §3.3 row text ("a per-vendor transform config home"), left to the BACKLOG's owner. |
 | ~~Batch~~ *(the unit-of-work entity)* | **Consignment** | ✅ **ROLLED OUT 2026-08-31 (Phase 7 / D-12).** The Java types are renamed: `Consignment`, `ConsignmentEvent`/`ConsignmentEventBus`, `ConsignmentManifest`, `ConsignmentAuditWriter`/`ConsignmentAuditReport`, `ConsignmentRow`, `ConsignmentGraphRunner`, `ConsignmentIngestStrategy`, `ConsignmentProcessingException`, plus `CsvIngestStrategy`, `StreamingPluginIngestStrategy`, `PipelineConsignmentSignal` and the UI's `ConsignmentAuditReport` mirror. 🔴 **`BatchProcessor` became `ConsignmentIngestor`, NOT `ConsignmentProcessor`** — that name is taken by the third-party post-sync SPI, and reusing it would break plugin authors and this table's own one-word-one-concept rule. Executed as ONE commit by `tools/rename-batch-to-consignment.mjs`: 24 files renamed, 1092 occurrences across 155 files, full reactor **3841/0/0/5** (baseline, unmoved). 🔴 **The stale scope figures are settled**: not 517 files/39 `@PublicApi`, and not the 81/29/8 re-measure either — the concept-scoped sweep was **155 files**. Over half the apparent blast radius was `PipelineConfigBatchTest`, a shared TEST FIXTURE imported by 165 tests that is **not** the entity and was deliberately left alone. ⚠ **Wire + persisted spellings intentionally unchanged**: `batch_id` keeps its `Csv.LEGACY_HEADERS` read-alias, `GET /runs/{n}/batches` and `/provenance/batches` still answer, and the `batch_max_*` config keys / `BatchedOperations` telemetry / JDBC `addBatch()` are the GROUPING sense and stay. ⚠ Residual: method-local identifiers (`batches`, `batch`) still read the old way in places — no published surface, and the vocabulary guard passes on them. |
 | *(no old term)* | **Core** (`@inspecto/core`) · **Link Analysis library** (`@inspecto/link-analysis`) · **gamma** · **la-app** | ✅ **Named 2026-10-02 (D-5 step 6, signed Decision 4)**, in-workspace code only (no npm package, no ng-packagr). **Core** = `inspecto-ui/src/app/inspecto/*`, imported as `@inspecto/core/*` (design system, API clients, OIDC client code, the host-service contracts' dependencies). **Link Analysis library** = `inspecto-ui/projects/link-analysis`, whose only eager surface is `@inspecto/link-analysis` (`public-api.ts`). **gamma** = the Inspecto console, the Angular application at the repository root (name kept; renaming it is not a D-5 job). **la-app** = the Link Analysis application, `inspecto-ui/projects/la-app`: its own shell and routes over the same Core and library. These are code and build names, not product concepts for a user to learn: the UI says *Link Analysis*, never *la-app*. ⛔ A **UI flavor** (`package.ps1 -Ui gamma|la-app`) is not an **edition** (EDITIONS.md): every edition can ship either application. |
+| *(no old term)* | **Inspecto LA** *(product)* vs **Link Analysis** *(capability)* | ✅ **Named 2026-10-17 (`ED-1`, `LA-EDITIONS-1`)**. Product name only: `la-app` index title, shell brand, landing heading and the shared sign-in screen (through `AppEnvironment.productName`, which the console leaves unset and so still reads "Inspecto"); user docs `docs/ui/link-analysis-*.md`, `docs/ops/la-*-runbook.md`, the two Link Analysis OKF concepts. Routes, keys, modules, packages and nav labels keep **Link Analysis** — no code rename. Open: `docs/stakeholders/LINK_ANALYSIS_WHITEPAPER.md` and `TECHNICAL_ARCHITECTURE.md`. |
 | ~~Sandbox~~ *(per-analyst working copy; the option-D placeholder)* | **Draft** | Vocabulary only (2026-10-03, `D16`); no code yet. Touchpoints for `D-7`: SPA labels/routes, `Draft*` model types, `/inv/investigations/{id}/drafts*` routes, per-Draft DuckDB file naming, audit action `draft.*`. Never touch `SqlSandboxPolicy` (the SQL sandbox keeps its word); never confuse with Pipeline draft / *Import as draft* (§11 *Draft*). |
 
 **Migration underway** (the *2b* coordinated breaking change, toward the pending **4.0.0** — one term per
@@ -1234,8 +1255,9 @@ contract, its envelope and error-code catalog, the OpenAPI document, ETag concur
 the Java embedding API's stability policy (`@PublicApi`). *Control* distinguishes it from the data plane
 (§6-B) — it moves configuration and commands, never rows.
 
-**Edition** — A **build flavour** of one Inspecto version — **Personal** · **Professional** · **Enterprise** —
-assembled by `package.ps1` from Maven profiles and `ServiceLoader` modules. ⛔ Never a branch (versions are
+**Edition** — A **build flavour** of one Inspecto version — **Basic** · **Standard** · **Advanced** (named by
+`LA-EDITIONS-1` ED-2, 2026-10-17; formerly Personal · Professional · Enterprise), plus **Preview** (everything, demo
+sign-in, never sold) — assembled by `package.ps1` from Maven profiles and `ServiceLoader` modules. ⛔ Never a branch (versions are
 branches; see `BRANCHING.md`) and never a runtime flag: a feature an edition lacks is a module that edition
 does not bundle. The per-feature table is `EDITIONS.md`.
 
@@ -1291,15 +1313,19 @@ and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *
 
 **Add-on** — A horizontal, domain-neutral Optional module set sold to any customer (Incidents, Case Management,
 Reconciliation, Scoring & Lists, Action Requests, Regulatory Reporting, Workflow & SLA, Link Analysis & Investigations, AI Assist &
-Intelligence, Integration & Delivery, Premium Connectors, Multi-entity / Group). **Tiers** (Personal ·
-Professional · Enterprise) are deployment and compliance posture, not Add-ons.
+Intelligence, Integration & Delivery, Premium Connectors, Multi-entity / Group). **Tiers** (Basic ·
+Standard · Advanced) are deployment and compliance posture, not Add-ons.
 
 **Solution pack** — Mostly-content bundle of Space Templates that **requires** Add-ons. Two kinds, composed:
 - **Function pack** — domain-neutral, written against neutral entity and measure names (Revenue Assurance,
   Fraud Management, Compliance Audit, BI, Link Analysis).
 - **Industry pack** — a vertical's data: record formats and parsers, Collector connectors, entity types, link
   kinds, reference data, and the mapping to the function packs' neutral names (telecom mobile, fixed-line,
-  cable / IPDR, mobile money, retail, supply chain).
+  cable / IPDR, mobile money, retail, supply chain). ✅ **For Inspecto LA, built 2026-10-17 (LA-EDITIONS-1):**
+  a declarative file set shipped inside every edition (`META-INF/inspecto/industry-packs/<id>/`: manifest, terms
+  keyed by canonical concept key, core Entity Types restated, link kinds, references to its pattern packs and Space
+  Templates). A Space selects one as its **Domain Profile** (§11). Shipped: `telecom`, `mobile-money`. A pack that
+  breaks any rule is refused whole at load.
 
 ⛔ Not *vertical pack × function pack* as one artifact — a sold solution is an **Offering** that composes them.
 ⚠ A **Job Pack** (§6-A) is an unrelated, Implementation-level unit of executable Jobs.

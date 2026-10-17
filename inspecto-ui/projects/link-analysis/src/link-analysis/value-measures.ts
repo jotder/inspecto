@@ -2,6 +2,7 @@ import type { ColDef } from 'ag-grid-community';
 import type { AttributeSpec } from '@inspecto/core/component-model';
 import type { ValueMeasureName, ValueMeasureQuery } from '@inspecto/link-analysis/api/inv.service';
 import { laLimit } from './la-limits';
+import { DomainProfile, GENERIC_PROFILE, termLabel } from '@inspecto/link-analysis/graph/domain-profile';
 
 /**
  * LA-18 value Measures (plan §2.6.1) — the SPA side of `GET /inv/value-measures`. Framework-free: the form's
@@ -12,8 +13,8 @@ import { laLimit } from './la-limits';
 export const VALUE_MEASURES: { value: ValueMeasureName; label: string; alertable: boolean }[] = [
     { value: 'passThrough', label: 'Pass-through (retention = 1 − ratio)', alertable: true },
     { value: 'velocity', label: 'Velocity (hours from inbound to next outbound)', alertable: true },
-    { value: 'timeToCashOut', label: 'Time to cash-out', alertable: true },
-    { value: 'cashOutConcentration', label: 'Cash-out concentration', alertable: true },
+    { value: 'timeToCashOut', label: 'Time to withdrawal', alertable: true },
+    { value: 'cashOutConcentration', label: 'Withdrawal concentration', alertable: true },
     { value: 'structuring', label: 'Structuring (legs just under a limit)', alertable: true },
     { value: 'benefitTransfer', label: 'Benefit transfer', alertable: true },
     { value: 'valueWeightedLinks', label: 'Value-weighted links (read-only, cannot be watched)', alertable: false },
@@ -58,7 +59,7 @@ const using = (key: string): ValueMeasureName[] =>
  * The schema-rendered part of the form — Dataset, link roles, Measure, columns, the rolling window, then the chosen
  * Measure's own settings. The fixed From / To window is two date pickers the host renders itself (DR-D4).
  */
-export function valueMeasureAttributes(): AttributeSpec[] {
+export function valueMeasureAttributes(profile: DomainProfile = GENERIC_PROFILE): AttributeSpec[] {
     const col = (key: string, label: string, required = true, help?: string): AttributeSpec => ({
         key,
         label,
@@ -70,15 +71,19 @@ export function valueMeasureAttributes(): AttributeSpec[] {
     });
     return [
         { key: 'dataset', label: 'Dataset', type: 'autocomplete', tier: 'required' },
-        col('sourceCol', 'Source column (payer)'),
-        col('targetCol', 'Target column (payee)'),
-        col('linkKindCol', 'Link kind column', false, 'Needed by the cash-out and benefit Measures.'),
+        col('sourceCol', 'Source column (sender)'),
+        col('targetCol', 'Target column (receiver)'),
+        col('linkKindCol', 'Link kind column', false, 'Needed by the withdrawal and benefit Measures.'),
         {
             key: 'name',
             label: 'Measure',
             type: 'select',
             tier: 'required',
-            options: VALUE_MEASURES.map(({ value, label }) => ({ value, label })),
+            // the Space's Domain Profile relabels a Measure through its `measure.<id>` term (LA-EDITIONS-1)
+            options: VALUE_MEASURES.map(({ value, label }) => ({
+                value,
+                label: termLabel(profile, `measure.${value}`, label),
+            })),
         },
         col('valueCol', 'Value column'),
         col('timeCol', 'Time column'),
@@ -106,7 +111,7 @@ export function valueMeasureAttributes(): AttributeSpec[] {
         ),
         {
             key: 'cashOutKinds',
-            label: 'Cash-out link kinds',
+            label: 'Withdrawal link kinds',
             type: 'list',
             tier: 'required',
             dependsOn: { key: 'name', in: ['timeToCashOut', 'cashOutConcentration'] },
@@ -120,12 +125,12 @@ export function valueMeasureAttributes(): AttributeSpec[] {
         },
         {
             key: 'agentList',
-            label: 'Agent list (optional)',
+            label: 'Intermediary list (optional)',
             type: 'autocomplete',
             tier: 'required',
             required: false,
             pattern: AGENT_LIST,
-            help: 'An Entity List of Entity Type agent: only its members count as cash-out agents.',
+            help: 'An Entity List of intermediaries: only its members count as withdrawal points.',
             dependsOn: { key: 'name', in: ['cashOutConcentration'] },
         },
     ];

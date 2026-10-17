@@ -5,8 +5,8 @@
  * WHY THIS EXISTS. `tools/sbom.mjs` built its first-party table from four artifacts (inspecto-processor,
  * inspecto-connectors, inspecto-oidc, inspecto-policy) under a comment claiming it was "the SAME
  * table package.ps1 stages from". It was not. Since EDG-01 (2026-09-07) package.ps1 has staged eleven
- * jars for Standard and twelve for Enterprise, so every Standard bill of materials declared 4 first-party
- * jars where the bundle carried 10, and Enterprise 4 where it carried 11. javax.mail appeared in NO
+ * jars for Standard and twelve for Advanced, so every Standard bill of materials declared 4 first-party
+ * jars where the bundle carried 10, and Advanced 4 where it carried 11. javax.mail appeared in NO
  * shipped SBOM at all: it moved from inspecto-connectors to inspecto-notify-channels in EDG-01 cell 1, and
  * the generator had never heard of that module.
  *
@@ -20,9 +20,9 @@
  * WHAT IT CHECKS (P3d stage 1, 2026-10-08 — package.ps1 no longer keeps three hand-written enumerations):
  *   A. the Maven module list is no longer a literal: package.ps1 must take `$modules` from
  *      `tools/offering-classpath.mjs --list-mvn`, and that generator's list must equal the generator
- *      table's edition-only modules for every edition (Professional, Enterprise, Preview);
+ *      table's edition-only modules for every edition (Standard, Advanced, Preview);
  *   B. the `Copy-Item … "$bundleDir\*.jar"` staging steps — what lands in the bundle — must equal
- *      tools/bundle-modules.mjs's maximal (Enterprise) set + the PostgreSQL sidecar, and Personal must equal
+ *      tools/bundle-modules.mjs's maximal (Advanced) set + the PostgreSQL sidecar, and Basic must equal
  *      what is staged unconditionally;
  *   C. the boot smoke and every launcher must READ the bundle's `modules.list` (no jar list of their own),
  *      and the classpath the generator emits for the maximal edition must equal the staged jars — so a staged
@@ -74,7 +74,7 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     let gen = generated;
     if (!gen) {
         const g = gather(root);
-        gen = { mvn: Object.fromEntries(['Professional', 'Enterprise', 'Preview'].map((e) => [e, mvnModules(e, g)])), classpathMax: classpath('Enterprise', { g }) };
+        gen = { mvn: Object.fromEntries(['Standard', 'Advanced', 'Preview'].map((e) => [e, mvnModules(e, g)])), classpathMax: classpath('Advanced', { g }) };
     }
 
     // ── A. the Maven module list must come from the generator, not from a literal ───────────────────────────
@@ -84,7 +84,7 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     if (!/\$modules\s*=[^\n]*offering-classpath\.mjs[^\n]*--list-mvn/.test(text)) {
         problems.push(`${SCRIPT} does not take \`$modules\` from \`tools/offering-classpath.mjs ... --list-mvn\`. Either it was restructured (fix this parser) or the per-edition module list is hand-kept again.`);
     }
-    for (const edition of ['Professional', 'Enterprise', 'Preview']) {
+    for (const edition of ['Standard', 'Advanced', 'Preview']) {
         const expected = set(editionOnlyModules(edition).map((m) => `:${m.artifactId}`));
         const got = set((gen.mvn[edition] ?? '').split(',').filter(Boolean));
         const check = diff(got, expected);
@@ -99,7 +99,7 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
 
     // ── B. the staging steps: what actually lands in the bundle ──────────────────────────────────────────────
     // A Copy-Item at column 0 is unconditional (every edition); an indented one sits inside an edition `if`.
-    // This reads the script's INDENTATION on purpose: if package.ps1 is ever reformatted, the Personal
+    // This reads the script's INDENTATION on purpose: if package.ps1 is ever reformatted, the Basic
     // assertion below fails loudly rather than quietly passing over a set nobody matched.
     // `[ \t]*`, not `\s*`: `\s` matches newlines, so a greedy run would start at an earlier line and
     // capture the newline as part of the "indentation", making every match look indented.
@@ -113,9 +113,9 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     if (staged.size < MIN_STAGED) {
         problems.push(`only ${staged.size} staged jar(s) parsed out of ${SCRIPT}, below the floor of ${MIN_STAGED}. Either the staging block changed shape (fix this parser) or jars were dropped.`);
     }
-    // Enterprise is the maximal bundle, so its first-party jars plus the PostgreSQL sidecar are every jar
+    // Advanced is the maximal bundle, so its first-party jars plus the PostgreSQL sidecar are every jar
     // package.ps1 can stage. sbom.mjs adds PG_SIDECAR itself (third-party, test-scoped in the reactor).
-    const maximal = set([...bundleModules('Enterprise').map((m) => m.bundleFile), PG_SIDECAR]);
+    const maximal = set([...bundleModules('Advanced').map((m) => m.bundleFile), PG_SIDECAR]);
     const maximalCheck = diff(staged, maximal);
     if (!maximalCheck.same) {
         problems.push(
@@ -124,13 +124,13 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
                 (maximalCheck.extra.length ? `\n      ${SCRIPT} stages, but no SBOM would declare: ${maximalCheck.extra.join(', ')}` : ''),
         );
     }
-    // Personal ships exactly what package.ps1 stages unconditionally.
-    const personalCheck = diff(stagedAlways, set(bundleModules('Personal').map((m) => m.bundleFile)));
+    // Basic ships exactly what package.ps1 stages unconditionally.
+    const personalCheck = diff(stagedAlways, set(bundleModules('Basic').map((m) => m.bundleFile)));
     if (!personalCheck.same) {
         problems.push(
-            `Personal: the generator's set does not match the jars ${SCRIPT} stages unconditionally` +
-                (personalCheck.missing.length ? `\n      declared for Personal, staged only conditionally: ${personalCheck.missing.join(', ')}` : '') +
-                (personalCheck.extra.length ? `\n      staged in every edition, absent from Personal's set: ${personalCheck.extra.join(', ')}` : ''),
+            `Basic: the generator's set does not match the jars ${SCRIPT} stages unconditionally` +
+                (personalCheck.missing.length ? `\n      declared for Basic, staged only conditionally: ${personalCheck.missing.join(', ')}` : '') +
+                (personalCheck.extra.length ? `\n      staged in every edition, absent from Basic's set: ${personalCheck.extra.join(', ')}` : ''),
         );
     }
 
@@ -229,7 +229,7 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     // ── each module's declared artifactId ────────────────────────────────────────────────────────────────────
     // sbom.mjs keys SHIPPED by artifactId and matches it against Maven's per-module banners. A wrong
     // dir→artifactId pair contributes ZERO components for that module and says nothing while doing it.
-    for (const m of [...bundleModules('Enterprise'), ...coreModules()]) {
+    for (const m of [...bundleModules('Advanced'), ...coreModules()]) {
         let pom;
         try {
             pom = readFileSync(join(root, m.dir, 'pom.xml'), 'utf8');
@@ -253,14 +253,14 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     // That file's `bundleModules` doc comment names the counts a reader will trust without running
     // anything. It drifted the moment inspecto-agent arrived (PKG-5) and said 2/10/11 against a real
     // 2/11/12 for five days. Prose beside a list is not checked by the list, so check it here.
-    const COUNTS = /Personal (\d+), Professional (\d+), Enterprise (\d+), Preview (\d+)/.exec(bmText);
+    const COUNTS = /Basic (\d+), Standard (\d+), Advanced (\d+), Preview (\d+)/.exec(bmText);
     if (!COUNTS) {
         problems.push(
-            `tools/bundle-modules.mjs no longer states its per-edition counts as \`Personal N, Professional N, Enterprise N\`. ` +
+            `tools/bundle-modules.mjs no longer states its per-edition counts as \`Basic N, Standard N, Advanced N\`. ` +
                 `Either the comment was reworded (fix this parser) or it was dropped — a count nobody asserts is how that comment went stale in the first place.`,
         );
     } else {
-        const stated = { Personal: +COUNTS[1], Professional: +COUNTS[2], Enterprise: +COUNTS[3], Preview: +COUNTS[4] };
+        const stated = { Basic: +COUNTS[1], Standard: +COUNTS[2], Advanced: +COUNTS[3], Preview: +COUNTS[4] };
         for (const edition of EDITIONS) {
             const actual = bundleModules(edition).length;
             if (stated[edition] !== actual) {

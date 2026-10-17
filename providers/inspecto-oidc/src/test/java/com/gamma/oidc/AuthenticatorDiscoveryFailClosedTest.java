@@ -121,7 +121,7 @@ class AuthenticatorDiscoveryFailClosedTest {
         assertTrue(ServiceLoader.load(NeverRegistered.class).iterator().hasNext() == false,
                 "nothing registers this SPI");
         assertEquals(Optional.empty(), OptionalSpi.first(NeverRegistered.class),
-                "no registration is an absence, not a failure — this is the Personal edition's path");
+                "no registration is an absence, not a failure — this is the Basic edition's path");
     }
 
     /** An SPI no module registers — stands in for Personal, which ships no Authenticator registration. */

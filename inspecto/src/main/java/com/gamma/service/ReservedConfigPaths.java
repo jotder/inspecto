@@ -50,7 +50,8 @@ public final class ReservedConfigPaths {
             "rename.journal", "dataset-publications.tsv",
             "day-manifest.tsv",   // LA-DAILY-INGEST-1 T8 per-day delivery manifest; a forged copy could fake or hide re-delivery/gap signals (operator, 2026-10-06)
             "safety-policy.toon",   // DUCKLE-C6 Space Safety Policy tier: an import must not narrow, brick or re-moded it
-            "case-link.json");   // LA-24: an imported copy would grant a Case team access (operator 2026-09-30)
+            "case-link.json",   // LA-24: an imported copy would grant a Case team access (operator 2026-09-30)
+            "la-integration.json");   // LA-EDITIONS-1 phase 6: names where evidence and webhooks go - an import could redirect them
 
     /** Reserved directories (a prefix of the config-relative path). */
     static final List<String> DIRS = List.of(

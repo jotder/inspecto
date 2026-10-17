@@ -109,6 +109,11 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("META-INF/inspecto/module.toon", "a classpath resource read from module jars by ModuleManifests, "
                 + "not a Space file: an import cannot plant it because it is read from the classpath, never from a "
                 + "Space config root (" + REPO + ")");
+        for (String p : List.of("META-INF/inspecto/industry-packs.toon", "industry-pack.toon", "industry-pack-terms.toon",
+                "industry-pack-entity-types.toon", "industry-pack-link-kinds.toon"))
+            ALLOWED.put(p, "an Industry pack's file set (IndustryPacks, LA-EDITIONS-1), read from the classpath under "
+                    + "META-INF/inspecto/industry-packs/<id>/, never from a Space config root - an import cannot plant it ("
+                    + REPO + ")");
         for (String p : List.of("reference.key", "inspecto.idempotency.key"))
             ALLOWED.put(p, NOT_A_FILE);
     }

@@ -48,7 +48,22 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
                                    Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
-                                   Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold, Embed embed) {
+                                   Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold, Embed embed,
+                                   String domainProfile) {
+
+    /**
+     * The sixteen-knob form that predates {@code domainProfile}: no Domain Profile is stated (the neutral vocabulary).
+     * ⚠ {@code domain_profile} is written only by {@link #writeDomainProfile}, so {@link #write} keeps the stored one.
+     */
+    public LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
+                                String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
+                                List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
+                                Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
+                                Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold, Embed embed) {
+        this(projectionNodeCap, analysisNodeCap, suspicionNodeCap, maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove,
+                entityTypes, mergedDistinctCap, seedByDistinctCap, graphRun, index, drafts, maxSetBytes,
+                maxInvestigationBytes, hubThreshold, embed, null);
+    }
 
     /** The fifteen-knob form that predates {@code embed}: the embed knobs inherit their shipped defaults. */
     public LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
@@ -251,7 +266,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     public static final String FILE = "link-analysis.toon";
-    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -322,9 +337,37 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         return maskingMode != null ? maskingMode : ConfigSpecs.LINK_ANALYSIS_MASKING_MODES.get(0);
     }
 
-    /** The Entity Types in force: the stated list, else {@link EntityTypes#DEFAULTS}. */
+    /**
+     * The Entity Types in force: the stated list, else {@link EntityTypes#DEFAULTS} as the Space's Domain Profile reads
+     * them ({@link IndustryPack#overlay} - relabelled, never more types).
+     */
     public List<EntityTypes.EntityType> effectiveEntityTypes() {
-        return entityTypes != null ? entityTypes : EntityTypes.DEFAULTS;
+        if (entityTypes != null) return entityTypes;
+        IndustryPack pack = activePack();
+        return pack != null ? pack.overlay(EntityTypes.DEFAULTS) : EntityTypes.DEFAULTS;
+    }
+
+    /**
+     * The installed {@link IndustryPack} this Space's {@code domain_profile} names, else {@code null} = the neutral
+     * vocabulary. A stated id that is not installed (absent from this build, or refused at load) also reads as
+     * {@code null}: a pack that cannot be trusted is never partly applied.
+     */
+    public IndustryPack activePack() {
+        return IndustryPacks.bundled().find(domainProfile);
+    }
+
+    /**
+     * Set ({@code id}) or clear ({@code null}) the {@code domain_profile} of {@code link-analysis.toon} at {@code path},
+     * as a read-modify-write that keeps every other key. The caller has validated {@code id} against the installed
+     * packs. A document that does not parse is refused, never replaced.
+     */
+    public static void writeDomainProfile(Path path, String id) throws IOException {
+        synchronized (LaLimits.WRITE_LOCK) {
+            Map<String, Object> m = LaLimits.loadRaw(path);   // absent = empty; unparseable = IOException (refused)
+            if (id == null) m.remove("domain_profile");
+            else m.put("domain_profile", id);
+            AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
+        }
     }
 
     /** The top-level keys {@link #write} models; a block's own sub-keys are listed beside its {@code block(...)} call. */
@@ -433,7 +476,8 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     entityTypes(m.get("entity_types"), (int) LaLimits.read(m, Map.of()).get(LaLimit.INPUT_ENTITY_TYPES)),
                     optInt(m, "merged_distinct_cap"),
                     optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")),
-                    optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"), optInt(m, "hub_threshold"), embed(m.get("embed")));
+                    optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"), optInt(m, "hub_threshold"), embed(m.get("embed")),
+                    domainProfile(m.get("domain_profile")));
         } catch (Exception e) {
             return EMPTY;
         }
@@ -526,6 +570,11 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         }
         Index r = new Index(enabled, maxDisk, optInt(g, "keep_versions"), optInt(g, "max_age_hours"));
         return r.isNone() ? null : r;
+    }
+
+    /** A stored pack id of the right shape, else {@code null} (no Domain Profile stated). */
+    private static String domainProfile(Object raw) {
+        return raw instanceof String s && IndustryPack.ID.matcher(s.trim()).matches() ? s.trim() : null;
     }
 
     /** A declared masking mode (case-insensitive), or {@code null} for anything else. */

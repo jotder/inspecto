@@ -358,8 +358,8 @@ public final class OperationalDb {
         } catch (ClassNotFoundException missing) {
             throw new IllegalStateException(
                     "-Dinspecto.db=postgres was selected but the PostgreSQL JDBC driver (" + PG_DRIVER
-                            + ") is not on the classpath. The Standard/Enterprise bundle ships it as the"
-                            + " postgresql.jar sidecar (auto-detected by serve.sh/serve.bat); the Personal"
+                            + ") is not on the classpath. The Standard/Advanced bundle ships it as the"
+                            + " postgresql.jar sidecar (auto-detected by serve.sh/serve.bat); the Basic"
                             + " bundle ships DuckDB only — drop postgresql.jar beside inspecto.jar.", missing);
         }
     }
@@ -392,7 +392,7 @@ public final class OperationalDb {
         if (!OBJECTS_POSTGRES.equals(backend))
             throw new IllegalStateException("-D" + OBJECTS_BACKEND + "=" + backend
                     + " is not a backend: use db (the Space's duckdb/ files), postgres (PostgreSQL, mandatory"
-                    + " on Enterprise) or memory (explicit, lost on restart)");
+                    + " on Advanced) or memory (explicit, lost on restart)");
         // The families that share the objects.backend toggle are the loaded ones (inspecto-ops contributes them).
         // With none loaded - an install without the ops module - nothing consumes the toggle, so there is
         // nothing to refuse beyond the value itself.
@@ -402,7 +402,7 @@ public final class OperationalDb {
         for (StoreFamily f : objectFamilies) {
             String url = urlFor(f, null);
             if (url == null || !url.toLowerCase().startsWith("jdbc:postgresql:"))
-                throw new IllegalStateException("-D" + OBJECTS_BACKEND + "=postgres (Enterprise: Incidents, Cases,"
+                throw new IllegalStateException("-D" + OBJECTS_BACKEND + "=postgres (Advanced: Incidents, Cases,"
                         + " notes, links and tags live in PostgreSQL) but " + f.label() + " has no PostgreSQL URL"
                         + (url == null ? "" : " (got " + url + ")")
                         + ": set -Dinspecto.db=postgres -Dinspecto.db.url=jdbc:postgresql://host:5432/db"
@@ -411,7 +411,7 @@ public final class OperationalDb {
         }
         if (!driverAvailable())
             throw new IllegalStateException("-D" + OBJECTS_BACKEND + "=postgres but the PostgreSQL JDBC driver ("
-                    + PG_DRIVER + ") is not on the classpath — the Enterprise bundle ships it as postgresql.jar"
+                    + PG_DRIVER + ") is not on the classpath — the Advanced bundle ships it as postgresql.jar"
                     + " beside inspecto.jar.");
     }
 

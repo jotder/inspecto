@@ -40,7 +40,7 @@
         RULES — a different domain from an OperationalObject whose objectType is ALERT. AlertService stays
         in core and reaches this module through the seam.
 
-        Built only under the "edition-professional"/"edition-enterprise" profiles, so a routine "mvn -o clean
+        Built only under the "edition-standard"/"edition-advanced" profiles, so a routine "mvn -o clean
         test" (= Personal, the DEFAULT build) never compiles it.
     </description>
 

@@ -213,7 +213,7 @@ class ApiContractTest {
      *
      * <p>🔴 <b>What this measures is the CORE surface, and that is structural, not a profile setting.</b>
      * The first draft of this javadoc said the live count was edition-dependent because route modules
-     * arrive by {@code ServiceLoader}. Measured under {@code -Pedition-enterprise}: <b>266, identical to
+     * arrive by {@code ServiceLoader}. Measured under {@code -Pedition-advanced}: <b>266, identical to
      * the default reactor.</b> The reason is the dependency direction — every optional module
      * ({@code inspecto-ops}, {@code inspecto-notify-channels}, {@code inspecto-geo-link}) depends on
      * {@code inspecto-processor} and the core declares none of them, so the arrow points module → core and

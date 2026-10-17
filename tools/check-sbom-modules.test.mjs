@@ -16,7 +16,7 @@ const mutate = (from, to) => { assert.ok(REAL.includes(from), `fixture anchor mi
 test('the real package.ps1 is GREEN', () => assert.equal(problems(REAL), ''));
 
 test('RED: a hand-written $modules literal is back', () => {
-    const t = mutate('    $modules = ((& node', "    $modules = if ($Edition -eq 'Enterprise') { ':a' } else { ':b' }\n    $unused = ((& node");
+    const t = mutate('    $modules = ((& node', "    $modules = if ($Edition -eq 'Advanced') { ':a' } else { ':b' }\n    $unused = ((& node");
     assert.match(problems(t), /still assigns `\$modules` from a hand-written/);
 });
 
@@ -65,13 +65,13 @@ test('RED: the generator is never run against the bundle', () => {
 });
 
 test('RED: bundle-modules.mjs prose counts drift from its table', () => {
-    const bm = readFileSync(join(ROOT, 'tools', 'bundle-modules.mjs'), 'utf8').replace(/Personal 2, Professional \d+/,'Personal 2, Professional 99');
-    assert.match(problems(REAL, { bundleModulesText: bm }), /says Professional ships 99 first-party module/);
+    const bm = readFileSync(join(ROOT, 'tools', 'bundle-modules.mjs'), 'utf8').replace(/Basic 7, Standard \d+/,'Basic 7, Standard 99');
+    assert.match(problems(REAL, { bundleModulesText: bm }), /says Standard ships 99 first-party module/);
 });
 
 test('RED: the --list-mvn output disagrees with the generator table', () => {
-    const gen = { mvn: { Professional: ':inspecto-oidc', Enterprise: '', Preview: '' }, classpathMax: [] };
-    assert.match(problems(REAL, { generated: gen }), /Professional: `offering-classpath\.mjs --list-mvn` does not match/);
+    const gen = { mvn: { Standard: ':inspecto-oidc', Advanced: '', Preview: '' }, classpathMax: [] };
+    assert.match(problems(REAL, { generated: gen }), /Standard: `offering-classpath\.mjs --list-mvn` does not match/);
 });
 
 // ── P3d stage 2: the core thin jars (rule D) ─────────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ test('RED: package.ps1 stops staging the core thin jars from the generator', () 
 test('RED: the generated classpath forgets a core jar', () => {
     const full = analyze(REAL).problems;
     assert.deepEqual(full, []);
-    const gen = { mvn: { Professional: ':x', Enterprise: ':x', Preview: ':x' }, classpathMax: coreModules().map((m) => m.bundleFile).filter((j) => j !== 'inspecto-util.jar') };
+    const gen = { mvn: { Standard: ':x', Advanced: ':x', Preview: ':x' }, classpathMax: coreModules().map((m) => m.bundleFile).filter((j) => j !== 'inspecto-util.jar') };
     assert.match(problems(REAL, { generated: gen }), /staged but absent from modules\.list: .*inspecto-util\.jar/);
 });
 

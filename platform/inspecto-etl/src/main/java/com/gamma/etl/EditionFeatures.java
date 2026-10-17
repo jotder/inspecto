@@ -43,6 +43,18 @@ public final class EditionFeatures {
      * only the Enterprise (and Preview) flavours bundle.
      */
     public static final String PII_MASK = "quality.pii.mask";
+    /**
+     * The Link Analysis <b>Investigation surface</b> — Investigations (sealed op log, replay, compare), Drafts, the Dossier
+     * and its bundle, templates and external references, members, embed links, Case linking, data trust (coverage,
+     * Dataset Files, data-changes), Graph Run, link index builds, and Alert Rules / standing detection on Investigations
+     * ({@code LA-EDITIONS-1} ED-4, operator 2026-10-17: "Basic has no sign-in and no Investigations"). Declared by
+     * {@code inspecto-ops}, which only the Standard, Advanced and Preview flavours bundle. Unlike the config features
+     * above it is also a ROUTE FEATURE: a route module whose {@code featureIds()} names it is answered
+     * {@code 503 CAPABILITY_UNAVAILABLE} with {@link #refusal} at dispatch when it is absent ({@link #gatesRoutes}),
+     * while the Link Analysis EXPLORER routes beside it (projection, paths, patterns, Value Measures, geo, Entity
+     * identities, Entity profile pages) answer in Basic as in every edition.
+     */
+    public static final String INVESTIGATIONS = "investigations";
 
     /** The finding / error code every refusal carries. Mirrors {@code FindingCodes.ERR_EDITION_FEATURE}. */
     public static final String CODE = "ERR_EDITION_FEATURE";
@@ -71,11 +83,25 @@ public final class EditionFeatures {
             case SINK_ARCHIVE -> "the compliance archive (sink.archive — collector.post_action.on_success: MOVE)";
             case SINK_DUCKLAKE -> "DuckLake catalog registration (sink.ducklake — ducklake.enabled: true)";
             case PII_MASK -> "PII masking (quality.pii.mask — a steps: mask Step)";
+            case INVESTIGATIONS -> "Link Analysis Investigations (Investigations, Drafts, Dossier, templates, members, embed links, "
+                    + "data trust, Graph Run, index builds and Alert Rules on Investigations)";
             default -> "'" + feature + "'";
         };
         if (PII_MASK.equals(feature))
-            return what + " is an Enterprise feature — this build does not include it";
-        return what + " is a Professional+ feature — this build (Personal) does not include it";
+            return what + " is an Advanced feature — this build does not include it";
+        if (INVESTIGATIONS.equals(feature))
+            return what + " are available in Standard and above — this build (Basic) is the Link Analysis explorer and does not "
+                    + "include them";
+        return what + " is a Standard+ feature — this build (Basic) does not include it";
+    }
+
+    /**
+     * Whether {@code featureId} — a {@code RouteModule.featureIds()} id — is an edition feature the HOST enforces on routes:
+     * a route owned by it answers {@code 503 CAPABILITY_UNAVAILABLE} with {@link #refusal} when the feature is absent.
+     * Only {@link #INVESTIGATIONS} today; every other route feature is decided by whether its module is installed.
+     */
+    public static boolean gatesRoutes(String featureId) {
+        return INVESTIGATIONS.equals(featureId);
     }
 
     /** Throws {@link IllegalStateException} with {@link #refusal} when {@code feature} is absent. */

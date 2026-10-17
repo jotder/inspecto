@@ -1,4 +1,4 @@
-# Link Analysis showcase B: Finance and audit (runbook, synthetic data only)
+# Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)
 
 **Status: BUILT and LIVE-REHEARSED 2026-10-16 on a booted Space (Enterprise Demo Auth bundle, port 8141): smoke 30/30, the HTTP routes and the headline browser scenes driven; what was not driven is listed in section 6.** Vertical B of the
 [multi-vertical showcase plan](../superpower/la-multi-vertical-showcase-plan.md): "procure-to-pay and the journal". The analyst's questions: is this vendor real, who approved,
@@ -10,7 +10,7 @@ The stakeholder-facing sibling script is the [demo runbook](la-demo-runbook.md) 
 
 | # | Step | Command / expectation |
 |---|---|---|
-| 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Enterprise -DemoAuth -Ui la-app -NoBakeDemo` (`-DemoAuth` refuses every edition but Enterprise, Preview included); unzip it inside the checkout, not under `%TEMP%` |
+| 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` (`-DemoAuth` refuses every edition but Enterprise, Preview included); unzip it inside the checkout, not under `%TEMP%` |
 | 2 | Lay the Space down (offline, before the server starts) | `node tools/seed-la-audit.mjs --scaffold <spacesRoot>` creates `la-audit` and the template gallery |
 | 3 | Start the server with `-Dla.embed.enabled=true` (only for the Embed scene) | without it the mint answers 503 |
 | 4 | Wait for the Jobs: `ap_links` runs on a 10-minute cron; its three derived Jobs and `la_index_build` follow it by signal | or press Run on each as `audit.manager` |

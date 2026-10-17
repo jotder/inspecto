@@ -8,7 +8,7 @@ and [`okf/backend/module-taxonomy.md`](../okf/backend/module-taxonomy.md). When 
 leftovers to BACKLOG, `git mv` to `archived-documents/plans-archive/` (CLAUDE.md lifecycle).
 
 > **Honesty box - what was and was not verified.** Verified by reading this checkout at `299becc07`: the Anomaly and Risk
-> Score OKF concepts, the archived anomaly design (decisions D-AD1..D-AD12), `offerings/professional.toon`, the anomaly
+> Score OKF concepts, the archived anomaly design (decisions D-AD1..D-AD12), `offerings/standard.toon`, the anomaly
 > `module.toon`, the module list under `features/ la/ platform/ providers/ spi/`, `SqlSandbox`/`SqlGuard` headers,
 > `tools/dependencies.lock` (it contains `onnxruntime 1.20.0` and `ai.djl` 0.36.0 `api` + `huggingface:tokenizers`),
 > the embedded-intelligence concept, the DuckDB pin (`duckdb.version` 1.5.6.0). **Not verified** (named so nobody
@@ -114,7 +114,7 @@ without it; separable; absence breaks no security promise; carries its own risk:
 - **UI:** Studio panes for the three kinds (list/detail/edit/History + preview), an entity prediction panel (the shape of
   `<inspecto-anomaly-panel>`), a forecast chart (`<inspecto-chart>`, already draws the anomaly series band). `navFeature:
   predictive` hides everything when the module is absent (503 / unknown kind = absent).
-- **Editions / Offering:** add-on `predictiveAnalytics` in `offerings/professional.toon` (`status: planned` then `built`),
+- **Editions / Offering:** add-on `predictiveAnalytics` in `offerings/standard.toon` (`status: planned` then `built`),
   so Professional, Enterprise, Preview; **not Personal** (as D-AD4), unless OD-5 chooses otherwise; needs the
   `tools/check-offerings.mjs` and bundle-module list entries anomaly had. Content ships as **Space Templates** (the unit of
   sale includes content): later `PACK-SALES-MARKETING-1` is a *function pack* (domain-neutral templates that `requires`

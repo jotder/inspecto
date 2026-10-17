@@ -13,7 +13,7 @@ Trial only, never for master. Worktree fast-forwarded to `1da0ad734`.
   Each lists only `windows_arm64`. The snapshot publish looks partial, or platform-split.
 - Maven stopped at `inspecto-util` (the first module on the DuckDB dependency):
   `Could not find artifact org.duckdb:duckdb_jdbc:jar:2.0-2848c61d-SNAPSHOT in sn`.
-  The reactor was `-Pedition-enterprise -pl :inspecto-la-storage,:inspecto-la-core,:inspecto-la-api,:inspecto-geo-link -am`,
+  The reactor was `-Pedition-advanced -pl :inspecto-la-storage,:inspecto-la-core,:inspecto-la-api,:inspecto-geo-link -am`,
   JDK 27. Every later module, all four LA modules included, was SKIPPED.
 
 ## Not answered
@@ -36,7 +36,7 @@ snapshots enabled, then `-Dduckdb.version=<ver>`. In PowerShell, quote every dot
 
 ## Update 2026-10-03: the 1.5.6.0 bump
 
-JDBC `1.5.6.0` (four-part Maven version) resolved and the DuckDB-touching reactor (26 modules, -Pedition-enterprise) passed with it; `duckdb.version` is now `1.5.6.0` in the root pom. 2.0 remains blocked as above.
+JDBC `1.5.6.0` (four-part Maven version) resolved and the DuckDB-touching reactor (26 modules, -Pedition-advanced) passed with it; `duckdb.version` is now `1.5.6.0` in the root pom. 2.0 remains blocked as above.
 
 ## DuckDB v1.5.6 release notes - what touches this repo (2026-10-03)
 

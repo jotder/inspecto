@@ -102,15 +102,15 @@ jobs:
       # ci.yml:130-135 already records this exact reasoning for the dependency guard, which shells the same
       # command; release.yml never got the same treatment.
       #
-      # `-Pedition-enterprise` and NOT the default reactor: the nine edition modules are profile-scoped, so
-      # a plain install leaves `inspecto-ops` and `inspecto-policy` absent — and Enterprise is the flavour
+      # `-Pedition-advanced` and NOT the default reactor: the nine edition modules are profile-scoped, so
+      # a plain install leaves `inspecto-ops` and `inspecto-policy` absent — and Advanced is the flavour
       # that fails first, because `inspecto-policy` gained a TEST-scoped edge to `inspecto-ops` in EDG-01
       # cell 7 and resolution covers every scope regardless of the generator's `-DincludeScope=runtime`.
-      # Enterprise is the superset (9 modules vs Standard's 8), so one pass covers every edition packaged
+      # Advanced is the superset (9 modules vs Standard's 8), so one pass covers every edition packaged
       # below. ⛔ Do NOT "fix" this by narrowing the scope filter: the failure is in RESOLUTION, which
       # precedes filtering.
       - name: Install the reactor into .m2 so the SBOM generator can resolve it (SBOM-RESOLVE-1)
-        run: mvn --batch-mode --no-transfer-progress -DskipTests -Pedition-enterprise install
+        run: mvn --batch-mode --no-transfer-progress -DskipTests -Pedition-advanced install
 
       - name: Install UI dependencies
         run: npm ci
@@ -182,11 +182,11 @@ jobs:
       # while Windows targets keep falling back to system java.
       # ⛔ If a release ever fails at "Embedding trimmed Java runtime", re-add -NoRuntime to unblock the
       # cut and reopen OPS-07 — do NOT provision a jmods cache, which is not what was missing.
-      - name: Package + SBOM + sign — Personal
+      - name: Package + SBOM + sign — Basic
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
           INSPECTO_JARSIGN_STOREPASS: ${{ secrets.INSPECTO_JARSIGN_STOREPASS }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Personal ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Basic ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
       # Examples smoke (EXAMPLES-STEPS-1): run one bundled example through the bundle's OWN runner against the
       # packaged jar, so a runner that stops declaring -Dassist.safety.roots ("no allowed roots configured")
       # fails the release instead of shipping. hello-csv is the minimum pipeline: CSV -> Parquet, 4 typed columns.
@@ -208,9 +208,9 @@ jobs:
       # lastStatus "". The mis-pointed path surfaces only when the task RESOLVES it, i.e. in a RUN, and
       # every job here is on a weekly/daily cron so a plain --demo never fires one.
       #
-      # ⚠ Personal ONLY, and deliberately placed under the Personal bundle: POST /jobs/{n}/trigger is
-      # behind canOperateRuns, a no-op on Personal (no Subject is ever attached) but a real capability
-      # on Professional/Enterprise — the same step after those packages would 401/403 for a reason that has
+      # ⚠ Basic ONLY, and deliberately placed under the Basic bundle: POST /jobs/{n}/trigger is
+      # behind canOperateRuns, a no-op on Basic (no Subject is ever attached) but a real capability
+      # on Standard/Advanced — the same step after those packages would 401/403 for a reason that has
       # nothing to do with the examples.
       #
       # ⚠ Proven RED and GREEN from the command line on Windows (re-point `dir` to `out/database` ->
@@ -226,45 +226,45 @@ jobs:
       # windows_amd64 extension set — so no Linux-labelled artifact was ever published and the one that was
       # could load none of its extensions. tools/release-collect.sh collects EVERY produced platform zip
       # (+ .sha256 + .asc) and FAILS if the runner's own platform (linux_amd64 on ubuntu-latest) is missing.
-      - name: Collect Personal artifacts
+      - name: Collect Basic artifacts
         run: |
           set -euo pipefail
-          bash tools/release-collect.sh personal
-          cp inspecto-deploy/sbom/inspecto-personal.cdx.json inspecto-deploy/sbom/inspecto-personal.spdx.json release/
-      # PROFESSIONAL-BUNDLE-1 (2026-09-10): Professional is its OWN artifact. Until now the pipeline shipped Personal
-      # and Enterprise only, labelling Enterprise "superset of Professional" — true of the module set, false of
-      # runtime identity: the launchers infer the edition from jar presence, so an Enterprise bundle handed
-      # to a Professional customer self-identified as Enterprise and enabled ABAC they had not bought. A Professional
-      # customer must receive a bundle that never carried inspecto-policy.jar. package.ps1 -Edition Professional
-      # has built exactly that set (-Pedition-professional, no policy jar) since W6; only the release step was missing.
-      - name: Package + SBOM + sign — Professional
+          bash tools/release-collect.sh basic
+          cp inspecto-deploy/sbom/inspecto-basic.cdx.json inspecto-deploy/sbom/inspecto-basic.spdx.json release/
+      # PROFESSIONAL-BUNDLE-1 (2026-09-10): Standard is its OWN artifact. Until now the pipeline shipped Basic
+      # and Advanced only, labelling Advanced "superset of Standard" — true of the module set, false of
+      # runtime identity: the launchers infer the edition from jar presence, so an Advanced bundle handed
+      # to a Standard customer self-identified as Advanced and enabled ABAC they had not bought. A Standard
+      # customer must receive a bundle that never carried inspecto-policy.jar. package.ps1 -Edition Standard
+      # has built exactly that set (-Pedition-standard, no policy jar) since W6; only the release step was missing.
+      - name: Package + SBOM + sign — Standard
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
           INSPECTO_JARSIGN_STOREPASS: ${{ secrets.INSPECTO_JARSIGN_STOREPASS }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Professional ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
-      - name: Collect Professional artifacts
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Standard ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
+      - name: Collect Standard artifacts
         run: |
           set -euo pipefail
-          bash tools/release-collect.sh professional
-          cp inspecto-deploy/sbom/inspecto-professional.cdx.json inspecto-deploy/sbom/inspecto-professional.spdx.json release/
-          # the commercial property this step exists for: no policy jar in what a Professional customer receives
+          bash tools/release-collect.sh standard
+          cp inspecto-deploy/sbom/inspecto-standard.cdx.json inspecto-deploy/sbom/inspecto-standard.spdx.json release/
+          # the commercial property this step exists for: no policy jar in what a Standard customer receives
           # (checked on the collected copies — release-collect.sh removes the originals so one edition's zips
           # can never be mistaken for the next's)
-          for z in release/inspecto-deploy-professional-*.zip; do
+          for z in release/inspecto-deploy-standard-*.zip; do
             if unzip -l "$z" | grep -q 'inspecto-policy'; then
-              echo "::error::the Professional bundle $z carries inspecto-policy — it would self-identify as Enterprise"; exit 1
+              echo "::error::the Standard bundle $z carries inspecto-policy — it would self-identify as Advanced"; exit 1
             fi
           done
-      - name: Package + SBOM + sign — Enterprise
+      - name: Package + SBOM + sign — Advanced
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
           INSPECTO_JARSIGN_STOREPASS: ${{ secrets.INSPECTO_JARSIGN_STOREPASS }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Enterprise ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
-      - name: Collect Enterprise artifacts
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Advanced ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
+      - name: Collect Advanced artifacts
         run: |
           set -euo pipefail
-          bash tools/release-collect.sh enterprise
-          cp inspecto-deploy/sbom/inspecto-enterprise.cdx.json inspecto-deploy/sbom/inspecto-enterprise.spdx.json release/
+          bash tools/release-collect.sh advanced
+          cp inspecto-deploy/sbom/inspecto-advanced.cdx.json inspecto-deploy/sbom/inspecto-advanced.spdx.json release/
 
       # Verify what we are about to publish — the same checks a customer runs. Checksums and the bundle
       # layout run on EVERY run, dispatch included; signatures are checked in the next step.
@@ -277,7 +277,7 @@ jobs:
             # The bundle's name, embedded JVM and DuckDB extension set must all agree — the mismatch that
             # RELEASE-BUNDLE-PLATFORM-MISMATCH-1 shipped (Linux JVM + windows_amd64 extensions) was visible
             # only in the zip's own entry table, never to the boot smoke, so it is asserted from the table.
-            plat=$(basename "$zip" .zip | sed -E 's/^inspecto-deploy-(personal|professional|enterprise)-//')
+            plat=$(basename "$zip" .zip | sed -E 's/^inspecto-deploy-(basic|standard|advanced)-//')
             entries=$(unzip -Z1 "$zip")
             case "$plat" in
               linux_amd64)   grep -qx 'inspecto-deploy/runtime/bin/java'     <<<"$entries" || { echo "::error::$zip: no runtime/bin/java";     exit 1; } ;;

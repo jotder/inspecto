@@ -14,5 +14,7 @@ export default [
     { path: 'templates', loadChildren: () => import('./templates/templates.routes') },
     { path: 'link-analysis', data: { hideShellFooter: true }, loadChildren: () => import('@inspecto/link-analysis/link-analysis/link-analysis.routes') },
     { path: 'entities', loadChildren: () => import('@inspecto/link-analysis/entities/entities.routes') },
+    // LA-EDITIONS-1 section 4: the "Open in Inspecto LA" deep link, the la-app's /open page at /studio/open.
+    { path: 'open', loadChildren: () => import('@inspecto/link-analysis/open/open.routes') },
     { path: 'geo-map', loadChildren: () => import('@inspecto/link-analysis/geo-map/geo-map.routes') },
 ] as Routes;

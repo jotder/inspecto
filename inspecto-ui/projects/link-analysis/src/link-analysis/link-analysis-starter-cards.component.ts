@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { LinkAnalysisView } from './link-analysis.service';
 import { oneLine } from './la-starter';
 import { msisdnError, normaliseMsisdn } from './investigate-number';
+import { activeDomainProfileId, domainProfile, termLabel } from '@inspecto/link-analysis/graph/domain-profile';
 
 /** The MSISDN field's validator: the shared rule's message, rendered verbatim by the `<mat-error>`. */
 function msisdnValidator(c: AbstractControl<string>): ValidationErrors | null {
@@ -45,7 +46,7 @@ function msisdnValidator(c: AbstractControl<string>): ValidationErrors | null {
                         Seeds the number and expands one degree of who it is linked to; Choose neighbours goes further.
                     </span>
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>MSISDN</mat-label>
+                        <mat-label>{{ numberLabel() }}</mat-label>
                         <input matInput formControlName="msisdn" inputmode="tel" autocomplete="off" />
                         @if (msisdn.errors?.['msisdn']; as message) {
                             <mat-error>{{ message }}</mat-error>
@@ -156,5 +157,9 @@ export class LinkAnalysisStarterCardsComponent {
         this.investigateNumber.emit(normaliseMsisdn(this.msisdn.value));
     }
 
+    /** The number field's label: the Space's Domain Profile relabel of the phone-number Entity Type, else the neutral word. */
+    readonly numberLabel = computed(() =>
+        termLabel(domainProfile(activeDomainProfileId()), 'entity_type.msisdn', 'Phone number'),
+    );
     readonly followAbout = computed(() => oneLine(this.followView()?.description, 110));
 }

@@ -29,30 +29,30 @@ test('union and diff', () => {
 });
 
 test('lock round trip and validation', () => {
-    const lock = { Professional: ['java.base', 'java.sql'] };
+    const lock = { Standard: ['java.base', 'java.sql'] };
     assert.deepEqual(parseLock(renderLock(lock)), lock);
     assert.deepEqual(validateLock(lock), []);
-    assert.ok(validateLock({ Professional: ['java.sql'] }).some((x) => x.includes('java.base')));
+    assert.ok(validateLock({ Standard: ['java.sql'] }).some((x) => x.includes('java.base')));
     assert.ok(validateLock({ Nope: ['java.base'] }).some((x) => x.includes('unknown edition')));
-    assert.ok(validateLock({ Personal: ['java.base', 'a.b', 'a.a'] }).some((x) => x.includes('not sorted')));
+    assert.ok(validateLock({ Basic: ['java.base', 'a.b', 'a.a'] }).some((x) => x.includes('not sorted')));
 });
 
 test('missing staged jar fails', () => {
-    const need = expectedJars('Personal');
-    assert.doesNotThrow(() => requireJars('Personal', need));
-    assert.throws(() => requireJars('Personal', need.slice(1)), /would under-report/);
+    const need = expectedJars('Basic');
+    assert.doesNotThrow(() => requireJars('Basic', need));
+    assert.throws(() => requireJars('Basic', need.slice(1)), /would under-report/);
 });
 
 test('lock mismatch message', () => {
-    assert.equal(lockMismatch('Personal', ['a'], ['a']), null);
-    assert.match(lockMismatch('Personal', ['a', 'b'], ['a', 'c']), /\+b .* -c/);
-    assert.match(lockMismatch('Personal', ['a'], undefined), /no \[Personal\] section/);
+    assert.equal(lockMismatch('Basic', ['a'], ['a']), null);
+    assert.match(lockMismatch('Basic', ['a', 'b'], ['a', 'c']), /\+b .* -c/);
+    assert.match(lockMismatch('Basic', ['a'], undefined), /no \[Basic\] section/);
 });
 
 test('computeSet unions jdeps with extra and enforces jars', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jlink-'));
-    assert.throws(() => computeSet({ edition: 'Personal', stagedDir: dir, jdeps: () => [], extraText: '' }), /lacks/);
-    for (const j of expectedJars('Personal')) writeFileSync(join(dir, j), '');
-    const r = computeSet({ edition: 'Personal', stagedDir: dir, jdeps: () => ['java.base', 'java.sql'], extraText: 'jdk.zipfs # why\n' });
+    assert.throws(() => computeSet({ edition: 'Basic', stagedDir: dir, jdeps: () => [], extraText: '' }), /lacks/);
+    for (const j of expectedJars('Basic')) writeFileSync(join(dir, j), '');
+    const r = computeSet({ edition: 'Basic', stagedDir: dir, jdeps: () => ['java.base', 'java.sql'], extraText: 'jdk.zipfs # why\n' });
     assert.deepEqual(r.all, ['java.base', 'java.sql', 'jdk.zipfs']);
 });

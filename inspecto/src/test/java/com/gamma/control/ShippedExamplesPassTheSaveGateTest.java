@@ -79,7 +79,7 @@ class ShippedExamplesPassTheSaveGateTest {
                         "07-steps/mask/orders_pipeline.toon steps[0].mask",
                         "_reference/ducklake-sink/orders_pipeline.toon output.ducklake",
                         "_reference/sftp-collector/orders_pipeline.toon collector.post_action.on_success"),
-                editionRefused, "the Professional+ templates, and the Enterprise-only mask Step (SEC-08), a Personal build refuses (G9)");
+                editionRefused, "the Standard+ templates, and the Advanced-only mask Step (SEC-08), a Basic build refuses (G9)");
     }
 
     @Test

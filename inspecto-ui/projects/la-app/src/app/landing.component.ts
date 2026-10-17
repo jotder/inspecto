@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
+import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_NAV } from './la-nav';
 
 /** The front door: one card per area of the application. */
@@ -12,7 +13,7 @@ import { LA_APP_NAV } from './la-nav';
     template: `
         <section class="mx-auto flex max-w-4xl flex-col gap-6 p-6" aria-labelledby="la-landing-title">
             <header class="flex flex-col gap-1">
-                <h1 id="la-landing-title" class="text-title m-0 font-semibold">Link Analysis</h1>
+                <h1 id="la-landing-title" class="text-title m-0 font-semibold">{{ product }}</h1>
                 <p class="text-secondary m-0">
                     Find the links between entities in your data: explore them as a graph, place them on a map, and keep
                     lists of the ones that matter.
@@ -36,5 +37,6 @@ import { LA_APP_NAV } from './la-nav';
     `,
 })
 export class LandingComponent {
+    protected readonly product = LA_PRODUCT_NAME;
     protected readonly nav = LA_APP_NAV;
 }

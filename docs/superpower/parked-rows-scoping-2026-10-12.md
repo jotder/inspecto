@@ -243,7 +243,7 @@ session (D14 sub-point).
 **Before the session (setup, 30 min, SAFE for an agent).**
 
 1. A build of current `master` with the `demo` Space and a bundle-local `demo-users.toon` holding a lead who has
-   `canManageIncidents` and a second user who has not (the proxy used `package.ps1 -Edition Enterprise -DemoAuth`,
+   `canManageIncidents` and a second user who has not (the proxy used `package.ps1 -Edition Advanced -DemoAuth`,
    port 8097 because 8080 was held; use a clean port).
 2. **Seed one Incident and one Case in the Space** (via a `create-incident` Decision Rule over the API, as the proxy
    did) so task 5 does not dead-end on an empty Space. State openly in the notes that this is seeded.

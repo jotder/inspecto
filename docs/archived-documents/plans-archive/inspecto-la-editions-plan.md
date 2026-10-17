@@ -1,6 +1,6 @@
 # Inspecto LA — product name, editions, industry packs and third-party integration (`LA-EDITIONS-1`)
 
-**Status: DECIDED 2026-10-17 (operator, after the stakeholder demo) — nothing built.** When a phase ships: distil its
+**Status: ARCHIVED 2026-10-17 — SHIPPED (all seven phases; §7 = as built and lane decisions; residuals on `LA-EDITIONS-RESIDUALS-1`).** When a phase ships: distil its
 as-built facts into the matching OKF concept and `docs/EDITIONS.md`, move residuals to `docs/BACKLOG.md`, and archive
 this file when the last phase ships.
 
@@ -112,3 +112,25 @@ clears the four endpoint gates and an `openapi-v1.json` entry.
 - ED-2 scope confirmation (whole product, as recorded).
 - Integration targets: unknown; ask the stakeholders which case managers and fraud products they run.
 - Do Basic's Value Measures and patterns stay free after pricing review? (ED-7 keeps them in Basic for now.)
+
+## 7. As built (2026-10-17, five parallel lanes, integrated on `lane/la-ed`)
+
+All seven phases shipped. Lane decisions LD-* are listed so a reviewer can overturn any of them.
+
+| Phase | As built |
+|---|---|
+| 1 Naming | `la-app` reads "Inspecto LA" (tab, rail, landing, sign-in via `AppEnvironment.productName`); GLOSSARY entry *Inspecto LA*; user manual, end-user guide, six runbooks, both OKF concepts use "Inspecto LA (Link Analysis)" on first use. |
+| 2 Edition rename | Basic / Standard / Advanced / Preview everywhere: Maven profiles `edition-standard`, `edition-advanced`, `edition-preview` (Basic = default build; `edition-professional` / `edition-enterprise` removed), `package.ps1 -Edition`, launchers, offerings `basic|standard|advanced.toon`, CI workflows, skills, `/bootstrap` edition id, refusal messages, EDITIONS.md, BRANCHING.md, GLOSSARY *Edition*. |
+| 3 Basic explorer | `entity-list`, `la-core`, `la-storage`, `la-api`, `geo-link` ship in Basic. Edition feature `investigations` (declared by `inspecto-ops`) gates 18 Investigation route modules plus the integration routes: on Basic they answer 503 `CAPABILITY_UNAVAILABLE` "available in Standard and above"; `/bootstrap` reports `features.investigations`; the SPA hides Investigation affordances. Masking on Basic is display-only (documented). |
+| 4 Packs | Industry packs are classpath resources in `inspecto-entity-store` (every edition): manifest, terms, Entity Types, link kinds; refused whole when invalid. Packs `telecom` and `mobile-money`; Space key `domain_profile`; `GET`/`PUT /settings/link-analysis/domain-profile`; SPA hardcoded profiles removed; vocabulary rule `industry-pack-term` keeps pack words out of the core (AC-09); `LDP-D7` settled. |
+| 5 Inbound | `POST /inv/inbound/investigations` (idempotent on system + external id; seeds through the normal ops; links an external reference) and `POST /inv/deep-links/resolve`; SPA `/open` ("Open in Inspecto LA"). |
+| 6 Outbound | Generic connector: `GET`/`PUT /inv/integration` (canAdminister, `la-integration.json`, endpoint = a registered https Connection, token by secret reference), `POST /inv/investigations/{id}/handoff` (Dossier bundle + findings, case id kept as an external reference); signed webhooks (HMAC, retries, audited). Inbound client-credentials trust NOT enabled: security review owed. |
+| 7 Preview | Preview carries every module (proven by `tools/offering-classpath.test.mjs`); `-DemoAuth` accepts Preview; a real Preview demo bundle booted and answered `/health`. |
+
+**Lane decisions** (one line each; details in the lane commits):
+- Brand: product name reaches the shared sign-in screen through `AppEnvironment.productName`; route, module and nav names keep "Link Analysis"; bare "LA" in UI text banned in GLOSSARY only.
+- Editions: gate = edition feature + route features at dispatch (no module split); 503 precedes the Space's 404 MODULE_DISABLED; Graph Run, index and Dataset Files count as Investigation surface; case-history stays explorer; Basic "Investigate a number" explains instead of seeding; Javadoc and comments keep old edition names (hundreds); old EDITIONS cell letters remapped; integration routes gated with the Investigation surface (ED-6).
+- Packs: classpath packs in a base module; file names reserved through `ImportLoaderInventoryTest.ALLOWED` on the `module.toon` precedent (⚠ a test inventory edit — operator to confirm); no pack code (normalisers chosen from the closed set); pack Entity Types overlay the defaults; default Entity Type labels made neutral; finance / supply-chain / cyber SPA profiles removed (views saved under them open as generic).
+- Inbound: no "alert" in paths (Glossary: an Alert is a fired Alert Rule); idempotency by derived id + create-once header; binding inferred from a saved view or index, else 422; both routes rate-classed EXPENSIVE; no new audit types.
+- Outbound: endpoint from a registered Connection (SSRF and egress guards for free); JSON settings file; case id as a non-granting external reference; webhooks carry no entity ids; retries default 2.
+- Integration: the three LA showcase and audit / claims / mobile-money templates gained the inert SLA examples file, and `la-showcase-off` mirrors the analyst reveal capability (both were red on origin/master).

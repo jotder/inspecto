@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // package.ps1 runs under `Set-StrictMode -Version Latest`: READING a variable that no earlier assignment in an
 // enclosing block set THROWS, and only at the bundling step of the edition that skipped the assigning branch.
-// (2026-10-08: the P7 module splits added reads of variables assigned only in the non-Personal branch, so
-// `package.ps1 -Edition Personal` died - and had already been dying since entity-list/LA, before the series.)
+// (2026-10-08: the P7 module splits added reads of variables assigned only in the non-Basic branch, so
+// `package.ps1 -Edition Basic` died - and had already been dying since entity-list/LA, before the series.)
 // This walks package.ps1 with the PowerShell AST (tools/check-package-strict.ps1) and fails on every such read.
 // Usage: node tools/check-package-strict.mjs [path-to-script.ps1]      (needs pwsh; no build)
 import { spawnSync } from 'node:child_process';

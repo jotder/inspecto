@@ -192,7 +192,7 @@ class ControlApiAlertAckTest {
     @Test
     void withNoSecurityModuleThePersonalOperatorWorksAnAlertWithAnHonourSystemActor(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {   // no Authenticator: Personal
-            assertTrue(c.svc.objects().isEmpty(), "the Personal shape: no operational objects");
+            assertTrue(c.svc.objects().isEmpty(), "the Basic shape: no operational objects");
             String id = firstAlert(c, null).get("id").asText();
             HttpResponse<String> ack = send(c, "POST", "/alerts/" + id + "/ack", null, null);
             assertEquals(200, ack.statusCode(), ack.body());

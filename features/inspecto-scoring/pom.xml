@@ -50,7 +50,7 @@
         </dependency>
 
         <!-- The WatchListFeed seam (com.gamma.entitylist). Always shipped beside this module: both are in the same
-             "Scoring and Lists" add-on (offerings/professional.toon scoringLists). -->
+             "Scoring and Lists" add-on (offerings/standard.toon scoringLists). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-entity-list</artifactId>

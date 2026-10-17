@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // compile-clean — the PROOF that a code cut / move / shared-interface change really compiles.
 //
-//   node tools/compile-clean.mjs [-Pedition-enterprise] [more mvn args…]      (default profile: edition-enterprise)
+//   node tools/compile-clean.mjs [-Pedition-advanced] [more mvn args…]      (default profile: edition-advanced)
 //
 // Runs `mvn -o clean test-compile -DskipTests -B -fae`, ALWAYS with `clean`, then reads the log instead of trusting
 // the exit code. Exit 0 only when: BUILD SUCCESS, a Reactor Summary exists with at least one module, no module is
@@ -78,7 +78,7 @@ export function summarise(v) {
 function main() {
     const extra = process.argv.slice(2);
     const hasProfile = extra.some((a) => a.startsWith('-P'));
-    const args = ['-o', 'clean', 'test-compile', '-DskipTests', '-B', '-fae', ...(hasProfile ? [] : ['-Pedition-enterprise']), ...extra];
+    const args = ['-o', 'clean', 'test-compile', '-DskipTests', '-B', '-fae', ...(hasProfile ? [] : ['-Pedition-advanced']), ...extra];
     console.log(`mvn ${args.join(' ')}   (JAVA_HOME=${process.env.JAVA_HOME ?? '<unset — mvn uses PATH java>'})`);
     const r = spawnSync('mvn', args, { encoding: 'utf8', shell: true, maxBuffer: 1 << 28 });
     const log = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;

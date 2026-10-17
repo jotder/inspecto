@@ -44,7 +44,7 @@ describe('Toolbox - Value Measures entry', () => {
         const h = header();
         expect(h).toBeTruthy();
         expect(h!.tagName).toBe('BUTTON');
-        expect(h!.textContent).toContain('Find entities by money flow: pass-through ratio, cash-out concentration');
+        expect(h!.textContent).toContain('Find entities by money flow: pass-through ratio, withdrawal concentration');
         expect(h!.getAttribute('aria-expanded')).toBe('false');
         h!.focus();
         h!.click(); // a native button: Enter/Space dispatch this same click
