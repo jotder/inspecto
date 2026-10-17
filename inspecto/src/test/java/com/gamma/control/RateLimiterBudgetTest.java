@@ -15,6 +15,27 @@ class RateLimiterBudgetTest {
     @AfterEach
     void clear() {
         System.clearProperty(KEY);
+        System.clearProperty(DASHBOARD);
+    }
+
+    private static final String DASHBOARD = "control.rateLimit.dashboard.capacity";
+
+    /** The /bi/query bucket keeps burst 120 by default and honours its override (MixedLoadBenchmark raises it so a
+     *  fast runner measures load, not the throttle). */
+    @Test
+    void theDashboardBurstIsTunable() {
+        assertEquals(120, burst(RateLimiter.dashboard()));
+        System.setProperty(DASHBOARD, "500");
+        assertEquals(500, burst(RateLimiter.dashboard()));
+        System.setProperty(DASHBOARD, "0");
+        assertEquals(120, burst(RateLimiter.dashboard()), "a non-positive value never disables the limiter");
+    }
+
+    private static int burst(RateLimiter l) {
+        l.useClock(() -> 0L);
+        int n = 0;
+        while (l.tryConsume("k") && n < 10_000) n++;
+        return n;
     }
 
     @Test
