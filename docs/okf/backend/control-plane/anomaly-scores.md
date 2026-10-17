@@ -273,7 +273,7 @@ a constant day series gets a padded y axis (value ± max(1, 10 %)) instead of -2
 the edit dialog lists every Dataset without probing and reads columns only for the Datasets the model's Features reference (or a user picks), once per open, from the list it already holds (no per-Dataset GET, so a one-Dataset model opens with 1 list + 1 probe; a 404 probe
 still shows in the browser console, which a page cannot suppress) and lays Feature fields out two per row.
 
-What remains of `ANOMALY-UI-FINDINGS-1` is the live visual check of the layout and the sign-in return path.
+The layout was checked live 2026-10-17. What remains of `ANOMALY-UI-FINDINGS-1` is a live check of the sign-in return path under a real token lapse / 401.
 
 ## Decisions (operator, 2026-10-10)
 
