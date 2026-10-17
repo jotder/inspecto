@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.util.SqlIdent;
+import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
@@ -50,7 +52,7 @@ public final class KpiCompletenessOutput {
             st.execute("CREATE TABLE k (pipeline VARCHAR, record_day DATE, status VARCHAR, rows BIGINT, "
                     + "baseline_rows BIGINT, deviation DOUBLE, missing_files BIGINT, unknown_streak_days INTEGER, "
                     + "evaluated_at TIMESTAMP)");
-            if (Files.exists(file)) st.execute("INSERT INTO k SELECT * FROM read_parquet(" + sqlStr(file) + ")");
+            if (Files.exists(file)) st.execute("INSERT INTO k SELECT * FROM " + SqlViews.parquetFile(file));
             try (PreparedStatement del = c.prepareStatement("DELETE FROM k WHERE pipeline = ? AND record_day = CAST(? AS DATE)")) {
                 del.setString(1, (String) payload.get("pipeline"));
                 del.setString(2, (String) payload.get("recordDay"));
@@ -71,7 +73,7 @@ public final class KpiCompletenessOutput {
                 ps.setTimestamp(9, Timestamp.from(evaluatedAt));
                 ps.executeUpdate();
             }
-            st.execute("COPY (SELECT * FROM k ORDER BY pipeline, record_day) TO " + sqlStr(tmp) + " (FORMAT PARQUET)");
+            st.execute("COPY (SELECT * FROM k ORDER BY pipeline, record_day) TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
         }
         Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         return file;
@@ -93,9 +95,5 @@ public final class KpiCompletenessOutput {
     private static void setLong(PreparedStatement ps, int i, Object v) throws SQLException {
         if (v instanceof Number n) ps.setLong(i, n.longValue());
         else ps.setNull(i, Types.BIGINT);
-    }
-
-    private static String sqlStr(Path p) {
-        return "'" + p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''") + "'";
     }
 }

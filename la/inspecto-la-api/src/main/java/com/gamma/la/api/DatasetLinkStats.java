@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.analytics.ColumnProfiler;
 import com.gamma.analytics.QuantileMode;
 import com.gamma.entitystore.EntityTypes;
@@ -35,10 +36,10 @@ final class DatasetLinkStats implements LinkStatsSource {
             boolean at = bound(f, ds, src), bt = bound(f, ds, dst);
             if (!at && !bt) continue;
             String kind = m.kind() != null && f.column(ds, m.kind()) != null
-                    ? "CAST(" + EntityProfiles.q(f.column(ds, m.kind())) + " AS VARCHAR)" : "CAST(NULL AS VARCHAR)";
+                    ? "CAST(" + SqlIdent.q(f.column(ds, m.kind())) + " AS VARCHAR)" : "CAST(NULL AS VARCHAR)";
             parts.add("SELECT " + end(f, ds, src) + " AS a, " + end(f, ds, dst) + " AS b, " + kind + " AS kind, " + at + " AS a_typed, " + bt
-                    + " AS b_typed FROM (" + f.relationSql.get(ds) + ") AS __r WHERE " + EntityProfiles.q(src) + " IS NOT NULL AND "
-                    + EntityProfiles.q(dst) + " IS NOT NULL");
+                    + " AS b_typed FROM (" + f.relationSql.get(ds) + ") AS __r WHERE " + SqlIdent.q(src) + " IS NOT NULL AND "
+                    + SqlIdent.q(dst) + " IS NOT NULL");
         }
         return parts.isEmpty() ? null : String.join(" UNION ALL ", parts);
     }
@@ -50,7 +51,7 @@ final class DatasetLinkStats implements LinkStatsSource {
 
     private static String end(EntityProfiles.Frame f, String ds, String col) {
         EntityTypes.EntityType t = f.resolved.typeOf(ds, col);
-        String c = EntityProfiles.q(col);
+        String c = SqlIdent.q(col);
         return t == null ? "CAST(" + c + " AS VARCHAR)" : EntityKeySql.key(t.normaliser(), c);
     }
 

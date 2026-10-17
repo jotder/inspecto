@@ -3,7 +3,9 @@ package com.gamma.job;
 import com.gamma.config.safety.PathJail;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.pipeline.SpaceConfigRoot;
+import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,15 +123,10 @@ final class PartitionCompactor {
 
         try {
             // 2. Merge into a glob-invisible temp, DuckDB doing the schema-tolerant heavy lifting.
-            StringBuilder list = new StringBuilder();
-            for (Path p : candidates) {
-                if (!list.isEmpty()) list.append(", ");
-                list.append('\'').append(p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")).append('\'');
-            }
+            String list = SqlViews.pathList(candidates.stream().map(p -> p.toAbsolutePath().toString()).toList());
             try (Statement st = conn.createStatement()) {
-                st.execute("COPY (SELECT * FROM read_parquet([" + list + "])) TO '"
-                        + tmp.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                        + "' (FORMAT PARQUET)");
+                st.execute("COPY (SELECT * FROM " + SqlViews.parquet(list, false, SqlViews.Hive.AUTO) + ") TO "
+                        + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
             }
 
             // 3. Hide the originals (atomic per file; readers' *.parquet globs no longer see them) …

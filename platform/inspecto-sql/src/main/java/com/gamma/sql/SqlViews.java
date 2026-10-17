@@ -102,6 +102,42 @@ public final class SqlViews {
         return list.append(']').toString();
     }
 
+    /**
+     * How a read treats hive-style {@code key=value} directories — the one option list for every
+     * {@code read_parquet(} in the product (ANALYTICS-CORE-1 M9).
+     */
+    public enum Hive {
+        /** No option rendered: DuckDB's own auto-detection (a plain read of one file or a flat directory). */
+        AUTO,
+        /** {@code hive_partitioning = false}: {@code key=value} directories are NOT columns (the files already carry the key). */
+        OFF,
+        /** {@code hive_partitioning=true, hive_types_autocast=0}: partition values stay {@code VARCHAR} — the store read. */
+        VARCHAR,
+        /** {@code hive_partitioning = true}: partition values typed by DuckDB's inference (an integer bucket key stays numeric). */
+        TYPED
+    }
+
+    /**
+     * A {@code read_parquet(} over a source literal with the options stated — for a read of files the caller wrote
+     * itself (an index, a compaction input, a just-written snapshot) rather than of a store, where
+     * {@link #reader} decides. {@code unionByName} aligns columns by name across files whose schemas drifted.
+     *
+     * @param source a SQL literal, already quoted/escaped ({@code SqlIdent.pathStr}, {@link #pathList})
+     */
+    public static String parquet(String source, boolean unionByName, Hive hive) {
+        return "read_parquet(" + source + (unionByName ? ", union_by_name=true" : "") + switch (hive) {
+            case AUTO -> "";
+            case OFF -> ", hive_partitioning = false";
+            case VARCHAR -> ", hive_partitioning=true, hive_types_autocast=0";
+            case TYPED -> ", hive_partitioning = true";
+        } + ")";
+    }
+
+    /** {@code read_parquet('<file>')} of one file with no options — a read-back of a file just written. */
+    public static String parquetFile(java.nio.file.Path file) {
+        return parquet(com.gamma.util.SqlIdent.pathStr(file), false, Hive.AUTO);
+    }
+
     /** A pattern no output file can match — the empty-selection rendering (see {@link #pathList}). */
     private static final String NO_FILES_GLOB = "__no_readable_files__/*";
 
@@ -112,8 +148,7 @@ public final class SqlViews {
         return switch (format) {
             // union_by_name: a store's files may gain additive columns over time (e.g. a Decision
             // Rule's tag consequence adds __tags from some batch onward) — align by name, not position.
-            case "PARQUET" -> "read_parquet(" + source + ", union_by_name=true"
-                    + (hive ? ", hive_partitioning=true, hive_types_autocast=0" : "") + ")";
+            case "PARQUET" -> parquet(source, true, hive ? Hive.VARCHAR : Hive.AUTO);
             case "CSV" -> "read_csv(" + source + ", header=true, all_varchar=true, union_by_name=true"
                     + (hive ? ", hive_partitioning=true, hive_types_autocast=0" : "") + ")";
             default -> throw new IllegalArgumentException("Unsupported format: " + format);

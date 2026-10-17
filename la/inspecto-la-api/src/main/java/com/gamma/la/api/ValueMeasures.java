@@ -2,7 +2,6 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
-import com.gamma.util.SqlIdent;
 import com.gamma.sql.SqlSandboxPolicy;
 
 import com.gamma.spi.auth.ApiException;
@@ -31,6 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * <b>LA-18 value Measures</b> ({@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2.6.1, DECIDED 2026-09-30) —
@@ -476,9 +477,5 @@ public final class ValueMeasures {
     /** Numbers print as JS does (no trailing {@code .0}), as {@code PatternRoutes.label} does. */
     private static String js(double d) {
         return d == Math.rint(d) && Math.abs(d) < 1e15 ? Long.toString((long) d) : Double.toString(d);
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 }

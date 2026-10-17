@@ -1,5 +1,8 @@
 package com.gamma.job;
 
+import com.gamma.sql.SqlViews;
+import com.gamma.util.SqlIdent;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,22 +65,21 @@ final class StorageSeries {
     /** Read the last {@code windowDays} of the series under {@code storeDir} (caller checks {@link #hasHistory}). */
     static Window read(Path storeDir, int windowDays) throws Exception {
         long cutoffMs = Instant.now().minus(Duration.ofDays(windowDays)).toEpochMilli();
-        String glob = "'" + storeDir.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                + "/*.parquet'";
+        String series = SqlViews.parquet(SqlIdent.pathStr(storeDir, "/*.parquet"), false, SqlViews.Hive.AUTO);
         List<long[]> totals = new ArrayList<>();
         List<AxisTrend> axes = new ArrayList<>();
         com.gamma.util.DuckDbUtil.loadDriver();
         // Spill under the Space data root (null ⇒ java.io.tmpdir).
         try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()), java.util.List.of(storeDir));
              Statement st = conn.createStatement()) {
-            try (ResultSet rs = st.executeQuery("SELECT created_ms, CAST(sum(bytes) AS BIGINT) FROM read_parquet("
-                    + glob + ") WHERE created_ms >= " + cutoffMs + " GROUP BY created_ms ORDER BY created_ms")) {
+            try (ResultSet rs = st.executeQuery("SELECT created_ms, CAST(sum(bytes) AS BIGINT) FROM "
+                    + series + " WHERE created_ms >= " + cutoffMs + " GROUP BY created_ms ORDER BY created_ms")) {
                 while (rs.next()) totals.add(new long[]{rs.getLong(1), rs.getLong(2)});
             }
             if (totals.size() < 2) return new Window(totals, List.of());
             double spanDays = new Window(totals, List.of()).spanDays();
             try (ResultSet rs = st.executeQuery("SELECT axis, arg_min(bytes, created_ms), "
-                    + "arg_max(bytes, created_ms) FROM read_parquet(" + glob + ") WHERE created_ms >= "
+                    + "arg_max(bytes, created_ms) FROM " + series + " WHERE created_ms >= "
                     + cutoffMs + " GROUP BY axis")) {
                 while (rs.next()) {
                     long first = rs.getLong(2), last = rs.getLong(3);

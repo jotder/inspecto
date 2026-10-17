@@ -1,6 +1,7 @@
 package com.gamma.pipeline;
 
 import com.gamma.etl.ExcelExtension;
+import com.gamma.util.SqlIdent;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,8 +86,8 @@ public final class PipelineDocumentXlsx {
                 List<Path> files = new ArrayList<>();
                 for (int i = 0; i < bodies.size(); i++) {
                     Path part = parts.resolve("part" + i + ".xlsx");
-                    st.execute("COPY (" + bodies.get(i) + ") TO " + literal(part.toString().replace('\\', '/'))
-                            + " (FORMAT xlsx, SHEET " + literal(names.get(i)) + ", HEADER false)");
+                    st.execute("COPY (" + bodies.get(i) + ") TO " + SqlIdent.pathStr(part)
+                            + " (FORMAT xlsx, SHEET " + SqlIdent.sqlStr(strOrEmpty(names.get(i))) + ", HEADER false)");
                     files.add(part);
                 }
                 XlsxSheetMerger.merge(files, names, target);
@@ -119,14 +120,10 @@ public final class PipelineDocumentXlsx {
         for (List<String> row : grid) {
             List<String> cells = new ArrayList<>();
             for (int i = 0; i < width; i++)
-                cells.add(literal(i < row.size() ? row.get(i) : "") + "::VARCHAR AS c" + i);
+                cells.add(SqlIdent.sqlStr(strOrEmpty(i < row.size() ? row.get(i) : "")) + "::VARCHAR AS c" + i);
             rows.add("SELECT " + String.join(", ", cells));
         }
         return String.join(" UNION ALL ", rows);
-    }
-
-    private static String literal(String s) {
-        return "'" + strOrEmpty(s).replace("'", "''") + "'";
     }
 
     /** Convenience: build the model for a recipe and write it, the shape a route calls. */

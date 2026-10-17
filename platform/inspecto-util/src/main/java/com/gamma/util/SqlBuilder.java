@@ -20,6 +20,18 @@ public final class SqlBuilder {
     }
 
     /**
+     * A string operand of a generated predicate: <b>bound</b> as a {@code VARCHAR} parameter when the caller
+     * collects parameters ({@code params != null} — appended, rendered {@code CAST(? AS VARCHAR)}), else an
+     * escaped literal ({@link SqlIdent#sqlStr}). Prefer the bound form wherever the value is user input and
+     * the statement is prepared; the literal form exists for SQL that is persisted or shown as text.
+     */
+    public static String stringOperand(String value, List<Object> params) {
+        if (params == null) return SqlIdent.sqlStr(value);
+        params.add(value);
+        return "CAST(? AS VARCHAR)";
+    }
+
+    /**
      * Append a {@code COALESCE(TRY_STRPTIME(col, fmt1), ...)::TYPE} expression to {@code sb}.
      *
      * <p>Used to try multiple date/timestamp format strings in order, returning the

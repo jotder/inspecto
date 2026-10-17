@@ -58,7 +58,7 @@ public interface BrowsableStore {
     default Page browseTable(String table, int limit, int offset) throws SQLException {
         if (!browseTables().contains(table))
             throw new IllegalArgumentException("unknown table '" + table + "'");
-        return exec("SELECT * FROM " + quoteIdent(table), limit, offset);
+        return exec("SELECT * FROM " + SqlIdent.q(table), limit, offset);
     }
 
     /** Ad-hoc read-only SQL (already {@code SqlGuard}-checked by the caller) over the live connection. */
@@ -98,10 +98,5 @@ public interface BrowsableStore {
      *  jsr310 module) — matches {@code QueryExecutor.wireValue}. All other values pass through. */
     private static Object wireValue(Object v) {
         return v instanceof java.time.temporal.Temporal ? v.toString() : v;
-    }
-
-    /** Double-quote an identifier for the {@code FROM} clause (table names are validated store constants). */
-    private static String quoteIdent(String ident) {
-        return SqlIdent.q(ident);
     }
 }

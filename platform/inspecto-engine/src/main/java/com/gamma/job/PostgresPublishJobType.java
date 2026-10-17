@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.auth.secrets.SecretResolver;
@@ -234,7 +235,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
         private String publish(JobContext ctx, Map<String, String> p, Map<String, Long> rows) throws Exception {
             if (dataDir == null || dataDir.isBlank()) throw new IllegalStateException("no Space data root");
             String schema = required(p, P_SCHEMA);
-            PostgresPublishSql.ident(schema, "schema");
+            PostgresPublishSql.safeId(schema, "schema");
             String mode = p.getOrDefault(P_MODE, FULL) == null ? FULL : p.getOrDefault(P_MODE, FULL).trim();
             if (mode.isEmpty()) mode = FULL;
             if (!mode.equals(FULL) && !mode.equals(INCREMENTAL))
@@ -242,7 +243,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             String partition = trim(p.get(P_PARTITION));
             if (mode.equals(INCREMENTAL)) {
                 if (partition == null) throw new IllegalArgumentException(INCREMENTAL + " needs " + P_PARTITION);
-                PostgresPublishSql.ident(partition, "partition column");
+                PostgresPublishSql.safeId(partition, "partition column");
             }
             int timeout = bounded(p.get(P_TIMEOUT), 300, 1, 3600, P_TIMEOUT);
             int retries = bounded(p.get(P_RETRIES), 2, 0, 5, P_RETRIES);
@@ -305,7 +306,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                                 exec(pg, "SET LOCAL statement_timeout = " + (timeout * 1000L), timeout);
                                 exec(pg, "SET LOCAL standard_conforming_strings = on", timeout);
                             }
-                            exec(pg, "CREATE SCHEMA IF NOT EXISTS " + PostgresPublishSql.ident(schema, "schema"), timeout);
+                            exec(pg, "CREATE SCHEMA IF NOT EXISTS " + SqlIdent.q(PostgresPublishSql.safeId(schema, "schema")), timeout);
                             for (Plan pl : plans)
                                 rows.put(pl.table(), mode.equals(FULL) ? fullRefresh(duck, pg, schema, pl, timeout)
                                         : incremental(duck, pg, schema, pl, partition, ctx.runId(), timeout));
@@ -432,7 +433,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                                 + "author " + (author.id() == null ? "(none — no authenticator)" : "'" + author.id() + "'")
                                 + " does not hold canAdminister — refused");
                 }
-                PostgresPublishSql.ident(name, "column of dataset '" + datasetId + "'");
+                PostgresPublishSql.safeId(name, "column of dataset '" + datasetId + "'");
                 String pg = PostgresPublishSql.pgType(type);
                 if (pg == null)
                     throw new IllegalArgumentException("column '" + datasetId + "." + name + "' has type " + type
@@ -637,7 +638,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                     ps.executeUpdate();
                 }
             }
-            String p = PostgresPublishSql.ident(partition, "partition column");
+            String p = SqlIdent.q(PostgresPublishSql.safeId(partition, "partition column"));
             String select = PostgresPublishSql.select(pl.relation(), pl.cols()) + " WHERE CAST(t." + p
                     + " AS VARCHAR) IN (SELECT v FROM __publish_changed WHERE NOT is_null) OR (t." + p
                     + " IS NULL AND EXISTS (SELECT 1 FROM __publish_changed WHERE is_null))";

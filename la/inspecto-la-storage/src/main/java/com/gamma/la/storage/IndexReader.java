@@ -2,6 +2,8 @@ package com.gamma.la.storage;
 
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
+import com.gamma.sql.SqlViews;
+import com.gamma.util.SqlIdent;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -117,9 +119,8 @@ public final class IndexReader implements AutoCloseable {
         try {
             try (Statement st = sandbox.connection().createStatement()) {
                 for (String table : new String[] {"out", "in"}) {
-                    String glob = versionDir.toAbsolutePath().normalize().toString().replace('\\', '/').replace("'", "''")
-                            + "/" + table + "/*/*.parquet";
-                    st.execute("CREATE VIEW e_" + table + " AS SELECT * FROM read_parquet('" + glob + "', hive_partitioning = true)");
+                    String glob = SqlIdent.pathStr(versionDir.toAbsolutePath().normalize(), "/" + table + "/*/*.parquet");
+                    st.execute("CREATE VIEW e_" + table + " AS SELECT * FROM " + SqlViews.parquet(glob, false, SqlViews.Hive.TYPED));
                 }
             }
             SqlSandbox.sealAllowing(sandbox.connection(), List.of(versionDir));

@@ -1,5 +1,6 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.StepProgress;
 import com.gamma.audit.Event;
@@ -437,7 +438,7 @@ public final class PipelineExecutor {
     /** Row count of a live scratch relation (long-precision; used for provenance counts). */
     private static long count(Connection conn, String table) throws SQLException {
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT count(*) FROM " + ScratchTables.q(table))) {
+             ResultSet rs = st.executeQuery("SELECT count(*) FROM " + SqlIdent.q(table))) {
             return rs.next() ? rs.getLong(1) : 0L;
         }
     }

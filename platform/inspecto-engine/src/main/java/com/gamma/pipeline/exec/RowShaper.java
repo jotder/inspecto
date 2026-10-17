@@ -1,5 +1,6 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.analytics.ColumnProfiler;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.DataTransformer;
@@ -11,7 +12,6 @@ import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.PipelineRel;
 import com.gamma.query.MeasureCompiler;
 
-import com.gamma.util.SqlIdent;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import static com.gamma.util.SqlIdent.q;
+import static com.gamma.util.SqlIdent.sqlStr;
 
 /**
  * <b>T10 — row-shaping SQL assembly.</b> Executes one pipeline {@code transform.*} node as SQL over a DuckDB
@@ -494,7 +497,7 @@ public final class RowShaper {
         if (!(keysRaw instanceof List<?> keyList) || keyList.isEmpty())
             throw new IllegalArgumentException("transform.dedup node '" + node.id() + "' needs a non-empty 'keys' list");
         List<String> keys = ((List<Object>) keysRaw).stream().map(Object::toString).toList();
-        String partition = String.join(", ", keys.stream().map(RowShaper::q).toList());
+        String partition = String.join(", ", keys.stream().map(SqlIdent::q).toList());
         String order = strOrNull(node, "order_by");
         // D-9: scope is parsed (and a window without order_by refused) BEFORE any table is written,
         // so a misconfigured node fails whole rather than half-shaping. The same refusal fires at the
@@ -848,7 +851,7 @@ public final class RowShaper {
         if (on.isEmpty())
             throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs 'on' key column(s)");
         String ref = references.resolve(conn, reference);
-        String using = "USING (" + String.join(", ", on.stream().map(RowShaper::q).toList()) + ")";
+        String using = "USING (" + String.join(", ", on.stream().map(SqlIdent::q).toList()) + ")";
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * FROM " + q(input)
                 + " LEFT JOIN " + q(ref) + " " + using);
@@ -1011,7 +1014,7 @@ public final class RowShaper {
             if (cast.length() > 0) cast.append(", ");
             cast.append(chosen.contains(c) ? "CAST(" + q(c) + " AS " + valueType.toUpperCase() + ") AS " + q(c) : q(c));
         }
-        String in = String.join(", ", chosen.stream().map(RowShaper::q).toList());
+        String in = String.join(", ", chosen.stream().map(SqlIdent::q).toList());
         String select = "SELECT * FROM (SELECT " + cast + " FROM " + q(input) + ") UNPIVOT"
                 + (includeNulls ? " INCLUDE NULLS" : "") + " (" + q(valueCol) + " FOR " + q(nameCol) + " IN (" + in + "))";
         String data = table(prefix, PipelineRel.DATA);
@@ -1273,16 +1276,6 @@ public final class RowShaper {
 
     private static String sanitize(String s) {
         return s.replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "");
-    }
-
-    /** Double-quote an identifier (escaping embedded quotes). */
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
-    }
-
-    /** A single-quoted SQL string literal. */
-    private static String sqlStr(String s) {
-        return SqlIdent.sqlStr(s);
     }
 
     private static String str(PipelineNode n, String key) {

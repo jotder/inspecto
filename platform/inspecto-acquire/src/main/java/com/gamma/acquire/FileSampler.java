@@ -2,6 +2,7 @@ package com.gamma.acquire;
 
 import com.gamma.acquire.ConnectionWorkbench.SampleResult;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -50,10 +51,10 @@ public final class FileSampler {
                     "file was only partially fetched — cannot parse a " + (gz ? "compressed" : ext) + " preview");
 
         String reader = switch (ext) {
-            case "parquet" -> "read_parquet(" + sqlStr(file) + ")";
-            case "csv", "tsv" -> "read_csv(" + sqlStr(file)
+            case "parquet" -> "read_parquet(" + SqlIdent.pathStr(file) + ")";
+            case "csv", "tsv" -> "read_csv(" + SqlIdent.pathStr(file)
                     + ", auto_detect=true, all_varchar=true, ignore_errors=true)";
-            case "json", "ndjson", "jsonl" -> "read_json_auto(" + sqlStr(file) + ")";
+            case "json", "ndjson", "jsonl" -> "read_json_auto(" + SqlIdent.pathStr(file) + ")";
             default -> null;
         };
         if (reader == null) return rawLines(file, displayPath, limit, complete);
@@ -114,10 +115,6 @@ public final class FileSampler {
     private static Object jsonSafe(Object v) {
         if (v == null || v instanceof Number || v instanceof Boolean || v instanceof String) return v;
         return String.valueOf(v);
-    }
-
-    private static String sqlStr(Path p) {
-        return "'" + p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''") + "'";
     }
 
     private static String ext(String name) {

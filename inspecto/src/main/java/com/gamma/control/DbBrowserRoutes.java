@@ -12,7 +12,6 @@ import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.BrowsableStore;
-import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -28,6 +27,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import com.gamma.access.WriteGates;
 import static com.gamma.util.Values.intOr;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Raw table browser — a per-space "database client" over the space's data
@@ -411,9 +411,5 @@ final class DbBrowserRoutes implements RouteModule {
 
     private static String orDefault(String v, String def) {
         return (v == null || v.isBlank()) ? def : v;
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 }

@@ -30,8 +30,38 @@ public final class SqlIdent {
         return "\"" + ident.replace("\"", "\"\"") + "\"";
     }
 
+    private static final java.util.regex.Pattern PLAIN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+    /**
+     * {@link #q} only when needed: a plain identifier ({@code [A-Za-z_][A-Za-z0-9_]*}) is returned as written, anything
+     * else (spaces, punctuation from a parsed header) is double-quoted. The rendering an author SEES in a Record
+     * Transform expression — the Java side of the UI twin {@code sql-functions.ts quoteIdentifier}, held to it by
+     * {@code RecordTransformContractTest}; generated SQL nobody reads uses {@link #q}.
+     */
+    public static String qIfNeeded(String ident) {
+        return PLAIN.matcher(ident).matches() ? ident : q(ident);
+    }
+
     /** A single-quoted SQL string literal, with embedded single quotes doubled. */
     public static String sqlStr(String s) {
         return "'" + s.replace("'", "''") + "'";
+    }
+
+    /**
+     * A single-quoted SQL string literal naming a file: the absolute path with forward slashes (DuckDB reads
+     * them on Windows too), embedded single quotes doubled. The one rendering of a path in generated SQL
+     * (ANALYTICS-CORE-1 M9 retired five private copies of it).
+     */
+    public static String pathStr(java.nio.file.Path p) {
+        return pathStr(p, "");
+    }
+
+    /**
+     * {@link #pathStr(java.nio.file.Path)} of a directory with a glob appended inside the same literal —
+     * {@code pathStr(dir, "/*}{@code /*.parquet")}. A glob cannot go through {@code Path.resolve}: {@code *} is
+     * not a legal path character on Windows.
+     */
+    public static String pathStr(java.nio.file.Path dir, String globSuffix) {
+        return sqlStr(dir.toAbsolutePath().toString().replace('\\', '/') + globSuffix);
     }
 }

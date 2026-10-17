@@ -10,7 +10,6 @@ import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.InputFingerprint;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.sql.SqlSandboxPolicy;
-import com.gamma.util.SqlIdent;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * The Entity Type profile and the Entity profile (plan {@code la-entity-profile-plan.md} §3, §4.1, §4.5): aggregates over every
@@ -940,10 +941,6 @@ final class EntityProfiles {
 
     static double round(double v) {
         return Math.round(v * 10_000d) / 10_000d;
-    }
-
-    static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 
     @SuppressWarnings("unchecked")

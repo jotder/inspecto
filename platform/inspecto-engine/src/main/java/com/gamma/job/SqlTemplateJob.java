@@ -26,6 +26,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static com.gamma.util.SqlIdent.sqlStr;
+
 /**
  * The {@code sql.template} Job Type (job-framework §15.1, P3b) — the first real Run Artifact producer.
  * Runs an authored SQL template (its {@code $name} tokens resolved by the framework, §7.2) against source
@@ -232,9 +234,5 @@ final class SqlTemplateJob implements Job {
         List<String> out = new ArrayList<>();
         if (csv != null) for (String s : csv.split(",")) { String t = s.trim(); if (!t.isEmpty()) out.add(t); }
         return out;
-    }
-
-    private static String sqlStr(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 }

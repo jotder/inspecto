@@ -1,5 +1,6 @@
 package com.gamma.etl;
 
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -245,9 +246,9 @@ public final class DuckDbCsvIngester {
                 .append(fields.get(i).get("name")).append('"');
         }
 
-        String readCsv = "read_csv('" + escapeSql(filePath) + "'"
+        String readCsv = "read_csv(" + SqlIdent.sqlStr(filePath)
                 + ", columns=" + cols
-                + ", delim='" + escapeSql(delim) + "'"
+                + ", delim=" + SqlIdent.sqlStr(delim)
                 + ", header=false"
                 + ", skip=" + skipLines
                 + readOptions(cfg)
@@ -293,7 +294,7 @@ public final class DuckDbCsvIngester {
                 .append(" AS \"").append(fields.get(i).get("name")).append('"');
         }
 
-        String readCsv = "(SELECT \"line\" FROM read_csv('" + escapeSql(filePath) + "'"
+        String readCsv = "(SELECT \"line\" FROM read_csv(" + SqlIdent.sqlStr(filePath)
                 + ", columns={'line':'VARCHAR'}"
                 + ", delim='', quote='', escape=''"
                 + ", header=false"
@@ -378,7 +379,7 @@ public final class DuckDbCsvIngester {
         List<String> formats = dateOnly ? csv.dateFormats() : csv.tsFormats();
         String asText = formats.isEmpty()
                 ? "CAST(" + value + " AS VARCHAR)"
-                : "strftime(" + value + ", '" + escapeSql(formats.get(0)) + "')";
+                : "strftime(" + value + ", " + SqlIdent.sqlStr(formats.get(0)) + ")";
         return "CASE WHEN regexp_full_match(trim(" + cell + "), '[0-9]+(\\.[0-9]+)?')"
                 + " AND " + serial + " < " + (XLSX_MAX_SERIAL + 1)
                 + " THEN " + asText + " ELSE " + cell + " END";
@@ -391,12 +392,12 @@ public final class DuckDbCsvIngester {
      * always passes {@code true}.
      */
     public static String xlsxReadRelation(String filePath, PipelineConfig.Xlsx x, boolean allVarchar) {
-        StringBuilder rx = new StringBuilder("read_xlsx('");
-        rx.append(escapeSql(filePath)).append("'")
+        StringBuilder rx = new StringBuilder("read_xlsx(");
+        rx.append(SqlIdent.sqlStr(filePath))
           .append(", all_varchar=").append(allVarchar)
           .append(", header=").append(x.header());
-        if (x.sheet() != null) rx.append(", sheet='").append(escapeSql(x.sheet())).append("'");
-        if (x.range() != null) rx.append(", range='").append(escapeSql(x.range())).append("'");
+        if (x.sheet() != null) rx.append(", sheet=").append(SqlIdent.sqlStr(x.sheet()));
+        if (x.range() != null) rx.append(", range=").append(SqlIdent.sqlStr(x.range()));
         if (x.stopAtEmpty())    rx.append(", stop_at_empty=true");
         if (x.ignoreErrors())   rx.append(", ignore_errors=true");
         if (x.normalizeNames()) rx.append(", normalize_names=true");
@@ -430,7 +431,7 @@ public final class DuckDbCsvIngester {
     /** The {@code read_parquet(...)} relation — the ONE assembly, shared by ingest and preview
      *  (the parity rule {@code Parsers} documents). One option: {@code hive_partitioning}. */
     public static String parquetReadRelation(String filePath, PipelineConfig.Parquet p) {
-        return "read_parquet('" + escapeSql(filePath) + "'"
+        return "read_parquet(" + SqlIdent.sqlStr(filePath)
                 + (p != null && p.hivePartitioning() ? ", hive_partitioning=true" : "") + ")";
     }
 
@@ -449,11 +450,11 @@ public final class DuckDbCsvIngester {
             StringBuilder proj = new StringBuilder();
             for (int i = 0; i < fields.size(); i++) {
                 if (i > 0) proj.append(", ");
-                proj.append("json_extract_string(\"line\", '")
+                proj.append("json_extract_string(\"line\", ")
                     .append(jsonPath(selectorSegments(fields.get(i).get("selector")), 0))
-                    .append("') AS \"").append(fields.get(i).get("name")).append('"');
+                    .append(") AS \"").append(fields.get(i).get("name")).append('"');
             }
-            String readCsv = "(SELECT \"line\" FROM read_csv('" + escapeSql(filePath) + "'"
+            String readCsv = "(SELECT \"line\" FROM read_csv(" + SqlIdent.sqlStr(filePath)
                     + ", columns={'line':'VARCHAR'}"
                     + ", delim='', quote='', escape=''"
                     + ", header=false"
@@ -482,8 +483,8 @@ public final class DuckDbCsvIngester {
         for (Map.Entry<String, Boolean> e : rootIsNested.entrySet()) {
             if (!first) cols.append(", ");
             first = false;
-            cols.append('\'').append(escapeSql(e.getKey()))
-                .append("':'").append(e.getValue() ? "JSON" : "VARCHAR").append('\'');
+            cols.append(SqlIdent.sqlStr(e.getKey()))
+                .append(":'").append(e.getValue() ? "JSON" : "VARCHAR").append('\'');
         }
         cols.append('}');
 
@@ -492,20 +493,20 @@ public final class DuckDbCsvIngester {
             if (i > 0) proj.append(", ");
             List<String> segs = selectorSegments(fields.get(i).get("selector"));
             if (segs.size() == 1) {
-                proj.append('"').append(escapeSql(segs.get(0))).append('"');
+                proj.append(SqlIdent.q(segs.get(0)));
             } else {
-                proj.append("json_extract_string(\"").append(escapeSql(segs.get(0))).append("\", '")
-                    .append(jsonPath(segs, 1)).append("')");
+                proj.append("json_extract_string(").append(SqlIdent.q(segs.get(0))).append(", ")
+                    .append(jsonPath(segs, 1)).append(")");
             }
             proj.append(" AS \"").append(fields.get(i).get("name")).append('"');
         }
 
-        StringBuilder rj = new StringBuilder("read_json('");
-        rj.append(escapeSql(filePath)).append('\'')
+        StringBuilder rj = new StringBuilder("read_json(");
+        rj.append(SqlIdent.sqlStr(filePath))
           .append(", columns=").append(cols)
           .append(", format='").append("array".equals(j.format()) ? "array" : "auto").append('\'');
         if (cfg.csv().inputCompression() != null && !cfg.csv().inputCompression().isBlank())
-            rj.append(", compression='").append(escapeSql(cfg.csv().inputCompression())).append('\'');
+            rj.append(", compression=").append(SqlIdent.sqlStr(cfg.csv().inputCompression()));
         rj.append(jsonReaderOptions(j));
         rj.append(')');
 
@@ -558,21 +559,21 @@ public final class DuckDbCsvIngester {
         StringBuilder proj = new StringBuilder();
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
-            proj.append("json_extract_string(\"rec\", '")
+            proj.append("json_extract_string(\"rec\", ")
                 .append(jsonPath(selectorSegments(fields.get(i).get("selector")), 0))
-                .append("') AS \"").append(fields.get(i).get("name")).append('"');
+                .append(") AS \"").append(fields.get(i).get("name")).append('"');
         }
 
-        StringBuilder src = new StringBuilder("read_json_objects('");
-        src.append(escapeSql(filePath)).append('\'');
+        StringBuilder src = new StringBuilder("read_json_objects(");
+        src.append(SqlIdent.sqlStr(filePath));
         if (cfg.csv().inputCompression() != null && !cfg.csv().inputCompression().isBlank())
-            src.append(", compression='").append(escapeSql(cfg.csv().inputCompression())).append('\'');
+            src.append(", compression=").append(SqlIdent.sqlStr(cfg.csv().inputCompression()));
         src.append(jsonReaderOptions(j));
         src.append(')');
 
-        String records = "unnest((CASE WHEN json_type(\"json\", '" + recordsPath + "') IS NULL"
-                + " THEN error('json.records_path not found in document: " + escapeSql(j.recordsPath()) + "')"
-                + " ELSE json_extract(\"json\", '" + recordsPath + "') END)::JSON[])";
+        String records = "unnest((CASE WHEN json_type(\"json\", " + recordsPath + ") IS NULL"
+                + " THEN error(" + SqlIdent.sqlStr("json.records_path not found in document: " + j.recordsPath()) + ")"
+                + " ELSE json_extract(\"json\", " + recordsPath + ") END)::JSON[])";
 
         String from = "(SELECT " + records + " AS \"rec\" FROM " + src + ") AS js";
         return new ReadSpec(proj.toString(), from);
@@ -625,12 +626,12 @@ public final class DuckDbCsvIngester {
         return segments;
     }
 
-    /** Segments from {@code from} onward as a DuckDB JSON path: {@code $."a"."b"}. */
+    /** Segments from {@code from} onward as a DuckDB JSON path literal: {@code '$."a"."b"'}. */
     private static String jsonPath(List<String> segments, int from) {
         StringBuilder sb = new StringBuilder("$");
         for (int i = from; i < segments.size(); i++)
-            sb.append(".\"").append(escapeSql(segments.get(i))).append('"');
-        return sb.toString();
+            sb.append(".\"").append(segments.get(i)).append('"');
+        return SqlIdent.sqlStr(sb.toString());
     }
 
     /**
@@ -654,12 +655,12 @@ public final class DuckDbCsvIngester {
 
         int    skipLines = cfg.csv().skipHeaderLines() + (cfg.csv().hasHeader() ? 1 : 0);
         String filePath  = file.getAbsolutePath().replace("\\", "/");
-        String pat       = escapeSql(tr.pattern());
+        String pat       = SqlIdent.sqlStr(tr.pattern());
         String names     = nameList(tr.groupNames());
         String proj      = textRegexProjection(fields, tr.groupNames());
 
-        String readCsv = "(SELECT regexp_extract(\"line\", '" + pat + "', " + names + ") AS rec"
-                + " FROM read_csv('" + escapeSql(filePath) + "'"
+        String readCsv = "(SELECT regexp_extract(\"line\", " + pat + ", " + names + ") AS rec"
+                + " FROM read_csv(" + SqlIdent.sqlStr(filePath)
                 + ", columns={'line':'VARCHAR'}"
                 + ", delim='', quote='', escape=''"
                 + ", header=false"
@@ -667,7 +668,7 @@ public final class DuckDbCsvIngester {
                 + readOptions(cfg)
                 + errorOptions(cfg, true)
                 + ", auto_detect=false)"
-                + " WHERE regexp_matches(\"line\", '" + pat + "')) AS tr";
+                + " WHERE regexp_matches(\"line\", " + pat + ")) AS tr";
 
         return new ReadSpec(proj, readCsv);
     }
@@ -688,17 +689,17 @@ public final class DuckDbCsvIngester {
 
         int    skipRecords = cfg.csv().skipHeaderLines() + (cfg.csv().hasHeader() ? 1 : 0);
         String filePath     = file.getAbsolutePath().replace("\\", "/");
-        String pat          = escapeSql("(?s)" + tr.pattern());
-        String delim        = escapeSql(tr.recordSplit());
+        String pat          = SqlIdent.sqlStr("(?s)" + tr.pattern());
+        String delim        = SqlIdent.sqlStr(tr.recordSplit());
         String names        = nameList(tr.groupNames());
         String proj         = textRegexProjection(fields, tr.groupNames());
 
-        String readText = "(SELECT regexp_extract(trim(blk), '" + pat + "', " + names + ") AS rec"
-                + " FROM (SELECT unnest(list_slice(str_split(content, '" + delim + "'), "
+        String readText = "(SELECT regexp_extract(trim(blk), " + pat + ", " + names + ") AS rec"
+                + " FROM (SELECT unnest(list_slice(str_split(content, " + delim + "), "
                 + (skipRecords + 1) + ", 2147483647)) AS blk"
-                + " FROM read_text('" + escapeSql(filePath) + "'))"
+                + " FROM read_text(" + SqlIdent.sqlStr(filePath) + "))"
                 + " WHERE trim(blk) != ''"
-                + " AND regexp_matches(trim(blk), '" + pat + "')) AS tr";
+                + " AND regexp_matches(trim(blk), " + pat + ")) AS tr";
 
         return new ReadSpec(proj, readText);
     }
@@ -708,7 +709,7 @@ public final class DuckDbCsvIngester {
         StringBuilder names = new StringBuilder("[");
         for (int i = 0; i < groupNames.size(); i++) {
             if (i > 0) names.append(", ");
-            names.append('\'').append(escapeSql(groupNames.get(i))).append('\'');
+            names.append(SqlIdent.sqlStr(groupNames.get(i)));
         }
         return names.append(']').toString();
     }
@@ -723,7 +724,7 @@ public final class DuckDbCsvIngester {
                         + "' selector '" + sel + "' has no matching capture group (declared: "
                         + groupNames + ")");
             if (i > 0) proj.append(", ");
-            proj.append("rec['").append(escapeSql(sel)).append("'] AS \"")
+            proj.append("rec[").append(SqlIdent.sqlStr(sel)).append("] AS \"")
                 .append(fields.get(i).get("name")).append('"');
         }
         return proj.toString();
@@ -802,7 +803,7 @@ public final class DuckDbCsvIngester {
         String sql =
                 "SELECT e.line, e.column_name, e.error_type, e.csv_line " +
                 "FROM \"" + rj.tableOrDefault() + "\" e JOIN \"" + rj.scanOrDefault() + "\" s USING (scan_id) " +
-                "WHERE s.file_path = '" + escapeSql(filePath) + "' ORDER BY e.line";
+                "WHERE s.file_path = " + SqlIdent.sqlStr(filePath) + " ORDER BY e.line";
 
         Path errorFilePath = ParserSpec.errorFile(file, cfg);
         Path errorDir      = errorFilePath.getParent();
@@ -900,14 +901,14 @@ public final class DuckDbCsvIngester {
         PipelineConfig.CsvSettings c = cfg.csv();
         StringBuilder sb = new StringBuilder();
         if (c.encoding() != null && !c.encoding().isBlank())
-            sb.append(", encoding='").append(escapeSql(c.encoding())).append('\'');
+            sb.append(", encoding=").append(SqlIdent.sqlStr(c.encoding()));
         if (c.inputCompression() != null && !c.inputCompression().isBlank())
-            sb.append(", compression='").append(escapeSql(c.inputCompression())).append('\'');
+            sb.append(", compression=").append(SqlIdent.sqlStr(c.inputCompression()));
         if (c.nullStrings() != null && !c.nullStrings().isEmpty()) {
             sb.append(", nullstr=[");
             for (int i = 0; i < c.nullStrings().size(); i++) {
                 if (i > 0) sb.append(", ");
-                sb.append('\'').append(escapeSql(c.nullStrings().get(i))).append('\'');
+                sb.append(SqlIdent.sqlStr(c.nullStrings().get(i)));
             }
             sb.append(']');
         }
@@ -945,9 +946,9 @@ public final class DuckDbCsvIngester {
         // store_rejects=false is what DuckDB itself refuses ("cannot be set without store_rejects").
         if (store) {
             if (r.table() != null && !r.table().isBlank())
-                sb.append(", rejects_table='").append(escapeSql(r.table())).append('\'');
+                sb.append(", rejects_table=").append(SqlIdent.sqlStr(r.table()));
             if (r.scan() != null && !r.scan().isBlank())
-                sb.append(", rejects_scan='").append(escapeSql(r.scan())).append('\'');
+                sb.append(", rejects_scan=").append(SqlIdent.sqlStr(r.scan()));
             if (r.limit() != null)
                 sb.append(", rejects_limit=").append(r.limit().intValue());
         }
@@ -964,14 +965,14 @@ public final class DuckDbCsvIngester {
     private static String dialectOptions(PipelineConfig cfg) {
         PipelineConfig.CsvSettings c = cfg.csv();
         StringBuilder sb = new StringBuilder();
-        if (c.quote() != null)   sb.append(", quote='").append(escapeSql(c.quote())).append('\'');
+        if (c.quote() != null)   sb.append(", quote=").append(SqlIdent.sqlStr(c.quote()));
         // Default the escape to the quote char (RFC-4180 doubling) whenever a custom quote is set:
         // DuckDB's escape default stays '"' regardless of quote, so a doubled custom quote would
         // otherwise be a parse error — and the univocity fallback already defaults escape=quote,
         // so without this the two engines diverge on the same file.
         String escape = c.escape() != null ? c.escape() : c.quote();
-        if (escape != null)      sb.append(", escape='").append(escapeSql(escape)).append('\'');
-        if (c.comment() != null) sb.append(", comment='").append(escapeSql(c.comment())).append('\'');
+        if (escape != null)      sb.append(", escape=").append(SqlIdent.sqlStr(escape));
+        if (c.comment() != null) sb.append(", comment=").append(SqlIdent.sqlStr(c.comment()));
         return sb.toString();
     }
 
@@ -988,21 +989,18 @@ public final class DuckDbCsvIngester {
         String col = "\"c" + c.filterTargetColumn() + "\"";
 
         List<String> includes = new ArrayList<>();
-        for (String p : c.includePrefixes()) includes.add(col + " LIKE '" + escapeSql(p) + "%'");
-        for (String r : c.includeRegex())    includes.add("regexp_matches(" + col + ", '" + escapeSql(r) + "')");
+        for (String p : c.includePrefixes()) includes.add(col + " LIKE " + SqlIdent.sqlStr(p + "%"));
+        for (String r : c.includeRegex())    includes.add("regexp_matches(" + col + ", " + SqlIdent.sqlStr(r) + ")");
 
         List<String> excludes = new ArrayList<>();
-        for (String p : c.excludePrefixes()) excludes.add(col + " NOT LIKE '" + escapeSql(p) + "%'");
-        for (String r : c.excludeRegex())    excludes.add("NOT regexp_matches(" + col + ", '" + escapeSql(r) + "')");
+        for (String p : c.excludePrefixes()) excludes.add(col + " NOT LIKE " + SqlIdent.sqlStr(p + "%"));
+        for (String r : c.excludeRegex())    excludes.add("NOT regexp_matches(" + col + ", " + SqlIdent.sqlStr(r) + ")");
 
         List<String> parts = new ArrayList<>();
         if (!includes.isEmpty()) parts.add("(" + String.join(" OR ",  includes) + ")");
         if (!excludes.isEmpty()) parts.add("(" + String.join(" AND ", excludes) + ")");
         return parts.isEmpty() ? "" : " WHERE " + String.join(" AND ", parts);
     }
-
-    /** Escape single quotes for embedding inside a single-quoted SQL string literal. */
-    private static String escapeSql(String s) { return s.replace("'", "''"); }
 
     /**
      * The header row of a header-bearing delimited file, named the way DuckDB names it — the OBSERVED
@@ -1014,10 +1012,10 @@ public final class DuckDbCsvIngester {
     static List<String> observedHeader(File file, PipelineConfig cfg, Connection conn) throws SQLException {
         PipelineConfig.CsvSettings c = cfg.csv();
         String delim = (c.delimiter() != null && !c.delimiter().isEmpty()) ? c.delimiter() : ",";
-        String sql = "DESCRIBE SELECT * FROM read_csv('" + escapeSql(file.getAbsolutePath().replace('\\', '/')) + "'"
+        String sql = "DESCRIBE SELECT * FROM read_csv(" + SqlIdent.sqlStr(file.getAbsolutePath().replace('\\', '/'))
                 + ", header=true, skip=" + c.skipHeaderLines()
                 // ignore_errors: a malformed DATA row must not hide the header — the real read judges rows.
-                + ", delim='" + escapeSql(delim) + "', all_varchar=true, sample_size=1, ignore_errors=true"
+                + ", delim=" + SqlIdent.sqlStr(delim) + ", all_varchar=true, sample_size=1, ignore_errors=true"
                 + readOptions(cfg) + dialectOptions(cfg) + ")";
         List<String> names = new ArrayList<>();
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {

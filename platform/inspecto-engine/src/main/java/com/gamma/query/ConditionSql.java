@@ -1,6 +1,5 @@
 package com.gamma.query;
 
-import com.gamma.util.SqlIdent;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -10,6 +9,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
 import static com.gamma.util.Values.strOrEmpty;
+import static com.gamma.util.SqlBuilder.stringOperand;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Renders the structured condition tree authored in the UI (the {@code query-types.ts} shape that
@@ -125,13 +126,13 @@ public final class ConditionSql {
     // ── one leaf ─────────────────────────────────────────────────────────────────
 
     private static String condition(Map<?, ?> c, List<Object> p) {
-        String f = ident(strOrEmpty(c.get("field")));
+        String f = q(strOrEmpty(c.get("field")));
         String operator = strOrEmpty(c.get("operator"));
         String value = strOrEmpty(c.get("value"));
         String value2 = strOrEmpty(c.get("value2"));
         boolean ic = ConditionTree.flag(c, "ignoreCase");
         String valueField = strOrEmpty(c.get("valueField"));
-        if (!valueField.isEmpty()) return fields(f, operator, ident(valueField), ic);
+        if (!valueField.isEmpty()) return fields(f, operator, q(valueField), ic);
         return switch (operator) {
             // ConditionTree treats null and '' alike for the null checks
             case "isNull" -> "(" + f + " IS NULL OR CAST(" + f + " AS VARCHAR) = '')";
@@ -139,7 +140,7 @@ public final class ConditionSql {
             case "contains" -> like(f, value, true, true, p);
             case "startsWith" -> like(f, value, false, true, p);
             case "endsWith" -> like(f, value, true, false, p);
-            case "matches" -> "regexp_matches(CAST(" + f + " AS VARCHAR), " + lit(value, p) + (ic ? ", 'i')" : ")");
+            case "matches" -> "regexp_matches(CAST(" + f + " AS VARCHAR), " + stringOperand(value, p) + (ic ? ", 'i')" : ")");
             case "in" -> in(f, value, ic, p);
             case "between" -> "(" + typed(f, ">=", value, false, p) + " AND " + typed(f, "<=", value2, false, p) + ")";
             case "=", "!=" -> typed(f, operator, value, ic, p);
@@ -167,7 +168,7 @@ public final class ConditionSql {
         String v = value.toLowerCase(Locale.ROOT)
                 .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
         String pattern = (pre ? "%" : "") + v + (post ? "%" : "");
-        return "LOWER(CAST(" + f + " AS VARCHAR)) LIKE " + lit(pattern, p) + " ESCAPE '\\'";
+        return "LOWER(CAST(" + f + " AS VARCHAR)) LIKE " + stringOperand(pattern, p) + " ESCAPE '\\'";
     }
 
     /** Operand-driven typed comparison (see class doc). */
@@ -189,9 +190,9 @@ public final class ConditionSql {
             return cell + " " + sqlOp + " " + ("true".equalsIgnoreCase(v) ? 1 : 0);
         }
         if (isDateLike(v))
-            return "TRY_CAST(CAST(" + f + " AS VARCHAR) AS TIMESTAMP) " + sqlOp + " TRY_CAST(" + lit(v, p) + " AS TIMESTAMP)";
-        if (ic) return "LOWER(CAST(" + f + " AS VARCHAR)) " + sqlOp + " " + lit(v.toLowerCase(Locale.ROOT), p);
-        return "CAST(" + f + " AS VARCHAR) " + sqlOp + " " + lit(v, p);
+            return "TRY_CAST(CAST(" + f + " AS VARCHAR) AS TIMESTAMP) " + sqlOp + " TRY_CAST(" + stringOperand(v, p) + " AS TIMESTAMP)";
+        if (ic) return "LOWER(CAST(" + f + " AS VARCHAR)) " + sqlOp + " " + stringOperand(v.toLowerCase(Locale.ROOT), p);
+        return "CAST(" + f + " AS VARCHAR) " + sqlOp + " " + stringOperand(v, p);
     }
 
     /**
@@ -258,18 +259,5 @@ public final class ConditionSql {
         } catch (Exception ignored) {
             return false;
         }
-    }
-
-    // ── quoting ──────────────────────────────────────────────────────────────────
-
-    private static String ident(String name) {
-        return SqlIdent.q(name);
-    }
-
-    /** A string operand: bound as a {@code VARCHAR} parameter when {@code p} collects them, else an escaped literal. */
-    private static String lit(String v, List<Object> p) {
-        if (p == null) return "'" + v.replace("'", "''") + "'";
-        p.add(v);
-        return "CAST(? AS VARCHAR)";
     }
 }

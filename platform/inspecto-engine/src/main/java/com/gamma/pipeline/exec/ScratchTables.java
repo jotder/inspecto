@@ -2,7 +2,6 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.util.JdbcRows;
 
-import com.gamma.util.SqlIdent;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,6 +11,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Small helpers for seeding sample rows into a throwaway DuckDB table and reading relations back — shared by
@@ -102,15 +103,5 @@ final class ScratchTables {
                 out.add(Map.of("name", rs.getString(1), "type", rs.getString(2)));
         }
         return out;
-    }
-
-    /** Quote a SQL identifier. */
-    static String q(String ident) {
-        return SqlIdent.q(ident);
-    }
-
-    /** A single-quoted SQL string literal (escaping embedded quotes). */
-    static String sqlStr(String s) {
-        return SqlIdent.sqlStr(s);
     }
 }

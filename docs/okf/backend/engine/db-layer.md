@@ -66,6 +66,25 @@ as a `view`-backed Dataset and **failed** as a `physicalRef`-backed one — same
 **off** for datasets: turning it on would surface partition segments as new columns on every existing
 Dataset, which is a product decision, not a bug fix.
 
+**One SQL building path (2026-10-17, `ANALYTICS-CORE-1` M9).** Every module builds SQL text through the
+shared builders, with no private helper in between (static imports such as `import static
+com.gamma.util.SqlIdent.q;` are the house idiom):
+
+| Need | Builder |
+|---|---|
+| A DuckDB identifier | `SqlIdent.q` (`SqlBuilder.quoteIdent` is the same function) |
+| A string literal | `SqlIdent.sqlStr` |
+| A file path as a literal (absolute, forward slashes, `'` doubled) | `SqlIdent.pathStr(path)`, `pathStr(dir, "/*.parquet")` for a glob |
+| An identifier shown to an author in a Record Transform (bare when plain) | `SqlIdent.qIfNeeded` (the twin of `sql-functions.ts quoteIdentifier`) |
+| A user-input string operand of a predicate | `SqlBuilder.stringOperand(value, params)`: bound `CAST(? AS VARCHAR)` when `params` is collected, else the literal |
+| A store read | `SqlViews.reader` / `readerOverLiteral` (union_by_name, VARCHAR hive values) |
+| A read of files the caller wrote itself (index, compaction input, just-written snapshot) | `SqlViews.parquet(source, unionByName, Hive.AUTO / OFF / VARCHAR / TYPED)`, `SqlViews.parquetFile(path)` |
+
+A name that must be validated before it is quoted keeps a validator that returns it **unquoted** (e.g.
+`PostgresPublishSql.safeId`, the `SAFE_IDENT` checks) and quotes through `SqlIdent.q` at the call site.
+Not yet on the path: `SummarizeSupport` (`inspecto-util` sits below `inspecto-sql`, so it cannot reach
+`SqlViews`), and the sites in the anomaly/scoring modules and `MeasureCompiler` that other lanes own.
+
 **The rule is counted, and the count may only fall (2026-10-17, `ANALYTICS-CORE-1` M10).**
 [`tools/check-data-ops-duplication.mjs`](../../../../tools/check-data-ops-duplication.mjs) inventories,
 per module with `file:line`, every copy of a data operation that has a shared home: (a) private SQL

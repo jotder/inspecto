@@ -1,11 +1,11 @@
 package com.gamma.query;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.etl.DuckDbExtension;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.LakehouseCatalog;
 
-import com.gamma.util.SqlIdent;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -17,6 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Runs a resolved, {@code SqlGuard}-checked query against a space's data in an ephemeral DuckDB
@@ -299,7 +301,7 @@ public final class QueryExecutor {
     private static String wrap(Request req) {
         String projection = (req.projection() == null || req.projection().isEmpty())
                 ? "*"
-                : req.projection().stream().map(QueryExecutor::safeCol).map(QueryExecutor::q)
+                : req.projection().stream().map(QueryExecutor::safeCol).map(SqlIdent::q)
                     .reduce((a, b) -> a + ", " + b).orElse("*");
         StringBuilder sb = new StringBuilder("SELECT ").append(projection)
                 .append(" FROM (").append(req.sql()).append(") AS ").append(q(DEFAULT_ALIAS));
@@ -321,9 +323,5 @@ public final class QueryExecutor {
         if (col == null || !SAFE_COL.matcher(col).matches())
             throw new IllegalArgumentException("unsafe column identifier '" + col + "'");
         return col;
-    }
-
-    private static String q(String ident) {
-        return SqlIdent.q(ident);
     }
 }

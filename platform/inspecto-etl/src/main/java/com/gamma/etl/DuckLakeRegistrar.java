@@ -1,6 +1,7 @@
 package com.gamma.etl;
 
 import com.gamma.config.safety.EgressGate;
+import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.LakehouseCatalog;
 import com.gamma.util.Topology;
@@ -15,7 +16,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Inserts newly written Parquet files into a DuckLake catalog.
@@ -270,17 +272,16 @@ public final class DuckLakeRegistrar {
                              String consignmentId) throws java.sql.SQLException {
         String key = (consignmentId == null || consignmentId.isBlank()) ? derivedKey(outputPaths) : consignmentId;
         String target = schema + "." + table;
-        String schemaQ = ident(schema);
-        String rec = "lake." + schemaQ + "." + ident(RECORD_TABLE);
-        String tbl = "lake." + schemaQ + "." + ident(table);
+        String schemaQ = q(schema);
+        String rec = "lake." + schemaQ + "." + q(RECORD_TABLE);
+        String tbl = "lake." + schemaQ + "." + q(table);
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE SCHEMA IF NOT EXISTS lake." + schemaQ);
-            stmt.execute("CREATE TABLE IF NOT EXISTS " + tbl + " AS SELECT * FROM read_parquet("
-                    + lit(outputPaths.get(0)) + ") LIMIT 0");
+            stmt.execute("CREATE TABLE IF NOT EXISTS " + tbl + " AS SELECT * FROM "
+                    + SqlViews.parquet(SqlViews.pathList(List.of(outputPaths.get(0))), false, SqlViews.Hive.AUTO) + " LIMIT 0");
             stmt.execute("CREATE TABLE IF NOT EXISTS " + rec
                     + " (target_table VARCHAR, consignment_id VARCHAR, registered_at TIMESTAMP)");
-            String pathList = outputPaths.stream().map(DuckLakeRegistrar::lit)
-                    .collect(Collectors.joining(", ", "[", "]"));
+            String files = SqlViews.parquet(SqlViews.pathList(outputPaths), false, SqlViews.Hive.AUTO);
             stmt.execute("BEGIN");
             boolean committed = false;
             try {
@@ -296,7 +297,7 @@ public final class DuckLakeRegistrar {
                         }
                     }
                 }
-                stmt.execute("INSERT INTO " + tbl + " SELECT * FROM read_parquet(" + pathList + ")");
+                stmt.execute("INSERT INTO " + tbl + " SELECT * FROM " + files);
                 try (java.sql.PreparedStatement ins = conn.prepareStatement(
                         "INSERT INTO " + rec + " VALUES (?, ?, now())")) {
                     ins.setString(1, target);
@@ -317,16 +318,6 @@ public final class DuckLakeRegistrar {
     /** Per-sink key, so sinks that resolve to one lake and table never skip each other. Stable across retries. */
     static String sinkKey(String consignmentId, String sinkDatabase) {
         return consignmentId == null ? null : consignmentId + "|" + sinkDatabase;
-    }
-
-    /** A double-quoted SQL identifier, embedded quotes doubled. */
-    static String ident(String name) {
-        return '"' + name.replace("\"", "\"\"") + '"';
-    }
-
-    /** A single-quoted SQL string literal of a path (slash-normalised), embedded quotes doubled. */
-    static String lit(String path) {
-        return '\'' + path.replace("\\", "/").replace("'", "''") + '\'';
     }
 
     /**
