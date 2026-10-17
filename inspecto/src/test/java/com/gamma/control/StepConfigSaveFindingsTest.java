@@ -480,6 +480,37 @@ class StepConfigSaveFindingsTest {
         assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(running("ID", "QTY", "5 rows")))));
     }
 
+    // ── resample / shift (transform.timeseries.*, ANALYTICS-CORE-1 M5) ────────────
+
+    private static Map<String, Object> resample(String time, String grain) {
+        return Map.of("resample", Map.of("time_column", time, "grain", grain, "measures", List.of("sum(QTY)")));
+    }
+
+    @Test
+    void aResampleTimeColumnTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(resample("EVENT_TS", "day")))),
+                "steps[0].resample", "EVENT_TS");
+    }
+
+    @Test
+    void aMalformedResampleGrainIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(resample("TS", "fortnight")))),
+                "steps[0].resample", "fortnight");
+    }
+
+    @Test
+    void aResampleOverANumericTimeColumnIsRefusedAndAVarcharOneFailsOpen(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(resample("QTY", "day")))),
+                "steps[0].resample", "DATE or TIMESTAMP");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(resample("ID", "month")))));
+    }
+
+    @Test
+    void aShiftWithZeroPeriodsIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("shift", Map.of("time_column", "ID",
+                "grain", "month", "columns", List.of("QTY"), "periods", 0))))), "steps[0].shift", "non-zero");
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

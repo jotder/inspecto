@@ -341,6 +341,17 @@ public final class MeasureCompiler {
         return "STRFTIME(" + TimeGrain.parse(grain).truncateSql(q(dim)) + ", '" + format + "')";
     }
 
+    /**
+     * The validated SQL aggregate for one measure, for a caller that builds its own query around the grammar (the
+     * {@code transform.timeseries.resample} Step, ANALYTICS-CORE-1 M5) — so the grammar is still evaluated only here.
+     */
+    public static String aggregateSql(Measure m) {
+        if (!AGGS.contains(m.agg()))
+            throw new IllegalArgumentException("unknown aggregation '" + m.agg() + "' (one of " + AGGS + ")");
+        if (!"count".equals(m.agg())) safeIdent(m.field(), "measure field");
+        return aggExpression(m);
+    }
+
     /** The SQL aggregate for a measure — the same set as the UI's aggExpression(). */
     private static String aggExpression(Measure m) {
         return switch (m.agg()) {

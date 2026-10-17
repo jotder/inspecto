@@ -703,6 +703,35 @@ final class ConfigRoutes {
                         : "transform.running duration window needs order_by '" + spec.orderBy()
                                 + "' to be a TIMESTAMP or DATE column, not " + type;
             }
+            case PipelineConfig.Step.RESAMPLE, PipelineConfig.Step.SHIFT -> {
+                boolean resample = PipelineConfig.Step.RESAMPLE.equals(kind);
+                String what = resample ? "transform.timeseries.resample" : "transform.timeseries.shift";
+                String time;
+                java.time.ZoneId zone;
+                List<String> required;
+                List<String> added;
+                try {
+                    if (resample) {
+                        var spec = com.gamma.pipeline.exec.TimeSeriesStep.parseResample(cfg);
+                        time = spec.timeColumn(); zone = spec.zone(); required = spec.inputColumns(); added = List.of();
+                    } else {
+                        var spec = com.gamma.pipeline.exec.TimeSeriesStep.parseShift(cfg);
+                        time = spec.timeColumn(); zone = spec.zone(); required = spec.inputColumns();
+                        added = spec.addedColumns();
+                    }
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.TimeSeriesStep.columnRefusal(what, required, added,
+                        columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null) return refusal;
+                String type = columns.stream().filter(c -> c.name().equalsIgnoreCase(time))
+                        .map(TypeFlow.Column::type).findFirst().orElse("");
+                // VARCHAR fails OPEN, as for running: a mapping-derived column is typed VARCHAR here whatever it computes.
+                return type.isEmpty() || "VARCHAR".equalsIgnoreCase(type) ? null
+                        : com.gamma.pipeline.exec.TimeSeriesStep.typeRefusal(what, time, zone, type);
+            }
             case PipelineConfig.Step.HASH -> {
                 // ⛔ A salt / key in config is refused by name: the key is the Space's, and an authored one would
                 // sit in the TOON in the clear — the leak the Step exists to prevent.

@@ -1,0 +1,6 @@
+job:
+  name: daily_sales_rollup
+  type: pipeline
+  pipeline_config: sales_pipeline.toon
+  data_dir: out
+  on_pipeline: step_timeseries

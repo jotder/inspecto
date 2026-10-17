@@ -1,0 +1,31 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEPS: resample (transform.timeseries.resample) then shift (transform.timeseries.shift) — processors
+# transform.timeseries.resample and transform.timeseries.shift (ANALYTICS-CORE-1 M5). A day-over-day sales series:
+#   steps[2]: - resample: { time_column: SALE_TS, grain: day, group_by[1]: REGION, measures[2]: count,sum(AMOUNT),
+#                           bucket_column: DAY }
+#             - shift:    { time_column: DAY, grain: day, group_by[1]: REGION, columns[1]: sum_AMOUNT, periods: 1,
+#                           suffix: _prev_day }
+# The resample makes one row per REGION per day from 1 to 5 October — every day present, an empty one with count 0
+# and sum 0 — and the shift brings each day's previous sum beside it. SALE_TS is a zone-less TIMESTAMP, so the days
+# are its own calendar days and no `timezone:` is set (a TIMESTAMPTZ column would need one).
+# At rest, like every steps: kind: the ingest lands out/sales/, the commit fires daily_sales_rollup, and the result
+# lands in out/daily_sales/.
+#
+# Expected evidence after the run:
+#   /jobs shows daily_sales_rollup type PIPELINE with lastStatus SUCCESS. On disk, out/daily_sales/*.parquet holds
+#   10 rows (REGION, DAY, count, sum_AMOUNT, sum_AMOUNT_prev_day):
+#     NORTH 2026-10-01  2  150.0  null
+#     NORTH 2026-10-02  1   60.0  150.0
+#     NORTH 2026-10-03  0    0.0   60.0   — no sale: filled, not missing
+#     NORTH 2026-10-04  1   90.0    0.0
+#     NORTH 2026-10-05  0    0.0   90.0
+#     SOUTH 2026-10-01  1   75.5  null
+#     SOUTH 2026-10-02  0    0.0   75.5
+#     SOUTH 2026-10-03  0    0.0    0.0
+#     SOUTH 2026-10-04  1   20.0    0.0
+#     SOUTH 2026-10-05  1   44.5   20.0
+#   The job can also be fired by hand: POST /jobs/daily_sales_rollup/trigger.
+/jobs
+/jobs/daily_sales_rollup/runs

@@ -205,6 +205,8 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_EXPLODE.type().equals(type))  return explode(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_UNPIVOT.type().equals(type))  return unpivot(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_RESAMPLE.type().equals(type)) return resample(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_SHIFT.type().equals(type))    return shift(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -715,6 +717,68 @@ public final class RowShaper {
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
         return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.timeseries.resample} (ANALYTICS-CORE-1 M5) — one row per key per bucket, every bucket between the
+     * bounds present. {@link TimeSeriesStep} owns the grammar; the SQL is the Analytics Kernel's. This checks the config
+     * against the inbound columns and the time column's type (the clock must be stated, never DuckDB's host zone).
+     */
+    private static List<Relation> resample(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        TimeSeriesStep.Resample spec;
+        try {
+            spec = TimeSeriesStep.parseResample(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = TimeSeriesStep.columnRefusal(TimeSeriesStep.RESAMPLE, spec.inputColumns(), List.of(),
+                List.copyOf(types.keySet()));
+        if (refusal == null)
+            refusal = TimeSeriesStep.typeRefusal(TimeSeriesStep.RESAMPLE, spec.timeColumn(), spec.zone(),
+                    typeOf(types, spec.timeColumn()));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.timeseries.shift} (ANALYTICS-CORE-1 M5) — every row gains the value its key had N buckets
+     * earlier, matched by bucket. Refuses an input holding two rows for one key and bucket: the earlier row would be
+     * ambiguous and the join would duplicate rows.
+     */
+    private static List<Relation> shift(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        TimeSeriesStep.Shift spec;
+        try {
+            spec = TimeSeriesStep.parseShift(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = TimeSeriesStep.columnRefusal(TimeSeriesStep.SHIFT, spec.inputColumns(), spec.addedColumns(),
+                List.copyOf(types.keySet()));
+        if (refusal == null)
+            refusal = TimeSeriesStep.typeRefusal(TimeSeriesStep.SHIFT, spec.timeColumn(), spec.zone(),
+                    typeOf(types, spec.timeColumn()));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        try (Statement st = conn.createStatement(); java.sql.ResultSet rs = st.executeQuery(spec.duplicatesSql(input))) {
+            long dup = rs.next() ? rs.getLong(1) : 0;
+            if (dup > 0)
+                throw new IllegalArgumentException("node '" + node.id() + "': " + TimeSeriesStep.SHIFT + " needs one row "
+                        + "per key per " + spec.grain().wire() + "; " + dup + " (key, bucket) pair(s) hold more - add "
+                        + "the missing group_by column or resample first");
+        }
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    private static String typeOf(Map<String, String> types, String column) {
+        return types.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(column))
+                .map(Map.Entry::getValue).findFirst().orElse("");
     }
 
     /** The inbound relation's column names → DuckDB type names, in declaration order — a zero-row read. */

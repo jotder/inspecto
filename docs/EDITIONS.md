@@ -406,8 +406,8 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-XFM-21 | 🚨 Velocity & impossible-travel anomaly (`transform.fintech.velocity`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-BI-01 | 🏛️ Level-of-detail (LOD) fixed aggregator (`transform.analytics.lod`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-BI-02 | 🏛️ LOD include / exclude context aggregator (`transform.analytics.lod_context`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
-| SP-BI-03 | ⏱️ Time-grain resampler & gap imputer (`transform.timeseries.resample`) | Analytics, Time-Series & Semantic Modeling | 🟡 | 🟡 | 🟡 | `measure-grammar` | time grains exist in Studio queries (`QuerySpec.grains`); no resampling step |
-| SP-BI-04 | 📈 Period-over-period (YoY / MoM / WoW) shift (`transform.timeseries.shift`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-03 | ⏱️ Time-grain resampler & gap imputer (`transform.timeseries.resample`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.timeseries.resample` | one row per key per bucket (second..year, ISO weeks), every bucket present - count/sum fill 0, the rest empty; an explicit time zone for TIMESTAMPTZ (2026-10-17, ANALYTICS-CORE-1 M5) |
+| SP-BI-04 | 📈 Period-over-period (YoY / MoM / WoW) shift (`transform.timeseries.shift`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.timeseries.shift` | the value a key had N buckets earlier, matched by bucket so a gap gives empty, not the wrong period (2026-10-17, ANALYTICS-CORE-1 M5) |
 | SP-BI-05 | 📊 Running calculations & moving averages (`transform.analytics.running`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.running` | count/sum/avg/min/max per key over a time (60m) or row (5 rows) window, as a Step (2026-10-06); state is per run — cross-batch velocity stays a SQL-over-sink Job |
 | SP-BI-06 | 🔮 Time-series forecaster (Holt-Winters) (`transform.timeseries.forecast`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-BI-07 | 📐 Semantic KPI calculator & Measure formulas (`transform.semantic.metric`) | Analytics, Time-Series & Semantic Modeling | 🟡 | 🟡 | 🟡 | `measure-grammar` | the Measure grammar (`count | agg(field)`) serves Studio + summarize; no named-KPI layer |
@@ -452,7 +452,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `sink.webhook` | top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Professional+ |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 119 processors — 40 delivered, 18 partial, 61 planned.
+**Count:** 119 processors — 42 delivered, 17 partial, 60 planned.
 
 **SP-CTL-07 behaviour change 2026-10-07 (operator, MODULE-REORG-P7-INCIDENTS slice 2): Alert records are durable on EVERY edition, Personal included.** Fired Alerts live in an Alert-owned store (`ALERTS` family, the Space's own `duckdb/inspecto-alerts.db`, `-Dalerts.backend=db` default), not in operational objects: wherever an Alert does fire on Personal (rule authoring is Professional+, so this is the rules a Personal Space was handed), it now remembers its Alerts across a restart — `GET /alerts` history survives and an open Alert is not re-fired. Personal still has NO Incidents, Cases or operational objects (CP-11 unchanged); only the Incident escalation is skipped there. A Personal operator works a stored Alert with `POST /alerts/{id}/ack|resolve` (`canWorkIncidents`, a no-op without a Subject). (Narrative kept here, outside the generated rows: the catalog `note` stays short.)
 

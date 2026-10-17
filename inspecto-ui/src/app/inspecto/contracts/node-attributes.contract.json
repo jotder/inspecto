@@ -684,6 +684,161 @@
     "default" : false,
     "help" : "Emit a row for a null cell too. Off: null cells produce no row."
   } ],
+  "transform.timeseries.resample" : [ {
+    "key" : "time_column",
+    "label" : "Time column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The DATE or TIMESTAMP column the rows are bucketed on. Rows where it is empty are left out.",
+    "placeholder" : "EVENT_TS"
+  }, {
+    "key" : "grain",
+    "label" : "Time grain",
+    "type" : "select",
+    "tier" : "required",
+    "options" : [ {
+      "value" : "second",
+      "label" : "Second"
+    }, {
+      "value" : "minute",
+      "label" : "Minute"
+    }, {
+      "value" : "hour",
+      "label" : "Hour"
+    }, {
+      "value" : "day",
+      "label" : "Day"
+    }, {
+      "value" : "week",
+      "label" : "Week (Monday)"
+    }, {
+      "value" : "month",
+      "label" : "Month"
+    }, {
+      "value" : "quarter",
+      "label" : "Quarter"
+    }, {
+      "value" : "year",
+      "label" : "Year"
+    } ],
+    "help" : "The bucket size. Weeks start on Monday."
+  }, {
+    "key" : "timezone",
+    "label" : "Time zone",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Only for a TIMESTAMP WITH TIME ZONE column: whose calendar the buckets follow (UTC, Europe/Berlin...). Leave blank for a DATE or TIMESTAMP column, which is bucketed on its own clock.",
+    "placeholder" : "Europe/Berlin"
+  }, {
+    "key" : "group_by",
+    "label" : "Series keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "One series per key; every key gets every bucket. Leave blank for one series.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "measures",
+    "label" : "Measures",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "count or agg(field). An empty bucket gets 0 for count, countDistinct and sum, empty otherwise.",
+    "placeholder" : "sum(amount)"
+  }, {
+    "key" : "bucket_column",
+    "label" : "Bucket column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "bucket",
+    "help" : "Receives each bucket's start (a TIMESTAMP, on the time zone's clock when one is set)."
+  }, {
+    "key" : "from",
+    "label" : "First bucket",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Start the series here even if the data starts later. Blank: the earliest bucket with data.",
+    "placeholder" : "2026-01-01"
+  }, {
+    "key" : "to",
+    "label" : "Last bucket",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "End the series here even if the data ends earlier. Blank: the latest bucket with data.",
+    "placeholder" : "2026-12-31"
+  } ],
+  "transform.timeseries.shift" : [ {
+    "key" : "time_column",
+    "label" : "Time column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The bucket column (a resample's output); one row per key per bucket.",
+    "placeholder" : "bucket"
+  }, {
+    "key" : "grain",
+    "label" : "Time grain",
+    "type" : "select",
+    "tier" : "required",
+    "options" : [ {
+      "value" : "second",
+      "label" : "Second"
+    }, {
+      "value" : "minute",
+      "label" : "Minute"
+    }, {
+      "value" : "hour",
+      "label" : "Hour"
+    }, {
+      "value" : "day",
+      "label" : "Day"
+    }, {
+      "value" : "week",
+      "label" : "Week (Monday)"
+    }, {
+      "value" : "month",
+      "label" : "Month"
+    }, {
+      "value" : "quarter",
+      "label" : "Quarter"
+    }, {
+      "value" : "year",
+      "label" : "Year"
+    } ],
+    "help" : "The bucket size. Weeks start on Monday."
+  }, {
+    "key" : "timezone",
+    "label" : "Time zone",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Only for a TIMESTAMP WITH TIME ZONE column: whose calendar the buckets follow (UTC, Europe/Berlin...). Leave blank for a DATE or TIMESTAMP column, which is bucketed on its own clock.",
+    "placeholder" : "Europe/Berlin"
+  }, {
+    "key" : "group_by",
+    "label" : "Series keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Shift within each key. Leave blank for one series.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "columns",
+    "label" : "Columns to shift",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Each gains a column with its value from the earlier bucket (empty when that bucket has no row).",
+    "placeholder" : "sum_amount"
+  }, {
+    "key" : "periods",
+    "label" : "Buckets back",
+    "type" : "number",
+    "tier" : "optional",
+    "default" : 1,
+    "help" : "1 = the previous bucket; 12 with a month grain = the same month last year; -1 = the next bucket."
+  }, {
+    "key" : "suffix",
+    "label" : "Name suffix",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "_prev",
+    "help" : "Added to each shifted column's name: sum_amount becomes sum_amount_prev."
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

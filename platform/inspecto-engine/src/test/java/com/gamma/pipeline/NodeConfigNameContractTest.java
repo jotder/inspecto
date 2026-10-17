@@ -3,6 +3,7 @@ package com.gamma.pipeline;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.pipeline.exec.TimeSeriesStep;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -781,6 +782,83 @@ class NodeConfigNameContractTest {
         assertEquals(new java.util.TreeSet<>(edited.keySet()), new java.util.TreeSet<>(
                 NodeAttributes.forType("transform.matrix.unpivot").stream().map(NodeAttribute::key).toList()),
                 "every key the round trip carries is declared, and nothing else is");
+    }
+
+    /**
+     * The time-series nodes' contract (ANALYTICS-CORE-1 M5): {@code steps: - resample:} / {@code - shift:} lift to ONE
+     * {@code transform.timeseries.*} node each (the kind is NOT the type's suffix), an edit of every declared key
+     * survives the lower and still parses as the run reads it, and the declared keys are exactly the ones carried.
+     */
+    @Test
+    void timeSeriesAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> resample = new LinkedHashMap<>();
+        resample.put("time_column", "EVENT_DATE");
+        resample.put("grain", "quarter");
+        resample.put("timezone", "Europe/Berlin");
+        resample.put("group_by", List.of("ID"));
+        resample.put("measures", List.of("count", "sum(AMOUNT)"));
+        resample.put("bucket_column", "q");
+        resample.put("from", "2026-01-01");
+        resample.put("to", "2026-12-31T23:00");
+        Map<String, Object> got = timeSeriesSavedAs(dir.resolve("r"), "resample", "transform.timeseries.resample", resample);
+        TimeSeriesStep.Resample r = TimeSeriesStep.parseResample(got);
+        assertEquals(List.of("ID", "q", "count", "sum_AMOUNT"), r.outputColumns());
+        assertEquals("Europe/Berlin", r.zone().getId());
+        assertEquals(java.time.LocalDateTime.parse("2026-12-31T23:00"), r.to());
+
+        Map<String, Object> shift = new LinkedHashMap<>();
+        shift.put("time_column", "EVENT_DATE");
+        shift.put("grain", "month");
+        shift.put("timezone", "UTC");
+        shift.put("group_by", List.of("ID"));
+        shift.put("columns", List.of("AMOUNT"));
+        shift.put("periods", 12);
+        shift.put("suffix", "_last_year");
+        got = timeSeriesSavedAs(dir.resolve("s"), "shift", "transform.timeseries.shift", shift);
+        TimeSeriesStep.Shift s = TimeSeriesStep.parseShift(got);
+        assertEquals(12, s.periods());
+        assertEquals(List.of("AMOUNT_last_year"), s.addedColumns());
+    }
+
+    private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
+            throws Exception {
+        java.nio.file.Files.createDirectories(dir);
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("active", Boolean.FALSE);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        processing.remove("dedup");
+        if (processing.get("csv_settings") instanceof Map<?, ?> csv) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            csv.forEach((k, v) -> { if (!"where".equals(k)) c.put(String.valueOf(k), v); });
+            processing.put("csv_settings", c);
+        }
+        raw.put("steps", new ArrayList<>(List.of(Map.of(kind, new LinkedHashMap<>(Map.of(
+                "time_column", "EVENT_DATE", "grain", "day", "measures", List.of("count"), "columns", List.of("ID")))))));
+
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(PipelineConfig.fromMap(raw), raw));
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!type.equals(n.type())) { nodes.add(n); continue; }
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), edited, n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> type.equals(n.type())).count(),
+                "the lift presents the " + kind + " step as ONE " + type + " node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        Path saved = dir.resolve(kind + "_saved_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(lowered));
+        List<PipelineConfig.Step> steps = PipelineConfig.fromMap(decode(saved)).steps();
+        List<String> kinds = steps.stream().map(PipelineConfig.Step::kind).toList();
+        assertEquals(kind, kinds.get(kinds.size() - 1), kinds.toString());
+        assertEquals(new java.util.TreeSet<>(edited.keySet()), new java.util.TreeSet<>(
+                NodeAttributes.forType(type).stream().map(NodeAttribute::key).toList()),
+                "every key the round trip carries is declared, and nothing else is");
+        Map<String, Object> got = steps.get(kinds.size() - 1).config();
+        assertEquals(new java.util.TreeSet<>(edited.keySet()), new java.util.TreeSet<>(got.keySet()));
+        return got;
     }
 
     /** Lift a fixture carrying {@code processing.profile}, set the node's {@code columns}, save, re-read. */

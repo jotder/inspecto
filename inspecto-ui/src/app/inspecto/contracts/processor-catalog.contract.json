@@ -697,18 +697,20 @@
     "label" : "Time-grain resampler & gap imputer",
     "emoji" : "⏱️",
     "icon" : "heroicons_outline:clock",
-    "status" : "partial",
-    "capability" : "measure-grammar",
-    "note" : "time grains exist in Studio queries (`QuerySpec.grains`); no resampling step",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.timeseries.resample",
+    "note" : "one row per key per bucket (second..year, ISO weeks), every bucket present - count/sum fill 0, the rest empty; an explicit time zone for TIMESTAMPTZ (2026-10-17, ANALYTICS-CORE-1 M5)",
+    "addable" : true
   }, {
     "id" : "transform.timeseries.shift",
     "family" : "BI",
     "label" : "Period-over-period (YoY / MoM / WoW) shift",
     "emoji" : "📈",
     "icon" : "heroicons_outline:presentation-chart-line",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.timeseries.shift",
+    "note" : "the value a key had N buckets earlier, matched by bucket so a gap gives empty, not the wrong period (2026-10-17, ANALYTICS-CORE-1 M5)",
+    "addable" : true
   }, {
     "id" : "transform.analytics.running",
     "family" : "BI",

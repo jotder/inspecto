@@ -573,6 +573,15 @@ class PipelineEditableTest {
                 node("f", "transform.filter", Map.of("where", "GROSS > 0")), node("u", "transform.matrix.unpivot", cfg));
     }
 
+    /** The time-series Steps (ANALYTICS-CORE-1 M5) have no singular block and types that are NOT transform.<kind>. */
+    @Test
+    void timeSeriesStepsLowerToStepsUnderTheirPlainKinds() {
+        Map<String, Object> r = new LinkedHashMap<>(Map.of("time_column", "TS", "grain", "day", "measures", List.of("count")));
+        Map<String, Object> s = new LinkedHashMap<>(Map.of("time_column", "bucket", "grain", "day", "columns", List.of("count")));
+        assertChain(List.of("filter", "resample", "shift"), node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("r", "transform.timeseries.resample", r), node("s", "transform.timeseries.shift", s));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);
