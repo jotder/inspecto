@@ -1,5 +1,6 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.SqlIdent;
 import com.gamma.util.egress.EgressPolicy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -183,7 +184,7 @@ public final class WebhookSink {
                         Target target, Function<PipelineConfig.Retry, RetryPolicy> retries) throws Exception {
         int batchSize = target.webhook().batchSize();
         RetryPolicy policy = retries.apply(target.webhook().retry());
-        String quoted = "\"" + inputTable.replace("\"", "\"\"") + "\"";
+        String quoted = SqlIdent.q(inputTable);
         long total;
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FROM " + quoted)) {
             rs.next();

@@ -3,6 +3,7 @@ package com.gamma.job;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.config.safety.PathJail;
 import com.gamma.signal.Severity;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,9 +138,7 @@ final class StorageReportTask {
                     ps.executeBatch();
                 }
                 try (Statement st = conn.createStatement()) {
-                    st.execute("COPY storage_sample TO '"
-                            + parquet.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                            + "' (FORMAT PARQUET)");
+                    st.execute("COPY storage_sample TO " + SqlIdent.pathStr(parquet) + " (FORMAT PARQUET)");
                 }
             }
             com.gamma.pipeline.ComponentStore store =

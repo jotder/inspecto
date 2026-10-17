@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.util.SqlIdent;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +49,7 @@ final class SqlParamScanner {
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
             String v = params.get(m.group(1));
-            String repl = v == null ? m.group() : "'" + v.replace("'", "''") + "'";
+            String repl = v == null ? m.group() : SqlIdent.sqlStr(v);
             m.appendReplacement(sb, Matcher.quoteReplacement(repl));
         }
         m.appendTail(sb);

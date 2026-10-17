@@ -6,6 +6,7 @@ import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlViews;
+import com.gamma.util.SqlIdent;
 import com.gamma.util.Values;
 
 import java.nio.file.Path;
@@ -123,7 +124,7 @@ public final class DatasetRelation {
         // SqlGuard admits ONE trailing ';' (optionally followed by line comments) — inside a subquery it is a
         // syntax error, so it is dropped here; everything else is embedded exactly as authored.
         String body = TRAILING_SEMICOLON.matcher(userSql.strip()).replaceFirst("");
-        return "WITH \"" + sourceName.replace("\"", "\"\"") + "\" AS (" + storeRead + ")\n"
+        return "WITH " + SqlIdent.q(sourceName) + " AS (" + storeRead + ")\n"
                 + "SELECT * FROM (\n" + body + "\n) AS __virtual";
     }
 

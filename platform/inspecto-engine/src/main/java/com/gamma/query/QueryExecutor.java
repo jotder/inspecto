@@ -212,7 +212,7 @@ public final class QueryExecutor {
             Connection conn = sandbox.connection();
             if (timeZone != null) {
                 try (Statement st = conn.createStatement()) {
-                    st.execute("SET TimeZone = '" + timeZone.getId().replace("'", "''") + "'");
+                    st.execute("SET TimeZone = " + SqlIdent.sqlStr(timeZone.getId()));
                 }
             }
             // Trusted registration: the ONLY place file-reading SQL runs (unsealed). The user query below

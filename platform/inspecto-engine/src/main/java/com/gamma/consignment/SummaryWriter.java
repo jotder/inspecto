@@ -3,6 +3,7 @@ package com.gamma.consignment;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -219,9 +220,7 @@ public final class SummaryWriter {
             throws Exception {
         Path staged = dir.resolve(fileName + "." + UUID.randomUUID().toString().substring(0, 8) + ".tmp");
         try (Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM " + scratch + ") TO '"
-                    + staged.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                    + "' (FORMAT PARQUET)");
+            st.execute("COPY (SELECT * FROM " + scratch + ") TO " + SqlIdent.pathStr(staged) + " (FORMAT PARQUET)");
         }
         Path finalPath = dir.resolve(fileName);
         Files.move(staged, finalPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

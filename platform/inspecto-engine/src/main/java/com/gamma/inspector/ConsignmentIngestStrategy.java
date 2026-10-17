@@ -474,9 +474,9 @@ interface ConsignmentIngestStrategy {
                     java.nio.file.Files.createDirectories(parkDir);
                     java.nio.file.Path parkTable = parkDir.resolve(batchId + "__" + node.id() + ".parquet");
                     try (java.sql.Statement st = conn.createStatement()) {
-                        st.execute("COPY " + inputTable + " TO '"
-                                + parkTable.toString().replace('\\', '/').replace("'", "''")
-                                + "' (FORMAT parquet)");
+                        st.execute("COPY " + inputTable + " TO "
+                                + SqlIdent.sqlStr(parkTable.toString().replace('\\', '/'))
+                                + " (FORMAT parquet)");
                     }
                     ParkedBranches.record(batchId, node.id(), parkTable);
                 });
@@ -686,7 +686,7 @@ interface ConsignmentIngestStrategy {
             payload.removeIf(c -> c.equalsIgnoreCase(del.column()));
             StringBuilder in = new StringBuilder();
             for (String v : del.values())
-                in.append(in.isEmpty() ? "" : ", ").append('\'').append(v.replace("'", "''")).append('\'');
+                in.append(in.isEmpty() ? "" : ", ").append(SqlIdent.sqlStr(v));
             opExpr = "CASE WHEN CAST(" + SqlIdent.q(del.column()) + " AS VARCHAR) IN (" + in
                     + ") THEN 'delete' ELSE 'upsert' END";
             star = "* EXCLUDE (" + SqlIdent.q(del.column()) + ")";
@@ -701,7 +701,7 @@ interface ConsignmentIngestStrategy {
         String staged = "SELECT " + star + ", " + keyHash + " AS __key_hash, " + rowHash + " AS __row_hash, "
                 + "now()::TIMESTAMP AS __valid_from, "
                 + opExpr + " AS __op, "
-                + "'" + batchId.replace("'", "''") + "' AS __batch_id "
+                + SqlIdent.sqlStr(batchId) + " AS __batch_id "
                 + "FROM \"" + src + "\" "
                 + "QUALIFY row_number() OVER (PARTITION BY " + keyHash + order + ") = 1";
         String sql = "CREATE TABLE \"" + dst + "\" AS SELECT * FROM (" + staged + ") AS _staged";

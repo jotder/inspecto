@@ -100,8 +100,8 @@ public final class XlsxWorkbook {
             }
             DuckDbUtil.lockConfiguration(conn);
             try (Statement st = conn.createStatement()) {
-                st.execute("COPY report_out TO '" + target.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                        + "' (FORMAT xlsx, HEADER true, SHEET '" + sheetName(sheet).replace("'", "''") + "')");
+                st.execute("COPY report_out TO " + SqlIdent.pathStr(target)
+                        + " (FORMAT xlsx, HEADER true, SHEET " + SqlIdent.sqlStr(sheetName(sheet)) + ")");
             }
         }
     }

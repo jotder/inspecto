@@ -106,7 +106,7 @@ public final class DerivedTableWriter {
                                 + value + "' is not a safe directory name (column " + table.partitionBy() + ")");
                     Path pdir = dir.resolve(table.partitionBy() + "=" + value);
                     Files.createDirectories(pdir);
-                    String where = " WHERE " + col + " = '" + value.replace("'", "''") + "'";
+                    String where = " WHERE " + col + " = " + SqlIdent.sqlStr(value);
                     Written w = copyTo(conn, "SELECT * FROM " + scratch + where, pdir, consignmentId + ".parquet");
                     rows.add(row(consignmentId, runId, table, value, w, writtenAt, producer, fingerprint,
                             count(conn, "SELECT count(*) FROM " + scratch + where)));

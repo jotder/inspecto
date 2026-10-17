@@ -424,8 +424,8 @@ public final class ComponentPreview {
         for (String k : keys) {
             if (!first) proj.append(", ");
             first = false;
-            proj.append("json_extract_string(\"line\", '$.\"").append(k.replace("'", "''"))
-                .append("\"') AS ").append(q(k));
+            proj.append("json_extract_string(\"line\", ").append(SqlIdent.sqlStr("$.\"" + k + "\""))
+                .append(") AS ").append(q(k));
         }
         try (java.sql.Statement st = conn.createStatement()) {
             st.execute("CREATE TABLE preview_parsed AS SELECT " + proj + " FROM js_lines");

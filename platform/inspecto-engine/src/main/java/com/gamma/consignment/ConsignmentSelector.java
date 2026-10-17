@@ -2,6 +2,7 @@ package com.gamma.consignment;
 
 import com.gamma.api.PublicApi;
 import com.gamma.sql.SqlViews;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,7 +129,7 @@ public final class ConsignmentSelector {
              // unfiltered), so a configured root containing a single quote would silently let a
              // superseded file back into a read — the exact staleness this class exists to prevent.
              ResultSet rs = st.executeQuery(
-                     "SELECT file FROM glob('" + glob.replace("\\", "/").replace("'", "''") + "')")) {
+                     "SELECT file FROM glob(" + SqlIdent.sqlStr(glob.replace("\\", "/")) + ")")) {
             while (rs.next()) {
                 String file = rs.getString(1);
                 if (file == null) continue;

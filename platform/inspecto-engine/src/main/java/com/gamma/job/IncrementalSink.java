@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,7 +145,7 @@ final class IncrementalSink {
     /** Replace exactly the {@code lookback} day partitions ending at {@code day} with {@code table}'s rows. */
     static Outcome replace(Connection conn, String table, Path sink, IncrementalSpec inc, LocalDate day,
                            String job, String runId) throws IOException, SQLException {
-        String col = "\"" + inc.column().replace("\"", "\"\"") + "\"";
+        String col = SqlIdent.q(inc.column());
         String type = null;
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT * FROM " + table + " LIMIT 0")) {
             java.sql.ResultSetMetaData md = rs.getMetaData();

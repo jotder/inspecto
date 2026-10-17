@@ -239,7 +239,7 @@ public final class ReferenceCompactor {
             String col = s.substring(0, eq), val = s.substring(eq + 1);
             partCols.add(col);
             if (!where.isEmpty()) where.append(" AND ");
-            where.append(quoteIdent(col)).append(" = '").append(val.replace("'", "''")).append('\'');
+            where.append(quoteIdent(col)).append(" = ").append(SqlIdent.sqlStr(val));
         }
         return where.isEmpty() ? "TRUE" : where.toString();
     }

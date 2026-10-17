@@ -40,6 +40,7 @@ import com.gamma.query.ViewReaderSql;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.LakehouseCatalog;
+import com.gamma.util.SqlIdent;
 import com.gamma.util.Topology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -345,7 +346,7 @@ public final class PipelineJobRunner implements Job {
                 String view = SEED_VIEW_PREFIX + "_" + safe(seed.node());
                 String predicate = incremental
                         ? watermarks.get(pipelineId, seed.store())
-                            .map(wm -> "\"" + incCol + "\" > '" + wm.replace("'", "''") + "'").orElse(null)
+                            .map(wm -> "\"" + incCol + "\" > " + SqlIdent.sqlStr(wm)).orElse(null)
                         : null;
                 List<String> read = SourceStoreReader.registerView(conn, view, dir, seed.store(), seed.format(), predicate);
                 reportSources(ctx, seed.store(), read);

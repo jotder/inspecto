@@ -487,8 +487,7 @@ public final class EnrichmentEngine {
             int j = 0;
             for (Map.Entry<String, String> e : m.entrySet()) {
                 if (j++ > 0) sb.append(" AND ");
-                sb.append('"').append(e.getKey()).append("\"='")
-                  .append(e.getValue().replace("'", "''")).append('\'');
+                sb.append('"').append(e.getKey()).append("\"=").append(SqlIdent.sqlStr(e.getValue()));
             }
             sb.append(')');
         }
