@@ -1,5 +1,7 @@
 package com.gamma.entitystore;
 
+import com.gamma.graph.UnionFind;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -173,16 +175,16 @@ public final class EntityRegistry {
      * groups keyed and sorted by their smallest member key. A key in no live assertion is in no group.
      */
     public static Map<String, Group> resolve(List<EntityFactLog.Fact> facts, long atSeq) {
-        Map<String, String> parent = new java.util.HashMap<>();
+        UnionFind sets = new UnionFind();
         List<Assertion> live = assertions(facts, atSeq).values().stream().filter(Assertion::live).toList();
         for (Assertion x : live) {
-            String ra = find(parent, x.a()), rb = find(parent, x.b());
-            if (ra.equals(rb)) continue;
-            if (ra.compareTo(rb) < 0) parent.put(rb, ra); else parent.put(ra, rb);   // root = smallest key
+            String ra = sets.find(x.a()), rb = sets.find(x.b());
+            // UnionFind.union(a, b) makes b's root the root: pass the larger root first so root = smallest key
+            if (ra.compareTo(rb) < 0) sets.union(rb, ra); else sets.union(ra, rb);
         }
         Map<String, Group> groups = new java.util.TreeMap<>();
         for (Assertion x : live) {
-            String root = find(parent, x.a());
+            String root = sets.find(x.a());
             Group g = groups.computeIfAbsent(root, r -> new Group(r, new TreeSet<>(), new TreeSet<>()));
             g.members().add(x.a());
             g.members().add(x.b());
@@ -192,12 +194,6 @@ public final class EntityRegistry {
         groups.forEach((id, g) -> out.put(id, new Group(id, Collections.unmodifiableSortedSet(g.members()),
                 Collections.unmodifiableSortedSet(g.assertions()))));
         return out;
-    }
-
-    private static String find(Map<String, String> parent, String k) {
-        String r = k;
-        while (parent.containsKey(r)) r = parent.get(r);
-        return r;
     }
 
     private static String str(Map<String, Object> b, String key) {

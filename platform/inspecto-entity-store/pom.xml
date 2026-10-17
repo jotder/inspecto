@@ -28,6 +28,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-util</artifactId>
         </dependency>
+        <!-- ANALYTICS-CORE-1 M8: the identity fold uses the graph library's one UnionFind (graph reaches the JDK only). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-graph</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-config</artifactId>
@@ -113,6 +118,7 @@
                                         <include>com.gamma.inspector:inspecto-audit-spi</include>
                                         <include>com.gamma.inspector:inspecto-auth-spi</include>
                                         <include>com.gamma.inspector:inspecto-config</include>
+                                        <include>com.gamma.inspector:inspecto-graph</include>
                                         <include>com.gamma.inspector:inspecto-http-spi</include>
                                         <include>com.gamma.inspector:inspecto-util</include>
                                     </includes>
