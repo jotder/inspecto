@@ -94,12 +94,16 @@ Set relation into a sealed in-memory DuckDB table and runs `MeasureCompiler`'s S
 **The rule is counted, and the count may only fall (2026-10-17, `ANALYTICS-CORE-1` M10).**
 [`tools/check-data-ops-duplication.mjs`](../../../../tools/check-data-ops-duplication.mjs) inventories,
 per module with `file:line`, every copy of a data operation that has a shared home: (a) private SQL
-quoting helpers (`q`, `lit`, `sqlStr`, `ident`…) outside `SqlBuilder` / `SqlIdent`, (b) hand-built
+quoting helpers (`q`, `lit`, `sqlStr`, `ident`, `escapeIdent`, `sqlIdent`…) outside `SqlBuilder` / `SqlIdent`,
+and every **inline** quote doubling — `.replace("'", "''")` (a literal, or a `COPY … TO '<path>'` rendered by
+hand) and `.replace("\"", "\"\"")` (an identifier), one finding per call, its member the enclosing method, (b) hand-built
 `read_*(` in a Java string literal outside `SqlViews`, (c) private median / percentile / MAD / z-score /
 Jaro-Winkler / Jaccard / union-find outside the Analytics Kernel and the graph library, (d) a JVM switch
 over the Measure aggregate names outside `MeasureCompiler`. It reads tracked `src/main/java` only, with
 comments stripped, and states that scope on every run. Its baseline at the start (43 / 22 / 8 / 1; 0 / 0 / 2 / 0
-after the M8/M9 lanes of 2026-10-17 — the two left are the Jaccard and Jaro-Winkler copies, Should item S1) is
+after the M8/M9 lanes of 2026-10-17 — the two left are the Jaccard and Jaro-Winkler copies, Should item S1;
+the inline count added to (a) the same day re-opened it at 35 — 18 of them in `inspecto-engine` — and the
+retirement lane took it back to 0 with byte-identical SQL) is
 [`tools/data-ops-duplication.baseline.json`](../../../../tools/data-ops-duplication.baseline.json); the CI
 guards job runs `--ratchet`, which fails when a module's count rises or an exemption goes stale. When a copy
 is retired, lower the baseline with `--baseline-write`; never raise it.
@@ -107,9 +111,13 @@ is retired, lower the baseline with `--baseline-write`; never raise it.
 named `esc` / `quote` / `ident`, and an ingest reader that opens a raw input file with its own parse
 options (`DuckDbCsvIngester`, `ComponentPreview`, `FileSampler`), is listed with its reason in
 [`tools/data-ops-duplication.exemptions.json`](../../../../tools/data-ops-duplication.exemptions.json)
-after someone read the site. ⚠ **It is name-based on purpose and says what it cannot see:** SQL quoting
-written inline without a helper, statistics computed inline (`VolumeBaseline`'s lower median), and a robust
-z named only `z` (`RobustStats.z`) are not counted, so a 0 means "no named copy", not "no copy". Plan:
+after someone read the site. RFC-4180 CSV quoting doubles `"` exactly like an identifier, so each CSV
+writer's method (`EventRoutes.csv`, `AuditLogRoutes.csv`, `ReportRenderer.csvCell`, `ReportJob.csv`,
+`CsvIngester.SourceId.csv`) is exempted by name. ⚠ **It says what it cannot see:** quoting done some other way
+than the doubling `replace` (a char loop, a regex, a `String.format` of a quote), an identifier wrapped in
+`"` with no escape at all (`EnrichmentEngine.buildFilter`'s key, `ConsignmentIngestStrategy`'s `src` /
+`dst` — nothing to match), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
+only `z` (`RobustStats.z`) are not counted, so a 0 means "no copy of the escape", not "no hand-built SQL". Plan:
 [`analytics-core-plan.md`](../../../superpower/analytics-core-plan.md) §1a, §4a.
 
 ---
