@@ -114,7 +114,7 @@ Sizes: S / M / L. "Consumers" names who gets it first.
 | **S2** | **Deterministic entity grouping** | Blocking keys + match conditions + union-find → resolution groups; Step `enrichment.entity.link`. Similarity can *propose* candidates but never asserts identity (D-M1) | LA, Screening, Case dedupe, Mobile Money agents/wallets | M |
 | **S3** | **Distribution Steps** | `transform.stats.outlier` (IQR, robust z), `transform.data.binning` (equal-width, quantile), histogram, `transform.stats.correlation` (`corr`, `regr_*`) | Data quality, Fraud, BA | M |
 | **S4** | **Ranking, sampling, pivot** | `transform.analytics.rank` (Top-N per group), `quality.sample.reservoir` (seeded, deterministic, stratified), `transform.matrix.pivot` | BI, investigations, testing large Datasets | S–M |
-| **S5** | **Forecasting kernel** | Seasonal-naive and Holt-Winters additive with backtest, lifted from the `business-assurance` template SQL into a core function and Step `transform.timeseries.forecast`; the Predictive design's S4 builds on it (OD-11 stays open there) | BA pack, KPI bands, Predictive | M |
+| **S5** | **Forecasting & Prediction base** (promoted 2026-10-17: the next item after the Musts) | (a) **Forecast kernel** — seasonal-naive and Holt-Winters additive, lifted from the `business-assurance` template SQL into a core function and Step `transform.timeseries.forecast`, built on the M5 primitives; (b) **Backtest + accuracy measures** — rolling-origin backtest and one definition each of MAE, MAPE (zero-actual rule stated), sMAPE, bias and coverage of the prediction interval; (c) **Seasonality detection** — period found from the data (autocorrelation over candidate periods, deterministic), so a declared period is optional; (d) **Deterministic holdout split** — seeded train / validation / test split by time or by entity hash, reusable by any model; (e) **Prediction-interval output shape** — point forecast plus lower / upper band and level, written through the M7 score/output contract so BI, KPI bands and Alert Rules read every forecast the same way. The Predictive design's S4 builds on it (OD-11 stays open there); no training on the request path, no new dependency (W1–W3, W7) | BA and RA packs, KPI bands, Anomaly (seasonality), Predictive | M–L |
 | **S6** | **Temporal motif matcher** | `BranchingPatternEngine` (fan-in / fan-out stages within a window) to the core; LA's `PatternQueryCompiler` stays | AML structuring, Mobile Money, Fraud | S |
 | **S8** | **JVM-side aggregation to SQL** | `ObjectService.analytics`, `CaseOperations.evaluateCaseRule`, `ReportService` percentiles move to the store's SQL or the kernel | Case Management, Incidents, ops reports | S |
 | **S7** | **Platform Service `analytics`** | The kernel's read-only functions granted to Jobs and packs; the Assistant's `anomaly_scan` / outlier tool reuses it instead of its own SQL | packs, Jobs, Assistant | S |
@@ -169,7 +169,8 @@ Sizes: S / M / L. "Consumers" names who gets it first.
    tests, adopt the baseline contract, one profiler. The guard ratchets down after each step.
 3. **A2 (M3, M5)** — Measure aggregates (Java + TS twin + contract JSON) and time-series primitives.
 4. **A3 (M7, M8)** — score output contract; graph library move.
-5. **Should** items as their consumers ask, S1/S2/S6 first (AML and Mobile Money use them).
+5. **S5 Forecasting & Prediction base** next (operator, 2026-10-17): (a)+(e) first, then (b), (c), (d).
+6. Other **Should** items as their consumers ask, S1/S2/S6 first (AML and Mobile Money use them).
 
 ## 6. Risks
 
