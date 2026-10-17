@@ -411,7 +411,7 @@ the engine reads only `sql`.
 
 **Behaviour.** Measures speak the **one measure grammar** (`measure-grammar.contract.json`) that the
 BI query and a materialize Job also use: `count` | `agg(field)` with `agg` ∈ count · countDistinct ·
-sum · avg · min · max; result columns are the stable `agg_field` ids (`count`, `sum_gross`,
+sum · avg · min · max · median · stddev · variance · p05 · p25 · p75 · p90 · p95 · p99; result columns are the stable `agg_field` ids (`count`, `sum_gross`,
 `max_unit_price`). `group_by` is optional — omit it for one grand-total row. Compiled by
 `MeasureCompiler`, so a summarize node, a materialize Job and a dashboard query cannot drift.
 Arms mid-branch.
@@ -916,7 +916,7 @@ four disjoint shapes, chosen by which keys are present:
 | `window` | ledger | `Ns`/`Nm`/`Nh`/`Nd` elapsed, or `Nb` = the last N batches. |
 | `onPipeline` | ledger | Restrict to one Pipeline; blank = every Pipeline. |
 | `when` | ledger | Condition tree scoping the ledger rows before the metric aggregates them. Refused on the other shapes. |
-| `dataset` + `measure` | measure | A Measure (`count`, or `agg(field)` with agg = count · countDistinct · sum · avg · min · max) over a Dataset's current data. No `metric`, `window` or `when`. |
+| `dataset` + `measure` | measure | A Measure (`count`, or `agg(field)` with agg = count · countDistinct · sum · avg · min · max · median · stddev · variance · p05 · p25 · p75 · p90 · p95 · p99) over a Dataset's current data. No `metric`, `window` or `when`. |
 | `dataset` + `maximumAge` | freshness | The Dataset must have published within `Ns`/`Nm`/`Nh`/`Nd`. Comparator and threshold are fixed (`gt`, 0), and a measure, metric, window or `when` is refused. |
 | `investigation` + `relation` + `measure` | investigation | A Measure over an Investigation's Working Set (`relation`: `entities` · `links` · `excluded`, default `entities`). Authored only through `POST /inv/investigations/{id}/alert-rules`. |
 | `comparator` | all but freshness | `gt` · `gte` · `lt` · `lte`. |

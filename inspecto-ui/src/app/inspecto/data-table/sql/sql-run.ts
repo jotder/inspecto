@@ -10,6 +10,8 @@
  * literals are left untouched. A genuinely-broken query throws; we surface that as an error so the caller
  * can decline to render it (and skip adding it to history).
  */
+import { registerStatAggregates } from './stat-aggregates';
+
 export interface SqlRunResult {
     ok: boolean;
     rows: Record<string, unknown>[];
@@ -21,7 +23,12 @@ export interface SqlRunResult {
 let enginePromise: Promise<any> | null = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function engine(): Promise<any> {
-    if (!enginePromise) enginePromise = import('alasql').then((m) => (m as { default?: unknown }).default ?? m);
+    if (!enginePromise)
+        enginePromise = import('alasql').then((m) => {
+            const alasql = (m as { default?: unknown }).default ?? m;
+            registerStatAggregates(alasql); // the statistical Measure aggregates, DuckDB-named (D-AN5)
+            return alasql;
+        });
     return enginePromise;
 }
 

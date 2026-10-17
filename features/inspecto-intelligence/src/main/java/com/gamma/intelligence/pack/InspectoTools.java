@@ -1102,9 +1102,12 @@ final class InspectoTools {
 
     /** Accepted measure aggregations — input matched case-insensitively, stored in the canonical casing
      *  the viz compile step + {@code MeasureCompiler.Measure} expect. */
-    private static final Map<String, String> AGG_CANON = Map.of(
-            "count", "count", "countdistinct", "countDistinct", "sum", "sum",
-            "avg", "avg", "min", "min", "max", "max");
+    private static final Map<String, String> AGG_CANON = Map.ofEntries(
+            Map.entry("count", "count"), Map.entry("countdistinct", "countDistinct"), Map.entry("sum", "sum"),
+            Map.entry("avg", "avg"), Map.entry("min", "min"), Map.entry("max", "max"),
+            Map.entry("median", "median"), Map.entry("stddev", "stddev"), Map.entry("variance", "variance"),
+            Map.entry("p05", "p05"), Map.entry("p25", "p25"), Map.entry("p75", "p75"),
+            Map.entry("p90", "p90"), Map.entry("p95", "p95"), Map.entry("p99", "p99"));
 
     /**
      * AGT-5 P2 {@code kpi_report_builder} (author, L1): compose a KPI report from a dataset ref + a list of
@@ -1123,7 +1126,7 @@ final class InspectoTools {
                         + "tiling them — you never write widget/dashboard JSON. Returns the draft bundle to "
                         + "promote via component_apply (apply the widgets first, then the dashboard). Args: "
                         + "dataset (ref), title, measures ([{agg,field,label?}], agg in "
-                        + "count|countDistinct|sum|avg|min|max), groupBy (optional [field]), filter (optional).",
+                        + "count|countDistinct|sum|avg|min|max|median|stddev|variance|p05|p25|p75|p90|p95|p99), groupBy (optional [field]), filter (optional).",
                 "{\"type\":\"object\",\"properties\":{"
                         + "\"dataset\":{\"type\":\"string\"},"
                         + "\"title\":{\"type\":\"string\"},"

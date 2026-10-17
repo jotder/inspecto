@@ -51,6 +51,14 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
 
     private static final Logger log = LoggerFactory.getLogger(WorkingSetMeasures.class);
 
+    /**
+     * The aggregates this in-JVM evaluator applies — a SUBSET of {@link MeasureCompiler}'s grammar. The statistical
+     * aggregates (median, spread, percentiles; D-AN5) pass {@link DatasetMeasureProbe#validMeasure} but are refused
+     * here rather than re-implemented in Java: a second median or percentile definition is exactly the duplication
+     * the analytics core plan removes, and an unhandled name must never fall through to {@code max}.
+     */
+    static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max");
+
     /** The columns {@code sum}/{@code avg}/{@code min}/{@code max} may aggregate. */
     static final Set<String> NUMERIC = Set.of("hop", "opSeq", "count", "contacts");
 
@@ -77,6 +85,9 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
                     + "count/countDistinct/sum/avg/min/max, got '" + measure + "'");
         Map<String, Object> m = MeasureCompiler.splitShorthand(List.of(measure), null).get(0);
         String agg = String.valueOf(m.get("agg"));
+        if (!AGGS.contains(agg))
+            throw new IllegalArgumentException("measure '" + measure + "': the Working Set evaluates only "
+                    + AGGS + " — the statistical aggregates run in SQL over a Dataset");
         Object f = m.get("field");
         if (f == null) return OptionalDouble.of(rows.size());   // bare count
         String field = String.valueOf(f);

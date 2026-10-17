@@ -101,7 +101,7 @@ are `FunctionTool`s on the belt (now **14** non-mutating of 21 total), `mutating
   `InspectoTools.defaultViews()` (`-Dassist.write.root/views`); no `tools(...)` signature change.
 
 - **`kpi_report_builder`** (measures → a KPI report) — composes a dataset ref + a list of measures
-  (`{agg,field}`, agg ∈ `count|countDistinct|sum|avg|min|max`) into DRAFT `widget` components (one `kpi`
+  (`{agg,field}`, agg ∈ `count|countDistinct|sum|avg|min|max|median|stddev|variance|p05|p25|p75|p90|p95|p99`) into DRAFT `widget` components (one `kpi`
   per measure, or a single grouped `bar` chart when `groupBy` is given) **and** a DRAFT `dashboard` that
   tiles them — the model never writes widget/dashboard JSON. `controls` are built server-side to the exact
   persisted shape (`value` for kpi; `x`/`y`/`series` for charts, per real widget TOON); each draft is

@@ -16,7 +16,7 @@ describe('parseMeasures / formatMeasures', () => {
     it('KEEPS a value it cannot parse instead of dropping it', () => {
         // 🔴 The data-loss case: a hand-written TOON measure, or an aggregate the engine grows before the
         // UI does. Opening the pane and applying it unchanged must not delete the author's value.
-        const odd = ['median(x)', 'weird', 'sum(a) + 1'];
+        const odd = ['mode(x)', 'weird', 'sum(a) + 1'];
         const rows = parseMeasures(odd);
         expect(rows.every((r) => r.raw !== undefined)).toBe(true);
         expect(formatMeasures(rows)).toEqual(odd);
@@ -49,7 +49,7 @@ describe('measureRowError', () => {
     });
 
     it('reports an unparsed row through the SAME message the list validator uses', () => {
-        expect(measureRowError({ agg: '', field: '', raw: 'median(x)' })).toContain('is not an aggregate');
+        expect(measureRowError({ agg: '', field: '', raw: 'mode(x)' })).toContain('is not an aggregate');
     });
 
     it('rejects a column name the engine would refuse', () => {

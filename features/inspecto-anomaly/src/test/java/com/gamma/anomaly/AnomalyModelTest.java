@@ -85,7 +85,7 @@ class AnomalyModelTest {
 
     @Test
     void featureRefusals() {
-        refused(withFeature(f -> f.put("measure", "median(mb)")), "features[0]");
+        refused(withFeature(f -> f.put("measure", "mode(mb)")), "features[0]");
         refused(withFeature(f -> f.put("key", "msisdn; drop")), "must be a plain column/name token");
         refused(withFeature(f -> f.remove("time")), "features[0].time");
         refused(withFeature(f -> f.put("time", "msisdn")), "time must differ from key");

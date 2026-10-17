@@ -1022,7 +1022,7 @@ describe('PipelineConfigDefinitionComponent', () => {
 
         it('REFUSES Apply while a measure is invalid, rather than saving something the Job throws on', async () => {
             const fixture = await create({
-                node: { ...SUMMARIZE, config: { group_by: [], measures: ['median(x)'] } },
+                node: { ...SUMMARIZE, config: { group_by: [], measures: ['mode(x)'] } },
             });
             const applied: AuthoredNode[] = [];
             fixture.componentInstance.applied.subscribe((n: AuthoredNode) => applied.push(n));

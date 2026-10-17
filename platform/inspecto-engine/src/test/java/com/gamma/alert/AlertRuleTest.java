@@ -140,6 +140,23 @@ class AlertRuleTest {
                 "a measure alert has no ledger rows to scope");
     }
 
+    /** D-AN5: a Dataset Measure rule takes the statistical aggregates; an unknown name is still refused. */
+    @Test
+    void aMeasureRuleTakesTheStatisticalAggregatesAndRefusesAnUnknownOne() {
+        for (String agg : List.of("median", "stddev", "variance", "p05", "p25", "p75", "p90", "p95", "p99")) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("name", "spread");
+            m.put("dataset", "sales_ds");
+            m.put("measure", agg + "(amount)");
+            m.put("comparator", "gt");
+            m.put("threshold", 1000);
+            m.put("severity", "WARNING");
+            assertEquals(agg + "(amount)", AlertRule.fromMap(m).measure(), agg);
+            m.put("measure", "p42(amount)");
+            assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m), "p42 is not a Measure aggregate");
+        }
+    }
+
     /**
      * 🔴 A bare condition as the root used to match EVERY ledger row, and a non-map {@code when} (a string)
      * was silently dropped to "no filter" — either way the rule fired on rows it was meant to exclude.

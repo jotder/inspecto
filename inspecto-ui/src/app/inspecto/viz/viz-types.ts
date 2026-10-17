@@ -27,8 +27,24 @@ export interface VizField {
     expression?: string;
 }
 
-/** Aggregation a measure channel applies to its column (offline: compiled to AlaSQL aggregate fns). */
-export type Aggregation = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'countDistinct';
+/** Aggregation a measure channel applies to its column (offline: compiled to AlaSQL aggregate fns). The statistics
+ *  (D-AN5) are fixed names — a sample spread and continuous percentiles — so a Measure stays an `{agg, field}` pair. */
+export type Aggregation =
+    | 'sum'
+    | 'avg'
+    | 'min'
+    | 'max'
+    | 'count'
+    | 'countDistinct'
+    | 'median'
+    | 'stddev'
+    | 'variance'
+    | 'p05'
+    | 'p25'
+    | 'p75'
+    | 'p90'
+    | 'p95'
+    | 'p99';
 
 /** One measure in a {@link QuerySpec} — a stable id, a compiled SQL expression, and a display label. */
 export interface QueryMeasure {

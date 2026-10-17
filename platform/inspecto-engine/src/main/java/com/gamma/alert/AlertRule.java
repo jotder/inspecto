@@ -37,7 +37,8 @@ import java.util.Set;
  *   alert {
  *     name:       low-total-revenue
  *     dataset:    sales_ds                 # a dataset component id
- *     measure:    sum(amount)              # count | agg(field), agg ∈ count/countDistinct/sum/avg/min/max
+ *     measure:    sum(amount)              # count | agg(field), agg ∈ count/countDistinct/sum/avg/min/max/
+ *                                          #   median/stddev/variance/p05/p25/p75/p90/p95/p99
  *     comparator: lt
  *     threshold:  1000
  *     severity:   WARNING
@@ -314,6 +315,11 @@ public record AlertRule(String name, String metric, String comparator, double th
                     "alert.relation must be one of " + INVESTIGATION_RELATIONS);
             require(com.gamma.query.DatasetMeasureProbe.validMeasure(measure),
                     "alert.measure must be count or agg(field) with agg ∈ count/countDistinct/sum/avg/min/max");
+            // The Working Set is evaluated in the JVM (WorkingSetMeasures), which applies only the first six
+            // aggregates; refuse a statistical one (D-AN5) here rather than at every sweep.
+            require(WORKING_SET_AGGS.contains(measure.contains("(") ? measure.substring(0, measure.indexOf('(')) : measure),
+                    "alert.measure over a Working Set takes count/countDistinct/sum/avg/min/max — "
+                            + "median, stddev, variance and the percentiles run over a Dataset");
         } else if (maximumAge != null) {
             // Freshness rule (DUCKLE-C1): "this Dataset must have published within maximumAge".
             // It is evaluated on a CLOCK against the last dataset.write Signal, so none of the
@@ -359,7 +365,7 @@ public record AlertRule(String name, String metric, String comparator, double th
             require(window == null, "a measure alert (dataset:) takes no window (it reads current data)");
             require(when == null, "alert.when scopes ledger rows; a measure alert (dataset:) has none");
             require(com.gamma.query.DatasetMeasureProbe.validMeasure(measure),
-                    "alert.measure must be count or agg(field) with agg ∈ count/countDistinct/sum/avg/min/max");
+                    "alert.measure must be count or agg(field), agg a Measure aggregate (sum, avg, median, p95, …)");
         } else {
             require(measure == null, "alert.measure requires alert.dataset");
             require(metric != null && METRICS.contains(metric), "alert.metric must be one of " + METRICS);   // Set.of(..).contains(null) throws
@@ -610,6 +616,9 @@ public record AlertRule(String name, String metric, String comparator, double th
         require(v instanceof Map<?, ?>, "alert.valueMeasure must be a block {name, …}");
         return (Map<String, Object>) v;
     }
+
+    /** The subset the in-JVM Working Set evaluator applies (an Investigation alert). */
+    private static final Set<String> WORKING_SET_AGGS = Set.of("count", "countDistinct", "sum", "avg", "min", "max");
 
     private static void require(boolean ok, String message) {
         if (!ok) throw new IllegalArgumentException(message);

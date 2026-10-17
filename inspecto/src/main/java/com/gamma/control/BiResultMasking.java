@@ -54,8 +54,9 @@ import java.util.regex.Pattern;
  * unrestricted like every capability gate, EXCEPT the public share route, which passes {@code reveal=false} always.
  *
  * <p><b>Inference channels refused (422) for a caller who cannot reveal:</b> a filter, a {@code when} condition or an
- * ordering on a masked column (a prefix filter bisects raw values; an order leaks rank), and a {@code min / max / sum /
- * avg} measure over one (it returns a raw key per group). {@code count} / {@code countDistinct} stay allowed.
+ * ordering on a masked column (a prefix filter bisects raw values; an order leaks rank), and any measure over one that
+ * reads its values — {@code min / max / sum / avg}, the median, percentiles and spread ({@link #revealsValues}). {@code
+ * count} / {@code countDistinct} stay allowed.
  */
 final class BiResultMasking {
 
@@ -183,7 +184,7 @@ final class BiResultMasking {
 
     /**
      * 422 when the spec filters, conditions or orders on a masked column, or returns a raw key through
-     * {@code min / max / sum / avg}. A no-op unless {@link #engaged}. {@code checkFilters=false} is for the public share
+     * {@code min / max / sum / avg} or a statistic. A no-op unless {@link #engaged}. {@code checkFilters=false} is for the public share
      * route, whose flat {@code filters} are the SHARED DASHBOARD'S stored ones, not the recipient's.
      * {@code boundText} is a bound saved query's text (a Widget over a Query): its output names are the author's, so
      * when it names a masked column every column not declared clean is treated as possibly masked.
@@ -196,7 +197,7 @@ final class BiResultMasking {
         for (String field : whenFields(spec.when())) refuseIfMasked(field, "filtering", viaText);
         for (MeasureCompiler.Sort s : spec.orderBy()) refuseIfMasked(s.field(), "ordering", viaText);
         for (MeasureCompiler.Measure m : spec.measures())
-            if (m.field() != null && List.of("min", "max", "sum", "avg").contains(m.agg()))
+            if (m.field() != null && revealsValues(m.agg()))
                 refuseIfMasked(m.field(), m.agg() + " over", viaText);
     }
 
@@ -373,10 +374,19 @@ final class BiResultMasking {
         return k;
     }
 
-    /** {@code GET /kpis/{id}/value}: a Measure that returns a raw key (min / max / sum / avg of a masked column) is refused. */
+    /** {@code GET /kpis/{id}/value}: a Measure that reads a masked column's values ({@link #revealsValues}) is refused. */
     void vetMeasure(MeasureCompiler.Measure m) {
         if (!engaged() || m.field() == null) return;
-        if (List.of("min", "max", "sum", "avg").contains(m.agg())) refuseIfMasked(m.field(), m.agg() + " over", false);
+        if (revealsValues(m.agg())) refuseIfMasked(m.field(), m.agg() + " over", false);
+    }
+
+    /**
+     * Every aggregate but {@code count} / {@code countDistinct} reads the column's VALUES: {@code min / max / sum / avg}
+     * return a raw key per group, a median or percentile is one (or an interpolation between two), and a spread over a
+     * two-row group gives away their difference. Fail closed: an aggregate added to the grammar later is refused too.
+     */
+    static boolean revealsValues(String agg) {
+        return !"count".equals(agg) && !"countDistinct".equals(agg);
     }
 
     /** Columns a caller-supplied value is compared with (a rule template hole's {@code field}): a masked one is an oracle. */

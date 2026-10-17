@@ -323,7 +323,7 @@ class ControlApiAlertRuleWriteTest {
         invalid.put("bad window", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":1,\"window\":\"soon\"}");
         invalid.put("non-numeric threshold", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":\"lots\",\"window\":\"1h\"}");
         invalid.put("measure rule with a window", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"window\":\"1h\"}");
-        invalid.put("unknown aggregation", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"median(amount)\",\"threshold\":1}");
+        invalid.put("unknown aggregation", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"mode(amount)\",\"threshold\":1}");
         invalid.put("stormCap without by", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"stormCap\":5}");
         invalid.put("healAfterSweeps below 1", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"healAfterSweeps\":0}");
         invalid.put("healAfterSweeps absurdly high", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"healAfterSweeps\":100000}");

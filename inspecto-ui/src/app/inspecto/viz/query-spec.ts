@@ -8,10 +8,31 @@ import { Aggregation, ChannelValue, QueryMeasure, QuerySpec } from './viz-types'
  * filter semantics match the rule/query surfaces exactly.
  */
 
-/** The SQL aggregate for a measure channel's aggregation over a column (`count` ignores the column). */
+/** The fraction each fixed-name percentile asks for — the twin of `MeasureCompiler.PERCENTILES`. */
+const PERCENTILES: Partial<Record<Aggregation, string>> = {
+    p05: '0.05',
+    p25: '0.25',
+    p75: '0.75',
+    p90: '0.9',
+    p95: '0.95',
+    p99: '0.99',
+};
+
+/**
+ * The SQL aggregate for a measure channel's aggregation over a column (`count` ignores the column). The statistics
+ * are spelled the DuckDB way (`QUANTILE_CONT`, `STDDEV_SAMP`, `VAR_SAMP`); the offline engine gets the same names
+ * from `registerStatAggregates`. The median is `QUANTILE_CONT(x, 0.5)` rather than `MEDIAN(x)` because AlaSQL's own
+ * `MEDIAN` takes the upper middle value of an even count, where DuckDB averages the pair — the same number either way.
+ */
 export function aggExpression(agg: Aggregation, field: string): string {
     const id = quoteIdent(field);
+    const fraction = agg === 'median' ? '0.5' : PERCENTILES[agg];
+    if (fraction) return `QUANTILE_CONT(${id}, ${fraction})`;
     switch (agg) {
+        case 'stddev':
+            return `STDDEV_SAMP(${id})`;
+        case 'variance':
+            return `VAR_SAMP(${id})`;
         case 'count':
             return 'COUNT(*)';
         case 'countDistinct':

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { BAR_PLUGIN, TABLE_PLUGIN } from 'app/inspecto/viz/plugins';
 import { ControlValues, VizField } from 'app/inspecto/viz';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
 import { ExploreControlsComponent } from './explore-controls.component';
 
 const FIELDS: VizField[] = [
@@ -45,6 +46,11 @@ describe('ExploreControlsComponent', () => {
         c.valuesChange.subscribe((v) => (emitted = v));
         c.onAgg('y', 'avg');
         expect(emitted?.y).toEqual([{ field: 'duration_s', agg: 'avg' }]);
+    });
+
+    it('offers every aggregate the Measure grammar contract publishes', () => {
+        const c = create().componentInstance;
+        expect(c.aggs.map((o) => o.value).sort()).toEqual([...MEASURE_AGGS].sort());
     });
 
     it('binds a multi-select to the SAME array across change detections', () => {

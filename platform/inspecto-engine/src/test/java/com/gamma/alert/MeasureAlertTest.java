@@ -209,7 +209,7 @@ class MeasureAlertTest {
                 new AlertRule("x", null, "lt", 1, "1h", "WARNING", null, "ds", "sum(a)"),
                 "a measure rule takes no window");
         assertThrows(IllegalArgumentException.class, () ->
-                new AlertRule("x", null, "lt", 1, null, "WARNING", null, "ds", "median(a)"),
+                new AlertRule("x", null, "lt", 1, null, "WARNING", null, "ds", "mode(a)"),
                 "unknown aggregation");
         assertThrows(IllegalArgumentException.class, () ->
                 new AlertRule("x", null, "lt", 1, null, "WARNING", null, null, "sum(a)"),

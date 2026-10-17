@@ -525,6 +525,15 @@ reusable**: every Widget or KPI tile bound to the same Dataset picks from the sa
 instead of re-typing the aggregate. Reuse is per-Dataset, not global. The Dataset id is immutable
 after creation; the **History** button restores earlier versions.
 
+**Which aggregates a Measure can use** — wherever you write `count` or `agg(column)` (a Widget's
+aggregation picker, a KPI, an Alert Rule on a Dataset, a summarize Step, a Risk factor, an Anomaly
+feature): `count`, `countDistinct`, `sum`, `avg`, `min`, `max`, and the statistics `median`,
+`stddev`, `variance` and the percentiles `p05`, `p25`, `p75`, `p90`, `p95`, `p99` — for example
+`p95(latency_ms)`. The statistics take a numeric column. `stddev` and `variance` are the **sample**
+figures (what Excel's `STDEV` and `VAR` give), so a group with a single row has none; percentiles
+interpolate between the two nearest values, so `p95` of 10 and 30 is 29. An Alert Rule on an
+Investigation's Working Set takes only the first six.
+
 **Tracing lineage and provenance** — Three surfaces answer "where did this number come from," at
 different grains:
 

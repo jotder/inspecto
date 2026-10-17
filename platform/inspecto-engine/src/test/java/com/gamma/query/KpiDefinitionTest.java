@@ -67,7 +67,7 @@ class KpiDefinitionTest {
 
     @Test
     void aBadMeasureTimeFieldComparisonOrDirectionIsRefused() {
-        assertTrue(refusal(Map.of("measure", "median(amount)")).contains("'measure'"));
+        assertTrue(refusal(Map.of("measure", "mode(amount)")).contains("'measure'"));
         assertTrue(refusal(Map.of("measure", "sum(a; drop)")).contains("'measure'"));
         assertTrue(refusal(Map.of("timeField", "order date")).contains("'timeField'"));
         assertTrue(refusal(Map.of("comparison", "yesterday")).contains("unknown kpi comparison"));

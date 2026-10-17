@@ -97,7 +97,7 @@ class RiskScoreModelTest {
     @Test
     void theIndicatorIsCompiledAtSave() {
         Map<String, Object> f = factor();
-        f.put("measure", "median(amount)");
+        f.put("measure", "mode(amount)");
         assertTrue(refused(model(f)).contains("unknown aggregation"), "an aggregate the compiler lacks");
         f.put("measure", "sum(amount); DROP TABLE x");
         assertThrows(IllegalArgumentException.class, () -> RiskScoreModel.fromMap("s", model(f)));

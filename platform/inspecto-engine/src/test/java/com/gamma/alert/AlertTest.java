@@ -114,6 +114,11 @@ class AlertTest {
         assertEquals("Average of amount", Alert.measureLabel("avg(amount)"));
         assertEquals("Minimum of amount", Alert.measureLabel("min(amount)"));
         assertEquals("Maximum of amount", Alert.measureLabel("max(amount)"));
+        assertEquals("Median of amount", Alert.measureLabel("median(amount)"));
+        assertEquals("Standard deviation of amount", Alert.measureLabel("stddev(amount)"));
+        assertEquals("Variance of amount", Alert.measureLabel("variance(amount)"));
+        assertEquals("95th percentile of amount", Alert.measureLabel("p95(amount)"));
+        assertEquals("5th percentile of amount", Alert.measureLabel("p05(amount)"));
     }
 
     @Test

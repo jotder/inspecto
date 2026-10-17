@@ -207,8 +207,18 @@ class ControlApiBiQueryTest {
             assertEquals(404, biQuery(c.port,
                     "{\"dataset\":\"ghost\",\"measures\":[{\"agg\":\"count\"}]}").statusCode());
             assertEquals(422, biQuery(c.port,
-                    "{\"dataset\":\"sales_ds\",\"measures\":[{\"agg\":\"median\",\"field\":\"amount\"}]}").statusCode(),
+                    "{\"dataset\":\"sales_ds\",\"measures\":[{\"agg\":\"mode\",\"field\":\"amount\"}]}").statusCode(),
                     "unknown aggregation");
+            // D-AN5: a statistical aggregate is accepted and runs — EU's two amounts {10, 30}.
+            HttpResponse<String> stats = biQuery(c.port, "{\"dataset\":\"sales_ds\",\"measures\":["
+                    + "{\"agg\":\"median\",\"field\":\"amount\"},{\"agg\":\"p95\",\"field\":\"amount\"},"
+                    + "{\"agg\":\"stddev\",\"field\":\"amount\"}],\"groupBy\":[\"region\"]}");
+            assertEquals(200, stats.statusCode(), stats.body());
+            JsonNode eu = V1Body.of(stats.body()).get("rows").get(0);
+            assertEquals("EU", eu.get("region").asText());
+            assertEquals(20.0, eu.get("median_amount").asDouble(), 1e-9);
+            assertEquals(29.0, eu.get("p95_amount").asDouble(), 1e-9);
+            assertEquals(Math.sqrt(200), eu.get("stddev_amount").asDouble(), 1e-9);
             assertEquals(422, biQuery(c.port,
                     "{\"dataset\":\"sales_ds\"}").statusCode(), "empty spec");
             assertEquals(422, biQuery(c.port,

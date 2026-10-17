@@ -49,7 +49,7 @@ public record Alert(String rule, String severity, String pipeline, String metric
             "rejected_files", "Rejected files",
             "duration_ms", "Average duration (ms)");
 
-    private static final Pattern MEASURE = Pattern.compile("([A-Za-z]+)\\(([A-Za-z_][A-Za-z0-9_]*)\\)");
+    private static final Pattern MEASURE = Pattern.compile("([A-Za-z][A-Za-z0-9]*)\\(([A-Za-z_][A-Za-z0-9_]*)\\)");
 
     static Alert of(AlertRule r, String pipeline, double value, long epochMillis) {
         return of(r, pipeline, pipeline, value, epochMillis);
@@ -179,6 +179,10 @@ public record Alert(String rule, String severity, String pipeline, String metric
             case "avg" -> "Average";
             case "min" -> "Minimum";
             case "max" -> "Maximum";
+            case "median" -> "Median";
+            case "stddev" -> "Standard deviation";
+            case "variance" -> "Variance";
+            case "p05", "p25", "p75", "p90", "p95", "p99" -> Integer.parseInt(m.group(1).substring(1)) + "th percentile";
             default -> null;
         };
         return agg == null ? measure : agg + " of " + m.group(2);
