@@ -78,8 +78,13 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                             label="Dataset"
                             formControlName="dataset"
                             [options]="datasetOptions()"
-                            help="Only Datasets with a readable Schema."
+                            help="Pick a Dataset with a readable Schema."
                         ></inspecto-option-picker>
+                        @if (unreadable(i)) {
+                            <p class="text-warn text-xs sm:col-span-2" role="alert" data-testid="no-schema">
+                                This Dataset has no readable Schema — choose another.
+                            </p>
+                        }
                         <inspecto-option-picker
                             label="Entity key column"
                             formControlName="key"
@@ -301,6 +306,12 @@ export class AnomalyModelFeaturesComponent implements OnInit {
     private loadColumns(dataset: string): void {
         if (!dataset || this.columns()[dataset]) return;
         this.columnMetaFor(dataset).then((cols) => this.columns.update((m) => ({ ...m, [dataset]: cols })));
+    }
+
+    /** True once the row's Dataset was probed and offered no column. */
+    unreadable(i: number): boolean {
+        const ds = String(this.rows.at(i).value['dataset'] ?? '');
+        return !!ds && this.columns()[ds]?.length === 0;
     }
 
     columnOptions(i: number): PickerOption[] {
