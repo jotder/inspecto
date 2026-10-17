@@ -156,7 +156,7 @@ Inspecto Link Analysis avoids the "black box" machine learning trap common in le
 
 ### 3.1 The 29 in-process graph algorithms catalog
 
-The analytical engine (`inspecto-la-graph` in Java, with TypeScript parity in `graph-analysis.ts`) delivers 29 deterministic graph algorithms executing in-process over the active Working Set:
+The analytical engine (the platform graph library `inspecto-graph` in Java, with TypeScript parity in `graph-analysis.ts`) delivers 29 deterministic graph algorithms executing in-process over the active Working Set:
 
 | Category | Algorithm | Complexity | Primary Use Case & Forensic Relevance |
 | :--- | :--- | :--- | :--- |
@@ -273,7 +273,7 @@ The Link Analysis capability is divided across six core modules and a shared pla
                     │                                 │
                     ▼                                 ▼
       ┌───────────────────────────┐     ┌───────────────────────────┐
-      │     inspecto-la-graph     │     │ platform/inspecto-entity- │
+      │      inspecto-graph       │     │ platform/inspecto-entity- │
       │ (29 In-Process Algorithms,│     │           store           │
       │  InMemoryGraphEngine)     │     │  (Fact Log, Hash Chains)  │
       └───────────────────────────┘     └───────────────────────────┘
@@ -285,7 +285,7 @@ The Link Analysis capability is divided across six core modules and a shared pla
       └─────────────────────────────────────────────────────────────┘
 ```
 
-- **Clean Inversion of Control**: `inspecto-la-storage` and `inspecto-la-graph` contain **zero HTTP or UI dependencies**. Algorithms and storage primitives can be tested, benchmarked, and embedded entirely headless.
+- **Clean Inversion of Control**: `inspecto-la-storage` and `inspecto-graph` contain **zero HTTP or UI dependencies**. Algorithms and storage primitives can be tested, benchmarked, and embedded entirely headless.
 - **Architectural Linter Enforcement**: Module dependency arrows are strictly enforced by `tools/check-module-deps.mjs` and Maven `maven-enforcer-plugin`. Reverse imports (e.g., `la-core` attempting to import `la-storage` or `la-api`) immediately fail the CI build.
 - **Host Discovery via ServiceLoader**: The entire Link Analysis capability registers with the core Inspecto process via Java `ServiceLoader`. If the optional `inspecto-geo-link` module is omitted from the deployment classpath (as in the Personal edition), the core engine boots cleanly with zero link analysis footprint.
 

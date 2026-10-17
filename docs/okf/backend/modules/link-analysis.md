@@ -1,10 +1,10 @@
 ---
 type: Concept
 title: Link Analysis backend architecture (la/ modules, entity store, host wiring)
-description: How the Link Analysis backend is built - the six la/ modules plus platform/inspecto-entity-store, their dependency direction, the Investigation op log and store port (filesystem / Postgres), Drafts, masking, the link index (la-storage), Graph Run (la-graph + la-core), the /inv and /geo route layer, the request gate order, host registration, editions, audit, rate limits and live detection.
+description: How the Link Analysis backend is built - the five la/ modules plus platform/inspecto-entity-store and platform/inspecto-graph, their dependency direction, the Investigation op log and store port (filesystem / Postgres), Drafts, masking, the link index (la-storage), Graph Run (graph + la-core), the /inv and /geo route layer, the request gate order, host registration, editions, audit, rate limits and live detection.
 resource: la/
 tags: [module, link-analysis, investigation, index, graph-run, drafts, architecture]
-timestamp: 2026-10-09T00:00:00Z
+timestamp: 2026-10-17T00:00:00Z
 ---
 
 # Link Analysis backend architecture
@@ -107,15 +107,15 @@ entry at write time, so an index rebuild or a Dataset change cannot alter a reco
         │        │
         ▼        ▼
    la/inspecto-la-core   domain: op evaluator, InvestigationStore port + FS impl, Drafts store, Graph Run service, ports
-        │                (la-graph, entity-store, http/auth/audit-spi, config, sql, util)
-        ├── la/inspecto-la-graph      pure-Java graph algorithms, RunControl   (no inspecto deps; enforcer-fenced)
+        │                (graph, entity-store, http/auth/audit-spi, config, sql, util)
+        ├── platform/inspecto-graph   pure-Java graph algorithms, RunControl, UnionFind (Base; no inspecto deps; enforcer-fenced)
         └── platform/inspecto-entity-store   Entity Types, Entity Lists, Identity Fact log, MaskTokens, LinkAnalysisSettings
    la/inspecto-la-store-pg   Postgres InvestigationStore (ServiceLoader provider)   (la-core)
 ```
 
 | Module (manifest id) | Role | Key classes |
 |---|---|---|
-| `la-graph` | Leaf algorithm library, line-for-line port of the SPA's `graph-analysis.ts` | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `GraphPropagation` (server-only), `RunControl`, `GraphAborted` |
+| `graph` (platform, base) | Leaf algorithm library (package `com.gamma.graph`), line-for-line port of the SPA's `graph-analysis.ts`; not LA-only since D-AN2 (2026-10-17) — a core thin jar in every edition so Fraud, AML and Case Management can use it without Link Analysis | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `GraphPropagation` (server-only), `UnionFind`, `RunControl`, `GraphAborted` |
 | `la-core` (platform, optional, boot) | Domain + ports, no HTTP routes | `InvestigationEvaluator`, `InvestigationStore`/`InvestigationStores`/`FsInvestigationStore`, `InvestigationMembers`, `DraftStore`/`DraftLifecycle`/`DraftCheckpoints`/`DraftIndex`, `GraphRunService`, `GraphEngine`, `InMemoryGraphEngine`, `GraphInput`, `Algorithm`, `GraphBudget`, `LinkEventTypes`, ports `DatasetProvider`/`CasePort`/`CollectorCoveragePort` |
 | `la-storage` | The link index (D-3) and the index-backed engine | `IndexBuilder`, `IndexBuildService`, `IndexStore`, `IndexManifest`, `IndexMapping`, `IndexPlan`, `IndexReader`, `IndexPins`, `BucketFunction`, `IndexedTraversal`, `SqlGraphEngine`, `RoutingGraphEngine` |
 | `la-api` (feature `geoLink`) | HTTP surface and orchestration | 21 `RouteModule`s (below), `EntityMasking`, `InvestigationMemberStore`, `DraftAdmission`/`DraftRebase`/`DraftPromote`, `IndexedRead` + `Indexed*`, `IndexStaleness`, `IndexBuildServices`, `GraphRunServices`, `StandingDetection`, `ScheduledIndexBuild` |
@@ -426,7 +426,15 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
   authority = the Job's stamped `owner`, re-decided every run; runs the plan's advice only (`full` needs
   `allow_full`).
 
-## 5. Graph Run (la-graph + la-core + la-storage)
+## 5. Graph Run (graph + la-core + la-storage)
+
+* **What stays in LA, what is the platform's** (D-AN2, 2026-10-17). The algorithms take plain node/edge ids and an
+  edge-id → weight map, and live in `platform/inspecto-graph`. Link Analysis keeps the algorithm catalogue
+  (`Algorithm`), dispatch (`InMemoryGraphEngine`), the cost ceilings and budget (`GraphBudget`), and the
+  `"kind · N"` edge-label weight parse, `WorkingSetGraphInput.edgeWeight` (la-core; pinned by `EdgeWeightParityTest`
+  against `graph-paths-parity.fixture.json`). `GraphSuspicion` stays in the library: it is the generic weighted blend
+  of five graph factors (default weight 1 each) with no LA preset in it. The TypeScript twins and the parity fixtures
+  stay under `inspecto-ui/projects/link-analysis/src/graph/`; the Java parity tests read them from there.
 
 * **Input** is a sealed `GraphInput`: `Materialised` (from the Working Set, `WorkingSetGraphInput`) or `IndexRef`.
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`
@@ -620,7 +628,7 @@ Plan archived: [`la-entity-profile-plan`](../../../archived-documents/plans-arch
 
 | | Personal | Standard | Professional | Preview | Enterprise |
 |---|---|---|---|---|---|
-| la-graph, la-core, la-storage, la-api, geo-link | — | ✓ | ✓ | ✓ | ✓ |
+| la-core, la-storage, la-api, geo-link | — | ✓ | ✓ | ✓ | ✓ |
 | la-store-pg (Postgres Investigations) | — | — | — | ✓ | ✓ |
 | D-E7 PDP (`providers/inspecto-policy`) | — | — | — | ✓ | ✓ |
 

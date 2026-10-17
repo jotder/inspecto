@@ -4,7 +4,7 @@ import com.gamma.la.core.GraphRunService.Limits;
 import com.gamma.la.core.GraphRunService.Request;
 import com.gamma.la.core.GraphRunService.RunView;
 import com.gamma.la.core.GraphRunService.Status;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.RunControl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

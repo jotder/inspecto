@@ -46,6 +46,8 @@
         <module>platform/inspecto-util</module>
         <module>platform/inspecto-config</module>
         <module>platform/inspecto-sql</module>
+        <!-- D-AN2 (analytics core plan, M8): the graph library, JDK only, a core thin jar in every edition. -->
+        <module>platform/inspecto-graph</module>
         <module>platform/inspecto-etl</module>
         <module>spi/inspecto-audit-spi</module>
         <module>spi/inspecto-auth-spi</module>
@@ -109,7 +111,6 @@
                 <module>la/inspecto-la-core</module>
                 <module>la/inspecto-la-api</module>
                 <module>la/inspecto-geo-link</module>
-                <module>la/inspecto-la-graph</module>
                 <module>la/inspecto-la-storage</module>
                 <!-- EDG-01 cell 4 (2026-09-07): cross-space exchange / sharing. SEC-10 is "not for Personal";
                      the com.gamma.exchange domain + ExchangeRoutes lived in the core. -->
@@ -164,7 +165,6 @@
                 <module>la/inspecto-la-core</module>
                 <module>la/inspecto-la-api</module>
                 <module>la/inspecto-geo-link</module>
-                <module>la/inspecto-la-graph</module>
                 <module>la/inspecto-la-storage</module>
                 <module>features/inspecto-exchange</module>
                 <module>features/inspecto-observability</module>
@@ -210,7 +210,6 @@
                 <module>la/inspecto-la-core</module>
                 <module>la/inspecto-la-api</module>
                 <module>la/inspecto-geo-link</module>
-                <module>la/inspecto-la-graph</module>
                 <module>la/inspecto-la-storage</module>
                 <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
                 <module>la/inspecto-la-store-pg</module>
@@ -251,7 +250,6 @@
                 <module>la/inspecto-la-core</module>
                 <module>la/inspecto-la-api</module>
                 <module>la/inspecto-geo-link</module>
-                <module>la/inspecto-la-graph</module>
                 <module>la/inspecto-la-storage</module>
                 <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
                 <module>la/inspecto-la-store-pg</module>
@@ -458,6 +456,11 @@
             <dependency>
                 <groupId>com.gamma.inspector</groupId>
                 <artifactId>inspecto-entity-store</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-graph</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

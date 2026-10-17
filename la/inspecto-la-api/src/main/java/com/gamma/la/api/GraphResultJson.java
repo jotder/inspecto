@@ -3,12 +3,12 @@ package com.gamma.la.api;
 import com.gamma.la.core.Algorithm;
 import com.gamma.la.core.GraphResult;
 import com.gamma.la.core.LinkIds;
-import com.gamma.la.graph.GraphAlgorithms.Score;
-import com.gamma.la.graph.GraphAlgorithms.Selection;
-import com.gamma.la.graph.GraphCentrality.PredictedLink;
-import com.gamma.la.graph.GraphPropagation.Factor;
-import com.gamma.la.graph.GraphPropagation.Risk;
-import com.gamma.la.graph.GraphSuspicion.Suspicion;
+import com.gamma.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Selection;
+import com.gamma.graph.GraphCentrality.PredictedLink;
+import com.gamma.graph.GraphPropagation.Factor;
+import com.gamma.graph.GraphPropagation.Risk;
+import com.gamma.graph.GraphSuspicion.Suspicion;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -245,7 +245,7 @@ final class GraphResultJson {
             }
             case GraphResult.SubGraph p -> {
                 List<Object> nodes = new ArrayList<>();
-                List<com.gamma.la.graph.GraphAlgorithms.Node> keptNodes = cap.cut("nodes", p.graph().nodes(), true);
+                List<com.gamma.graph.GraphAlgorithms.Node> keptNodes = cap.cut("nodes", p.graph().nodes(), true);
                 keptNodes.forEach(n -> {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("id", ids.node(n.id()));
@@ -254,8 +254,8 @@ final class GraphResultJson {
                 });
                 // An edge whose endpoint node was cut would dangle: keep only edges with both endpoints returned, and say
                 // so in lists.edges (total = every edge of the result, returned = what is here).
-                List<com.gamma.la.graph.GraphAlgorithms.Edge> allEdges = p.graph().edges();
-                List<com.gamma.la.graph.GraphAlgorithms.Edge> reachable = allEdges;
+                List<com.gamma.graph.GraphAlgorithms.Edge> allEdges = p.graph().edges();
+                List<com.gamma.graph.GraphAlgorithms.Edge> reachable = allEdges;
                 if (keptNodes.size() < p.graph().nodes().size()) {
                     java.util.Set<String> keptIds = new java.util.HashSet<>();
                     keptNodes.forEach(n -> keptIds.add(n.id()));

@@ -1,6 +1,0 @@
----
-id: la-graph
-title: Link analysis graph algorithms
-buildRole: platform
-offeringRole: optional
-bindingTime: build

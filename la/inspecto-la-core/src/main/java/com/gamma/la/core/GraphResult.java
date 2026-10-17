@@ -1,12 +1,12 @@
 package com.gamma.la.core;
 
-import com.gamma.la.graph.GraphAlgorithms.Graph;
-import com.gamma.la.graph.GraphAlgorithms.Score;
-import com.gamma.la.graph.GraphAlgorithms.Selection;
-import com.gamma.la.graph.GraphCentrality.PredictedLink;
-import com.gamma.la.graph.GraphPaths.MaxFlowResult;
-import com.gamma.la.graph.GraphPropagation.Risk;
-import com.gamma.la.graph.GraphSuspicion.Suspicion;
+import com.gamma.graph.GraphAlgorithms.Graph;
+import com.gamma.graph.GraphAlgorithms.Score;
+import com.gamma.graph.GraphAlgorithms.Selection;
+import com.gamma.graph.GraphCentrality.PredictedLink;
+import com.gamma.graph.GraphPaths.MaxFlowResult;
+import com.gamma.graph.GraphPropagation.Risk;
+import com.gamma.graph.GraphSuspicion.Suspicion;
 
 import java.util.List;
 import java.util.Map;
@@ -16,9 +16,9 @@ import java.util.Map;
  * dangling edges the input dropped ({@link GraphInput#droppedDangling()} — carried so a result never hides a smaller
  * graph than the one asked about), and the wall-clock the run took.
  *
- * <p>Orders are la-graph's, which are canonical-v1 (score descending, then id code units, then label — one comparator in
+ * <p>Orders are inspecto-graph's, which are canonical-v1 (score descending, then id code units, then label — one comparator in
  * TypeScript and Java), so the same ranking comes back wherever the algorithm ran. The value records inside the
- * payloads are la-graph's own ({@code Score}, {@code Selection}, …): they are the parity-tested shapes.
+ * payloads are inspecto-graph's own ({@code Score}, {@code Selection}, …): they are the parity-tested shapes.
  */
 public record GraphResult(Algorithm algorithm, Payload payload, int dropped, long elapsedMs) {
 

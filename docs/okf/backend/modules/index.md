@@ -39,6 +39,7 @@ module (build role · offering role · binding time) and the Offerings that comp
 * `platform/inspecto-access/` — access policy: roles, grants, row scope, audit trail (`access`).
 * `platform/inspecto-acquire/` — `com.gamma.acquire`: Collectors, connection profiles/registry/workbench, fingerprint ledger, stability gate, retry/circuit-breaker (`acquire`).
 * `platform/inspecto-entity-store/` — the entity store (`entity-store`).
+* `platform/inspecto-graph/` — the graph library (`com.gamma.graph`, JDK only): path, centrality, community, structure and flow algorithms, `UnionFind`, `RunControl`; moved out of Link Analysis by D-AN2, 2026-10-17 — see [Link Analysis](link-analysis.md) §5 (`graph`).
 * `platform/inspecto-engine/` — the engine cluster: `signal`/`query`/`pipeline`/`inspector`/`ingester`/`ops`/`job`/`enrich`/`alert`/`notify`/`catalog`/`decision` (`engine`).
 
 ## `features/` — optional modules (offeringRole optional)
@@ -60,7 +61,7 @@ module (build role · offering role · binding time) and the Offerings that comp
 
 ## `la/` — link analysis (optional)
 
-* `la/inspecto-la-graph/` — graph algorithms (`la-graph`). `la/inspecto-la-core/` — core and ports (`la-core`). `la/inspecto-la-storage/` — storage (`la-storage`). `la/inspecto-la-api/` — link-analysis and geo routes (`la-api`; feature `geoLink`). `la/inspecto-geo-link/` — geo and link adapters over platform data (`geo-link`). `la/inspecto-la-store-pg/` — the PostgreSQL store (`la-store-pg`, Enterprise provider).
+* `la/inspecto-la-core/` — core and ports (`la-core`). `la/inspecto-la-storage/` — storage (`la-storage`). `la/inspecto-la-api/` — link-analysis and geo routes (`la-api`; feature `geoLink`). `la/inspecto-geo-link/` — geo and link adapters over platform data (`geo-link`). `la/inspecto-la-store-pg/` — the PostgreSQL store (`la-store-pg`, Enterprise provider).
 
 ## `providers/` — implementations chosen by deployment profile (offeringRole provider)
 

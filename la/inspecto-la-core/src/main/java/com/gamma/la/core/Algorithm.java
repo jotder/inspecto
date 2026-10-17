@@ -10,7 +10,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * The catalogue of the 29 graph algorithms the server can run (LA separation D-4; the ports in {@code inspecto-la-graph},
+ * The catalogue of the 29 graph algorithms the server can run (LA separation D-4; the ports in {@code inspecto-graph},
  * D-S4). One constant per ported function; {@link #id()} is the TypeScript export name, so the browser, the wire and the
  * Java port speak one name. The 29th, {@link #PROPAGATED_RISK}, is server-side only (no TypeScript twin).
  *

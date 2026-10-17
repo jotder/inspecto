@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * kinds and their row counts), the de-duplication and placeholder rules of docs/superpower/la-multi-vertical-showcase-plan.md
  * section 4, and the planted figures that live in tables rather than in the graph (early-claim policies, the near-duplicate
  * pair NOT linked by phone). The graph-side plants (Louvain, cliques, HITS ...) are pinned by {@code LaClaimsGoldenTest} in
- * inspecto-la-graph over the same link counts.
+ * inspecto-graph over the same link counts.
  */
 class LaClaimsLinksJobTest {
 

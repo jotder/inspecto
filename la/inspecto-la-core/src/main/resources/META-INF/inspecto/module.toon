@@ -5,4 +5,4 @@ buildRole: platform
 offeringRole: optional
 bindingTime: boot
 requires:
-  modules[1]: la-graph
+  modules[1]: graph

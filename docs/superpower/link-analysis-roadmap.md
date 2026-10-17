@@ -47,7 +47,7 @@ Drawn from: `archived-documents/plans-archive/la-separation-feasibility-plan.md`
 | D-1 shared platform layer | done |
 | D-2 spikes D-S1..S5 | mostly measured; D-S2 dropped; 10^9 axis OPEN (`LA-INDEX-SCALE-MEASURE-1` (3)) |
 | D-3 `la-storage` index + `la-data` | Path A steps 1-8 built; index OFF by default; 5-level index walk FAILED the 1.5 s criterion in the spike (path narrowed); SPA surfaces + scale measure open (`LA-INDEX-SPA-SURFACES-1`, `LA-INDEX-SCALE-MEASURE-1`) |
-| D-4 `la-graph` server-side algorithms | done; remainder is `LA-GRAPH-RUN-*` rows |
+| D-4 `la-graph` server-side algorithms (now `platform/inspecto-graph`, D-AN2) | done; remainder is `LA-GRAPH-RUN-*` rows |
 | D-5 `la-app` host + SPA shell + product flavor | steps 1-7 built; real IdP sign-in unverified (`LA-APP-REAL-SIGNIN-1`) |
 | D-6 integration | references + Dossier bundle built; embeddable view OPEN (`LA-EMBED-VIEW-1`); I1 machine-to-machine trust not built (no live call needs it) |
 | D-7 Drafts | backend D7-1..D7-7 built 2026-10-03/04; open remainder in section 2 |

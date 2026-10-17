@@ -274,7 +274,7 @@ jobs:
       - name: Tools — java-closure and compile-clean fixture tests
         run: node --test tools/java-closure.test.mjs tools/compile-clean.test.mjs tools/check-native-licences.test.mjs
 
-      # Extracted-module dependency guard (LA separation D-1, Decision 5). The SPI modules and inspecto-la-graph exist so
+      # Extracted-module dependency guard (LA separation D-1, Decision 5). The SPI modules and inspecto-graph exist so
       # Link Analysis can stand on a thin platform layer without the core; one convenient <dependency> on
       # inspecto-processor / -engine / -etl / -acquire / -event undoes that silently. This derives each governed module's
       # transitive reach from the poms (test scope exempt) and fails if it leaves its allowlist, if the module lacks its

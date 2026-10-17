@@ -9,7 +9,7 @@ Writes under spaces/_templates/la-mobile-money/data/:
   staged/wallet_txn/WALLET_TXN_20261017.csv        a GAP day (20261016 is missing -> a delivery-gap signal)
 
 The plan is docs/superpower/la-multi-vertical-showcase-plan.md, vertical A ("the agent who never sleeps"). Seven planted
-stories, each pinned by LaMobileMoneyGoldenTest (la/inspecto-la-graph):
+stories, each pinned by LaMobileMoneyGoldenTest (platform/inspecto-graph):
 
   1 agent-assisted structuring   AG-18 cashes in for 25 wallets (STRUCT-01..25) inside 36 h, every amount in the top 5 %
                                  band under the Tier-1 limit 5 000 (4 750 <= amount < 5 000); each wallet pays the hub

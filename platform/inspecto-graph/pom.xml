@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-graph</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Graph algorithms (graph, base)</name>
+    <description>
+        The platform graph library: shortest and weighted paths, centrality, PageRank, Louvain, k-core, cliques, link
+        prediction, max-flow, propagated risk, the suspicion blend and RunControl, over plain node and edge ids. A
+        server-side port of the Link Analysis SPA's graph algorithms, carved out of inspecto-geo-link (LA separation D-1)
+        and moved out of the la/ family into the platform by the analytics core plan (D-AN2, M8) so Fraud, AML and
+        Case Management can use it without depending on Link Analysis. Plain JDK: NO dependency on any inspecto module.
+        Link Analysis keeps its algorithm catalogue, cost ceilings and the "kind · N" edge-label weight parse (la-core).
+
+        A core thin jar in every edition (tools/bundle-modules.mjs CORE_MODULES). The parity tests read their fixtures
+        from ../../inspecto-ui/projects/link-analysis/src/graph, where the TypeScript twins read them too.
+    </description>
+
+    <dependencies>
+        <!-- Tests only: the parity tests parse the shared JSON fixtures. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- LA separation D-1 (Decision 5), kept by D-AN2: this module may reach ONLY the inspecto-* modules below, directly or
+                 transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
+                 poms and fails if this list drifts from its ALLOWED table. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>platform-layer-deps</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.gamma.inspector:*:*:*:compile</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:provided</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <includes>
+
+                                    </includes>
+                                    <message>inspecto-graph may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (none: it is the JDK only). A host module here silently undoes the extraction.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

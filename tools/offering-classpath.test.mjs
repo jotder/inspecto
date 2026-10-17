@@ -23,24 +23,25 @@ const short = (jars) => jars.filter((j) => !CORE_JARS.includes(j)).map((j) => (j
 // (a throwaway script parsed the run.sh / serve.sh here-strings, the boot-smoke `$cp = @(...)` literal and the
 // `$demoJars` literal, and applied each file-presence test over the jars each edition stages). Frozen here so the
 // generator is held against what the launchers actually did, not against a comment.
+// D-AN2 (2026-10-17): `la-graph` dropped out of these strings when the graph library became the core thin jar inspecto-graph.
 const OLD = {
     serve: {   // serve.sh == serve.bat: the control plane's classpath, and the order the generator preserves EXACTLY.
         Personal: 'processor connectors',
-        Professional: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 connectors notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent postgresql',
-        Enterprise: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 policy connectors notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql',
+        Professional: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 connectors notify-channels backup entity-list la-storage la-core la-api geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent postgresql',
+        Enterprise: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 policy connectors notify-channels backup entity-list la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql',
     },
     run: {     // run.sh == run.bat: oidc group LAST, and NO inspecto-policy.
         Personal: 'processor connectors',
-        Professional: 'processor connectors notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
-        Enterprise: 'processor connectors notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
+        Professional: 'processor connectors notify-channels backup entity-list la-storage la-core la-api geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
+        Enterprise: 'processor connectors notify-channels backup entity-list la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
     },
     smoke: {   // the boot-smoke `$cp` literal: connectors before kafka/asn1, policy before connectors.
         Personal: 'processor connectors',
-        Professional: 'processor oidc secrets geo-country connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent postgresql',
-        Enterprise: 'processor oidc secrets geo-country policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql',
+        Professional: 'processor oidc secrets geo-country connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-storage la-core la-api geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent postgresql',
+        Enterprise: 'processor oidc secrets geo-country policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql',
     },
-    demo: 'processor demo-auth policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql',
-    demoSmoke: 'processor policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql demo-auth',
+    demo: 'processor demo-auth policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql',
+    demoSmoke: 'processor policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management action-requests regulatory-reporting reconciliation scoring screening anomaly agent intelligence postgresql demo-auth',
 };
 const sorted = (s) => s.split(' ').sort().join(' ');
 
@@ -144,7 +145,7 @@ test('P3d stage 2: every edition carries the core thin jars, directly behind ins
         assert.deepEqual(cp.slice(1, 1 + CORE_JARS.length), CORE_JARS, `${ed}: the core jars follow the product jar in CORE_MODULES order`);
         assert.equal(new Set(cp).size, cp.length, `${ed}: no jar twice`);
     }
-    assert.equal(CORE_JARS.length, 15);
+    assert.equal(CORE_JARS.length, 16);   // 14 until ANALYTICS-CORE-1 added inspecto-analytics and D-AN2 (2026-10-17) added inspecto-graph
 });
 
 test('RED: a core jar with no place in CLASSPATH_ORDER fails', () => {

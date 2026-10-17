@@ -67,6 +67,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `entity-store` - Entity store | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `etl` - ETL model and step registry | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `event` - Event model and log | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `graph` - Graph algorithms | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `sql` - SQL guard and helpers | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `util` - Utilities, DuckDB access, TOON helpers, module manifests | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 | `workflow` - Workflow and SLA models | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
@@ -86,8 +87,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | `screening` - Screening | features | optional | `entity-list`, `ops` | — | ✅ | ✅ | ✅ |
 | `geo-link` - Geo and link adapters over platform data | la | optional | `la-api`, `la-core` | — | ✅ | ✅ | ✅ |
 | `la-api` - Link analysis and geo routes | la | optional | `la-core`, `la-storage` | — | ✅ | ✅ | ✅ |
-| `la-core` - Link analysis core and ports | la | optional | `la-graph` | — | ✅ | ✅ | ✅ |
-| `la-graph` - Link analysis graph algorithms | la | optional | — | — | ✅ | ✅ | ✅ |
+| `la-core` - Link analysis core and ports | la | optional | `graph` | — | ✅ | ✅ | ✅ |
 | `la-storage` - Link analysis storage | la | optional | `la-core` | — | ✅ | ✅ | ✅ |
 | `la-store-pg` - Link analysis PostgreSQL store | la | provider | `la-core` | — | — | ✅ | ✅ |
 | `agent-hosted` - Hosted model providers for the assistant | providers | provider | `agent` | — | — | — | — |
@@ -113,7 +113,7 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 | caseManagement | `case-management` | — | built | built | built |
 | incidents | planned in `engine`, `ops` | — | planned | planned | planned |
 | integrationDelivery | `notify-channels` | — | built | built | built |
-| linkAnalysis | `la-graph`, `la-storage`, `la-core`, `la-api`, `geo-link` | — | built | built | built |
+| linkAnalysis | `la-storage`, `la-core`, `la-api`, `geo-link` | — | built | built | built |
 | multiEntity | `exchange` | — | built | built | built |
 | premiumConnectors | `connectors-kafka` | — | built | built | built |
 | reconciliation | `reconciliation` | — | built | built | built |
@@ -136,10 +136,10 @@ source for them yet (see `docs/okf/backend/module-reorganisation-decisions.md`, 
 
 | | Personal | Professional | Enterprise | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 17 | 41 | 44 | 44 |
-| of which core thin jars | 15 | 15 | 15 | 15 |
-| Optional modules beyond Personal | 0 | 24 | 27 | 27 |
-| Total on the classpath (+ third-party sidecars) | 17 | 42 | 45 | 45 |
+| First-party jars (processor + connectors + optional + core thin) | 18 | 41 | 44 | 44 |
+| of which core thin jars | 16 | 16 | 16 | 16 |
+| Optional modules beyond Personal | 0 | 23 | 26 | 26 |
+| Total on the classpath (+ third-party sidecars) | 18 | 42 | 45 | 45 |
 <!-- offerings-matrix:end -->
 
 ## Preview — not a customer-facing tier

@@ -16,7 +16,7 @@ import com.gamma.la.core.GraphInput;
 import com.gamma.la.core.GraphResult;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.LinkIds;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.RunControl;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;

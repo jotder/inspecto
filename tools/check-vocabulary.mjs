@@ -538,7 +538,7 @@ const SOURCE_ALLOW = {
         'The label of that same algorithm ("Max flow / min cut") — the graph-theory term an analyst expects, nothing to do with a Pipeline.',
     'la/inspecto-la-core/src/main/java/com/gamma/la/core/InMemoryGraphEngine.java::flow-identifier':
         'Dispatches to GraphPaths.maxFlow — the max-flow/min-cut algorithm, the only correct name for it.',
-    'la/inspecto-la-graph/src/main/java/com/gamma/la/graph/GraphPaths.java::flow-identifier':
+    'platform/inspecto-graph/src/main/java/com/gamma/graph/GraphPaths.java::flow-identifier':
         'The Java port of graph-analysis.ts maxFlow — the same **max-flow/min-cut** algorithm, kept under the same name so the parity fixture reads identically on both sides.',
     'inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-toolbox.component.html::flow-identifier':
         'The template half of the max-flow toolbox below (flowFrom/flowTo/runFlow) — same algorithmic sense.',

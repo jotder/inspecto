@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * LA-DEMO-SEED-1 (DR-S2, S3, S6, S7): the {@code la-showcase} Space Template's settings, Jobs, personas and its
  * feature-off companion, read with the REAL loaders ({@link LinkAnalysisSettings}, {@link JobConfig}, {@link Roles},
- * {@code ModuleSettings}). The corpus ranking is pinned by {@code LaShowcaseGoldenTest} in inspecto-la-graph.
+ * {@code ModuleSettings}). The corpus ranking is pinned by {@code LaShowcaseGoldenTest} in inspecto-graph.
  */
 class LaShowcaseTemplateTest {
 

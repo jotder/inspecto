@@ -60,7 +60,6 @@ const MODULES = [
     { artifactId: 'inspecto-notify-channels', dir: 'providers/inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'professional' },
     { artifactId: 'inspecto-backup', dir: 'features/inspecto-backup', bundleFile: 'inspecto-backup.jar', from: 'professional' },        // cell 2 (OPS-06)
     { artifactId: 'inspecto-entity-list', dir: 'features/inspecto-entity-list', bundleFile: 'inspecto-entity-list.jar', from: 'professional' },  // SEP-08 (Entity Lists + the shared fact log; geo-link depends on it)
-    { artifactId: 'inspecto-la-graph', dir: 'la/inspecto-la-graph', bundleFile: 'inspecto-la-graph.jar', from: 'professional' },  // LA separation D-4 step 4 (the ported graph algorithms - la-core's InMemoryGraphEngine calls them, so they ship)
     { artifactId: 'inspecto-la-storage', dir: 'la/inspecto-la-storage', bundleFile: 'inspecto-la-storage.jar', from: 'professional' },  // LA separation D-3 step 2 (the index store skeleton; la-api depends on it from a later step, staged now so the jar and the classpaths are consistent)
     { artifactId: 'inspecto-la-core', dir: 'la/inspecto-la-core', bundleFile: 'inspecto-la-core.jar', from: 'professional' },    // LA separation D-1 step 5b (host-free Link Analysis model + the Dataset/Case ports)
     { artifactId: 'inspecto-la-api', dir: 'la/inspecto-la-api', bundleFile: 'inspecto-la-api.jar', from: 'professional' },       // LA separation D-1 step 5b (the Link Analysis routes, written against the ports)
@@ -100,6 +99,7 @@ const MODULES = [
  */
 export const CORE_MODULES = [
     { artifactId: 'inspecto-api', dir: 'platform/inspecto-api' },
+    { artifactId: 'inspecto-graph', dir: 'platform/inspecto-graph' },   // D-AN2 (analytics core plan, M8): the graph library, JDK only; was the optional la-graph
     { artifactId: 'inspecto-util', dir: 'platform/inspecto-util' },
     { artifactId: 'inspecto-config', dir: 'platform/inspecto-config' },
     { artifactId: 'inspecto-sql', dir: 'platform/inspecto-sql' },
@@ -129,7 +129,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 26, Enterprise 29, Preview 29 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 25, Enterprise 28, Preview 28 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

@@ -4,7 +4,7 @@ import com.gamma.la.core.Algorithm;
 import com.gamma.la.core.GraphEngine;
 import com.gamma.la.core.GraphInput;
 import com.gamma.la.core.GraphResult;
-import com.gamma.la.graph.RunControl;
+import com.gamma.graph.RunControl;
 
 import java.util.Map;
 import java.util.Set;

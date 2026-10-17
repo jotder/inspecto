@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The {@code la-mobile-money} Space Template's settings, Jobs, personas and saved views, read with the REAL loaders
  * ({@link LinkAnalysisSettings}, {@link JobConfig}, {@link Roles}). The corpus promises are pinned by
- * {@code LaMobileMoneyGoldenTest} (inspecto-la-graph) and {@code MmLinksJobGoldenTest} (inspecto-engine).
+ * {@code LaMobileMoneyGoldenTest} (inspecto-graph) and {@code MmLinksJobGoldenTest} (inspecto-engine).
  */
 class LaMobileMoneyTemplateTest {
 

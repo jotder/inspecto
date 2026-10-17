@@ -31,10 +31,10 @@ import { reactorModuleDirs } from './reactor-modules.mjs';
 export const TABLE = {
     spi: ['inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi'],                                   // buildRole contract
     platform: ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-sql', 'inspecto-etl', 'inspecto-event', 'inspecto-workflow', 'inspecto-analytics', 'inspecto-access',
-               'inspecto-acquire', 'inspecto-entity-store', 'inspecto-engine'],                              // buildRole foundation|platform, offeringRole base
+               'inspecto-acquire', 'inspecto-entity-store', 'inspecto-engine', 'inspecto-graph'],                              // buildRole foundation|platform, offeringRole base
     features: ['inspecto-agent', 'inspecto-backup', 'inspecto-entity-list', 'inspecto-exchange', 'inspecto-intelligence', 'inspecto-observability',
                'inspecto-ops', 'inspecto-reconciliation', 'inspecto-scoring'],                               // implementation + offeringRole optional
-    la: ['inspecto-la-core', 'inspecto-la-api', 'inspecto-la-graph', 'inspecto-la-storage', 'inspecto-la-store-pg', 'inspecto-geo-link'], // the Link Analysis family (geo-link is its bridge)
+    la: ['inspecto-la-core', 'inspecto-la-api', 'inspecto-la-storage', 'inspecto-la-store-pg', 'inspecto-geo-link'], // the Link Analysis family (geo-link is its bridge)
     providers: ['inspecto-agent-hosted', 'inspecto-connectors', 'inspecto-connectors-kafka', 'inspecto-demo-auth', 'inspecto-geo-country',
                 'inspecto-notify-channels', 'inspecto-oidc', 'inspecto-policy', 'inspecto-secrets', 'inspecto-telecom-asn1',
                 'asn-parser'],                                                                               // implementation + offeringRole provider; asn-parser = nested reactor, moves as a unit
