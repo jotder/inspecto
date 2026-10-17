@@ -28,7 +28,7 @@ import java.util.Map;
  * {@code sample.hello}. An absent service fails the Run closed: evaluation is the whole work, and
  * silently succeeding would report health that was never checked.
  *
- * <p>Optional {@code rule} narrows a fire to one rule by name; absent, every rule evaluates.
+ * <p>Optional {@code rule} evaluates ONLY that rule (unknown name fails the Run); absent, every rule evaluates.
  */
 final class AlertEvaluateJob implements Job {
 
@@ -70,16 +70,17 @@ final class AlertEvaluateJob implements Job {
         // (and none) means the full sweep, so an unset scope keeps today's behaviour exactly.
         String scope = ctx.params().get("scope");
         boolean freshnessOnly = scope != null && "freshness".equalsIgnoreCase(scope.trim());
-        List<Alert> fired = freshnessOnly ? alerts.evaluateFreshnessRules() : alerts.evaluateRules();
-        if (only != null && !only.isBlank())
-            fired = fired.stream().filter(a -> only.equalsIgnoreCase(a.rule())).toList();
+        boolean scoped = only != null && !only.isBlank();
+        // `rule` evaluates ONLY that rule (an unknown name fails the Run); it wins over `scope`.
+        List<Alert> fired = scoped ? alerts.evaluateRule(only.trim())
+                : freshnessOnly ? alerts.evaluateFreshnessRules() : alerts.evaluateRules();
 
         List<String> names = fired.stream().map(Alert::rule).distinct().toList();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("job", cfg.name());
         payload.put("fired", fired.size());
         payload.put("rules", names);
-        if (only != null && !only.isBlank()) payload.put("scopedTo", only);
+        if (scoped) payload.put("scopedTo", only);
         if (freshnessOnly) payload.put("scope", "freshness");
         // WARN when something breached, so the Run itself is visible in the feed — the Alert/Incident
         // objects are opened by the Alert engine, not here.

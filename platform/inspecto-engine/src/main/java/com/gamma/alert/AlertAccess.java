@@ -66,6 +66,15 @@ public interface AlertAccess {
         return evaluateRules();
     }
 
+    /**
+     * Evaluate only the named Alert Rule; every other rule is left untouched (not evaluated, no side effect).
+     * Throws when no rule has that name. The default filters the full sweep's result — correct for a test
+     * double, but it still evaluates every rule; the production form is narrow.
+     */
+    default List<Alert> evaluateRule(String name) {
+        return evaluateRules().stream().filter(a -> name.equalsIgnoreCase(a.rule())).toList();
+    }
+
     /** The production implementation over an {@link AlertService}, resolved lazily so boot wiring can
      *  register the service before the Alert engine is constructed. An absent engine fails loudly:
      *  evaluation is the whole work, so reporting success would report health that was never checked. */
@@ -73,6 +82,9 @@ public interface AlertAccess {
         return new AlertAccess() {
             @Override public List<Alert> evaluateRules() {
                 return engine().evaluateRules();
+            }
+            @Override public List<Alert> evaluateRule(String name) {
+                return engine().evaluateRule(name);
             }
             @Override public List<Alert> evaluateFreshnessRules() {
                 return engine().evaluateFreshnessRules();

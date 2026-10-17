@@ -543,6 +543,20 @@ public final class AlertService {
     }
 
     /**
+     * Evaluate exactly one authored rule by name — what {@code alert.evaluate}'s {@code rule} parameter means.
+     * Every other rule is left untouched: not evaluated, no cooldown advanced, no Alert or Incident opened.
+     * Same contract as {@link #evaluateRules()} otherwise (it mutates; no preview form).
+     *
+     * @throws IllegalArgumentException when no rule has that name (the Run fails rather than reporting
+     *         health for a rule that does not exist)
+     */
+    public List<Alert> evaluateRule(String name) {
+        List<AlertRule> one = rules.stream().filter(r -> r.name().equalsIgnoreCase(name)).toList();
+        if (one.isEmpty()) throw new IllegalArgumentException("no Alert Rule has the requested name");
+        return evaluate(null, System.currentTimeMillis(), one);
+    }
+
+    /**
      * DUCKLE-C1 — the <b>freshness-only</b> sweep: evaluate just the {@code maximumAge} rules and
      * nothing else.
      *
@@ -587,13 +601,13 @@ public final class AlertService {
             throw new IllegalStateException("no Investigation probe is wired: the Link Analysis module is not "
                     + "present in this build, so nothing could be evaluated");
         List<Alert> out = new ArrayList<>();
-        evaluateInvestigationPass(System.currentTimeMillis(), out);
+        evaluateInvestigationPass(System.currentTimeMillis(), out, rules);
         return out;
     }
 
-    private void evaluateInvestigationPass(long nowMs, List<Alert> out) {
+    private void evaluateInvestigationPass(long nowMs, List<Alert> out, List<AlertRule> ruleSet) {
         var probe = investigationProbe;
-        for (AlertRule rule : rules) {
+        for (AlertRule rule : ruleSet) {
             if (!rule.isInvestigationRule()) continue;
             InvestigationMeasureProbe.Reading reading = probe.apply(rule);
             java.util.OptionalDouble value = reading.value();
@@ -607,17 +621,22 @@ public final class AlertService {
      * one pipeline's ledger, {@code null} sweeps all. Returns the alerts fired by this pass.
      */
     synchronized List<Alert> evaluate(String pipelineFilter, long nowMs) {
+        return evaluate(pipelineFilter, nowMs, rules);
+    }
+
+    /** The sweep over {@code ruleSet} only — a rule outside it is not evaluated and has no side effect. */
+    private synchronized List<Alert> evaluate(String pipelineFilter, long nowMs, List<AlertRule> ruleSet) {
         List<Alert> out = new ArrayList<>();
 
         // Measure rules (BI-5) are dataset-scoped, not pipeline-scoped: any sweep (a terminal batch may
         // have changed the data, or the manual POST /alerts/evaluate) re-reads the current value; an
         // open breach raises nothing new until it heals. Skipped silently when no probe is wired (lean/unit paths).
-        for (AlertRule rule : rules) {
+        for (AlertRule rule : ruleSet) {
             if (!rule.isFreshnessRule()) continue;
             evaluateFreshness(rule, nowMs, out);
         }
 
-        for (AlertRule rule : rules) {
+        for (AlertRule rule : ruleSet) {
             if (!rule.isMeasureRule()) continue;
             if (rule.isGrouped()) {                       // per-entity (by:) — its own edge-triggered pass
                 evaluateGrouped(rule, nowMs, out);
@@ -647,7 +666,7 @@ public final class AlertService {
         // Investigation rules (LA-23) are scoped to their Investigation: the scope — and so the cooldown key, the
         // Signal's correlation id and the Incident dedupe scope — is the Investigation id. The probe answers empty
         // for anything it cannot vouch for (no owner binding, unknown Investigation), which never fires.
-        if (investigationProbe != null) evaluateInvestigationPass(nowMs, out);
+        if (investigationProbe != null) evaluateInvestigationPass(nowMs, out, ruleSet);
 
         for (PipelineConfig cfg : configs.pipelines()) {
             String display = cfg.identity().name();
@@ -655,7 +674,7 @@ public final class AlertService {
             if (pipelineFilter != null && !matches(pipelineFilter, display, id)) continue;
 
             List<Map<String, String>> ledger = null;
-            for (AlertRule rule : rules) {
+            for (AlertRule rule : ruleSet) {
                 if (rule.isMeasureRule()) continue;
                 // ⛔ Freshness rules are evaluated by their OWN pass above (evaluateFreshness) and must
                 // never reach the ledger path: they carry no `window:` by construction (AlertRule refuses

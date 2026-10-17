@@ -113,6 +113,26 @@ class SampleJobTypesTest {
         assertEquals(1, ctx.signals.size(), "one completion Signal");
     }
 
+    @Test
+    void alertEvaluateRuleParamUsesTheNarrowEvaluationNotTheFullSweep() throws Exception {
+        java.util.List<String> narrow = new java.util.ArrayList<>();
+        var alerts = new com.gamma.alert.AlertAccess() {
+            @Override public List<com.gamma.alert.Alert> evaluateRules() { return List.of(breach("FULL_SWEEP")); }
+            @Override public List<com.gamma.alert.Alert> evaluateRule(String name) {
+                narrow.add(name);
+                return List.of(breach(name));
+            }
+        };
+        StubContext ctx = new StubContext(false, grantOf(alerts));
+        ctx.params = Map.of("rule", "fraud_irsf");
+
+        JobResult r = alertEvaluate().run(ctx);
+
+        assertTrue(r.success());
+        assertEquals(List.of("fraud_irsf"), narrow);
+        assertFalse(r.message().contains("FULL_SWEEP"), "the full sweep was not run");
+    }
+
     /** MNT-1: evaluation IS the action (it fires Alerts and opens Incidents), so it has no preview form. */
     @Test
     void alertEvaluateDoesNotEvaluateUnderADryRun() throws Exception {
@@ -216,7 +236,8 @@ class SampleJobTypesTest {
         @Override public String spaceId()               { return "default"; }
         @Override public TriggerInfo trigger()          { return TriggerInfo.parse("manual"); }
         @Override public Map<String, String> config()   { return Map.of(); }
-        @Override public Map<String, String> params()   { return Map.of(); }
+        Map<String, String> params = Map.of();
+        @Override public Map<String, String> params()   { return params; }
         @Override public boolean dryRun()               { return dryRun; }
         @Override public PlatformServices services()    { return services; }
         @Override public com.gamma.signal.SignalEmitter signals() {
