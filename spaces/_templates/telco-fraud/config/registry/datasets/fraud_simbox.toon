@@ -1,2 +1,10 @@
 name: fraud_simbox
 physicalRef: fraud_simbox
+columns[7]{name,type,classification}:
+  msisdn,string,MSISDN
+  voice_targets,number,
+  sms_sent,number,
+  cells,number,
+  calls_received,number,
+  simbox_targets,number,
+  window_date,date,

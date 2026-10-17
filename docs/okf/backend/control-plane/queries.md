@@ -102,14 +102,14 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   `/db/table` / `/db/query`. ⚠ A dashboard drill-through (`filtered()` in the dashboard editor) still
   reads the raw store through `/db/query`, so a cross-filter ON a calculated column cannot resolve there.
 
-## Classified entity keys are masked in BI result rows (`BI-QUERY-MASKING-1`, built 2026-10-12, awaiting operator review)
+## Classified entity keys are masked in BI result rows (`BI-QUERY-MASKING-1`, built 2026-10-12; first pack consumer telco-fraud classified 2026-10-18)
 
 `BiResultMasking` (`inspecto/.../control/`) is the ONE helper behind `/bi/query`, `/queries/{id}/run`,
 `/datasets/{id}/rows` and `POST /public/dashboards/{token}/query`. A column is masked when the Space's Link Analysis
 `maskingMode` says so (`typed`: its classification is claimed by a masked Entity Type; `all`: any MSISDN / IMSI /
 ACCOUNT / PII; `none`: off) and the caller lacks `canRevealLinkEntities`; the cell becomes the Space-key alias
 `masked:<16 hex>` (`MaskTokens.spaceKey`, the same alias Link Analysis exploration and Entity Lists show) AFTER
-execution, so grouping and `countDistinct` are unchanged. The response carries a `masking` block (`mode`, `masked`,
+execution, so grouping and `countDistinct` are unchanged. A column classified `PII` masks only under `all`: in `typed` mode it masks only when a masked Entity Type claims `PII` (the telecom pack does not). The response carries a `masking` block (`mode`, `masked`,
 `columns`, `basis`); a Dataset with no classified column returns today's body, with no block.
 Fail closed: an untraceable lineage masks every column the Dataset does not declare; a calculated column naming a masked
 column is masked; a saved query's string output is masked when its text names a masked column. A viewer's filter, `when`,

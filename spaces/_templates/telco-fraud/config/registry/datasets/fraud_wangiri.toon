@@ -1,2 +1,7 @@
 name: fraud_wangiri
 physicalRef: fraud_wangiri
+columns[4]{name,type,classification}:
+  caller,string,MSISDN
+  ring_targets,number,
+  callback_targets,number,
+  window_date,date,
