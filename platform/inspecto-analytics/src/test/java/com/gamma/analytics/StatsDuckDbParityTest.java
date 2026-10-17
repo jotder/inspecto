@@ -107,6 +107,40 @@ class StatsDuckDbParityTest {
         assertTrue(checked > 2000, "parity checks run: " + checked);
     }
 
+    /** S7: the SQL forms in {@link StatsSql} compute what their {@link Stats} twins do, the z row by row. */
+    @Test
+    void theStatsSqlFormsMatchTheirJvmTwins() throws Exception {
+        int checked = 0;
+        for (double[] v : inputs()) {
+            if (v.length < 2) continue;
+            load(v);
+            String tag = "n=" + v.length;
+            double mean;
+            double sd;
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT " + StatsSql.mean("x") + ", " + StatsSql.stddevPopulation("x")
+                         + ", " + StatsSql.stddevSample("x") + " FROM t")) {
+                assertTrue(rs.next());
+                mean = rs.getDouble(1);
+                sd = rs.getDouble(2);
+                close(mean, Stats.mean(v), tag + " mean");
+                close(sd, Stats.stddevPopulation(v), tag + " stddevPopulation");
+                close(rs.getDouble(3), Stats.stddevSample(v), tag + " stddevSample");
+            }
+            if (!(sd > 0)) continue;
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT x, " + StatsSql.zScore("x", mean, sd) + " FROM t")) {
+                while (rs.next()) {
+                    close(rs.getDouble(2), Stats.zScore(rs.getDouble(1), mean, sd), tag + " z of " + rs.getDouble(1));
+                    checked++;
+                }
+            }
+        }
+        assertTrue(checked > 1000, "z parity checks run: " + checked);
+        assertThrows(IllegalArgumentException.class, () -> StatsSql.zScore("x", 1, 0));
+        assertThrows(IllegalArgumentException.class, () -> StatsSql.zScore("x", Double.POSITIVE_INFINITY, 1));
+    }
+
     @Test
     void ratioAndRateMatchDivisionByNullifZero() throws Exception {
         double[][] pairs = {{5, 2}, {-1, 4}, {0, 7}, {3, 0}, {0, 0}, {1, 3}, {1e6 + 0.5, 3.25}, {-7.5, -2.5}};

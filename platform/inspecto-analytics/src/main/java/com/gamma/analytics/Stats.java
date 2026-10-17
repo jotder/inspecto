@@ -170,6 +170,22 @@ public final class Stats {
         return (observed - median) / Math.max(scaledMad, floor);
     }
 
+    /**
+     * Classic z: {@code (observed − mean) / stddev}. Which stddev is the caller's to state ({@link #stddevPopulation} or
+     * {@link #stddevSample}); {@code stddev} must be finite and &gt; 0 — no spread has no z — and {@code mean} finite,
+     * otherwise {@link IllegalArgumentException}. SQL form: {@link StatsSql#zScore}.
+     */
+    public static double zScore(double observed, double mean, double stddev) {
+        checkZ(mean, stddev);
+        return (observed - mean) / stddev;
+    }
+
+    static void checkZ(double mean, double stddev) {
+        if (!Double.isFinite(mean) || !Double.isFinite(stddev) || !(stddev > 0))
+            throw new IllegalArgumentException("z needs a finite mean and a finite stddev > 0, got mean " + mean
+                    + ", stddev " + stddev);
+    }
+
     /** Robust z of {@code observed} against {@code values}: median, scaled MAD and floor all from this class. */
     public static double robustZ(double observed, double[] values, double unit) {
         double m = median(values);

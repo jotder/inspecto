@@ -15,7 +15,7 @@ timestamp: 2026-10-17T00:00:00Z
 > serves `transform.profile`, the Expectation `baseline` (profile and median) and Link Analysis' column profile and
 > degree quantiles (§ Column profiler); `VolumeBaseline`, `ReportService` and LA's `LinkTemporalDetector` use the kernel
 > statistics (see [Callers consolidated](#callers-consolidated)). The SQL-side statistics (`quantile_cont` /
-> `quantile_disc` strings, the Assistant outlier tool's `stddev_pop`) stay SQL. The time-grain truncation, resample and
+> `quantile_disc` strings, the Assistant outlier tool's mean and population stddev — built with `StatsSql` since S7) stay SQL. The time-grain truncation, resample and
 > shift serve the `transform.timeseries.*` Steps, file-sequence gaps, delivery checks, KPI periods and BI grains
 > (§ [Time-series primitives](#time-series-primitives)).
 > Anomaly Detection and Risk Score write their outputs through the score output contract (§ [Score output contract](#score-output-contract)).
@@ -63,6 +63,7 @@ Values are sorted ascending as `v[0..n-1]`.
 | Quantile, `NEAREST_RANK` | `v[min(max(⌈qn⌉, 1), n) − 1]`, `ReportService.percentile`'s arithmetic with q = p / 100 | `quantile(x, q, NEAREST_RANK)` | same value as `quantile_disc` |
 | MAD (raw) | median(\|x − median(x)\|), both medians `STANDARD` | `mad(x)`, `mad(x, centre)` | `mad` |
 | Scaled MAD | 1.4826 × MAD — consistent with σ for normal data | `scaledMad(x)`, `scaledMad(x, centre)` | `1.4826 * mad(x)` |
+| Classic z | (observed − mean) / stddev; stddev finite and > 0, which stddev is the caller's to state | `zScore` | `StatsSql.zScore` = `((x - mean) / stddev)` |
 | Robust z | (observed − median) / max(scaledMad, floor), floor = max(unit, 5 % of \|median\|) | `robustZ`, `robustZFloor` | — |
 | IQR | Q3 − Q1, both `CONTINUOUS` | `iqr` | `quantile_cont(x, 0.75) - quantile_cont(x, 0.25)` |
 | Tukey fences | [Q1 − k·IQR, Q3 + k·IQR], k = 1.5 by default; a value strictly outside is an outlier | `tukeyFences(x[, k])` → `Fences.outside(v)` | — |
@@ -75,6 +76,22 @@ and `ReportService` can each keep their exact arithmetic when M2 moves them (the
 
 ⚠ The robust-z floor exists so a near-constant history (scaled MAD ≈ 0) cannot turn a one-unit change into an
 enormous z. It is Anomaly Detection's rule (design §4.2), kept exactly.
+
+**SQL forms.** `StatsSql` (S7) renders the statistics a caller computes set-based, over data too large for the JVM:
+`mean` = `avg`, `stddevPopulation` = `stddev_pop`, `stddevSample` = `stddev_samp`, and the row-level `zScore`
+(the same finite-mean, positive-stddev rule as `Stats.zScore`). `StatsDuckDbParityTest` runs each against its `Stats`
+twin, z row by row. The Assistant's `anomaly_scan` builds its SQL with them: z = (x − mean) / **population** stddev
+over the column's non-NULL values, unchanged from before the switch (`AnomalyScanGoldenTest`, committed first).
+
+## Platform Service `analytics`
+
+ANALYTICS-CORE-1 S7: Jobs and packs reach the kernel through the read-only Platform Service `analytics`
+(`requires: [analytics]`, `ctx.services().get(AnalyticsAccess.class)`) — the statistics above, the column profiler's
+`rowPerColumn` SQL over a granted `datasets` read (`profileSql`), and the zoned time-grain truncation. The interface
+`com.gamma.query.AnalyticsAccess` lives in the **engine**, its implementation `AnalyticsAccess.kernel()` only
+delegates here: a Platform Service interface must be engine-published (D-12) and this module may never depend on the
+engine (D-AN1). The surface reuses the kernel's own `MedianMode`, `QuantileMode` and `TimeGrain` rather than copies.
+Menu row, grants and dry run: [platform-services](control-plane/platform-services.md) §3; tests `AnalyticsServiceTest`.
 
 ## Column profiler
 

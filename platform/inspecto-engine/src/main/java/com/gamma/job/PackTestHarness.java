@@ -38,7 +38,8 @@ import java.util.UUID;
  * <p><b>Mutating services are recorded, not real.</b> {@code notifications} and {@code incidents}
  * are bound to in-memory stand-ins that honour their documented contracts — the feed's
  * dedupe-collapse and the Incident active-object convention — so a Job that relies on either
- * behaves here as it will in production. Anything else a Job Type declares — {@code schema},
+ * behaves here as it will in production. {@code analytics} is bound to the production service itself: it is pure
+ * functions with no host state. Anything else a Job Type declares — {@code schema},
  * {@code consignment-status}, {@code alerts} — must be supplied with {@link #service} <em>before</em>
  * the providers load, because {@code requires:} resolves at registration; an unbound id refuses the
  * type exactly as the engine's registry does, naming what is available. {@code alerts} is deliberately
@@ -66,9 +67,11 @@ public final class PackTestHarness {
     private PackTestHarness() {
         platform.register("notifications", NotificationAccess.class, this::recordNotification);
         platform.register("incidents", IncidentAccess.class, this::recordIncident);
+        // The real service, not a stand-in: it is pure and stateless, so production has nothing a harness could fake.
+        platform.register("analytics", com.gamma.query.AnalyticsAccess.class, com.gamma.query.AnalyticsAccess.kernel());
     }
 
-    /** A harness with the recording {@code notifications} and {@code incidents} services bound. */
+    /** A harness with the recording {@code notifications} and {@code incidents} services and the real {@code analytics} bound. */
     public static PackTestHarness create() {
         return new PackTestHarness();
     }

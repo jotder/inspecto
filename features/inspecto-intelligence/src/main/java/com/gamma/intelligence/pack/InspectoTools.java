@@ -6,6 +6,7 @@ import com.eoiagent.core.ToolCall;
 import com.eoiagent.core.ToolResult;
 import com.eoiagent.core.ToolSpec;
 import com.eoiagent.tool.Tool;
+import com.gamma.analytics.StatsSql;
 import com.gamma.intelligence.action.ComponentActions;
 import com.gamma.intelligence.action.ControlPlaneClient;
 import com.gamma.intelligence.action.OperationalActions;
@@ -591,7 +592,9 @@ final class InspectoTools {
             String t = SqlIdent.q(table);
             String c = SqlIdent.q(column);
             try {
-                String statsSql = "SELECT avg(" + c + ") AS __mean, stddev_pop(" + c + ") AS __sd, "
+                // z = (x - mean) / POPULATION stddev over the non-NULL values: the Analytics Kernel's Stats.zScore with
+                // Stats.mean / Stats.stddevPopulation, kept set-based as their SQL forms (StatsSql) — the table may be large.
+                String statsSql = "SELECT " + StatsSql.mean(c) + " AS __mean, " + StatsSql.stddevPopulation(c) + " AS __sd, "
                         + "count(" + c + ") AS __n FROM " + t;
                 List<Finding> findings = SqlGuard.check(statsSql);
                 if (!findings.isEmpty()) return error(findings.get(0).message());
@@ -602,7 +605,7 @@ final class InspectoTools {
                 double mean = meanN.doubleValue();
                 double sd = s0.get("__sd") instanceof Number sdN ? sdN.doubleValue() : 0d;
                 long scanned = s0.get("__n") instanceof Number n ? n.longValue() : 0L;
-                String zExpr = sd > 0 ? "((" + c + " - " + mean + ") / " + sd + ")" : "NULL";
+                String zExpr = sd > 0 ? StatsSql.zScore(c, mean, sd) : "NULL";
                 String where;
                 String order;
                 if (method.equals("zscore")) {

@@ -34,7 +34,8 @@ ranked root-cause **Triage Run** with a fix draft. (The record was `Case` until 
 - **Analysis tools (slice A)** — four read-only `FunctionTool`s on the belt (belt is now 9):
   `timeline_build` (signals + job runs + component saves, one ordered window), `diff_batches` (two
   batch-ledger entries compared), `config_versions_diff` (ComponentStore `.history` structural diff),
-  `anomaly_scan` (deterministic z-score/threshold SQL — model judges, tools compute). All
+  `anomaly_scan` (deterministic z-score/threshold SQL — model judges, tools compute; z = (x − mean) / population
+  stddev, built with the Analytics Kernel's `StatsSql` since ANALYTICS-CORE-1 S7, pinned by `AnomalyScanGoldenTest`). All
   `mutating=false`, `Role.USER`. Belt exposed via `InspectoTools.tools(service, components, browseStores)`.
 - **Triage Run Store (slice D)** — `triage.TriageRunStore`, an in-memory bounded ring (synchronized
   `ArrayDeque`, evict-oldest; modeled on `DiagnosisStore`), holding `TriageRun` records (incidentRef,
