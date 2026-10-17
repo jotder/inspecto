@@ -2,7 +2,7 @@
 
 > 🟢 **MUST ITEMS BUILT 2026-10-17** (M1–M10; M6 amended by D-AN9). As-built: `okf/backend/analytics-kernel.md`
 > and `okf/backend/engine/db-layer.md` (one SQL building path). Duplication inventory 74 → 2 (only Jaccard and
-> Jaro-Winkler left, Should item S1). Should / Could not started. Decisions D-AN1…D-AN9 taken by the agent under the
+> Jaro-Winkler left, Should item S1). Should batch 2 BUILT 2026-10-17: S1 (similarity kit, `transform.similarity` Step; duplication inventory now 0), S5 (forecast kernel + prediction intervals + `transform.timeseries.forecast` Step, accuracy measures and backtest, seasonality detection, holdout split), S6 (temporal motif matcher in `platform/inspecto-graph`), S7 (`analytics` Platform Service). Open: S2, S3, S4, S8; Could not started. Decisions D-AN1…D-AN9 taken by the agent under the
 > operator's delegated authority, each with its reason (§7). Row: `ANALYTICS-CORE-1` in `docs/BACKLOG.md`.
 >
 > **Operator brief (2026-10-17).** Every application on the platform — Link Analysis, Revenue Assurance, Fraud,
