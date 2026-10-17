@@ -49,6 +49,23 @@ public final class HoldoutSplit {
         return (int) Math.round(fraction * WHOLE);
     }
 
+    /**
+     * DuckDB's {@code md5_number_lower(text)} in the JVM: the lower 64 bits of the MD5 of the UTF-8 bytes (digest bytes
+     * 8..15, little-endian), as an <b>unsigned</b> long — compare with {@link Long#compareUnsigned}. The one reading the
+     * holdout split and the sampler ({@code com.gamma.analytics.sample.Sampler}) hash with.
+     */
+    public static long md5NumberLower(String text) {
+        byte[] d;
+        try {
+            d = MessageDigest.getInstance("MD5").digest(text.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        long lower = 0;
+        for (int i = 15; i >= 8; i--) lower = (lower << 8) | (d[i] & 0xFFL);
+        return lower;
+    }
+
     // ---- by time ----------------------------------------------------------------------------------------------------
 
     /**
@@ -138,15 +155,7 @@ public final class HoldoutSplit {
 
         /** {@code md5_number_lower(seed ':' key) mod 10000} — in [0, 10000). */
         public int bucket(String key) {
-            byte[] d;
-            try {
-                d = MessageDigest.getInstance("MD5").digest(hashed(key).getBytes(StandardCharsets.UTF_8));
-            } catch (NoSuchAlgorithmException e) {
-                throw new IllegalStateException(e);
-            }
-            long lower = 0;
-            for (int i = 15; i >= 8; i--) lower = (lower << 8) | (d[i] & 0xFFL);
-            return (int) Long.remainderUnsigned(lower, WHOLE);
+            return (int) Long.remainderUnsigned(md5NumberLower(hashed(key)), WHOLE);
         }
 
         public Role role(String key) {
