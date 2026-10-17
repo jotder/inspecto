@@ -1,4 +1,5 @@
 package com.gamma.sql;
+import com.gamma.util.SqlIdent;
 
 /**
  * Builds DuckDB table-function expressions that read a Parquet/CSV dataset — the view-registration
@@ -51,7 +52,7 @@ public final class SqlViews {
      * @throws IllegalArgumentException for an unsupported format
      */
     public static String reader(String format, String pathOrGlob, boolean hive) {
-        return over(format, "'" + pathOrGlob.replace("\\", "/").replace("'", "''") + "'", hive);
+        return over(format, SqlIdent.sqlStr(pathOrGlob.replace("\\", "/")), hive);
     }
 
     /**
@@ -97,7 +98,7 @@ public final class SqlViews {
         StringBuilder list = new StringBuilder("[");
         for (int i = 0; i < paths.size(); i++) {
             if (i > 0) list.append(", ");
-            list.append('\'').append(paths.get(i).replace("\\", "/").replace("'", "''")).append('\'');
+            list.append(SqlIdent.sqlStr(paths.get(i).replace("\\", "/")));
         }
         return list.append(']').toString();
     }

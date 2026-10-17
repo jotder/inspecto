@@ -1,6 +1,7 @@
 package com.gamma.sql;
 
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 
 import java.io.File;
 import java.io.IOException;
@@ -134,7 +135,7 @@ public final class SqlSandbox implements AutoCloseable {
                 for (Path f : files) {
                     String file = f.toAbsolutePath().normalize().toString().replace('\\', '/');
                     if (list.length() > 1) list.append(", ");
-                    list.append('\'').append(file.replace("'", "''")).append('\'');
+                    list.append(SqlIdent.sqlStr(file));
                 }
                 st.execute("SET allowed_paths=" + list.append(']'));
             }
@@ -144,7 +145,7 @@ public final class SqlSandbox implements AutoCloseable {
                     String dir = d.toAbsolutePath().normalize().toString().replace('\\', '/');
                     if (!dir.endsWith("/")) dir += "/";
                     if (list.length() > 1) list.append(", ");
-                    list.append('\'').append(dir.replace("'", "''")).append('\'');
+                    list.append(SqlIdent.sqlStr(dir));
                 }
                 st.execute("SET allowed_directories=" + list.append(']'));
             }

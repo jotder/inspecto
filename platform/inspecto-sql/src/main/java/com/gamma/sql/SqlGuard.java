@@ -1,6 +1,7 @@
 package com.gamma.sql;
 
 import com.gamma.config.spec.Finding;
+import com.gamma.util.SqlIdent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -408,9 +409,9 @@ public final class SqlGuard {
             if (root.path("error").asBoolean(true) || root.path("statements").size() != 1) return sql;
             java.util.TreeSet<Integer> locations = new java.util.TreeSet<>();
             if (!collectRefs(root.path("statements"), oldName, locations)) return sql;
-            String quotedOld = "\"" + oldName.replace("\"", "\"\"") + "\"";
+            String quotedOld = SqlIdent.q(oldName);
             // Always quoted: a new name may be a reserved word (select, order, table) or need quoting anyway.
-            String replacement = "\"" + newName.replace("\"", "\"\"") + "\"";
+            String replacement = SqlIdent.q(newName);
             byte[] utf8 = sql.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             StringBuilder out = new StringBuilder(sql);
             for (int byteLoc : locations.descendingSet()) {
