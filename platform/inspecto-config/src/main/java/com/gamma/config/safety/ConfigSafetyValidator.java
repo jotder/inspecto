@@ -199,7 +199,14 @@ public final class ConfigSafetyValidator {
     // ── pipeline ─────────────────────────────────────────────────────────────────────
 
     private static void checkPipeline(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
-        for (String f : PIPELINE_DIRS) checkDataHome(f, RawConfig.str(raw, f), p, configDir, out);
+        for (String f : PIPELINE_DIRS) {
+            String v = RawConfig.str(raw, f);
+            // SCALEOUT-OBJSTORE-DATABASE-DIR-1: dirs.database alone may be an object-store URI, held to
+            // PathJail's object-store rule (operator allow-list, empty = refused). Every other dir keeps the
+            // flat URI refusal in checkPathValue.
+            if ("dirs.database".equals(f) && v != null && PathJail.isUri(v.trim())) checkObjectStore(f, v, out);
+            else checkDataHome(f, v, p, configDir, out);
+        }
         checkDataHome("output.ducklake.data_path", RawConfig.str(raw, "output.ducklake.data_path"), p, configDir, out);
         // ROADMAP §3.5 "jail the database temp directory". The fallback `dirs.temp` is in PIPELINE_DIRS,
         // but `ConsignmentIngestStrategy.scratchDir` PREFERS this explicit spill dir and returned it raw,
@@ -626,6 +633,15 @@ public final class ConfigSafetyValidator {
         try {
             PathJail.refuseDataHome(PathJail.resolveDataPath(configDir, value.trim(), field),
                     PathJail.spaceDirOf(configDir), p.allowedRoots(), value.trim(), field);
+        } catch (PathJail.Escape refused) {
+            out.add(Finding.error(field, refused.getMessage()));
+        }
+    }
+
+    /** An object-store location, by the SAME rule {@code PartitionWriter} enforces at write time. */
+    private static void checkObjectStore(String field, String value, List<Finding> out) {
+        try {
+            PathJail.requireObjectStore(PathJail.allowedObjectRoots(), value, field);
         } catch (PathJail.Escape refused) {
             out.add(Finding.error(field, refused.getMessage()));
         }

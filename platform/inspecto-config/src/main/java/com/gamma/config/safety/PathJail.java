@@ -81,6 +81,83 @@ public final class PathJail {
         return value != null && URI_SCHEME.matcher(value.trim()).find();
     }
 
+    /** The operator-only allow-list of object-store prefixes (SCALEOUT-OBJSTORE-DATABASE-DIR-1). */
+    public static final String OBJECT_ROOTS_PROPERTY = "assist.safety.object_roots";
+
+    /** An S3 bucket name: 3-63 of lowercase letters, digits, {@code .} and {@code -}, alphanumeric at both ends. */
+    private static final java.util.regex.Pattern S3_BUCKET =
+            java.util.regex.Pattern.compile("[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9]");
+
+    /** One key segment. ⛔ No {@code %} (an encoded {@code ..}), no glob byte ({@code * ? [ ] { }} —
+     *  DuckDB expands them), no quote, no whitespace; {@code =} stays, it is the Hive partition spelling. */
+    private static final java.util.regex.Pattern KEY_SEGMENT =
+            java.util.regex.Pattern.compile("[A-Za-z0-9._=+\\-]+");
+
+    /**
+     * The object-store prefixes a URI-valued {@code dirs.database} must lie under: {@code
+     * -Dassist.safety.object_roots}, a {@code ;}-separated list of {@code s3://bucket[/prefix]}. ⛔ Blank — the
+     * default — allows NOTHING, so every object-store path stays refused until an operator names a prefix.
+     * A server property and not a Space key on purpose: a Space must not be able to widen its own jail (the
+     * same reason {@code -Dassist.safety.roots} is not authorable). A malformed entry is dropped, never
+     * loosened into a match.
+     */
+    public static List<String> allowedObjectRoots() {
+        String prop = System.getProperty(OBJECT_ROOTS_PROPERTY, "");
+        List<String> out = new java.util.ArrayList<>();
+        for (String e : prop.split(";")) {
+            String n = normalizeObjectUri(e.trim());
+            if (n != null) out.add(n);
+        }
+        return List.copyOf(out);
+    }
+
+    /**
+     * The containment rule for an object-store location (scale-out §5.4 bullet 6) — the URI branch
+     * {@link #isUri} said would be needed. Returns the normalised URI (no trailing {@code /}) when
+     * {@code value} lies under one of {@code allowedPrefixes}, else throws {@link Escape}. Fail-closed in
+     * every step:
+     * <ol>
+     *   <li>only {@code s3://} is recognised — any other scheme, or {@code S3://}, is refused;</li>
+     *   <li>the bucket must be a valid S3 bucket name — no userinfo ({@code @}), port, or IP-ish host;</li>
+     *   <li>every key segment must match {@link #KEY_SEGMENT}: {@code .}/{@code ..} segments, empty segments
+     *       ({@code //}), {@code %}-escapes, {@code ?}, {@code #}, backslashes and glob bytes are refused,
+     *       never decoded or collapsed — a value is judged as written;</li>
+     *   <li>containment is segment-wise: {@code s3://b/pX} is NOT under {@code s3://b/p}.</li>
+     * </ol>
+     * An empty allow-list refuses everything.
+     */
+    public static String requireObjectStore(List<String> allowedPrefixes, String value, String field) {
+        String s = value == null ? "" : value.trim();
+        String n = normalizeObjectUri(s);
+        if (n == null)
+            throw new Escape(field, s, "is not an accepted object-store location — only s3://<bucket>/<key> "
+                    + "with plain key segments ([A-Za-z0-9._=+-], no '.', '..', '%', '?', '#', glob bytes or "
+                    + "empty segments) is recognised");
+        for (String p : allowedPrefixes == null ? List.<String>of() : allowedPrefixes) {
+            String root = normalizeObjectUri(p);
+            if (root != null && (n.equals(root) || n.startsWith(root + "/"))) return n;
+        }
+        throw new Escape(field, s, allowedPrefixes == null || allowedPrefixes.isEmpty()
+                ? "is an object-store location, and none is allowed — an operator must name its prefix in -D"
+                        + OBJECT_ROOTS_PROPERTY
+                : "is outside the allowed object-store prefixes " + allowedPrefixes + " (-D"
+                        + OBJECT_ROOTS_PROPERTY + ")");
+    }
+
+    /** {@code value} as {@code s3://bucket[/seg…]} with no trailing {@code /}, or {@code null} when it is not one. */
+    private static String normalizeObjectUri(String value) {
+        if (value == null || !value.startsWith("s3://")) return null;
+        String rest = value.substring("s3://".length());
+        if (rest.endsWith("/")) rest = rest.substring(0, rest.length() - 1);
+        String[] parts = rest.split("/", -1);
+        if (!S3_BUCKET.matcher(parts[0]).matches()) return null;
+        for (int i = 1; i < parts.length; i++) {
+            String seg = parts[i];
+            if (seg.equals(".") || seg.equals("..") || !KEY_SEGMENT.matcher(seg).matches()) return null;
+        }
+        return "s3://" + rest;
+    }
+
     /** Thrown when a value escapes its root. Callers at an HTTP edge map this to 403. */
     public static final class Escape extends RuntimeException {
         private final String field;

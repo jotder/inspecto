@@ -255,17 +255,21 @@ public final class PartitionWriter {
      * </ol>
      *
      * <p>⛔ This is reachable only by a caller that already holds a connection configured for the store
-     * (endpoint and credentials are session settings). It is NOT reachable from a pipeline config today:
-     * {@code dirs.database} refuses a URI at the 422 write gate and in the jail. Wiring those together is
-     * the open credentials decision (BACKLOG §1), deliberately not pre-empted here.
+     * (endpoint and credentials are session settings), and only for a location under an operator-allowed
+     * prefix ({@link com.gamma.config.safety.PathJail#requireObjectStore}). The ingest lane still refuses a
+     * URI {@code dirs.database} at its seal — credentials and the seal's URL allow-list are the open part of
+     * SCALEOUT-OBJSTORE-DATABASE-DIR-1.
      */
     private static List<PartitionOutput> writeToObjectStore(Connection conn, String projection,
                                                             String databaseDir, OutputFormat fmt,
                                                             String compression, String baseName,
                                                             List<String> partitionColumns,
                                                             boolean partitioned) throws Exception {
-        String root = databaseDir.endsWith("/") ? databaseDir.substring(0, databaseDir.length() - 1)
-                                                : databaseDir;
+        // SCALEOUT-OBJSTORE-DATABASE-DIR-1: re-check containment at the write, by the same rule the 422 gate
+        // applies — a caller that skipped the gate still cannot COPY outside an allowed prefix. Returns the
+        // normalised URI (no trailing '/').
+        String root = com.gamma.config.safety.PathJail.requireObjectStore(
+                com.gamma.config.safety.PathJail.allowedObjectRoots(), databaseDir, "dirs.database");
         String stem = baseName + "_out";
 
         StringBuilder copyOpts = new StringBuilder("FORMAT ").append(fmt.copyToken());

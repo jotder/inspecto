@@ -173,6 +173,33 @@ falsified the doc; the constructor now keeps empty empty, `PathJail.requireUnder
 ⚠ Surefire sets the roots to `<repo>;<temp>`, so **nothing under a `@TempDir` escapes by default** — a
 containment test that does not narrow the roots passes vacuously.
 
+## Object-store containment — `PathJail.requireObjectStore` (2026-10-18, `SCALEOUT-OBJSTORE-DATABASE-DIR-1`)
+
+A bucket URI cannot be contained by `Path` comparison (and on Linux `Paths.get("s3://b/x")` silently becomes a
+local `s3:` directory — see `PathJail.isUri`), so an object-store location has its own rule, dispatched on
+`isUri`:
+
+* **Allow-list:** `-Dassist.safety.object_roots`, a `;`-separated list of `s3://bucket[/prefix]`. A **server
+  property, never a Space key** — a Space must not be able to widen its own jail. **Blank (the default)
+  refuses every URI.** A malformed entry (traversal, glob, bad bucket) is dropped, never loosened into a match.
+* **Recognised form only:** `s3://` (lower case) + a valid S3 bucket name + key segments of
+  `[A-Za-z0-9._=+-]`. Refused, never decoded or collapsed: `.`/`..` segments, empty segments (`//`), `%`
+  escapes, `?`, `#`, backslashes, glob bytes (DuckDB expands them), quotes, whitespace, userinfo, a port, any
+  other scheme (`s3a://`, `gs://`, `file://`, `S3://`).
+* **Containment is segment-wise:** `s3://b/pX` is not under `s3://b/p`.
+* **Where it applies:** only `dirs.database`. `ConfigSafetyValidator.checkPipeline` sends a URI there to
+  `requireObjectStore`; every other `dirs.*` (and every other path key) keeps the flat "is a URI" refusal.
+  `PartitionWriter.writeToObjectStore` re-checks the same rule before any I/O, so a caller that skipped the
+  gate still cannot COPY outside an allowed prefix.
+* ⚠ **Accepted at the gate is not yet written by a run:** `ConsignmentIngestStrategy.configure` refuses a URI
+  `dirs.database` by name — the ingest lane has no credentials route and its sealed connection has external
+  access off. That wiring is the rest of the row. Open call (BACKLOG §1): whether a Space may narrow the
+  server list to its own prefix.
+
+Pinned by `PathJailObjectStoreTest`, `ConfigSafetyValidatorTest.anAllowListedObjectStoreDatabaseDirIsAcceptedAndNothingElseIs`
+and `PartitionWriterObjectStoreContainmentTest`; each refusal is paired with the accepted
+value it was derived from, and dropping the `..` check turns the traversal test red.
+
 ## The `/config/*` write routes never reach `registry/` or a reserved file (`CONFIG-WRITE-REGISTRY-1`, 2026-09-27)
 
 Being contained in the write root is not the same as being a file those routes own. `POST /config/write`,
