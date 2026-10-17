@@ -1,0 +1,23 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: correlation (transform.stats.correlation) - ANALYTICS-CORE-1 S3, DuckDB corr and regr_* (the Analytics
+# Kernel's Stats.correlation and Stats.linearRegression):
+#   steps[1]: - correlation: { columns[3]: PRICE, QUANTITY, DISCOUNT, group_by[1]: REGION }
+# Summarising: one row per region per column pair, (PRICE, QUANTITY), (PRICE, DISCOUNT), (QUANTITY, DISCOUNT); in
+# each pair the later column is regressed on the earlier (QUANTITY = intercept + slope * PRICE).
+# At rest, like every steps: kind: the ingest lands out/orders/, the commit fires price_effects, and the result
+# lands in out/price_effects/.
+#
+# Expected evidence after the run:
+#   /jobs shows price_effects type PIPELINE with lastStatus SUCCESS. On disk, out/price_effects/*.parquet holds 6
+#   rows (REGION, x_column, y_column, n, correlation, slope, intercept, r2), rounded here to 4 places:
+#     NORTH PRICE    QUANTITY 5  -0.9995  -2.4265  74.1971  0.9989  - dearer, fewer units
+#     NORTH PRICE    DISCOUNT 5   0.9572   0.2647  -2.3706  0.9163
+#     NORTH QUANTITY DISCOUNT 5  -0.9507  -0.1083   5.6931  0.9038
+#     SOUTH PRICE    QUANTITY 5  -0.9978  -3.2611  86.6283  0.9956
+#     SOUTH PRICE    DISCOUNT 5   0.9422   0.2345  -1.9204  0.8878
+#     SOUTH QUANTITY DISCOUNT 5  -0.9302  -0.0708   4.2568  0.8652
+#   The job can also be fired by hand: POST /jobs/price_effects/trigger.
+/jobs
+/jobs/price_effects/runs

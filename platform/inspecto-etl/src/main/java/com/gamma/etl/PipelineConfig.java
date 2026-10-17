@@ -396,10 +396,28 @@ public final class PipelineConfig {
          * spelling - always {@code steps:}.
          */
         public static final String ENTITY_LINK = "entity_link";
+        /**
+         * Outlier flags on a number column ({@code transform.stats.outlier}, ANALYTICS-CORE-1 S3). Keys: {@code column},
+         * optional {@code method} (iqr | robust_z), {@code k}, {@code quantile_mode}, {@code threshold}, {@code unit},
+         * {@code group_by}, {@code prefix}. No legacy spelling - always {@code steps:}.
+         */
+        public static final String OUTLIER = "outlier";
+        /**
+         * Equal-width or quantile bins of a number column ({@code transform.data.binning}, ANALYTICS-CORE-1 S3). Keys:
+         * {@code column}, {@code bins}, optional {@code method}, {@code min}, {@code max}, {@code quantile_mode},
+         * {@code group_by}, {@code bin_column}, {@code label_column}. No legacy spelling - always {@code steps:}.
+         */
+        public static final String BINNING = "binning";
+        /**
+         * Pearson correlation and linear regression per column pair ({@code transform.stats.correlation},
+         * ANALYTICS-CORE-1 S3) - one row per group per pair. Keys: {@code columns}, optional {@code group_by}. No legacy
+         * spelling - always {@code steps:}.
+         */
+        public static final String CORRELATION = "correlation";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST}, {@link #SIMILARITY}, {@link #RANK}, {@link #SAMPLE}, {@link #PIVOT} and {@link #ENTITY_LINK} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY, RANK, SAMPLE, PIVOT, ENTITY_LINK);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST}, {@link #SIMILARITY}, {@link #RANK}, {@link #SAMPLE}, {@link #PIVOT}, {@link #ENTITY_LINK}, {@link #OUTLIER}, {@link #BINNING} and {@link #CORRELATION} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY, RANK, SAMPLE, PIVOT, ENTITY_LINK, OUTLIER, BINNING, CORRELATION);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

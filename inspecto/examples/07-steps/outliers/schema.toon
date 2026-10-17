@@ -1,0 +1,20 @@
+raw:
+  name: PAYMENTS
+  format: CSV
+  fields[3]{name,selector,type}:
+    PAYMENT_ID,"0",VARCHAR
+    REGION,"1",VARCHAR
+    AMOUNT,"2",DOUBLE
+mapping:
+  canonicalName: payments
+  rawName: PAYMENTS
+  fields[3]:
+    - name: PAYMENT_ID
+      from: PAYMENT_ID
+      fn: keep
+    - name: REGION
+      from: REGION
+      fn: keep
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep

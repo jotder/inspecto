@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
-description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6), and ranking, sampling and pivot (S4: the deterministic seeded sampler with DuckDB parity, Steps transform.analytics.rank, transform.sample, transform.matrix.pivot), and deterministic entity grouping (S2: blocking keys, exact match conditions, union-find, its DuckDB form and parity, Step transform.entity.link; similarity never forms a group, D-M1).
+description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6), and ranking, sampling and pivot (S4: the deterministic seeded sampler with DuckDB parity, Steps transform.analytics.rank, transform.sample, transform.matrix.pivot), and deterministic entity grouping (S2: blocking keys, exact match conditions, union-find, its DuckDB form and parity, Step transform.entity.link; similarity never forms a group, D-M1). Also the distribution Steps (S3: outlier flags, equal-width and quantile bins, Pearson correlation and linear regression, their edge rules and DuckDB parity).
 resource: docs/superpower/analytics-core-plan.md
 tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, modules, duckdb]
 timestamp: 2026-10-17T00:00:00Z
@@ -29,6 +29,8 @@ timestamp: 2026-10-17T00:00:00Z
 > **S2, deterministic entity grouping, is built (2026-10-17):** blocking keys + exact match conditions + union-find,
 > JVM and DuckDB forms with parity, caps that fail closed; Step `transform.entity.link`; similarity only proposes
 > review candidates, never a group (§ [Entity grouping](#entity-grouping)).
+> **S3, the distribution Steps, are built (2026-10-17):** `transform.stats.outlier`, `transform.data.binning` and
+> `transform.stats.correlation` on the definitions here (§ [Distribution Steps](#distribution-steps)).
 
 ## The module
 
@@ -54,6 +56,8 @@ Packages:
   `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
 * `com.gamma.analytics.entity` — deterministic entity grouping (S2): `EntityGrouping`, `EntityGroupingSql`,
   `MatchCondition`, `KeyColumn`, `Normalization`, `SimilarityCandidate`, `EntityRecord` (§ [Entity grouping](#entity-grouping)).
+* `com.gamma.analytics.distribution` — the distribution Steps' kernel (S3): `OutlierSql`, `Binning`, `CorrelationSql`
+  (§ [Distribution Steps](#distribution-steps)).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -79,7 +83,9 @@ Values are sorted ascending as `v[0..n-1]`.
 | Classic z | (observed − mean) / stddev; stddev finite and > 0, which stddev is the caller's to state | `zScore` | `StatsSql.zScore` = `((x - mean) / stddev)` |
 | Robust z | (observed − median) / max(scaledMad, floor), floor = max(unit, 5 % of \|median\|) | `robustZ`, `robustZFloor` | — |
 | IQR | Q3 − Q1, both `CONTINUOUS` | `iqr` | `quantile_cont(x, 0.75) - quantile_cont(x, 0.25)` |
-| Tukey fences | [Q1 − k·IQR, Q3 + k·IQR], k = 1.5 by default; a value strictly outside is an outlier | `tukeyFences(x[, k])` → `Fences.outside(v)` | — |
+| Tukey fences | [Q1 − k·IQR, Q3 + k·IQR], k = 1.5 by default; a value strictly outside is an outlier | `tukeyFences(x[, k[, mode]])` → `Fences.outside(v)` | `OutlierSql` (S3) |
+| Pearson correlation | Σ(x − x̄)(y − ȳ) / √(Σ(x − x̄)² Σ(y − ȳ)²); **empty** when a side is constant | `correlation(x, y)` | `corr` (NaN there → NULL) |
+| Least-squares line | slope Sxy / Sxx, intercept ȳ − slope·x̄; r2 empty for constant x, 1 for constant y, else r² | `linearRegression(x, y)` | `regr_slope`, `regr_intercept`, `regr_r2`, `regr_count` |
 | Ratio | numerator / denominator; **empty** (`OptionalDouble`) when the denominator is ±0 — never NaN | `ratio(num, den)` | `num / NULLIF(den, 0)` |
 | Rate | events / total, a share in [0, 1] of a count; **empty** when total = 0 | `rate(events, total)` | `events::DOUBLE / NULLIF(total, 0)` |
 
@@ -342,6 +348,74 @@ independence, key refusals, both caps, normalisations, code-point order, D-M1 by
 review) and `EntityGroupingParityTest` (JVM = DuckDB on three seeded 600-record corpora with and without blocking,
 every similarity method raw and normalised, a 300-record chain, ids beyond the Basic Multilingual Plane, identical
 refusals with nothing written, a numeric key keeping its type). In the engine, `RowShaperEntityLinkTest`.
+
+## Distribution Steps
+
+*ANALYTICS-CORE-1 S3, built 2026-10-17.* Package `com.gamma.analytics.distribution`. Three Steps — outlier flags, bins and
+correlation — built **on the definitions above**: no statistic of their own (the duplication guard's category c stays
+at 0). Each SQL form names the `Stats` definition it renders and a parity test holds the two equal.
+
+| Piece | Kernel | Definition it rests on | Step |
+|---|---|---|---|
+| Tukey fences per row | `OutlierSql` (`Method.IQR`) | `Stats.tukeyFences(values, k, QuantileMode)` — `Q1 − k·(Q3 − Q1)`, `Q3 + k·(Q3 − Q1)`; strictly outside = outlier | `transform.stats.outlier` |
+| Robust z per row | `OutlierSql` (`Method.ROBUST_Z`) | `Stats.robustZ` with `Stats.robustZFloor` — DuckDB `median`, `mad`; flag `abs(z) > threshold` | `transform.stats.outlier` |
+| Equal-width bin | `Binning.equalWidthIndex` / `equalWidthIndexSql` | `min(⌊(x − lo) / (hi − lo) · bins⌋, bins − 1)`, 0 when `hi = lo` — **also `ColumnProfiler.histogram`'s bin** | `transform.data.binning` |
+| Quantile bin | `Binning.quantileEdges` / `quantileIndex` | edges `Stats.quantile(x, i / bins, mode)`; bin = interior edges at or below x | `transform.data.binning` |
+| Pearson r | `CorrelationSql` (`corr`) | `Stats.correlation` — `Σ(x − x̄)(y − ȳ) / √(Σ(x − x̄)² Σ(y − ȳ)²)`, empty when a side is constant | `transform.stats.correlation` |
+| Least-squares line | `CorrelationSql` (`regr_slope`, `regr_intercept`, `regr_r2`, `regr_count`) | `Stats.linearRegression` — slope `Sxy / Sxx`, intercept `ȳ − slope · x̄`, r2: empty for constant x, **1 for constant y**, else r² | `transform.stats.correlation` |
+
+Added to `Stats` for these: `tukeyFences(values, k, mode)` (the quartiles in an explicit `QuantileMode`; the two-argument
+form stays `CONTINUOUS`), `correlation(x, y)` and `linearRegression(x, y)` → `Regression(count, slope, intercept, r2)`
+(input rules as every statistic: equal lengths, no NaN, not empty).
+
+### Edge rules, written down
+
+* **Missing values.** The SQL reads the column as `DOUBLE` with **NaN read as NULL**; a NULL is missing — it gets no
+  flag, score or bin, and is not counted in its group's statistics. The JVM forms refuse NaN (as all of `Stats`), so the
+  two count the same values. Correlation counts a pair only when **both** values are present (`n`).
+* **Groups.** `PARTITION BY` / `GROUP BY` the group columns; a NULL key is a group of its own. No group = the whole
+  column.
+* **Inclusive / exclusive.** Outlier: strictly outside the fences (a value on a fence is not an outlier); `|z|` strictly
+  above the threshold. Bins: `[lower, upper)`, the **last bin closed** `[lower, upper]`; a value on an edge opens the
+  next bin; for quantile bins, ties always share a bin (the higher one when a value equals an edge).
+* **Out of range.** Equal-width bins over a **stated** `min` / `max`: a value below or above gets no bin (NULL index and
+  label) — never clamped. Over the group's own range nothing is out of range.
+* **Degenerate groups.** A group of one value: fences equal to it (never flagged); robust z 0. All values equal (one
+  value included): equal-width bin 0, quantile bin `bins − 1` (every edge equals the value). Correlation: a constant side has no r,
+  a constant x no line, a constant y slope 0 and r2 1; DuckDB's NaN for these is written as NULL — **never NaN**.
+* **Quantile mode.** `CONTINUOUS` (`quantile_cont`, D-AN3's canonical mode) by default; `DISCRETE` (`quantile_disc`) when
+  stated, for the fences and the quantile edges.
+
+### Parity
+
+* `OutlierDuckDbParityTest` — four groups of 7–70 seeded values with planted highs, lows and heavy ties, NULL and NaN, a
+  NULL key, an all-missing group, a one-value and a constant group; IQR in both quantile modes at k 0 / 0.75 / 1.5 / 3,
+  robust z at two units and thresholds: fences and z within 1e-9 × max(1, |value|), flags equal row by row.
+* `BinningTest` — hand figures, then equal width (group range and stated ranges with out-of-range values) and quantile
+  bins (both modes, 1–10 bins) row by row: the **bin index equal**, the label's edges within 1e-9 (DuckDB's
+  `quantile_cont` and the JVM's can differ in the last bit); `ColumnProfiler.histogram`'s counts = the Step's bins.
+* `CorrelationDuckDbParityTest` — groups of every size 1–30 with NULL and NaN on either side, constant x, constant y, both
+  constant, a NULL key, no complete pair: within 1e-9; ⚠ a group on a **1e9 offset** agrees only within 1e-8 — DuckDB's
+  streaming covariance loses digits there (measured slope error 5e-12 relative at 1e6, 1.7e-9 at 1e9, 5e-6 at 1e12; the
+  two-pass JVM form does not). The Step documents it; centre such data first.
+
+### Histogram — no separate Step
+
+`ColumnProfiler.histogram` (M4) stays the profiler's one-column histogram (every bin listed, empty ones with 0) and now
+computes its bin with `Binning.equalWidthIndexSql` — one equal-width definition. A Pipeline gets a histogram as
+`binning` then `summarize` (`group_by: [bin, bin_label]`, `measures: [count]`). A separate Step would add a fourth
+grammar for the same bins and differ only in listing empty bins — not worth a node type; reopen if a consumer needs the
+empty bins in a Pipeline.
+
+### The Steps
+
+`DistributionStep` (engine) owns the three grammars; `RowShaper`, the recipe compiler and the save gate (`ConfigRoutes`)
+refuse with its words. Keys, outputs and release bar: [step-catalog](pipeline-graph/step-catalog.md) § `outlier`,
+§ `binning`, § `correlation`. Base in every edition (D-AN7). The catalog's *Pearson & Spearman correlation matrix* is
+**PARTIAL**: Spearman is not built. In the engine: `RowShaperDistributionTest`,
+`PipelineJobRunnerTest#runsAFlatConfigsOutlierAndBinningStepsAndWritesFlagsAndBins`,
+`PipelineJobRunnerTest#runsAFlatConfigsCorrelationStepAndWritesOneRowPerPair`; demos `examples/07-steps/outliers` and
+`examples/07-steps/correlation`.
 
 ## Score output contract
 

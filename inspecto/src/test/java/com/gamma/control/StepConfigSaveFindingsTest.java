@@ -612,6 +612,33 @@ class StepConfigSaveFindingsTest {
                         "candidate_threshold", 0.9))))));
     }
 
+    // ── distribution Steps (ANALYTICS-CORE-1 S3) ─────────────────────────────────────
+
+    @Test
+    void anOutlierColumnTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("outlier",
+                Map.of("column", "NOPE"))))), "steps[0].outlier", "NOPE");
+    }
+
+    @Test
+    void aBinningWithNoBinsIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("binning",
+                Map.of("column", "QTY", "bins", 0))))), "steps[0].binning", "between 1 and");
+    }
+
+    @Test
+    void aCollidingBinColumnOrARepeatedCorrelationColumnIsRefusedAndValidOnesPass(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("binning",
+                Map.of("column", "QTY", "bins", 3, "bin_column", "qty"))))), "steps[0].binning", "collides");
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("correlation",
+                Map.of("columns", List.of("QTY", "qty")))))), "steps[0].correlation", "twice");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("outlier", Map.of("column", "QTY", "group_by", List.of("ID"))),
+                Map.of("binning", Map.of("column", "QTY", "bins", 4, "method", "quantile")),
+                Map.of("correlation", Map.of("columns", List.of("QTY", "outlier_upper"), "group_by", List.of("ID")))))),
+                "the outlier and bin columns flow on: correlation may read outlier_upper");
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

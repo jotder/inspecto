@@ -619,6 +619,16 @@ class PipelineEditableTest {
                 node("e", "transform.entity.link", e));
     }
 
+    /** The distribution Steps (ANALYTICS-CORE-1 S3) lower to steps: under their plain kinds, in canvas order. */
+    @Test
+    void theDistributionStepsLowerToStepsUnderTheirPlainKinds() {
+        assertChain(List.of("filter", "outlier", "binning", "correlation"),
+                node("f", "transform.filter", Map.of("where", "GROSS > 0")),
+                node("o", "transform.stats.outlier", new LinkedHashMap<>(Map.of("column", "GROSS"))),
+                node("b", "transform.data.binning", new LinkedHashMap<>(Map.of("column", "GROSS", "bins", 4))),
+                node("c", "transform.stats.correlation", new LinkedHashMap<>(Map.of("columns", List.of("GROSS", "NET")))));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

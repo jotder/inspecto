@@ -765,8 +765,10 @@
     "label" : "Histogram & quantile binner",
     "emoji" : "📦",
     "icon" : "heroicons_outline:chart-bar",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.data.binning",
+    "note" : "`transform.data.binning` — equal-width or quantile (equal-frequency) bins of a number column, per group, with a bin number and label; a histogram is binning then summarize (count by bin), and the profiler's histogram shares the equal-width bin (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "addable" : true
   }, {
     "id" : "transform.string.smart_split",
     "family" : "BI",
@@ -799,16 +801,20 @@
     "label" : "Outlier detector & IQR boxplot fencer",
     "emoji" : "🚨",
     "icon" : "heroicons_outline:exclamation-circle",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.stats.outlier",
+    "note" : "`transform.stats.outlier` — Tukey's fences (k, quantile mode) or a robust z (median and MAD) per group; every row kept with its fences or score and a flag (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "addable" : true
   }, {
     "id" : "transform.stats.correlation",
     "family" : "BI",
     "label" : "Pearson & Spearman correlation matrix",
     "emoji" : "🧮",
     "icon" : "heroicons_outline:squares-2x2",
-    "status" : "planned",
-    "addable" : false
+    "status" : "partial",
+    "nodeType" : "transform.stats.correlation",
+    "note" : "`transform.stats.correlation` ships Pearson plus the least-squares line (slope, intercept, r2) per column pair and group, as long-form rows; Spearman (rank) correlation is not built (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "addable" : true
   }, {
     "id" : "enrichment.reference",
     "family" : "ENR",

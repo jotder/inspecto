@@ -197,12 +197,13 @@ public final class ColumnProfiler {
      * dropped): {@code bins} rows {@code bin} (0-based), {@code lower_bound}, {@code upper_bound}, {@code frequency},
      * empty bins included. Bin {@code i} covers {@code [min + i·w, min + (i+1)·w)} with {@code w = (max − min) / bins};
      * the last bin is closed so the maximum is counted. When every value is equal all of them fall in bin 0. No numeric
-     * value at all: no rows.
+     * value at all: no rows. The bin is {@link com.gamma.analytics.distribution.Binning#equalWidthIndexSql} — the one
+     * equal-width definition, shared with the {@code transform.data.binning} Step.
      */
     public static String histogram(String relation, String column, int bins) {
         if (bins < 1) throw new IllegalArgumentException("a histogram needs at least 1 bin, got " + bins);
         String x = numeric(SqlIdent.q(column));
-        String bin = "least(CAST(coalesce(floor((v.x - s.lo) / nullif(s.hi - s.lo, 0) * " + bins + "), 0) AS BIGINT), " + (bins - 1) + ")";
+        String bin = com.gamma.analytics.distribution.Binning.equalWidthIndexSql("v.x", "s.lo", "s.hi", bins);
         return "WITH v AS (SELECT " + x + " AS x FROM " + relation + "), s AS (SELECT min(x) AS lo, max(x) AS hi FROM v) "
                 + "SELECT r.bin, s.lo + r.bin * (s.hi - s.lo) / " + bins + " AS lower_bound, "
                 + "CASE WHEN r.bin = " + (bins - 1) + " THEN s.hi ELSE s.lo + (r.bin + 1) * (s.hi - s.lo) / " + bins + " END AS upper_bound, "

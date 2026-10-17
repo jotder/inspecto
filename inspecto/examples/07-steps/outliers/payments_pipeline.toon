@@ -1,0 +1,41 @@
+name: STEP_OUTLIERS
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/payments/database
+  backup:     out/payments/backup
+  temp:       out/payments/temp
+  errors:     out/payments/errors
+  quarantine: out/payments/quarantine
+  markers:    out/payments/markers
+  status_dir: out/payments/status
+  log_dir:    out/payments/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+
+output_store: payment_review
+
+steps[2]:
+  - outlier:
+      column: AMOUNT
+      group_by[1]: REGION
+  - binning:
+      column: AMOUNT
+      bins: 4
+      min: 0
+      max: 1000
+      bin_column: AMOUNT_BAND
+      label_column: AMOUNT_RANGE

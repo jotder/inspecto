@@ -38,7 +38,7 @@ class BuiltinNodeTypeFlatHomeTest {
                 assertNull(t.stepKind(), t + " carries a steps: kind without a steps: home");
             }
         }
-        assertEquals(21, kinds.size(), "twenty-one built-in chain kinds as of 2026-10-17 (running, hash, mask, explode, unpivot; resample, shift, forecast; similarity; rank, sample, pivot; entity_link) — a change here is a change to the "
+        assertEquals(24, kinds.size(), "twenty-four built-in chain kinds as of 2026-10-17 (running, hash, mask, explode, unpivot; resample, shift, forecast; similarity; rank, sample, pivot; entity_link; outlier, binning, correlation) — a change here is a change to the "
                 + "flat file's chain vocabulary and must come with its lift/lower: " + kinds);
     }
 

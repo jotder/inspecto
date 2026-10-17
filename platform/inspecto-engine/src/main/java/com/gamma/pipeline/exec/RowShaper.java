@@ -217,6 +217,9 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_SAMPLE.type().equals(type))   return sample(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PIVOT.type().equals(type))    return pivot(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_ENTITY_LINK.type().equals(type)) return entityLink(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_OUTLIER.type().equals(type)) return outlier(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_BINNING.type().equals(type)) return binning(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_CORRELATION.type().equals(type)) return correlation(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -918,6 +921,75 @@ public final class RowShaper {
         } catch (IllegalStateException e) {
             throw new IllegalArgumentException("node '" + node.id() + "': " + EntityLinkStep.KIND + ": " + e.getMessage(), e);
         }
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.stats.outlier} (ANALYTICS-CORE-1 S3) — every inbound row gains its group's fences or robust z and
+     * an outlier flag. {@link DistributionStep} owns the grammar; the SQL is the Analytics Kernel's ({@code OutlierSql}).
+     */
+    private static List<Relation> outlier(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        DistributionStep.Outlier spec;
+        try {
+            spec = DistributionStep.parseOutlier(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = DistributionStep.columnRefusal(DistributionStep.OUTLIER, spec.inputColumns(), spec.addedColumns(),
+                List.copyOf(types.keySet()));
+        if (refusal == null)
+            refusal = DistributionStep.numberRefusal(DistributionStep.OUTLIER, List.of(spec.kernel().column()), types);
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.data.binning} (ANALYTICS-CORE-1 S3) — every inbound row gains a bin number and label.
+     * {@link DistributionStep} owns the grammar; the SQL is the Analytics Kernel's ({@code Binning}).
+     */
+    private static List<Relation> binning(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        DistributionStep.Bins spec;
+        try {
+            spec = DistributionStep.parseBinning(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = DistributionStep.columnRefusal(DistributionStep.BINNING, spec.inputColumns(), spec.addedColumns(),
+                List.copyOf(types.keySet()));
+        if (refusal == null)
+            refusal = DistributionStep.numberRefusal(DistributionStep.BINNING, List.of(spec.kernel().column()), types);
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.stats.correlation} (ANALYTICS-CORE-1 S3) — summarising: one row per group per column pair with
+     * Pearson's r and the least-squares line. {@link DistributionStep} owns the grammar; the SQL is the Analytics
+     * Kernel's ({@code CorrelationSql}).
+     */
+    private static List<Relation> correlation(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        DistributionStep.Correlation spec;
+        try {
+            spec = DistributionStep.parseCorrelation(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = DistributionStep.columnRefusal(DistributionStep.CORRELATION, spec.inputColumns(), List.of(),
+                List.copyOf(types.keySet()));
+        if (refusal == null) refusal = DistributionStep.numberRefusal(DistributionStep.CORRELATION, spec.columns(), types);
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

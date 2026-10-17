@@ -222,6 +222,17 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_ENTITY_LINK("transform.entity.link", NodeCategory.TRANSFORM, "Entity grouping",
             "Gives every row a resolution group: rows that agree exactly on a match key are the same entity. Similarity only flags look-alikes for review.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "entity_link"),
+    // Distribution Steps (ANALYTICS-CORE-1 S3) on the Analytics Kernel (OutlierSql, Binning, CorrelationSql) through
+    // DistributionStep. steps: kinds `outlier`, `binning`, `correlation`.
+    TRANSFORM_OUTLIER("transform.stats.outlier", NodeCategory.TRANSFORM, "Outlier flags",
+            "Flags each row whose number lies outside Tukey's fences (IQR) or past a robust z, per group; every row kept.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "outlier"),
+    TRANSFORM_BINNING("transform.data.binning", NodeCategory.TRANSFORM, "Bins",
+            "Adds a bin number and label to each row: equal-width or equal-frequency (quantile) bins of a number column.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "binning"),
+    TRANSFORM_CORRELATION("transform.stats.correlation", NodeCategory.TRANSFORM, "Correlation",
+            "One row per column pair (per group): Pearson correlation and the least-squares line (slope, intercept, r2).",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "correlation"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

@@ -1,0 +1,28 @@
+raw:
+  name: ORDERS
+  format: CSV
+  fields[5]{name,selector,type}:
+    ORDER_ID,"0",VARCHAR
+    REGION,"1",VARCHAR
+    PRICE,"2",DOUBLE
+    QUANTITY,"3",INTEGER
+    DISCOUNT,"4",DOUBLE
+mapping:
+  canonicalName: orders
+  rawName: ORDERS
+  fields[5]:
+    - name: ORDER_ID
+      from: ORDER_ID
+      fn: keep
+    - name: REGION
+      from: REGION
+      fn: keep
+    - name: PRICE
+      from: PRICE
+      fn: keep
+    - name: QUANTITY
+      from: QUANTITY
+      fn: keep
+    - name: DISCOUNT
+      from: DISCOUNT
+      fn: keep

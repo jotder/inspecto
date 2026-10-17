@@ -964,6 +964,56 @@ class NodeConfigNameContractTest {
         assertEquals(List.of("person", "candidate_score", "candidate_group", "candidate_review"), s.addedColumns());
     }
 
+    /**
+     * The distribution Steps' contract (ANALYTICS-CORE-1 S3): {@code outlier:}, {@code binning:} and
+     * {@code correlation:} each lift to ONE node of their type, an edit of every declared key survives the lower and still
+     * parses as the run reads it.
+     */
+    @Test
+    void distributionAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> outlier = new LinkedHashMap<>();
+        outlier.put("column", "QTY");
+        outlier.put("method", "robust_z");
+        outlier.put("group_by", List.of("ID"));
+        outlier.put("k", 3.0);
+        outlier.put("quantile_mode", "discrete");
+        outlier.put("threshold", 2.5);
+        outlier.put("unit", 0.01);
+        outlier.put("prefix", "qty_");
+        var o = com.gamma.pipeline.exec.DistributionStep.parseOutlier(
+                timeSeriesSavedAs(dir.resolve("o"), "outlier", "transform.stats.outlier", outlier));
+        assertEquals(com.gamma.analytics.distribution.OutlierSql.Method.ROBUST_Z, o.kernel().method());
+        assertEquals(2.5, o.kernel().threshold());
+        assertEquals(0.01, o.kernel().unit());
+        assertEquals(List.of("qty_score", "qty_flag"), o.addedColumns());
+        assertEquals(List.of("ID"), o.kernel().groupBy());
+
+        Map<String, Object> bins = new LinkedHashMap<>();
+        bins.put("column", "QTY");
+        bins.put("bins", 5);
+        bins.put("method", "equal_width");
+        bins.put("group_by", List.of("ID"));
+        bins.put("min", 0);
+        bins.put("max", 100);
+        bins.put("quantile_mode", "discrete");
+        bins.put("bin_column", "qty_bin");
+        bins.put("label_column", "qty_range");
+        var b = com.gamma.pipeline.exec.DistributionStep.parseBinning(
+                timeSeriesSavedAs(dir.resolve("b"), "binning", "transform.data.binning", bins));
+        assertEquals(5, b.kernel().bins());
+        assertEquals(0.0, b.kernel().rangeMin());
+        assertEquals(100.0, b.kernel().rangeMax());
+        assertEquals(List.of("qty_bin", "qty_range"), b.addedColumns());
+
+        Map<String, Object> corr = new LinkedHashMap<>();
+        corr.put("columns", List.of("QTY", "PRICE", "TAX"));
+        corr.put("group_by", List.of("ID"));
+        var c = com.gamma.pipeline.exec.DistributionStep.parseCorrelation(
+                timeSeriesSavedAs(dir.resolve("c"), "correlation", "transform.stats.correlation", corr));
+        assertEquals(3, c.pairs().size());
+        assertEquals(List.of("ID"), c.groupBy());
+    }
+
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
             throws Exception {
         java.nio.file.Files.createDirectories(dir);
