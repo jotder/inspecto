@@ -159,20 +159,23 @@ final class AgentRoutes implements RouteModule {
             }
             return result.get("value");
         });
-        api.get("/agent/triage-runs", (e, m) ->
-                Map.of("triageRuns", agentOr503(api).recentTriageRuns(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
+        // OBJECT-READ-MASKING-RESIDUALS-1: Triage Runs, their feedback and the approvals inbox are free text the agent
+        // and operators wrote about Incidents (hypotheses, tool arguments, previews, notes). It cannot be masked per
+        // object, so these reads take the reveal capability (fail closed), the same one every masked read honours.
+        api.get("/agent/triage-runs", ApiContext.withCapability("canRevealLinkEntities", (e, m) ->
+                Map.of("triageRuns", agentOr503(api).recentTriageRuns(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50)))));
         // AGT-5 P5 (Learning): triage-run similarity recall — prior Triage Runs like this one. Registered BEFORE the
         // greedy /agent/triage-runs/(.+) so it wins (routes match in registration order, first-match). 404 when
         // the base Triage Run is unknown (read it first), else the (possibly empty) neighbour list.
-        api.get("/agent/triage-runs/(.+)/similar", (e, m) -> {
+        api.get("/agent/triage-runs/(.+)/similar", ApiContext.withCapability("canRevealLinkEntities", (e, m) -> {
             String id = ApiContext.name(m);
             IntelligenceAgent agent = agentOr503(api);
             if (agent.triageRunById(id).isEmpty()) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown triage run: '" + id + "'");
             return Map.of("similar", agent.similarTriageRuns(id, ApiContext.parseIntOr(ApiContext.query(e, "k"), 5)));
-        });
-        api.get("/agent/triage-runs/(.+)", (e, m) ->
+        }));
+        api.get("/agent/triage-runs/(.+)", ApiContext.withCapability("canRevealLinkEntities", (e, m) ->
                 agentOr503(api).triageRunById(ApiContext.name(m))
-                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown triage run: '" + ApiContext.name(m) + "'")));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown triage run: '" + ApiContext.name(m) + "'"))));
 
         // AGT-5 P5 (Learning): operator feedback on a Triage Run — the raw signal the learning
         // tier turns into eval growth + per-skill tuning. The write is audited by ControlApi.dispatch.
@@ -186,8 +189,8 @@ final class AgentRoutes implements RouteModule {
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
             }
         }));
-        api.get("/agent/feedback", (e, m) -> Map.of("feedback",
-                agentOr503(api).recentTriageRunFeedback(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100))));
+        api.get("/agent/feedback", ApiContext.withCapability("canRevealLinkEntities", (e, m) -> Map.of("feedback",
+                agentOr503(api).recentTriageRunFeedback(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100)))));
 
         // AGT-5 P3 (autonomy L2): the approvals inbox. A mutating agent tool call parks in the
         // intelligence module's ApprovalStore until an operator decides here; the decision POST resumes
@@ -198,11 +201,11 @@ final class AgentRoutes implements RouteModule {
         // no agent route ever implemented that — corrected 2026-08-26, the UI explains the 503 instead.)
         // The decision is itself audited by ControlApi.dispatch; a secured edition prepends the
         // approver-capability gate at the ApiContext/WriteGates seam (plan §6, L2).
-        api.get("/agent/approvals", (e, m) ->
-                Map.of("approvals", agentOr503(api).recentApprovals(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
-        api.get("/agent/approvals/(.+)", (e, m) ->
+        api.get("/agent/approvals", ApiContext.withCapability("canRevealLinkEntities", (e, m) ->
+                Map.of("approvals", agentOr503(api).recentApprovals(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50)))));
+        api.get("/agent/approvals/(.+)", ApiContext.withCapability("canRevealLinkEntities", (e, m) ->
                 agentOr503(api).approvalById(ApiContext.name(m))
-                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown approval: '" + ApiContext.name(m) + "'")));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown approval: '" + ApiContext.name(m) + "'"))));
         api.post("/agent/approvals/(.+)/decision", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
             Boolean approve = parseDecision(ApiContext.str(body, "decision"));

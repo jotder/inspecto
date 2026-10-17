@@ -372,6 +372,14 @@ public final class CapabilityManifest {
             // the coarse capability without the product question the Incident-triage family needs.
             // ⚠ Reachability caveat: `/agent/*` answers 503 in every bundle today (no packaging stages
             // `inspecto-intelligence`), so this gate is correct-but-unreached until that changes.
+            // OBJECT-READ-MASKING-RESIDUALS-1 (2026-10-18): the agent's free-text records about Incidents cannot be
+            // masked per object, so reading them takes the reveal capability (fail closed).
+            new Entry("GET", "/agent/triage-runs", Roles.CAN_REVEAL_LINK_ENTITIES),
+            new Entry("GET", "/agent/triage-runs/(.+)/similar", Roles.CAN_REVEAL_LINK_ENTITIES),
+            new Entry("GET", "/agent/triage-runs/(.+)", Roles.CAN_REVEAL_LINK_ENTITIES),
+            new Entry("GET", "/agent/feedback", Roles.CAN_REVEAL_LINK_ENTITIES),
+            new Entry("GET", "/agent/approvals", Roles.CAN_REVEAL_LINK_ENTITIES),
+            new Entry("GET", "/agent/approvals/(.+)", Roles.CAN_REVEAL_LINK_ENTITIES),
             new Entry("POST", "/agent/triage-runs/(.+)/feedback", Roles.CAN_ADMINISTER),
             new Entry("POST", "/agent/approvals/(.+)/decision", Roles.CAN_ADMINISTER),
             new Entry("PUT", "/agent/policy", Roles.CAN_ADMINISTER),
