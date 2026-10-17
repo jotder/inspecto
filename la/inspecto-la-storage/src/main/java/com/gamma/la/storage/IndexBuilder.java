@@ -721,7 +721,7 @@ public final class IndexBuilder {
         String column(String name, Map<String, String> types) {
             if (!types.containsKey(name.toLowerCase(Locale.ROOT)))
                 throw new IndexBuildException("the relation has no column '" + name + "' (it has " + types.keySet() + ")");
-            return "\"" + name.replace("\"", "\"\"") + "\"";
+            return SqlIdent.q(name);
         }
 
         String effectiveZone(IndexMapping m, Map<String, String> types) {
