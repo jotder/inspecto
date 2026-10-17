@@ -1,5 +1,6 @@
 package com.gamma.query;
 
+import com.gamma.analytics.time.TimeGrain;
 import com.gamma.util.SqlIdent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -337,7 +338,18 @@ public final class MeasureCompiler {
         String grain = grains == null ? null : grains.get(dim);
         if (grain == null) return q(dim);
         String format = "month".equals(grain) ? "%Y-%m" : "%Y-%m-%d";
-        return "STRFTIME(DATE_TRUNC('" + grain + "', " + q(dim) + "), '" + format + "')";
+        return "STRFTIME(" + TimeGrain.parse(grain).truncateSql(q(dim)) + ", '" + format + "')";
+    }
+
+    /**
+     * The validated SQL aggregate for one measure, for a caller that builds its own query around the grammar (the
+     * {@code transform.timeseries.resample} Step, ANALYTICS-CORE-1 M5) — so the grammar is still evaluated only here.
+     */
+    public static String aggregateSql(Measure m) {
+        if (!AGGS.contains(m.agg()))
+            throw new IllegalArgumentException("unknown aggregation '" + m.agg() + "' (one of " + AGGS + ")");
+        if (!"count".equals(m.agg())) safeIdent(m.field(), "measure field");
+        return aggExpression(m);
     }
 
     /** The SQL aggregate for a measure — the same set as the UI's aggExpression(). */

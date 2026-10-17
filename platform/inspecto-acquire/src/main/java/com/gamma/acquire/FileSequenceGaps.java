@@ -1,5 +1,6 @@
 package com.gamma.acquire;
 
+import com.gamma.analytics.time.TimeGrain;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -241,13 +242,12 @@ public final class FileSequenceGaps {
         return holes;
     }
 
-    /** Floor {@code t} to the bucket granularity so window enumeration lands on bucket starts. */
+    /**
+     * Floor {@code t} to the bucket granularity so window enumeration lands on bucket starts — the Analytics Kernel's
+     * wall-clock truncation (ANALYTICS-CORE-1 M5): a file-name date carries no zone, so none is applied.
+     */
     private static LocalDateTime truncate(LocalDateTime t, ChronoUnit unit) {
-        return switch (unit) {
-            case SECONDS, MINUTES, HOURS, DAYS -> t.truncatedTo(unit);
-            case MONTHS -> t.truncatedTo(ChronoUnit.DAYS).withDayOfMonth(1);
-            default -> t.truncatedTo(ChronoUnit.DAYS).withDayOfYear(1);
-        };
+        return TimeGrain.of(unit).truncate(t);
     }
 
     // ── template parsing ─────────────────────────────────────────────────────

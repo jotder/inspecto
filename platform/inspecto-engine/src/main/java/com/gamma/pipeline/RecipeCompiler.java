@@ -127,6 +127,8 @@ public final class RecipeCompiler {
                 case "mask" -> nodes.add(mask(id, cfg, refusals));
                 case "explode" -> nodes.add(explode(id, cfg, refusals));
                 case "unpivot" -> nodes.add(unpivot(id, cfg, refusals));
+                case "resample" -> nodes.add(resample(id, cfg, refusals));
+                case "shift" -> nodes.add(shift(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -406,6 +408,31 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_EXPLODE.type(), new LinkedHashMap<>(cfg));
     }
 
+    /**
+     * {@code resample:} -> a {@code transform.timeseries.resample} node, config verbatim (ANALYTICS-CORE-1 M5). The
+     * grammar is {@link com.gamma.pipeline.exec.TimeSeriesStep#parseResample}'s, so the recipe refuses what the run would.
+     */
+    private static PipelineNode resample(String id, Map<String, Object> cfg,
+                                         List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.pipeline.exec.TimeSeriesStep.parseResample(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_RESAMPLE.type(), new LinkedHashMap<>(cfg));
+    }
+
+    /** {@code shift:} -> a {@code transform.timeseries.shift} node, config verbatim; refused as the run would refuse it. */
+    private static PipelineNode shift(String id, Map<String, Object> cfg,
+                                      List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.pipeline.exec.TimeSeriesStep.parseShift(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SHIFT.type(), new LinkedHashMap<>(cfg));
+    }
+
     /** {@code unpivot: {columns[] | columns_pattern, name_column?, value_column?, value_type?, include_nulls?}} ->
      *  a transform.matrix.unpivot node, config verbatim. Exactly one column selector; the rest is judged at run. */
     private static PipelineNode unpivot(String id, Map<String, Object> cfg,
@@ -636,6 +663,8 @@ public final class RecipeCompiler {
                     case "mask" -> stepNode = mask(stepId, stepCfg, refusals);
                     case "explode" -> stepNode = explode(stepId, stepCfg, refusals);
                     case "unpivot" -> stepNode = unpivot(stepId, stepCfg, refusals);
+                    case "resample" -> stepNode = resample(stepId, stepCfg, refusals);
+                    case "shift" -> stepNode = shift(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);

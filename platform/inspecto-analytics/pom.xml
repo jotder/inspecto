@@ -13,11 +13,12 @@
 
     <!-- ANALYTICS-CORE-1 M1 + M6 (docs/superpower/analytics-core-plan.md, D-AN1): the Analytics Kernel - one written
          definition per statistic (Stats: mean, variance / stddev, median modes, quantile modes, MAD, robust z, IQR,
-         Tukey fences), the baseline contract promoted from inspecto-anomaly (com.gamma.analytics.baseline) and the one
-         column profiler (ColumnProfiler, M4). Pure functions and SQL builders, no routes, no state. BASE in every
-         edition. No third-party library of its own (D-AN8); the policy below allows only the foundation layer (api,
-         config, sql, util). Main code uses inspecto-util for SqlIdent - the one SQL quoting implementation - so the
-         profiler never carries a private quoting helper; the tests open DuckDB through it too. -->
+         Tukey fences), the baseline contract promoted from inspecto-anomaly (com.gamma.analytics.baseline), the one
+         column profiler (ColumnProfiler, M4) and the time-series primitives (com.gamma.analytics.time: TimeGrain,
+         TimeSeriesSql, M5). Pure functions and SQL builders, no routes, no state. BASE in every edition. No third-party
+         library of its own (D-AN8); the policy below allows only the foundation layer (api, config, sql, util). Main
+         code uses inspecto-util for SqlIdent - the one SQL quoting implementation - so neither the profiler nor the
+         time-series builders carry a private quoting helper; the tests open DuckDB through its DuckDbUtil too. -->
     <artifactId>inspecto-analytics</artifactId>
     <name>Inspecto Analytics Kernel</name>
 

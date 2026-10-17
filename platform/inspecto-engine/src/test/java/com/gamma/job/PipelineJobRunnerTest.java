@@ -1301,6 +1301,48 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * A stored {@code resample} then {@code shift} chain executes at rest (ANALYTICS-CORE-1 M5): monthly sums with the
+     * empty February filled with 0, then each month's previous sum beside it. The lift must map the plain kinds to
+     * {@code transform.timeseries.*} — a {@code transform.resample} node would fail as an unknown type.
+     */
+    @Test
+    void runsAFlatConfigsResampleAndShiftStepsAndWritesAMonthOverMonthSeries() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("ts_pipeline.toon");
+        Files.writeString(flat, """
+                name: ts_etl
+                active: false
+                output_store: monthly
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[2]:
+                  - resample:
+                      time_column: id
+                      grain: month
+                      measures[1]: sum(amt)
+                      bucket_column: month
+                  - shift:
+                      time_column: month
+                      grain: month
+                      columns[1]: sum_amt
+                """);
+        seedParquet(dataDir, "ts_etl", "(TIMESTAMP '2026-01-05 10:00',10),(TIMESTAMP '2026-01-20 11:00',5),"
+                + "(TIMESTAMP '2026-03-02 00:00',7)");
+
+        JobConfig cfg = new JobConfig("mom", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("2026-01|15.0|null", "2026-02|0.0|15.0", "2026-03|7.0|0.0"), queryStore(dataDir, "monthly",
+                "SELECT strftime(month, '%%Y-%%m'), sum_amt, sum_amt_prev FROM %s ORDER BY month"));
+    }
+
+    /**
      * A {@code webhook:} branch run end to end through the job lane: {@code PipelineLift.stageTwo} makes it a
      * second branch beside {@code output_store:}, {@code PartitionSinkWriter} dispatches it to
      * {@code WebhookSink}, and the edition's transport — here a capturing one, discovered through the real

@@ -174,6 +174,33 @@ class RecipeCompilerTest {
         assertTrue(e.refusals().get(0).message().contains("60 parsecs"), e.refusals().get(0).message());
     }
 
+    /**
+     * {@code resample:} and {@code shift:} (ANALYTICS-CORE-1 M5) compile to {@code steps:} entries under their plain
+     * kinds, and a malformed one refuses as the run would.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void timeSeriesStepsCompileAndAMalformedOneRefusesByName() {
+        Map<String, Object> resample = new LinkedHashMap<>(Map.of("time_column", "TS", "grain", "month",
+                "measures", List.of("sum(AMOUNT)"), "bucket_column", "MONTH"));
+        Map<String, Object> shift = new LinkedHashMap<>(Map.of("time_column", "MONTH", "grain", "month",
+                "columns", List.of("sum_AMOUNT"), "periods", 12));
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(4, step("resample", resample));
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(5, step("shift", shift));
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) RecipeCompiler.compile(recipe).get("steps");
+        assertTrue(steps.stream().anyMatch(s -> resample.equals(s.get("resample"))), String.valueOf(steps));
+        assertTrue(steps.stream().anyMatch(s -> shift.equals(s.get("shift"))), String.valueOf(steps));
+
+        Map<String, Object> bad = linearRecipe("/data/db");
+        Map<String, Object> broken = new LinkedHashMap<>(resample);
+        broken.put("grain", "fortnight");
+        ((List<Map<String, Object>>) (List<?>) bad.get("steps")).add(4, step("resample", broken));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class, () -> RecipeCompiler.compile(bad));
+        assertEquals(RecipeCompiler.MALFORMED_STEP, e.refusals().get(0).code());
+        assertTrue(e.refusals().get(0).message().contains("fortnight"), e.refusals().get(0).message());
+    }
+
     /** quality.crypto.hash (2026-10-06): an authored salt is refused by name — the key is the Space's, never config. */
     @Test
     @SuppressWarnings("unchecked")

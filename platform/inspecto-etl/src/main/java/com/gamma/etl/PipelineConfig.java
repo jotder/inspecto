@@ -344,10 +344,22 @@ public final class PipelineConfig {
          * {@code include_nulls}. No legacy singular spelling - always {@code steps:}.
          */
         public static final String UNPIVOT = "unpivot";
+        /**
+         * Time-series resample ({@code transform.timeseries.resample}, ANALYTICS-CORE-1 M5). Keys: {@code time_column},
+         * {@code grain}, optional {@code timezone}, {@code group_by}, {@code measures}, {@code bucket_column},
+         * {@code from}, {@code to}. No legacy spelling - always {@code steps:}.
+         */
+        public static final String RESAMPLE = "resample";
+        /**
+         * Period-over-period shift ({@code transform.timeseries.shift}, ANALYTICS-CORE-1 M5). Keys:
+         * {@code time_column}, {@code grain}, {@code columns}, optional {@code timezone}, {@code group_by},
+         * {@code periods}, {@code suffix}. No legacy spelling - always {@code steps:}.
+         */
+        public static final String SHIFT = "shift";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE} and {@link #UNPIVOT} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE} and {@link #SHIFT} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

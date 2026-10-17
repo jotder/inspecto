@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.analytics.time.TimeGrain;
 import com.gamma.acquire.DayManifest;
 import com.gamma.acquire.FileSequenceGaps;
 import com.gamma.acquire.GapTracker;
@@ -147,8 +148,7 @@ final class DeliveryCheck {
             if (first == null) return List.of();                              // nothing known yet: no window to judge
             ChronoUnit unit = FileSequenceGaps.unit(gd.fileTemplate());
             LocalDateTime now = LocalDateTime.ofEpochSecond(nowMillis / 1000, 0, ZoneOffset.UTC);
-            LocalDateTime current = unit == ChronoUnit.MONTHS ? now.truncatedTo(ChronoUnit.DAYS).withDayOfMonth(1)
-                    : unit == ChronoUnit.YEARS ? now.truncatedTo(ChronoUnit.DAYS).withDayOfYear(1) : now.truncatedTo(unit);
+            LocalDateTime current = TimeGrain.of(unit).truncate(now);   // the kernel's wall-clock floor, on UTC
             LocalDateTime lastComplete = current.minus(1, unit);
             if (lastComplete.isBefore(first)) return List.of();
             FileSequenceGaps.Report r = FileSequenceGaps.analyze(gd.fileTemplate(), names, first, lastComplete,

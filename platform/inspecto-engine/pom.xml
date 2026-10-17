@@ -42,7 +42,9 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-sql</artifactId>
         </dependency>
-        <!-- ANALYTICS-CORE-1 M4: transform.profile builds its SQL with the Analytics Kernel's ColumnProfiler. -->
+        <!-- ANALYTICS-CORE-1: the canonical statistics (M2 - VolumeBaseline's lower median is Stats.median(x, LOWER));
+             transform.profile builds its SQL with the kernel's ColumnProfiler (M4); the time-grain truncation and the
+             resample / shift Steps use com.gamma.analytics.time (M5). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-analytics</artifactId>
@@ -71,11 +73,6 @@
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-workflow</artifactId>
-        </dependency>
-        <!-- ANALYTICS-CORE-1 M2: the canonical statistics (VolumeBaseline's lower median is Stats.median(x, LOWER)). -->
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-analytics</artifactId>
         </dependency>
 
         <!-- DuckDB (parent-managed since WS-D). -->

@@ -429,6 +429,57 @@ public final class NodeAttributes {
             NodeAttribute.of("include_nulls", "Keep empty cells", "boolean", "optional").defaultValue(false)
                     .help("Emit a row for a null cell too. Off: null cells produce no row."));
 
+    private static NodeAttribute grain() {
+        return NodeAttribute.of("grain", "Time grain", "select", "required")
+                .options("second", "Second", "minute", "Minute", "hour", "Hour", "day", "Day", "week", "Week (Monday)",
+                        "month", "Month", "quarter", "Quarter", "year", "Year")
+                .help("The bucket size. Weeks start on Monday.");
+    }
+
+    private static NodeAttribute timezone() {
+        return NodeAttribute.of("timezone", "Time zone", "string", "optional").placeholder("Europe/Berlin")
+                .help("Only for a TIMESTAMP WITH TIME ZONE column: whose calendar the buckets follow (UTC, Europe/Berlin...). "
+                        + "Leave blank for a DATE or TIMESTAMP column, which is bucketed on its own clock.");
+    }
+
+    /**
+     * {@code transform.timeseries.resample} (ANALYTICS-CORE-1 M5): one row per key per bucket, gaps filled. The grammar
+     * and run-time rules live in {@code TimeSeriesStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_RESAMPLE = List.of(
+            NodeAttribute.of("time_column", "Time column", "string", "required").placeholder("EVENT_TS")
+                    .help("The DATE or TIMESTAMP column the rows are bucketed on. Rows where it is empty are left out."),
+            grain(),
+            timezone(),
+            NodeAttribute.of("group_by", "Series keys", "list", "optional").placeholder("REGION")
+                    .help("One series per key; every key gets every bucket. Leave blank for one series."),
+            NodeAttribute.of("measures", "Measures", "list", "required").placeholder("sum(amount)")
+                    .help("count or agg(field). An empty bucket gets 0 for count, countDistinct and sum, empty otherwise."),
+            NodeAttribute.of("bucket_column", "Bucket column", "string", "optional").defaultValue("bucket")
+                    .help("Receives each bucket's start (a TIMESTAMP, on the time zone's clock when one is set)."),
+            NodeAttribute.of("from", "First bucket", "string", "optional").placeholder("2026-01-01")
+                    .help("Start the series here even if the data starts later. Blank: the earliest bucket with data."),
+            NodeAttribute.of("to", "Last bucket", "string", "optional").placeholder("2026-12-31")
+                    .help("End the series here even if the data ends earlier. Blank: the latest bucket with data."));
+
+    /**
+     * {@code transform.timeseries.shift} (ANALYTICS-CORE-1 M5): the value a key had N buckets earlier, matched by bucket.
+     * Rules in {@code TimeSeriesStep}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_SHIFT = List.of(
+            NodeAttribute.of("time_column", "Time column", "string", "required").placeholder("bucket")
+                    .help("The bucket column (a resample's output); one row per key per bucket."),
+            grain(),
+            timezone(),
+            NodeAttribute.of("group_by", "Series keys", "list", "optional").placeholder("REGION")
+                    .help("Shift within each key. Leave blank for one series."),
+            NodeAttribute.of("columns", "Columns to shift", "list", "required").placeholder("sum_amount")
+                    .help("Each gains a column with its value from the earlier bucket (empty when that bucket has no row)."),
+            NodeAttribute.of("periods", "Buckets back", "number", "optional").defaultValue(1)
+                    .help("1 = the previous bucket; 12 with a month grain = the same month last year; -1 = the next bucket."),
+            NodeAttribute.of("suffix", "Name suffix", "string", "optional").defaultValue("_prev")
+                    .help("Added to each shifted column's name: sum_amount becomes sum_amount_prev."));
+
     /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
@@ -612,7 +663,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -631,6 +682,8 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_MASK.type(), TRANSFORM_MASK);
         m.put(BuiltinNodeType.TRANSFORM_EXPLODE.type(), TRANSFORM_EXPLODE);
         m.put(BuiltinNodeType.TRANSFORM_UNPIVOT.type(), TRANSFORM_UNPIVOT);
+        m.put(BuiltinNodeType.TRANSFORM_RESAMPLE.type(), TRANSFORM_RESAMPLE);
+        m.put(BuiltinNodeType.TRANSFORM_SHIFT.type(), TRANSFORM_SHIFT);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

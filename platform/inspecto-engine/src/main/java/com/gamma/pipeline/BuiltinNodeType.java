@@ -188,6 +188,14 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_UNPIVOT("transform.matrix.unpivot", NodeCategory.TRANSFORM, "Unpivot",
             "Wide columns become (name, value) rows.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "unpivot"),
+    // Time-series primitives (ANALYTICS-CORE-1 M5). Types keep the catalog ids; steps: kinds are the plain words.
+    // Both execute in RowShaper through TimeSeriesStep, whose SQL is the Analytics Kernel's (TimeSeriesSql).
+    TRANSFORM_RESAMPLE("transform.timeseries.resample", NodeCategory.TRANSFORM, "Resample",
+            "One row per key per time bucket, every bucket present: counts and sums of an empty bucket are 0.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "resample"),
+    TRANSFORM_SHIFT("transform.timeseries.shift", NodeCategory.TRANSFORM, "Period shift",
+            "Each row gains the value its key had N buckets earlier (previous month, same week last year).",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "shift"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

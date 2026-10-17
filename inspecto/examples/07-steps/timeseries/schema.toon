@@ -1,0 +1,29 @@
+partitionKey: SALE_DATE
+raw:
+  name: SALES
+  format: CSV
+  fields[5]{name,selector,type}:
+    SALE_ID,"0",VARCHAR
+    SALE_DATE,"1",DATE
+    REGION,"2",VARCHAR
+    SALE_TS,"3",TIMESTAMP
+    AMOUNT,"4",DOUBLE
+mapping:
+  canonicalName: sales
+  rawName: SALES
+  fields[5]:
+    - name: SALE_ID
+      from: SALE_ID
+      fn: keep
+    - name: SALE_DATE
+      from: SALE_DATE
+      fn: keep
+    - name: REGION
+      from: REGION
+      fn: keep
+    - name: SALE_TS
+      from: SALE_TS
+      fn: keep
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep
