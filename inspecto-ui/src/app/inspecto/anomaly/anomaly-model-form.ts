@@ -12,9 +12,9 @@ export const ANOMALY_ENTITY_TYPES = ['subscriber', 'account', 'device', 'sim', '
 export const MAX_FEATURES = 16;
 /** `AnomalyModel.Direction`, lower-cased as authored. */
 export const ANOMALY_DIRECTIONS: { value: string; label: string }[] = [
-    { value: 'up', label: 'Up (higher than usual is unusual)' },
-    { value: 'down', label: 'Down (lower than usual is unusual)' },
-    { value: 'both', label: 'Both directions' },
+    { value: 'up', label: 'Up' },
+    { value: 'down', label: 'Down' },
+    { value: 'both', label: 'Both' },
 ];
 
 /** The flat top-level fields, one schema-form. Nested `peers` / `watchList` are flattened here. */

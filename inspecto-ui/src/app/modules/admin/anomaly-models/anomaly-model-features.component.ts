@@ -109,6 +109,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                             label="Direction"
                             formControlName="direction"
                             [options]="directions"
+                            help="Up: higher than usual is unusual. Down: lower than usual is unusual."
                         ></inspecto-option-picker>
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Weight</mat-label>
@@ -133,7 +134,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                         <p class="text-secondary text-xs">Only rows matching every filter are measured.</p>
                         @for (fg of filtersOf(g).controls; track fg; let j = $index) {
                             <div
-                                class="mt-2 grid grid-cols-1 items-start gap-x-4 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto]"
+                                class="mt-2 grid grid-cols-1 items-start gap-x-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                                 role="group"
                                 [formGroupName]="j"
                                 [attr.aria-label]="'Feature ' + (i + 1) + ' filter ' + (j + 1)"
