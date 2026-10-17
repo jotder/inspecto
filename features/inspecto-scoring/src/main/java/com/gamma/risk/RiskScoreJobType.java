@@ -36,7 +36,7 @@ public final class RiskScoreJobType implements JobTypeProvider {
     static final JobTypeDescriptor DESCRIPTOR = new JobTypeDescriptor("risk.score", "Risk Score",
             "Scores every entity a saved Risk Score model names (Σ weight × indicator, 0–100, with its factors) "
                     + "and writes the scores Dataset.",
-            List.of(ParameterDecl.required("model", ParamType.STRING, "Saved risk-score component id")),
+            ParameterDecl.configOnly(List.of(ParameterDecl.required("model", ParamType.STRING, "Saved risk-score component id"))),
             List.of(ScoringSignals.RISK_SCORE_PRODUCED),
             List.of(ArtifactDecl.dataset("scores")));
 

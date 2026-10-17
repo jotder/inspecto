@@ -42,7 +42,7 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
     static final JobTypeDescriptor DESCRIPTOR = new JobTypeDescriptor("anomaly.score", "Anomaly Score",
             "Scores every entity a saved Anomaly Model names against its own robust baseline (median / MAD, 0-100, "
                     + "with a per-feature explanation) and writes the scores Dataset.",
-            List.of(ParameterDecl.required("model", ParamType.STRING, "Saved anomaly-model component id"),
+            List.of(ParameterDecl.required("model", ParamType.STRING, "Saved anomaly-model component id").asConfigOnly(),
                     ParameterDecl.optional("as_of", ParamType.STRING, null,
                             "Score the day before this date (YYYY-MM-DD, UTC); default today")),
             List.of(AnomalySignals.ANOMALY_SCORE_PRODUCED),

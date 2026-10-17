@@ -63,6 +63,7 @@ public record JobTypeDescriptor(String id, String title, String description,
             pm.put("multi", p.multi());
             pm.put("secret", p.secret());
             pm.put("expressions", p.expressions());
+            pm.put("configOnly", p.configOnly());
             return pm;
         }).toList());
         m.put("emits", emits);

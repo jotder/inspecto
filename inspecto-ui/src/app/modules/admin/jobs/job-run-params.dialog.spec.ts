@@ -10,7 +10,7 @@ import { JobRunParamsDialog } from './job-run-params.dialog';
 
 const decl = (o: object) => ({ required: false, deduce: '', default: '', description: '', ...o });
 
-function create(trigger = vi.fn(() => of({ runId: 'r1' }))) {
+function create(trigger = vi.fn(() => of({ runId: 'r1' })), extra: object[] = []) {
     const ref = { close: vi.fn() };
     TestBed.configureTestingModule({
         imports: [JobRunParamsDialog],
@@ -32,6 +32,7 @@ function create(trigger = vi.fn(() => of({ runId: 'r1' }))) {
                             parameters: [
                                 decl({ name: 'as_of', type: 'DATE', tier: 'REQUIRED' }),
                                 decl({ name: 'limit', type: 'INTEGER', tier: 'REQUIRED', default: '10' }),
+                                ...extra,
                             ],
                         }),
                     get: () => of({ name: 'j1', type: 'anomaly.score', params: { limit: 5 } }),
@@ -46,6 +47,13 @@ function create(trigger = vi.fn(() => of({ runId: 'r1' }))) {
 }
 
 describe('JobRunParamsDialog', () => {
+    it('does not offer a config-only parameter (the Run would silently ignore an override)', async () => {
+        const { fixture, c } = create(undefined, [decl({ name: 'sink_dataset', type: 'STRING', configOnly: true })]);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(c.specs().map((s) => s.key)).toEqual(['as_of', 'limit']);
+    });
+
     it('sends only the fields the user changed, then closes with the run id', async () => {
         const { fixture, c, ref, trigger } = create();
         await fixture.whenStable();

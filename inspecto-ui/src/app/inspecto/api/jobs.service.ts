@@ -131,6 +131,11 @@ export interface JobParameterDecl {
     secret?: boolean;
     /** Whether `$`-tokens are accepted here; false forces a literal. Defaults to true. */
     expressions?: boolean;
+    /**
+     * The Job reads this key from its saved config only, so a trigger argument would be silently ignored:
+     * the authoring form renders it, the "Run with parameters" dialog does not offer it. Defaults to false.
+     */
+    configOnly?: boolean;
 }
 
 /** One Job Type's catalog metadata (GET /jobs/types[/{id}]) — the descriptor that drives authoring. */

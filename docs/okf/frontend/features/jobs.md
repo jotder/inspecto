@@ -36,7 +36,21 @@ the authoring form, and posts `POST /jobs/{name}/trigger {"params":{…}}` with 
 value is joined to CSV, the resolver's wire form). A refusal (422) shows inline and the dialog stays open; success
 reuses the Run-now toast + reload. Same gate as Run now (the route's `canOperateRuns`; the UI adds none).
 Deliberately **no free-form key=value rows**: a Job's contract is its declaration, and a type with none shows
-"declares no runtime parameters". Needed no backend change — the declarations were already exposed.
+"declares no runtime parameters".
+
+**Config-only declarations are not offered (2026-10-17).** The dialog lists only `!configOnly` declarations. A
+`ParameterDecl` is `configOnly` when its Job reads the key from the saved config (`cfg.opt/require/params()`), never
+from `ctx.params()`, so a trigger arg would be silently ignored (live drive: `fraud_irsf` Sink dataset, a `report`
+Job's `format`/`out_dir`). The flag is served on `GET /jobs/types/{id}` (`configOnly`) and the authoring form still
+renders those fields. As built: `enrich`, `report`, `maintenance`, `pipeline`, `kpi.completeness`,
+`space.comparison`, `la.index.build`, `caserule.evaluate`, `risk.score`, `screening.run`, `objects.analytics` are
+wholly config-only; `sql.template` has `sql`/`sink_dataset`/`sources` config-only (its scanned `$name` tokens and
+incremental `day` stay runtime); `anomaly.score` `model` and `recon.run` `reconciliation` are config-only while
+`as_of` / `day` are runtime. Runtime (honoured via `ctx.params()`): `alert.evaluate`, `incident.open`,
+`expectation.evaluate`, `mail.send`, `sample.hello`, `consignment.process`, `publish.postgres`,
+`objectstore.export`. A new Job Type's declaration must set `configOnly` for any key its Job does not read from
+`ctx.params()` (pinned for the built-ins by `ConfigOnlyParametersTest`). `sources` is labelled **Input Datasets**.
+`alert.evaluate`'s `rule` evaluates ONLY that rule (`AlertAccess.evaluateRule`; unknown name fails the Run).
 
 ## The authoring form is descriptor-driven (job-parameter-contract steps 10–16, 2026-08-10)
 

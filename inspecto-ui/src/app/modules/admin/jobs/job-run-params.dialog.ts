@@ -81,10 +81,12 @@ export class JobRunParamsDialog {
     constructor() {
         forkJoin({ type: this.api.describeType(this.data.type), job: this.api.get(this.data.name) }).subscribe({
             next: ({ type, job }) => {
-                this.validators.set(paramExtraValidators(type.parameters));
-                this.specs.set(paramDeclsToSpecs(type.parameters));
+                // Only what a Run honours: a config-only key would be silently ignored if sent as a trigger arg.
+                const runtime = type.parameters.filter((p) => !p.configOnly);
+                this.validators.set(paramExtraValidators(runtime));
+                this.specs.set(paramDeclsToSpecs(runtime));
                 // Configured values win over the declared default (which the spec already carries).
-                const declared = new Set(type.parameters.map((p) => p.name));
+                const declared = new Set(runtime.map((p) => p.name));
                 const init = Object.fromEntries(Object.entries(job.params ?? {}).filter(([k]) => declared.has(k)));
                 this.initial.set(Object.keys(init).length ? init : undefined);
                 this.loading.set(false);

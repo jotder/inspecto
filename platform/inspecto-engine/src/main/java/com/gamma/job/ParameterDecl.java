@@ -30,12 +30,18 @@ import java.util.List;
  * @param secret      mask on input, and in API reads (masked at the route boundary, never in
  *                    {@code JobConfig.toMap()}, which also feeds bundle export — §7.2)
  * @param expressions whether {@code $}-tokens are accepted here; {@code false} forces a literal
+ * @param configOnly  the Job reads this key from its saved config only ({@code JobConfig.opt/require/params}),
+ *                    never from the resolved Run parameters, so a trigger argument would be silently ignored.
+ *                    It still validates and renders in the Job's authoring form, but the "Run with parameters"
+ *                    dialog must not offer it. Default {@code false} — set it ONLY on a declaration the Job
+ *                    does not read via {@code ctx.params()}
  */
 public record ParameterDecl(String name, ParamType type, boolean required,
                             String deduce, String defaultValue, String description,
                             String label, Tier tier, List<String> options, String pattern,
                             Double min, Double max, String placeholder, String group,
-                            boolean multi, boolean secret, boolean expressions) {
+                            boolean multi, boolean secret, boolean expressions,
+                            boolean configOnly) {
 
     /** Disclosure tier — deliberately separate from {@code required}: an optional parameter can still be
      *  prominent, and a rarely-touched one can be tucked away without becoming optional. */
@@ -56,7 +62,19 @@ public record ParameterDecl(String name, ParamType type, boolean required,
     public ParameterDecl(String name, ParamType type, boolean required,
                          String deduce, String defaultValue, String description) {
         this(name, type, required, deduce, defaultValue, description,
-                null, null, List.of(), null, null, null, null, null, false, false, true);
+                null, null, List.of(), null, null, null, null, null, false, false, true, false);
+    }
+
+    /** The same declaration marked {@link #configOnly()}. */
+    public ParameterDecl asConfigOnly() {
+        return new ParameterDecl(name, type, required, deduce, defaultValue, description, label, tier, options,
+                pattern, min, max, placeholder, group, multi, secret, expressions, true);
+    }
+
+    /** Every declaration of {@code decls} marked {@link #configOnly()} — for a Job Type whose Job reads its
+     *  keys from the saved config only. */
+    public static List<ParameterDecl> configOnly(List<ParameterDecl> decls) {
+        return decls.stream().map(ParameterDecl::asConfigOnly).toList();
     }
 
     public static ParameterDecl required(String name, ParamType type, String description) {
@@ -112,7 +130,7 @@ public record ParameterDecl(String name, ParamType type, boolean required,
 
         public ParameterDecl build() {
             return new ParameterDecl(name, type, required, deduce, defaultValue, description,
-                    label, tier, options, pattern, min, max, placeholder, group, multi, secret, expressions);
+                    label, tier, options, pattern, min, max, placeholder, group, multi, secret, expressions, false);
         }
     }
 }

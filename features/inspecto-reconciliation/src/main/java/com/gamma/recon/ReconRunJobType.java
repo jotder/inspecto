@@ -26,7 +26,7 @@ public final class ReconRunJobType implements JobTypeProvider {
     public JobTypeDescriptor descriptor() {
         return new JobTypeDescriptor("recon.run", "Reconciliation Run",
                 "Runs a saved Reconciliation over its Datasets and emits a signal carrying the Break counts.",
-                List.of(ParameterDecl.required("reconciliation", ParamType.STRING, "Saved reconciliation component id"),
+                List.of(ParameterDecl.required("reconciliation", ParamType.STRING, "Saved reconciliation component id").asConfigOnly(),
                         ParameterDecl.optional("day", ParamType.DATE, null,
                                 "The day to reconcile (yyyy-mm-dd); absent = the latest day present on any side")),
                 List.of(ReconSignals.RECON_RUN_COMPLETED), List.of(), List.of("objects"));

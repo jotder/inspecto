@@ -44,7 +44,7 @@ final class KpiCompletenessJob implements Job {
     static final String TOGGLE = "consignment.outputs.backend";
 
     /** The declared parameters — {@code /jobs/types} publishes them and the form renders them. */
-    static final List<ParameterDecl> PARAMS = List.of(
+    static final List<ParameterDecl> PARAMS = ParameterDecl.configOnly(List.of(
             // Optional in the declaration only because on_pipeline: may supply it (operator, 2026-10-10, §7-d):
             // neither set still refuses — at run, in effectivePipeline.
             ParameterDecl.optional("pipeline", ParamType.STRING, null,
@@ -72,7 +72,7 @@ final class KpiCompletenessJob implements Job {
                             + "CDR_{yyyyMMddHH}_{seq}_*").build(),
             ParameterDecl.of("seq_scope", ParamType.STRING).label("Sequence scope override")
                     .options("PER_BUCKET", "CONTINUOUS")
-                    .description("Overrides the Collector's gap_detection.seq_scope").build());
+                    .description("Overrides the Collector's gap_detection.seq_scope").build()));
 
     static final String FILE_FAMILY = "fileStages";
     static final String FILE_TOGGLE = "file.stages.backend";
