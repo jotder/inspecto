@@ -309,6 +309,7 @@
     "/jobs/{jobId}/runs/{runId}/diff/{diffId}",
     "/audit/route-inventory",
     "/assist/skills",
+    "/analytics/functions",
     "/settings/link-analysis",
     "/settings/link-analysis/limits",
     "/settings/link-analysis/domain-profile",
@@ -6584,6 +6585,19 @@
           }
         },
         "x-generated" : true
+      }
+    },
+    "/analytics/functions" : {
+      "get" : {
+        "tags" : [ "analytics" ],
+        "summary" : "The Analytics function catalogue: every function the Analytics Kernel offers",
+        "operationId" : "getAnalyticsFunctions",
+        "description" : "Answers {total, kernels[{id, label, count}], functions[{id, label, kernel, cost, result, forms[], step, summary, params[{name, type, default, min, max, choices, description}]}]}. cost is a hint (constant, linear, linearithmic, quadratic); result is the kind of value returned; step names the pipeline Step id when the function is also one. Optional ?kernel=statistics|profiler|time_series|forecast|similarity|grouping|graph narrows the list (counts stay whole); any other value is 422 naming the valid ones. Read-only and ungated: it describes functions and runs none. Functions come from registered AnalyticsFunctionProviders, so later kernels appear without a change here.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
       }
     },
     "/assist/skills" : {
