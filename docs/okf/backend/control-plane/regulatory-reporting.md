@@ -169,7 +169,7 @@ the template wrote it (`dirLabel`, stored beside the pinned absolute `dir` the d
 1 MiB cap refuses with the cap in the message, half the cap renders whole). Not fixable: a required template field that names a Case
 attribute that does not exist saves (it cannot be known statically) and fails at draft with a 422 naming it.
 
-**Decisions taken 2026-10-18** (owed since the rehearsal; taken by the lane with the operator away, each the
+**Decisions taken 2026-10-18** (owed since the rehearsal; confirmed by the operator the same day; each the
 recommendation, per the decide-when-away rule):
 
 1. **XSD validation of XML reports** - BUILT (below).
