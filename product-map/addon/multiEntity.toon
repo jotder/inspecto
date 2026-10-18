@@ -1,6 +1,6 @@
 id: addon.multiEntity
 kind: addon
-title: Multi Entity
+title: Multi-entity / Group
 offeringAddon: multiEntity
 billable: true
 orderCode: INS-AO-MULTI-ENTITY

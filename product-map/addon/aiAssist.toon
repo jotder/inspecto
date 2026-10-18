@@ -1,6 +1,6 @@
 id: addon.aiAssist
 kind: addon
-title: Ai Assist
+title: AI Assist & Intelligence
 offeringAddon: aiAssist
 billable: true
 orderCode: INS-AO-AI-ASSIST

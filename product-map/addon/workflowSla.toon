@@ -1,6 +1,6 @@
 id: addon.workflowSla
 kind: addon
-title: Workflow Sla
+title: Workflow & SLA
 offeringAddon: workflowSla
 billable: true
 orderCode: INS-AO-WORKFLOW-SLA

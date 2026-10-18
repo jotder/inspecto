@@ -1,6 +1,6 @@
 id: addon.integrationDelivery
 kind: addon
-title: Integration Delivery
+title: Integration & Delivery
 offeringAddon: integrationDelivery
 billable: true
 orderCode: INS-AO-INTEGRATION-DELIVERY

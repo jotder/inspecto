@@ -17,4 +17,6 @@ Rules:
 - **Never copy technical facts** (roles, dependencies, which Edition holds what) here. Name the id; tools look the facts up.
 - **No prices here.** Prices and customer records go in `private/`, which is gitignored.
 - No `#` lines (TOON has no comments).
+- `node tools/render-product-map.mjs` writes the views (CSV, Excel, mind-map HTML) to `target/product-map/`, merging prices from
+  `private/prices.csv` (`orderCode,listPrice,currency`) when it exists.
 - `node tools/product-map-seed.mjs` adds items for new modules, Add-ons, packs and Editions. It never overwrites an existing file.

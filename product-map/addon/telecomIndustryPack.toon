@@ -1,6 +1,6 @@
 id: addon.telecomIndustryPack
 kind: addon
-title: Telecom Industry Pack
+title: Telecom industry pack
 offeringAddon: telecomIndustryPack
 billable: true
 orderCode: INS-AO-TELECOM-INDUSTRY-PACK

@@ -1,7 +1,7 @@
 # Product Map: plan
 
 > 🟢 **PLAN 2026-10-18 (`PRODUCT-MAP-1`): decisions D-PM1…D-PM6 were taken by the operator on 2026-10-18 (§8).
-> S0 (glossary), S1 (format, seed, gitignore) and S2 (guard in CI) are done; S3…S5 are not built.**
+> S0 (glossary), S1 (format, seed, gitignore), S2 (guard in CI) and S3 (CSV, XLSX, mind map) are done; S4 and S5 are not built.**
 > **Goal:** one place that is easy to manage, laid out like a mind map, that describes every **Product Map Item**:
 > modules, Add-ons, Solution packs, **Functionalities** and **Editions**. Pricing, support and sales use it, and it
 > can produce a **customer-specific build** (an Offering made of only what a customer buys). People and agents both
@@ -77,7 +77,7 @@ docs: docs/stakeholders/modules/link-analysis.md
 
 **No price in the repo (D-PM3).** Real prices and customer records live in `product-map/private/`, which is
 gitignored (a committed `.gitignore` entry, so every shift has it):
-- `product-map/private/prices.toon`: `orderCode → listPrice, currency`
+- `product-map/private/prices.csv`: `orderCode,listPrice,currency`
 - `product-map/private/customers/<id>.toon`: Edition + chosen Order Codes + agreed discounts
 
 The generator merges them in when the folder is present, and writes empty price columns when it is not.
@@ -102,12 +102,19 @@ The guard checks each value against the manifest, so a Functionality cannot clai
    every non-internal module has an item; every `parent:` resolves (no cycles); `billable:true` has an `orderCode`
    and a `billing.model`; Order Codes are unique; `enforcement` is possible for the module; no technical fact is
    duplicated; **no price field appears outside `product-map/private/`**.
-3. **`render-product-map.mjs`** (generator) writes to `build/product-map/` (not committed):
-   - `product-map.xlsx`, with a sheet per kind, one flat **price list**, and one **Edition × Product Map Item** matrix
-     (Edition membership is derived from the Offerings, never hand-kept)
-   - `product-map.csv` (one row per item; the bulk-edit format)
-   - `product-map.html`, a collapsible mind map (standalone)
-   - `product-map.duckdb`, for questions like "what does customer X pay for" or "which Order Codes need module Y"
+3. **`render-product-map.mjs`** (generator) writes to `target/product-map/` (gitignored, not committed). ✅ **Built (S3)**
+   with `render-product-map.test.mjs`, run in the Product Map CI step:
+   - `product-map.xlsx`, with three sheets: **Items** (every item, filterable by kind), **Price list** (billable items)
+     and **Edition matrix** (billable items × Editions). Edition membership is derived from the Offerings
+     (`includes` resolved; a base/internal module and an Industry pack are in every Edition), never hand-kept. As
+     built, there is one Items sheet with a `kind` filter instead of a sheet per kind. The file is written by a
+     built-in zip writer (stored entries + CRC-32), because the guards job has no npm dependencies.
+   - `product-map.csv` (one row per item, UTF-8 with BOM for Excel; the bulk-edit format)
+   - `product-map.html`, a collapsible mind map (standalone, light and dark, with a filter box). Parentless items get
+     their own group rather than being dropped.
+   - `product-map.duckdb` is deferred to S6.
+   Prices are merged from `product-map/private/prices.csv` (`orderCode,listPrice,currency`). **As built this is CSV,
+   not `prices.toon`**: TOON keys cannot hold the `-` in an Order Code, and pricing staff work in CSV.
 4. **`product-map-import.mjs`**: CSV/Excel → files, **only for the commercial columns** (title, Order Code,
    billing model, support, status, and prices, which go to `private/`). It shows a diff and refuses changes to
    ids/parents/modules. Agents never set prices.
@@ -133,8 +140,8 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 | S0 ✅ | glossary terms; decisions signed | done 2026-10-18 |
 | S1 ✅ | file format + `product-map-seed.mjs` + reviewed seed + `.gitignore` entry | done 2026-10-18: 87 items (6 layers, 47 modules, 15 Add-ons, 15 Solution packs, 4 Editions) |
 | S2 ✅ | `check-product-map.mjs` in the guards job | a missing module item, a bad `parent:`, an impossible `enforcement` or a committed price fails CI |
-| S3 | `render-product-map.mjs`: CSV + XLSX + mind-map HTML | the price list and the Edition matrix open in Excel |
-| S4 | `product-map-import.mjs` round trip | edit a price in Excel → import → a one-line change in `private/prices.toon` |
+| S3 ✅ | `render-product-map.mjs`: CSV + XLSX + mind-map HTML | the price list and the Edition matrix open in Excel |
+| S4 | `product-map-import.mjs` round trip | edit a price in Excel → import → a one-line change in `private/prices.csv` |
 | S5 | `customer-build.mjs` + the **demo-telco** pilot (D-PM6) | `package.ps1` builds a bundle with only demo-telco's modules; the bill of materials matches |
 | S6 (later) | DuckDB query file; support view (module → owner/runbook); `usage` billing once metering exists | on demand |
 
